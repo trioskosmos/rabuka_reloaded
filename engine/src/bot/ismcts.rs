@@ -18,6 +18,7 @@ pub fn search(
     if actions.is_empty() {
         return Action {
             description: "pass".into(),
+            description_ja: None,
             action_type: crate::game_setup::ActionType::Pass,
             parameters: None,
         };

@@ -79,5 +79,20 @@
   "No revealed cards": "公開カードなし",
   "No performance data yet": "パフォーマンスデータなし",
   "AI is thinking...": "AI思考中...",
-  "Waiting for opponent...": "対戦相手を待っています..."
+  "Waiting for opponent...": "対戦相手を待っています...",
+  "Point camera at QR code": "QRコードをカメラに向けてください",
+  "Point camera at deck QR code": "デッキのQRコードをカメラに向けてください",
+  "Auto-detects when QR is visible": "QRが見えると自動検出します",
+  "B=cancel B=back": "B=キャンセル B=戻る",
+  "Receiving deck data...": "デッキデータ受信中...",
+  "Press START to exit": "STARTで終了",
+  "Done! Press START.": "完了! STARTを押してください",
+  "Lives:": "ライブ:",
+  "L=text": "L=テキスト",
+  "L/B=close": "L/B=閉じる",
+  "UP/DOWN=move, A=select, B=close": "上下=移動, A=選択, B=閉じる",
+  "Pass": "パス",
+  "T": "T",
+  "Score:": "スコア:",
+  "Success:": "成功:"
 }

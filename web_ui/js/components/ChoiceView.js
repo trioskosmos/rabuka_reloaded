@@ -352,8 +352,6 @@ export const ChoiceView = {
             const label = choice.choice_player_id === 'p2' ? 'P2' : 'P1';
             headerText = `[${label}] ${headerText}`;
         }
-        if (choice.card_no) headerText += ` <span style="opacity:0.5;font-size:0.8em;">[${choice.card_no}]</span>`;
-        else if (cardId >= 0) headerText += ` <span style="opacity:0.6;font-size:0.8em;">(ID: ${cardId})</span>`;
 
         let content = `<div class="choice-header" style="color:${headerColor};">${headerText}</div>`;
 

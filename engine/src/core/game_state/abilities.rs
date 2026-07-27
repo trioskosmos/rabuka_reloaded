@@ -263,7 +263,7 @@ impl GameState {
         event: &crate::ability::types::TriggerEvent,
     ) {
         let player_id_clone = player_id.to_string();
-        let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
+        let mut abilities_to_trigger: Vec<(i16, usize, i16)> = Vec::new();
         let skip_this_card_auto_key = self.just_completed_ability_key.clone();
         {
             let player = if player_id_clone == self.player1.id {
@@ -423,36 +423,25 @@ impl GameState {
                                     }
                                 }
                             }
-                            let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                            // Batch-scoped guard: use instance-aware key so
-                            // different copies of the same card (P1 vs P2) are
-                            // not blocked by each other's batch dedup.
-                            let batch_key =
-                                format!("{}_{}_{}", card_id, card.card_no, ability.full_text);
                             // Re-scan guard: skip re-enqueueing the exact auto
-                            // ability that just completed.
-                            if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
+                            // ability that just completed (numeric key).
+                            let num_key = ((card_id as u32) << 16) | (ability_idx as u32);
+                            if skip_this_card_auto_key == Some(num_key) {
                                 continue;
                             }
                             // Batch-scoped guard: prevent re-enqueue of any ability
                             // already triggered during this movement batch.
-                            if self.this_batch_triggered_ability_ids.contains(&batch_key) {
+                            if self.this_batch_triggered_ability_ids.contains(&num_key) {
                                 continue;
                             }
-                            if !self.this_batch_triggered_ability_ids.contains(&batch_key) {
-                                self.this_batch_triggered_ability_ids.push(batch_key);
-                            }
+                            self.this_batch_triggered_ability_ids.push(num_key);
                             // §9.7.2.1: Multi-trigger — N trigger instances → N
                             // standby entries.  All entries share the same
                             // trigger_moved_cards (full batch) because each
                             // instance independently re-evaluates the condition
                             // at resolution time via can_activate_effect.
                             for _ in 0..trigger_multiplicity {
-                                abilities_to_trigger.push((
-                                    ability_id.clone(),
-                                    card.card_no.to_string(),
-                                    card_id,
-                                ));
+                                abilities_to_trigger.push((card_id, ability_idx, card_id));
                             }
                         }
                     }
@@ -461,7 +450,7 @@ impl GameState {
             // Also scan live cards for AUTO abilities
             for &card_id in &player.live_card_zone.cards {
                 if let Some(card) = self.card_database.get_card(card_id) {
-                    for ar in &card.abilities {
+                    for (ability_idx, ar) in card.abilities.iter().enumerate() {
                         let ability = ar.resolve();
                         if ability
                             .triggers
@@ -502,23 +491,15 @@ impl GameState {
                                     }
                                 }
                             }
-                            let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                            let batch_key =
-                                format!("{}_{}_{}", card_id, card.card_no, ability.full_text);
-                            if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
+                            let num_key = ((card_id as u32) << 16) | (ability_idx as u32);
+                            if skip_this_card_auto_key == Some(num_key) {
                                 continue;
                             }
-                            if self.this_batch_triggered_ability_ids.contains(&batch_key) {
+                            if self.this_batch_triggered_ability_ids.contains(&num_key) {
                                 continue;
                             }
-                            if !self.this_batch_triggered_ability_ids.contains(&batch_key) {
-                                self.this_batch_triggered_ability_ids.push(batch_key);
-                            }
-                            abilities_to_trigger.push((
-                                ability_id,
-                                card.card_no.to_string(),
-                                card_id,
-                            ));
+                            self.this_batch_triggered_ability_ids.push(num_key);
+                            abilities_to_trigger.push((card_id, ability_idx, card_id));
                         }
                     }
                 }
@@ -557,7 +538,7 @@ impl GameState {
                     if card_owner != player_id_clone {
                         continue; // card belongs to a different player
                     }
-                    for ar in &card.abilities {
+                    for (ability_idx, ar) in card.abilities.iter().enumerate() {
                         let ability = ar.resolve();
                         if ability
                             .triggers
@@ -586,40 +567,38 @@ impl GameState {
                                     }
                                 }
                             }
-                            let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                            let batch_key =
-                                format!("{}_{}_{}", moved_card_id, card.card_no, ability.full_text);
-                            if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
+                            let num_key = ((moved_card_id as u32) << 16) | (ability_idx as u32);
+                            if skip_this_card_auto_key == Some(num_key) {
                                 continue;
                             }
-                            if self.this_batch_triggered_ability_ids.contains(&batch_key) {
+                            if self.this_batch_triggered_ability_ids.contains(&num_key) {
                                 continue;
                             }
-                            if !self.this_batch_triggered_ability_ids.contains(&batch_key) {
-                                self.this_batch_triggered_ability_ids.push(batch_key);
-                            }
-                            abilities_to_trigger.push((
-                                ability_id,
-                                card.card_no.to_string(),
-                                moved_card_id,
-                            ));
+                            self.this_batch_triggered_ability_ids.push(num_key);
+                            abilities_to_trigger.push((moved_card_id, ability_idx, moved_card_id));
                         }
                     }
                 }
             }
         }
         let moved = Some(event.moved_cards.clone());
-        for (ability_id, card_no, stage_card_id) in abilities_to_trigger {
-            if !self.this_batch_triggered_ability_ids.contains(&ability_id) {
-                self.this_batch_triggered_ability_ids
-                    .push(ability_id.clone());
+        for (card_id, ability_idx, stage_card_id) in abilities_to_trigger {
+            let num_key = ((card_id as u32) << 16) | (ability_idx as u32);
+            if !self.this_batch_triggered_ability_ids.contains(&num_key) {
+                self.this_batch_triggered_ability_ids.push(num_key);
             }
-            self.trigger_auto_ability(
-                ability_id,
+            // Look up card_no from the card_id for the queue entry
+            let card_no = self
+                .card_database
+                .get_card(card_id)
+                .map(|c| String::from(c.card_no.as_ref()))
+                .unwrap_or_default();
+            self.trigger_auto_ability_by_index(
                 AbilityTrigger::Auto,
                 player_id_clone.clone(),
                 Some(card_no),
-                Some(stage_card_id),
+                Some(card_id),
+                ability_idx,
                 moved.clone(),
                 None,
             );
@@ -707,83 +686,87 @@ impl GameState {
         if let Some(ref card_no) = source_card_id {
             #[cfg(feature = "ds_debug")]
             ds_print("TAA:GET");
-            let (card, card_id) = if let Some(cid) = explicit_card_id {
+            let card_id = if let Some(cid) = explicit_card_id {
                 #[cfg(feature = "ds_debug")]
                 ds_print("TAA:DBGET");
-                (self.card_database.get_card(cid).cloned(), Some(cid))
+                Some(cid)
             } else {
-                self.find_card_by_number_for_player(card_no, &player_id)
+                self.find_card_by_number_for_player(card_no, &player_id).1
             };
             #[cfg(feature = "ds_debug")]
             ds_print("TAA:GOT");
-            if let Some(card) = card {
-                #[cfg(feature = "ds_debug")]
-                ds_print("TAA:ITER");
-                // Check original abilities
-                let expected_id = |ability: &crate::card::Ability| -> String {
-                    format!("{}_{}", card_no, ability.full_text)
-                };
-                for (ability_index, ability) in card.abilities.iter().enumerate() {
+            if let Some(cid) = card_id {
+                if let Some(card) = self.card_database.get_card(cid) {
                     #[cfg(feature = "ds_debug")]
-                    ds_print("TAA:RES");
-                    if Self::ability_matches_trigger(&ability.resolve(), &trigger_type)
-                        && ability_id == expected_id(&ability.resolve())
-                    {
-                        let entry = self.build_ability_queue_entry(
-                            card_no.clone(),
-                            ability_index,
-                            ability.to_arc(),
-                            card_id,
-                            player_id.clone(),
-                            trigger_type,
-                            trigger_moved_cards.clone(),
-                            triggering_member_id,
-                        );
-                        // Snapshot batch_movements and energy flags at enqueue
-                        // time so the "moves" and energy conditions can check
-                        // what triggered the ability even after
-                        // clear_effect_tracking clears the global lists.
-                        let mut entry = entry;
-                        entry.snapshot_movements = self.batch_movements.clone();
-                        if crate::ability::debug::ABILITY_DEBUG
-                            .load(core::sync::atomic::Ordering::Relaxed)
+                    ds_print("TAA:ITER");
+                    // Check original abilities
+                    let expected_id = |ability: &crate::card::Ability| -> String {
+                        format!("{}_{}", card_no, ability.full_text)
+                    };
+                    for (ability_index, ability) in card.abilities.iter().enumerate() {
+                        #[cfg(feature = "ds_debug")]
+                        ds_print("TAA:RES");
+                        if Self::ability_matches_trigger(&ability.resolve(), &trigger_type)
+                            && ability_id == expected_id(&ability.resolve())
                         {
-                            log::debug!(
-                                "[QUEUE_DIAG] enqueue player={} card_no={}",
-                                entry.player_id,
-                                entry.card_no
+                            let entry = self.build_ability_queue_entry(
+                                card_no.clone(),
+                                ability_index,
+                                ability.to_arc(),
+                                card_id,
+                                player_id.clone(),
+                                trigger_type,
+                                trigger_moved_cards.clone(),
+                                triggering_member_id,
                             );
+                            // Snapshot batch_movements and energy flags at enqueue
+                            // time so the "moves" and energy conditions can check
+                            // what triggered the ability even after
+                            // clear_effect_tracking clears the global lists.
+                            let mut entry = entry;
+                            entry.snapshot_movements = self.batch_movements.clone();
+                            if crate::ability::debug::ABILITY_DEBUG
+                                .load(core::sync::atomic::Ordering::Relaxed)
+                            {
+                                log::debug!(
+                                    "[QUEUE_DIAG] enqueue player={} card_no={}",
+                                    entry.player_id,
+                                    entry.card_no
+                                );
+                            }
+                            self.ability_queue.enqueue(entry);
+                            return;
                         }
-                        self.ability_queue.enqueue(entry);
-                        return;
                     }
-                }
-                // Check gained card abilities (ability_id format: "card_no_gained_{idx}")
-                if ability_id.contains("_gained_") {
-                    let cid = card_id.or(explicit_card_id);
-                    if let Some(card_id_val) = cid {
-                        if let Some(gained_list) = self.gained_card_abilities.get(&card_id_val) {
-                            // Extract the gained index from ability_id
-                            if let Some(idx_str) = ability_id.rsplit('_').next() {
-                                if let Ok(gidx) = idx_str.parse::<usize>() {
-                                    if let Some(gained_ability) = gained_list.get(gidx) {
-                                        if Self::ability_matches_trigger(
-                                            gained_ability,
-                                            &trigger_type,
-                                        ) {
-                                            let entry = self.build_ability_queue_entry(
-                                                card_no.clone(),
-                                                10000 + gidx,
-                                                crate::Arc::new(gained_ability.clone()),
-                                                Some(card_id_val),
-                                                player_id.clone(),
-                                                trigger_type,
-                                                trigger_moved_cards.clone(),
-                                                triggering_member_id,
-                                            );
-                                            let mut entry = entry;
-                                            entry.snapshot_movements = self.batch_movements.clone();
-                                            self.ability_queue.enqueue(entry);
+                    // Check gained card abilities (ability_id format: "card_no_gained_{idx}")
+                    if ability_id.contains("_gained_") {
+                        let cid = card_id.or(explicit_card_id);
+                        if let Some(card_id_val) = cid {
+                            if let Some(gained_list) = self.gained_card_abilities.get(&card_id_val)
+                            {
+                                // Extract the gained index from ability_id
+                                if let Some(idx_str) = ability_id.rsplit('_').next() {
+                                    if let Ok(gidx) = idx_str.parse::<usize>() {
+                                        if let Some(gained_ability) = gained_list.get(gidx) {
+                                            if Self::ability_matches_trigger(
+                                                gained_ability,
+                                                &trigger_type,
+                                            ) {
+                                                let entry = self.build_ability_queue_entry(
+                                                    card_no.clone(),
+                                                    10000 + gidx,
+                                                    crate::Arc::new(gained_ability.clone()),
+                                                    Some(card_id_val),
+                                                    player_id.clone(),
+                                                    trigger_type,
+                                                    trigger_moved_cards.clone(),
+                                                    triggering_member_id,
+                                                );
+                                                let mut entry = entry;
+                                                entry.snapshot_movements =
+                                                    self.batch_movements.clone();
+                                                self.ability_queue.enqueue(entry);
+                                            }
                                         }
                                     }
                                 }
@@ -795,12 +778,56 @@ impl GameState {
         }
     }
 
+    /// Hot-path version of trigger_auto_ability that takes a numeric ability index
+    /// instead of a string key. Avoids format!() allocations in the TAS scan loop.
+    pub fn trigger_auto_ability_by_index(
+        &mut self,
+        trigger_type: AbilityTrigger,
+        player_id: String,
+        source_card_id: Option<String>,
+        explicit_card_id: Option<i16>,
+        ability_index: usize,
+        trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
+        triggering_member_id: Option<i16>,
+    ) {
+        if let Some(card_id) = explicit_card_id {
+            if let Some(card) = self.card_database.get_card(card_id) {
+                if let Some(ar) = card.abilities.get(ability_index) {
+                    let card_no_str = source_card_id.unwrap_or_default();
+                    let entry = self.build_ability_queue_entry(
+                        card_no_str,
+                        ability_index,
+                        ar.to_arc(),
+                        Some(card_id),
+                        player_id,
+                        trigger_type,
+                        trigger_moved_cards,
+                        triggering_member_id,
+                    );
+                    let mut entry = entry;
+                    entry.snapshot_movements = self.batch_movements.clone();
+                    if crate::ability::debug::ABILITY_DEBUG
+                        .load(core::sync::atomic::Ordering::Relaxed)
+                    {
+                        log::debug!(
+                            "[QUEUE_DIAG] enqueue player={} card_no={}",
+                            entry.player_id,
+                            entry.card_no
+                        );
+                    }
+                    self.ability_queue.enqueue(entry);
+                }
+            }
+        }
+    }
+
     /// Search for a card in the specified player's zones first, fall back to the other player.
+    /// Returns (card_database_id, instance_card_id) instead of cloning the full Card.
     fn find_card_by_number_for_player(
         &self,
         card_no: &str,
         player_id: &str,
-    ) -> (Option<crate::card::Card>, Option<i16>) {
+    ) -> (Option<i16>, Option<i16>) {
         let preferred = if player_id == self.player1.id || player_id == "p1" {
             &self.player1
         } else {
@@ -818,15 +845,17 @@ impl GameState {
         self.search_player_zones_for_card(card_no, other)
     }
 
+    /// Search for a card by card_no in the specified player's zones.
+    /// Returns (card_database_id, instance_card_id) instead of cloning the full Card.
     fn search_player_zones_for_card(
         &self,
         card_no: &str,
         player: &Player,
-    ) -> (Option<crate::card::Card>, Option<i16>) {
+    ) -> (Option<i16>, Option<i16>) {
         for id in &player.hand.cards {
             if let Some(card) = self.card_database.get_card(*id) {
                 if card.card_no == card_no {
-                    return (Some(card.clone()), Some(*id));
+                    return (Some(*id), Some(*id));
                 }
             }
         }
@@ -834,7 +863,7 @@ impl GameState {
             if *stage_card_id != -1 {
                 if let Some(card) = self.card_database.get_card(*stage_card_id) {
                     if card.card_no == card_no {
-                        return (Some(card.clone()), Some(*stage_card_id));
+                        return (Some(*stage_card_id), Some(*stage_card_id));
                     }
                 }
             }
@@ -842,21 +871,21 @@ impl GameState {
         for waitroom_card_id in &player.waitroom.cards {
             if let Some(card) = self.card_database.get_card(*waitroom_card_id) {
                 if card.card_no == card_no {
-                    return (Some(card.clone()), Some(*waitroom_card_id));
+                    return (Some(*waitroom_card_id), Some(*waitroom_card_id));
                 }
             }
         }
         for live_card_id in &player.live_card_zone.cards {
             if let Some(card) = self.card_database.get_card(*live_card_id) {
                 if card.card_no == card_no {
-                    return (Some(card.clone()), Some(*live_card_id));
+                    return (Some(*live_card_id), Some(*live_card_id));
                 }
             }
         }
         for success_card_id in &player.success_live_card_zone.cards {
             if let Some(card) = self.card_database.get_card(*success_card_id) {
                 if card.card_no == card_no {
-                    return (Some(card.clone()), Some(*success_card_id));
+                    return (Some(*success_card_id), Some(*success_card_id));
                 }
             }
         }
@@ -888,10 +917,10 @@ impl GameState {
             return;
         }
         let player_id_clone = player_id.to_string();
-        let mut abilities: Vec<(String, String, i16)> = Vec::new();
+        let mut abilities: Vec<(i16, usize, i16)> = Vec::new();
         for &card_id in &player.live_card_zone.cards {
             if let Some(card) = self.card_database.get_card(card_id) {
-                for ar in &card.abilities {
+                for (ability_idx, ar) in card.abilities.iter().enumerate() {
                     let ability = ar.resolve();
                     if ability.triggers.as_deref() != Some(crate::triggers::AUTO) {
                         continue;
@@ -910,18 +939,22 @@ impl GameState {
                     if !watch_text.is_some_and(|t| t.contains(trigger_substring)) {
                         continue;
                     }
-                    let aid = format!("{}_{}", card.card_no, ability.full_text);
-                    abilities.push((aid, card.card_no.to_string(), card_id));
+                    abilities.push((card_id, ability_idx, card_id));
                 }
             }
         }
-        for (aid, card_no, cid) in abilities {
-            self.trigger_auto_ability(
-                aid,
+        for (cid, ability_idx, _) in abilities {
+            let card_no = self
+                .card_database
+                .get_card(cid)
+                .map(|c| String::from(c.card_no.as_ref()))
+                .unwrap_or_default();
+            self.trigger_auto_ability_by_index(
                 crate::game_state::AbilityTrigger::Auto,
                 player_id_clone.clone(),
                 Some(card_no),
                 Some(cid),
+                ability_idx,
                 None,
                 Some(member_card_id),
             );
@@ -1523,10 +1556,12 @@ impl GameState {
             // re-scan can skip re-enqueueing this SPECIFIC ability while
             // still allowing OTHER abilities (e.g. each_time) on the same
             // card to fire.
-            let just_completed_key: Option<String> = self
-                .ability_queue
-                .current_entry()
-                .map(|e| format!("{}_{}", e.card_no, e.ability.full_text));
+            let just_completed_key: Option<u32> =
+                self.ability_queue.current_entry().and_then(|e| {
+                    let cid = e.card_id? as u32;
+                    let idx = e.ability_index as u32;
+                    Some((cid << 16) | idx)
+                });
 
             self.ability_queue.complete_current();
             // Keep activating_card/ability_index alive through the post-resolution

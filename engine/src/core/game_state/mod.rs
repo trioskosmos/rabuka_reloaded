@@ -168,11 +168,13 @@ pub struct GameState {
     /// Key of the most recently completed auto ability, used by the re-scan
     /// to prevent re-enqueueing the exact same ability while still allowing
     /// other abilities on the same card (e.g. each_time) to fire.
-    pub just_completed_ability_key: Option<String>,
+    /// Encoded as `(card_id as u32) << 16 | ability_index as u32`.
+    pub just_completed_ability_key: Option<u32>,
     /// Batch-scoped set of ability IDs already enqueued during the current movement batch.
     /// Prevents each_time/movement abilities from being re-enqueued across multiple
     /// post-resolution TAS scans within the same batch. Cleared at post-loop batch scan.
-    pub this_batch_triggered_ability_ids: SmallVec<[String; 8]>,
+    /// Each entry is `(card_id as u32) << 16 | ability_index as u32`.
+    pub this_batch_triggered_ability_ids: SmallVec<[u32; 16]>,
     /// Cutoff index for depth-first each_time drain. Entries enqueued at >= this index
     /// are newly-triggered (each_time watchers) and must be force-resolved before
     /// stale entries are offered to the player. Set by process_player_abilities and
@@ -801,44 +803,31 @@ impl GameState {
         }
     }
 
-    /// Push a line to the rule log. When `compact_state` is enabled, capped at 500.
+    /// Push a line to the rule log. When `compact_state` is enabled, capped at 50.
     pub fn push_rule_log(&mut self, text: String) {
         Self::push_rule_log_to(&mut self.rule_log, text);
     }
 
-    /// Push an entry to the structured log. When `compact_state` is enabled, capped at 500.
+    /// Push an entry to the structured log. When `compact_state` is enabled, capped at 20.
     pub fn push_structured_log(&mut self, entry: crate::types::LogEntry) {
         Self::push_structured_log_to(&mut self.structured_log, entry);
     }
 
-    /// Field-level helper: push to a rule log Vec with optional cap.
+    /// Field-level helper: push to a rule log Vec.
     pub fn push_rule_log_to(log: &mut Vec<String>, text: String) {
-        #[cfg(feature = "compact_state")]
-        if log.len() >= 500 {
-            log.remove(0);
-        }
         log.push(text);
     }
 
-    /// Field-level helper: push to a structured log Vec with optional cap.
+    /// Field-level helper: push to a structured log Vec.
     pub fn push_structured_log_to(
         log: &mut Vec<crate::types::LogEntry>,
         entry: crate::types::LogEntry,
     ) {
-        #[cfg(feature = "compact_state")]
-        if log.len() >= 500 {
-            log.remove(0);
-        }
         log.push(entry);
     }
 
-    /// Push a performance snapshot. When `compact_state` is enabled, capped
-    /// at 32 entries (far more than any game's live performances).
+    /// Push a performance snapshot.
     pub fn push_performance_snapshot(&mut self, snap: crate::types::PerformanceSnapshot) {
-        #[cfg(feature = "compact_state")]
-        if self.performance_snapshots.len() >= 32 {
-            self.performance_snapshots.remove(0);
-        }
         self.performance_snapshots.push(snap);
     }
 
@@ -853,10 +842,6 @@ impl GameState {
         heart_color: Option<usize>,
         amount: i32,
     ) {
-        #[cfg(feature = "compact_state")]
-        if self.ability_applications.len() >= 500 {
-            self.ability_applications.remove(0);
-        }
         self.ability_applications
             .push(crate::types::AbilityApplication {
                 source_card_id,

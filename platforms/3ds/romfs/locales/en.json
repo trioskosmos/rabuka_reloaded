@@ -79,5 +79,20 @@
   "No revealed cards": "No revealed cards",
   "No performance data yet": "No performance data yet",
   "AI is thinking...": "AI is thinking...",
-  "Waiting for opponent...": "Waiting for opponent..."
+  "Waiting for opponent...": "Waiting for opponent...",
+  "Point camera at QR code": "Point camera at QR code",
+  "Point camera at deck QR code": "Point camera at deck QR code",
+  "Auto-detects when QR is visible": "Auto-detects when QR is visible",
+  "B=cancel B=back": "B=cancel B=back",
+  "Receiving deck data...": "Receiving deck data...",
+  "Press START to exit": "Press START to exit",
+  "Done! Press START.": "Done! Press START.",
+  "Lives:": "Lives:",
+  "L=text": "L=text",
+  "L/B=close": "L/B=close",
+  "UP/DOWN=move, A=select, B=close": "UP/DOWN=move, A=select, B=close",
+  "Pass": "Pass",
+  "T": "T",
+  "Score:": "Score:",
+  "Success:": "Success:"
 }

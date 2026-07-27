@@ -801,10 +801,13 @@ impl super::TurnEngine {
                 .current_entry()
                 .is_some_and(|e| e.effect_started);
             // Capture key and player_id BEFORE complete_current() removes the entry.
-            let just_completed_key = game_state
-                .ability_queue
-                .current_entry()
-                .map(|e| format!("{}_{}", e.card_no, e.ability.full_text));
+            // Numeric key: (card_id as u32) << 16 | ability_index as u32
+            let just_completed_key: Option<u32> =
+                game_state.ability_queue.current_entry().and_then(|e| {
+                    let cid = e.card_id? as u32;
+                    let idx = e.ability_index as u32;
+                    Some((cid << 16) | idx)
+                });
             let entry_player_id = game_state
                 .ability_queue
                 .current_entry()

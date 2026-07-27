@@ -466,7 +466,7 @@ impl AbilityResolver {
                         let player_ref = gs.resolve_target_player(target);
                         let hand_cards = &player_ref.hand.cards;
                         // Group hand cards by unit name
-                        let mut unit_groups: HashMap<String, Vec<i16>> = HashMap::new();
+                        let mut unit_groups: HashMap<String, Vec<i16>> = HashMap::default();
                         for &cid in hand_cards {
                             if filter.matches(card_db, cid, false) {
                                 let unit = card_db

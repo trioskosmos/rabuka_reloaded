@@ -67,6 +67,7 @@ impl Bot {
         if actions.is_empty() {
             return Action {
                 description: "pass".into(),
+                description_ja: None,
                 action_type: ActionType::Pass,
                 parameters: None,
             };

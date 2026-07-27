@@ -436,9 +436,9 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub activating_ability_index: Option<usize>,
     #[serde(default)]
-    pub just_completed_ability_key: Option<String>,
+    pub just_completed_ability_key: Option<u32>,
     #[serde(default)]
-    pub this_batch_triggered_ability_ids: Vec<String>,
+    pub this_batch_triggered_ability_ids: Vec<u32>,
     #[serde(default)]
     pub turn1_abilities_played: Vec<String>,
     #[serde(default)]
@@ -1820,11 +1820,11 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         pending_rps_player_id: game_state.pending_rps_player_id,
         activating_card: game_state.activating_card,
         activating_ability_index: game_state.activating_ability_index,
-        just_completed_ability_key: game_state.just_completed_ability_key.clone(),
+        just_completed_ability_key: game_state.just_completed_ability_key,
         this_batch_triggered_ability_ids: game_state
             .this_batch_triggered_ability_ids
             .iter()
-            .cloned()
+            .copied()
             .collect(),
         turn1_abilities_played: game_state.turn1_abilities_played.iter().cloned().collect(),
         turn2_abilities_played: game_state

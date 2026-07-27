@@ -35,6 +35,7 @@ u32 __stacksize__ = 2 * 1024 * 1024;
 #define TEXTLEN 8192
 static char top_text[TEXTLEN];
 static C3D_RenderTarget* top_target = NULL;
+static C3D_RenderTarget* top_target_right = NULL;
 static C3D_RenderTarget* bot_target = NULL;
 static C2D_TextBuf top_buf = NULL;
 static C2D_Text top_obj;
@@ -167,11 +168,13 @@ static void zone_heights(float h, float* live, float* stage, float* energy, floa
 // ---- init / exit ----
 void _3ds_init() {
     gfxInitDefault();
+    gfxSet3D(true);
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
     C2D_Init(C2D_DEFAULT_MAX_OBJECTS);
     C2D_Prepare();
 
     top_target = C2D_CreateScreenTarget(GFX_TOP, GFX_LEFT);
+    top_target_right = C2D_CreateScreenTarget(GFX_TOP, GFX_RIGHT);
     bot_target = C2D_CreateScreenTarget(GFX_BOTTOM, GFX_LEFT);
 
     top_buf = C2D_TextBufNew(4096);
@@ -189,7 +192,7 @@ void _3ds_init() {
     hud_turn = 0; hud_phase[0] = '\0'; hud_player[0] = '\0';
     active_is_p1 = true;
     hl_count = 0;
-    tmp_text_buf = C2D_TextBufNew(8192);
+    tmp_text_buf = C2D_TextBufNew(32768);
 }
 
 // Measure per-line height for the custom font at scale 0.85.
@@ -744,19 +747,6 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
         hx += h_slot_w + 1;
         if (hx > W - M) break;
     }
-    // Hand scroll indicator: ◀/▶ arrows + range "off+1-off+vis/total"
-    // Shown at the right side of the hand zone, above any overflow
-    float range_x = W - M - 60;
-    float range_y = hand_y + 2;
-    char rbuf[48];
-    int show = hand_range_off + 1;
-    int show_end = (hand_range_off + hand_range_vis) < hand_range_total
-                    ? (hand_range_off + hand_range_vis) : hand_range_total;
-    snprintf(rbuf, sizeof(rbuf), "%s%d-%d/%d%s",
-        hand_range_off > 0 ? "<" : " ",
-        show, show_end, hand_range_total,
-        show_end < hand_range_total ? ">" : " ");
-    _3ds_draw_label(rbuf, range_x, range_y, COL_GOLD, 0.45f);
 }
 
 void _3ds_render_board() {
@@ -861,50 +851,57 @@ void _3ds_swap_buffers() {
 
     C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
 
-    // TOP SCREEN
-    if (cli_mode) {
-        // CLI/debug mode: green text on black at scale 0.85 = 26px glyph.
-        C2D_TargetClear(top_target, C2D_Color32(0, 0, 0, 255));
-        C2D_SceneBegin(top_target);
-        if (top_parsed) {
-            C2D_DrawText(&top_obj,
-                C2D_WithColor,
-                2.0f, 2.0f - (float)top_scroll_y, 0.5f,
-                0.85f, 0.85f,
-                C2D_Color32(0, 255, 0, 255),
-                390.0f);
-        }
-    } else {
-        // Game mode: render queued draw ops
-        C2D_TargetClear(top_target, COL_TOP_BG);
-        C2D_SceneBegin(top_target);
-        C2D_TextBufClear(tmp_text_buf);
-        C2D_Font f = custom_font ? custom_font : NULL;
-        for (int i = 0; i < draw_op_count; i++) {
-            if (draw_op_types[i] == OP_RECT) {
-                C2D_DrawRectSolid(draw_ops[i].x, draw_ops[i].y, 0.5f,
-                    draw_ops[i].w, draw_ops[i].h, draw_ops[i].color);
-            } else if (draw_op_types[i] == OP_TEXT) {
-                C2D_TextFontParse(&tmp_text_obj, f, tmp_text_buf, draw_ops[i].text);
-                C2D_TextOptimize(&tmp_text_obj);
-                float max_w = fmaxf(390.0f - draw_ops[i].x, 0.0f);
-                C2D_DrawText(&tmp_text_obj, C2D_WithColor | C2D_WordWrap,
-                    draw_ops[i].x, draw_ops[i].y, 0.5f,
-                    draw_ops[i].scale, draw_ops[i].scale,
-                    draw_ops[i].color,
-                    max_w);
-            } else if (draw_op_types[i] == OP_CARD) {
-                C2D_Image img = _3ds_get_card_image(draw_ops[i].atlas, draw_ops[i].atlas_idx);
-                if (img.tex != NULL) {
-                    float sx = draw_ops[i].w / (float)img.subtex->width;
-                    float sy = draw_ops[i].h / (float)img.subtex->height;
-                    C2D_DrawImageAt(img, draw_ops[i].x, draw_ops[i].y, 0.5f, NULL, sx, sy);
+    // TOP SCREEN — stereoscopic 3D: render twice (left + right eye)
+    int eye_count = gfxIs3D() ? 2 : 1;
+    float slider = osGet3DSliderState();
+    for (int eye = 0; eye < eye_count; eye++) {
+        C3D_RenderTarget* target = (eye == 0) ? top_target : top_target_right;
+        float x_off = (eye == 1) ? slider * 48.0f : 0.0f;
+
+        if (cli_mode) {
+            C2D_TargetClear(target, C2D_Color32(0, 0, 0, 255));
+            C2D_SceneBegin(target);
+            if (top_parsed) {
+                C2D_DrawText(&top_obj,
+                    C2D_WithColor,
+                    2.0f + x_off, 2.0f - (float)top_scroll_y, 0.5f,
+                    0.85f, 0.85f,
+                    C2D_Color32(0, 255, 0, 255),
+                    390.0f);
+            }
+        } else {
+            C2D_TargetClear(target, COL_TOP_BG);
+            C2D_SceneBegin(target);
+            C2D_TextBufClear(tmp_text_buf);
+            C2D_Font f = custom_font ? custom_font : NULL;
+            for (int i = 0; i < draw_op_count; i++) {
+                if (draw_op_types[i] == OP_RECT) {
+                    C2D_DrawRectSolid(draw_ops[i].x + x_off, draw_ops[i].y, 0.5f,
+                        draw_ops[i].w, draw_ops[i].h, draw_ops[i].color);
+                } else if (draw_op_types[i] == OP_TEXT) {
+                    C2D_TextBufClear(tmp_text_buf);
+                    C2D_TextFontParse(&tmp_text_obj, f, tmp_text_buf, draw_ops[i].text);
+                    C2D_TextOptimize(&tmp_text_obj);
+                    float x = draw_ops[i].x + x_off;
+                    float max_w = fmaxf(390.0f - x, 0.0f);
+                    C2D_DrawText(&tmp_text_obj, C2D_WithColor | C2D_WordWrap,
+                        x, draw_ops[i].y, 0.5f,
+                        draw_ops[i].scale, draw_ops[i].scale,
+                        draw_ops[i].color,
+                        max_w);
+                } else if (draw_op_types[i] == OP_CARD) {
+                    C2D_Image img = _3ds_get_card_image(draw_ops[i].atlas, draw_ops[i].atlas_idx);
+                    if (img.tex != NULL) {
+                        float sx = draw_ops[i].w / (float)img.subtex->width;
+                        float sy = draw_ops[i].h / (float)img.subtex->height;
+                        C2D_DrawImageAt(img, draw_ops[i].x + x_off, draw_ops[i].y, 0.5f, NULL, sx, sy);
+                    }
                 }
             }
         }
     }
 
-    // BOTTOM SCREEN: board or text
+    // BOTTOM SCREEN: board or text (no 3D effect)
     if (board_mode) {
         _3ds_render_board();
     } else {

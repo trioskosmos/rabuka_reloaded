@@ -155,6 +155,20 @@ pub enum Choice {
     },
 }
 
+impl Choice {
+    pub fn description_ja(&self) -> Option<&str> {
+        match self {
+            Choice::SelectCard { description_ja, .. }
+            | Choice::SelectTarget { description_ja, .. }
+            | Choice::SelectPosition { description_ja, .. }
+            | Choice::SelectHeartColor { description_ja, .. }
+            | Choice::SelectHeartType { description_ja, .. }
+            | Choice::SelectAutoAbility { description_ja, .. }
+            | Choice::SelectLiveSuccess { description_ja, .. } => description_ja.as_deref(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LiveSuccessOption {
     pub card_name: String,

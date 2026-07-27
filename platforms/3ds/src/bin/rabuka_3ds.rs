@@ -81,6 +81,26 @@ fn tl_fmt(key: &str, params: &[(&str, &str)]) -> String {
     i18n::t_fmt(key, current_lang(), params)
 }
 
+/// Translate stage area labels for display.
+#[cfg(feature = "3ds")]
+fn tl_area(area: &str) -> &str {
+    if current_lang() == Lang::Japanese {
+        match area {
+            "left" => "左",
+            "center" => "センター",
+            "right" => "右",
+            other => other,
+        }
+    } else {
+        match area {
+            "left" => "Left",
+            "center" => "Center",
+            "right" => "Right",
+            other => other,
+        }
+    }
+}
+
 /// Reader wrapper that calls aptMainLoop() every `threshold` bytes without
 /// any GPU buffer operations. Keeps the 3DS OS alive during long deserialization
 /// without the overhead/cost of _3ds_keep_alive().
@@ -822,7 +842,7 @@ fn main() {
                         if was_dirty {
                             if _3ds_is_cli_mode() {
                                 _3ds_clear_top();
-                                _3ds_text_add_top("SELECT MODE\n\0".as_ptr());
+                                _3ds_text_add_top(format!("{}\n\0", tl("SELECT MODE")).as_ptr());
                                 for (i, m) in
                                     ["VS AI", "Sandbox (2 players)", "QR Scan", "Local MP"]
                                         .iter()
@@ -842,7 +862,7 @@ fn main() {
                                     8.0,
                                     COL_GOLD,
                                     0.85f32,
-                                    "SELECT MODE\0".as_ptr(),
+                                    format!("{}\0", tl("SELECT MODE")).as_ptr(),
                                 );
                                 for (i, m) in ["VS AI", "Sandbox", "QR Scan", "Local MP"]
                                     .iter()
@@ -882,7 +902,7 @@ fn main() {
                                         230.0,
                                         COL_MED,
                                         0.60f32,
-                                        "UP/DOWN=select  A=confirm\0".as_ptr(),
+                                        format!("{}\0", tl("UP/DOWN=select  A=confirm")).as_ptr(),
                                     );
                                 }
                             }
@@ -1009,7 +1029,7 @@ fn main() {
                                         228.0,
                                         COL_MED,
                                         0.65f32,
-                                        "UP/DOWN=select  A=confirm\0".as_ptr(),
+                                        format!("{}\0", tl("UP/DOWN=select  A=confirm")).as_ptr(),
                                     );
                                 }
                             }
@@ -1133,7 +1153,7 @@ fn main() {
                                         228.0,
                                         COL_MED,
                                         0.65f32,
-                                        "UP/DOWN=select  A=confirm\0".as_ptr(),
+                                        format!("{}\0", tl("UP/DOWN=select  A=confirm")).as_ptr(),
                                     );
                                 }
                             }
@@ -1241,7 +1261,7 @@ fn main() {
                                         228.0,
                                         COL_MED,
                                         0.65f32,
-                                        "A=select  B=use same\0".as_ptr(),
+                                        format!("{}\0", tl("A=select  B=use same")).as_ptr(),
                                     );
                                 }
                             }
@@ -1387,42 +1407,51 @@ fn main() {
                             if unsafe { _3ds_is_cli_mode() } {
                                 unsafe {
                                     _3ds_clear_top();
-                                    _3ds_text_add_top("QR SCAN\n\0".as_ptr());
+                                    _3ds_text_add_top(format!("{}\n\0", tl("QR SCAN")).as_ptr());
                                     _3ds_text_add_top(
-                                        "Point camera at QR code\nB=cancel\0".as_ptr(),
+                                        format!(
+                                            "{}\n{}\0",
+                                            tl("Point camera at QR code"),
+                                            tl("B=cancel")
+                                        )
+                                        .as_ptr(),
                                     );
                                 }
                             } else {
                                 unsafe {
                                     _3ds_top_clear();
                                     _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                    let qr_hdr = tl("QR SCAN");
                                     _3ds_top_queue_text(
                                         120.0,
                                         8.0,
                                         COL_GOLD,
                                         0.85f32,
-                                        "QR SCAN\0".as_ptr(),
+                                        format!("{}\0", qr_hdr).as_ptr(),
                                     );
+                                    let qr_msg = tl("Point camera at deck QR code");
                                     _3ds_top_queue_text(
                                         40.0,
                                         60.0,
                                         COL_LIGHT,
                                         0.70f32,
-                                        "Point camera at deck QR code\0".as_ptr(),
+                                        format!("{}\0", qr_msg).as_ptr(),
                                     );
+                                    let qr_auto = tl("Auto-detects when QR is visible");
                                     _3ds_top_queue_text(
                                         40.0,
                                         85.0,
                                         COL_MED,
                                         0.65f32,
-                                        "Auto-detects when QR is visible\0".as_ptr(),
+                                        format!("{}\0", qr_auto).as_ptr(),
                                     );
+                                    let qr_cancel = tl("B=cancel");
                                     _3ds_top_queue_text(
                                         40.0,
                                         230.0,
                                         COL_MED,
                                         0.60f32,
-                                        "B=cancel\0".as_ptr(),
+                                        format!("{}\0", qr_cancel).as_ptr(),
                                     );
                                 }
                             }
@@ -1461,7 +1490,7 @@ fn main() {
                                 unsafe {
                                     _3ds_clear_both();
                                     _3ds_text_add_top(format!("Camera error: {}\0", r).as_ptr());
-                                    _3ds_text_add_top("B=back\0".as_ptr());
+                                    _3ds_text_add_top(format!("{}\0", tl("B=back")).as_ptr());
                                 }
                                 unsafe {
                                     _3ds_qr_stop();
@@ -1482,7 +1511,7 @@ fn main() {
                             if unsafe { _3ds_is_cli_mode() } {
                                 unsafe {
                                     _3ds_clear_top();
-                                    _3ds_text_add_top("QR DECK\n\0".as_ptr());
+                                    _3ds_text_add_top(format!("{}\n\0", tl("QR DECK")).as_ptr());
                                     for c in cards_read.iter().take(20) {
                                         _3ds_text_add_top(format!("  {}\n\0", c).as_ptr());
                                     }
@@ -1500,7 +1529,7 @@ fn main() {
                                         8.0,
                                         COL_GOLD,
                                         0.85f32,
-                                        "QR DECK\0".as_ptr(),
+                                        format!("{}\0", tl("QR DECK")).as_ptr(),
                                     );
                                     _3ds_top_queue_text(
                                         200.0,
@@ -1654,7 +1683,8 @@ fn main() {
                                         230.0,
                                         COL_MED,
                                         0.60f32,
-                                        "UP/DOWN=select  A=confirm  B=back\0".as_ptr(),
+                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back"))
+                                            .as_ptr(),
                                     );
                                 }
                             }
@@ -1717,7 +1747,8 @@ fn main() {
                                         unsafe {
                                             _3ds_clear_top();
                                             _3ds_text_add_top(
-                                                "HOST: Network created!\n\0".as_ptr(),
+                                                format!("{}\n\0", tl("HOST: Network created!"))
+                                                    .as_ptr(),
                                             );
                                             let wait_msg = tl("Waiting for client...");
                                             _3ds_text_add_top(format!("{}\n\0", wait_msg).as_ptr());
@@ -1760,7 +1791,9 @@ fn main() {
                                             _3ds_text_add_top(
                                                 format!("UDS INIT FAILED: {}\n\0", e).as_ptr(),
                                             );
-                                            _3ds_text_add_top("B = back\n\0".as_ptr());
+                                            _3ds_text_add_top(
+                                                format!("{}\n\0", tl("B = back")).as_ptr(),
+                                            );
                                         }
                                     } else {
                                         unsafe {
@@ -1864,7 +1897,9 @@ fn main() {
                                             _3ds_text_add_top(
                                                 format!("UDS INIT FAILED: {}\n\0", e).as_ptr(),
                                             );
-                                            _3ds_text_add_top("B = back\n\0".as_ptr());
+                                            _3ds_text_add_top(
+                                                format!("{}\n\0", tl("B = back")).as_ptr(),
+                                            );
                                         }
                                     } else {
                                         unsafe {
@@ -1968,7 +2003,10 @@ fn main() {
                                 if unsafe { _3ds_is_cli_mode() } {
                                     unsafe {
                                         _3ds_clear_top();
-                                        _3ds_text_add_top("Receiving deck data...\n\0".as_ptr());
+                                        _3ds_text_add_top(
+                                            format!("{}\n\0", tl("Receiving deck data..."))
+                                                .as_ptr(),
+                                        );
                                     }
                                 } else {
                                     unsafe {
@@ -1979,7 +2017,7 @@ fn main() {
                                             8.0,
                                             COL_GOLD,
                                             0.85f32,
-                                            "Receiving deck data...\0".as_ptr(),
+                                            format!("{}\0", tl("Receiving deck data...")).as_ptr(),
                                         );
                                     }
                                 }
@@ -2217,6 +2255,10 @@ fn main() {
                                     }
                                     _ => Overlay::None,
                                 };
+                                redraw = true;
+                            }
+                            if keys & 0x00000002 != 0 {
+                                overlay = Overlay::None;
                                 redraw = true;
                             }
                         }
@@ -2865,9 +2907,34 @@ fn main() {
                         } else {
                             (0, 0)
                         };
-                        let stage_y = unsafe { _3ds_board_get_zone_y(1) };
-                        let stage_h = unsafe { _3ds_board_get_zone_h(1) };
-                        let st_slot_w = unsafe { _3ds_board_get_slot_w(1) };
+                        // Compute zone coordinates for each player's section separately
+                        // because zone positions depend on section_rect (which differs per player in split view)
+                        let (p1_stage_y, p1_stage_h, p1_st_slot_w) = unsafe {
+                            _3ds_board_set_section_rect(p1y0 as f32, p1h as f32, false);
+                            (
+                                _3ds_board_get_zone_y(1),
+                                _3ds_board_get_zone_h(1),
+                                _3ds_board_get_slot_w(1),
+                            )
+                        };
+                        let (p2_stage_y, p2_stage_h, p2_st_slot_w) = if p2h > 0 {
+                            unsafe {
+                                _3ds_board_set_section_rect(p2y0 as f32, p2h as f32, true);
+                                (
+                                    _3ds_board_get_zone_y(1),
+                                    _3ds_board_get_zone_h(1),
+                                    _3ds_board_get_slot_w(1),
+                                )
+                            }
+                        } else {
+                            (0, 0, 0.0f32)
+                        };
+                        // Use the correct coordinates for the tapped player's section
+                        let (stage_y, stage_h, st_slot_w) = if y0 == p1y0 {
+                            (p1_stage_y, p1_stage_h, p1_st_slot_w)
+                        } else {
+                            (p2_stage_y, p2_stage_h, p2_st_slot_w)
+                        };
                         let mut stage_tap: Option<String> = None;
                         let mut tapped_card: Option<i16> = None;
                         let mut tapped_hand_idx: Option<usize> = None;
@@ -3567,6 +3634,10 @@ fn main() {
                             _3ds_board_set_opp_utility,
                             hand_offset_p2
                         );
+                        // Hide AI opponent's hand — shouldn't be visible to player
+                        unsafe {
+                            _3ds_board_set_opp_hand_count(0);
+                        }
                     }
 
                     // Set HUD + active player (always, so toggle works smoothly)
@@ -3630,7 +3701,7 @@ fn main() {
                                 170.0,
                                 COL_MED,
                                 0.55f32,
-                                "Press START to exit\0".as_ptr(),
+                                format!("{}\0", tl("Press START to exit")).as_ptr(),
                             );
                         }
                     }
@@ -3738,17 +3809,7 @@ fn main() {
                                     390.0,
                                     0.85,
                                 );
-                                unsafe {
-                                    _3ds_text_add_top(
-                                        format!(
-                                            "[{}] {}\n\0",
-                                            entry.card_no,
-                                            ab_text.lines().next().unwrap_or("")
-                                        )
-                                        .as_ptr(),
-                                    );
-                                }
-                                for line in ab_text.lines().skip(1) {
+                                for line in ab_text.lines() {
                                     unsafe {
                                         _3ds_text_add_top(format!("{}\n\0", line).as_ptr());
                                     }
@@ -3818,6 +3879,7 @@ fn main() {
                                                 .as_ref()
                                                 .and_then(|p| p.stage_area.clone())
                                                 .unwrap_or_default();
+                                            let area_label = tl_area(&area);
                                             let is_db = act
                                                 .parameters
                                                 .as_ref()
@@ -3827,7 +3889,7 @@ fn main() {
                                             let pfx = if is_db { ">>" } else { " " };
                                             format!(
                                                 "[{}] {} c:{}  {} {}",
-                                                cn, name, cost, pfx, area
+                                                cn, name, cost, pfx, area_label
                                             )
                                         }
                                         game_setup::ActionType::UseAbility => {
@@ -3848,6 +3910,7 @@ fn main() {
                                                 .as_ref()
                                                 .and_then(|p| p.stage_area.clone())
                                                 .unwrap_or_default();
+                                            let area_label = tl_area(&area);
                                             let abil = act
                                                 .parameters
                                                 .as_ref()
@@ -3860,7 +3923,7 @@ fn main() {
                                                     "[{}] {} {} c:{} {}",
                                                     cn_or_empty(act),
                                                     name,
-                                                    area,
+                                                    area_label,
                                                     cost,
                                                     abil_short
                                                 )
@@ -3869,14 +3932,17 @@ fn main() {
                                                     "[{}] {} {} {}",
                                                     cn_or_empty(act),
                                                     name,
-                                                    area,
+                                                    area_label,
                                                     abil_short
                                                 )
                                             }
                                         }
-                                        _ => {
-                                            act.description.lines().next().unwrap_or("").to_string()
-                                        }
+                                        _ => act
+                                            .display_desc(current_lang() == Lang::Japanese)
+                                            .lines()
+                                            .next()
+                                            .unwrap_or("")
+                                            .to_string(),
                                     };
                                     let desc_full = wrap_text(&line, 390.0, 0.85);
                                     for (li, l) in desc_full.lines().enumerate() {
@@ -4466,7 +4532,7 @@ fn main() {
                                         render_text_with_icons(
                                             4.0,
                                             44.0,
-                                            &format!("[{}] {}", entry.card_no, ab_lines[0]),
+                                            ab_lines[0],
                                             COL_LIGHT,
                                             0.65,
                                         );
@@ -4524,6 +4590,55 @@ fn main() {
                                         let iy_card = iy;
                                         if iy_card + ch + 20.0 > 230.0 {
                                             break;
+                                        }
+                                        // Skip card-image rendering for special
+                                        // pay/skip optional cost actions — they use
+                                        // card_id as option index, not real card ID.
+                                        let is_special_choice = act
+                                            .parameters
+                                            .as_ref()
+                                            .and_then(|p| p.card_no.as_deref())
+                                            .map(|cn| {
+                                                matches!(
+                                                    cn,
+                                                    "pay_optional_cost"
+                                                        | "skip_optional_cost"
+                                                        | "yes"
+                                                        | "no"
+                                                )
+                                            })
+                                            .unwrap_or(false);
+                                        if is_special_choice {
+                                            // Render as text label instead
+                                            let desc = act
+                                                .description
+                                                .lines()
+                                                .next()
+                                                .unwrap_or("")
+                                                .to_string();
+                                            if !desc.is_empty() {
+                                                let c = if is_disabled {
+                                                    COL_MED
+                                                } else if di == display_pos {
+                                                    COL_GOLD
+                                                } else {
+                                                    COL_LIGHT
+                                                };
+                                                let pfx =
+                                                    if di == display_pos { "> " } else { "  " };
+                                                let txt = format!("{}{}", pfx, desc);
+                                                unsafe {
+                                                    _3ds_top_queue_text(
+                                                        4.0,
+                                                        ty,
+                                                        c,
+                                                        0.65f32,
+                                                        format!("{}\0", txt).as_ptr(),
+                                                    );
+                                                }
+                                                ty += 18.0;
+                                            }
+                                            continue;
                                         }
                                         let real_cid = act
                                             .parameters
@@ -4623,7 +4738,7 @@ fn main() {
                                             228.0,
                                             COL_MED,
                                             0.45f32,
-                                            "L=text\0".as_ptr(),
+                                            format!("{}\0", tl("L=text")).as_ptr(),
                                         );
                                     }
                                     // Text overlay on top of choices grid
@@ -4683,7 +4798,7 @@ fn main() {
                                                     228.0,
                                                     COL_MED,
                                                     0.50f32,
-                                                    "L/B=close\0".as_ptr(),
+                                                    format!("{}\0", tl("L/B=close")).as_ptr(),
                                                 );
                                             }
                                         }
@@ -4941,6 +5056,7 @@ fn main() {
                                                         .as_ref()
                                                         .and_then(|p| p.stage_area.clone())
                                                         .unwrap_or_default();
+                                                    let area_label = tl_area(&area);
                                                     let abil = act
                                                         .parameters
                                                         .as_ref()
@@ -4953,24 +5069,28 @@ fn main() {
                                                         if cost > 0 {
                                                             format!(
                                                                 "[{}] {} {} c:{} {}",
-                                                                cn, name, area, cost, abil_short
+                                                                cn,
+                                                                name,
+                                                                area_label,
+                                                                cost,
+                                                                abil_short
                                                             )
                                                         } else {
                                                             format!(
                                                                 "[{}] {} {} {}",
-                                                                cn, name, area, abil_short
+                                                                cn, name, area_label, abil_short
                                                             )
                                                         }
                                                     } else {
                                                         if cost > 0 {
                                                             format!(
                                                                 "{} {} c:{} {}",
-                                                                name, area, cost, abil_short
+                                                                name, area_label, cost, abil_short
                                                             )
                                                         } else {
                                                             format!(
                                                                 "{} {} {}",
-                                                                name, area, abil_short
+                                                                name, area_label, abil_short
                                                             )
                                                         }
                                                     }
@@ -4984,7 +5104,11 @@ fn main() {
                                                             .unwrap_or_default(),
                                                         current_lang(),
                                                     );
-                                                    let desc = act.description.to_string();
+                                                    let desc = act
+                                                        .display_desc(
+                                                            current_lang() == Lang::Japanese,
+                                                        )
+                                                        .to_string();
                                                     let ability_text = if act.action_type
                                                         == game_setup::ActionType::ChoiceOption
                                                     {
@@ -5242,7 +5366,7 @@ fn main() {
                                     210.0,
                                     COL_MED,
                                     0.50f32,
-                                    "UP/DOWN=move, A=select, B=close\0".as_ptr(),
+                                    format!("{}\0", tl("UP/DOWN=move, A=select, B=close")).as_ptr(),
                                 );
                             },
                             Overlay::GameLog(offset) => {
@@ -5339,8 +5463,14 @@ fn main() {
                                                 COL_LIGHT,
                                                 0.60f32,
                                                 format!(
-                                                    "Turn {} | {} | Score:{} | Success:{}\0",
-                                                    s.turn, s.player_id, s.total_score, s.success
+                                                    "{} {} | {} | {}{} | {}{}\0",
+                                                    tl("T"),
+                                                    s.turn,
+                                                    s.player_id,
+                                                    tl("Score:"),
+                                                    s.total_score,
+                                                    tl("Success:"),
+                                                    s.success
                                                 )
                                                 .as_ptr(),
                                             );
@@ -5349,7 +5479,7 @@ fn main() {
                                                 36.0,
                                                 COL_MED,
                                                 0.55f32,
-                                                "Lives:\0".as_ptr(),
+                                                format!("{}\0", tl("Lives:")).as_ptr(),
                                             );
                                         }
                                         let mut ly = 50.0;
@@ -5359,7 +5489,8 @@ fn main() {
                                                 .get_card(lc.card_id)
                                                 .map(|c| &c.card_no[..])
                                                 .unwrap_or("?");
-                                            let status = if lc.passed { "PASS" } else { "FAIL" };
+                                            let status =
+                                                tl(if lc.passed { "PASS" } else { "FAIL" });
                                             unsafe {
                                                 _3ds_top_queue_text(
                                                     8.0,
@@ -5528,7 +5659,7 @@ fn main() {
                 }
                 match r {
                     Ok(_) => unsafe {
-                        _3ds_text_add_bot("Done! Press START.\n\0".as_ptr());
+                        _3ds_text_add_bot(format!("{}\n\0", tl("Done! Press START.")).as_ptr());
                     },
                     Err(e) => unsafe {
                         let s = format!("ERROR: {}\n\0", e);

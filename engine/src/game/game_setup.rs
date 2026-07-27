@@ -125,8 +125,25 @@ macro_rules! action_desc {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Action {
     pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description_ja: Option<String>,
     pub action_type: ActionType,
     pub parameters: Option<ActionParameters>,
+}
+
+impl Action {
+    pub fn with_ja(mut self, ja: impl Into<String>) -> Self {
+        self.description_ja = Some(ja.into());
+        self
+    }
+
+    pub fn display_desc(&self, is_ja: bool) -> &str {
+        if is_ja {
+            self.description_ja.as_deref().unwrap_or(&self.description)
+        } else {
+            &self.description
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -228,6 +245,7 @@ pub fn settle_single_player_state(game_state: &mut GameState) {
 fn make_action(action_type: ActionType, description: impl Into<String>) -> Action {
     Action {
         description: description.into(),
+        description_ja: None,
         action_type,
         parameters: None,
     }
@@ -240,6 +258,7 @@ fn make_action_params(
 ) -> Action {
     Action {
         description: description.into(),
+        description_ja: None,
         action_type,
         parameters: Some(params),
     }
@@ -336,7 +355,8 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             card_no: Some("pay_optional_cost".to_string()),
                             ..make_params()
                         },
-                    ),
+                    )
+                    .with_ja("オプショナルコストを支払う"),
                     make_action_params(
                         ActionType::ChoiceDecision,
                         "Skip optional cost",
@@ -345,7 +365,8 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             card_no: Some("skip_optional_cost".to_string()),
                             ..make_params()
                         },
-                    ),
+                    )
+                    .with_ja("オプショナルコストをスキップ"),
                 ];
             }
             if target == "position|destination" || target == "area_select" {
@@ -379,12 +400,31 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                 Some(f) => f.to_uppercase().to_string() + c.as_str(),
                             }
                         };
+                        let ja_area = match stage_area.as_str() {
+                            "left" => "左",
+                            "center" => "センター",
+                            "right" => "右",
+                            _ => &stage_area,
+                        };
                         let label = if is_source {
                             action_desc!("Select {}", capitalize(&stage_area))
                         } else if let Some(ref src) = from_pos {
                             action_desc!("{} → {}", capitalize(src), capitalize(&stage_area))
                         } else {
                             action_desc!("Move to {}", capitalize(&stage_area))
+                        };
+                        let label_ja = if is_source {
+                            action_desc!("{}を選択", ja_area)
+                        } else if let Some(ref src) = from_pos {
+                            let ja_src = match src.as_str() {
+                                "left" => "左",
+                                "center" => "センター",
+                                "right" => "右",
+                                _ => src,
+                            };
+                            action_desc!("{} → {}", ja_src, ja_area)
+                        } else {
+                            action_desc!("{}に移動", ja_area)
                         };
                         make_action_params(
                             ActionType::ChoicePosition,
@@ -396,18 +436,22 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                 ..make_params()
                             },
                         )
+                        .with_ja(label_ja)
                     })
                     .collect();
                 if *allow_skip {
-                    actions.push(make_action_params(
-                        ActionType::ChoiceSkip,
-                        "Skip (don't change position)",
-                        ActionParameters {
-                            card_id: Some(-1),
-                            card_no: Some("skip".to_string()),
-                            ..make_params()
-                        },
-                    ));
+                    actions.push(
+                        make_action_params(
+                            ActionType::ChoiceSkip,
+                            "Skip (don't change position)",
+                            ActionParameters {
+                                card_id: Some(-1),
+                                card_no: Some("skip".to_string()),
+                                ..make_params()
+                            },
+                        )
+                        .with_ja("スキップ (ポジション変更なし)"),
+                    );
                 }
                 return actions;
             }
@@ -424,6 +468,11 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         } else {
                             action_desc!("Draw {}", n)
                         };
+                        let label_ja = if n == 0 {
+                            "0枚引く (スキップ)".to_string()
+                        } else {
+                            action_desc!("{}枚引く", n)
+                        };
                         make_action_params(
                             ActionType::ChoiceDecision,
                             &label,
@@ -433,6 +482,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                 ..make_params()
                             },
                         )
+                        .with_ja(label_ja)
                     })
                     .collect();
             }
@@ -445,6 +495,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 return (0..count)
                     .map(|n| {
                         let label = action_desc!("Move card {} to top", n + 1);
+                        let label_ja = action_desc!("{}番目を山札上に移動", n + 1);
                         make_action_params(
                             ActionType::ChoiceDecision,
                             &label,
@@ -454,6 +505,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                 ..make_params()
                             },
                         )
+                        .with_ja(label_ja)
                     })
                     .collect();
             }
@@ -474,14 +526,17 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     })
                     .collect();
                 if *allow_skip {
-                    actions.push(make_action_params(
-                        ActionType::ChoiceSkip,
-                        "Skip",
-                        ActionParameters {
-                            card_no: Some("skip".to_string()),
-                            ..make_params()
-                        },
-                    ));
+                    actions.push(
+                        make_action_params(
+                            ActionType::ChoiceSkip,
+                            "Skip",
+                            ActionParameters {
+                                card_no: Some("skip".to_string()),
+                                ..make_params()
+                            },
+                        )
+                        .with_ja("スキップ"),
+                    );
                 }
                 return actions;
             }
@@ -495,7 +550,8 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             card_no: Some("primary".to_string()),
                             ..make_params()
                         },
-                    ),
+                    )
+                    .with_ja(action_desc!("主: {}", description)),
                     make_action_params(
                         ActionType::ChoiceOption,
                         action_desc!("Alternative: {}", description),
@@ -504,15 +560,16 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             card_no: Some("alternative".to_string()),
                             ..make_params()
                         },
-                    ),
+                    )
+                    .with_ja(action_desc!("副: {}", description)),
                 ];
             }
             if target == "apply_replacement" {
-                return make_choice_pair(
-                    ActionType::ChoiceOption,
-                    "Apply replacement",
-                    "Don't apply",
-                );
+                let mut pair =
+                    make_choice_pair(ActionType::ChoiceOption, "Apply replacement", "Don't apply");
+                pair[0].description_ja = Some("置き換えを適用".into());
+                pair[1].description_ja = Some("適用しない".into());
+                return pair;
             }
             if target == "self_or_opponent" {
                 let opts = options.as_ref().map(|v| v.as_slice()).unwrap_or(&[]);
@@ -553,7 +610,10 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         })
                         .collect();
                 }
-                return make_choice_pair(ActionType::ChoiceOption, "Yes", "No");
+                let mut pair = make_choice_pair(ActionType::ChoiceOption, "Yes", "No");
+                pair[0].description_ja = Some("はい".into());
+                pair[1].description_ja = Some("いいえ".into());
+                return pair;
             }
             if target == "choice_condition" {
                 let opts = options.as_ref().map(|v| v.as_slice()).unwrap_or(&[]);
@@ -576,7 +636,10 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 }
             }
             // Generic fallback for unrecognized targets
-            make_choice_pair(ActionType::ChoiceDecision, "Yes", "No")
+            let mut pair = make_choice_pair(ActionType::ChoiceDecision, "Yes", "No");
+            pair[0].description_ja = Some("はい".into());
+            pair[1].description_ja = Some("いいえ".into());
+            pair
         }
         Choice::SelectCard {
             zone,
@@ -770,7 +833,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             }
 
             if actions.is_empty() {
-                actions.push(make_action_params(
+                let mut a = make_action_params(
                     ActionType::ChoiceSelect,
                     action_desc!("Select card(s): {}", description),
                     ActionParameters {
@@ -778,17 +841,26 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         card_no: Some("select".to_string()),
                         ..make_params()
                     },
-                ));
+                );
+                a.description_ja = Some(
+                    choice
+                        .description_ja()
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| "カードを選択".into()),
+                );
+                actions.push(a);
             }
             if *allow_skip {
-                actions.push(make_action_params(
+                let mut a = make_action_params(
                     ActionType::ChoiceSkip,
                     "Skip",
                     ActionParameters {
                         card_no: Some("skip".to_string()),
                         ..make_params()
                     },
-                ));
+                );
+                a.description_ja = Some("スキップ".into());
+                actions.push(a);
             }
             actions
         }
@@ -796,36 +868,53 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             position,
             description: _,
             ..
-        } => position
-            .split(',')
-            .map(|a| a.trim())
-            .map(|area| {
-                let (stage_area_str, card_id) = match area {
-                    "left" | "left_side" | "左サイドエリア" => {
-                        (Some("left".to_string()), Some(0i16))
-                    }
-                    "center" | "センターエリア" => (Some("center".to_string()), Some(1i16)),
-                    "right" | "right_side" | "右サイドエリア" => {
-                        (Some("right".to_string()), Some(2i16))
-                    }
-                    _ => (Some(area.to_string()), Some(1i16)),
-                };
-                let label = stage_area_str
-                    .as_deref()
-                    .map(|s| action_desc!("Place at {}", s))
-                    .unwrap_or_else(|| action_desc!("Place at {}", area));
-                make_action_params(
-                    ActionType::ChoicePosition,
-                    &label,
-                    ActionParameters {
-                        card_id,
-                        stage_area: stage_area_str,
-                        card_no: Some("select".to_string()),
-                        ..make_params()
-                    },
-                )
-            })
-            .collect(),
+        } => {
+            let choice_ja = choice.description_ja().map(|s| s.to_string());
+            position
+                .split(',')
+                .map(|a| a.trim())
+                .map(|area| {
+                    let (stage_area_str, card_id) = match area {
+                        "left" | "left_side" | "左サイドエリア" => {
+                            (Some("left".to_string()), Some(0i16))
+                        }
+                        "center" | "センターエリア" => {
+                            (Some("center".to_string()), Some(1i16))
+                        }
+                        "right" | "right_side" | "右サイドエリア" => {
+                            (Some("right".to_string()), Some(2i16))
+                        }
+                        _ => (Some(area.to_string()), Some(1i16)),
+                    };
+                    let ja_area = match stage_area_str.as_deref() {
+                        Some("left") => "左",
+                        Some("center") => "センター",
+                        Some("right") => "右",
+                        _ => area,
+                    };
+                    let label = stage_area_str
+                        .as_deref()
+                        .map(|s| action_desc!("Place at {}", s))
+                        .unwrap_or_else(|| action_desc!("Place at {}", area));
+                    let mut a = make_action_params(
+                        ActionType::ChoicePosition,
+                        &label,
+                        ActionParameters {
+                            card_id,
+                            stage_area: stage_area_str,
+                            card_no: Some("select".to_string()),
+                            ..make_params()
+                        },
+                    );
+                    a.description_ja = Some(
+                        choice_ja
+                            .clone()
+                            .unwrap_or_else(|| action_desc!("{}に配置", ja_area)),
+                    );
+                    a
+                })
+                .collect()
+        }
         Choice::SelectHeartColor {
             count: _,
             options,
@@ -895,9 +984,9 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
 
 fn generate_rps_actions() -> Vec<Action> {
     vec![
-        make_action(ActionType::RockChoice, "Rock"),
-        make_action(ActionType::PaperChoice, "Paper"),
-        make_action(ActionType::ScissorsChoice, "Scissors"),
+        make_action(ActionType::RockChoice, "Rock").with_ja("グー"),
+        make_action(ActionType::PaperChoice, "Paper").with_ja("チョキ"),
+        make_action(ActionType::ScissorsChoice, "Scissors").with_ja("パー"),
     ]
 }
 
@@ -907,8 +996,10 @@ fn generate_choose_first_attacker_actions(game_state: &GameState) -> Vec<Action>
         game_state.rps_winner
     );
     vec![
-        make_action_params(ActionType::ChooseFirstAttacker, "Go first", make_params()),
-        make_action_params(ActionType::ChooseSecondAttacker, "Go second", make_params()),
+        make_action_params(ActionType::ChooseFirstAttacker, "Go first", make_params())
+            .with_ja("先攻"),
+        make_action_params(ActionType::ChooseSecondAttacker, "Go second", make_params())
+            .with_ja("後攻"),
     ]
 }
 
@@ -930,11 +1021,15 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
     };
     let mulligan_player = game_state.active_player();
 
-    let mut actions = vec![make_action_params(
-        ActionType::ConfirmMulligan,
-        action_desc!("Confirm {}'s mulligan", player_name),
-        ActionParameters { ..make_params() },
-    )];
+    let mut actions = vec![{
+        let mut a = make_action_params(
+            ActionType::ConfirmMulligan,
+            action_desc!("Confirm {}'s mulligan", player_name),
+            ActionParameters { ..make_params() },
+        );
+        a.description_ja = Some(action_desc!("{}のマリガンを確定", player_name));
+        a
+    }];
 
     for (hand_index, card_id) in mulligan_player.hand.cards.iter().enumerate() {
         let is_selected = game_state.mulligan_selected_indices.contains(&hand_index);
@@ -943,7 +1038,12 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
             .get_card(*card_id)
             .map(|c| c.name.as_ref())
             .unwrap_or("Unknown");
-        actions.push(make_action_params(
+        let sel_ja = if is_selected {
+            "の選択解除"
+        } else {
+            "を選択"
+        };
+        let mut a = make_action_params(
             ActionType::SelectMulligan,
             action_desc!(
                 "{} {} for mulligan",
@@ -955,7 +1055,9 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
                 card_indices: Some(vec![hand_index]),
                 ..make_params()
             },
-        ));
+        );
+        a.description_ja = Some(action_desc!("{} {} マリガン", card_name, sel_ja));
+        actions.push(a);
     }
 
     actions
@@ -989,7 +1091,9 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
     #[cfg(not(feature = "no_std"))]
     let _timer = crate::timer::Timer::start("generate_main_phase_actions");
     let active_player = game_state.active_player();
-    let mut actions = vec![make_action(ActionType::Pass, "Pass - End Main Phase")];
+    let mut actions =
+        vec![make_action(ActionType::Pass, "Pass - End Main Phase")
+            .with_ja("パス - メインフェーズ終了")];
 
     if !game_state.is_action_prohibited("play_member") {
         // Rule 7.7.2.2: Main Phase - Can play member cards to stage
@@ -1509,11 +1613,15 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
         "Player 1"
     };
 
-    let mut actions = vec![make_action_params(
-        ActionType::ConfirmLiveCardSet,
-        action_desc!("Confirm {}'s live card set", player_name),
-        ActionParameters { ..make_params() },
-    )];
+    let mut actions = vec![{
+        let mut a = make_action_params(
+            ActionType::ConfirmLiveCardSet,
+            action_desc!("Confirm {}'s live card set", player_name),
+            ActionParameters { ..make_params() },
+        );
+        a.description_ja = Some(action_desc!("{}のライブカードセットを確定", player_name));
+        a
+    }];
 
     let max_live_cards =
         3i32 - i32::try_from(active_player.live_card_set_limit_reduction).unwrap_or(0);
@@ -1530,7 +1638,12 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
             .get_card(*card_id)
             .map(|c| c.name.as_ref())
             .unwrap_or("Unknown");
-        actions.push(make_action_params(
+        let sel_ja = if is_selected {
+            "の選択解除"
+        } else {
+            "を選択"
+        };
+        let mut a = make_action_params(
             ActionType::SelectLiveCard,
             action_desc!(
                 "{} {} for live set",
@@ -1543,7 +1656,9 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
                 card_indices: Some(vec![hand_index]),
                 ..make_params()
             },
-        ));
+        );
+        a.description_ja = Some(action_desc!("{} {} ライブカード", card_name, sel_ja));
+        actions.push(a);
     }
 
     actions
