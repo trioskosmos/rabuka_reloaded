@@ -3252,8 +3252,8 @@ fn main() {
                                     }
                                 }
                                 redraw = true;
-                            // Default: toggle card detail view
-                            } else {
+                            // Default: toggle card detail view (skip if user tapped a stage zone)
+                            } else if stage_tap.is_none() {
                                 if Some(cid) == viewing_card {
                                     viewing_card = None;
                                     detail_mode = false;
@@ -3271,7 +3271,7 @@ fn main() {
                                 }
                                 redraw = true;
                             }
-                        } else {
+                        } else if stage_tap.is_none() {
                             viewing_card = None;
                         }
 
@@ -3297,71 +3297,71 @@ fn main() {
                                 } else {
                                     None
                                 };
-                                // PlayMemberToStage: empty slot
-                                if card_at_slot.is_none() {
-                                    for (ai, act) in acts_cache.iter().enumerate() {
-                                        if act.action_type
-                                            != game_setup::ActionType::PlayMemberToStage
-                                        {
-                                            continue;
-                                        }
-                                        let p = match &act.parameters {
-                                            Some(x) => x,
-                                            None => continue,
-                                        };
-                                        if p.disabled.unwrap_or(false) {
-                                            continue;
-                                        }
-                                        if p.stage_area.as_ref().map(|s| s.as_str())
-                                            != Some(sa.as_str())
-                                        {
-                                            continue;
-                                        }
-                                        cur = ai;
-                                        let act2 = acts_cache[cur].clone();
-                                        let pp = act2.parameters.clone();
-                                        let _ = turn::TurnEngine::execute_main_phase_action(
-                                            &mut gs,
-                                            &act2.action_type,
-                                            pp.as_ref().and_then(|x| x.card_id),
-                                            pp.as_ref().and_then(|x| x.card_indices.clone()),
-                                            pp.as_ref().and_then(|x| {
-                                                x.stage_area.as_ref().and_then(|s| s.parse().ok())
-                                            }),
-                                            pp.as_ref().and_then(|x| x.use_baton_touch),
-                                        );
-                                        if is_multiplayer {
-                                            let my_id = if is_host { 0 } else { 1 };
-                                            let sc = match sa.as_str() {
-                                                "left" => 1u8,
-                                                "center" => 2,
-                                                "right" => 3,
-                                                _ => 0,
-                                            };
-                                            let sync = uds::ActionSync {
-                                                action_tag: 6,
-                                                card_id: pp.as_ref().and_then(|x| x.card_id),
-                                                card_indices: pp
-                                                    .as_ref()
-                                                    .and_then(|x| x.card_indices.clone())
-                                                    .unwrap_or_default(),
-                                                stage_area: sc,
-                                                use_baton_touch: pp
-                                                    .as_ref()
-                                                    .and_then(|x| x.use_baton_touch)
-                                                    .unwrap_or(false),
-                                                ability_index: None,
-                                            };
-                                            let _ = uds::uds_send(&sync.to_bytes());
-                                            waiting_for_opponent = !mp_can_act(&gs, my_id);
-                                        }
-                                        detail_mode = false;
-                                        viewing_card = None;
-                                        cur = 0;
-                                        redraw = true;
-                                        stage_handled = true;
-                                        break;
+                                // PlayMemberToStage (empty slot = normal play, filled slot = baton touch)
+                                for (ai, act) in acts_cache.iter().enumerate() {
+                                    if act.action_type != game_setup::ActionType::PlayMemberToStage
+                                    {
+                                        continue;
                                     }
+                                    let p = match &act.parameters {
+                                        Some(x) => x,
+                                        None => continue,
+                                    };
+                                    if p.disabled.unwrap_or(false) {
+                                        continue;
+                                    }
+                                    if p.stage_area.as_ref().map(|s| s.as_str())
+                                        != Some(sa.as_str())
+                                    {
+                                        continue;
+                                    }
+                                    if p.card_id != viewing_card {
+                                        continue;
+                                    }
+                                    cur = ai;
+                                    let act2 = acts_cache[cur].clone();
+                                    let pp = act2.parameters.clone();
+                                    let _ = turn::TurnEngine::execute_main_phase_action(
+                                        &mut gs,
+                                        &act2.action_type,
+                                        pp.as_ref().and_then(|x| x.card_id),
+                                        pp.as_ref().and_then(|x| x.card_indices.clone()),
+                                        pp.as_ref().and_then(|x| {
+                                            x.stage_area.as_ref().and_then(|s| s.parse().ok())
+                                        }),
+                                        pp.as_ref().and_then(|x| x.use_baton_touch),
+                                    );
+                                    if is_multiplayer {
+                                        let my_id = if is_host { 0 } else { 1 };
+                                        let sc = match sa.as_str() {
+                                            "left" => 1u8,
+                                            "center" => 2,
+                                            "right" => 3,
+                                            _ => 0,
+                                        };
+                                        let sync = uds::ActionSync {
+                                            action_tag: 6,
+                                            card_id: pp.as_ref().and_then(|x| x.card_id),
+                                            card_indices: pp
+                                                .as_ref()
+                                                .and_then(|x| x.card_indices.clone())
+                                                .unwrap_or_default(),
+                                            stage_area: sc,
+                                            use_baton_touch: pp
+                                                .as_ref()
+                                                .and_then(|x| x.use_baton_touch)
+                                                .unwrap_or(false),
+                                            ability_index: None,
+                                        };
+                                        let _ = uds::uds_send(&sync.to_bytes());
+                                        waiting_for_opponent = !mp_can_act(&gs, my_id);
+                                    }
+                                    detail_mode = false;
+                                    viewing_card = None;
+                                    cur = 0;
+                                    redraw = true;
+                                    stage_handled = true;
+                                    break;
                                 }
                             }
                             // ChoicePosition: select stage position during choice prompt
@@ -4590,11 +4590,11 @@ fn main() {
                                         let ab_lines: Vec<String> =
                                             wrap_ability_text(&ab_text, 392.0, 0.60)
                                                 .lines()
-                                                .take(3)
+                                                .take(2)
                                                 .map(|l| l.to_string())
                                                 .collect();
                                         let n_lines = ab_lines.len();
-                                        let h = 18.0 + n_lines as f32 * 13.0;
+                                        let h = 16.0 + n_lines as f32 * 13.0;
                                         unsafe {
                                             _3ds_top_queue_rect(0.0, 42.0, 400.0, h, COL_ABILITY);
                                         }
@@ -4628,7 +4628,7 @@ fn main() {
                                     let cw = 72.0f32;
                                     let ch = cw / 0.711;
                                     let gap = 4.0f32;
-                                    let label_h = 40.0f32;
+                                    let label_h = 28.0f32;
                                     let cols = 5usize;
                                     let grid_start = choice_grid_offset;
                                     let grid_len =
