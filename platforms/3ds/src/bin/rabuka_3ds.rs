@@ -2545,8 +2545,8 @@ fn main() {
                         }
                         redraw = true;
                     }
-                    // A: show card detail for selected card
-                    if keys & 0x00000001 != 0 && viewing_card.is_none() {
+                    // X: show card detail for selected card
+                    if keys & 0x00000400 != 0 && viewing_card.is_none() {
                         if let Some((_, ref cards)) = zone_viewer {
                             if zone_viewer_offset < cards.len() {
                                 viewing_card = Some(cards[zone_viewer_offset]);
@@ -4105,11 +4105,12 @@ fn main() {
                             );
                         }
 
-                        // Content panel:
-                        //   detail_mode = full-screen card detail (blocks action list)
-                        //   viewing_card = compact card info overlay + action list below
-                        //   ability_queue = compact queue overlay + action list below
-                        //   otherwise = action list only
+                        // Content panel — rendering stack (bottom to top):
+                        //   1. zone_viewer       — zone card grid (own/opponent stage)
+                        //   2. detail_mode        — full-screen card detail overlay
+                        //   3. ability_queue      — compact ability banner (CLI/text only)
+                        //   4. choice_image_mode  — ability banner + card choice grid
+                        //   5. action list        — text action list (bottom text area)
                         let mut content_y: f32 = 42.0;
 
                         if let Some((ref zlabel, ref zcards)) = zone_viewer {
@@ -4131,7 +4132,7 @@ fn main() {
                                         4.0,
                                         COL_GOLD,
                                         0.70f32,
-                                        format!("{}  (B=close, A=detail)\0", zlabel).as_ptr(),
+                                        format!("{}  (B=close, X=detail)\0", zlabel).as_ptr(),
                                     );
                                 }
                                 for i in page..n.min(page + pp) {
@@ -4566,15 +4567,50 @@ fn main() {
                             }
                         }
 
-                        // Choice image mode: two subviews — text (paged with L) and choices
+                        // ---- Choice image mode: ability banner + card grid ----
+                        // When detail_mode is active, the card detail overlay (above)
+                        // replaces the grid so card images don't overlap the detail text.
                         {
                             let is_ai_turn =
                                 *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
                             let is_opponent_turn_mp =
                                 is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
                             if zone_viewer.is_none() {
-                                if choice_image_mode && gs.has_pending_choice() {
-                                    // Always render choices grid as primary view
+                                if choice_image_mode
+                                    && gs.has_pending_choice()
+                                    && !(detail_mode && viewing_card.is_some())
+                                {
+                                    // ---- Render ability banner first ----
+                                    let mut grid_iy: f32 = 42.0;
+                                    if let Some(entry) = gs.ability_queue.current_entry() {
+                                        let ab_text = i18n::translate_ability(
+                                            &entry.ability.full_text,
+                                            current_lang(),
+                                        );
+                                        let ab_lines: Vec<String> =
+                                            wrap_ability_text(&ab_text, 392.0, 0.60)
+                                                .lines()
+                                                .take(3)
+                                                .map(|l| l.to_string())
+                                                .collect();
+                                        let n_lines = ab_lines.len();
+                                        let h = 18.0 + n_lines as f32 * 13.0;
+                                        unsafe {
+                                            _3ds_top_queue_rect(0.0, 42.0, 400.0, h, COL_ABILITY);
+                                        }
+                                        for (li, line) in ab_lines.iter().enumerate() {
+                                            render_text_with_icons(
+                                                4.0,
+                                                44.0 + li as f32 * 13.0,
+                                                line,
+                                                COL_LIGHT,
+                                                0.60,
+                                            );
+                                        }
+                                        grid_iy = 42.0 + h + 4.0;
+                                    }
+
+                                    // ---- Choice cards grid (below ability) ----
                                     let opt_map: std::collections::HashMap<i16, i16> = {
                                         let mut m = std::collections::HashMap::new();
                                         if let Some(c) = gs.get_pending_choice() {
@@ -4592,8 +4628,8 @@ fn main() {
                                     let cw = 72.0f32;
                                     let ch = cw / 0.711;
                                     let gap = 4.0f32;
+                                    let label_h = 40.0f32;
                                     let cols = 5usize;
-                                    let iy = 42.0f32;
                                     let grid_start = choice_grid_offset;
                                     let grid_len =
                                         display_order.len().saturating_sub(grid_start).min(10);
@@ -4609,8 +4645,8 @@ fn main() {
                                         let col = gi % cols;
                                         let row = gi / cols;
                                         let ix = 4.0 + col as f32 * (cw + gap);
-                                        let iy_card = iy + row as f32 * (ch + 20.0 + gap);
-                                        if iy_card + ch + 20.0 > 230.0 {
+                                        let iy_card = grid_iy + row as f32 * (ch + label_h + gap);
+                                        if iy_card + ch + label_h > 230.0 {
                                             break;
                                         }
                                         // Skip card-image rendering for special
@@ -4681,12 +4717,48 @@ fn main() {
                                                     } else {
                                                         COL_CARD
                                                     };
+                                                    // Card name for label
+                                                    let card_name_str = gs
+                                                        .card_database
+                                                        .get_card(cid)
+                                                        .map(|c| {
+                                                            i18n::card_display_name(
+                                                                &c.name,
+                                                                current_lang(),
+                                                            )
+                                                        })
+                                                        .unwrap_or_default();
+                                                    // First line of ability text
+                                                    let ab_text_str = gs
+                                                        .card_database
+                                                        .get_card(cid)
+                                                        .and_then(|c| {
+                                                            c.resolved_abilities().next().map(
+                                                                |ab| {
+                                                                    let t = i18n::translate_ability(
+                                                                        &ab.full_text,
+                                                                        current_lang(),
+                                                                    );
+                                                                    let first = wrap_ability_text(
+                                                                        &t,
+                                                                        cw - 4.0,
+                                                                        0.40,
+                                                                    )
+                                                                    .lines()
+                                                                    .next()
+                                                                    .unwrap_or("")
+                                                                    .to_string();
+                                                                    first
+                                                                },
+                                                            )
+                                                        })
+                                                        .unwrap_or_default();
                                                     unsafe {
                                                         _3ds_top_queue_rect(
                                                             ix,
                                                             iy_card,
                                                             cw,
-                                                            ch + 20.0,
+                                                            ch + label_h,
                                                             border,
                                                         );
                                                         _3ds_top_queue_card(
@@ -4706,13 +4778,41 @@ fn main() {
                                                                 0xAA000000,
                                                             );
                                                         }
+                                                        // Line 1: [card_no] card_name
                                                         _3ds_top_queue_text(
                                                             ix + 1.0,
                                                             iy_card + ch + 1.0,
                                                             COL_LIGHT,
-                                                            0.50f32,
-                                                            format!("{}\0", cn).as_ptr(),
+                                                            0.45f32,
+                                                            format!(
+                                                                "[{}] {}\0",
+                                                                cn,
+                                                                wrap_text(
+                                                                    &card_name_str,
+                                                                    cw - 4.0,
+                                                                    0.45
+                                                                )
+                                                            )
+                                                            .as_ptr(),
                                                         );
+                                                        // Line 2: ability text (truncated)
+                                                        if !ab_text_str.is_empty() {
+                                                            _3ds_top_queue_text(
+                                                                ix + 1.0,
+                                                                iy_card + ch + 14.0,
+                                                                COL_MED,
+                                                                0.40f32,
+                                                                format!(
+                                                                    "{}\0",
+                                                                    wrap_text(
+                                                                        &ab_text_str,
+                                                                        cw - 4.0,
+                                                                        0.40
+                                                                    )
+                                                                )
+                                                                .as_ptr(),
+                                                            );
+                                                        }
                                                     }
                                                     continue;
                                                 }
