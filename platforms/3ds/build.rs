@@ -110,4 +110,9 @@ fn main() {
         }
     }
     println!("cargo:rerun-if-changed=romfs/font.bcfnt");
+    if let Ok(entries) = std::fs::read_dir("romfs/locales") {
+        for entry in entries.flatten() {
+            println!("cargo:rerun-if-changed={}", entry.path().display());
+        }
+    }
 }
