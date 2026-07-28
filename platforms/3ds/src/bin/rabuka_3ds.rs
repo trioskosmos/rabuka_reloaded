@@ -996,10 +996,10 @@ fn main() {
                                 unsafe {
                                     _3ds_top_queue_text(
                                         50.0,
-                                        230.0,
+                                        225.0,
                                         COL_MED,
-                                        0.60f32,
-                                        format!("{}\0", tl("UP/DOWN=select  A=confirm")).as_ptr(),
+                                        0.55f32,
+                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  X=language")).as_ptr(),
                                     );
                                 }
                             }
@@ -1016,6 +1016,14 @@ fn main() {
                                 cards.clone(),
                                 decks.clone(),
                                 SetupPhase::PickMode(cur + 1),
+                                true,
+                            )
+                        } else if keys & 0x00000100 != 0 {
+                            set_lang(current_lang().toggle());
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickMode(cur),
                                 true,
                             )
                         } else if keys & 0x00000001 != 0 {
@@ -1732,7 +1740,7 @@ fn main() {
                                     _3ds_text_add_top(
                                         format!("{} {}\n\0", arrow_c, client_label).as_ptr(),
                                     );
-                                    _3ds_text_add_top("\nUP/DOWN=select A=confirm\0".as_ptr());
+                                _3ds_text_add_top("\nUP/DOWN=select A=confirm X=language\0".as_ptr());
                                 }
                             } else {
                                 unsafe {
