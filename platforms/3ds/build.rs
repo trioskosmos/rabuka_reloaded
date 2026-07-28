@@ -83,6 +83,8 @@ fn main() {
     println!("cargo:rustc-link-arg=-lcitro2d");
     println!("cargo:rustc-link-arg=-lcitro3d");
     println!("cargo:rustc-link-arg=-lctru");
+    println!("cargo:rustc-link-arg=-lndsp");
+    println!("cargo:rustc-link-arg=-lvorbisidec");
     println!("cargo:rustc-link-arg=-lm");
     println!("cargo:rustc-link-arg=-Wl,--end-group");
 

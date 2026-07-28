@@ -27,6 +27,7 @@
 #include <3ds.h>
 #include <citro2d.h>
 #include <errno.h>
+#include <tremor/ivorbisfile.h>
 
 u32 __ctru_heap_size = 64 * 1024 * 1024;
 u32 __stacksize__ = 2 * 1024 * 1024;
@@ -1269,4 +1270,107 @@ int _3ds_qr_poll(char *out_text, unsigned int out_max) {
     } else { result = -6; }
 
     return result;
+}
+
+// ===================== AUDIO (NDSP + tremor OGG Vorbis) =====================
+
+static ndspWaveBuf s_wavebuf;
+static void* s_audio_data = NULL;
+static OggVorbis_File s_vf;
+
+#define AUDIO_BUFSIZE  (44100 * 2 * 2 * 120 / 1000)  // 120ms stereo 16-bit @ 44100
+
+static int decode_chunk(int16_t* buf, int samples_needed) {
+    int total = 0;
+    while (total < samples_needed) {
+        long ret = ov_read(&s_vf, (char*)(buf + total), (samples_needed - total) * 2, NULL);
+        if (ret <= 0) {
+            ov_raw_seek(&s_vf, 0);
+            if (ret == 0) continue;
+            break;
+        }
+        total += ret / 2;
+    }
+    return total;
+}
+
+void _3ds_audio_init(void) {
+    ndspInit();
+    ndspSetOutputMode(NDSP_OUTPUT_STEREO);
+    ndspSetVoiceClipping(false);
+}
+
+void _3ds_audio_play_ogg(const char* path) {
+    _3ds_audio_stop();
+
+    FILE* f = fopen(path, "rb");
+    if (!f) return;
+
+    ov_callbacks cb = { 0 };
+    cb.read_func = (size_t(*)(void*, size_t, size_t, void*))fread;
+    cb.seek_func = (int(*)(void*, int64_t, int))fseek;
+    cb.tell_func = (long(*)(void*))ftell;
+
+    if (ov_open_callbacks(f, &s_vf, NULL, 0, cb) < 0) {
+        fclose(f);
+        return;
+    }
+
+    vorbis_info* vi = ov_info(&s_vf, -1);
+
+    s_audio_data = linearAlloc(AUDIO_BUFSIZE);
+    if (!s_audio_data) {
+        ov_clear(&s_vf);
+        return;
+    }
+
+    int ch = 0;
+    ndspChnReset(&ch);
+    ndspChnSetInterpolation(&ch, NDSP_INTERP_LINEAR);
+
+    if (vi->channels == 1) {
+        ndspChnSetFormat(&ch, NDSP_FORMAT_MONO_PCM16);
+    } else {
+        ndspChnSetFormat(&ch, NDSP_FORMAT_STEREO_PCM16);
+    }
+
+    ndspChnSetSampleRate(&ch, (float)vi->rate);
+
+    float mix[12] = { 0 };
+    mix[0] = 0.5f;
+    mix[1] = 0.5f;
+    ndspChnSetMix(&ch, mix);
+
+    ndspChnWaveBufClear(&ch);
+
+    memset(s_audio_data, 0, AUDIO_BUFSIZE);
+    int channels = vi->channels;
+    int samples = (channels == 1) ? AUDIO_BUFSIZE / 2 : AUDIO_BUFSIZE / 4;
+    decode_chunk((int16_t*)s_audio_data, samples * channels);
+
+    DSP_FlushDataCache(s_audio_data, AUDIO_BUFSIZE);
+    memset(&s_wavebuf, 0, sizeof(s_wavebuf));
+    s_wavebuf.data_vaddr = s_audio_data;
+    s_wavebuf.nsamples = samples;
+    s_wavebuf.looping = true;
+    s_wavebuf.status = NDSP_WBUF_FREE;
+
+    ndspChnWaveBufAdd(&ch, &s_wavebuf);
+}
+
+void _3ds_audio_stop(void) {
+    int ch = 0;
+    ndspChnWaveBufClear(&ch);
+    if (s_audio_data) {
+        linearFree(s_audio_data);
+        s_audio_data = NULL;
+    }
+    ov_clear(&s_vf);
+}
+
+void _3ds_audio_set_volume(float vol) {
+    float mix[12] = { 0 };
+    mix[0] = vol;
+    mix[1] = vol;
+    ndspChnSetMix(0, mix);
 }

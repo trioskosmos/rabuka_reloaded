@@ -856,6 +856,10 @@ fn main() {
     unsafe {
         _3ds_init();
     }
+    unsafe {
+        _3ds_audio_init();
+        _3ds_audio_play_ogg(b"romfs:/next_card.ogg\0".as_ptr());
+    }
     i18n::init();
 
     let mut _frame: u64 = 0;
@@ -6192,6 +6196,11 @@ extern "C" {
     fn _3ds_qr_start() -> i32;
     fn _3ds_qr_stop();
     fn _3ds_qr_poll(out_text: *mut u8, out_max: u32) -> i32;
+    // Audio (NDSP + tremor OGG)
+    fn _3ds_audio_init();
+    fn _3ds_audio_play_ogg(path: *const u8);
+    fn _3ds_audio_stop();
+    fn _3ds_audio_set_volume(vol: f32);
 }
 
 #[cfg(not(feature = "3ds"))]
