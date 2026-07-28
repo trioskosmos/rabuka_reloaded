@@ -36,11 +36,7 @@ fn q137_keke_active_cost_pay_applies_wait() {
     game.select_option(1); // Pay
 
     let ori = game.state.mods.get_orientation_modifier(keke);
-    assert_eq!(
-        ori,
-        Some("wait"),
-        "Keke should be waited after paying cost"
-    );
+    assert_eq!(ori, Some("wait"), "Keke should be waited after paying cost");
 
     // Effect resolves (look_at_4) — no valid Liella! live cards → skip selection
     while game.has_pending_choice() {

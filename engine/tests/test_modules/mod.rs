@@ -22,9 +22,9 @@ pub mod bloom_hs_test;
 pub mod bring_love_test;
 pub mod butterfly_wing_suppress_test;
 #[cfg(feature = "bytecode_abilities")]
-pub mod bytecode_validation_test;
-#[cfg(feature = "bytecode_abilities")]
 pub mod bytecode_deep_compare_test;
+#[cfg(feature = "bytecode_abilities")]
+pub mod bytecode_validation_test;
 pub mod cannot_baton_touch_test;
 pub mod card_ability_tests;
 pub mod card_count_state_test;
@@ -78,9 +78,12 @@ pub mod hasunosora_bp6_test;
 pub mod hasunosora_pb1_test;
 pub mod hazuki_test;
 pub mod heart_override_test;
+pub mod himeno_bp5_live_start_test;
 pub mod himeno_front_test;
+pub mod himeno_position_change_single_test;
 pub mod himeno_test;
 pub mod hinoshita_test;
+pub mod honoka_bp5_live_score_test;
 pub mod honoka_test;
 pub mod izumi_bp5_test;
 pub mod izumi_bp6_test;

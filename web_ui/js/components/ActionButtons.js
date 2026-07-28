@@ -117,7 +117,7 @@ export const ActionButtons = {
             name = i18n.t('skip');
         }
         name = StringUtils.cleanCardName(name);
-        const isBaton = params.use_baton_touch || (name && (name.includes('Baton') || name.includes('バトン')));
+        const isBaton = params.use_baton_touch || (name && (name.includes('Baton') || name.includes('バトン') || name.includes('baton')));
 
         if (a.action_type === 'select_mulligan') {
             const ci = params.card_index;
@@ -138,8 +138,8 @@ export const ActionButtons = {
             const cardName = displayCard
                 ? (currentLang === 'en' ? i18n.translateCard(displayCard).name : StringUtils.cleanCardName(displayCard.name))
                 : (name || '?');
-            const prefix = isSelected ? '✓ ' : '';
-            const displayName = prefix + cardName;
+            const selLabel = isSelected ? i18n.t('selected_label') : i18n.t('unselected_label');
+            const displayName = `[${selLabel}] ${cardName}`;
             if (isMini) return `<span class="truncate-name">${displayName}</span>`;
             return `<div class="action-title">${Tooltips.enrichAbilityText(displayName)}</div>`;
         }
@@ -150,8 +150,8 @@ export const ActionButtons = {
             const cardName = displayCard
                 ? (currentLang === 'en' ? i18n.translateCard(displayCard).name : StringUtils.cleanCardName(displayCard.name))
                 : (name || '?');
-            const prefix = isSelected ? '✓ ' : '';
-            const displayName = prefix + cardName;
+            const selLabel = isSelected ? i18n.t('selected_label') : i18n.t('unselected_label');
+            const displayName = `[${selLabel}] ${cardName}`;
             if (isMini) return `<span class="truncate-name">${displayName}</span>`;
             return `<div class="action-title">${Tooltips.enrichAbilityText(displayName)}</div>`;
         }
@@ -163,9 +163,9 @@ export const ActionButtons = {
             return Tooltips.enrichAbilityText(label);
         } else {
             let displayName = name;
-            const isActivation = displayName.includes('(起動)') || displayName.includes('(Activate)') || a.action_type === 'use_ability';
+            const isActivation = displayName.includes('(起動)') || displayName.includes('(Activation)') || displayName.includes('(Activate)') || a.action_type === 'use_ability';
             if (isActivation) {
-                displayName = displayName.split(' (起動)')[0].split(' (Activate)')[0];
+                displayName = displayName.split(' (起動)')[0].split(' (Activation)')[0].split(' (Activate)')[0];
             }
             displayName = Tooltips.enrichAbilityText(displayName);
 

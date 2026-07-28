@@ -188,6 +188,8 @@ function _renderStageChoice(items, choice) {
     // Determine player targeting from choice-level context
     const choiceText = (choice?.prompt_en || choice?.description || choice?.title || '');
     const allOpponent = /opponent/i.test(choiceText) && !/your|self/i.test(choiceText);
+    const selfPlayerIdx = choice?.choice_player_id === 'p2' ? 1 : 0;
+    const opponentIdx = selfPlayerIdx === 0 ? 1 : 0;
 
     function parsePlayerAndPos(item) {
         const params = item.action?.parameters || {};
@@ -199,7 +201,7 @@ function _renderStageChoice(items, choice) {
         const optText = (optIdx !== undefined && choice?.options?.[optIdx]) ? String(choice.options[optIdx]) : '';
         const prefixed = optText.startsWith('opponent:') || optText.startsWith('self:');
         const isOpp = prefixed ? optText.startsWith('opponent:') : allOpponent;
-        return { player: isOpp ? 1 : 0, posKey: STAGE_POSITIONS[idx].key, slotIdx: idx, item };
+        return { player: isOpp ? opponentIdx : selfPlayerIdx, posKey: STAGE_POSITIONS[idx].key, slotIdx: idx, item };
     }
 
     const parsed = allItems.map(parsePlayerAndPos).filter(p => p !== null);
@@ -209,7 +211,6 @@ function _renderStageChoice(items, choice) {
         playerGroups[p.player][p.posKey] = p.item;
     }
 
-    const pp = State.perspectivePlayer;
     const state = State.data;
 
     for (const [playerStr, posMap] of Object.entries(playerGroups)) {
@@ -221,10 +222,10 @@ function _renderStageChoice(items, choice) {
         const stageBlock = document.createElement('div');
         stageBlock.className = 'stage-choice-block';
 
-        const isSelf = (pp === 0 && playerIdx === 0) || (pp === 1 && playerIdx === 1);
+        const isSelf = playerIdx === selfPlayerIdx;
         const titleEl = document.createElement('div');
         titleEl.className = 'stage-choice-player-title';
-        titleEl.textContent = isSelf ? 'Your Stage' : 'Opponent Stage';
+        titleEl.textContent = isSelf ? i18n.t('stage_your') : i18n.t('stage_opponent');
         stageBlock.appendChild(titleEl);
 
         const row = document.createElement('div');

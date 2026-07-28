@@ -277,40 +277,46 @@ impl AbilityResolver {
                     let card_db = &gs.card_database;
                     let cost_limit = cost.cost_limit_any();
                     let card_type_filter = card_type.as_deref();
-                    let mut filter = cost.filter_subset();
-                    filter.card_type = card_type_filter;
-                    filter.cost_limit = cost_limit;
-                    let resolved_group: Option<String> =
-                        if cost.group_reference_any().as_deref() == Some("same_group_name") {
-                            self.activating_card_id
-                                .and_then(|cid| card_db.get_card(cid))
-                                .and_then(|c| {
-                                    if c.group.is_empty() {
-                                        None
-                                    } else {
-                                        Some(c.group.to_string())
-                                    }
-                                })
-                        } else {
-                            None
-                        };
-                    if let Some(ref g) = resolved_group {
-                        filter.group = Some(g.as_str());
-                    }
-                    let mut matching_indices: Vec<usize> = pl
-                        .hand
-                        .cards
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, &cid)| filter.matches(card_db, cid, false))
-                        .map(|(i, _)| i)
-                        .collect();
-                    // Activating card has no group — no cards can satisfy "same_group_name"
-                    if cost.group_reference_any().as_deref() == Some("same_group_name")
-                        && resolved_group.is_none()
-                    {
-                        matching_indices.clear();
-                    }
+                    let is_same_group_name =
+                        cost.group_reference_any().as_deref() == Some("same_group_name");
+                    let mut matching_indices: Vec<usize> = if is_same_group_name {
+                        // "same_group_name" = 2 cards from hand that share a group name
+                        // with each other (any group, not necessarily the activating card's).
+                        // Build a group→count map, then only allow cards from groups with
+                        // at least `count` members.
+                        use std::collections::HashMap;
+                        let mut group_counts: HashMap<String, Vec<usize>> = HashMap::new();
+                        for (i, &cid) in pl.hand.cards.iter().enumerate() {
+                            if let Some(card) = card_db.get_card(cid) {
+                                if !card.group.is_empty() {
+                                    group_counts
+                                        .entry(card.group.to_string())
+                                        .or_default()
+                                        .push(i);
+                                }
+                            }
+                        }
+                        let needed = count;
+                        let mut indices: Vec<usize> = Vec::new();
+                        for (_group, members) in &group_counts {
+                            if members.len() >= needed {
+                                indices.extend(members);
+                            }
+                        }
+                        indices.sort_unstable();
+                        indices
+                    } else {
+                        let mut filter = cost.filter_subset();
+                        filter.card_type = card_type.as_deref();
+                        filter.cost_limit = cost.cost_limit_any();
+                        pl.hand
+                            .cards
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, &cid)| filter.matches(card_db, cid, false))
+                            .map(|(i, _)| i)
+                            .collect()
+                    };
                     let is_optional = (optional || is_any_number) && !is_activation;
                     let match_names: Vec<String> = matching_indices
                         .iter()
@@ -403,7 +409,7 @@ impl AbilityResolver {
                                 entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
                             }
                         }
-                        let filtered = if resolved_group.is_some() {
+                        let filtered = if is_same_group_name {
                             Some(matching_indices.clone())
                         } else {
                             None
@@ -434,7 +440,7 @@ impl AbilityResolver {
                                     cost.cost_limit_any(),
                                     cost.cost_limit_operator_any().map(|s| s.to_string()),
                                 )
-                                .group(resolved_group.clone().or_else(|| {
+                                .group(None::<String>.or_else(|| {
                                     cost.group_names_any().clone().map(|v| v.join(","))
                                 }))
                                 .characters(cost.characters_any().cloned())

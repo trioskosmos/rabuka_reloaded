@@ -215,7 +215,7 @@ export const LogRenderer = {
         if (constantStatuses.length > 0) {
             const jyoujiBar = document.createElement('div');
             jyoujiBar.className = 'jyouji-status-bar';
-            jyoujiBar.innerHTML = `<span class="jyouji-bar-label">⚡ 常時:</span> `;
+            jyoujiBar.innerHTML = `<span class="jyouji-bar-label">⚡ ${i18n.t('constant')}:</span> `;
             constantStatuses.forEach((cs, idx) => {
                 const allMet = cs.all_conditions_met;
                 const icon = allMet ? '🟢' : '🔴';
@@ -427,7 +427,7 @@ export const LogRenderer = {
         const triggerText = meta.trigger || '?';
         const triggerIcon = TRIGGER_ICONS[triggerText] || '';
         const triggerImg = triggerIcon ? `<img src="img/texticon/${triggerIcon}.png" class="heart-mini-icon" title="${triggerText}" style="width:14px;height:14px;vertical-align:middle;">` : '';
-        const zoneLabel = meta.zone === 'stage' ? 'ステージ' : meta.zone === 'live_card_zone' ? 'ライブ置場' : meta.zone || '?';
+        const zoneLabel = meta.zone === 'stage' ? i18n.t('zone_stage') : meta.zone === 'live_card_zone' ? i18n.t('zone_live_card') : meta.zone || '?';
         headerDiv.innerHTML = `
             <div class="log-entry-icon"> </div>
             <div class="log-entry-content">
@@ -464,7 +464,7 @@ export const LogRenderer = {
             const resultIcon = meta.result === 'success' ? '✓' : '✗';
             resultDiv.innerHTML = `<div class="ability-cond-row">
                 <span class="ability-cond-icon ${resultClass}">${resultIcon}</span>
-                <span class="ability-cond-text"><strong>結果: ${meta.result}</strong></span>
+                <span class="ability-cond-text"><strong>${i18n.t('cond_result')}: ${meta.result}</strong></span>
             </div>`;
             detailsContainer.appendChild(resultDiv);
         } else if (meta.resolved && meta.items && meta.items.length === 0) {
@@ -479,10 +479,11 @@ export const LogRenderer = {
             resultDiv.className = 'log-entry effect detail';
             const resultClass = meta.result === 'success' ? 'ability-pass' : 'ability-fail';
             const resultIcon = meta.result === 'success' ? '✓' : '✗';
-            const resultLabel = meta.result === 'skipped' ? 'スキップ' : meta.result === 'failure' ? '失敗' : meta.result === 'position_fail' ? '位置条件不成立' : meta.result;
+            const RESULT_LABELS = { 'skipped': i18n.t('result_skipped'), 'failure': i18n.t('result_failure'), 'position_fail': i18n.t('result_position_fail') };
+            const resultLabel = RESULT_LABELS[meta.result] || meta.result;
             resultDiv.innerHTML = `<div class="ability-cond-row">
                 <span class="ability-cond-icon ${resultClass}">${resultIcon}</span>
-                <span class="ability-cond-text"><strong>結果: ${resultLabel}</strong></span>
+                <span class="ability-cond-text"><strong>${i18n.t('cond_result')}: ${resultLabel}</strong></span>
                 ${meta.error ? `<span class="ability-cond-detail">(${meta.error})</span>` : ''}
             </div>`;
             detailsContainer.appendChild(resultDiv);
@@ -496,7 +497,7 @@ export const LogRenderer = {
             }
             const pendingDiv = document.createElement('div');
             pendingDiv.className = 'log-entry effect detail';
-            pendingDiv.innerHTML = `<span class="ability-cond-text">結果: ${meta.result === 'pending' ? '条件評価待ち' : meta.result}</span>`;
+            pendingDiv.innerHTML = `<span class="ability-cond-text">${i18n.t('cond_result')}: ${meta.result === 'pending' ? i18n.t('result_pending') : meta.result}</span>`;
             detailsContainer.appendChild(pendingDiv);
         }
         blockDiv.appendChild(detailsContainer);
@@ -549,6 +550,51 @@ export const LogRenderer = {
             return Tooltips.enrichAbilityText(result);
         };
         const e = (text) => Tooltips.enrichAbilityText(text || '');
+        const ACTION_LABELS = {
+            'move_cards': i18n.t('log_move'),
+            'draw_card': i18n.t('log_draw_card') || 'Draw card',
+            'gain_resource': i18n.t('log_gain_resource_label') || 'Gain resource',
+            'change_state': i18n.t('log_change_state') || 'Change state',
+            'modify_score': i18n.t('log_score_modify_label') || 'Modify score',
+            'position_change': i18n.t('log_position_change'),
+            'select': i18n.t('log_select'),
+            'select_cards': i18n.t('log_select'),
+            'look_at': i18n.t('log_look_at') || 'Look at cards',
+            'reveal': i18n.t('log_reveal') || 'Reveal cards',
+            'pay_energy': i18n.t('log_pay_energy') || 'Pay energy',
+            'look_and_select': i18n.t('log_look_and_select') || 'Look and select',
+            'restriction': i18n.t('log_restriction'),
+            'gain_ability': i18n.t('log_gain_ability'),
+            'do_nothing': '',
+            'sequential': '',
+            'choice': i18n.t('log_choice') || 'Choose 1',
+            'play_baton_touch': i18n.t('log_baton_touch') || 'Baton touch',
+            'modify_required_hearts': i18n.t('log_required_hearts_label') || 'Modify required hearts',
+            'activate_ability': i18n.t('log_activate_ability') || 'Activate ability',
+            'set_card_identity': i18n.t('log_set_card_identity') || 'Set card identity',
+            'set_blade_count': i18n.t('log_set_blade') || 'Set blade',
+            'set_heart_type': i18n.t('log_set_heart_type'),
+            'set_blade_type': i18n.t('log_set_blade_type'),
+            'discard_until_count': i18n.t('log_discard_until'),
+            'draw_until_count': i18n.t('log_draw_until') || 'Draw until count',
+            'modify_cost': i18n.t('log_modify_cost') || 'Modify cost',
+            'modify_yell_count': i18n.t('log_yell_count_label') || 'Modify yell count',
+            'perform_yell': i18n.t('log_perform_yell') || 'Perform yell',
+            're_yell': i18n.t('log_re_yell'),
+            'specify_heart_color': i18n.t('log_heart_select'),
+            'place_energy_under_member': i18n.t('log_energy_under'),
+            'invalidate_ability': i18n.t('log_negate_ability'),
+            'choose_target_player': i18n.t('log_choose_player') || 'Choose player',
+            'repeat_procedure': i18n.t('log_repeat') || 'Repeat',
+            'sequential_cost': '',
+            'reveal_until_live_card': i18n.t('log_reveal_until_live') || 'Reveal until live card',
+            'gain_ability_from_source': i18n.t('log_gain_ability_from_source'),
+            'conditional_on_optional': '',
+            'conditional_on_result': '',
+            'conditional_alternative': '',
+            'reduce_live_card_set_limit': i18n.t('log_reduce_live_limit') || 'Reduce live card set limit',
+        };
+        const describeEffectAction = (action) => ACTION_LABELS[action] || action;
         const div = document.createElement('div');
         div.className = 'log-entry effect detail ability-log-item';
 
@@ -559,13 +605,12 @@ export const LogRenderer = {
                 let html = `<div class="ability-cond-row">
                     <span class="ability-cond-icon">${iconChar}</span>
                     <span class="ability-cond-text">${_t(item.text)}</span>
-                </div>
-                ${item.type ? `<div class="ability-cond-type">${item.type}</div>` : ''}`;
+                </div>`;
                 if (item.expectation || item.actual) {
                     html += `<div class="ability-cond-detail">
-                        <span class="ability-label">期待:</span>
+                        <span class="ability-label">${i18n.t('cond_expect')}:</span>
                         <span class="ability-value">${_t(item.expectation)}</span>
-                        <span class="ability-label">実際:</span>
+                        <span class="ability-label">${i18n.t('cond_actual')}:</span>
                         <span class="ability-value">${_t(item.actual)}</span>
                         <span class="ability-result ${item.passed ? 'pass' : 'fail'}">
                             ${iconChar}
@@ -592,19 +637,22 @@ export const LogRenderer = {
                 div.innerHTML = `<div class="ability-cost-row">
                     <span class="ability-cond-icon"> </span>
                     <span class="ability-cond-text">${_t(item.text)}</span>
-                    <span class="ability-label">期待:</span>
+                    <span class="ability-label">${i18n.t('cond_expect')}:</span>
                     <span class="ability-value">${_t(item.expectation)}</span>
-                    <span class="ability-label">実際:</span>
+                    <span class="ability-label">${i18n.t('cond_actual')}:</span>
                     <span class="ability-value">${_t(item.actual)}</span>
                     <span class="ability-result ${item.passed ? 'pass' : 'fail'}">${iconChar}</span>
                 </div>`;
                 break;
             }
             case 'Effect': {
+                const actionLabel = item.action ? describeEffectAction(item.action) : '';
+                const effectText = item.text || actionLabel;
+                const effectDetails = item.details || '';
                 div.innerHTML = `<div class="ability-effect-row">
                     <span class="ability-cond-icon"> </span>
-                    <span class="ability-cond-text">${_t(item.text)}</span>
-                    <span class="ability-effect-detail">${_t(item.details || item.action || '')}</span>
+                    <span class="ability-cond-text">${_t(effectText)}</span>
+                    ${effectDetails ? `<span class="ability-effect-detail">${_t(effectDetails)}</span>` : ''}
                 </div>`;
                 break;
             }
@@ -715,10 +763,10 @@ export const LogRenderer = {
         } else if (group.entry.includes('===')) {
             div.classList.add('turn');
             entryType = 'turn';
-        } else if (entryUpper.includes('ハート') || entryUpper.includes('heart') || entryUpper.includes('ブレード') || entryUpper.includes('blade')) {
+        } else if (entryUpper.includes('ハート') || entryUpper.includes('HEART') || entryUpper.includes('ブレード') || entryUpper.includes('BLADE')) {
             div.classList.add('effect');
             entryType = 'heart_effect';
-        } else if (entryUpper.includes('能力') || entryUpper.includes('ability') || entryUpper.includes('スコア') || entryUpper.includes('コスト')) {
+        } else if (entryUpper.includes('能力') || entryUpper.includes('ABILITY') || entryUpper.includes('スコア') || entryUpper.includes('SCORE') || entryUpper.includes('コスト') || entryUpper.includes('COST')) {
             div.classList.add('effect');
             entryType = 'ability_effect';
         } else if (entryUpper.includes('[ACTIVATED]') || entryUpper.includes('[TRIGGERED]')) {

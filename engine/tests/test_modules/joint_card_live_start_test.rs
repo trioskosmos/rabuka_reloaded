@@ -601,11 +601,7 @@ fn test_bp4_debut_wait_opponent_members_after_selection() {
     // ayumu cost=2 → filter: cost≤2 AND original blade≤3
     // p2_low (cost=2, blade=1) should be waited (orientation = "wait")
     let ori = |cid| game.state.mods.get_orientation_modifier(cid);
-    assert_eq!(
-        ori(p2_low),
-        Some("wait"),
-        "p2_low should be waited"
-    );
+    assert_eq!(ori(p2_low), Some("wait"), "p2_low should be waited");
     assert_ne!(
         ori(p2_high_cost),
         Some("wait"),

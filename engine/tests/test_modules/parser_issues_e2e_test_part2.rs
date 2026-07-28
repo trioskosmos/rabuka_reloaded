@@ -270,8 +270,8 @@ fn issue8_honoka_live_score_dynamic() {
 
     // Honoka on stage
     game.state.player1.stage.stage[0] = honoka;
-    // Place live card in success zone with its score (score=1)
-    game.state.player1.success_live_card_zone.cards.push(live);
+    // Place live card in live_card_zone (the zone total_live_score reads from)
+    game.state.player1.live_card_zone.cards.push(live);
     // Add a card to hand so the optional cost can be paid
     let cost_fodder = game.id("PL!-sd1-010-SD");
     game.state.player1.hand.cards.push(cost_fodder);
@@ -322,7 +322,7 @@ fn issue8_honoka_live_score_2() {
     let filler = game.id_ref("PL!-sd1-010-SD");
 
     game.state.player1.stage.stage[0] = honoka;
-    game.state.player1.success_live_card_zone.cards.push(live2);
+    game.state.player1.live_card_zone.cards.push(live2);
     let cost_fodder = game.id("PL!-sd1-010-SD");
     game.state.player1.hand.cards.push(cost_fodder);
     game.state.player1.main_deck.cards.clear();
@@ -369,8 +369,8 @@ fn issue8_honoka_live_score_1_plus_2() {
     let filler = game.id_ref("PL!-sd1-010-SD");
 
     game.state.player1.stage.stage[0] = honoka;
-    game.state.player1.success_live_card_zone.cards.push(live1);
-    game.state.player1.success_live_card_zone.cards.push(live2);
+    game.state.player1.live_card_zone.cards.push(live1);
+    game.state.player1.live_card_zone.cards.push(live2);
     let cost_fodder = game.id("PL!-sd1-010-SD");
     game.state.player1.hand.cards.push(cost_fodder);
     game.state.player1.main_deck.cards.clear();

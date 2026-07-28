@@ -147,48 +147,20 @@ impl<'a> ConditionContext<'a> {
     }
 }
 
-/// Push a condition verdict to the structured log buffer.
-/// `actual_label` overrides the auto-generated actual string; use "" to auto-generate.
-#[cfg(not(feature = "no_std"))]
-pub fn push_cond_verdict(
-    condition: &Condition,
-    extra_actual: &str,
-    passed: bool,
-    children: Vec<crate::ability::log::AbilityLogItem>,
-) {
-    use crate::ability::log::{push_verdict, AbilityLogItem};
-    let condition_type = match condition {
-        Condition::Appearance { .. } => "appearance_condition",
-        Condition::Comparison { .. } => "comparison_condition",
-        Condition::Location { .. } => "card_count_condition",
-        Condition::Movement { .. } => "movement_condition",
-        Condition::Group { .. } => "group_condition",
-        Condition::PositionCond { .. } => "position_condition",
-        Condition::Resource { .. } => "resource_condition",
-        Condition::ScoreThreshold { .. } => "score_threshold_condition",
-        Condition::State { .. } => "state_condition",
-        Condition::Temporal { .. } => "temporal_condition",
-        Condition::AbilityFilter { .. } => "ability_filter_condition",
-        Condition::Choice { .. } => "choice_condition",
-        Condition::Complex { .. } => "complex_condition",
-        Condition::OpponentChoice { .. } => "opponent_choice_condition",
-        Condition::OpponentLiveSuccess { .. } => "opponent_live_success",
-        Condition::NoExcessHeart { .. } => "no_excess_heart",
-        Condition::Compound { .. } => "compound",
-        Condition::AnyOf { .. } => "any_of_condition",
-        Condition::AlwaysTrue { .. } => "otherwise_condition",
-        Condition::AllRevealedMatchHeartColor { .. } => "all_revealed_match_heart_color",
-    }
-    .to_string();
+/// Produce a user-friendly human-readable expectation string for a condition.
+fn describe_condition_expectation(condition: &Condition) -> String {
     let op = condition.get_operator().unwrap_or(">=");
     let threshold = condition
         .get_count()
         .map(|c| c.to_string())
         .unwrap_or_default();
-    let resource = condition.get_resource_type().unwrap_or("");
     let location = condition.get_location().unwrap_or("");
+    let ct_field = condition
+        .get_card_type()
+        .map(|ct| ct.as_str())
+        .unwrap_or("");
 
-    let expectation = match condition {
+    match condition {
         Condition::Appearance { .. } => {
             if let Some(ref chars) = condition.get_characters() {
                 if !chars.is_empty() {
@@ -226,26 +198,25 @@ pub fn push_cond_verdict(
             }
         }
         Condition::Comparison { .. } => {
-            if !resource.is_empty() {
-                format!("{}{} {}{}", op, threshold, resource, location)
-            } else if !location.is_empty() {
-                format!("{}{} {}", op, threshold, location)
+            let loc = if !location.is_empty() {
+                format!(" ({})", describe_zone_label(location))
             } else {
-                format!("{}{}", op, threshold)
-            }
+                String::new()
+            };
+            format!("{} {}{}", op, threshold, loc)
         }
         Condition::Location { .. } => {
-            let ct_field = condition
-                .get_card_type()
-                .map(|ct| ct.as_str())
-                .unwrap_or("");
-            if !ct_field.is_empty() {
-                format!("{}{} {} {}", op, threshold, ct_field, location)
-            } else if !location.is_empty() {
-                format!("{}{} {}", op, threshold, location)
+            let zone_desc = if !location.is_empty() {
+                describe_zone_label(location)
             } else {
-                format!("{}{}", op, threshold)
-            }
+                "anywhere".into()
+            };
+            let type_desc = if !ct_field.is_empty() {
+                describe_card_type_label(ct_field)
+            } else {
+                "cards".into()
+            };
+            format!("{} {} {} in {}", op, threshold, type_desc, zone_desc)
         }
         Condition::Group { .. } => {
             if let Some(gns) = condition.get_group_names() {
@@ -262,36 +233,21 @@ pub fn push_cond_verdict(
             }
         }
         Condition::Resource { .. } => {
-            format!("ブレード{}{}", op, threshold)
+            format!("ブレード {} {}", op, threshold)
         }
         Condition::ScoreThreshold { .. } => {
-            format!("スコア{}{}", op, threshold)
+            format!("スコア {} {}", op, threshold)
         }
-        Condition::State {
-            energy_state,
-            state,
-            ..
-        } => {
-            if energy_state.is_some() {
-                energy_state
-                    .as_deref()
-                    .unwrap_or("エネルギー状態")
-                    .to_string()
-            } else {
-                let st = state.as_ref().map(|s| s.as_str()).unwrap_or("状態");
-                let loc = condition.get_location().unwrap_or("stage");
-                format!("{}状態を{}で確認", st, loc)
-            }
+        Condition::State { .. } => {
+            let st = condition.get_state().map(|s| s.as_str()).unwrap_or("状態");
+            let loc = describe_zone_label(location);
+            format!("{}状態のメンバー in {}", st, loc)
         }
         Condition::Movement { .. } => {
             format!("移動={}", condition.get_movement().unwrap_or("?"))
         }
         Condition::Temporal { .. } => condition.get_temporal().unwrap_or("タイミング").to_string(),
-        Condition::AbilityFilter { .. } => condition
-            .get_ability_filter()
-            .map(|_| "フィルター")
-            .unwrap_or("フィルター")
-            .to_string(),
+        Condition::AbilityFilter { .. } => "フィルター".into(),
         Condition::NoExcessHeart { .. } => "余剰ハートなし".into(),
         Condition::Choice { .. }
         | Condition::Complex { .. }
@@ -301,21 +257,82 @@ pub fn push_cond_verdict(
         | Condition::AnyOf { .. }
         | Condition::AlwaysTrue { .. }
         | Condition::AllRevealedMatchHeartColor { .. } => String::new(),
-    };
+    }
+}
+
+fn describe_zone_label(zone: &str) -> String {
+    match zone {
+        "hand" => "[[zone_hand]]".into(),
+        "discard" | "waitroom" => "[[zone_discard]]".into(),
+        "deck" => "[[zone_deck]]".into(),
+        "deck_top" => "[[zone_deck_top]]".into(),
+        "deck_bottom" => "[[zone_deck_bottom]]".into(),
+        "stage" => "[[zone_stage]]".into(),
+        "energy" | "energy_zone" => "[[zone_energy]]".into(),
+        "live_card_zone" => "[[zone_live_card]]".into(),
+        "success_zone" | "success_live_zone" => "[[zone_success_live]]".into(),
+        "revealed_cards" => "[[zone_revealed]]".into(),
+        "those_cards" => "[[zone_those_cards]]".into(),
+        "all_selected" => "[[zone_selected]]".into(),
+        "under_member" => "[[zone_under_member]]".into(),
+        _ => zone.to_string(),
+    }
+}
+
+fn describe_card_type_label(ct: &str) -> String {
+    match ct {
+        "member_card" => "[[card_type_member]]".into(),
+        "live_card" => "[[card_type_live]]".into(),
+        "energy_card" => "[[card_type_energy]]".into(),
+        "card" => "[[card_type_card]]".into(),
+        _ => ct.to_string(),
+    }
+}
+
+/// Push a condition verdict to the structured log buffer.
+/// `actual_label` overrides the auto-generated actual string; use "" to auto-generate.
+#[cfg(not(feature = "no_std"))]
+pub fn push_cond_verdict(
+    condition: &Condition,
+    extra_actual: &str,
+    passed: bool,
+    children: Vec<crate::ability::log::AbilityLogItem>,
+) {
+    use crate::ability::log::{push_verdict, AbilityLogItem};
+    let condition_type = match condition {
+        Condition::Appearance { .. } => "appearance_condition",
+        Condition::Comparison { .. } => "comparison_condition",
+        Condition::Location { .. } => "card_count_condition",
+        Condition::Movement { .. } => "movement_condition",
+        Condition::Group { .. } => "group_condition",
+        Condition::PositionCond { .. } => "position_condition",
+        Condition::Resource { .. } => "resource_condition",
+        Condition::ScoreThreshold { .. } => "score_threshold_condition",
+        Condition::State { .. } => "state_condition",
+        Condition::Temporal { .. } => "temporal_condition",
+        Condition::AbilityFilter { .. } => "ability_filter_condition",
+        Condition::Choice { .. } => "choice_condition",
+        Condition::Complex { .. } => "complex_condition",
+        Condition::OpponentChoice { .. } => "opponent_choice_condition",
+        Condition::OpponentLiveSuccess { .. } => "opponent_live_success",
+        Condition::NoExcessHeart { .. } => "no_excess_heart",
+        Condition::Compound { .. } => "compound",
+        Condition::AnyOf { .. } => "any_of_condition",
+        Condition::AlwaysTrue { .. } => "otherwise_condition",
+        Condition::AllRevealedMatchHeartColor { .. } => "all_revealed_match_heart_color",
+    }
+    .to_string();
+
+    let expectation = describe_condition_expectation(condition);
 
     let actual = if !extra_actual.is_empty() {
         extra_actual.to_string()
-    } else if passed {
-        "条件満たす".into()
     } else {
-        "条件満たさない".into()
+        describe_condition_expectation(condition)
     };
 
     push_verdict(AbilityLogItem::Condition {
-        text: condition
-            .get_text()
-            .map(|s| s.to_string())
-            .unwrap_or_default(),
+        text: describe_condition_expectation(condition),
         condition_type,
         expectation,
         actual,

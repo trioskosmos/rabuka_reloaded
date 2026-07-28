@@ -164,7 +164,7 @@ impl AbilityResolver {
             {
                 let player = gs.resolve_target_player("self");
                 player
-                    .success_live_card_zone
+                    .live_card_zone
                     .cards
                     .iter()
                     .filter_map(|&id| gs.card_database.get_card(id).and_then(|c| c.score))

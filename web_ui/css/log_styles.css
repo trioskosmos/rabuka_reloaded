@@ -1204,7 +1204,6 @@
     display: flex;
     align-items: flex-start;
     gap: 4px;
-    flex-wrap: wrap;
 }
 
 .ability-cond-icon {
@@ -1235,7 +1234,8 @@
     margin-top: 2px;
     padding-left: 22px;
     font-size: 0.78rem;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow: hidden;
 }
 
 .ability-label {

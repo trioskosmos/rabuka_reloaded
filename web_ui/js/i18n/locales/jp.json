@@ -579,6 +579,8 @@
   "result_pending": "条件評価待ち",
 
   "constant": "常時",
+  "stage_your": "自分のステージ",
+  "stage_opponent": "相手のステージ",
 
   "log_activation_cost": "起動コスト{op} {value}",
   "log_set_blade_count": "ブレード数を{n}に設定",

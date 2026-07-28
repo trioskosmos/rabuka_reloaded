@@ -109,7 +109,7 @@ export const LogDetailModal = {
 
         const heartMatch = body.match(/(ハート|heart)\s*([\+\-]\d+)\s*\(?(\w+)\)?/i);
         const bladeMatch = body.match(/(ブレード|blade)\s*([\+\-]\d+)/i);
-        const scoreMatch = body.match(/スコア.*?(\d+)/i);
+        const scoreMatch = body.match(/(スコア|score).*?(\d+)/i);
 
         if (heartMatch || bladeMatch || scoreMatch) {
             const list = document.createElement('ul');
@@ -118,17 +118,17 @@ export const LogDetailModal = {
             if (heartMatch) {
                 const li = document.createElement('li');
                 const colorIdx = parseInt(heartMatch[3]?.replace('heart', '') || '0');
-                li.innerHTML = `ハート ${heartMatch[2]} ${hIcon(colorIdx)}`;
+                li.innerHTML = `${i18n.t('heart')} ${heartMatch[2]} ${hIcon(colorIdx)}`;
                 list.appendChild(li);
             }
             if (bladeMatch) {
                 const li = document.createElement('li');
-                li.innerHTML = `ブレード ${bladeMatch[2]} <img src="img/texticon/icon_blade.png" class="heart-mini-icon" alt="">`;
+                li.innerHTML = `${i18n.t('blade')} ${bladeMatch[2]} <img src="img/texticon/icon_blade.png" class="heart-mini-icon" alt="">`;
                 list.appendChild(li);
             }
             if (scoreMatch) {
                 const li = document.createElement('li');
-                li.innerHTML = `スコア ${scoreMatch[1]} <img src="img/texticon/icon_score.png" class="heart-mini-icon" alt="">`;
+                li.innerHTML = `${i18n.t('score')} ${scoreMatch[2]} <img src="img/texticon/icon_score.png" class="heart-mini-icon" alt="">`;
                 list.appendChild(li);
             }
 
@@ -142,7 +142,7 @@ export const LogDetailModal = {
 
             const passMatch = body.match(/Score:\s*(\d+)/);
             const score = passMatch ? passMatch[1] : '?';
-            result.innerHTML = `<strong>${isPass ? '✓ PASS' : '✗ FAIL'}</strong> スコア: ${score}`;
+            result.innerHTML = `<strong>${isPass ? '✓ PASS' : '✗ FAIL'}</strong> ${i18n.t('score')}: ${score}`;
             div.appendChild(result);
         }
 

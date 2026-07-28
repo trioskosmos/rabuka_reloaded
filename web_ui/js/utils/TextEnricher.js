@@ -1,5 +1,6 @@
 import { State } from '../state.js';
 import { ICON_DATA_URIs } from '../assets_registry.js';
+import * as i18n from '../i18n/index.js';
 
 // Pre-compiled regex patterns for performance
 const REGEX_HTML_TAG = /<[^>]+>/g;
@@ -416,10 +417,10 @@ export const TextEnricher = {
     getActionTags: (action, vertical = false) => {
         if (!action || !action.triggers) return "";
         const tags = [];
-        if (action.triggers.includes(1)) tags.push(`<img src="img/texticon/toujyou.png" alt="[登場時]" style="height:14px; vertical-align:middle;">`);
-        if (action.triggers.includes(2)) tags.push(`<img src="img/texticon/live_start.png" alt="[開始時]" style="height:14px; vertical-align:middle;">`);
-        if (action.triggers.includes(7)) tags.push(`<img src="img/texticon/kidou.png" alt="[起動]" style="height:14px; vertical-align:middle;">`);
-        if (action.triggers.includes(6)) tags.push(`<img src="img/texticon/jyouji.png" alt="[常時]" style="height:14px; vertical-align:middle;">`);
+        if (action.triggers.includes(1)) tags.push(`<img src="img/texticon/toujyou.png" alt="[${i18n.t('trigger_debut')}]" style="height:14px; vertical-align:middle;">`);
+        if (action.triggers.includes(2)) tags.push(`<img src="img/texticon/live_start.png" alt="[${i18n.t('trigger_live_start')}]" style="height:14px; vertical-align:middle;">`);
+        if (action.triggers.includes(7)) tags.push(`<img src="img/texticon/kidou.png" alt="[${i18n.t('trigger_activation')}]" style="height:14px; vertical-align:middle;">`);
+        if (action.triggers.includes(6)) tags.push(`<img src="img/texticon/jyouji.png" alt="[${i18n.t('trigger_constant')}]" style="height:14px; vertical-align:middle;">`);
 
         if (tags.length === 0) return "";
         if (vertical) {

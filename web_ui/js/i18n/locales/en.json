@@ -453,6 +453,8 @@
   "result_pending": "Evaluating conditions...",
 
   "constant": "Constant",
+  "stage_your": "Your Stage",
+  "stage_opponent": "Opponent Stage",
   "log_activation_cost": "Activation cost {op} {value}",
   "log_set_blade_count": "Blade count set to {n}",
   "log_modify_cost": "Cost {op} {value}",
