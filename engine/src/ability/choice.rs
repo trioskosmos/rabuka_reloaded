@@ -2379,6 +2379,10 @@ impl super::resolver::AbilityResolver {
         );
         if selected == "skip" {
             self.formation_plan.clear();
+            // Clear pending actions so conditional-sequential sub-effects
+            // (e.g. gain_resource gated by this position change) don't fire
+            // when the player skips.
+            gs.ability_queue.set_pending_actions(vec![]);
             self.clear_choice_state_and_resume(gs)?;
             self.execution_context = ExecutionContext::None;
             return Ok(());

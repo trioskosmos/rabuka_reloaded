@@ -275,8 +275,8 @@ impl AbilityResolver {
                     let target_str = cost.target.as_deref().unwrap_or("self");
                     let pl = gs.resolve_target_player(target_str);
                     let card_db = &gs.card_database;
-                    let cost_limit = cost.cost_limit_any();
-                    let card_type_filter = card_type.as_deref();
+                    let _cost_limit = cost.cost_limit_any();
+                    let _card_type_filter = card_type.as_deref();
                     let is_same_group_name =
                         cost.group_reference_any().as_deref() == Some("same_group_name");
                     let mut matching_indices: Vec<usize> = if is_same_group_name {

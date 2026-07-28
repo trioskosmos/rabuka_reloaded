@@ -433,23 +433,21 @@ impl AbilityResolver {
                                 let is_opponent_action = action.action
                                     == ActionType::OpponentAction
                                     || action.action_by().as_deref() == Some("opponent");
-                                // When an optional action creates a SelectCard choice (card
-                                // selection from a zone), the effect was already fully
-                                // completed by the choice resolution — the card(s) were
-                                // moved to their destination. Re-executing with optional=None
-                                // would pick ADDITIONAL cards from the same source zone,
-                                // corrupting the count. Skip re-execution for SelectCard.
-                                let is_card_selection =
-                                    self.pending_choice.as_ref().is_some_and(|c| {
-                                        matches!(
-                                            c,
-                                            crate::ability::types::Choice::SelectCard { .. }
-                                        )
-                                    });
+                                // SelectCard/PositionChange effects are fully executed
+                                // by the choice handler. Re-executing with optional=None
+                                // would duplicate the effect. Skip re-execution for these.
+                                let completes_in_handler =
+                                    matches!(action.action, ActionType::PositionChange)
+                                        || self.pending_choice.as_ref().is_some_and(|c| {
+                                            matches!(
+                                                c,
+                                                crate::ability::types::Choice::SelectCard { .. }
+                                            )
+                                        });
                                 let mut remaining = if current_was_optional
                                     && i + 1 < repeat_actions.len()
                                     && !is_opponent_action
-                                    && !is_card_selection
+                                    && !completes_in_handler
                                 {
                                     let mut actions: Vec<Box<AbilityEffect>> =
                                         repeat_actions[i..].to_vec();
