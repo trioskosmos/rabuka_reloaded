@@ -492,6 +492,7 @@ pub async fn get_game_state(
 
     let ui_config = data.ui_config.lock().unwrap().clone();
     let final_actions = if display.waiting_for_opponent {
+        display.pending_choice = None;
         None
     } else {
         Some(actions)
@@ -624,11 +625,13 @@ fn filter_display_for_player(
 
     // 4. If the pending choice is routed to a player different from the requester,
     //    remove the entire pending_choice so the opponent's card data doesn't leak.
+    //    Also remove if choice_player_id is missing (defensive: never leak opponent choices).
     if let Some(ref pending) = display.pending_choice {
         let cpid = pending.get("choice_player_id").and_then(|v| v.as_str());
-        if let Some(cpid) = cpid {
-            let requester_str = if requester_player_id == 0 { "p1" } else { "p2" };
-            if cpid != requester_str {
+        let requester_str = if requester_player_id == 0 { "p1" } else { "p2" };
+        match cpid {
+            Some(cpid) if cpid == requester_str => {}
+            _ => {
                 display.pending_choice = None;
             }
         }
