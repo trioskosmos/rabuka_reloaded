@@ -48,6 +48,46 @@ use rabuka_engine::turn::TurnEngine;
 const DECKS_JSON: &str = include_str!("../../psp/baked/decks.json");
 use rabuka_engine::deck_parser::DECK_CARD_FILES;
 
+use rabuka_engine::game::platform_ui;
+
+struct WiiUi<'a> {
+    display: &'a mut Display,
+    input: &'a mut Input,
+}
+
+impl<'a> platform_ui::PlatformUi for WiiUi<'a> {
+    fn clear_screen(&mut self) {
+        self.display.clear();
+    }
+    fn println(&mut self, text: &str) {
+        self.display.println(text);
+    }
+    fn swap_buffers(&mut self) {
+        self.display.swap_buffers();
+    }
+    fn poll_input(&mut self) {
+        self.input.poll();
+    }
+    fn just_pressed_a(&self) -> bool {
+        self.input.just_pressed(Button::A)
+    }
+    fn just_pressed_b(&self) -> bool {
+        self.input.just_pressed(Button::B)
+    }
+    fn just_pressed_up(&self) -> bool {
+        self.input.just_pressed(Button::Up)
+    }
+    fn just_pressed_down(&self) -> bool {
+        self.input.just_pressed(Button::Down)
+    }
+    fn just_pressed_start(&self) -> bool {
+        self.input.just_pressed(Button::Start)
+    }
+    fn wait_vblank(&mut self) {
+        self.display.wait_vsync();
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn rabuka_main() {
     run_game();
@@ -61,13 +101,17 @@ fn run_game() {
     let decks: Vec<DeckEntry> = serde_json::from_str(DECKS_JSON).expect("parse decks");
     let deck_names: Vec<&str> = decks.iter().map(|d| d.name.as_str()).collect();
 
-    let mode_idx = select(&mut display, &mut input, &deck_names, "Mode");
+    let mut ui = WiiUi {
+        display: &mut display,
+        input: &mut input,
+    };
+    let mode_idx = platform_ui::select(&mut ui, &deck_names, "Mode");
     let vs_ai = mode_idx == 0;
-    let deck1_idx = select(&mut display, &mut input, &deck_names, "Your Deck");
+    let deck1_idx = platform_ui::select(&mut ui, &deck_names, "Your Deck");
     let deck2_idx = if vs_ai {
         rng::rand_range(decks.len())
     } else {
-        select(&mut display, &mut input, &deck_names, "P2 Deck")
+        platform_ui::select(&mut ui, &deck_names, "P2 Deck")
     };
 
     display.println("Loading...");
@@ -102,12 +146,20 @@ fn run_game() {
     loop {
         TurnEngine::check_victory_condition(&mut gs);
         if gs.game_result != GameResult::Ongoing {
-            show_result(&mut display, &mut input, &gs);
+            let mut ui = WiiUi {
+                display: &mut display,
+                input: &mut input,
+            };
+            platform_ui::show_result(&mut ui, &gs);
             break;
         }
         game_setup::settle_auto(&mut gs);
         if gs.game_result != GameResult::Ongoing {
-            show_result(&mut display, &mut input, &gs);
+            let mut ui = WiiUi {
+                display: &mut display,
+                input: &mut input,
+            };
+            platform_ui::show_result(&mut ui, &gs);
             break;
         }
         let actions = game_setup::generate_possible_actions(&gs);
@@ -117,16 +169,24 @@ fn run_game() {
             continue;
         }
         if gs.has_pending_choice() {
-            if !handle_choice(&mut display, &mut input, &mut gs) {
+            let mut ui = WiiUi {
+                display: &mut display,
+                input: &mut input,
+            };
+            if !platform_ui::handle_choice(&mut ui, &mut gs) {
                 break;
             }
             continue;
         }
         let is_ai = vs_ai && gs.active_player().id != gs.player1.id;
         let ok = if is_ai {
-            ai_turn(&mut gs, &actions)
+            platform_ui::ai_turn(&mut gs, &actions)
         } else {
-            human_turn(&mut display, &mut input, &mut gs, &actions)
+            let mut ui = WiiUi {
+                display: &mut display,
+                input: &mut input,
+            };
+            platform_ui::human_turn(&mut ui, &mut gs, &actions)
         };
         if !ok {
             break;
