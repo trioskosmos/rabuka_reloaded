@@ -433,17 +433,24 @@ impl AbilityResolver {
                                 let is_opponent_action = action.action
                                     == ActionType::OpponentAction
                                     || action.action_by().as_deref() == Some("opponent");
-                                // SelectCard/PositionChange effects are fully executed
-                                // by the choice handler. Re-executing with optional=None
-                                // would duplicate the effect. Skip re-execution for these.
+                                // Some handlers fully execute the effect during choice
+                                // resolution (SelectCard moves cards, PositionChange swaps
+                                // members). Re-executing with optional=None would duplicate
+                                // the effect. Detect by Choice variant — the variant
+                                // encodes whether the handler completed the work.
                                 let completes_in_handler =
-                                    matches!(action.action, ActionType::PositionChange)
-                                        || self.pending_choice.as_ref().is_some_and(|c| {
-                                            matches!(
-                                                c,
-                                                crate::ability::types::Choice::SelectCard { .. }
-                                            )
-                                        });
+                                    self.pending_choice.as_ref().is_some_and(|c| {
+                                        matches!(
+                                            c,
+                                            crate::ability::types::Choice::SelectCard { .. }
+                                        )
+                                    }) || matches!(
+                                        self.pending_choice.as_ref(),
+                                        Some(crate::ability::types::Choice::SelectTarget {
+                                            target,
+                                            ..
+                                        }) if target == "position|destination"
+                                    );
                                 let mut remaining = if current_was_optional
                                     && i + 1 < repeat_actions.len()
                                     && !is_opponent_action
