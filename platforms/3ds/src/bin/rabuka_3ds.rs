@@ -4701,6 +4701,8 @@ fn main() {
                                 if choice_image_mode
                                     && gs.has_pending_choice()
                                     && !(detail_mode && viewing_card.is_some())
+                                    && !is_ai_turn
+                                    && !is_opponent_turn_mp
                                 {
                                     // ---- Render ability banner first ----
                                     let mut grid_iy: f32 = 42.0;
@@ -5296,9 +5298,10 @@ fn main() {
                                                                 "{} {} {}",
                                                                 name, area_label, abil_short
                                                             )
-                                                        }
-                                                    }
-                                                }
+                            }
+                        }
+                        } // end if !is_ai_turn && !is_opponent_turn_mp
+                    }
                                                 _ => {
                                                     let cn = cn_or_empty(act);
                                                     let name = i18n::card_display_name(
@@ -5398,6 +5401,7 @@ fn main() {
                         }
 
                         // Highlight interactive zones for all tap-to-deploy action types
+                        if !is_ai_turn && !is_opponent_turn_mp {
                         for act in &acts_cache {
                             let p = match &act.parameters {
                                 Some(x) => x,
@@ -5488,7 +5492,8 @@ fn main() {
                             }
                         }
                         // Also highlight SelectAutoAbility option cards
-                        if choice_image_mode && gs.has_pending_choice() {
+                        if !is_ai_turn && !is_opponent_turn_mp
+                            && choice_image_mode && gs.has_pending_choice() {
                             if let Some(c) = gs.get_pending_choice() {
                                 use rabuka_engine::ability::types::Choice;
                                 if let Choice::SelectAutoAbility { options, .. } = c {
