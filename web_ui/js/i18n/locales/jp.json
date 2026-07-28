@@ -33,6 +33,8 @@
     "turn": "ターン",
     "phase": "フェーズ",
     "score": "スコア",
+    "heart": "ハート",
+    "blade": "ブレード",
     "update": "更新",
     "reset": "リセット",
     "deck_creator": "デッキ作成",
@@ -438,7 +440,9 @@
     "mulligan": "マリガン",
     "live_card_set": "ライブカードセット",
     "live_victory_determination": "ライブ勝敗判定フェイズ",
-    "wait": "待機..."
+    "wait": "待機...",
+    "selected_label": "選択中",
+    "unselected_label": "未選択"
   },
   "choice_descriptions": {
     "Choose a heart color": "ハートの色を選んでください",
@@ -508,13 +512,23 @@
   "trigger_unknown": "不明",
 
   "zone_deck": "デッキ",
+  "zone_deck_top": "デッキの上",
+  "zone_deck_bottom": "デッキの下",
   "zone_hand": "手札",
   "zone_discard": "控え室",
   "zone_stage": "ステージ",
   "zone_energy": "エネルギーゾーン",
-  "zone_live_card": "ライブ置場",
-  "zone_success_live": "成功ライブ置場",
-  "zone_success_live": "成功ライブ置場",
+  "zone_live_card": "ライブカードゾーン",
+  "zone_success_live": "成功ライブカード置き場",
+  "zone_revealed": "公開されたカード",
+  "zone_those_cards": "それらのカード",
+  "zone_selected": "選択したカード",
+  "zone_under_member": "このメンバーの下",
+
+  "card_type_member": "メンバー",
+  "card_type_live": "ライブカード",
+  "card_type_energy": "エネルギー",
+  "card_type_card": "カード",
 
   "log_activation": "[発動]",
   "log_ability_result": "{trigger} — {result}",
@@ -555,6 +569,17 @@
   "log_set_cost": "コスト設定",
   "log_set_blade_type": "ブレード種類を{type}に設定",
   "log_set_heart_type": "ハート種類を{type}に設定",
+
+  "cond_expect": "期待",
+  "cond_actual": "実際",
+  "cond_result": "結果",
+  "result_skipped": "スキップ",
+  "result_failure": "失敗",
+  "result_position_fail": "位置条件不成立",
+  "result_pending": "条件評価待ち",
+
+  "constant": "常時",
+
   "log_activation_cost": "起動コスト{op} {value}",
   "log_set_blade_count": "ブレード数を{n}に設定",
   "log_modify_cost": "コスト{op} {value}",
