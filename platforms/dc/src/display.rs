@@ -79,37 +79,6 @@ impl Display {
         }
     }
 
-    pub fn write_at(&mut self, row: u32, col: u32, text: &str) {
-        let start_x = (col as i32) * FONT_W;
-        let start_y = (row as i32) * FONT_H;
-        let old_x = self.cursor_x;
-        let old_y = self.cursor_y;
-        self.cursor_x = start_x;
-        self.cursor_y = start_y;
-        self.print(text);
-        self.cursor_x = old_x;
-        self.cursor_y = old_y;
-    }
-
-    pub fn clear_line(&mut self, row: u32) {
-        let y = (row as usize) * FONT_H as usize;
-        let line_words = WIDTH as usize * FONT_H as usize;
-        unsafe {
-            core::ptr::write_bytes(self.vram.add(y * WIDTH as usize), 0, line_words);
-        }
-    }
-
-    pub fn draw_menu(&mut self, items: &[&str], selected: usize, title: &str) {
-        self.clear();
-        self.println(title);
-        self.println(&"-".repeat(COLUMNS as usize));
-        for (i, item) in items.iter().enumerate() {
-            let prefix = if i == selected { " >" } else { "  " };
-            let line = alloc::format!("{prefix} {item}");
-            self.println(&line);
-        }
-    }
-
     pub fn swap_buffers(&mut self) {}
 
     fn draw_char(&mut self, ch: char) {

@@ -31,7 +31,7 @@ use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::game::deck_builder;
 use rabuka_engine::game::platform_ui;
 use rabuka_engine::game_setup;
-use rabuka_engine::game_state::{GameResult, GameState, Phase};
+use rabuka_engine::game_state::{GameResult, GameState};
 use rabuka_engine::player::Player;
 use rabuka_engine::rng;
 use rabuka_engine::turn::TurnEngine;
@@ -143,7 +143,8 @@ static ALLOCATOR: DsAllocator = DsAllocator::new();
 
 const DECKS_JSON: &str = include_str!("../../../psp/baked/decks.json");
 
-use rabuka_engine::deck_parser::DECK_CARD_FILES;
+use rabuka_engine::deck_parser;
+use rabuka_engine::deck_parser::DeckListEntry as DeckEntry;
 
 #[no_mangle]
 pub extern "C" fn main() {
@@ -437,13 +438,6 @@ fn test_ai_vs_ai_ds(d1: usize, d2: usize) -> Result<usize, alloc::string::String
 fn display_heap_stats(display: &mut Display) {
     let oom = ALLOCATOR.oom();
     display.println(&alloc::format!("oom:{}", oom));
-}
-
-fn dbg_row(row: i32, text: &str) {
-    let c_str = CString::new(text).unwrap_or_default();
-    unsafe {
-        nds_dbg_direct(row, c_str.as_ptr());
-    }
 }
 
 fn init_rng() {

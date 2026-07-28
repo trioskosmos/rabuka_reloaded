@@ -14,12 +14,6 @@ impl Display {
             printf("\x1b[2J\x1b[;0H\0".as_ptr());
         }
     }
-    pub fn print(&mut self, text: &str) {
-        let v = to_c(text);
-        unsafe {
-            printf(v.as_ptr());
-        }
-    }
     pub fn println(&mut self, text: &str) {
         let s = to_c(&alloc::format!("{}\n", text));
         unsafe {
@@ -33,15 +27,6 @@ impl Display {
                 fn VIDEO_WaitVSync();
             }
             VIDEO_WaitVSync();
-        }
-    }
-    pub fn draw_menu(&mut self, items: &[&str], sel: usize, title: &str) {
-        self.clear();
-        self.println(title);
-        self.println("-------------------");
-        for (i, item) in items.iter().enumerate() {
-            let p = if i == sel { " >" } else { "  " };
-            self.println(&alloc::format!("{p} {item}"));
         }
     }
 }

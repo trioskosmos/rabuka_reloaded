@@ -21,7 +21,7 @@ use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::game::deck_builder;
 use rabuka_engine::game::platform_ui;
 use rabuka_engine::game_setup;
-use rabuka_engine::game_state::{GameResult, GameState, Phase};
+use rabuka_engine::game_state::{GameResult, GameState};
 use rabuka_engine::player::Player;
 use rabuka_engine::rng;
 use rabuka_engine::turn::TurnEngine;
@@ -69,17 +69,6 @@ psp::module!("rabuka", 1, 0);
 const DECKS_JSON: &str = include_str!("../../baked/decks.json");
 
 use rabuka_engine::deck_parser::DECK_CARD_FILES;
-
-fn truncate_chars(s: &str, max_chars: usize) -> &str {
-    let mut char_count = 0;
-    for (i, _) in s.char_indices() {
-        if char_count >= max_chars {
-            return &s[..i];
-        }
-        char_count += 1;
-    }
-    s
-}
 
 fn psp_main() {
     psp::enable_home_button();
@@ -214,11 +203,7 @@ fn psp_main() {
     }
 }
 
-#[derive(serde::Deserialize)]
-struct DeckEntry {
-    name: String,
-    cards: Vec<String>,
-}
+use rabuka_engine::deck_parser::DeckListEntry as DeckEntry;
 
 fn init_rng() {
     let mut tick: u64 = 0;

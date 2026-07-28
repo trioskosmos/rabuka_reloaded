@@ -52,32 +52,7 @@ impl Input {
         let mask = button_to_mask(btn);
         (self.curr & mask) != 0 && (self.prev & mask) == 0
     }
-
-    pub fn is_held(&self, btn: Button) -> bool {
-        let mask = button_to_mask(btn);
-        (self.curr & mask) != 0
-    }
-
-    pub fn any_just_pressed(&self) -> Option<Button> {
-        for btn in &[
-            Button::Up,
-            Button::Down,
-            Button::Left,
-            Button::Right,
-            Button::A,
-            Button::B,
-            Button::X,
-            Button::Y,
-            Button::Start,
-            Button::Select,
-            Button::L,
-            Button::R,
-        ] {
-            if self.just_pressed(*btn) {
-                return Some(*btn);
-            }
-        }
-        None
+}
     }
 }
 

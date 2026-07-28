@@ -4,14 +4,8 @@ use alloc::format;
 use alloc::string::String;
 #[cfg(feature = "no_std")]
 use alloc::vec::Vec;
-/// Platform-agnostic UI trait for shared game loop functions.
-/// Each platform implements this trait for its Display+Input pair.
 #[cfg(not(feature = "no_std"))]
 use std::format;
-#[cfg(not(feature = "no_std"))]
-use String;
-#[cfg(not(feature = "no_std"))]
-use Vec;
 
 use crate::game::game_setup;
 use crate::game_state::GameState;
@@ -38,7 +32,6 @@ pub fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
 
 /// Show the game result screen and wait for a button press.
 pub fn show_result(ui: &mut dyn PlatformUi, gs: &GameState) {
-    use std::format;
     loop {
         ui.clear_screen();
         ui.println("=== GAME OVER ===");

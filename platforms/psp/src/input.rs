@@ -49,32 +49,7 @@ impl Input {
         let mask = button_to_mask(btn);
         !self.prev.contains(mask) && self.curr.contains(mask)
     }
-
-    pub fn is_held(&self, btn: Button) -> bool {
-        let mask = button_to_mask(btn);
-        self.curr.contains(mask)
-    }
-
-    pub fn any_just_pressed(&self) -> Option<Button> {
-        for btn in &[
-            Button::Up,
-            Button::Down,
-            Button::Left,
-            Button::Right,
-            Button::Cross,
-            Button::Circle,
-            Button::Square,
-            Button::Triangle,
-            Button::Start,
-            Button::Select,
-            Button::LTrigger,
-            Button::RTrigger,
-        ] {
-            if self.just_pressed(*btn) {
-                return Some(*btn);
-            }
-        }
-        None
+}
     }
 }
 

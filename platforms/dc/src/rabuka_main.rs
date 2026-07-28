@@ -48,7 +48,7 @@ impl<'a> platform_ui::PlatformUi for DcUi<'a> {
     }
 }
 use rabuka_engine::game_setup;
-use rabuka_engine::game_state::{GameResult, GameState, Phase};
+use rabuka_engine::game_state::{GameResult, GameState};
 use rabuka_engine::player::Player;
 use rabuka_engine::rng;
 use rabuka_engine::turn::TurnEngine;
@@ -57,8 +57,6 @@ extern "C" {
     fn timer_ms_gettime64() -> u64;
     fn thd_sleep(duration: i32);
 }
-
-use rabuka_engine::deck_parser::DECK_CARD_FILES;
 
 const DECKS_JSON: &str = include_str!("../../psp/baked/decks.json");
 
@@ -168,11 +166,7 @@ pub extern "C" fn rabuka_main() {
     }
 }
 
-#[derive(serde::Deserialize)]
-struct DeckEntry {
-    name: String,
-    cards: Vec<String>,
-}
+use rabuka_engine::deck_parser::DeckListEntry as DeckEntry;
 
 fn init_rng() {
     let tick = unsafe { timer_ms_gettime64() };

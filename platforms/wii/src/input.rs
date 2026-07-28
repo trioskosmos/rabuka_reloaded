@@ -48,11 +48,6 @@ impl Input {
         let mask = button_mask(btn);
         self.prev & mask == 0 && self.curr & mask != 0
     }
-
-    pub fn is_held(&self, btn: Button) -> bool {
-        let mask = button_mask(btn);
-        self.curr & mask != 0
-    }
 }
 
 fn button_mask(btn: Button) -> u16 {

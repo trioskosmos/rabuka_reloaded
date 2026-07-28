@@ -19,6 +19,12 @@ pub struct DeckEntry {
     pub quantity: u32,
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct DeckListEntry {
+    pub name: String,
+    pub cards: Vec<String>,
+}
+
 #[derive(Debug, Clone)]
 pub struct DeckList {
     pub name: String,
