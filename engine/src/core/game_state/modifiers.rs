@@ -1195,8 +1195,6 @@ impl GameState {
     pub fn clear_revealed_cards(&mut self) {
         self.revealed_cards.clear();
         self.revealed_card_meta.clear();
-        self.player1_cheer_revealed_cards.clear();
-        self.player2_cheer_revealed_cards.clear();
     }
 
     pub fn remove_from_source_hands(&mut self, card_ids: &[i16]) {

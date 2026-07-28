@@ -255,8 +255,6 @@ impl super::TurnEngine {
                         return;
                     }
                     game_state.clear_revealed_cards();
-                    game_state.revealed_cost_cards.clear();
-                    game_state.revealed_cost_card_meta.clear();
                     game_state.turn_limited_abilities_used.clear();
                     game_state.cannot_activate_members.clear();
                     game_state.cannot_live_players.clear();

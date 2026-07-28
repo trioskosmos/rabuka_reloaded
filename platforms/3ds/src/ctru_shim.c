@@ -339,6 +339,7 @@ float _3ds_board_get_slot_w(int zone_type) {
     switch (zone_type) {
         case 0: { float h = live_h - 4.0f; return h < 0 ? 0 : h * LANDSCAPE; } // live
         case 1: { float h = stage_h - 4.0f; return h < 0 ? 0 : h; }           // stage (square)
+        case 2: { float h = energy_h - 4.0f; return h < 0 ? 0 : h * PORTRAIT; } // energy (portrait)
         case 3: { float h = hand_h - 4.0f; return h < 0 ? 0 : h * PORTRAIT; } // hand
         default: return 0;
     }
@@ -619,14 +620,14 @@ void _3ds_draw_card_at(CardSlot* slot, float x, float y, float w, float h) {
 }
 
 // Zone height allocation for bottom screen (320x240).
-// With font scale 0.65 (~20px glyph), each zone needs enough height for its
-// label line plus content. Energy gets 15% (was 9%) to fit the "ENERGY" label.
+// Energy uses PORTRAIT ratio cards so active/waited look the same.
+// 12 energy cards fit at 15% with PORTRAIT ratio (e_w = e_sz * 0.711).
 static void zone_heights(float h, float* live, float* stage, float* energy, float* hand) {
     float u = h - 3.0f;
-    *live   = u * 0.20f;
-    *stage  = u * 0.25f;
+    *live   = u * 0.15f;
+    *stage  = u * 0.35f;
     *energy = u * 0.15f;
-    *hand   = u * 0.40f;
+    *hand   = u * 0.35f;
 }
 
 static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool flip_cards) {
@@ -667,9 +668,6 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float live_slot_w = live_card_h * LANDSCAPE;
     for (int i = 0; i < 3; i++) {
         _3ds_draw_rect(lx, live_y + 1, live_slot_w, live_card_h, 0x33000000);
-        if (!cli_mode && _is_highlighted(0, i, opponent)) {
-            _3ds_draw_border(lx, live_y + 1, live_slot_w, live_card_h, COL_SEL, 2);
-        }
         if (pb->live[i].active) _3ds_draw_card_at(&pb->live[i], lx, live_y + 1, live_slot_w, live_card_h);
         lx += live_slot_w + 2;
     }
@@ -702,37 +700,36 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
         st_x += st_slot_w + 2;
     }
 
-    // Utility counts
+    // Utility counts — D E on top row, W S on bottom row
     _3ds_draw_rect(util_x, stage_y, util_w, stage_h, COL_ZONE_BG);
     _3ds_draw_border(util_x, stage_y, util_w, stage_h, COL_ZONE_BDR, 1);
-    // Utility counts: scale 0.70 = 21px glyph, 0.65 = 20px fallback.
-    // Line spacing fy += 14 accommodates 21px glyph + 1px gap.
     char buf[40];
     float fs = stage_h > 40 ? 0.70f : 0.65f;
     float fx = util_x + 1;
+    float row_h = stage_h * 0.5f;
     snprintf(buf, sizeof(buf), "D:%d", pb->deck);
-    _3ds_draw_label(buf, fx, stage_y + 1, COL_TEXT, fs); fx += 36;
-    snprintf(buf, sizeof(buf), "E:%d", pb->edeck);
-    _3ds_draw_label(buf, fx, stage_y + 1, COL_TEXT, fs); fx += 36;
-    snprintf(buf, sizeof(buf), "W:%d", pb->discard);
-    _3ds_draw_label(buf, fx, stage_y + 1, COL_TEXT, fs); fx += 36;
-    snprintf(buf, sizeof(buf), "S:%d", pb->success);
     _3ds_draw_label(buf, fx, stage_y + 1, COL_TEXT, fs);
+    snprintf(buf, sizeof(buf), "E:%d", pb->edeck);
+    _3ds_draw_label(buf, fx + util_w * 0.5f, stage_y + 1, COL_TEXT, fs);
+    snprintf(buf, sizeof(buf), "W:%d", pb->discard);
+    _3ds_draw_label(buf, fx, stage_y + 1 + row_h, COL_TEXT, fs);
+    snprintf(buf, sizeof(buf), "S:%d", pb->success);
+    _3ds_draw_label(buf, fx + util_w * 0.5f, stage_y + 1 + row_h, COL_TEXT, fs);
 
     // === ENERGY ===
     _3ds_draw_rect(M, energy_y, W - 2 * M, energy_h, COL_ZONE_BG);
     _3ds_draw_border(M, energy_y, W - 2 * M, energy_h, COL_GOLD, 1);
     float ex = M + 2;
     float e_sz = energy_h - 4;
+    float e_w = e_sz * PORTRAIT;
     for (int i = 0; i < pb->energy_count && i < MAX_SLOTS; i++) {
-        float e_w = e_sz * LANDSCAPE;
         if (!cli_mode && _is_highlighted(2, i, opponent)) {
             _3ds_draw_border(ex, energy_y + 2, e_w, e_sz, COL_SEL, 2);
         }
         if (pb->energy[i].active) _3ds_draw_card_at(&pb->energy[i], ex, energy_y + 2, e_w, e_sz);
         else _3ds_draw_rect(ex, energy_y + 2, e_w, e_sz, 0x33000000);
-        ex += e_w + 1;
-        if (ex > W - M - e_w) break;
+        ex += e_w;
+        if (ex > W - M) break;
     }
 
     // === HAND ===
@@ -764,10 +761,7 @@ void _3ds_render_board() {
         _3ds_draw_rect(0, div_y, 320, 4, COL_ZONE_BDR);
         _3ds_board_set_section_rect(div_y + 4, 240 - div_y - 4, false);
         draw_section(&p_board, div_y + 4, 240 - div_y - 4, false, false);
-        // Active player highlight: gold border around their section
-        float hl_y = active_is_p1 ? (div_y + 4) : 2;
-        float hl_h = active_is_p1 ? (240 - div_y - 4) : half;
-        _3ds_draw_border(0, hl_y, 320, hl_h, COL_SEL, 2);
+        // Active player: no border highlight
     } else if (board_view == 1) {
         _3ds_board_set_section_rect(0, 240, false);
         draw_section(&o_board, 0, 240, false, true);
@@ -804,22 +798,7 @@ void _3ds_render_board() {
         }
     }
 
-    // View indicator + hand range: scale 0.70 = 21px, 0.65 = 20px.
-    if (!cli_mode && overlay_count > 0) return; // overlay covers it
-    const char* view_label = board_view == 0 ? "YOU" : (board_view == 1 ? "OPP" : "BOTH");
-    _3ds_draw_label(view_label, 275, 218, COL_GOLD, 0.70f);
-    char hbuf2[20];
-    int e = (hand_range_off + hand_range_vis) < hand_range_total
-              ? (hand_range_off + hand_range_vis) : hand_range_total;
-    snprintf(hbuf2, sizeof(hbuf2), "%d-%d/%d", hand_range_off + 1, e, hand_range_total);
-    _3ds_draw_label(hbuf2, 275, 206, COL_TEXT, 0.65f);
-    if (hand_range_off > 0 && (hand_range_off + hand_range_vis) < hand_range_total) {
-        _3ds_draw_label("< >", 275, 196, COL_GOLD, 0.65f);
-    } else if (hand_range_off > 0) {
-        _3ds_draw_label("<", 275, 196, COL_GOLD, 0.65f);
-    } else if ((hand_range_off + hand_range_vis) < hand_range_total) {
-        _3ds_draw_label(">", 275, 196, COL_GOLD, 0.65f);
-    }
+    // No view indicator or hand range labels — clean board
 }
 
 // ---- Text measurement ----
@@ -858,7 +837,7 @@ void _3ds_swap_buffers() {
     float slider = osGet3DSliderState();
     for (int eye = 0; eye < eye_count; eye++) {
         C3D_RenderTarget* target = (eye == 0) ? top_target : top_target_right;
-        float x_off = (eye == 1) ? slider * 48.0f : 0.0f;
+        float x_off = (eye == 1) ? -slider * 48.0f : 0.0f;
 
         if (cli_mode) {
             C2D_TargetClear(target, C2D_Color32(0, 0, 0, 255));

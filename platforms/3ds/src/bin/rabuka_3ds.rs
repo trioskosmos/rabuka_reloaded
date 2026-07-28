@@ -533,7 +533,7 @@ enum Overlay {
     StartMenu(usize),
     GameLog(usize),
     PerfStats(Option<usize>),
-    RevealedCards(bool),
+    RevealedCards(bool, usize),
 }
 
 #[cfg(feature = "3ds")]
@@ -1491,7 +1491,10 @@ fn main() {
                                 // Fatal error (alloc failed, quirc failed, re-arm failed)
                                 unsafe {
                                     _3ds_clear_both();
-                                    _3ds_text_add_top(format!("Camera error: {}\0", r).as_ptr());
+                                    _3ds_text_add_top(
+                                        format!("{}\n\0", tl_fmt("Camera error", &[("e", &r.to_string())]))
+                                            .as_ptr(),
+                                    );
                                     _3ds_text_add_top(format!("{}\0", tl("B=back")).as_ptr());
                                 }
                                 unsafe {
@@ -1563,7 +1566,7 @@ fn main() {
                                         230.0,
                                         COL_MED,
                                         0.60f32,
-                                        "A=use deck  B=discard\0".as_ptr(),
+                                        format!("{}\0", tl("A=use deck  B=discard")).as_ptr(),
                                     );
                                 }
                             }
@@ -1766,7 +1769,8 @@ fn main() {
                                                 8.0,
                                                 COL_GOLD,
                                                 0.85f32,
-                                                "HOST: Network created!\0".as_ptr(),
+                                                format!("{}\0", tl("HOST: Network created!"))
+                                                    .as_ptr(),
                                             );
                                             let wait_msg = tl("Waiting for client...");
                                             _3ds_top_queue_text(
@@ -1781,7 +1785,7 @@ fn main() {
                                                 230.0,
                                                 COL_MED,
                                                 0.60f32,
-                                                "B=cancel\0".as_ptr(),
+                                                format!("{}\0", tl("B=cancel")).as_ptr(),
                                             );
                                         }
                                     }
@@ -1791,7 +1795,11 @@ fn main() {
                                         unsafe {
                                             _3ds_clear_top();
                                             _3ds_text_add_top(
-                                                format!("UDS INIT FAILED: {}\n\0", e).as_ptr(),
+                                                format!(
+                                                    "{}\n\0",
+                                                    tl_fmt("UDS INIT FAILED", &[("e", &e.to_string())])
+                                                )
+                                                .as_ptr(),
                                             );
                                             _3ds_text_add_top(
                                                 format!("{}\n\0", tl("B = back")).as_ptr(),
@@ -1806,7 +1814,11 @@ fn main() {
                                                 8.0,
                                                 0xFF0000FF,
                                                 0.85f32,
-                                                format!("UDS INIT FAILED: {}\0", e).as_ptr(),
+                                                format!(
+                                                    "{}\0",
+                                                    tl_fmt("UDS INIT FAILED", &[("e", &e.to_string())])
+                                                )
+                                                .as_ptr(),
                                             );
                                         }
                                     }
@@ -1880,14 +1892,15 @@ fn main() {
                                                 100.0,
                                                 COL_LIGHT,
                                                 0.70f32,
-                                                "Looking for host network\n\0".as_ptr(),
+                                                format!("{}\n\0", tl("Looking for host network"))
+                                                    .as_ptr(),
                                             );
                                             _3ds_top_queue_text(
                                                 50.0,
                                                 230.0,
                                                 COL_MED,
                                                 0.60f32,
-                                                "B=cancel\0".as_ptr(),
+                                                format!("{}\0", tl("B=cancel")).as_ptr(),
                                             );
                                         }
                                     }
@@ -1897,7 +1910,11 @@ fn main() {
                                         unsafe {
                                             _3ds_clear_top();
                                             _3ds_text_add_top(
-                                                format!("UDS INIT FAILED: {}\n\0", e).as_ptr(),
+                                                format!(
+                                                    "{}\n\0",
+                                                    tl_fmt("UDS INIT FAILED", &[("e", &e.to_string())])
+                                                )
+                                                .as_ptr(),
                                             );
                                             _3ds_text_add_top(
                                                 format!("{}\n\0", tl("B = back")).as_ptr(),
@@ -1912,7 +1929,11 @@ fn main() {
                                                 8.0,
                                                 0xFF0000FF,
                                                 0.85f32,
-                                                format!("UDS INIT FAILED: {}\0", e).as_ptr(),
+                                                format!(
+                                                    "{}\0",
+                                                    tl_fmt("UDS INIT FAILED", &[("e", &e.to_string())])
+                                                )
+                                                .as_ptr(),
                                             );
                                         }
                                     }
@@ -2250,7 +2271,7 @@ fn main() {
                                 overlay = match *sel {
                                     0 => Overlay::PerfStats(None),
                                     1 => Overlay::GameLog(gs.rule_log.len().saturating_sub(16)),
-                                    2 => Overlay::RevealedCards(true),
+                                    2 => Overlay::RevealedCards(true, 0),
                                     3 => {
                                         // Toggle language
                                         set_lang(current_lang().toggle());
@@ -2293,9 +2314,18 @@ fn main() {
                                 redraw = true;
                             }
                         }
-                        Overlay::RevealedCards(ref mut show_self) => {
+                        Overlay::RevealedCards(ref mut show_self, ref mut rev_scroll) => {
                             if keys & 0x00000400 != 0 {
                                 *show_self = !*show_self;
+                                *rev_scroll = 0;
+                                redraw = true;
+                            }
+                            if keys & 0x00000040 != 0 {
+                                *rev_scroll = rev_scroll.saturating_sub(1);
+                                redraw = true;
+                            }
+                            if keys & 0x00000080 != 0 {
+                                *rev_scroll = rev_scroll.saturating_add(1);
                                 redraw = true;
                             }
                         }
@@ -3033,7 +3063,7 @@ fn main() {
                             } else {
                                 None
                             };
-                            // Utility zone tap (right of stage slots): open zone viewer
+                            // Utility zone tap: left half = waitroom, right half = live success
                             if tapped_card.is_none() {
                                 let tx_f = tx as f32;
                                 let ux = 2.0 + 3.0 * (st_slot_w + 2.0) + 5.0;
@@ -3043,20 +3073,20 @@ fn main() {
                                     && tx_f >= ux
                                     && tx_f < ux + uw
                                 {
-                                    match ((tx_f - ux) / 36.0) as usize {
-                                        2 => Some((
-                                            "Waitroom".into(),
+                                    if tx_f < ux + uw * 0.5 {
+                                        Some((
+                                            tl("Waitroom").into(),
                                             pb.waitroom.cards.iter().copied().collect::<Vec<i16>>(),
-                                        )),
-                                        3 => Some((
-                                            "Live Success".into(),
+                                        ))
+                                    } else {
+                                        Some((
+                                            tl("Live Success").into(),
                                             pb.success_live_card_zone
                                                 .cards
                                                 .iter()
                                                 .copied()
                                                 .collect::<Vec<i16>>(),
-                                        )),
-                                        _ => None,
+                                        ))
                                     }
                                 } else {
                                     None
@@ -3895,17 +3925,36 @@ fn main() {
                                                 .and_then(|p| p.stage_area.clone())
                                                 .unwrap_or_default();
                                             let area_label = tl_area(&area);
-                                            let is_db = act
+                                            let card_indices = act
                                                 .parameters
                                                 .as_ref()
-                                                .and_then(|p| p.card_indices.as_ref())
-                                                .map(|ci| ci.len() >= 2)
-                                                .unwrap_or(false);
-                                            let pfx = if is_db { ">>" } else { " " };
-                                            format!(
-                                                "[{}] {} c:{}  {} {}",
-                                                cn, name, cost, pfx, area_label
-                                            )
+                                                .and_then(|p| p.card_indices.clone())
+                                                .unwrap_or_default();
+                                            let is_db = card_indices.len() >= 2;
+                                            if is_db {
+                                                let src_labels: Vec<&str> = card_indices
+                                                    .iter()
+                                                    .map(|&idx| match idx {
+                                                        0 => tl_area("left"),
+                                                        1 => tl_area("center"),
+                                                        2 => tl_area("right"),
+                                                        _ => "?",
+                                                    })
+                                                    .collect();
+                                                format!(
+                                                    "[{}] {} c:{} {}→{}",
+                                                    cn,
+                                                    name,
+                                                    cost,
+                                                    src_labels.join("+"),
+                                                    area_label
+                                                )
+                                            } else {
+                                                format!(
+                                                    "[{}] {} c:{}   {}",
+                                                    cn, name, cost, area_label
+                                                )
+                                            }
                                         }
                                         game_setup::ActionType::UseAbility => {
                                             let name = i18n::card_display_name(
@@ -4628,7 +4677,6 @@ fn main() {
                                     let cw = 72.0f32;
                                     let ch = cw / 0.711;
                                     let gap = 4.0f32;
-                                    let label_h = 28.0f32;
                                     let cols = 5usize;
                                     let grid_start = choice_grid_offset;
                                     let grid_len =
@@ -4645,8 +4693,8 @@ fn main() {
                                         let col = gi % cols;
                                         let row = gi / cols;
                                         let ix = 4.0 + col as f32 * (cw + gap);
-                                        let iy_card = grid_iy + row as f32 * (ch + label_h + gap);
-                                        if iy_card + ch + label_h > 230.0 {
+                                        let iy_card = grid_iy + row as f32 * (ch + 16.0 + gap);
+                                        if iy_card + ch + 16.0 > 230.0 {
                                             break;
                                         }
                                         // Skip card-image rendering for special
@@ -4717,48 +4765,12 @@ fn main() {
                                                     } else {
                                                         COL_CARD
                                                     };
-                                                    // Card name for label
-                                                    let card_name_str = gs
-                                                        .card_database
-                                                        .get_card(cid)
-                                                        .map(|c| {
-                                                            i18n::card_display_name(
-                                                                &c.name,
-                                                                current_lang(),
-                                                            )
-                                                        })
-                                                        .unwrap_or_default();
-                                                    // First line of ability text
-                                                    let ab_text_str = gs
-                                                        .card_database
-                                                        .get_card(cid)
-                                                        .and_then(|c| {
-                                                            c.resolved_abilities().next().map(
-                                                                |ab| {
-                                                                    let t = i18n::translate_ability(
-                                                                        &ab.full_text,
-                                                                        current_lang(),
-                                                                    );
-                                                                    let first = wrap_ability_text(
-                                                                        &t,
-                                                                        cw - 4.0,
-                                                                        0.40,
-                                                                    )
-                                                                    .lines()
-                                                                    .next()
-                                                                    .unwrap_or("")
-                                                                    .to_string();
-                                                                    first
-                                                                },
-                                                            )
-                                                        })
-                                                        .unwrap_or_default();
                                                     unsafe {
                                                         _3ds_top_queue_rect(
                                                             ix,
                                                             iy_card,
                                                             cw,
-                                                            ch + label_h,
+                                                            ch + 16.0,
                                                             border,
                                                         );
                                                         _3ds_top_queue_card(
@@ -4778,41 +4790,13 @@ fn main() {
                                                                 0xAA000000,
                                                             );
                                                         }
-                                                        // Line 1: [card_no] card_name
                                                         _3ds_top_queue_text(
                                                             ix + 1.0,
                                                             iy_card + ch + 1.0,
                                                             COL_LIGHT,
                                                             0.45f32,
-                                                            format!(
-                                                                "[{}] {}\0",
-                                                                cn,
-                                                                wrap_text(
-                                                                    &card_name_str,
-                                                                    cw - 4.0,
-                                                                    0.45
-                                                                )
-                                                            )
-                                                            .as_ptr(),
+                                                            format!("{}\0", cn).as_ptr(),
                                                         );
-                                                        // Line 2: ability text (truncated)
-                                                        if !ab_text_str.is_empty() {
-                                                            _3ds_top_queue_text(
-                                                                ix + 1.0,
-                                                                iy_card + ch + 14.0,
-                                                                COL_MED,
-                                                                0.40f32,
-                                                                format!(
-                                                                    "{}\0",
-                                                                    wrap_text(
-                                                                        &ab_text_str,
-                                                                        cw - 4.0,
-                                                                        0.40
-                                                                    )
-                                                                )
-                                                                .as_ptr(),
-                                                            );
-                                                        }
                                                     }
                                                     continue;
                                                 }
@@ -5695,7 +5679,7 @@ fn main() {
                                     }
                                 }
                             }
-                            Overlay::RevealedCards(show_self) => {
+                            Overlay::RevealedCards(show_self, rev_scroll) => {
                                 unsafe {
                                     _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, 0xCC000000);
                                     let who = if show_self { tl("You") } else { tl("Opponent") };
@@ -5704,13 +5688,46 @@ fn main() {
                                         4.0,
                                         2.0,
                                         COL_GOLD,
-                                        0.65f32,
+                                        0.60f32,
                                         format!("{} ({})  B=close X=toggle\0", rev_hdr, who)
                                             .as_ptr(),
                                     );
                                 }
-                                let revealed = &gs.revealed_cards;
-                                if revealed.is_empty() {
+                                // Aggregate sections from all engine vectors
+                                struct RevSection<'a> {
+                                    label: &'a str,
+                                    cards: &'a [i16],
+                                }
+                                let cheer = if show_self {
+                                    &gs.player1_cheer_revealed_cards
+                                } else {
+                                    &gs.player2_cheer_revealed_cards
+                                };
+                                let sections: Vec<RevSection> = vec![
+                                    RevSection {
+                                        label: "Yell",
+                                        cards: &gs.initial_yell_revealed_cards,
+                                    },
+                                    RevSection {
+                                        label: "Re-Yell",
+                                        cards: &gs.re_yell_revealed_cards,
+                                    },
+                                    RevSection {
+                                        label: "Cheer",
+                                        cards: cheer,
+                                    },
+                                    RevSection {
+                                        label: "Cost",
+                                        cards: &gs.revealed_cost_cards,
+                                    },
+                                    RevSection {
+                                        label: "Effects",
+                                        cards: &gs.revealed_cards,
+                                    },
+                                ];
+                                let total_cards: usize =
+                                    sections.iter().map(|s| s.cards.len()).sum();
+                                if total_cards == 0 {
                                     let msg = tl("No revealed cards");
                                     unsafe {
                                         _3ds_top_queue_text(
@@ -5723,49 +5740,91 @@ fn main() {
                                     }
                                 } else {
                                     let gap = 4.0_f32;
-                                    let cw = 72.0_f32;
+                                    let cw = 56.0_f32;
                                     let ch = cw / 0.711;
-                                    let mut ix = 4.0;
-                                    let mut iy = 28.0;
-                                    for (_i, cid) in revealed.iter().enumerate() {
-                                        let cn = gs
-                                            .card_database
-                                            .get_card(*cid)
-                                            .map(|c| &c.card_no[..])
-                                            .unwrap_or("?");
-                                        if let Some((atl, idx)) = atlas.lookup(cn) {
-                                            let c_str = std::ffi::CString::new(atl.as_bytes())
-                                                .unwrap_or_default();
-                                            unsafe {
-                                                _3ds_top_queue_card(
-                                                    c_str.as_ptr() as *const u8,
-                                                    *idx as i32,
-                                                    ix,
-                                                    iy,
-                                                    cw,
-                                                    ch,
-                                                );
-                                            }
-                                        } else {
-                                            unsafe {
-                                                _3ds_top_queue_rect(ix, iy, cw, ch, 0xFF444444);
-                                                _3ds_top_queue_text(
-                                                    ix + 2.0,
-                                                    iy + 2.0,
-                                                    COL_LIGHT,
-                                                    0.45f32,
-                                                    format!("{}\0", cn).as_ptr(),
-                                                );
-                                            }
+                                    let header_h = 14.0_f32;
+                                    let mut iy = 18.0_f32;
+                                    let mut skip = rev_scroll;
+                                    for sec in &sections {
+                                        if sec.cards.is_empty() {
+                                            continue;
                                         }
-                                        ix += cw + gap;
-                                        if ix + cw > 400.0 {
-                                            ix = 4.0;
-                                            iy += ch + gap;
-                                            if iy > 220.0 {
-                                                break;
-                                            }
+                                        // Skip scrolled-off sections
+                                        if skip > 0 {
+                                            skip -= 1;
+                                            continue;
                                         }
+                                        // Section header
+                                        unsafe {
+                                            _3ds_top_queue_text(
+                                                4.0,
+                                                iy,
+                                                COL_GOLD,
+                                                0.55f32,
+                                                format!("{} ({})\0", sec.label, sec.cards.len())
+                                                    .as_ptr(),
+                                            );
+                                        }
+                                        iy += header_h;
+                                        if iy > 230.0 {
+                                            break;
+                                        }
+                                        // Card grid for this section
+                                        let mut ix = 4.0_f32;
+                                        for cid in sec.cards {
+                                            let cn = gs
+                                                .card_database
+                                                .get_card(*cid)
+                                                .map(|c| &c.card_no[..])
+                                                .unwrap_or("?");
+                                            if ix + cw > 396.0 {
+                                                ix = 4.0;
+                                                iy += ch + gap;
+                                                if iy > 230.0 {
+                                                    break;
+                                                }
+                                            }
+                                            if let Some((atl, idx)) = atlas.lookup(cn) {
+                                                let c_str = std::ffi::CString::new(atl.as_bytes())
+                                                    .unwrap_or_default();
+                                                unsafe {
+                                                    _3ds_top_queue_card(
+                                                        c_str.as_ptr() as *const u8,
+                                                        *idx as i32,
+                                                        ix,
+                                                        iy,
+                                                        cw,
+                                                        ch,
+                                                    );
+                                                }
+                                            } else {
+                                                unsafe {
+                                                    _3ds_top_queue_rect(ix, iy, cw, ch, 0xFF444444);
+                                                    _3ds_top_queue_text(
+                                                        ix + 2.0,
+                                                        iy + 2.0,
+                                                        COL_LIGHT,
+                                                        0.40f32,
+                                                        format!("{}\0", cn).as_ptr(),
+                                                    );
+                                                }
+                                            }
+                                            ix += cw + gap;
+                                        }
+                                        iy += ch + gap + 4.0;
+                                        if iy > 230.0 {
+                                            break;
+                                        }
+                                    }
+                                    // Scroll hint
+                                    unsafe {
+                                        _3ds_top_queue_text(
+                                            4.0,
+                                            228.0,
+                                            COL_MED,
+                                            0.45f32,
+                                            format!("{}\0", tl("UP/DOWN=scroll")).as_ptr(),
+                                        );
                                     }
                                 }
                             }
@@ -5813,7 +5872,7 @@ fn main() {
                         _3ds_text_add_bot(format!("{}\n\0", tl("Done! Press START.")).as_ptr());
                     },
                     Err(e) => unsafe {
-                        let s = format!("ERROR: {}\n\0", e);
+                        let s = format!("{}\n\0", tl_fmt("ERROR", &[("e", &format!("{}", e))]));
                         _3ds_text_add_bot(s.as_ptr());
                     },
                 }

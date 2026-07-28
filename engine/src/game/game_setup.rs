@@ -1290,6 +1290,13 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 "right" => "Right",
                                 o => o,
                             };
+                            let area_label_ja = match area.area.as_str() {
+                                "left" => "左",
+                                "center" => "センター",
+                                "right" => "右",
+                                o => o,
+                            };
+                            let cost_display = area.cost;
                             let bt = if area.is_baton_touch {
                                 action_desc!(
                                     " bt from {}",
@@ -1298,50 +1305,69 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                             } else {
                                 String::new()
                             };
-                            actions.push(make_action_params(
-                                ActionType::PlayMemberToStage,
+                            let bt_ja = if area.is_baton_touch {
                                 action_desc!(
-                                    "{} → {} (cost:{}){}",
+                                    " バトン:{}から",
+                                    area.existing_member_name.as_deref().unwrap_or("?")
+                                )
+                            } else {
+                                String::new()
+                            };
+                            let cost_str = cost_display.to_string();
+                            {
+                                let mut a = make_action_params(
+                                    ActionType::PlayMemberToStage,
+                                    action_desc!(
+                                        "{} → {} (cost:{}){}",
+                                        card.name,
+                                        area_label,
+                                        cost_display,
+                                        bt
+                                    ),
+                                    ActionParameters {
+                                        card_id: Some(*card_id),
+                                        card_index: Some(hand_index),
+                                        card_name: {
+                                            if cfg!(not(feature = "profiling")) {
+                                                Some(card.name.to_string())
+                                            } else {
+                                                None
+                                            }
+                                        },
+                                        card_no: {
+                                            if cfg!(not(feature = "profiling")) {
+                                                Some(card.card_no.to_string())
+                                            } else {
+                                                None
+                                            }
+                                        },
+                                        base_cost: Some(card_cost),
+                                        stage_area: Some(area.area.clone()),
+                                        // available_areas is only consumed by the UI/web/main.rs
+                                        // path; the profiling/bot decision path never reads it, so
+                                        // skip the Vec<AreaInfo> clone in profiling builds.
+                                        available_areas: if cfg!(feature = "profiling") {
+                                            None
+                                        } else {
+                                            Some(available_areas.clone())
+                                        },
+                                        double_baton_pairs: if cfg!(feature = "profiling") {
+                                            None
+                                        } else {
+                                            double_baton_pairs.clone()
+                                        },
+                                        ..make_params()
+                                    },
+                                );
+                                a.description_ja = Some(action_desc!(
+                                    "{} → {} (コスト:{}){}",
                                     card.name,
-                                    area_label,
-                                    area.cost,
-                                    bt
-                                ),
-                                ActionParameters {
-                                    card_id: Some(*card_id),
-                                    card_index: Some(hand_index),
-                                    card_name: {
-                                        if cfg!(not(feature = "profiling")) {
-                                            Some(card.name.to_string())
-                                        } else {
-                                            None
-                                        }
-                                    },
-                                    card_no: {
-                                        if cfg!(not(feature = "profiling")) {
-                                            Some(card.card_no.to_string())
-                                        } else {
-                                            None
-                                        }
-                                    },
-                                    base_cost: Some(card_cost),
-                                    stage_area: Some(area.area.clone()),
-                                    // available_areas is only consumed by the UI/web/main.rs
-                                    // path; the profiling/bot decision path never reads it, so
-                                    // skip the Vec<AreaInfo> clone in profiling builds.
-                                    available_areas: if cfg!(feature = "profiling") {
-                                        None
-                                    } else {
-                                        Some(available_areas.clone())
-                                    },
-                                    double_baton_pairs: if cfg!(feature = "profiling") {
-                                        None
-                                    } else {
-                                        double_baton_pairs.clone()
-                                    },
-                                    ..make_params()
-                                },
-                            ));
+                                    area_label_ja,
+                                    cost_str,
+                                    bt_ja
+                                ));
+                                actions.push(a);
+                            }
                         }
                         if let Some(ref pairs) = double_baton_pairs {
                             for pair in pairs {
@@ -1355,45 +1381,108 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         _ => 0,
                                     })
                                     .collect();
-                                actions.push(make_action_params(
-                                    ActionType::PlayMemberToStage,
-                                    action_desc!(
-                                        "{} → {} (double {}&{} cost:{})",
-                                        card.name,
-                                        pair.placement,
-                                        pair.areas[0],
-                                        pair.areas[1],
-                                        pair.cost
+                                let (src0_en, src1_en, dst_en) = match (
+                                    pair.areas[0].as_str(),
+                                    pair.areas[1].as_str(),
+                                    pair.placement.as_str(),
+                                ) {
+                                    (a, b, p) => (
+                                        match a {
+                                            "left" => "Left",
+                                            "center" => "Center",
+                                            "right" => "Right",
+                                            o => o,
+                                        },
+                                        match b {
+                                            "left" => "Left",
+                                            "center" => "Center",
+                                            "right" => "Right",
+                                            o => o,
+                                        },
+                                        match p {
+                                            "left" => "Left",
+                                            "center" => "Center",
+                                            "right" => "Right",
+                                            o => o,
+                                        },
                                     ),
-                                    ActionParameters {
-                                        card_id: Some(*card_id),
-                                        card_index: Some(hand_index),
-                                        card_name: if cfg!(not(feature = "profiling")) {
-                                            Some(card.name.to_string())
-                                        } else {
-                                            None
+                                };
+                                let (src0_ja, src1_ja, dst_ja) = match (
+                                    pair.areas[0].as_str(),
+                                    pair.areas[1].as_str(),
+                                    pair.placement.as_str(),
+                                ) {
+                                    (a, b, p) => (
+                                        match a {
+                                            "left" => "左",
+                                            "center" => "センター",
+                                            "right" => "右",
+                                            o => o,
                                         },
-                                        card_no: if cfg!(not(feature = "profiling")) {
-                                            Some(card.card_no.to_string())
-                                        } else {
-                                            None
+                                        match b {
+                                            "left" => "左",
+                                            "center" => "センター",
+                                            "right" => "右",
+                                            o => o,
                                         },
-                                        base_cost: Some(card_cost),
-                                        stage_area: Some(pair.placement.clone()),
-                                        card_indices: Some(area_indices),
-                                        available_areas: if cfg!(feature = "profiling") {
-                                            None
-                                        } else {
-                                            Some(available_areas.clone())
+                                        match p {
+                                            "left" => "左",
+                                            "center" => "センター",
+                                            "right" => "右",
+                                            o => o,
                                         },
-                                        double_baton_pairs: if cfg!(feature = "profiling") {
-                                            None
-                                        } else {
-                                            double_baton_pairs.clone()
+                                    ),
+                                };
+                                {
+                                    let mut a = make_action_params(
+                                        ActionType::PlayMemberToStage,
+                                        action_desc!(
+                                            "{} ({}+{})→{} cost:{}",
+                                            card.name,
+                                            src0_en,
+                                            src1_en,
+                                            dst_en,
+                                            pair.cost
+                                        ),
+                                        ActionParameters {
+                                            card_id: Some(*card_id),
+                                            card_index: Some(hand_index),
+                                            card_name: if cfg!(not(feature = "profiling")) {
+                                                Some(card.name.to_string())
+                                            } else {
+                                                None
+                                            },
+                                            card_no: if cfg!(not(feature = "profiling")) {
+                                                Some(card.card_no.to_string())
+                                            } else {
+                                                None
+                                            },
+                                            base_cost: Some(pair.cost),
+                                            stage_area: Some(pair.placement.clone()),
+                                            card_indices: Some(area_indices),
+                                            available_areas: if cfg!(feature = "profiling") {
+                                                None
+                                            } else {
+                                                Some(available_areas.clone())
+                                            },
+                                            double_baton_pairs: if cfg!(feature = "profiling") {
+                                                None
+                                            } else {
+                                                double_baton_pairs.clone()
+                                            },
+                                            ..make_params()
                                         },
-                                        ..make_params()
-                                    },
-                                ));
+                                    );
+                                    a.description_ja = Some(action_desc!(
+                                        "{} ({}+{})→{} コスト:{}",
+                                        card.name,
+                                        src0_ja,
+                                        src1_ja,
+                                        dst_ja,
+                                        pair.cost
+                                    ));
+                                    actions.push(a);
+                                }
                             }
                         }
                     }
