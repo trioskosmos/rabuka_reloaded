@@ -261,8 +261,53 @@ fn heart_label_to_icon(s: &str) -> String {
     }
 }
 
+/// Build heart string from a HeartMap, sorted by heart index (h00 first).
+fn build_heart_str(
+    hearts: &rabuka_engine::card::HeartMap,
+    card_id: i16,
+    mods: &rabuka_engine::core::game_modifiers::GameModifiers,
+    is_need: bool,
+) -> String {
+    let mut entries: Vec<(u8, String)> = hearts
+        .iter()
+        .map(|(c, v)| {
+            let code = c.short_label();
+            let num = if code.len() >= 3 && code.as_bytes()[0] == b'h' {
+                code[1..3].parse::<u8>().unwrap_or(99)
+            } else {
+                99
+            };
+            let bonus = if is_need {
+                mods.need_heart_modifiers
+                    .get(&card_id)
+                    .and_then(|hm| hm.get(c))
+                    .map(|m| m.total())
+                    .unwrap_or(0)
+            } else {
+                mods.heart_modifiers
+                    .get(&card_id)
+                    .and_then(|hm| hm.get(c))
+                    .map(|m| m.total())
+                    .unwrap_or(0)
+            };
+            let label = if bonus != 0 {
+                format!("{}{}+{}", code, v, bonus)
+            } else {
+                format!("{}{}", code, v)
+            };
+            (num, label)
+        })
+        .collect();
+    entries.sort_by_key(|e| e.0);
+    entries
+        .into_iter()
+        .map(|e| e.1)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Build stat line with texticons for card detail.
-/// Shows only relevant stats for the card type (no blade on live, no score on members).
+/// Member: blade, hearts, energy. Live: score, need_heart, energy.
 fn card_stat_line(
     blade: i32,
     heart_str: &str,
@@ -270,36 +315,45 @@ fn card_stat_line(
     cost: u32,
     tapped: bool,
     variant: &str,
+    need_heart_str: &str,
 ) -> String {
     let mut s = String::new();
-    let can_have_blade = variant == "member_card";
-    let can_have_score = variant == "live_card";
-    if can_have_blade && (blade > 0 || cost > 0) {
-        s.push_str(&format!("{{{{icon_blade.png|BLADE}}}}{}  ", blade));
-    }
-    for part in heart_str.split_whitespace() {
-        let converted = heart_label_to_icon(part);
-        if !converted.starts_with("{{") && heart_str.len() <= 3 {
-            continue;
+    if variant == "member_card" {
+        // Member: energy → hearts → blade
+        if cost > 0 {
+            s.push_str(&format!("{{{{icon_energy.png|E}}}}{}  ", cost));
         }
-        s.push_str(&converted);
-        s.push(' ');
-    }
-    if !heart_str.is_empty() {
-        let trimmed = s.trim_end().to_string();
-        s = trimmed;
-        if !can_have_blade || blade <= 0 || cost == 0 {
+        for part in heart_str.split_whitespace() {
+            let converted = heart_label_to_icon(part);
+            if !converted.starts_with("{{") && heart_str.len() <= 3 {
+                continue;
+            }
+            s.push_str(&converted);
             s.push(' ');
-        } else {
+        }
+        if !heart_str.is_empty() {
+            s = s.trim_end().to_string();
             s.push_str("  ");
         }
-    }
-    if can_have_score && score > 0 {
-        s.push_str(&format!("{{{{icon_score.png|SCORE}}}}{}  ", score));
-    }
-    let show_cost = cost > 0 || can_have_blade;
-    if show_cost {
-        s.push_str(&format!("{{{{icon_energy.png|E}}}}{}", cost));
+        if blade > 0 {
+            s.push_str(&format!("{{{{icon_blade.png|BLADE}}}}{}", blade));
+        }
+    } else if variant == "live_card" {
+        // Live: score → need_heart
+        if score > 0 {
+            s.push_str(&format!("{{{{icon_score.png|SCORE}}}}{}  ", score));
+        }
+        for part in need_heart_str.split_whitespace() {
+            let converted = heart_label_to_icon(part);
+            if !converted.starts_with("{{") && need_heart_str.len() <= 3 {
+                continue;
+            }
+            s.push_str(&converted);
+            s.push(' ');
+        }
+        if !need_heart_str.is_empty() {
+            s = s.trim_end().to_string();
+        }
     }
     if tapped {
         s.push_str(" [TAPPED]");
@@ -314,6 +368,75 @@ fn measure_text_width(s: &str, scale: f32) -> f32 {
     }
     let c_str = std::ffi::CString::new(s).unwrap_or_default();
     unsafe { _3ds_measure_text_width(c_str.as_ptr() as *const u8, scale) }
+}
+
+/// Pre-computed card display stats for detail rendering.
+struct CardDisplayStats {
+    is_tapped: bool,
+    total_blade: i32,
+    score: i32,
+    cost: u32,
+    heart_str: String,
+    need_heart_str: String,
+}
+
+fn compute_card_stats(
+    card: &rabuka_engine::card::Card,
+    cid: i16,
+    gs: &rabuka_engine::game_state::GameState,
+) -> CardDisplayStats {
+    let is_tapped = gs
+        .mods
+        .orientation_modifiers
+        .get(&cid)
+        .map(|o| o.as_str() == "wait")
+        .unwrap_or(false);
+    let bm = gs
+        .mods
+        .blade_modifiers
+        .get(&cid)
+        .map(|m| m.total())
+        .unwrap_or(0);
+    let total_blade = if is_tapped {
+        0
+    } else {
+        (card.blade as i32 + bm).max(0)
+    };
+    let score = card.score.unwrap_or(0) as i32
+        + gs.mods
+            .score_modifiers
+            .get(&cid)
+            .map(|m| m.total())
+            .unwrap_or(0);
+    let cost = card.cost.unwrap_or(0);
+    let heart_str = build_heart_str(
+        &card
+            .base_heart
+            .as_ref()
+            .map(|bh| bh.hearts.clone())
+            .unwrap_or_default(),
+        cid,
+        &gs.mods,
+        false,
+    );
+    let need_heart_str = build_heart_str(
+        &card
+            .need_heart
+            .as_ref()
+            .map(|bh| bh.hearts.clone())
+            .unwrap_or_default(),
+        cid,
+        &gs.mods,
+        true,
+    );
+    CardDisplayStats {
+        is_tapped,
+        total_blade,
+        score,
+        cost,
+        heart_str,
+        need_heart_str,
+    }
 }
 
 /// Find a break point in a string so the prefix fits within max_px pixels.
@@ -357,6 +480,35 @@ fn split_at_px(s: &str, max_px: f32, scale: f32) -> (String, String) {
 /// Wrap ability text — keeps `{{...}}` icon markers for later inline rendering.
 fn wrap_ability_text(s: &str, max_px: f32, scale: f32) -> String {
     wrap_text(s, max_px, scale)
+}
+
+/// Truncate text at segment boundaries, keeping `{{...}}` icon markers intact.
+/// Only plain text characters count toward the character limit.
+fn truncate_aware_segments(s: &str, max_chars: usize) -> String {
+    let segs = segment_text(s);
+    let mut result = String::new();
+    let mut text_count = 0usize;
+    for seg in &segs {
+        match seg {
+            TextSeg::Icon(icon) => {
+                result.push_str(&format!("{{{{{}}}}}", icon));
+            }
+            TextSeg::Text(text) => {
+                let remaining = max_chars.saturating_sub(text_count);
+                if remaining == 0 {
+                    break;
+                }
+                if text_count + text.len() <= max_chars {
+                    result.push_str(text);
+                    text_count += text.len();
+                } else {
+                    result.push_str(&text[..remaining.min(text.len())]);
+                    break;
+                }
+            }
+        }
+    }
+    result
 }
 
 /// Segments of text: either a plain text span or an icon marker like {{icon.png|alt}}
@@ -520,6 +672,7 @@ enum SetupPhase {
     MultiplayerPickRole(usize, usize), // deck_idx, role_cursor (0=Host, 1=Client)
     MultiplayerHostWait(usize), // p1_idx: host waiting for client to connect
     MultiplayerClientScan(usize), // p1_idx: client scanning for host network
+    MultiplayerClientHostSelect(usize, Vec<u16>, usize), // p1_idx, host_node_ids, cursor
     MultiplayerSyncDeck(usize, usize, bool), // p1_idx, p2_idx, is_host
     MultiplayerLoading(usize, usize, bool, Option<Vec<u8>>), // p1_idx, p2_idx, is_host, deck_sync_bytes
     QrScan,                                                  // QR code scanning for deck import
@@ -1492,8 +1645,11 @@ fn main() {
                                 unsafe {
                                     _3ds_clear_both();
                                     _3ds_text_add_top(
-                                        format!("{}\n\0", tl_fmt("Camera error", &[("e", &r.to_string())]))
-                                            .as_ptr(),
+                                        format!(
+                                            "{}\n\0",
+                                            tl_fmt("Camera error", &[("e", &r.to_string())])
+                                        )
+                                        .as_ptr(),
                                     );
                                     _3ds_text_add_top(format!("{}\0", tl("B=back")).as_ptr());
                                 }
@@ -1797,7 +1953,10 @@ fn main() {
                                             _3ds_text_add_top(
                                                 format!(
                                                     "{}\n\0",
-                                                    tl_fmt("UDS INIT FAILED", &[("e", &e.to_string())])
+                                                    tl_fmt(
+                                                        "UDS INIT FAILED",
+                                                        &[("e", &e.to_string())]
+                                                    )
                                                 )
                                                 .as_ptr(),
                                             );
@@ -1816,7 +1975,10 @@ fn main() {
                                                 0.85f32,
                                                 format!(
                                                     "{}\0",
-                                                    tl_fmt("UDS INIT FAILED", &[("e", &e.to_string())])
+                                                    tl_fmt(
+                                                        "UDS INIT FAILED",
+                                                        &[("e", &e.to_string())]
+                                                    )
                                                 )
                                                 .as_ptr(),
                                             );
@@ -1860,49 +2022,63 @@ fn main() {
                     }
                     // Multiplayer: Client scanning for host
                     SetupPhase::MultiplayerClientScan(p1_idx) => {
-                        // Initialize UDS as client on first entry
+                        // Initialize UDS and scan for hosts on first entry
                         if was_dirty {
                             let init_result = uds::uds_init(false);
                             match init_result {
                                 Ok(()) => {
-                                    if unsafe { _3ds_is_cli_mode() } {
-                                        unsafe {
-                                            _3ds_clear_top();
-                                            let scan_msg = tl("CLIENT: Scanning...");
-                                            _3ds_text_add_top(format!("{}\n\0", scan_msg).as_ptr());
-                                            let look_msg = tl("Looking for host network");
-                                            _3ds_text_add_top(format!("{}\n\0", look_msg).as_ptr());
-                                            let b_cancel = tl("B = cancel");
-                                            _3ds_text_add_top(format!("{}\n\0", b_cancel).as_ptr());
+                                    let hosts = uds::uds_scan_networks();
+                                    if hosts.is_empty() {
+                                        // No hosts found
+                                        if unsafe { _3ds_is_cli_mode() } {
+                                            unsafe {
+                                                _3ds_clear_top();
+                                                _3ds_text_add_top(
+                                                    format!("{}\n\0", tl("No hosts found"))
+                                                        .as_ptr(),
+                                                );
+                                                _3ds_text_add_top(
+                                                    format!("{}\n\0", tl("B = back")).as_ptr(),
+                                                );
+                                            }
+                                        } else {
+                                            unsafe {
+                                                _3ds_top_clear();
+                                                _3ds_top_queue_rect(
+                                                    0.0, 0.0, 400.0, 240.0, COL_TOP_BG,
+                                                );
+                                                _3ds_top_queue_text(
+                                                    80.0,
+                                                    100.0,
+                                                    COL_MED,
+                                                    0.75f32,
+                                                    format!("{}\0", tl("No hosts found")).as_ptr(),
+                                                );
+                                                _3ds_top_queue_text(
+                                                    80.0,
+                                                    230.0,
+                                                    COL_MED,
+                                                    0.60f32,
+                                                    format!("{}\0", tl("B=back")).as_ptr(),
+                                                );
+                                            }
                                         }
+                                        Step::Setup(
+                                            cards.clone(),
+                                            decks.clone(),
+                                            SetupPhase::MultiplayerClientScan(p1_idx),
+                                            false,
+                                        )
                                     } else {
-                                        unsafe {
-                                            _3ds_top_clear();
-                                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                                            let scan_msg = tl("CLIENT: Scanning...");
-                                            _3ds_top_queue_text(
-                                                80.0,
-                                                8.0,
-                                                COL_GOLD,
-                                                0.85f32,
-                                                format!("{}\0", scan_msg).as_ptr(),
-                                            );
-                                            _3ds_top_queue_text(
-                                                50.0,
-                                                100.0,
-                                                COL_LIGHT,
-                                                0.70f32,
-                                                format!("{}\n\0", tl("Looking for host network"))
-                                                    .as_ptr(),
-                                            );
-                                            _3ds_top_queue_text(
-                                                50.0,
-                                                230.0,
-                                                COL_MED,
-                                                0.60f32,
-                                                format!("{}\0", tl("B=cancel")).as_ptr(),
-                                            );
-                                        }
+                                        // Hosts found — go to selection
+                                        Step::Setup(
+                                            cards.clone(),
+                                            decks.clone(),
+                                            SetupPhase::MultiplayerClientHostSelect(
+                                                p1_idx, hosts, 0,
+                                            ),
+                                            true,
+                                        )
                                     }
                                 }
                                 Err(e) => {
@@ -1912,7 +2088,10 @@ fn main() {
                                             _3ds_text_add_top(
                                                 format!(
                                                     "{}\n\0",
-                                                    tl_fmt("UDS INIT FAILED", &[("e", &e.to_string())])
+                                                    tl_fmt(
+                                                        "UDS INIT FAILED",
+                                                        &[("e", &e.to_string())]
+                                                    )
                                                 )
                                                 .as_ptr(),
                                             );
@@ -1931,42 +2110,151 @@ fn main() {
                                                 0.85f32,
                                                 format!(
                                                     "{}\0",
-                                                    tl_fmt("UDS INIT FAILED", &[("e", &e.to_string())])
+                                                    tl_fmt(
+                                                        "UDS INIT FAILED",
+                                                        &[("e", &e.to_string())]
+                                                    )
                                                 )
                                                 .as_ptr(),
                                             );
                                         }
                                     }
+                                    Step::Setup(
+                                        cards.clone(),
+                                        decks.clone(),
+                                        SetupPhase::MultiplayerPickRole(p1_idx, 0),
+                                        true,
+                                    )
                                 }
                             }
-                        }
-                        // Poll for host connection
-                        let connected = uds::uds_is_connected();
-                        if connected {
-                            // Send hello so host knows we're here
-                            let hello = [0xAAu8];
-                            let _ = uds::uds_send(&hello);
-                            // Host found! Move to deck sync
-                            Step::Setup(
-                                cards.clone(),
-                                decks.clone(),
-                                SetupPhase::MultiplayerSyncDeck(p1_idx, 0, false),
-                                true,
-                            )
-                        } else if keys & 0x00000002 != 0 {
-                            // B = cancel
-                            uds::uds_exit();
-                            Step::Setup(
-                                cards.clone(),
-                                decks.clone(),
-                                SetupPhase::MultiplayerPickRole(p1_idx, 0),
-                                true,
-                            )
                         } else {
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
                                 SetupPhase::MultiplayerClientScan(p1_idx),
+                                false,
+                            )
+                        }
+                    }
+                    // Multiplayer: Client selecting which host to connect to
+                    SetupPhase::MultiplayerClientHostSelect(p1_idx, ref hosts, cursor) => {
+                        let n = hosts.len();
+                        if n == 0 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerClientScan(p1_idx),
+                                true,
+                            )
+                        } else if keys & 0x00000002 != 0 {
+                            // B = back to scan
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerClientScan(p1_idx),
+                                true,
+                            )
+                        } else if keys & 0x00000001 != 0 {
+                            // A = connect to selected host
+                            let selected = hosts[cursor];
+                            match uds::uds_connect_network(selected) {
+                                Ok(()) => {
+                                    let hello = [0xAAu8];
+                                    let _ = uds::uds_send(&hello);
+                                    Step::Setup(
+                                        cards.clone(),
+                                        decks.clone(),
+                                        SetupPhase::MultiplayerSyncDeck(p1_idx, 0, false),
+                                        true,
+                                    )
+                                }
+                                Err(_) => Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::MultiplayerClientHostSelect(
+                                        p1_idx,
+                                        hosts.clone(),
+                                        cursor,
+                                    ),
+                                    true,
+                                ),
+                            }
+                        } else {
+                            // UP/DOWN to navigate
+                            let mut new_cursor = cursor;
+                            if keys & 0x00000040 != 0 && cursor > 0 {
+                                new_cursor = cursor - 1;
+                            }
+                            if keys & 0x00000080 != 0 && cursor + 1 < n {
+                                new_cursor = cursor + 1;
+                            }
+                            // Draw host list
+                            if unsafe { _3ds_is_cli_mode() } {
+                                unsafe {
+                                    _3ds_clear_top();
+                                }
+                                let hdr = tl("SELECT HOST");
+                                unsafe {
+                                    _3ds_text_add_top(format!("{}\n\0", hdr).as_ptr());
+                                }
+                                for (i, _) in hosts.iter().enumerate() {
+                                    let prefix = if i == new_cursor { "> " } else { "  " };
+                                    let label =
+                                        format!("{}{}\0", prefix, format!("Host {}", i + 1));
+                                    unsafe {
+                                        _3ds_text_add_top(format!("{}\n\0", label).as_ptr());
+                                    }
+                                }
+                                unsafe {
+                                    _3ds_text_add_top(
+                                        format!("{}\n\0", tl("A=connect B=back")).as_ptr(),
+                                    );
+                                }
+                            } else {
+                                unsafe {
+                                    _3ds_top_clear();
+                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                    _3ds_top_queue_text(
+                                        80.0,
+                                        8.0,
+                                        COL_GOLD,
+                                        0.85f32,
+                                        format!("{}\0", tl("SELECT HOST")).as_ptr(),
+                                    );
+                                }
+                                for i in 0..n {
+                                    let y = 50.0 + i as f32 * 32.0;
+                                    let col = if i == new_cursor { COL_SEL } else { COL_LIGHT };
+                                    let prefix = if i == new_cursor { "> " } else { "  " };
+                                    unsafe {
+                                        _3ds_top_queue_text(
+                                            40.0,
+                                            y,
+                                            col,
+                                            0.70f32,
+                                            format!("{}{}\0", prefix, format!("Host {}", i + 1))
+                                                .as_ptr(),
+                                        );
+                                    }
+                                }
+                                unsafe {
+                                    _3ds_top_queue_text(
+                                        40.0,
+                                        230.0,
+                                        COL_MED,
+                                        0.60f32,
+                                        format!("{}\0", tl("A=connect B=back")).as_ptr(),
+                                    );
+                                }
+                            }
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerClientHostSelect(
+                                    p1_idx,
+                                    hosts.clone(),
+                                    new_cursor,
+                                ),
                                 false,
                             )
                         }
@@ -3685,20 +3973,6 @@ fn main() {
                         }
                     }
 
-                    // Set HUD + active player (always, so toggle works smoothly)
-                    {
-                        let ap_label = if ap.id == p1.id { "P1\0" } else { "P2\0" };
-                        let phase_str = format!("{:?}\0", gs.current_phase);
-                        unsafe {
-                            _3ds_board_set_hud(
-                                gs.turn_number as i32,
-                                phase_str.as_ptr(),
-                                ap_label.as_ptr(),
-                            );
-                            _3ds_board_set_active_player(ap.id == p1.id);
-                        }
-                    }
-
                     // Game over: show winner on top screen
                     if gs.game_result != GameResult::Ongoing {
                         let winner = match gs.game_result {
@@ -4242,97 +4516,51 @@ fn main() {
                                 // Active card detail overlay within zone viewer
                                 let vcid = viewing_card.unwrap();
                                 if let Some(card) = gs.card_database.get_card(vcid) {
-                                    let is_tapped = gs
-                                        .mods
-                                        .orientation_modifiers
-                                        .get(&vcid)
-                                        .map(|o| o.as_str() == "wait")
-                                        .unwrap_or(false);
-                                    let bt = card.blade;
-                                    let bm = gs
-                                        .mods
-                                        .blade_modifiers
-                                        .get(&vcid)
-                                        .map(|m| m.total())
-                                        .unwrap_or(0);
-                                    let tb = if is_tapped {
-                                        0
-                                    } else {
-                                        (bt as i32 + bm).max(0)
-                                    };
-                                    let sc = card.score.unwrap_or(0) as i32
-                                        + gs.mods
-                                            .score_modifiers
-                                            .get(&vcid)
-                                            .map(|m| m.total())
-                                            .unwrap_or(0);
-                                    let co = card.cost.unwrap_or(0);
-                                    let hr = card
-                                        .base_heart
-                                        .as_ref()
-                                        .map(|bh| {
-                                            bh.hearts
-                                                .iter()
-                                                .map(|(c, v)| {
-                                                    let code = c.short_label();
-                                                    let bonus = gs
-                                                        .mods
-                                                        .heart_modifiers
-                                                        .get(&vcid)
-                                                        .and_then(|hm| hm.get(c))
-                                                        .map(|m| m.total())
-                                                        .unwrap_or(0);
-                                                    if bonus != 0 {
-                                                        format!("{}{}+{}", code, v, bonus)
-                                                    } else {
-                                                        format!("{}{}", code, v)
-                                                    }
-                                                })
-                                                .collect::<Vec<_>>()
-                                                .join(" ")
-                                        })
-                                        .unwrap_or_default();
+                                    let stats = compute_card_stats(card, vcid, &gs);
                                     unsafe {
-                                        _3ds_top_queue_rect(40.0, 40.0, 320.0, 160.0, COL_CARD);
+                                        _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                        _3ds_top_queue_rect(0.0, 0.0, 400.0, 232.0, COL_CARD);
                                         let display_name =
                                             i18n::card_display_name(&card.name, current_lang());
                                         _3ds_top_queue_text(
-                                            44.0,
-                                            44.0,
+                                            4.0,
+                                            4.0,
                                             COL_BLUE,
-                                            0.70f32,
+                                            0.80f32,
                                             format!("[{}] {}\0", card.card_no, display_name)
                                                 .as_ptr(),
                                         );
                                         render_text_with_icons(
-                                            44.0,
-                                            66.0,
+                                            4.0,
+                                            24.0,
                                             &card_stat_line(
-                                                tb,
-                                                &hr,
-                                                sc,
-                                                co,
-                                                is_tapped,
+                                                stats.total_blade,
+                                                &stats.heart_str,
+                                                stats.score,
+                                                stats.cost,
+                                                stats.is_tapped,
                                                 card.card_type.as_card_str(),
+                                                &stats.need_heart_str,
                                             ),
                                             COL_LIGHT,
-                                            0.60f32,
+                                            0.65f32,
                                         );
-                                        let mut ty = 86.0;
+                                        let mut ty = 44.0;
                                         for ab in card.resolved_abilities() {
                                             let ab_text = i18n::translate_ability(
                                                 &ab.full_text,
                                                 current_lang(),
                                             );
-                                            let w = wrap_ability_text(&ab_text, 312.0, 0.55);
+                                            let w = wrap_ability_text(&ab_text, 392.0, 0.65);
                                             for line in w.lines() {
-                                                if ty < 190.0 {
+                                                if ty < 230.0 {
                                                     render_text_with_icons(
-                                                        44.0, ty, line, COL_LIGHT, 0.55,
+                                                        4.0, ty, line, COL_LIGHT, 0.65,
                                                     );
-                                                    ty += 16.0;
+                                                    ty += 18.0;
                                                 }
                                             }
+                                            ty += 3.0;
                                         }
                                     }
                                 }
@@ -4380,67 +4608,18 @@ fn main() {
                                             )
                                             .as_ptr(),
                                         );
-                                        let is_tapped = gs
-                                            .mods
-                                            .orientation_modifiers
-                                            .get(&cid)
-                                            .map(|o| o.as_str() == "wait")
-                                            .unwrap_or(false);
-                                        let base_blade = card.blade;
-                                        let blade_mod = gs
-                                            .mods
-                                            .blade_modifiers
-                                            .get(&cid)
-                                            .map(|m| m.total())
-                                            .unwrap_or(0);
-                                        let total_blade = if is_tapped {
-                                            0
-                                        } else {
-                                            (base_blade as i32 + blade_mod).max(0)
-                                        };
-                                        let score = card.score.unwrap_or(0) as i32
-                                            + gs.mods
-                                                .score_modifiers
-                                                .get(&cid)
-                                                .map(|m| m.total())
-                                                .unwrap_or(0);
-                                        let cost = card.cost.unwrap_or(0);
-                                        let heart_str = card
-                                            .base_heart
-                                            .as_ref()
-                                            .map(|bh| {
-                                                let parts: Vec<String> = bh
-                                                    .hearts
-                                                    .iter()
-                                                    .map(|(c, v)| {
-                                                        let code = c.short_label();
-                                                        let bonus = gs
-                                                            .mods
-                                                            .heart_modifiers
-                                                            .get(&cid)
-                                                            .and_then(|hm| hm.get(c))
-                                                            .map(|m| m.total())
-                                                            .unwrap_or(0);
-                                                        if bonus != 0 {
-                                                            format!("{}{}+{}", code, v, bonus)
-                                                        } else {
-                                                            format!("{}{}", code, v)
-                                                        }
-                                                    })
-                                                    .collect();
-                                                parts.join(" ")
-                                            })
-                                            .unwrap_or_default();
+                                        let stats = compute_card_stats(card, cid, &gs);
                                         render_text_with_icons(
                                             4.0,
                                             66.0,
                                             &card_stat_line(
-                                                total_blade,
-                                                &heart_str,
-                                                score,
-                                                cost,
-                                                is_tapped,
+                                                stats.total_blade,
+                                                &stats.heart_str,
+                                                stats.score,
+                                                stats.cost,
+                                                stats.is_tapped,
                                                 card.card_type.as_card_str(),
+                                                &stats.need_heart_str,
                                             ),
                                             COL_LIGHT,
                                             0.65f32,
@@ -4473,57 +4652,7 @@ fn main() {
                             if let Some(vcid) = viewing_card {
                                 // Compact card info overlay with stats
                                 if let Some(card) = gs.card_database.get_card(vcid) {
-                                    let is_tapped = gs
-                                        .mods
-                                        .orientation_modifiers
-                                        .get(&vcid)
-                                        .map(|o| o.as_str() == "wait")
-                                        .unwrap_or(false);
-                                    let base_blade = card.blade;
-                                    let blade_mod = gs
-                                        .mods
-                                        .blade_modifiers
-                                        .get(&vcid)
-                                        .map(|m| m.total())
-                                        .unwrap_or(0);
-                                    let total_blade = if is_tapped {
-                                        0
-                                    } else {
-                                        (base_blade as i32 + blade_mod).max(0)
-                                    };
-                                    let score = card.score.unwrap_or(0) as i32
-                                        + gs.mods
-                                            .score_modifiers
-                                            .get(&vcid)
-                                            .map(|m| m.total())
-                                            .unwrap_or(0);
-                                    let cost = card.cost.unwrap_or(0);
-                                    let heart_str = card
-                                        .base_heart
-                                        .as_ref()
-                                        .map(|bh| {
-                                            let parts: Vec<String> = bh
-                                                .hearts
-                                                .iter()
-                                                .map(|(c, v)| {
-                                                    let code = c.short_label();
-                                                    let bonus = gs
-                                                        .mods
-                                                        .heart_modifiers
-                                                        .get(&vcid)
-                                                        .and_then(|hm| hm.get(c))
-                                                        .map(|m| m.total())
-                                                        .unwrap_or(0);
-                                                    if bonus != 0 {
-                                                        format!("{}{}+{}", code, v, bonus)
-                                                    } else {
-                                                        format!("{}{}", code, v)
-                                                    }
-                                                })
-                                                .collect();
-                                            parts.join(" ")
-                                        })
-                                        .unwrap_or_default();
+                                    let stats = compute_card_stats(card, vcid, &gs);
                                     unsafe {
                                         _3ds_top_queue_rect(0.0, 42.0, 400.0, 76.0, COL_CARD);
                                         let btm_name =
@@ -4544,12 +4673,13 @@ fn main() {
                                             4.0,
                                             64.0,
                                             &card_stat_line(
-                                                total_blade,
-                                                &heart_str,
-                                                score,
-                                                cost,
-                                                is_tapped,
+                                                stats.total_blade,
+                                                &stats.heart_str,
+                                                stats.score,
+                                                stats.cost,
+                                                stats.is_tapped,
                                                 card.card_type.as_card_str(),
+                                                &stats.need_heart_str,
                                             ),
                                             COL_LIGHT,
                                             0.65f32,
@@ -4711,6 +4841,7 @@ fn main() {
                                                         | "skip_optional_cost"
                                                         | "yes"
                                                         | "no"
+                                                        | "select"
                                                 )
                                             })
                                             .unwrap_or(false);
@@ -5192,8 +5323,8 @@ fn main() {
                                                         .as_ref()
                                                         .and_then(|p| p.source_ability.clone())
                                                         .unwrap_or_default();
-                                                    let abil_short: String =
-                                                        abil.chars().take(28).collect();
+                                                    let abil_short =
+                                                        truncate_aware_segments(&abil, 28);
                                                     let cn = cn_or_empty(act);
                                                     if !cn.is_empty() {
                                                         if cost > 0 {
@@ -6089,10 +6220,6 @@ extern "C" {
     fn _3ds_top_queue_text(x: f32, y: f32, color: u32, scale: f32, text: *const u8);
     fn _3ds_top_queue_card(atlas: *const u8, idx: i32, x: f32, y: f32, w: f32, h: f32);
     fn _3ds_measure_text_width(text: *const u8, scale: f32) -> f32;
-
-    // Board HUD
-    fn _3ds_board_set_hud(turn: i32, phase: *const u8, player: *const u8);
-    fn _3ds_board_set_active_player(is_p1: bool);
 
     // Action highlight on board slots
     fn _3ds_board_set_action_highlight(zone: i32, slot: i32, opponent: bool);

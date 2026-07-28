@@ -136,13 +136,7 @@ static const char* pool_strdup(const char* s) {
 }
 static u32   COL_TOP_BG = 0xFF0A0E1A; // very dark navy
 
-// ---- Board HUD overlay state ----
-static int   hud_turn = 0;
-static char  hud_phase[32] = "";
-static char  hud_player[8] = "";
 
-// ---- Active-player highlight ----
-static bool active_is_p1 = true;
 
 // ---- Action highlight on board slots (multiple) ----
 #define MAX_HIGHLIGHTS 16
@@ -165,6 +159,7 @@ static C2D_Text     tmp_text_obj;
 // ---- Forward declarations ----
 C2D_Image _3ds_get_card_image(const char* atlas_name, int index);
 static void zone_heights(float h, float* live, float* stage, float* energy, float* hand);
+void _3ds_qr_draw_preview(float x_off);
 
 // ---- init / exit ----
 void _3ds_init() {
@@ -190,8 +185,7 @@ void _3ds_init() {
     cli_mode = false;
     draw_op_count = 0;
     overlay_count = 0;
-    hud_turn = 0; hud_phase[0] = '\0'; hud_player[0] = '\0';
-    active_is_p1 = true;
+
     hl_count = 0;
     tmp_text_buf = C2D_TextBufNew(32768);
 }
@@ -391,14 +385,7 @@ static C2D_Image _atlas_get_image(const char* atlas, int idx) {
     return img;
 }
 
-// ---- Board HUD ----
-void _3ds_board_set_hud(int turn, const char* phase, const char* player) {
-    hud_turn = turn;
-    strncpy(hud_phase, phase ? phase : "", 31); hud_phase[31] = '\0';
-    strncpy(hud_player, player ? player : "", 7); hud_player[7] = '\0';
-}
 
-void _3ds_board_set_active_player(bool is_p1) { active_is_p1 = is_p1; }
 
 // ---- Action highlight ----
 void _3ds_board_set_action_highlight(int zone, int slot, bool opponent) {
@@ -770,15 +757,6 @@ void _3ds_render_board() {
         draw_section(&p_board, 0, 240, false, false);
     }
 
-    // HUD overlay bar (game mode only)
-    // HUD overlay bar: scale 0.65 = ~20px glyph. Bar height 22px fits one line.
-    if (!cli_mode && hud_turn > 0) {
-        C2D_DrawRectSolid(0, 0, 0.5f, 320, 22, C2D_Color32(0, 0, 0, 180));
-        char hbuf[64];
-        snprintf(hbuf, sizeof(hbuf), "T%d %s [%s]", hud_turn, hud_phase, hud_player);
-        _3ds_draw_label(hbuf, 4, 1, COL_SEL, 0.65f);
-    }
-
     // Action overlay panel (game mode, bottom-right)
     // Action overlay panel: scale 0.60 = 18px glyph, line height 24px.
     if (!cli_mode && overlay_count > 0) {
@@ -853,6 +831,8 @@ void _3ds_swap_buffers() {
         } else {
             C2D_TargetClear(target, COL_TOP_BG);
             C2D_SceneBegin(target);
+            // Camera preview for QR scan (draws behind text overlays)
+            _3ds_qr_draw_preview(x_off);
             C2D_TextBufClear(tmp_text_buf);
             C2D_Font f = custom_font ? custom_font : NULL;
             for (int i = 0; i < draw_op_count; i++) {
@@ -1010,67 +990,87 @@ int _3ds_uds_init(int is_host) {
         uds_connected = true; // host is always "connected" once network is created
         return 0;
     } else {
-        // Client: scan for networks
-        u32 tmpbuf_size = 0x4000;
-        u32 *tmpbuf = (u32*)malloc(tmpbuf_size);
-        if (!tmpbuf) {
-            udsExit();
-            return -5;
-        }
-        memset(tmpbuf, 0, tmpbuf_size);
-
-        size_t total_networks = 0;
-        udsNetworkScanInfo *networks = NULL;
-
-        // Scan up to 10 times
-        for (int i = 0; i < 10; i++) {
-            ret = udsScanBeacons(tmpbuf, tmpbuf_size, &networks, &total_networks,
-                                 UDS_WLAN_COMM_ID, 0, NULL, false);
-            if (total_networks > 0) break;
-        }
-
-        free(tmpbuf);
-
-        if (total_networks == 0) {
-            udsExit();
-            return -6; // no networks found
-        }
-
-        // Connect to first matching network
-        char passphrase[0x14];
-        memset(passphrase, 0, sizeof(passphrase));
-        strncpy(passphrase, (char*)uds_appdata + 4, 12);
-
-        bool connected = false;
-        for (size_t i = 0; i < total_networks; i++) {
-            udsNetworkStruct *net = &networks[i].network;
-            // Check if it's our app (first 4 bytes of appdata match)
-            if (memcmp(net->appdata, uds_appdata, 4) == 0) {
-                for (int attempt = 0; attempt < 10; attempt++) {
-                    ret = udsConnectNetwork(net, passphrase, strlen(passphrase) + 1,
-                                            &uds_bindctx, UDS_BROADCAST_NETWORKNODEID,
-                                            UDSCONTYPE_Client, uds_data_channel,
-                                            uds_recv_buf_size);
-                    if (R_SUCCEEDED(ret)) {
-                        connected = true;
-                        break;
-                    }
-                }
-                if (connected) break;
-            }
-        }
-
-        free(networks);
-
-        if (!connected) {
-            udsExit();
-            return -7;
-        }
+        // Client: initialize UDS only (scanning and connecting done separately)
+        Result ret = udsInit(uds_sharedmem_size, NULL);
+        if (R_FAILED(ret)) return -2;
 
         uds_initialized = true;
-        uds_connected = true;
+        uds_connected = false;
         return 0;
     }
+}
+
+// Scan for available host networks. Returns count of matching networks found.
+// Each network's node_id is written to out_ids (up to max_out).
+int _3ds_uds_scan_networks(unsigned short *out_ids, int max_out) {
+    if (!uds_initialized || uds_is_host) return 0;
+
+    u32 tmpbuf_size = 0x4000;
+    u32 *tmpbuf = (u32*)malloc(tmpbuf_size);
+    if (!tmpbuf) return 0;
+    memset(tmpbuf, 0, tmpbuf_size);
+
+    size_t total_networks = 0;
+    udsNetworkScanInfo *networks = NULL;
+
+    for (int i = 0; i < 5; i++) {
+        Result ret = udsScanBeacons(tmpbuf, tmpbuf_size, &networks, &total_networks,
+                                     UDS_WLAN_COMM_ID, 0, NULL, false);
+        if (total_networks > 0) break;
+        svcSleepThread(500000000); // 500ms between scans
+    }
+
+    int count = 0;
+    for (size_t i = 0; i < total_networks && count < max_out; i++) {
+        udsNetworkStruct *net = &networks[i].network;
+        if (memcmp(net->appdata, uds_appdata, 4) == 0) {
+            out_ids[count] = net->node_id;
+            count++;
+        }
+    }
+
+    free(tmpbuf);
+    free(networks);
+    return count;
+}
+
+// Connect to a specific network by node_id.
+int _3ds_uds_connect_network(unsigned short node_id) {
+    if (!uds_initialized || uds_is_host) return -1;
+
+    u32 tmpbuf_size = 0x4000;
+    u32 *tmpbuf = (u32*)malloc(tmpbuf_size);
+    if (!tmpbuf) return -2;
+    memset(tmpbuf, 0, tmpbuf_size);
+
+    size_t total_networks = 0;
+    udsNetworkScanInfo *networks = NULL;
+
+    Result ret = udsScanBeacons(tmpbuf, tmpbuf_size, &networks, &total_networks,
+                                 UDS_WLAN_COMM_ID, 0, NULL, false);
+    free(tmpbuf);
+
+    if (total_networks == 0 || !networks) { free(networks); return -3; }
+
+    char passphrase[0x14];
+    memset(passphrase, 0, sizeof(passphrase));
+    strncpy(passphrase, (char*)uds_appdata + 4, 12);
+
+    int result = -4;
+    for (size_t i = 0; i < total_networks; i++) {
+        udsNetworkStruct *net = &networks[i].network;
+        if (net->node_id == node_id && memcmp(net->appdata, uds_appdata, 4) == 0) {
+            ret = udsConnectNetwork(net, passphrase, strlen(passphrase) + 1,
+                                    &uds_bindctx, UDS_BROADCAST_NETWORKNODEID,
+                                    UDSCONTYPE_Client, uds_data_channel,
+                                    uds_recv_buf_size);
+            if (R_SUCCEEDED(ret)) { result = 0; break; }
+        }
+    }
+
+    free(networks);
+    return result;
+}
 }
 
 void _3ds_uds_exit() {
@@ -1116,12 +1116,61 @@ int _3ds_uds_is_connected() {
 // No button needed either — the QR code is auto-detected when camera sees it.
 #include "quirc.h"
 #include <3ds/services/cam.h>
+#include <3ds/services/gspgpu.h>
 
 static bool cam_running = false;
 static Handle cam_event = 0;
 static u8 *cam_buf = NULL;
 static struct quirc *qr = NULL;
 static u8 *gray = NULL;
+static C3D_Tex cam_tex = {0};
+static bool cam_tex_inited = false;
+
+// Convert linear RGB565 buffer to tiled RGBA8 texture for GPU display.
+static void _3ds_qr_update_texture(const u8 *buf, int w, int h) {
+    if (!cam_tex_inited) {
+        C3D_TexInit(&cam_tex, w, h, GPU_RGBA8);
+        cam_tex_inited = true;
+    }
+    u32 *tiled = (u32*)linearAlloc(w * h * 4);
+    if (!tiled) return;
+    // RGB565 → RGBA8
+    for (int i = 0; i < w * h; i++) {
+        u16 p = ((u16*)buf)[i];
+        u8 r = ((p >> 11) & 0x1F) << 3;
+        u8 g = ((p >> 5) & 0x3F) << 2;
+        u8 b = (p & 0x1F) << 3;
+        tiled[i] = r | (g << 8) | (b << 16) | 0xFF000000;
+    }
+    // Tile the linear buffer (required by 3DS GPU)
+    u32 stride = 400 * 4;
+    for (int y = 0; y < h; y += 8) {
+        for (int x = 0; x < w; x += 8) {
+            for (int ty = 0; ty < 8; ty++) {
+                for (int tx = 0; tx < 8; tx++) {
+                    int si = (y + ty) * w + (x + tx);
+                    // 3DS tile interleaving: 2 words per 8 pixels, word index by (tx%2)*4 + tx/2 + ty*4
+                    int di = (x / 8) * 64 + (y / 8) * stride + (tx % 2) * 32 + (tx / 2 + ty * 4) * 4;
+                    ((u32*)cam_tex.data)[di] = tiled[si];
+                }
+            }
+        }
+    }
+    GSPGPU_FlushDataCache(cam_tex.data, w * h * 4);
+    linearFree(tiled);
+}
+
+// Draw camera preview on top screen (call during game-mode top render).
+void _3ds_qr_draw_preview(float x_off) {
+    if (!cam_running || !cam_tex_inited) return;
+    C2D_Image img = { .tex = &cam_tex, .subtex = NULL };
+    // Set subtex to cover full texture
+    static C3D_SubTex sub;
+    sub.left = 0; sub.top = 0; sub.right = 1.0f; sub.bottom = 1.0f;
+    sub.width = 400; sub.height = 240;
+    img.subtex = &sub;
+    C2D_DrawImageAt(img, x_off, 0.0f, 0.4f, NULL, 1.0f, 1.0f);
+}
 
 int _3ds_qr_start(void) {
     if (cam_running) return 0;
@@ -1173,6 +1222,7 @@ void _3ds_qr_stop(void) {
     camExit();
     if (qr) { quirc_destroy(qr); qr = NULL; }
     if (gray) { linearFree(gray); gray = NULL; }
+    if (cam_tex_inited) { C3D_TexDelete(&cam_tex); cam_tex_inited = false; }
     if (cam_buf) { linearFree(cam_buf); cam_buf = NULL; }
     if (cam_event) { svcCloseHandle(cam_event); cam_event = 0; }
 }
@@ -1185,9 +1235,6 @@ int _3ds_qr_poll(char *out_text, unsigned int out_max) {
     int wr = svcWaitSynchronization(cam_event, 0);
     if (wr != 0) return 0; // no frame ready yet
 
-    svcCloseHandle(cam_event);
-    cam_event = 0;
-
     int w = 400, h = 240;
     size_t gsz = (size_t)(w * h);
 
@@ -1198,11 +1245,13 @@ int _3ds_qr_poll(char *out_text, unsigned int out_max) {
             gray[y * w + x] = (r_ * 77 + g_ * 150 + b_ * 29) >> 8;
         }
 
+    // Update camera preview texture for top screen display
+    _3ds_qr_update_texture(cam_buf, w, h);
+
+    // Re-arm camera for next frame BEFORE processing (reduces race window)
+    CAMU_SetReceiving(&cam_event, cam_buf, SELECT_OUT1, 400 * 240 * 2, -1);
+
     int result = 0;
-    if (quirc_resize(qr, w, h) < 0) {
-        CAMU_SetReceiving(&cam_event, cam_buf, SELECT_OUT1, 400 * 240 * 2, -1);
-        return -15;
-    }
     memcpy(quirc_begin(qr, NULL, NULL), gray, gsz);
     quirc_end(qr);
 
@@ -1218,9 +1267,6 @@ int _3ds_qr_poll(char *out_text, unsigned int out_max) {
             result = len;
         } else { result = -5; }
     } else { result = -6; }
-
-    // Re-arm for next frame
-    CAMU_SetReceiving(&cam_event, cam_buf, SELECT_OUT1, 400 * 240 * 2, -1);
 
     return result;
 }

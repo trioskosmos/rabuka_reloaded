@@ -1530,6 +1530,18 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     continue;
                 }
 
+                // Skip abilities that can only activate from the discard pile
+                let is_discard_only = ability
+                    .effect
+                    .as_ref()
+                    .and_then(|e| e.activation_condition_parsed_any())
+                    .is_some_and(|c| {
+                        Zone::from_str(c.get_location().unwrap_or("")) == Some(Zone::Discard)
+                    });
+                if is_discard_only {
+                    continue;
+                }
+
                 let ability_key = (card_id, ability_index, game_state.turn_number);
                 if let Some(use_limit) = ability.use_limit {
                     let used = game_state

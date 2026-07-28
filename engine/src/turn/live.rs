@@ -386,7 +386,7 @@ impl super::TurnEngine {
                             for (color, entry) in color_mods {
                                 let total = entry.total();
                                 if total != 0 {
-                                    let color_label = heart_color_debug_name(color);
+                                    let color_label = color.to_string();
                                     adjustments.push(crate::types::Adjustment {
                                         adjustment_type: AdjustmentType::Requirement,
                                         desc: if verbose {
@@ -2577,22 +2577,6 @@ fn card_name_by_no(card_db: &CardDatabase, card_no: &str) -> String {
         .get_card_by_no(card_no)
         .map(|c| c.name.to_string())
         .unwrap_or_else(|| card_no.to_string().into())
-}
-
-fn heart_color_debug_name(color: &HeartColor) -> &'static str {
-    match color {
-        HeartColor::Heart00 => "heart00",
-        HeartColor::Heart01 => "heart01",
-        HeartColor::Heart02 => "heart02",
-        HeartColor::Heart03 => "heart03",
-        HeartColor::Heart04 => "heart04",
-        HeartColor::Heart05 => "heart05",
-        HeartColor::Heart06 => "heart06",
-        HeartColor::BAll => "b_all",
-        HeartColor::Draw => "draw",
-        HeartColor::Score => "score",
-        HeartColor::All => "all",
-    }
 }
 
 fn fmt_player_id(id: &str) -> String {

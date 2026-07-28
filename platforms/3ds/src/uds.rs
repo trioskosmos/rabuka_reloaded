@@ -17,6 +17,8 @@ extern "C" {
     fn _3ds_uds_send(data: *const u8, len: u32) -> i32;
     fn _3ds_uds_recv(buf: *mut u8, buf_len: u32, out_len: *mut u32) -> i32;
     fn _3ds_uds_is_connected() -> bool;
+    fn _3ds_uds_scan_networks(out_ids: *mut u16, max_out: i32) -> i32;
+    fn _3ds_uds_connect_network(node_id: u16) -> i32;
 }
 
 pub const MSG_SYNC_SETUP: u8 = 0x01;
@@ -63,6 +65,23 @@ pub fn uds_recv(buf: &mut [u8]) -> Result<usize, i32> {
 /// Check if UDS is connected.
 pub fn uds_is_connected() -> bool {
     unsafe { _3ds_uds_is_connected() }
+}
+
+/// Scan for available host networks. Returns list of node_ids.
+pub fn uds_scan_networks() -> Vec<u16> {
+    let mut ids = [0u16; 8];
+    let count = unsafe { _3ds_uds_scan_networks(ids.as_mut_ptr(), 8) };
+    ids[..count as usize].to_vec()
+}
+
+/// Connect to a specific host network by node_id.
+pub fn uds_connect_network(node_id: u16) -> Result<(), i32> {
+    let rc = unsafe { _3ds_uds_connect_network(node_id) };
+    if rc == 0 {
+        Ok(())
+    } else {
+        Err(rc)
+    }
 }
 
 // --- High-level message helpers ---

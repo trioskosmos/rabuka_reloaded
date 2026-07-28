@@ -15,17 +15,26 @@ use alloc::{
 use serde::{Deserialize, Serialize};
 
 fn heart_color_index(color: &HeartColor) -> Option<usize> {
-    Some(match color {
-        HeartColor::Heart00 => 0,
-        HeartColor::Heart01 => 1,
-        HeartColor::Heart02 => 2,
-        HeartColor::Heart03 => 3,
-        HeartColor::Heart04 => 4,
-        HeartColor::Heart05 => 5,
-        HeartColor::Heart06 => 6,
-        HeartColor::All => 7,
-        _ => return None,
-    })
+    match color {
+        HeartColor::BAll | HeartColor::Draw | HeartColor::Score => None,
+        _ => Some(color.index()),
+    }
+}
+
+fn heart_color_to_str(color: &HeartColor) -> &'static str {
+    match color {
+        HeartColor::Heart00 => "heart00",
+        HeartColor::Heart01 => "heart01",
+        HeartColor::Heart02 => "heart02",
+        HeartColor::Heart03 => "heart03",
+        HeartColor::Heart04 => "heart04",
+        HeartColor::Heart05 => "heart05",
+        HeartColor::Heart06 => "heart06",
+        HeartColor::BAll => "b_all",
+        HeartColor::Draw => "draw",
+        HeartColor::Score => "score",
+        HeartColor::All => "all",
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -267,6 +276,21 @@ pub struct RevealedCardDisplay {
     pub owner: i8,
     #[serde(default)]
     pub is_private: bool,
+}
+
+impl RevealedCardDisplay {
+    pub fn from_card_and_meta(
+        card_id: i16,
+        meta: Option<&crate::core::game_state::RevealedCardMeta>,
+    ) -> Self {
+        RevealedCardDisplay {
+            card_id,
+            source_card_id: meta.and_then(|m| m.source),
+            source_card_name: meta.and_then(|m| m.source_name.clone()),
+            owner: meta.and_then(|m| m.owner).map(|o| o as i8).unwrap_or(-1i8),
+            is_private: meta.map(|m| m.is_private).unwrap_or(false),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -545,22 +569,7 @@ pub fn card_to_display(
         let base_heart = card.base_heart.as_ref().map(|bh| {
             bh.hearts
                 .iter()
-                .map(|(color, count)| {
-                    let color_str = match color {
-                        crate::card::HeartColor::Heart00 => "heart00",
-                        crate::card::HeartColor::Heart01 => "heart01",
-                        crate::card::HeartColor::Heart02 => "heart02",
-                        crate::card::HeartColor::Heart03 => "heart03",
-                        crate::card::HeartColor::Heart04 => "heart04",
-                        crate::card::HeartColor::Heart05 => "heart05",
-                        crate::card::HeartColor::Heart06 => "heart06",
-                        crate::card::HeartColor::BAll => "b_all",
-                        crate::card::HeartColor::Draw => "draw",
-                        crate::card::HeartColor::Score => "score",
-                        crate::card::HeartColor::All => "all",
-                    };
-                    (color_str.to_string(), *count)
-                })
+                .map(|(color, count)| (heart_color_to_str(color).to_string(), *count))
                 .collect()
         });
         CardDisplay {
@@ -648,75 +657,29 @@ pub fn card_to_display_full(
         let base_heart = card.base_heart.as_ref().map(|bh| {
             bh.hearts
                 .iter()
-                .map(|(color, count)| {
-                    let color_str = match color {
-                        crate::card::HeartColor::Heart00 => "heart00",
-                        crate::card::HeartColor::Heart01 => "heart01",
-                        crate::card::HeartColor::Heart02 => "heart02",
-                        crate::card::HeartColor::Heart03 => "heart03",
-                        crate::card::HeartColor::Heart04 => "heart04",
-                        crate::card::HeartColor::Heart05 => "heart05",
-                        crate::card::HeartColor::Heart06 => "heart06",
-                        crate::card::HeartColor::BAll => "b_all",
-                        crate::card::HeartColor::Draw => "draw",
-                        crate::card::HeartColor::Score => "score",
-                        crate::card::HeartColor::All => "all",
-                    };
-                    (color_str.to_string(), *count)
-                })
+                .map(|(color, count)| (heart_color_to_str(color).to_string(), *count))
                 .collect()
         });
         // Additive hearts (shown with +/-)
         let mut bonus_hearts = vec![0i32; 8];
         for (color, &val) in heart_additive {
-            let idx = match color {
-                crate::card::HeartColor::Heart00 => 0,
-                crate::card::HeartColor::Heart01 => 1,
-                crate::card::HeartColor::Heart02 => 2,
-                crate::card::HeartColor::Heart03 => 3,
-                crate::card::HeartColor::Heart04 => 4,
-                crate::card::HeartColor::Heart05 => 5,
-                crate::card::HeartColor::Heart06 => 6,
-                crate::card::HeartColor::All => 7,
-                _ => continue,
-            };
-            bonus_hearts[idx] += val;
+            if let Some(idx) = heart_color_index(color) {
+                bonus_hearts[idx] += val;
+            }
         }
         // Set/override hearts (shown without +/-)
         let mut set_hearts = vec![0i32; 8];
         for (color, &val) in heart_set {
-            let idx = match color {
-                crate::card::HeartColor::Heart00 => 0,
-                crate::card::HeartColor::Heart01 => 1,
-                crate::card::HeartColor::Heart02 => 2,
-                crate::card::HeartColor::Heart03 => 3,
-                crate::card::HeartColor::Heart04 => 4,
-                crate::card::HeartColor::Heart05 => 5,
-                crate::card::HeartColor::Heart06 => 6,
-                crate::card::HeartColor::All => 7,
-                _ => continue,
-            };
-            set_hearts[idx] += val;
+            if let Some(idx) = heart_color_index(color) {
+                set_hearts[idx] += val;
+            }
         }
         let total_blade = if blade_set != 0 {
             (blade_set + blade_additive).max(0) as u32
         } else {
             ((card.blade as i32) + blade_additive).max(0) as u32
         };
-        let transform_str = heart_transform.map(|hc| {
-            let s = match hc {
-                crate::card::HeartColor::Heart00 => "heart00",
-                crate::card::HeartColor::Heart01 => "heart01",
-                crate::card::HeartColor::Heart02 => "heart02",
-                crate::card::HeartColor::Heart03 => "heart03",
-                crate::card::HeartColor::Heart04 => "heart04",
-                crate::card::HeartColor::Heart05 => "heart05",
-                crate::card::HeartColor::Heart06 => "heart06",
-                crate::card::HeartColor::All => "all",
-                _ => "heart00",
-            };
-            s.to_string()
-        });
+        let transform_str = heart_transform.map(|hc| heart_color_to_str(&hc).to_string());
         CardDisplay {
             card_no: card.card_no.to_string(),
             name: card.name.to_string(),
@@ -1133,17 +1096,9 @@ pub fn player_to_display(
             if let Some(card) = card_db.get_card(cid) {
                 let mut arr = vec![0i32; 8];
                 for (color, &val) in colors {
-                    let idx = match color {
-                        crate::card::HeartColor::Heart00 => 0,
-                        crate::card::HeartColor::Heart01 => 1,
-                        crate::card::HeartColor::Heart02 => 2,
-                        crate::card::HeartColor::Heart03 => 3,
-                        crate::card::HeartColor::Heart04 => 4,
-                        crate::card::HeartColor::Heart05 => 5,
-                        crate::card::HeartColor::Heart06 => 6,
-                        _ => continue,
-                    };
-                    arr[idx] = val;
+                    if let Some(idx) = heart_color_index(color) {
+                        arr[idx] = val;
+                    }
                 }
                 nh_mods.insert(card.card_no.to_string(), arr);
             }
@@ -1165,22 +1120,7 @@ pub fn player_to_display(
     let stage_hearts_display = player.stage_hearts.as_ref().map(|sh| {
         sh.hearts
             .iter()
-            .map(|(color, count)| {
-                let color_str = match color {
-                    crate::card::HeartColor::Heart00 => "heart00",
-                    crate::card::HeartColor::Heart01 => "heart01",
-                    crate::card::HeartColor::Heart02 => "heart02",
-                    crate::card::HeartColor::Heart03 => "heart03",
-                    crate::card::HeartColor::Heart04 => "heart04",
-                    crate::card::HeartColor::Heart05 => "heart05",
-                    crate::card::HeartColor::Heart06 => "heart06",
-                    crate::card::HeartColor::BAll => "b_all",
-                    crate::card::HeartColor::Draw => "draw",
-                    crate::card::HeartColor::Score => "score",
-                    crate::card::HeartColor::All => "all",
-                };
-                (color_str.to_string(), *count)
-            })
+            .map(|(color, count)| (heart_color_to_str(color).to_string(), *count))
             .collect()
     });
 
@@ -1858,18 +1798,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .iter()
             .enumerate()
             .map(|(i, &cid)| {
-                let meta = game_state.revealed_card_meta.get(i);
-                let src_id = meta.and_then(|m| m.source);
-                let src_name = meta.and_then(|m| m.source_name.clone());
-                let owner = meta.and_then(|m| m.owner).map(|o| o as i8).unwrap_or(-1i8);
-                let is_private = meta.map(|m| m.is_private).unwrap_or(false);
-                RevealedCardDisplay {
-                    card_id: cid,
-                    source_card_id: src_id,
-                    source_card_name: src_name,
-                    owner,
-                    is_private,
-                }
+                RevealedCardDisplay::from_card_and_meta(cid, game_state.revealed_card_meta.get(i))
             })
             .collect(),
         initial_yell_revealed_cards: game_state.initial_yell_revealed_cards.to_vec(),
@@ -1888,18 +1817,10 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .iter()
             .enumerate()
             .map(|(i, &cid)| {
-                let meta = game_state.revealed_cost_card_meta.get(i);
-                let src_id = meta.and_then(|m| m.source);
-                let src_name = meta.and_then(|m| m.source_name.clone());
-                let owner = meta.and_then(|m| m.owner).map(|o| o as i8).unwrap_or(-1i8);
-                let is_private = meta.map(|m| m.is_private).unwrap_or(false);
-                RevealedCardDisplay {
-                    card_id: cid,
-                    source_card_id: src_id,
-                    source_card_name: src_name,
-                    owner,
-                    is_private,
-                }
+                RevealedCardDisplay::from_card_and_meta(
+                    cid,
+                    game_state.revealed_cost_card_meta.get(i),
+                )
             })
             .collect(),
         ability_applications: ability_apps,
