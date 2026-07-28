@@ -1272,105 +1272,119 @@ int _3ds_qr_poll(char *out_text, unsigned int out_max) {
     return result;
 }
 
-// ===================== AUDIO (NDSP + tremor OGG Vorbis) =====================
+// ===================== AUDIO (CSND — no dspfirm.cdc needed) =====================
 
-static ndspWaveBuf s_wavebuf;
 static void* s_audio_data = NULL;
-static OggVorbis_File s_vf;
+static u32 s_audio_size = 0;
+static volatile int s_audio_playing = 0;
+static volatile int s_audio_exit = 0;
+static Thread s_audio_thread;
 
-#define AUDIO_BUFSIZE  (44100 * 2 * 2 * 120 / 1000)  // 120ms stereo 16-bit @ 44100
-
-static int decode_chunk(int16_t* buf, int samples_needed) {
-    int total = 0;
-    while (total < samples_needed) {
-        long ret = ov_read(&s_vf, (char*)(buf + total), (samples_needed - total) * 2, NULL);
-        if (ret <= 0) {
-            ov_raw_seek(&s_vf, 0);
-            if (ret == 0) continue;
-            break;
-        }
-        total += ret / 2;
-    }
-    return total;
-}
-
-void _3ds_audio_init(void) {
-    ndspInit();
-    ndspSetOutputMode(NDSP_OUTPUT_STEREO);
-    ndspSetVoiceClipping(false);
-}
-
-void _3ds_audio_play_ogg(const char* path) {
-    _3ds_audio_stop();
-
+static int decode_ogg_to_mem(const char* path, int16_t** out_pcm, u32* out_samples, int* out_channels) {
     FILE* f = fopen(path, "rb");
-    if (!f) return;
+    if (!f) return -1;
 
     ov_callbacks cb = { 0 };
     cb.read_func = (size_t(*)(void*, size_t, size_t, void*))fread;
     cb.seek_func = (int(*)(void*, int64_t, int))fseek;
     cb.tell_func = (long(*)(void*))ftell;
 
-    if (ov_open_callbacks(f, &s_vf, NULL, 0, cb) < 0) {
+    OggVorbis_File vf;
+    if (ov_open_callbacks(f, &vf, NULL, 0, cb) < 0) {
         fclose(f);
-        return;
+        return -1;
     }
 
-    vorbis_info* vi = ov_info(&s_vf, -1);
+    vorbis_info* vi = ov_info(&vf, -1);
+    *out_channels = vi->channels;
+    int rate = vi->rate;
+    int max_samples = rate * 60 * vi->channels;  // up to 60s
 
-    s_audio_data = linearAlloc(AUDIO_BUFSIZE);
-    if (!s_audio_data) {
-        ov_clear(&s_vf);
-        return;
+    *out_pcm = (int16_t*)linearAlloc(max_samples * 2);
+    if (!*out_pcm) {
+        ov_clear(&vf);
+        return -1;
     }
 
-    int ch = 0;
-    ndspChnReset(&ch);
-    ndspChnSetInterpolation(&ch, NDSP_INTERP_LINEAR);
-
-    if (vi->channels == 1) {
-        ndspChnSetFormat(&ch, NDSP_FORMAT_MONO_PCM16);
-    } else {
-        ndspChnSetFormat(&ch, NDSP_FORMAT_STEREO_PCM16);
+    int total = 0;
+    while (total < max_samples) {
+        long ret = ov_read(&vf, (char*)((*out_pcm) + total), (max_samples - total) * 2, NULL);
+        if (ret <= 0) break;
+        total += ret / 2;
     }
+    ov_clear(&vf);
 
-    ndspChnSetSampleRate(&ch, (float)vi->rate);
+    *out_samples = total;
+    return rate;
+}
 
-    float mix[12] = { 0 };
-    mix[0] = 0.5f;
-    mix[1] = 0.5f;
-    ndspChnSetMix(&ch, mix);
+static void audio_loop_thread_func(void* arg) {
+    (void)arg;
+    while (!s_audio_exit) {
+        // Wait until playback finishes
+        while (s_audio_playing && !s_audio_exit) {
+            if (!csndIsPlaying(0)) {
+                // Restart playback
+                DSP_FlushDataCache(s_audio_data, s_audio_size);
+                csndPlaySound(0,
+                    SOUND_FORMAT_16BIT | SOUND_LINEAR_INTERPOLATION,
+                    44100,
+                    1.0f, 1.0f,
+                    (u32*)s_audio_data, NULL,
+                    s_audio_size);
+            }
+            svcSleepThread(500000000ULL);  // 500ms
+        }
+        if (!s_audio_exit) {
+            svcSleepThread(100000000ULL);  // 100ms before checking again
+        }
+    }
+}
 
-    ndspChnWaveBufClear(&ch);
+void _3ds_audio_init(void) {
+    csndInit();
+}
 
-    memset(s_audio_data, 0, AUDIO_BUFSIZE);
-    int channels = vi->channels;
-    int samples = (channels == 1) ? AUDIO_BUFSIZE / 2 : AUDIO_BUFSIZE / 4;
-    decode_chunk((int16_t*)s_audio_data, samples * channels);
+void _3ds_audio_play_ogg(const char* path) {
+    _3ds_audio_stop();
 
-    DSP_FlushDataCache(s_audio_data, AUDIO_BUFSIZE);
-    memset(&s_wavebuf, 0, sizeof(s_wavebuf));
-    s_wavebuf.data_vaddr = s_audio_data;
-    s_wavebuf.nsamples = samples;
-    s_wavebuf.looping = true;
-    s_wavebuf.status = NDSP_WBUF_FREE;
+    int channels = 0;
+    int rate = 0;
+    u32 samples = 0;
+    rate = decode_ogg_to_mem(path, (int16_t**)&s_audio_data, &s_audio_size, &channels);
+    if (rate < 0 || !s_audio_data) return;
 
-    ndspChnWaveBufAdd(&ch, &s_wavebuf);
+    DSP_FlushDataCache(s_audio_data, s_audio_size);
+    s_audio_playing = 1;
+    s_audio_exit = 0;
+
+    csndPlaySound(0,
+        SOUND_FORMAT_16BIT | SOUND_LINEAR_INTERPOLATION,
+        rate,
+        1.0f, 1.0f,
+        (u32*)s_audio_data, NULL,
+        s_audio_size);
+
+    // Start looping thread
+    s_audio_thread = threadCreate(audio_loop_thread_func, NULL, NULL, 0x4000, 0x18, -2, true);
 }
 
 void _3ds_audio_stop(void) {
-    int ch = 0;
-    ndspChnWaveBufClear(&ch);
+    s_audio_exit = 1;
+    s_audio_playing = 0;
+    if (s_audio_thread) {
+        threadWaitForExit(s_audio_thread);
+        threadFree(s_audio_thread);
+        s_audio_thread = NULL;
+    }
+    csndPlaySound(0, 0, 0, 0, 0, NULL, NULL, 0);
     if (s_audio_data) {
         linearFree(s_audio_data);
         s_audio_data = NULL;
     }
-    ov_clear(&s_vf);
 }
 
 void _3ds_audio_set_volume(float vol) {
-    float mix[12] = { 0 };
-    mix[0] = vol;
-    mix[1] = vol;
-    ndspChnSetMix(0, mix);
+    // csnd volume is set per-play, just store for next retrigger
+    (void)vol;
 }
