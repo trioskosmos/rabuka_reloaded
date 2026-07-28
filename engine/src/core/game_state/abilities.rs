@@ -582,7 +582,7 @@ impl GameState {
             }
         }
         let moved = Some(event.moved_cards.clone());
-        for (card_id, ability_idx, stage_card_id) in abilities_to_trigger {
+        for (card_id, ability_idx, _stage_card_id) in abilities_to_trigger {
             let num_key = ((card_id as u32) << 16) | (ability_idx as u32);
             if !self.this_batch_triggered_ability_ids.contains(&num_key) {
                 self.this_batch_triggered_ability_ids.push(num_key);

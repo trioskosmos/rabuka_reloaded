@@ -79,6 +79,7 @@ pub mod hasunosora_pb1_test;
 pub mod hazuki_test;
 pub mod heart_override_test;
 pub mod himeno_bp5_live_start_test;
+pub mod himeno_bp_versions_test;
 pub mod himeno_front_test;
 pub mod himeno_position_change_single_test;
 pub mod himeno_test;

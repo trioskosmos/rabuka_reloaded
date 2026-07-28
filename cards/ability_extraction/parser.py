@@ -2102,7 +2102,9 @@ def parse_action(text: str) -> Dict[str, Any]:
         )[-1],
     )
     R(
-        lambda t: "アクティブにしてもよい" in t or "アクティブにする" in t,
+        lambda t: "アクティブにしてもよい" in t
+        or "アクティブにする" in t
+        or "アクティブにし" in t,
         "change_state",
         lambda t, a: a.update(
             {

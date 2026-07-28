@@ -279,7 +279,7 @@ impl AbilityResolver {
                     let _card_type_filter = card_type.as_deref();
                     let is_same_group_name =
                         cost.group_reference_any().as_deref() == Some("same_group_name");
-                    let mut matching_indices: Vec<usize> = if is_same_group_name {
+                    let matching_indices: Vec<usize> = if is_same_group_name {
                         // "same_group_name" = 2 cards from hand that share a group name
                         // with each other (any group, not necessarily the activating card's).
                         // Build a group→count map, then only allow cards from groups with

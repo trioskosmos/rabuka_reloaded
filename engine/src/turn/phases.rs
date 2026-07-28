@@ -34,6 +34,7 @@ fn ds_print(s: &str) {
     }
 }
 
+#[allow(unused_macros)]
 macro_rules! tdbg {
     ($($arg:tt)*) => {{
         let msg = format!($($arg)*);
@@ -42,6 +43,7 @@ macro_rules! tdbg {
     }};
 }
 #[cfg(not(feature = "3ds"))]
+#[allow(unused_macros)]
 macro_rules! tdbg {
     ($($arg:tt)*) => {};
 }

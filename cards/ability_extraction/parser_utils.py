@@ -496,6 +496,8 @@ STATE_CHANGE_PATTERNS: List[Tuple[str, str]] = [
     ("ウェイト状態で置く", "wait"),
     ("ウェイト状態で登場させる", "wait"),
     ("アクティブにする", "active"),
+    ("アクティブにし", "active"),
+    ("アクティブにしてもよい", "active"),
 ]
 
 LOCATION_PATTERNS: List[Tuple[str, str]] = [
