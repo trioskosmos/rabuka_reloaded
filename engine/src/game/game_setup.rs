@@ -4,6 +4,8 @@
 use crate::ability::enums::Zone;
 use crate::ability::types::Choice;
 use crate::game_state::GameState;
+use crate::game_state::{GameResult, Phase};
+use crate::turn::TurnEngine;
 use crate::zones::MemberArea;
 use crate::HashSet;
 #[cfg(feature = "no_std")]
@@ -240,6 +242,101 @@ pub fn settle_single_player_state(game_state: &mut GameState) {
             break;
         }
     }
+}
+
+/// Advance automatic phases until a human choice is needed or game ends.
+/// Used by all platform main loops after executing an action.
+pub fn settle_auto(gs: &mut GameState) {
+    for _ in 0..500 {
+        if gs.has_pending_choice() || gs.game_result != GameResult::Ongoing {
+            break;
+        }
+        if is_automatic_phase(gs)
+            || matches!(
+                gs.current_phase,
+                Phase::RockPaperScissors | Phase::ChooseFirstAttacker
+            )
+        {
+            TurnEngine::advance_phase(gs);
+        } else {
+            break;
+        }
+    }
+}
+
+/// Execute a game action extracted from the action parameters.
+/// Returns Ok(()) on success, Err(message) on failure. Always resets loop detection.
+pub fn execute_action(gs: &mut GameState, action: &Action) -> Result<(), String> {
+    let params = action.parameters.clone();
+    let result = TurnEngine::execute_main_phase_action(
+        gs,
+        &action.action_type,
+        params.as_ref().and_then(|p| p.card_id),
+        params.as_ref().and_then(|p| p.card_indices.clone()),
+        params
+            .as_ref()
+            .and_then(|p| p.stage_area.as_ref().and_then(|s| s.parse().ok())),
+        params.as_ref().and_then(|p| p.use_baton_touch),
+    );
+    gs.reset_loop_detection();
+    result
+}
+
+/// Run a quick AI-vs-AI test game using the given cards and deck lists.
+/// Returns the number of actions executed, or an error string.
+#[cfg(not(feature = "no_std"))]
+pub fn test_ai_vs_ai(
+    cards: &[crate::card::Card],
+    d1: &crate::deck_parser::DeckList,
+    d2: &crate::deck_parser::DeckList,
+    max_turns: u32,
+) -> Result<usize, String> {
+    use crate::card::CardDatabase;
+    use crate::deck_parser::DeckParser;
+    use crate::game::deck_builder::DeckBuilder;
+    use crate::player::Player;
+    use std::sync::Arc;
+
+    let mut db = Arc::new(CardDatabase::load_or_create(cards.to_vec()));
+    let n1 = DeckParser::deck_list_to_card_numbers(d1);
+    let n2 = DeckParser::deck_list_to_card_numbers(d2);
+    let mut pd1 =
+        DeckBuilder::build_deck_from_database(&mut db, n1).map_err(|e| format!("D1:{}", e))?;
+    DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
+    let mut pd2 =
+        DeckBuilder::build_deck_from_database(&mut db, n2).map_err(|e| format!("D2:{}", e))?;
+    DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
+    pd1.shuffle_main_deck();
+    pd1.shuffle_energy_deck();
+    pd2.shuffle_main_deck();
+    pd2.shuffle_energy_deck();
+    let mut p1 = Player::new("p1".into(), "P1".into(), true);
+    p1.set_main_deck(pd1.main_deck);
+    p1.set_energy_deck(pd1.energy_deck);
+    let mut p2 = Player::new("p2".into(), "P2".into(), false);
+    p2.set_main_deck(pd2.main_deck);
+    p2.set_energy_deck(pd2.energy_deck);
+    let mut gs = GameState::new(p1, p2, db);
+    setup_game(&mut gs);
+    let mut count = 0usize;
+    let mut turns = 0u32;
+    let max_iter = (max_turns * 40) as usize;
+    while gs.game_result == GameResult::Ongoing && turns < max_turns * 2 && count < max_iter {
+        let acts = generate_possible_actions(&gs);
+        if acts.is_empty() {
+            break;
+        }
+        let _ = execute_action(&mut gs, &acts[0]);
+        count += 1;
+        while gs.game_result == GameResult::Ongoing && is_automatic_phase(&gs) {
+            TurnEngine::advance_phase(&mut gs);
+            turns += 1;
+        }
+        if gs.current_phase == Phase::Active || gs.current_phase == Phase::Draw {
+            turns += 1;
+        }
+    }
+    Ok(count)
 }
 
 fn make_action(action_type: ActionType, description: impl Into<String>) -> Action {

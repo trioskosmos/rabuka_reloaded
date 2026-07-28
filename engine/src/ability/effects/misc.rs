@@ -1342,7 +1342,7 @@ impl AbilityResolver {
             final_count as i32
         };
         let heart_color_val =
-            crate::zones::parse_heart_color(heart_color_str.as_deref().unwrap_or("heart00"));
+            crate::card::parse_heart_color(heart_color_str.as_deref().unwrap_or("heart00"));
 
         // Build heart distribution: for fixed multi-color grants, distribute count
         // across all specified colors instead of using a single color.
@@ -1355,7 +1355,7 @@ impl AbilityResolver {
             effect
                 .heart_colors_any()
                 .iter()
-                .map(|c| (crate::zones::parse_heart_color(c), per_color))
+                .map(|c| (crate::card::parse_heart_color(c), per_color))
                 .collect()
         } else {
             vec![(heart_color_val, final_count)]

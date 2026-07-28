@@ -2467,7 +2467,7 @@ impl GameState {
                     if let Some(ref data) = effect.effect_data {
                         for item in data.items() {
                             let color_str = item.color.unwrap_or("heart01");
-                            let color = crate::zones::parse_heart_color(color_str);
+                            let color = crate::card::parse_heart_color(color_str);
                             self.mods
                                 .remove_heart_modifier(item.card_id, color, item.amount);
                             log::debug!(

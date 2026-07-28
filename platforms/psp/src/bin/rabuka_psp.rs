@@ -29,41 +29,7 @@ psp::module!("rabuka", 1, 0);
 
 const DECKS_JSON: &str = include_str!("../../baked/decks.json");
 
-const DECK_CARD_FILES: &[&str] = &[
-    include_str!("../../baked/deck_0_cards.json"),
-    include_str!("../../baked/deck_1_cards.json"),
-    include_str!("../../baked/deck_2_cards.json"),
-    include_str!("../../baked/deck_3_cards.json"),
-    include_str!("../../baked/deck_4_cards.json"),
-    include_str!("../../baked/deck_5_cards.json"),
-    include_str!("../../baked/deck_6_cards.json"),
-    include_str!("../../baked/deck_7_cards.json"),
-    include_str!("../../baked/deck_8_cards.json"),
-    include_str!("../../baked/deck_9_cards.json"),
-    include_str!("../../baked/deck_10_cards.json"),
-    include_str!("../../baked/deck_11_cards.json"),
-    include_str!("../../baked/deck_12_cards.json"),
-    include_str!("../../baked/deck_13_cards.json"),
-    include_str!("../../baked/deck_14_cards.json"),
-    include_str!("../../baked/deck_15_cards.json"),
-];
-
-fn load_two_decks(deck1_idx: usize, deck2_idx: usize) -> Vec<Card> {
-    let json1 = DECK_CARD_FILES[deck1_idx];
-    let mut merged: Vec<Card> = serde_json::from_str(json1).unwrap_or_default();
-
-    if deck1_idx != deck2_idx && deck2_idx < DECK_CARD_FILES.len() {
-        let json2 = DECK_CARD_FILES[deck2_idx];
-        let cards2: Vec<Card> = serde_json::from_str(json2).unwrap_or_default();
-        for c in cards2 {
-            if !merged.iter().any(|m| m.card_no == c.card_no) {
-                merged.push(c);
-            }
-        }
-    }
-
-    merged
-}
+use rabuka_engine::deck_parser::DECK_CARD_FILES;
 
 fn truncate_chars(s: &str, max_chars: usize) -> &str {
     let mut char_count = 0;
@@ -113,7 +79,7 @@ fn psp_main() {
 
     display.println("Loading deck cards...");
     display.swap_buffers();
-    let mut all_cards = load_two_decks(deck1_idx, deck2_idx);
+    let mut all_cards = deck_parser::load_two_decks(deck1_idx, deck2_idx);
 
     display.println("Attaching abilities...");
     display.swap_buffers();
@@ -156,7 +122,7 @@ fn psp_main() {
             break;
         }
 
-        settle_auto(&mut gs);
+        game_setup::settle_auto(&mut gs);
         if gs.game_result != GameResult::Ongoing {
             show_result(&mut display, &mut input, &gs);
             break;
@@ -185,7 +151,7 @@ fn psp_main() {
         if !ok {
             break;
         }
-        settle_auto(&mut gs);
+        game_setup::settle_auto(&mut gs);
     }
 }
 
@@ -293,28 +259,10 @@ fn human_turn(
 }
 
 fn execute_action(gs: &mut GameState, action: &game_setup::Action) -> bool {
-    let params = action.parameters.clone();
-    let result = TurnEngine::execute_main_phase_action(
-        gs,
-        &action.action_type,
-        params.as_ref().and_then(|p| p.card_id),
-        params.as_ref().and_then(|p| p.card_indices.clone()),
-        params
-            .as_ref()
-            .and_then(|p| p.stage_area.as_ref().and_then(|s| s.parse().ok())),
-        params.as_ref().and_then(|p| p.use_baton_touch),
-    );
-    match result {
-        Ok(_) => {
-            gs.reset_loop_detection();
-            true
-        }
-        Err(e) => {
-            dprintln!("Action error: {}", e);
-            gs.reset_loop_detection();
-            true
-        }
+    if let Err(e) = game_setup::execute_action(gs, action) {
+        dprintln!("Action error: {}", e);
     }
+    true
 }
 
 fn menu_select(
@@ -554,24 +502,6 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
     }
 }
 
-fn settle_auto(gs: &mut GameState) {
-    for _ in 0..500 {
-        if gs.has_pending_choice() || gs.game_result != GameResult::Ongoing {
-            break;
-        }
-        if game_setup::is_automatic_phase(gs)
-            || matches!(
-                gs.current_phase,
-                Phase::RockPaperScissors | Phase::ChooseFirstAttacker
-            )
-        {
-            TurnEngine::advance_phase(gs);
-        } else {
-            break;
-        }
-    }
-}
-
 fn show_result(display: &mut Display, input: &mut Input, gs: &GameState) {
     display.clear();
     display.println("=== GAME OVER ===");
@@ -690,68 +620,33 @@ fn run_on_device_tests(display: &mut Display, input: &mut Input) {
 }
 
 fn test_ai_vs_ai_psp() -> Result<usize, alloc::string::String> {
-    let decks: Vec<DeckEntry> =
+    let decks: Vec<rabuka_engine::deck_parser::DeckEntry> =
         serde_json::from_str(DECKS_JSON).map_err(|e| alloc::format!("JSON: {}", e))?;
     if decks.len() < 2 {
         return Err("need 2+ decks".into());
     }
 
-    let mut all_cards = load_two_decks(0, 1);
+    let mut all_cards = deck_parser::load_two_decks(0, 1);
     CardLoader::attach_abilities(&mut all_cards);
-    let mut db = Arc::new(CardDatabase::load_or_create(all_cards));
 
-    let nums1: Vec<alloc::string::String> = decks[0].cards.clone();
-    let nums2: Vec<alloc::string::String> = decks[1].cards.clone();
-    let mut pd1 = deck_builder::DeckBuilder::build_deck_from_database(&mut db, nums1)
-        .map_err(|e| alloc::format!("D1build: {}", e))?;
-    deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
-    let mut pd2 = deck_builder::DeckBuilder::build_deck_from_database(&mut db, nums2)
-        .map_err(|e| alloc::format!("D2build: {}", e))?;
-    deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
-    pd1.shuffle_main_deck();
-    pd1.shuffle_energy_deck();
-    pd2.shuffle_main_deck();
-    pd2.shuffle_energy_deck();
-
-    let mut p1 = Player::new("p1".into(), "P1".into(), true);
-    p1.set_main_deck(pd1.main_deck);
-    p1.set_energy_deck(pd1.energy_deck);
-    let mut p2 = Player::new("p2".into(), "P2".into(), false);
-    p2.set_main_deck(pd2.main_deck);
-    p2.set_energy_deck(pd2.energy_deck);
-    let mut gs = GameState::new(p1, p2, db);
-    game_setup::setup_game(&mut gs);
-
-    let mut count = 0usize;
-    let mut turns = 0u32;
-    while gs.game_result == GameResult::Ongoing && turns < 10 {
-        let acts = game_setup::generate_possible_actions(&gs);
-        if acts.is_empty() {
-            TurnEngine::advance_phase(&mut gs);
-            turns += 1;
-            continue;
-        }
-        let a = acts[0].clone();
-        let p = a.parameters.clone();
-        let _ = TurnEngine::execute_main_phase_action(
-            &mut gs,
-            &a.action_type,
-            p.as_ref().and_then(|x| x.card_id),
-            p.as_ref().and_then(|x| x.card_indices.clone()),
-            p.as_ref()
-                .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
-            p.as_ref().and_then(|x| x.use_baton_touch),
-        );
-        count += 1;
-        while gs.game_result == GameResult::Ongoing && game_setup::is_automatic_phase(&gs) {
-            TurnEngine::advance_phase(&mut gs);
-            turns += 1;
-        }
-        if gs.current_phase == Phase::Active || gs.current_phase == Phase::Draw {
-            turns += 1;
-        }
-    }
-    Ok(count)
+    // Build DeckList from DeckEntry
+    let to_deck_list =
+        |e: &rabuka_engine::deck_parser::DeckEntry| -> rabuka_engine::deck_parser::DeckList {
+            rabuka_engine::deck_parser::DeckList {
+                name: e.name.clone(),
+                entries: e
+                    .cards
+                    .iter()
+                    .map(|c| rabuka_engine::deck_parser::DeckEntry {
+                        card_no: c.clone(),
+                        quantity: 1,
+                    })
+                    .collect(),
+            }
+        };
+    let dl1 = to_deck_list(&decks[0]);
+    let dl2 = to_deck_list(&decks[1]);
+    rabuka_engine::game_setup::test_ai_vs_ai(&all_cards, &dl1, &dl2, 5).map_err(|e| e.into())
 }
 
 fn wait_frames(n: u32) {

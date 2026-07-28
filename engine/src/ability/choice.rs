@@ -3071,7 +3071,7 @@ impl super::resolver::AbilityResolver {
         colors: &[String],
     ) -> Result<(), String> {
         if let Some(chosen) = colors.first() {
-            let color = crate::zones::parse_heart_color(chosen);
+            let color = crate::card::parse_heart_color(chosen);
             if let Some(card_id) = gs.activating_card {
                 gs.set_heart_override(card_id, color, count.max(1), "live_end");
             }

@@ -459,7 +459,7 @@ impl AbilityResolver {
         // Each listed color gets the same per-color value.
         let per_color_value = value;
         for hc in &colors {
-            let color = crate::zones::parse_heart_color(hc);
+            let color = crate::card::parse_heart_color(hc);
             gs.push_rule_log(format!(
                 "{} {}: [[log_required_hearts:op={},value={},color={}]]",
                 pp, act_name, operation, per_color_value, hc
@@ -503,7 +503,7 @@ impl AbilityResolver {
             player.live_card_zone.cards.to_vec()
         };
         for hc in &colors {
-            let color = crate::zones::parse_heart_color(hc);
+            let color = crate::card::parse_heart_color(hc);
             for card_id in &card_ids {
                 let modifier_value = match operation {
                     "increase" => value as i32,
@@ -630,7 +630,7 @@ impl AbilityResolver {
         };
         for card_id in card_ids {
             for color_str in &color_strs {
-                let color = crate::zones::parse_heart_color(color_str);
+                let color = crate::card::parse_heart_color(color_str);
                 gs.mods.add_need_heart_modifier(card_id, color, delta);
             }
         }

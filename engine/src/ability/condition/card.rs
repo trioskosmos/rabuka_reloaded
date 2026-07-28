@@ -648,7 +648,7 @@ impl<'a> ConditionContext<'a> {
         // heart00 is a wildcard — skip check since no card has it in base_heart
         if cols
             .iter()
-            .any(|cs| crate::zones::parse_heart_color(cs) == crate::card::HeartColor::Heart00)
+            .any(|cs| crate::card::parse_heart_color(cs) == crate::card::HeartColor::Heart00)
         {
             return true;
         }
@@ -664,7 +664,7 @@ impl<'a> ConditionContext<'a> {
                 id != -1
                     && card_db.get_card(id).is_some_and(|c| {
                         c.base_heart.as_ref().is_some_and(|bh| {
-                            bh.hearts.contains_key(&crate::zones::parse_heart_color(cs))
+                            bh.hearts.contains_key(&crate::card::parse_heart_color(cs))
                         })
                     })
             })
@@ -874,7 +874,7 @@ impl<'a> ConditionContext<'a> {
                                 .map(|bh| {
                                     hc.iter()
                                         .map(|color_str| {
-                                            let color = crate::zones::parse_heart_color(color_str);
+                                            let color = crate::card::parse_heart_color(color_str);
                                             bh.hearts.get(&color).copied().unwrap_or(0) as u32
                                         })
                                         .sum::<u32>()
@@ -883,7 +883,7 @@ impl<'a> ConditionContext<'a> {
                             let modifier: i32 = hc
                                 .iter()
                                 .map(|color_str| {
-                                    let color = crate::zones::parse_heart_color(color_str);
+                                    let color = crate::card::parse_heart_color(color_str);
                                     self.game_state
                                         .mods
                                         .heart_modifiers
@@ -925,7 +925,7 @@ impl<'a> ConditionContext<'a> {
                                         hc.iter()
                                             .map(|color_str| {
                                                 let color =
-                                                    crate::zones::parse_heart_color(color_str);
+                                                    crate::card::parse_heart_color(color_str);
                                                 nh.hearts.get(&color).copied().unwrap_or(0) as u32
                                             })
                                             .sum::<u32>()
@@ -942,7 +942,7 @@ impl<'a> ConditionContext<'a> {
                         // No operator: check each color individually across all cards
                         let threshold = condition.get_count().unwrap_or(1) as u32;
                         let all_ok = hc.iter().all(|color_str| {
-                            let color = crate::zones::parse_heart_color(color_str);
+                            let color = crate::card::parse_heart_color(color_str);
                             let total: u32 = cards
                                 .iter()
                                 .filter(|&&cid| {
@@ -1336,7 +1336,7 @@ impl<'a> ConditionContext<'a> {
             if let Some(hc) = condition.get_heart_colors() {
                 if !hc.is_empty()
                     && !hc.iter().any(|cs| {
-                        crate::zones::parse_heart_color(cs) == crate::card::HeartColor::Heart00
+                        crate::card::parse_heart_color(cs) == crate::card::HeartColor::Heart00
                     })
                 {
                     let filtered: Vec<i16> = cards
@@ -1358,7 +1358,7 @@ impl<'a> ConditionContext<'a> {
                         .copied()
                         .collect();
                     for color_str in hc {
-                        let color = crate::zones::parse_heart_color(color_str);
+                        let color = crate::card::parse_heart_color(color_str);
                         let found = filtered.iter().any(|&cid| {
                             card_db.get_card(cid).is_some_and(|c| {
                                 c.base_heart
@@ -1790,7 +1790,7 @@ impl<'a> ConditionContext<'a> {
             };
             let required_colors: Vec<crate::card::HeartColor> = hc
                 .iter()
-                .map(|s| crate::zones::parse_heart_color(s))
+                .map(|s| crate::card::parse_heart_color(s))
                 .collect();
             let mut present = HashSet::<HeartColor>::default();
             for &cid in &source_cards {
@@ -2235,7 +2235,7 @@ impl<'a> ConditionContext<'a> {
                 if condition.get_unit().as_deref() == Some("types") && !hc.is_empty() {
                     let required_colors: Vec<crate::card::HeartColor> = hc
                         .iter()
-                        .map(|s| crate::zones::parse_heart_color(s))
+                        .map(|s| crate::card::parse_heart_color(s))
                         .collect();
                     let mut present = HashSet::<HeartColor>::default();
                     let is_blade = condition.get_heart_source() == Some("blade");
@@ -2352,7 +2352,7 @@ impl<'a> ConditionContext<'a> {
                 } else if condition.get_unit().as_deref() == Some("types") {
                     let required_colors: Vec<crate::card::HeartColor> = hc
                         .iter()
-                        .map(|s| crate::zones::parse_heart_color(s))
+                        .map(|s| crate::card::parse_heart_color(s))
                         .collect();
                     let mut present = HashSet::<HeartColor>::default();
                     let is_blade = condition.get_heart_source() == Some("blade");
@@ -3877,7 +3877,7 @@ impl<'a> ConditionContext<'a> {
         if let Some(rt) = resource_type {
             if rt.starts_with("heart") {
                 let clean: String = rt.chars().filter(|&c| c != '_').collect();
-                let color = crate::zones::parse_heart_color(&clean);
+                let color = crate::card::parse_heart_color(&clean);
                 let player = self.resolve_condition_player(target);
                 let card_db = &self.game_state.card_database;
                 let sum_all = || -> u32 {
@@ -3947,7 +3947,7 @@ impl<'a> ConditionContext<'a> {
                         if &snap.player_id == player_id {
                             let mut total = 0u32;
                             for hc_str in colors {
-                                let color = crate::zones::parse_heart_color(hc_str);
+                                let color = crate::card::parse_heart_color(hc_str);
                                 total += snap.surplus_hearts[color.index()];
                             }
                             return total;
@@ -3974,7 +3974,7 @@ impl<'a> ConditionContext<'a> {
             if let Some(colors) = condition.get_heart_colors() {
                 let mut total = 0u32;
                 for hc_str in colors {
-                    let color = crate::zones::parse_heart_color(hc_str);
+                    let color = crate::card::parse_heart_color(hc_str);
                     let member_of_color: u32 = player
                         .stage
                         .stage

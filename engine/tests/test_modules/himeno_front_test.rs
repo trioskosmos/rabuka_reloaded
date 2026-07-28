@@ -169,7 +169,7 @@ fn himeno_front_constant_no_opponent() {
     let m = game
         .state
         .mods
-        .get_heart_modifier(himeno, rabuka_engine::zones::parse_heart_color("heart01"));
+        .get_heart_modifier(himeno, rabuka_engine::card::parse_heart_color("heart01"));
     assert_eq!(m, 0);
 }
 
@@ -189,6 +189,6 @@ fn himeno_front_constant_opponent_at_side() {
     let m = game
         .state
         .mods
-        .get_heart_modifier(himeno, rabuka_engine::zones::parse_heart_color("heart01"));
+        .get_heart_modifier(himeno, rabuka_engine::card::parse_heart_color("heart01"));
     assert_eq!(m, 0);
 }

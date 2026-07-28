@@ -961,7 +961,7 @@ impl<'a> CardFilter<'a> {
         if let Some(min_count) = self.heart_color_count {
             let passes = if self.require_all_heart_colors {
                 self.heart_colors.iter().all(|color| {
-                    let hc = crate::zones::parse_heart_color(color);
+                    let hc = crate::card::parse_heart_color(color);
                     let base_amount = db
                         .get_card(id)
                         .and_then(|c| c.base_heart.as_ref())
@@ -976,7 +976,7 @@ impl<'a> CardFilter<'a> {
                 })
             } else {
                 self.heart_colors.iter().any(|color| {
-                    let hc = crate::zones::parse_heart_color(color);
+                    let hc = crate::card::parse_heart_color(color);
                     let base_amount = db
                         .get_card(id)
                         .and_then(|c| c.base_heart.as_ref())
@@ -1008,7 +1008,7 @@ impl<'a> CardFilter<'a> {
             if let Some(color_str) = self.need_heart_color {
                 // Per-color check (e.g. heart06 >= 3 for specific-color
                 // live-card require conditions, not member base hearts).
-                let color = crate::zones::parse_heart_color(color_str);
+                let color = crate::card::parse_heart_color(color_str);
                 let card_amount = db
                     .get_card(id)
                     .and_then(|c| c.need_heart.as_ref())

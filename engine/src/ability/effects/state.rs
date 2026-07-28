@@ -939,7 +939,7 @@ impl AbilityResolver {
         if card_id == -1 {
             return;
         }
-        let color = crate::zones::parse_heart_color(&ht);
+        let color = crate::card::parse_heart_color(&ht);
         gs.mods.heart_color_multiplier.insert(card_id, color);
         gs.record_ability_application(
             card_id,

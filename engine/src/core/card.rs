@@ -5921,6 +5921,23 @@ impl HeartColor {
             HeartColor::All => "all",
         }
     }
+
+    /// Returns the canonical string representation ("heart00"-"all").
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            HeartColor::Heart00 => "heart00",
+            HeartColor::Heart01 => "heart01",
+            HeartColor::Heart02 => "heart02",
+            HeartColor::Heart03 => "heart03",
+            HeartColor::Heart04 => "heart04",
+            HeartColor::Heart05 => "heart05",
+            HeartColor::Heart06 => "heart06",
+            HeartColor::BAll => "b_all",
+            HeartColor::Draw => "draw",
+            HeartColor::Score => "score",
+            HeartColor::All => "all",
+        }
+    }
 }
 
 impl core::str::FromStr for HeartColor {

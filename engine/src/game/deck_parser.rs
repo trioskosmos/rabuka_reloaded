@@ -25,7 +25,42 @@ pub struct DeckList {
     pub entries: Vec<DeckEntry>,
 }
 
+/// Load and merge two deck JSON files from DECK_CARD_FILES, deduplicating by card_no.
+pub fn load_two_decks(deck1_idx: usize, deck2_idx: usize) -> Vec<crate::card::Card> {
+    let json1 = DECK_CARD_FILES[deck1_idx];
+    let mut merged: Vec<crate::card::Card> = serde_json::from_str(json1).unwrap_or_default();
+    if deck1_idx != deck2_idx && deck2_idx < DECK_CARD_FILES.len() {
+        let json2 = DECK_CARD_FILES[deck2_idx];
+        let cards2: Vec<crate::card::Card> = serde_json::from_str(json2).unwrap_or_default();
+        for c in cards2 {
+            if !merged.iter().any(|m| m.card_no == c.card_no) {
+                merged.push(c);
+            }
+        }
+    }
+    merged
+}
+
 pub struct DeckParser;
+
+pub const DECK_CARD_FILES: &[&str] = &[
+    include_str!("../../../platforms/psp/baked/deck_0_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_1_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_2_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_3_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_4_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_5_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_6_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_7_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_8_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_9_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_10_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_11_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_12_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_13_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_14_cards.json"),
+    include_str!("../../../platforms/psp/baked/deck_15_cards.json"),
+];
 
 impl DeckParser {
     #[cfg(not(feature = "no_std"))]

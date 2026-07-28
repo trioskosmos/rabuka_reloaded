@@ -458,9 +458,7 @@ impl Stage {
     }
 }
 
-pub fn parse_heart_color(s: &str) -> HeartColor {
-    crate::card::parse_heart_color(s)
-}
+// Removed: use crate::card::parse_heart_color directly
 
 #[derive(Debug, Clone)]
 pub struct LiveCardZone {

@@ -3,7 +3,6 @@ use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::hash::{BuildHasher, Hasher};
 
 use crate::display::Display;
 use crate::input::{Button, Input};
@@ -20,51 +19,8 @@ extern "C" {
     fn thd_sleep(duration: i32);
 }
 
-#[derive(Default, Clone, Copy)]
-struct DcHasher(u64);
+use rabuka_engine::deck_parser::DECK_CARD_FILES;
 
-impl Hasher for DcHasher {
-    fn write(&mut self, bytes: &[u8]) {
-        for &b in bytes {
-            self.0 = self.0.wrapping_mul(131).wrapping_add(b as u64);
-        }
-    }
-    fn finish(&self) -> u64 {
-        self.0
-    }
-}
-
-impl BuildHasher for DcHasher {
-    type Hasher = DcHasher;
-    fn build_hasher(&self) -> DcHasher {
-        DcHasher(0)
-    }
-}
-
-macro_rules! deck_cards {
-    ($n:literal) => {
-        include_str!(concat!("../../psp/baked/deck_", $n, "_cards.json"))
-    };
-}
-
-const DECK_CARDS: &[&str] = &[
-    deck_cards!("0"),
-    deck_cards!("1"),
-    deck_cards!("2"),
-    deck_cards!("3"),
-    deck_cards!("4"),
-    deck_cards!("5"),
-    deck_cards!("6"),
-    deck_cards!("7"),
-    deck_cards!("8"),
-    deck_cards!("9"),
-    deck_cards!("10"),
-    deck_cards!("11"),
-    deck_cards!("12"),
-    deck_cards!("13"),
-    deck_cards!("14"),
-    deck_cards!("15"),
-];
 const DECKS_JSON: &str = include_str!("../../psp/baked/decks.json");
 
 #[no_mangle]
@@ -89,22 +45,7 @@ pub extern "C" fn rabuka_main() {
     display.println("Loading...");
     display.swap_buffers();
 
-    let cards1: Vec<Card> =
-        serde_json::from_str(DECK_CARDS[deck1_idx]).expect("Failed to parse deck cards");
-    let cards2: Vec<Card> =
-        serde_json::from_str(DECK_CARDS[deck2_idx]).expect("Failed to parse deck cards");
-
-    let mut card_map: hashbrown::HashMap<String, Card, DcHasher> =
-        hashbrown::HashMap::with_hasher(DcHasher(0));
-    for c in cards1.into_iter().chain(cards2.into_iter()) {
-        let key = c.card_no.to_string();
-        if !card_map.contains_key(&key) {
-            let card = c;
-            card_map.insert(key, card);
-        }
-    }
-
-    let mut cards: Vec<Card> = card_map.into_values().collect();
+    let mut cards: Vec<Card> = rabuka_engine::deck_parser::load_two_decks(deck1_idx, deck2_idx);
     rabuka_engine::card_loader::CardLoader::attach_abilities(&mut cards);
     let mut db = Arc::new(rabuka_engine::card::CardDatabase::load_or_create(cards));
 
@@ -139,7 +80,7 @@ pub extern "C" fn rabuka_main() {
             break;
         }
 
-        settle_auto(&mut gs);
+        game_setup::settle_auto(&mut gs);
         if gs.game_result != GameResult::Ongoing {
             show_result(&mut display, &mut input, &gs);
             break;
@@ -168,7 +109,7 @@ pub extern "C" fn rabuka_main() {
         if !ok {
             break;
         }
-        settle_auto(&mut gs);
+        game_setup::settle_auto(&mut gs);
     }
 }
 
@@ -273,27 +214,8 @@ fn human_turn(
 }
 
 fn execute_action(gs: &mut GameState, action: &game_setup::Action) -> bool {
-    let params = action.parameters.clone();
-    let result = TurnEngine::execute_main_phase_action(
-        gs,
-        &action.action_type,
-        params.as_ref().and_then(|p| p.card_id),
-        params.as_ref().and_then(|p| p.card_indices.clone()),
-        params
-            .as_ref()
-            .and_then(|p| p.stage_area.as_ref().and_then(|s| s.parse().ok())),
-        params.as_ref().and_then(|p| p.use_baton_touch),
-    );
-    match result {
-        Ok(_) => {
-            gs.reset_loop_detection();
-            true
-        }
-        Err(_) => {
-            gs.reset_loop_detection();
-            true
-        }
-    }
+    let _ = game_setup::execute_action(gs, action);
+    true
 }
 
 fn menu_select(
@@ -518,24 +440,6 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
             let sel = menu_select(display, input, &items, &description, false).unwrap_or(0);
             TurnEngine::resume_with_choice(gs, None, Some(vec![sel])).ok();
             true
-        }
-    }
-}
-
-fn settle_auto(gs: &mut GameState) {
-    for _ in 0..500 {
-        if gs.has_pending_choice() || gs.game_result != GameResult::Ongoing {
-            break;
-        }
-        if game_setup::is_automatic_phase(gs)
-            || matches!(
-                gs.current_phase,
-                Phase::RockPaperScissors | Phase::ChooseFirstAttacker
-            )
-        {
-            TurnEngine::advance_phase(gs);
-        } else {
-            break;
         }
     }
 }

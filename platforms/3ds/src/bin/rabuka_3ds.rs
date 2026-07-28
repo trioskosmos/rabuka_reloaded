@@ -757,7 +757,7 @@ fn run_on_device_tests(cards: Arc<Vec<Card>>, decks: Vec<DeckList>) -> Vec<Strin
         "ENERGY: missing (FAIL!)".into()
     });
     if decks.len() >= 2 {
-        match test_ai_vs_ai(&cards_vec, &decks[0], &decks[1], 5) {
+        match rabuka_engine::game_setup::test_ai_vs_ai(&cards_vec, &decks[0], &decks[1], 5) {
             Ok(n) => r.push(format!("AI PLAY: {} actions (OK)", n)),
             Err(e) => r.push(format!("AI PLAY: FAIL {}", e)),
         }
@@ -772,63 +772,6 @@ fn run_on_device_tests(cards: Arc<Vec<Card>>, decks: Vec<DeckList>) -> Vec<Strin
 
 /// Mini AI vs AI test: sets up game, runs 5 turns with random AI.
 #[cfg(feature = "3ds")]
-fn test_ai_vs_ai(cards: &[Card], d1: &DeckList, d2: &DeckList, mt: u32) -> Result<usize, String> {
-    use rabuka_engine::card::CardDatabase;
-    use std::sync::Arc;
-    let mut db = Arc::new(CardDatabase::load_or_create(cards.to_vec()));
-    let n1 = DeckParser::deck_list_to_card_numbers(d1);
-    let n2 = DeckParser::deck_list_to_card_numbers(d2);
-    let mut pd1 =
-        DeckBuilder::build_deck_from_database(&mut db, n1).map_err(|e| format!("D1:{}", e))?;
-    DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
-    let mut pd2 =
-        DeckBuilder::build_deck_from_database(&mut db, n2).map_err(|e| format!("D2:{}", e))?;
-    DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
-    pd1.shuffle_main_deck();
-    pd1.shuffle_energy_deck();
-    pd2.shuffle_main_deck();
-    pd2.shuffle_energy_deck();
-    let mut p1 = Player::new("p1".into(), "P1".into(), true);
-    p1.set_main_deck(pd1.main_deck);
-    p1.set_energy_deck(pd1.energy_deck);
-    let mut p2 = Player::new("p2".into(), "P2".into(), false);
-    p2.set_main_deck(pd2.main_deck);
-    p2.set_energy_deck(pd2.energy_deck);
-    let mut gs = GameState::new(p1, p2, db);
-    game_setup::setup_game(&mut gs);
-    let mut c = 0usize;
-    let mut tu = 0u32;
-    let max_iter = (mt * 40) as usize;
-    while gs.game_result == GameResult::Ongoing && tu < mt * 2 && c < max_iter {
-        let acts = game_setup::generate_possible_actions(&gs);
-        if acts.is_empty() {
-            break;
-        }
-        let a = acts[0].clone();
-        let p = a.parameters.clone();
-        let _ = turn::TurnEngine::execute_main_phase_action(
-            &mut gs,
-            &a.action_type,
-            p.as_ref().and_then(|x| x.card_id),
-            p.as_ref().and_then(|x| x.card_indices.clone()),
-            p.as_ref()
-                .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
-            p.as_ref().and_then(|x| x.use_baton_touch),
-        );
-        gs.reset_loop_detection();
-        gs.reset_loop_detection();
-        c += 1;
-        while gs.game_result == GameResult::Ongoing && game_setup::is_automatic_phase(&gs) {
-            turn::TurnEngine::advance_phase(&mut gs);
-            tu += 1;
-        }
-        if gs.current_phase == Phase::Active || gs.current_phase == Phase::Draw {
-            tu += 1;
-        }
-    }
-    Ok(c)
-}
-
 #[cfg(feature = "3ds")]
 #[no_mangle]
 pub unsafe extern "C" fn pthread_atfork(

@@ -21,22 +21,6 @@ fn heart_color_index(color: &HeartColor) -> Option<usize> {
     }
 }
 
-fn heart_color_to_str(color: &HeartColor) -> &'static str {
-    match color {
-        HeartColor::Heart00 => "heart00",
-        HeartColor::Heart01 => "heart01",
-        HeartColor::Heart02 => "heart02",
-        HeartColor::Heart03 => "heart03",
-        HeartColor::Heart04 => "heart04",
-        HeartColor::Heart05 => "heart05",
-        HeartColor::Heart06 => "heart06",
-        HeartColor::BAll => "b_all",
-        HeartColor::Draw => "draw",
-        HeartColor::Score => "score",
-        HeartColor::All => "all",
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TempEffectDisplay {
     pub effect_type: String,
@@ -569,7 +553,7 @@ pub fn card_to_display(
         let base_heart = card.base_heart.as_ref().map(|bh| {
             bh.hearts
                 .iter()
-                .map(|(color, count)| (heart_color_to_str(color).to_string(), *count))
+                .map(|(color, count)| (color.as_str().to_string(), *count))
                 .collect()
         });
         CardDisplay {
@@ -657,7 +641,7 @@ pub fn card_to_display_full(
         let base_heart = card.base_heart.as_ref().map(|bh| {
             bh.hearts
                 .iter()
-                .map(|(color, count)| (heart_color_to_str(color).to_string(), *count))
+                .map(|(color, count)| (color.as_str().to_string(), *count))
                 .collect()
         });
         // Additive hearts (shown with +/-)
@@ -679,7 +663,7 @@ pub fn card_to_display_full(
         } else {
             ((card.blade as i32) + blade_additive).max(0) as u32
         };
-        let transform_str = heart_transform.map(|hc| heart_color_to_str(&hc).to_string());
+        let transform_str = heart_transform.map(|hc| hc.as_str().to_string());
         CardDisplay {
             card_no: card.card_no.to_string(),
             name: card.name.to_string(),
@@ -1120,7 +1104,7 @@ pub fn player_to_display(
     let stage_hearts_display = player.stage_hearts.as_ref().map(|sh| {
         sh.hearts
             .iter()
-            .map(|(color, count)| (heart_color_to_str(color).to_string(), *count))
+            .map(|(color, count)| (color.as_str().to_string(), *count))
             .collect()
     });
 
@@ -1148,6 +1132,15 @@ pub fn player_to_display(
         .iter()
         .map(|(&k, &total)| (k, total - cost_set.get(&k).copied().unwrap_or(0)))
         .collect();
+
+    let prevent_baton = if restrictions
+        .iter()
+        .any(|r| r.contains("cannot_baton") || r.contains("prevent_baton"))
+    {
+        1
+    } else {
+        0
+    };
 
     PlayerDisplay {
         energy: energy_display,
@@ -1268,22 +1261,8 @@ pub fn player_to_display(
             })
             .collect(),
         cost_reduction: 0,
-        prevent_baton_touch: if restrictions
-            .iter()
-            .any(|r| r.contains("cannot_baton") || r.contains("prevent_baton"))
-        {
-            1
-        } else {
-            0
-        },
-        prevent_baton: if restrictions
-            .iter()
-            .any(|r| r.contains("cannot_baton") || r.contains("prevent_baton"))
-        {
-            1
-        } else {
-            0
-        },
+        prevent_baton_touch: prevent_baton,
+        prevent_baton,
         deployed_this_turn: player.deployed_this_turn.iter().copied().collect(),
         debut_count_this_turn: player.debut_count_this_turn,
         id: player.id.clone(),
