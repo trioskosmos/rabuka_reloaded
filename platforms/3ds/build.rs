@@ -29,6 +29,7 @@ fn main() {
                 obj_file.to_str().unwrap(),
                 &src_path,
                 &format!("-I{}/libctru/include", devkitpro),
+                &format!("-I{}/portlibs/3ds/include", devkitpro),
                 &format!("-I{}/arm-none-eabi/include", devkitarm),
                 &format!("-I{}/lib/gcc/arm-none-eabi/16.1.0/include", devkitarm),
                 "-I",
@@ -77,6 +78,10 @@ fn main() {
     // - this flag prevents the linker error and lets our version win
     println!("cargo:rustc-link-arg=-Wl,--allow-multiple-definition");
     println!("cargo:rustc-link-search=native={}/libctru/lib", devkitpro);
+    println!(
+        "cargo:rustc-link-search=native={}/portlibs/3ds/lib",
+        devkitpro
+    );
     println!("cargo:rustc-link-search=native={}", out_dir.display());
     println!("cargo:rustc-link-arg=-Wl,--start-group");
     println!("cargo:rustc-link-arg=-lctru_shim");
