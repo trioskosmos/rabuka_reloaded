@@ -268,14 +268,12 @@ impl AbilityResolver {
                     // Discard/move_cards actions should not inherit per_unit multipliers
                     let supports_per_unit = matches!(
                         action.action,
-                        ActionType::Draw
-                            | ActionType::DrawCard
+                        ActionType::DrawCard
                             | ActionType::GainResource
                             | ActionType::ModifyScore
                             | ActionType::ModifyRequiredHearts
                             | ActionType::GainAbility
                             | ActionType::SetBladeCount
-                            | ActionType::Look
                             | ActionType::LookAt
                     );
                     if supports_per_unit {

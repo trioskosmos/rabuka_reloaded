@@ -264,7 +264,7 @@ impl AbilityResolver {
             ActionType::ConditionalAlternative => self.execute_conditional_alternative(gs, effect),
             ActionType::LookAndSelect => self.execute_look_and_select(gs, effect),
             ActionType::SelectCards => self.execute_select_cards(gs, effect),
-            ActionType::Draw | ActionType::DrawCard => self.execute_draw_wrapper(gs, effect),
+            ActionType::DrawCard => self.execute_draw_wrapper(gs, effect),
             ActionType::DrawUntilCount => {
                 self.execute_draw_until_count(
                     gs,
@@ -522,7 +522,7 @@ impl AbilityResolver {
             ActionType::PlayBatonTouch => {
                 self.execute_play_baton_touch(gs, effect.count_or(1), effect.target_name())
             }
-            ActionType::Reveal | ActionType::RevealEffect => self.execute_reveal_effect(gs, effect),
+            ActionType::Reveal => self.execute_reveal_effect(gs, effect),
             ActionType::Select => {
                 let pp = self.player_prefix(gs);
                 let cn = gs
@@ -534,7 +534,7 @@ impl AbilityResolver {
                 self.execute_select_effect(gs, effect)
             }
             ActionType::SelectNumber => self.execute_select_number(gs, effect),
-            ActionType::Look | ActionType::LookAt => {
+            ActionType::LookAt => {
                 let base_count = if let Some(ref dc) = effect.dynamic_count_any() {
                     self.resolve_dynamic_count(gs, dc)
                 } else {
@@ -915,9 +915,6 @@ impl AbilityResolver {
             | ActionType::OpponentAction
             | ActionType::ActionBy
             | ActionType::SequentialCost
-            | ActionType::Tap
-            | ActionType::Rest
-            | ActionType::Discard
             | ActionType::ChoiceCondition
             | ActionType::EnergyCondition => {
                 log::warn!(

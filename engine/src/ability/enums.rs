@@ -133,13 +133,12 @@ impl core::fmt::Display for Zone {
 }
 
 /// Strongly-typed ability effect action types to prevent stringly-typed dispatch bugs.
-/// Replaces error-prone action == "draw" patterns with ActionType::Draw.
+/// Action type for ability effects.
 /// ~60 variants cover all effect actions in the game.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ActionType {
     // Card movement
-    Draw,
     DrawCard,
     DrawUntilCount,
     MoveCards,
@@ -148,9 +147,7 @@ pub enum ActionType {
     SelectCards,
     LookAndSelect,
     LookAt,
-    Look,
     Reveal,
-    RevealEffect,
     RevealPerGroup,
     RevealUntilLiveCard,
     RevealUntilChosenCard,
@@ -232,9 +229,6 @@ pub enum ActionType {
     OpponentAction,
     ActionBy,
     SequentialCost,
-    Tap,
-    Rest,
-    Discard,
     ChoiceCondition,
     EnergyCondition,
 }
@@ -244,7 +238,6 @@ impl ActionType {
     /// Returns None for unrecognized action names (makes typos detectable at parse time).
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
-            "draw" => Some(ActionType::Draw),
             "draw_card" => Some(ActionType::DrawCard),
             "draw_until_count" => Some(ActionType::DrawUntilCount),
             "choose_target_player" => Some(ActionType::ChooseTargetPlayer),
@@ -255,9 +248,7 @@ impl ActionType {
             "select_cards" => Some(ActionType::SelectCards),
             "look_and_select" => Some(ActionType::LookAndSelect),
             "look_at" => Some(ActionType::LookAt),
-            "look" => Some(ActionType::Look),
             "reveal" => Some(ActionType::Reveal),
-            "reveal_effect" => Some(ActionType::RevealEffect),
             "reveal_per_group" => Some(ActionType::RevealPerGroup),
             "reveal_until_live_card" => Some(ActionType::RevealUntilLiveCard),
             "reveal_until_chosen_card" => Some(ActionType::RevealUntilChosenCard),
@@ -312,9 +303,6 @@ impl ActionType {
             "opponent_action" => Some(ActionType::OpponentAction),
             "action_by" => Some(ActionType::ActionBy),
             "sequential_cost" => Some(ActionType::SequentialCost),
-            "tap" => Some(ActionType::Tap),
-            "rest" => Some(ActionType::Rest),
-            "discard" => Some(ActionType::Discard),
             "choice_condition" => Some(ActionType::ChoiceCondition),
             "energy_condition" => Some(ActionType::EnergyCondition),
             _ => None,
@@ -324,7 +312,6 @@ impl ActionType {
     /// Convert the typed action back to a string representation.
     pub fn to_str(&self) -> &'static str {
         match self {
-            ActionType::Draw => "draw",
             ActionType::DrawCard => "draw_card",
             ActionType::DrawUntilCount => "draw_until_count",
             ActionType::ChooseTargetPlayer => "choose_target_player",
@@ -335,9 +322,7 @@ impl ActionType {
             ActionType::SelectCards => "select_cards",
             ActionType::LookAndSelect => "look_and_select",
             ActionType::LookAt => "look_at",
-            ActionType::Look => "look",
             ActionType::Reveal => "reveal",
-            ActionType::RevealEffect => "reveal_effect",
             ActionType::RevealPerGroup => "reveal_per_group",
             ActionType::RevealUntilLiveCard => "reveal_until_live_card",
             ActionType::RevealUntilChosenCard => "reveal_until_chosen_card",
@@ -391,9 +376,6 @@ impl ActionType {
             ActionType::OpponentAction => "opponent_action",
             ActionType::ActionBy => "action_by",
             ActionType::SequentialCost => "sequential_cost",
-            ActionType::Tap => "tap",
-            ActionType::Rest => "rest",
-            ActionType::Discard => "discard",
             ActionType::ChoiceCondition => "choice_condition",
             ActionType::EnergyCondition => "energy_condition",
         }
@@ -402,7 +384,6 @@ impl ActionType {
     /// Human-readable action label for debug/UI output.
     pub fn label(&self) -> &'static str {
         match self {
-            ActionType::Draw => "Draw",
             ActionType::DrawCard => "Draw Card",
             ActionType::DrawUntilCount => "Draw Until Count",
             ActionType::ChooseTargetPlayer => "Choose Target Player",
@@ -413,9 +394,7 @@ impl ActionType {
             ActionType::SelectCards => "Select Cards",
             ActionType::LookAndSelect => "Look and Select",
             ActionType::LookAt => "Look At",
-            ActionType::Look => "Look",
             ActionType::Reveal => "Reveal",
-            ActionType::RevealEffect => "Reveal Effect",
             ActionType::RevealPerGroup => "Reveal Per Group",
             ActionType::RevealUntilLiveCard => "Reveal Until Live Card",
             ActionType::RevealUntilChosenCard => "Reveal Until Chosen Card",
@@ -469,9 +448,6 @@ impl ActionType {
             ActionType::OpponentAction => "Opponent Action",
             ActionType::ActionBy => "Action By",
             ActionType::SequentialCost => "Sequential Cost",
-            ActionType::Tap => "Tap",
-            ActionType::Rest => "Rest",
-            ActionType::Discard => "Discard",
             ActionType::ChoiceCondition => "Choice Condition",
             ActionType::EnergyCondition => "Energy Condition",
         }

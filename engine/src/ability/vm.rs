@@ -558,7 +558,7 @@ fn decode_ability_effect_from_object(bc: &mut BcReader) -> Option<AbilityEffect>
             .iter()
             .map(|a| {
                 let mut f = (**a).clone();
-                if (f.action == ActionType::Draw || f.action == ActionType::DrawCard)
+                if (f.action == ActionType::DrawCard)
                     && f.count.is_none()
                     && f.dynamic_count_any().is_none()
                 {

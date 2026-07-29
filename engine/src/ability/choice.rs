@@ -3116,7 +3116,7 @@ impl super::resolver::AbilityResolver {
     fn set_chosen_target(effect: &mut AbilityEffect, target: &str) {
         if matches!(
             effect.action,
-            ActionType::Draw | ActionType::DrawCard | ActionType::SelectCards
+            ActionType::DrawCard | ActionType::SelectCards
         ) {
             return;
         }
