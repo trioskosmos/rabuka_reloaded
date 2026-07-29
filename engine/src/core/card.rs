@@ -220,9 +220,6 @@ impl HeartMap {
     pub fn iter(&self) -> impl Iterator<Item = &(HeartColor, u32)> {
         self.0.iter()
     }
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut (HeartColor, u32)> {
-        self.0.iter_mut()
-    }
     pub fn keys(&self) -> impl Iterator<Item = &HeartColor> {
         self.0.iter().map(|(c, _)| c)
     }
@@ -640,11 +637,6 @@ impl Ability {
 pub struct AbilityCost(pub AbilityEffect);
 
 impl AbilityCost {
-    /// Borrow the inner effect.
-    pub fn as_effect(&self) -> &AbilityEffect {
-        &self.0
-    }
-
     /// Consume the cost and return the inner effect.
     pub fn into_effect(self) -> AbilityEffect {
         self.0
@@ -2208,211 +2200,6 @@ impl AbilityEffect {
         let tagged = serde_json::json!({tag: effect_json});
         serde_json::from_value(tagged).ok()
     }
-
-    /// Populate `kind` from this effect's JSON value. Recurses into sub-effects.
-    pub fn populate_from_json(&mut self, json_val: &serde_json::Value) {
-        if let Some(kind) = Self::kind_from_action(self.action.to_str(), json_val) {
-            self.kind = Some(ek_box_new(kind));
-        }
-        if let Some(ref mut sub) = self.compound.look_action {
-            if let Some(sub_json) = json_val.get("look_action") {
-                sub.populate_from_json(sub_json);
-            }
-        }
-        if let Some(ref mut sub) = self.compound.select_action {
-            if let Some(sub_json) = json_val.get("select_action") {
-                sub.populate_from_json(sub_json);
-            }
-        }
-        if let Some(ref mut sub) = self.compound.followup_action {
-            if let Some(sub_json) = json_val.get("followup_action") {
-                sub.populate_from_json(sub_json);
-            }
-        }
-        if let Some(ref mut sub) = self.compound.primary_effect {
-            if let Some(sub_json) = json_val.get("primary_effect") {
-                sub.populate_from_json(sub_json);
-            }
-        }
-        if let Some(ref mut sub) = self.compound.optional_action {
-            if let Some(sub_json) = json_val.get("optional_action") {
-                sub.populate_from_json(sub_json);
-            }
-        }
-        if let Some(ref mut sub) = self.compound.conditional_action {
-            if let Some(sub_json) = json_val.get("conditional_action") {
-                sub.populate_from_json(sub_json);
-            }
-        }
-        if let Some(ref mut actions) = self.compound.actions {
-            if let Some(json_actions) = json_val.get("actions").and_then(|a| a.as_array()) {
-                for (i, action) in actions.iter_mut().enumerate() {
-                    if i < json_actions.len() {
-                        action.populate_from_json(&json_actions[i]);
-                    }
-                }
-            }
-        }
-        if let Some(ref mut steps) = self.effect_steps {
-            if let Some(json_steps) = json_val.get("effect_steps").and_then(|a| a.as_array()) {
-                for (i, step) in steps.iter_mut().enumerate() {
-                    if i < json_steps.len() {
-                        step.populate_from_json(&json_steps[i]);
-                    }
-                }
-            }
-        }
-        if let Some(ref mut cond) = self.condition {
-            if let Some(cond_json) = json_val.get("condition") {
-                condition_populate_from_json(cond, cond_json);
-            }
-        }
-        match self.kind.as_deref_mut() {
-            Some(EffectKind::LookReveal {
-                ref mut options,
-                ref mut resource_on_select,
-                ..
-            }) => {
-                if let Some(ref mut opts) = options {
-                    if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
-                        for (i, opt) in opts.iter_mut().enumerate() {
-                            if i < json_opts.len() {
-                                opt.populate_from_json(&json_opts[i]);
-                            }
-                        }
-                    }
-                }
-                if let Some(ref mut ros) = resource_on_select {
-                    if let Some(ros_json) = json_val.get("resource_on_select") {
-                        ros.populate_from_json(ros_json);
-                    }
-                }
-            }
-            Some(EffectKind::CompoundEffect {
-                ref mut options,
-                ref mut alternative_effect,
-                ..
-            }) => {
-                if let Some(ref mut opts) = options {
-                    if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
-                        for (i, opt) in opts.iter_mut().enumerate() {
-                            if i < json_opts.len() {
-                                opt.populate_from_json(&json_opts[i]);
-                            }
-                        }
-                    }
-                }
-                if let Some(ref mut ae) = alternative_effect {
-                    if let Some(ae_json) = json_val.get("alternative_effect") {
-                        ae.populate_from_json(ae_json);
-                    }
-                }
-            }
-            Some(EffectKind::AbilityOp {
-                ref mut gained_effect,
-                ..
-            }) => {
-                if let Some(ref mut ge) = gained_effect {
-                    if let Some(ge_json) = json_val.get("gained_effect") {
-                        ge.populate_from_json(ge_json);
-                    }
-                }
-            }
-            Some(EffectKind::CustomOp {
-                ref mut opponent_action,
-                ..
-            }) => {
-                if let Some(ref mut oa) = opponent_action {
-                    if let Some(oa_json) = json_val.get("opponent_action") {
-                        oa.populate_from_json(oa_json);
-                    }
-                }
-            }
-            Some(EffectKind::MiscOp {
-                ref mut options, ..
-            }) => {
-                if let Some(ref mut opts) = options {
-                    if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
-                        for (i, opt) in opts.iter_mut().enumerate() {
-                            if i < json_opts.len() {
-                                opt.populate_from_json(&json_opts[i]);
-                            }
-                        }
-                    }
-                }
-            }
-            Some(EffectKind::SelectTarget {
-                ref mut options, ..
-            }) => {
-                if let Some(ref mut opts) = options {
-                    if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
-                        for (i, opt) in opts.iter_mut().enumerate() {
-                            if i < json_opts.len() {
-                                opt.populate_from_json(&json_opts[i]);
-                            }
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-/// Populate EffectKind for sub-effects inside Condition variants.
-pub fn condition_populate_from_json(cond: &mut Condition, cond_json: &serde_json::Value) {
-    if let Condition::Choice {
-        ref mut options, ..
-    } = cond
-    {
-        if let Some(ref mut opts) = options {
-            if let Some(json_opts) = cond_json.get("options").and_then(|a| a.as_array()) {
-                for (i, opt) in opts.iter_mut().enumerate() {
-                    if i < json_opts.len() {
-                        opt.populate_from_json(&json_opts[i]);
-                    }
-                }
-            }
-        }
-    }
-    if let Condition::Complex { ref mut effect, .. } = cond {
-        if let Some(ref mut eff) = effect {
-            if let Some(eff_json) = cond_json.get("effect") {
-                eff.populate_from_json(eff_json);
-            }
-        }
-    }
-    if let Condition::Compound {
-        ref mut conditions,
-        ref mut operator,
-        ..
-    } = cond
-    {
-        if operator.is_none()
-            && cond_json.get("type").and_then(|t| t.as_str()) == Some("or_condition")
-        {
-            *operator = Some("or".into());
-        }
-        if let Some(ref mut conditions) = conditions {
-            if let Some(json_conditions) = cond_json.get("conditions").and_then(|a| a.as_array()) {
-                for (i, sub_cond) in conditions.iter_mut().enumerate() {
-                    if i < json_conditions.len() {
-                        condition_populate_from_json(sub_cond, &json_conditions[i]);
-                    }
-                }
-            }
-        }
-    }
-    if let Condition::Temporal {
-        ref mut condition, ..
-    } = cond
-    {
-        if let Some(ref mut sub_cond) = condition {
-            if let Some(sub_cond_json) = cond_json.get("condition") {
-                condition_populate_from_json(sub_cond, sub_cond_json);
-            }
-        }
-    }
 }
 
 // Macro-generated getters for EffectKind fields
@@ -3230,54 +3017,6 @@ impl AbilityEffect {
         }
     }
     setter!(set_card_property, card_property: ArcStr => [MoveCards, SelectTarget, LookReveal, GainResource, ChangeState]);
-    pub fn set_card_type(&mut self, val: Option<ArcStr>) {
-        let parsed = val.and_then(|s| CardType::from_card_str(&s));
-        match self.kind.as_deref_mut() {
-            Some(EffectKind::MoveCards {
-                ref mut card_type, ..
-            }) => *card_type = parsed,
-            Some(EffectKind::DrawCards {
-                ref mut card_type, ..
-            }) => *card_type = parsed,
-            Some(EffectKind::SelectTarget {
-                ref mut card_type, ..
-            }) => *card_type = parsed,
-            Some(EffectKind::LookReveal {
-                ref mut card_type, ..
-            }) => *card_type = parsed,
-            Some(EffectKind::ModifyScore {
-                ref mut card_type, ..
-            }) => *card_type = parsed,
-            Some(EffectKind::ModifyHearts {
-                ref mut card_type, ..
-            }) => *card_type = parsed,
-            Some(EffectKind::GainResource {
-                ref mut card_type, ..
-            }) => *card_type = parsed,
-            Some(EffectKind::ChangeState {
-                ref mut card_type, ..
-            }) => *card_type = parsed,
-            Some(EffectKind::AbilityOp {
-                ref mut card_type, ..
-            }) => *card_type = parsed,
-            Some(EffectKind::CompoundEffect {
-                ref mut card_type, ..
-            }) => *card_type = parsed,
-            Some(EffectKind::RestrictionOp {
-                ref mut card_type, ..
-            }) => *card_type = parsed,
-            Some(EffectKind::PositionOp {
-                ref mut card_type, ..
-            }) => *card_type = parsed,
-            Some(EffectKind::MiscOp {
-                ref mut card_type, ..
-            }) => *card_type = parsed,
-            Some(EffectKind::CustomOp {
-                ref mut card_type, ..
-            }) => *card_type = parsed,
-            _ => {}
-        }
-    }
     box_setter!(set_characters, characters: Vec<String> => [MoveCards, SelectTarget, LookReveal, GainResource, ChangeState, AbilityOp, RestrictionOp, PositionOp, MiscOp, CustomOp]);
 
     setter!(set_choice_based, choice_based: bool => [RestrictionOp, CustomOp]);
@@ -3322,9 +3061,6 @@ impl AbilityEffect {
     setter!(set_multiple_targets, multiple_targets: bool => [MoveCards, SelectTarget, PositionOp]);
     setter!(set_name_constraint, name_constraint: ArcStr => [MoveCards, SelectTarget, LookReveal, ChangeState]);
     setter!(set_name_constraint_source, name_constraint_source: ArcStr => [MoveCards, SelectTarget, LookReveal, ChangeState]);
-    setter!(set_need_heart_color, need_heart_color: ArcStr => [MoveCards]);
-    setter!(set_need_heart_operator, need_heart_operator: Operator => [MoveCards]);
-    setter!(set_need_heart_total, need_heart_total: u32 => [MoveCards]);
     setter!(set_negation, negation: bool => [MoveCards, SelectTarget, LookReveal, ModifyHearts, GainResource, ChangeState, MiscOp]);
 
     setter!(set_operation, operation: ArcStr => [ModifyScore, ModifyHearts, GainResource, RestrictionOp], boxed [MiscOp]);
@@ -3354,12 +3090,10 @@ impl AbilityEffect {
         }
     }
     box_setter!(set_or_card_types, or_card_types: Vec<String> => [MoveCards, SelectTarget, MiscOp]);
-    setter!(set_original_cost, original_cost: u32 => [MiscOp]);
     setter!(set_original_count, original_count: u32 => [ModifyHearts, MiscOp]);
     setter!(set_original_operator, original_operator: Operator => [ModifyHearts, MiscOp]);
     setter!(set_original_value, original_value: bool => [MoveCards, SelectTarget, LookReveal, ModifyHearts, GainResource, ChangeState, MiscOp, CustomOp]);
 
-    setter!(set_per_group, per_group: bool => [MoveCards, MiscOp]);
     setter!(set_per_group_count, per_group_count: u32 => [MoveCards, MiscOp]);
     setter!(set_per_unit, per_unit: bool => [SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, MiscOp]);
     setter!(set_per_unit_count, per_unit_count: u32 => [SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, MiscOp]);
@@ -3369,17 +3103,14 @@ impl AbilityEffect {
     box_setter!(set_picker, picker: ArcStr => [MiscOp]);
     setter!(set_placement_order, placement_order: PlacementOrder => [MoveCards, SelectTarget, MiscOp]);
     setter!(set_question, question: ArcStr => [SelectTarget, CompoundEffect, CustomOp]);
-    setter!(set_ref_offset, ref_offset: i32 => [MiscOp]);
     box_setter!(set_ref_value, ref_value: ArcStr => [MiscOp]);
     setter!(set_repeat_limit, repeat_limit: u32 => [ModifyScore, ModifyHearts, CompoundEffect, MiscOp]);
     setter!(set_replaces_event, replaces_event: ArcStr => [RestrictionOp, CustomOp]);
 
-    setter!(set_require_all_heart_colors, require_all_heart_colors: bool => [MiscOp]);
+    setter!(set_reveal, reveal: bool => [LookReveal, SelectTarget]);
     setter!(set_resource, resource: ArcStr => [GainResource]);
-
     setter!(set_restricted_destination, restricted_destination: ArcStr => [RestrictionOp]);
     setter!(set_restriction_type, restriction_type: ArcStr => [RestrictionOp]);
-    setter!(set_reveal, reveal: bool => [LookReveal, SelectTarget]);
     setter!(set_same_unit_name, same_unit_name: bool => [MiscOp]);
     setter!(set_self_cost, self_cost: bool => [ChangeState]);
     setter!(set_self_target, self_target: bool => [MoveCards, SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, AbilityOp, RestrictionOp, PositionOp, MiscOp, CustomOp]);
@@ -3387,32 +3118,6 @@ impl AbilityEffect {
     setter!(set_sign, sign: ArcStr => [GainResource], boxed [MiscOp]);
     setter!(set_source_card, source_card: ArcStr => [AbilityOp]);
     setter!(set_source_position, source_position: ArcStr => [MoveCards, PositionOp]);
-    pub fn set_state(&mut self, val: Option<ArcStr>) {
-        let parsed = val.map(|s| EffectState::from_str(&s));
-        match self.kind.as_deref_mut() {
-            Some(EffectKind::MoveCards { ref mut state, .. }) => *state = parsed.map(Box::new),
-            Some(EffectKind::LookReveal { ref mut state, .. }) => *state = parsed.map(Box::new),
-            Some(EffectKind::GainResource { ref mut state, .. }) => *state = parsed.map(Box::new),
-            Some(EffectKind::PositionOp { ref mut state, .. }) => *state = parsed.map(Box::new),
-            _ => {}
-        }
-    }
-
-    pub fn set_state_change(&mut self, val: Option<ArcStr>) {
-        let parsed = val.map(|s| EffectState::from_str(&s));
-        match self.kind.as_deref_mut() {
-            Some(EffectKind::ChangeState {
-                ref mut state_change,
-                ..
-            }) => *state_change = parsed.map(Box::new),
-            Some(EffectKind::MoveCards {
-                ref mut state_change,
-                ..
-            }) => *state_change = parsed.map(Box::new),
-            _ => {}
-        }
-    }
-
     setter!(set_target_count, target_count: u32 => [MoveCards, DrawCards, SelectTarget, ModifyScore, ModifyHearts, CompoundEffect, MiscOp]);
     setter!(set_target_from_selection, target_from_selection: bool => [MoveCards, GainResource]);
     setter!(set_target_member, target_member: ArcStr => [PositionOp]);
@@ -3485,29 +3190,6 @@ impl AbilityEffect {
     /// Returns the group_names slice, or `&[]` if absent.
     pub fn group_names_slice(&self) -> &[String] {
         self.group_names_any().map_or(&[], |v| v.as_slice())
-    }
-
-    /// Returns true if `card_id` matches this effect's group filter.
-    pub fn matches_group_filter(&self, card_db: &CardDatabase, card_id: i16) -> bool {
-        crate::ability::util::card_matches_any_group(card_db, card_id, self.group_names_slice())
-    }
-
-    /// Returns the first heart color as a string reference, or a static default.
-    pub fn heart_color_or(&self, default: &'static str) -> &str {
-        self.heart_colors_any()
-            .first()
-            .map(|s| s.as_str())
-            .unwrap_or(default)
-    }
-
-    /// Returns the typed ActionType for this effect.
-    pub fn action_type(&self) -> ActionType {
-        self.action
-    }
-
-    /// Returns true if the action matches the given ActionType variant.
-    pub fn is_action(&self, at: ActionType) -> bool {
-        self.action == at
     }
 
     /// Returns the numeric value from `value` or `count`, in that priority.
@@ -5726,19 +5408,6 @@ impl Card {
         }
     }
 
-    /// Image URL for frontend display. Returns `None` when compact_cards
-    /// feature is enabled (the field is stripped from the struct).
-    pub fn img_url(&self) -> Option<&str> {
-        #[cfg(not(feature = "compact_cards"))]
-        {
-            self.img.as_deref()
-        }
-        #[cfg(feature = "compact_cards")]
-        {
-            None
-        }
-    }
-
     /// Total hearts this card has (printed hearts for member cards).
     ///
     /// Returns base_heart (printed hearts) for member cards, falling back to
@@ -5762,19 +5431,6 @@ impl Card {
         }
     }
 
-    /// Total required hearts (sum of all need_heart values).
-    ///
-    /// This is the live card's cost hearts (not member base_heart).
-    /// For member cards this always returns 0 since members don't have
-    /// need_heart.  For condition checks involving members' printed hearts,
-    /// use total_hearts() instead (per Q149: 基本ハート).
-    pub fn need_heart_total(&self) -> u32 {
-        self.need_heart
-            .as_ref()
-            .map(|nh| nh.hearts.values_sum())
-            .unwrap_or(0)
-    }
-
     pub fn has_blade_heart(&self) -> bool {
         self.blade_heart.is_some()
             || self
@@ -5795,19 +5451,8 @@ impl Card {
             .is_some_and(|bh| bh.hearts.contains_key(&HeartColor::BAll))
     }
 
-    /// Check if a given need_heart is satisfied by provided hearts.
-    /// This is identical to satisfies_heart_requirement but allows an
-    /// externally-adjusted need_heart (e.g. with modifiers applied).
     pub fn need_heart_satisfied(need: &BaseHeart, provided_hearts: &BaseHeart) -> bool {
         check_heart_requirement(need, provided_hearts)
-    }
-
-    pub fn satisfies_heart_requirement(&self, provided_hearts: &BaseHeart) -> bool {
-        if let Some(ref need_heart) = self.need_heart {
-            check_heart_requirement(need_heart, provided_hearts)
-        } else {
-            true
-        }
     }
 }
 
@@ -5971,90 +5616,5 @@ pub fn parse_heart_color(s: &str) -> HeartColor {
 impl Card {
     pub fn get_score(&self) -> u32 {
         self.score.unwrap_or(0)
-    }
-
-    // ============== RESOURCE MODIFICATION METHODS ==============
-
-    /// Add blades to card
-    pub fn add_blades(&mut self, amount: u32) {
-        self.blade += amount;
-    }
-
-    /// Remove blades from card (minimum 0)
-    pub fn remove_blades(&mut self, amount: u32) {
-        self.blade = self.blade.saturating_sub(amount);
-    }
-
-    /// Set blades to specific value
-    pub fn set_blades(&mut self, amount: u32) {
-        self.blade = amount;
-    }
-
-    /// Add hearts of specific color
-    pub fn add_heart(&mut self, heart_color: &str, amount: u32) {
-        if let Some(ref mut base_heart) = self.base_heart {
-            let color = parse_heart_color(heart_color);
-            *base_heart.hearts.entry_or_default(color) += amount;
-        }
-    }
-
-    pub fn remove_heart(&mut self, heart_color: &str, amount: u32) {
-        if let Some(ref mut base_heart) = self.base_heart {
-            let color = parse_heart_color(heart_color);
-            let current = base_heart.hearts.get(&color).copied().unwrap_or(0);
-            if current <= amount {
-                base_heart.hearts.remove(&color);
-            } else {
-                base_heart.hearts.insert(color, current - amount);
-            }
-        }
-    }
-
-    pub fn set_heart(&mut self, heart_color: &str, amount: u32) {
-        if let Some(ref mut base_heart) = self.base_heart {
-            let color = parse_heart_color(heart_color);
-            base_heart.hearts.insert(color, amount);
-        }
-    }
-
-    /// Add score to card
-    pub fn add_score(&mut self, amount: u32) {
-        if self.score.is_none() {
-            self.score = Some(0);
-        }
-        if let Some(ref mut score) = self.score {
-            *score += amount;
-        }
-    }
-
-    /// Remove score from card (minimum 0)
-    pub fn remove_score(&mut self, amount: u32) {
-        if let Some(ref mut score) = self.score {
-            *score = score.saturating_sub(amount);
-        }
-    }
-
-    /// Set score to specific value
-    pub fn set_score(&mut self, amount: u32) {
-        self.score = Some(amount);
-    }
-
-    /// Modify cost by amount (minimum 0)
-    pub fn modify_cost(&mut self, amount: i32) {
-        if self.cost.is_none() {
-            self.cost = Some(0);
-        }
-        if let Some(ref mut cost) = self.cost {
-            if amount >= 0 {
-                *cost += amount as u32;
-            } else {
-                *cost = cost.saturating_sub((-amount) as u32);
-            }
-        }
-    }
-
-    /// Set cost to specific value
-    pub fn set_cost(&mut self, amount: u32) {
-        self.cost = Some(amount);
     }
 }

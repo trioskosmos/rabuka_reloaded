@@ -1,6 +1,6 @@
 use super::abilities_gen::{BYTECODE, NUM_ABILITIES, OFFSETS, STRINGS};
 use crate::ability::enums::ActionType;
-use crate::card::{Ability, AbilityCost, AbilityEffect};
+use crate::card::{ek_box_new, Ability, AbilityCost, AbilityEffect, Condition, EffectKind};
 use crate::core::types::ArcStr;
 
 #[cfg(feature = "no_std")]
@@ -571,6 +571,204 @@ fn decode_ability_effect_from_object(bc: &mut BcReader) -> Option<AbilityEffect>
     }
 
     Some(effect)
+}
+
+// ── populate_from_json (moved from card.rs) ──
+
+impl AbilityEffect {
+    /// Populate `kind` from this effect's JSON value. Recurses into sub-effects.
+    pub fn populate_from_json(&mut self, json_val: &serde_json::Value) {
+        if let Some(kind) = Self::kind_from_action(self.action.to_str(), json_val) {
+            self.kind = Some(ek_box_new(kind));
+        }
+        if let Some(ref mut sub) = self.compound.look_action {
+            if let Some(sub_json) = json_val.get("look_action") {
+                sub.populate_from_json(sub_json);
+            }
+        }
+        if let Some(ref mut sub) = self.compound.select_action {
+            if let Some(sub_json) = json_val.get("select_action") {
+                sub.populate_from_json(sub_json);
+            }
+        }
+        if let Some(ref mut sub) = self.compound.followup_action {
+            if let Some(sub_json) = json_val.get("followup_action") {
+                sub.populate_from_json(sub_json);
+            }
+        }
+        if let Some(ref mut sub) = self.compound.primary_effect {
+            if let Some(sub_json) = json_val.get("primary_effect") {
+                sub.populate_from_json(sub_json);
+            }
+        }
+        if let Some(ref mut sub) = self.compound.optional_action {
+            if let Some(sub_json) = json_val.get("optional_action") {
+                sub.populate_from_json(sub_json);
+            }
+        }
+        if let Some(ref mut sub) = self.compound.conditional_action {
+            if let Some(sub_json) = json_val.get("conditional_action") {
+                sub.populate_from_json(sub_json);
+            }
+        }
+        if let Some(ref mut actions) = self.compound.actions {
+            if let Some(json_actions) = json_val.get("actions").and_then(|a| a.as_array()) {
+                for (i, action) in actions.iter_mut().enumerate() {
+                    if i < json_actions.len() {
+                        action.populate_from_json(&json_actions[i]);
+                    }
+                }
+            }
+        }
+        if let Some(ref mut steps) = self.effect_steps {
+            if let Some(json_steps) = json_val.get("effect_steps").and_then(|a| a.as_array()) {
+                for (i, step) in steps.iter_mut().enumerate() {
+                    if i < json_steps.len() {
+                        step.populate_from_json(&json_steps[i]);
+                    }
+                }
+            }
+        }
+        if let Some(ref mut cond) = self.condition {
+            if let Some(cond_json) = json_val.get("condition") {
+                condition_populate_from_json(cond, cond_json);
+            }
+        }
+        match self.kind.as_deref_mut() {
+            Some(EffectKind::LookReveal {
+                ref mut options,
+                ref mut resource_on_select,
+                ..
+            }) => {
+                if let Some(ref mut opts) = options {
+                    if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
+                        for (i, opt) in opts.iter_mut().enumerate() {
+                            if i < json_opts.len() {
+                                opt.populate_from_json(&json_opts[i]);
+                            }
+                        }
+                    }
+                }
+                if let Some(ref mut ros) = resource_on_select {
+                    if let Some(ros_json) = json_val.get("resource_on_select") {
+                        ros.populate_from_json(ros_json);
+                    }
+                }
+            }
+            Some(EffectKind::CompoundEffect {
+                ref mut options,
+                ref mut alternative_effect,
+                ..
+            }) => {
+                if let Some(ref mut opts) = options {
+                    if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
+                        for (i, opt) in opts.iter_mut().enumerate() {
+                            if i < json_opts.len() {
+                                opt.populate_from_json(&json_opts[i]);
+                            }
+                        }
+                    }
+                }
+                if let Some(ref mut ae) = alternative_effect {
+                    if let Some(ae_json) = json_val.get("alternative_effect") {
+                        ae.populate_from_json(ae_json);
+                    }
+                }
+            }
+            Some(EffectKind::AbilityOp {
+                ref mut gained_effect,
+                ..
+            }) => {
+                if let Some(ref mut ge) = gained_effect {
+                    if let Some(ge_json) = json_val.get("gained_effect") {
+                        ge.populate_from_json(ge_json);
+                    }
+                }
+            }
+            Some(EffectKind::CustomOp {
+                ref mut opponent_action,
+                ..
+            }) => {
+                if let Some(ref mut oa) = opponent_action {
+                    if let Some(oa_json) = json_val.get("opponent_action") {
+                        oa.populate_from_json(oa_json);
+                    }
+                }
+            }
+            Some(EffectKind::MiscOp {
+                ref mut options, ..
+            })
+            | Some(EffectKind::SelectTarget {
+                ref mut options, ..
+            }) => {
+                if let Some(ref mut opts) = options {
+                    if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
+                        for (i, opt) in opts.iter_mut().enumerate() {
+                            if i < json_opts.len() {
+                                opt.populate_from_json(&json_opts[i]);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn condition_populate_from_json(cond: &mut Condition, cond_json: &serde_json::Value) {
+    if let Condition::Choice {
+        ref mut options, ..
+    } = cond
+    {
+        if let Some(ref mut opts) = options {
+            if let Some(json_opts) = cond_json.get("options").and_then(|a| a.as_array()) {
+                for (i, opt) in opts.iter_mut().enumerate() {
+                    if i < json_opts.len() {
+                        opt.populate_from_json(&json_opts[i]);
+                    }
+                }
+            }
+        }
+    }
+    if let Condition::Complex { ref mut effect, .. } = cond {
+        if let Some(ref mut eff) = effect {
+            if let Some(eff_json) = cond_json.get("effect") {
+                eff.populate_from_json(eff_json);
+            }
+        }
+    }
+    if let Condition::Compound {
+        ref mut conditions,
+        ref mut operator,
+        ..
+    } = cond
+    {
+        if operator.is_none()
+            && cond_json.get("type").and_then(|t| t.as_str()) == Some("or_condition")
+        {
+            *operator = Some("or".into());
+        }
+        if let Some(ref mut conditions) = conditions {
+            if let Some(json_conditions) = cond_json.get("conditions").and_then(|a| a.as_array()) {
+                for (i, sub_cond) in conditions.iter_mut().enumerate() {
+                    if i < json_conditions.len() {
+                        condition_populate_from_json(sub_cond, &json_conditions[i]);
+                    }
+                }
+            }
+        }
+    }
+    if let Condition::Temporal {
+        ref mut condition, ..
+    } = cond
+    {
+        if let Some(ref mut sub_cond) = condition {
+            if let Some(sub_cond_json) = cond_json.get("condition") {
+                condition_populate_from_json(sub_cond, sub_cond_json);
+            }
+        }
+    }
 }
 
 // ── Keyword decoder ──
