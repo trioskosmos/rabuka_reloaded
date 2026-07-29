@@ -2104,7 +2104,7 @@ def parse_action(text: str) -> Dict[str, Any]:
     R(
         lambda t: "アクティブにしてもよい" in t
         or "アクティブにする" in t
-        or "アクティブにし" in t,
+        or ("アクティブにし" in t and "しない" not in t),
         "change_state",
         lambda t, a: a.update(
             {
@@ -7352,6 +7352,20 @@ def _try_implicit_sequential(text):
                 stash = None
             filt.append(p)
         parts = filt
+    # Merge fragments ending with conjunction particle "と" with the next fragment
+    # e.g. "これによりアクティブにしたメンバーと" + "このメンバーは" → single fragment
+    # Replace the comma with a space to prevent re-splitting by parse_effect.
+    merged = []
+    for p in parts:
+        if (
+            merged
+            and merged[-1].rstrip("、").endswith("と")
+            and not p.startswith("それぞれ")
+        ):
+            merged[-1] = merged[-1].rstrip("、") + " " + p
+        else:
+            merged.append(p)
+    parts = merged
     if len(parts) < 2:
         return None
     actions = []
@@ -8224,9 +8238,10 @@ def _try_duration_effect(text):
 
 
 def _try_restriction_effect(text):
-    """アクティブにならない — restriction effect preventing activation.
-    Matches both "効果によってはアクティブにならない" and plain "アクティブフェイズにアクティブにならない"."""
-    if "アクティブにならない" not in text:
+    """アクティブにならない/にしない — restriction effect preventing activation.
+    Matches both "効果によってはアクティブにならない" and plain "アクティブフェイズにアクティブにならない".
+    Also matches "アクティブにしない" (causative negative, e.g. 近江彼方)."""
+    if "アクティブにならない" not in text and "アクティブにしない" not in text:
         return None
     result = {
         "text": text,
@@ -10114,46 +10129,36 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                         if gns:
                             eff["group_names"] = gns
 
-        # FIX 13: Split gain_resource that targets both "selected member + self"
-        # into two actions (one per target).  Detected by the text pattern:
-        #   "これによりアクティブにしたメンバーと、このメンバーは"
-        # The second gain_resource gets self_target:true (this card);
-        # the first keeps card_type=member_card (selected card via sequential flow).
+        # FIX 13: Remove spurious change_state actions inside sequential containers.
+        # When _try_implicit_sequential splits "これによりアクティブにしたメンバーと、このメンバーは"
+        # the conjunction phrase "これにより...と" is incorrectly parsed as change_state.
+        # This pollutes selected_cards with wrong members. Remove the spurious change_state
+        # so the subsequent gain_resource with multiple_targets targets correctly.
         if eff.get("action") == "sequential":
             new_actions = []
             for sub in eff.get("actions", []):
-                if (
-                    isinstance(sub, dict)
-                    and sub.get("action") == "gain_resource"
-                    and "これによりアクティブにしたメンバーと、このメンバーは"
-                    in sub.get("text", "")
-                ):
-                    heart_colors = sub.get("heart_colors", [])
-                    duration = sub.get("duration")
-                    sr = sub.get("resource", "heart")
-                    cnt = sub.get("count", 1)
-                    new_actions.append(
-                        {
-                            "action": "gain_resource",
-                            "resource": sr,
-                            "count": cnt,
-                            "heart_colors": list(heart_colors),
-                            "duration": duration,
-                            "target_from_selection": True,
-                        }
-                    )
-                    new_actions.append(
-                        {
-                            "action": "gain_resource",
-                            "resource": sr,
-                            "count": cnt,
-                            "heart_colors": list(heart_colors),
-                            "duration": duration,
-                            "self_target": True,
-                        }
-                    )
-                    continue
-                new_actions.append(sub)
+                if isinstance(sub, dict) and sub.get("action") == "sequential":
+                    inner_acts = sub.get("actions", [])
+                    filtered = [
+                        a
+                        for a in inner_acts
+                        if not (
+                            isinstance(a, dict)
+                            and a.get("action") == "change_state"
+                            and "これにより" in a.get("text", "")
+                            and "と" in a.get("text", "")
+                        )
+                    ]
+                    if len(filtered) < len(inner_acts):
+                        if len(filtered) == 1:
+                            new_actions.append(filtered[0])
+                        else:
+                            sub["actions"] = filtered
+                            new_actions.append(sub)
+                    else:
+                        new_actions.append(sub)
+                else:
+                    new_actions.append(sub)
             if new_actions != eff.get("actions", []):
                 eff["actions"] = new_actions
 

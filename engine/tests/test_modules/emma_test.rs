@@ -203,10 +203,11 @@ fn emma_live_start_three_members_only_activated_gets_heart() {
 
     trigger_emma_live_start(&mut game, emma);
 
-    while game.has_pending_choice() {
+    // Optional cost: discard 2 cards
+    if game.has_pending_choice() {
         game.select_indices(&[0, 1]);
     }
-    // Select member_a to activate
+    // Select member_a only to activate
     if game.has_pending_choice() {
         game.select_indices(&[0]);
     }

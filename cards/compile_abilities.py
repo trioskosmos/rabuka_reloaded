@@ -1,6 +1,6 @@
 """Auto-compiler: scans abilities.json, discovers field types, generates bytecode + Rust decoder."""
 
-import json, struct, re
+import json, struct, re, hashlib
 from pathlib import Path
 from collections import defaultdict
 
@@ -988,6 +988,48 @@ def main():
 
     generate_abilities_gen(bytecode, offsets, strings, card_ability_pairs, build_dir)
     print(f"  Avg: {len(bytecode) / len(abilities):.1f} bytes/ability")
+
+    # Write generation manifest for reproducibility tracking
+    abilities_json_path = root / "abilities.json"
+    abilities_hash = hashlib.sha256(abilities_json_path.read_bytes()).hexdigest()[:16]
+    bytecode_hash = hashlib.sha256(bytecode).hexdigest()[:16]
+
+    git_hash = "unknown"
+    try:
+        import subprocess
+
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=str(root.parent),
+            timeout=5,
+        )
+        if result.returncode == 0:
+            git_hash = result.stdout.strip()
+    except Exception:
+        pass
+
+    manifest = {
+        "schema": "compiled_abilities.v1",
+        "compiler": "cards/compile_abilities.py",
+        "engine_commit": git_hash,
+        "input": {
+            "source": "cards/abilities.json",
+            "sha256": abilities_hash,
+            "unique_abilities": len(abilities),
+        },
+        "output": {
+            "bytecode_bytes": len(bytecode),
+            "interned_strings": len(strings),
+            "card_ability_pairs": len(card_ability_pairs),
+            "sha256": bytecode_hash,
+        },
+    }
+    (build_dir / "generation_manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    )
+    print(f"  manifest: generation_manifest.json")
 
 
 if __name__ == "__main__":

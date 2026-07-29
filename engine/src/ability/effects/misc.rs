@@ -1235,7 +1235,17 @@ impl AbilityResolver {
                 selected_for_current
             } else if use_raw && !selected_for_current.is_empty() && effect.distinct_any().is_none()
             {
-                selected_for_current
+                if effect.multiple_targets_any().unwrap_or(false) {
+                    let mut targets = selected_for_current;
+                    if let Some(aid) = activating_card_id {
+                        if !targets.contains(&aid) {
+                            targets.push(aid);
+                        }
+                    }
+                    targets
+                } else {
+                    selected_for_current
+                }
             } else if use_raw {
                 all_selected.iter().copied().collect()
             } else if resource == "heart" || resource == "ハート" {
@@ -1637,7 +1647,8 @@ impl AbilityResolver {
                     && activating_card_id.is_some()
                     && effect.source_any().is_none()
                     && effect.card_type_any().is_none()
-                    && !effect.target_from_selection_any().unwrap_or(false))
+                    && !effect.target_from_selection_any().unwrap_or(false)
+                    && !effect.multiple_targets_any().unwrap_or(false))
             {
                 if let Some(card_id) = activating_card_id {
                     self.apply_heart_to_card(
@@ -1653,7 +1664,8 @@ impl AbilityResolver {
                     );
                 }
             } else {
-                let targets: Vec<i16> = if is_all {
+                let targets: Vec<i16> = if is_all || effect.multiple_targets_any().unwrap_or(false)
+                {
                     heart_targets.clone()
                 } else {
                     heart_targets

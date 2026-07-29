@@ -1,8 +1,11 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-28T23:35:48.040395",
-  "generated_by": "tools/ability_extraction/extract_card_abilities.py",
-  "source_file": "/home/trios/OneDrive/Documents/rabuka_reloaded/cards/cards.json",
+  "generated_at": "2026-07-29T14:28:22.302563",
+  "generated_by": "cards/ability_extraction/extract_card_abilities.py",
+  "source_file": "cards/cards.json",
+  "engine_commit": "f7b23bd5",
+  "parser_version": "1.0",
+  "input_hash": null,
   "statistics": {
     "total_cards": 2280,
     "cards_with_abilities": 1373,
@@ -2868,33 +2871,15 @@
             "action": "change_state"
           },
           {
-            "text": "これによりアクティブにしたメンバーと、このメンバーは、それぞれ{{heart_04.png|heart04}}を得る",
-            "action": "sequential",
-            "actions": [
-              {
-                "text": "これによりアクティブにしたメンバーと",
-                "state_change": "active",
-                "card_type": "member_card",
-                "action": "change_state",
-                "count": 1,
-                "duration": "live_end",
-                "exclude_self": true
-              },
-              {
-                "text": "それぞれ{{heart_04.png|heart04}}を得る",
-                "multiple_targets": true,
-                "action": "gain_resource",
-                "resource": "heart",
-                "count": 1,
-                "heart_colors": [
-                  "heart04"
-                ],
-                "duration": "live_end"
-              }
-            ],
-            "duration": "live_end",
+            "text": "それぞれ{{heart_04.png|heart04}}を得る",
             "multiple_targets": true,
-            "exclude_self": true
+            "action": "gain_resource",
+            "resource": "heart",
+            "count": 1,
+            "heart_colors": [
+              "heart04"
+            ],
+            "duration": "live_end"
           }
         ],
         "conditional": true,
@@ -7881,10 +7866,9 @@
       "cost": null,
       "effect": {
         "text": "このメンバーはアクティブにしない",
-        "state_change": "active",
+        "action": "restriction",
+        "restriction_type": "cannot_activate",
         "card_type": "member_card",
-        "action": "change_state",
-        "count": 1,
         "condition": {
           "type": "temporal_condition",
           "phase": "active_phase",

@@ -443,11 +443,38 @@ def extract_all_abilities(cards_file: Path) -> dict:
     # Sort by card count
     unique_abilities.sort(key=lambda x: -x["card_count"])
 
+    # Compute repository-relative source path
+    try:
+        repo_root = Path(__file__).parent.parent.parent
+        rel_source = str(cards_file.relative_to(repo_root))
+    except ValueError:
+        rel_source = str(cards_file)
+
+    # Get git commit hash for reproducibility tracking
+    git_hash = "unknown"
+    try:
+        import subprocess
+
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=str(Path(__file__).parent.parent.parent),
+            timeout=5,
+        )
+        if result.returncode == 0:
+            git_hash = result.stdout.strip()
+    except Exception:
+        pass
+
     return {
         "schema": "extracted_abilities.v1",
         "generated_at": datetime.now().isoformat(),
-        "generated_by": "tools/ability_extraction/extract_card_abilities.py",
-        "source_file": str(cards_file),
+        "generated_by": "cards/ability_extraction/extract_card_abilities.py",
+        "source_file": rel_source,
+        "engine_commit": git_hash,
+        "parser_version": "1.0",
+        "input_hash": None,  # filled by caller if needed
         "statistics": {
             "total_cards": len(cards_dict),
             "cards_with_abilities": len(
