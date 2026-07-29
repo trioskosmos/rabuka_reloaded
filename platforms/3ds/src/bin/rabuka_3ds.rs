@@ -1000,10 +1000,10 @@ fn main() {
                                 unsafe {
                                     _3ds_top_queue_text(
                                         50.0,
-                                        225.0,
+                                        230.0,
                                         COL_MED,
-                                        0.55f32,
-                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  X=language")).as_ptr(),
+                                        0.60f32,
+                                        format!("{}\0", tl("UP/DOWN=select  A=confirm")).as_ptr(),
                                     );
                                 }
                             }
@@ -1744,7 +1744,7 @@ fn main() {
                                     _3ds_text_add_top(
                                         format!("{} {}\n\0", arrow_c, client_label).as_ptr(),
                                     );
-                                _3ds_text_add_top("\nUP/DOWN=select A=confirm X=language\0".as_ptr());
+                                    _3ds_text_add_top("\nUP/DOWN=select A=confirm\0".as_ptr());
                                 }
                             } else {
                                 unsafe {
@@ -4713,8 +4713,6 @@ fn main() {
                                 if choice_image_mode
                                     && gs.has_pending_choice()
                                     && !(detail_mode && viewing_card.is_some())
-                                    && !is_ai_turn
-                                    && !is_opponent_turn_mp
                                 {
                                     // ---- Render ability banner first ----
                                     let mut grid_iy: f32 = 42.0;
@@ -5310,10 +5308,9 @@ fn main() {
                                                                 "{} {} {}",
                                                                 name, area_label, abil_short
                                                             )
-                            }
-                        }
-                        } // end if !is_ai_turn && !is_opponent_turn_mp
-                    }
+                                                        }
+                                                    }
+                                                }
                                                 _ => {
                                                     let cn = cn_or_empty(act);
                                                     let name = i18n::card_display_name(
@@ -5413,7 +5410,6 @@ fn main() {
                         }
 
                         // Highlight interactive zones for all tap-to-deploy action types
-                        if !is_ai_turn && !is_opponent_turn_mp {
                         for act in &acts_cache {
                             let p = match &act.parameters {
                                 Some(x) => x,
@@ -5504,8 +5500,7 @@ fn main() {
                             }
                         }
                         // Also highlight SelectAutoAbility option cards
-                        if !is_ai_turn && !is_opponent_turn_mp
-                            && choice_image_mode && gs.has_pending_choice() {
+                        if choice_image_mode && gs.has_pending_choice() {
                             if let Some(c) = gs.get_pending_choice() {
                                 use rabuka_engine::ability::types::Choice;
                                 if let Choice::SelectAutoAbility { options, .. } = c {
@@ -6196,7 +6191,7 @@ extern "C" {
     fn _3ds_qr_start() -> i32;
     fn _3ds_qr_stop();
     fn _3ds_qr_poll(out_text: *mut u8, out_max: u32) -> i32;
-    // Audio (NDSP + tremor OGG)
+    // Audio (CSND + tremor OGG)
     fn _3ds_audio_init();
     fn _3ds_audio_play_ogg(path: *const u8);
     fn _3ds_audio_stop();

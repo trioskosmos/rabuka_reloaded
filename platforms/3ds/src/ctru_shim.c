@@ -1025,7 +1025,7 @@ int _3ds_uds_scan_networks(unsigned short *out_ids, int max_out) {
     for (size_t i = 0; i < total_networks && count < max_out; i++) {
         udsNetworkStruct *net = &networks[i].network;
         if (memcmp(net->appdata, uds_appdata, 4) == 0) {
-            out_ids[count] = net->node_id;
+            out_ids[count] = net->networkID;
             count++;
         }
     }
@@ -1060,7 +1060,7 @@ int _3ds_uds_connect_network(unsigned short node_id) {
     int result = -4;
     for (size_t i = 0; i < total_networks; i++) {
         udsNetworkStruct *net = &networks[i].network;
-        if (net->node_id == node_id && memcmp(net->appdata, uds_appdata, 4) == 0) {
+        if (net->networkID == node_id && memcmp(net->appdata, uds_appdata, 4) == 0) {
             ret = udsConnectNetwork(net, passphrase, strlen(passphrase) + 1,
                                     &uds_bindctx, UDS_BROADCAST_NETWORKNODEID,
                                     UDSCONTYPE_Client, uds_data_channel,
@@ -1071,7 +1071,6 @@ int _3ds_uds_connect_network(unsigned short node_id) {
 
     free(networks);
     return result;
-}
 }
 
 void _3ds_uds_exit() {
@@ -1165,11 +1164,6 @@ static void _3ds_qr_update_texture(const u8 *buf, int w, int h) {
 void _3ds_qr_draw_preview(float x_off) {
     if (!cam_running || !cam_tex_inited) return;
     C2D_Image img = { .tex = &cam_tex, .subtex = NULL };
-    // Set subtex to cover full texture
-    static C3D_SubTex sub;
-    sub.left = 0; sub.top = 0; sub.right = 1.0f; sub.bottom = 1.0f;
-    sub.width = 400; sub.height = 240;
-    img.subtex = &sub;
     C2D_DrawImageAt(img, x_off, 0.0f, 0.4f, NULL, 1.0f, 1.0f);
 }
 
@@ -1280,6 +1274,8 @@ static volatile int s_audio_playing = 0;
 static volatile int s_audio_exit = 0;
 static Thread s_audio_thread;
 
+static void _3ds_audio_stop(void);
+
 static int decode_ogg_to_mem(const char* path, int16_t** out_pcm, u32* out_samples, int* out_channels) {
     FILE* f = fopen(path, "rb");
     if (!f) return -1;
@@ -1323,11 +1319,13 @@ static void audio_loop_thread_func(void* arg) {
     while (!s_audio_exit) {
         // Wait until playback finishes
         while (s_audio_playing && !s_audio_exit) {
-            if (!csndIsPlaying(0)) {
+            u8 status = 0;
+            csndIsPlaying(0, &status);
+            if (!status) {
                 // Restart playback
                 DSP_FlushDataCache(s_audio_data, s_audio_size);
                 csndPlaySound(0,
-                    SOUND_FORMAT_16BIT | SOUND_LINEAR_INTERPOLATION,
+                    SOUND_FORMAT_16BIT | SOUND_LINEAR_INTERP,
                     44100,
                     1.0f, 1.0f,
                     (u32*)s_audio_data, NULL,
@@ -1349,31 +1347,31 @@ void _3ds_audio_play_ogg(const char* path) {
     _3ds_audio_stop();
 
     int channels = 0;
-    int rate = 0;
     u32 samples = 0;
-    rate = decode_ogg_to_mem(path, (int16_t**)&s_audio_data, &s_audio_size, &channels);
+    int rate = decode_ogg_to_mem(path, (int16_t**)&s_audio_data, &samples, &channels);
     if (rate < 0 || !s_audio_data) return;
 
+    s_audio_size = samples * sizeof(int16_t);
     DSP_FlushDataCache(s_audio_data, s_audio_size);
     s_audio_playing = 1;
     s_audio_exit = 0;
 
     csndPlaySound(0,
-        SOUND_FORMAT_16BIT | SOUND_LINEAR_INTERPOLATION,
+        SOUND_FORMAT_16BIT | SOUND_LINEAR_INTERP,
         rate,
         1.0f, 1.0f,
         (u32*)s_audio_data, NULL,
         s_audio_size);
 
     // Start looping thread
-    s_audio_thread = threadCreate(audio_loop_thread_func, NULL, NULL, 0x4000, 0x18, -2, true);
+    s_audio_thread = threadCreate(audio_loop_thread_func, NULL, 0x4000, 0x18, -1, true);
 }
 
 void _3ds_audio_stop(void) {
     s_audio_exit = 1;
     s_audio_playing = 0;
     if (s_audio_thread) {
-        threadWaitForExit(s_audio_thread);
+        threadJoin(s_audio_thread, 0xFFFFFFFF);
         threadFree(s_audio_thread);
         s_audio_thread = NULL;
     }
