@@ -197,13 +197,12 @@ void _3ds_init() {
 // Fallback 30.0px if measurement fails (matches system font at scale 1.0).
 float _3ds_bot_line_height() {
     C2D_Font f = custom_font ? custom_font : NULL;
-    C2D_TextBuf tmp = C2D_TextBufNew(128);
+    C2D_TextBufClear(tmp_text_buf);
     C2D_Text t;
-    C2D_TextFontParse(&t, f, tmp, "A\nA\0");
+    C2D_TextFontParse(&t, f, tmp_text_buf, "A\nA\0");
     C2D_TextOptimize(&t);
     float w, h;
     C2D_TextGetDimensions(&t, 0.85f, 0.85f, &w, &h);
-    C2D_TextBufDelete(tmp);
     if (h <= 0) return 30.0f;
     return h / 2.0f;
 }
@@ -565,12 +564,11 @@ void _3ds_draw_dotted_rect(float x, float y, float w, float h, u32 color) {
 void _3ds_draw_label(const char* label, float x, float y, u32 color, float scale) {
     if (!label || label[0] == '\0') return;
     C2D_Font f = custom_font ? custom_font : NULL;
-    C2D_TextBuf tmp = C2D_TextBufNew(256);
+    C2D_TextBufClear(tmp_text_buf);
     C2D_Text t;
-    C2D_TextFontParse(&t, f, tmp, label);
+    C2D_TextFontParse(&t, f, tmp_text_buf, label);
     C2D_TextOptimize(&t);
     C2D_DrawText(&t, C2D_WithColor, x, y, 0.6f, scale, scale, color);
-    C2D_TextBufDelete(tmp);
 }
 
 void _3ds_draw_card_at(CardSlot* slot, float x, float y, float w, float h) {
@@ -991,10 +989,7 @@ int _3ds_uds_init(int is_host) {
         uds_connected = true; // host is always "connected" once network is created
         return 0;
     } else {
-        // Client: initialize UDS only (scanning and connecting done separately)
-        Result ret = udsInit(uds_sharedmem_size, NULL);
-        if (R_FAILED(ret)) return -2;
-
+        // Client: scanning and connecting done separately
         uds_initialized = true;
         uds_connected = false;
         return 0;
@@ -1368,10 +1363,12 @@ static void audio_loop_thread_func(void* arg) {
                     (u32*)s_audio_data, NULL,
                     s_audio_size);
             }
-            svcSleepThread(500000000ULL);  // 500ms
+            for (int i = 0; i < 50 && !s_audio_exit; i++) {
+                svcSleepThread(10000000ULL);  // 10ms
+            }
         }
         if (!s_audio_exit) {
-            svcSleepThread(100000000ULL);  // 100ms before checking again
+            svcSleepThread(10000000ULL);  // 10ms
         }
     }
 }

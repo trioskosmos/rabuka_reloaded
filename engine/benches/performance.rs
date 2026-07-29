@@ -24,12 +24,11 @@ fn ctx() -> &'static BenchContext {
 fn init_ctx() {
     let _ = CTX.get_or_init(|| {
         let cards_path = std::path::Path::new("../cards/cards.json");
-        let cards =
-            card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
+        let cards = card_loader::CardLoader::load_cards_from_file(cards_path)
+            .expect("Failed to load cards");
         let card_database = Arc::new(CardDatabase::load_or_create(cards));
 
-        let deck_lists =
-            deck_parser::DeckParser::parse_all_decks().expect("Failed to load decks");
+        let deck_lists = deck_parser::DeckParser::parse_all_decks().expect("Failed to load decks");
 
         let mut deck_templates = Vec::new();
         for deck_list in &deck_lists {
@@ -139,7 +138,10 @@ fn run_game_to_completion(gs: &mut GameState) -> u64 {
             gs,
             &action.action_type,
             action.parameters.as_ref().and_then(|p| p.card_id),
-            action.parameters.as_ref().and_then(|p| p.card_indices.clone()),
+            action
+                .parameters
+                .as_ref()
+                .and_then(|p| p.card_indices.clone()),
             action
                 .parameters
                 .as_ref()

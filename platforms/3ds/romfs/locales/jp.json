@@ -94,5 +94,7 @@
   "Pass": "パス",
   "T": "T",
   "Score:": "スコア:",
-  "Success:": "成功:"
+  "Success:": "成功:",
+  "selected_label": "選択中",
+  "unselected_label": "未選択"
 }

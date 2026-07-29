@@ -70,6 +70,7 @@ impl Bot {
                 description_ja: None,
                 action_type: ActionType::Pass,
                 parameters: None,
+                selected: None,
             };
         }
         if actions.len() == 1 {

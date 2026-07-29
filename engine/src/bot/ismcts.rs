@@ -21,6 +21,7 @@ pub fn search(
             description_ja: None,
             action_type: crate::game_setup::ActionType::Pass,
             parameters: None,
+            selected: None,
         };
     }
     if actions.len() == 1 {

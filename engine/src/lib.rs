@@ -58,8 +58,8 @@ pub mod ability;
 pub mod ability_queue;
 #[cfg(not(feature = "no_std"))]
 pub mod qa_test_suite;
+pub mod rng;
 #[cfg(not(feature = "no_std"))]
 pub mod timer;
-pub mod rng;
 pub mod triggers;
 pub mod turn;

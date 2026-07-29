@@ -1,11 +1,14 @@
-#[cfg(feature = "no_std")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use crate::{HashMap, HashSet};
 use actix_cors::Cors;
 use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+#[cfg(feature = "no_std")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use crate::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -753,7 +756,8 @@ pub async fn execute_action(
                             // Subsequent action: write previous buffered pair + current before-state
                             let state_bytes = serialize_p1_state(&snapshot);
                             let (cid, aidx) = room.recording_action.unwrap_or((0, 0));
-                            room.recording_data.extend_from_slice(&room.recording_before);
+                            room.recording_data
+                                .extend_from_slice(&room.recording_before);
                             room.recording_data.extend_from_slice(&cid.to_le_bytes());
                             room.recording_data.push(aidx);
                             room.recording_data.extend_from_slice(&0f32.to_le_bytes()); // reward placeholder
@@ -766,7 +770,9 @@ pub async fn execute_action(
                             ));
                         }
                         // Check game end — if over, flush recording to file
-                        if game_state.game_result != crate::game_state::GameResult::Ongoing && room.recording {
+                        if game_state.game_result != crate::game_state::GameResult::Ongoing
+                            && room.recording
+                        {
                             let outcome = match game_state.game_result {
                                 crate::game_state::GameResult::FirstAttackerWins => 1.0f32,
                                 crate::game_state::GameResult::SecondAttackerWins => -1.0f32,
@@ -774,12 +780,15 @@ pub async fn execute_action(
                             };
                             // Update reward for last buffered pair
                             if let Some((cid, aidx)) = room.recording_action.take() {
-                                room.recording_data.extend_from_slice(&room.recording_before);
+                                room.recording_data
+                                    .extend_from_slice(&room.recording_before);
                                 room.recording_data.extend_from_slice(&cid.to_le_bytes());
                                 room.recording_data.push(aidx);
-                                room.recording_data.extend_from_slice(&outcome.to_le_bytes());
+                                room.recording_data
+                                    .extend_from_slice(&outcome.to_le_bytes());
                                 // Last action: no next state, repeat current
-                                room.recording_data.extend_from_slice(&room.recording_before);
+                                room.recording_data
+                                    .extend_from_slice(&room.recording_before);
                             }
                             // Write to file
                             let log_path = format!("../recording_{}.bin", rid);
@@ -832,7 +841,10 @@ pub async fn execute_action(
 
             // Notify other SSE clients that state changed (skip in sandbox mode — single client)
             if let Some(rid) = get_room_id_from_req(&http_req) {
-                let is_multiplayer = data.rooms.lock().ok()
+                let is_multiplayer = data
+                    .rooms
+                    .lock()
+                    .ok()
                     .and_then(|r| r.get(&rid).map(|room| room.mode.as_str() == "pvp"))
                     .unwrap_or(false);
                 if is_multiplayer {
@@ -1203,7 +1215,8 @@ async fn exec_code(
         with_player!(p, {
             if let Some(cid) = p.energy_zone.cards.pop() {
                 p.energy_deck.cards.push(cid);
-                p.energy_zone.set_active_count(p.energy_zone.active_count().min(p.energy_zone.cards.len()));
+                p.energy_zone
+                    .set_active_count(p.energy_zone.active_count().min(p.energy_zone.cards.len()));
             }
         });
     }
@@ -1423,7 +1436,8 @@ async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
                     for (ability_idx, ar) in card.abilities.iter().enumerate() {
                         let ability = ar.resolve();
                         if let Some(ref effect) = ability.effect {
-                            let condition_fields: [(&str, &Option<Box<crate::card::Condition>>); 3] = [
+                            let condition_fields: [(&str, &Option<Box<crate::card::Condition>>);
+                                3] = [
                                 ("condition", &effect.condition),
                                 (
                                     "alternative_condition",
@@ -1609,7 +1623,10 @@ pub async fn set_deck(
 
     let card_numbers: Vec<String> = if let Some(arr) = req.get("deck").and_then(|v| v.as_array()) {
         arr.iter()
-            .filter_map(|v| v.as_str().map(|s| deck_parser::DeckParser::normalize_card_no(s)))
+            .filter_map(|v| {
+                v.as_str()
+                    .map(|s| deck_parser::DeckParser::normalize_card_no(s))
+            })
             .collect()
     } else {
         let deck_content = req.get("deck").and_then(|v| v.as_str()).unwrap_or("");
@@ -1638,7 +1655,10 @@ pub async fn set_deck(
             if let Some(energy_arr) = req.get("energy_deck").and_then(|v| v.as_array()) {
                 deck_entry.energy = energy_arr
                     .iter()
-                    .filter_map(|v| v.as_str().map(|s| deck_parser::DeckParser::normalize_card_no(s)))
+                    .filter_map(|v| {
+                        v.as_str()
+                            .map(|s| deck_parser::DeckParser::normalize_card_no(s))
+                    })
                     .collect();
             }
             // Check if both players have submitted
@@ -1718,12 +1738,10 @@ async fn sse_events(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::UnboundedReceiverStream;
 
-    let room_id = actix_web::web::Query::<HashMap<String, String>>::from_query(
-        req.query_string(),
-    )
-    .ok()
-    .and_then(|params| params.get("room_id").cloned())
-    .unwrap_or_default();
+    let room_id = actix_web::web::Query::<HashMap<String, String>>::from_query(req.query_string())
+        .ok()
+        .and_then(|params| params.get("room_id").cloned())
+        .unwrap_or_default();
 
     if room_id.is_empty() {
         return HttpResponse::BadRequest().body("Missing room_id");
@@ -1891,7 +1909,10 @@ pub async fn rooms_create(
         })
         .collect();
 
-    let mode = req.mode.clone().unwrap_or_else(|| "sandbox".to_string().into());
+    let mode = req
+        .mode
+        .clone()
+        .unwrap_or_else(|| "sandbox".to_string().into());
     // pve mode aliases to sandbox gameplay but preserves the mode string
     // so the frontend can distinguish vs AI from sandbox
 
@@ -2131,8 +2152,7 @@ pub async fn rooms_join(
 
             // Assign new player
 
-            let taken_pids: HashSet<i32> =
-                room.sessions.values().map(|s| s.player_id).collect();
+            let taken_pids: HashSet<i32> = room.sessions.values().map(|s| s.player_id).collect();
 
             if !taken_pids.contains(&0) {
                 player_id = 0;
@@ -2320,9 +2340,8 @@ async fn init_game(
                 let e1 = custom_energy.remove(&1).unwrap_or_else(|| e0.clone());
                 (p0, p1, e0, e1)
             } else if deck_lists.is_empty() {
-                return HttpResponse::InternalServerError().json(
-                    "No decks available. Ensure deck files are present in web_ui/decks/."
-                );
+                return HttpResponse::InternalServerError()
+                    .json("No decks available. Ensure deck files are present in web_ui/decks/.");
             } else {
                 let deck = if let Some(idx) = deck_index {
                     if idx >= deck_lists.len() {
@@ -2650,25 +2669,44 @@ fn serialize_p1_state(gs: &GameState) -> Vec<u8> {
     let mut buf = Vec::new();
     let hand = &gs.player1.hand.cards;
     buf.push(hand.len() as u8);
-    for &c in hand.iter() { buf.extend_from_slice(&c.to_le_bytes()); }
-    for &c in &gs.player1.stage.stage { buf.extend_from_slice(&c.to_le_bytes()); }
-    for &c in &gs.player2.stage.stage { buf.extend_from_slice(&c.to_le_bytes()); }
+    for &c in hand.iter() {
+        buf.extend_from_slice(&c.to_le_bytes());
+    }
+    for &c in &gs.player1.stage.stage {
+        buf.extend_from_slice(&c.to_le_bytes());
+    }
+    for &c in &gs.player2.stage.stage {
+        buf.extend_from_slice(&c.to_le_bytes());
+    }
     buf
 }
 fn action_type_to_idx(at: Option<&str>) -> u8 {
     match at {
-        Some("pass") => 0, Some("rock_choice") => 1, Some("paper_choice") => 2,
-        Some("scissors_choice") => 3, Some("choose_first_attacker") => 4,
-        Some("choose_second_attacker") => 5, Some("mulligan_header") => 6,
-        Some("select_mulligan") => 7, Some("confirm_mulligan") => 8,
-        Some("skip_mulligan") => 9, Some("live_card_header") => 10,
-        Some("select_live_card") => 11, Some("confirm_live_card_set") => 12,
-        Some("skip_live_card_set") => 13, Some("play_member_to_stage") => 14,
-        Some("use_ability") => 15, Some("set_live_card") => 16,
-        Some("finish_live_card_set") => 17, Some("decision") => 18,
-        Some("select_card") => 19, Some("select_skip") => 20,
-        Some("choose_option") => 21, Some("select_position") => 22,
-        Some("energy_charge") => 23, Some("pass_remaining") => 24,
+        Some("pass") => 0,
+        Some("rock_choice") => 1,
+        Some("paper_choice") => 2,
+        Some("scissors_choice") => 3,
+        Some("choose_first_attacker") => 4,
+        Some("choose_second_attacker") => 5,
+        Some("mulligan_header") => 6,
+        Some("select_mulligan") => 7,
+        Some("confirm_mulligan") => 8,
+        Some("skip_mulligan") => 9,
+        Some("live_card_header") => 10,
+        Some("select_live_card") => 11,
+        Some("confirm_live_card_set") => 12,
+        Some("skip_live_card_set") => 13,
+        Some("play_member_to_stage") => 14,
+        Some("use_ability") => 15,
+        Some("set_live_card") => 16,
+        Some("finish_live_card_set") => 17,
+        Some("decision") => 18,
+        Some("select_card") => 19,
+        Some("select_skip") => 20,
+        Some("choose_option") => 21,
+        Some("select_position") => 22,
+        Some("energy_charge") => 23,
+        Some("pass_remaining") => 24,
         _ => 0,
     }
 }
@@ -2751,7 +2789,10 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
         tokio::spawn(async move {
             loop {
                 tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-                let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
                 let mut rooms_lock = rooms.lock().unwrap();
                 let before = rooms_lock.len();
                 rooms_lock.retain(|id, room| {
@@ -2781,9 +2822,15 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
         let mut buf = Vec::new();
         let hand = &gs.player1.hand.cards;
         buf.push(hand.len() as u8);
-        for &c in hand.iter() { buf.extend_from_slice(&c.to_le_bytes()); }
-        for &c in &gs.player1.stage.stage { buf.extend_from_slice(&c.to_le_bytes()); }
-        for &c in &gs.player2.stage.stage { buf.extend_from_slice(&c.to_le_bytes()); }
+        for &c in hand.iter() {
+            buf.extend_from_slice(&c.to_le_bytes());
+        }
+        for &c in &gs.player1.stage.stage {
+            buf.extend_from_slice(&c.to_le_bytes());
+        }
+        for &c in &gs.player2.stage.stage {
+            buf.extend_from_slice(&c.to_le_bytes());
+        }
         buf
     }
 

@@ -494,15 +494,18 @@ fn truncate_aware_segments(s: &str, max_chars: usize) -> String {
                 result.push_str(&format!("{{{{{}}}}}", icon));
             }
             TextSeg::Text(text) => {
+                let chars: Vec<char> = text.chars().collect();
                 let remaining = max_chars.saturating_sub(text_count);
                 if remaining == 0 {
                     break;
                 }
-                if text_count + text.len() <= max_chars {
+                if chars.len() <= remaining {
                     result.push_str(text);
-                    text_count += text.len();
+                    text_count += chars.len();
                 } else {
-                    result.push_str(&text[..remaining.min(text.len())]);
+                    let truncated: String = chars.into_iter().take(remaining).collect();
+                    result.push_str(&truncated);
+                    text_count += remaining;
                     break;
                 }
             }
@@ -2932,22 +2935,24 @@ fn main() {
                                     3 => Some(rabuka_engine::zones::MemberArea::RightSide),
                                     _ => None,
                                 };
-                                let _ = turn::TurnEngine::execute_main_phase_action(
-                                    &mut gs,
-                                    &action_type,
-                                    sync.card_id,
-                                    if sync.card_indices.is_empty() {
-                                        None
-                                    } else {
-                                        Some(sync.card_indices.clone())
-                                    },
-                                    stage_area,
-                                    if sync.use_baton_touch {
-                                        Some(true)
-                                    } else {
-                                        None
-                                    },
-                                );
+                                let _ =
+                                    turn::TurnEngine::execute_main_phase_action_with_ability_index(
+                                        &mut gs,
+                                        &action_type,
+                                        sync.card_id,
+                                        if sync.card_indices.is_empty() {
+                                            None
+                                        } else {
+                                            Some(sync.card_indices.clone())
+                                        },
+                                        stage_area,
+                                        if sync.use_baton_touch {
+                                            Some(true)
+                                        } else {
+                                            None
+                                        },
+                                        sync.ability_index.map(|x| x as usize),
+                                    );
                                 gs.reset_loop_detection();
                                 let my_id = if is_host { 0 } else { 1 };
                                 waiting_for_opponent = !mp_can_act(&gs, my_id);
@@ -2978,7 +2983,7 @@ fn main() {
                     } else {
                         let action = acts_cache[cur].clone();
                         let p = action.parameters.clone();
-                        let result = turn::TurnEngine::execute_main_phase_action(
+                        let result = turn::TurnEngine::execute_main_phase_action_with_ability_index(
                             &mut gs,
                             &action.action_type,
                             p.as_ref().and_then(|x| x.card_id),
@@ -2986,6 +2991,7 @@ fn main() {
                             p.as_ref()
                                 .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
                             p.as_ref().and_then(|x| x.use_baton_touch),
+                            p.as_ref().and_then(|x| x.ability_index),
                         );
                         if let Err(ref e) = result {
                             unsafe {
@@ -3066,7 +3072,10 @@ fn main() {
                                     .as_ref()
                                     .and_then(|x| x.use_baton_touch)
                                     .unwrap_or(false),
-                                ability_index: None,
+                                ability_index: p
+                                    .as_ref()
+                                    .and_then(|x| x.ability_index)
+                                    .map(|x| x as u16),
                             };
                             let data = sync.to_bytes();
                             let _ = uds::uds_send(&data);
@@ -3088,7 +3097,7 @@ fn main() {
                 // In multiplayer: opponent's turn is handled via UDS receive, not AI
                 // Uses mp_can_act(gs, 0) which correctly handles pending choices (choice_player_id).
                 let is_ai_turn = *ai_vs_ai || (*vs_ai && !mp_can_act(&gs, 0));
-                if is_ai_turn && !dirty {
+                if is_ai_turn && !dirty && (_frame % 10 == 0) {
                     if acts_cache.len() > 0 {
                         let ai_idx = (unsafe { _3ds_system_tick() } as usize) % acts_cache.len();
                         let action = acts_cache[ai_idx].clone();
@@ -3115,13 +3124,21 @@ fn main() {
                     && gs.game_result == GameResult::Ongoing
                     && game_setup::is_automatic_phase(&gs);
                 if auto {
-                    settle_3ds(&mut gs);
+                    game_setup::settle_single_player_state(&mut gs);
                     if is_multiplayer {
                         let my_id = if is_host { 0 } else { 1 };
                         waiting_for_opponent = !mp_can_act(&gs, my_id);
                     }
                     cur = 0;
                     dirty = true;
+                }
+                if gs.has_pending_choice()
+                    || game_setup::is_automatic_phase(&gs)
+                    || gs.game_result != GameResult::Ongoing
+                {
+                    cur = 0;
+                    dirty = true;
+                    redraw = true;
                 }
 
                 // Touch: tap board zones to view card details, or overlay to select action
@@ -3272,7 +3289,8 @@ fn main() {
                             let vis = visible_hand_slots();
                             let hand_slot_w = unsafe { _3ds_board_get_slot_w(3) };
                             let live_slot_w = unsafe { _3ds_board_get_slot_w(0) };
-                            tapped_card = if (ty as i32) >= hand_y
+                            tapped_card = if tap_active_side
+                                && (ty as i32) >= hand_y
                                 && (ty as i32) < (hand_y + hand_h)
                             {
                                 let idx = ((tx as f32 - 4.0) / (hand_slot_w + 2.0)) as usize;
@@ -3488,7 +3506,7 @@ fn main() {
                                 if let Some(idx) = act_idx {
                                     let action = acts_cache[idx].clone();
                                     let p = action.parameters.clone();
-                                    let result = turn::TurnEngine::execute_main_phase_action(
+                                    let result = turn::TurnEngine::execute_main_phase_action_with_ability_index(
                                         &mut gs,
                                         &action.action_type,
                                         p.as_ref().and_then(|x| x.card_id),
@@ -3497,6 +3515,7 @@ fn main() {
                                             x.stage_area.as_ref().and_then(|s| s.parse().ok())
                                         }),
                                         p.as_ref().and_then(|x| x.use_baton_touch),
+                                        p.as_ref().and_then(|x| x.ability_index),
                                     );
                                     if let Err(ref e) = result {
                                         unsafe {
@@ -3594,7 +3613,7 @@ fn main() {
                                     cur = ai;
                                     let act2 = acts_cache[cur].clone();
                                     let pp = act2.parameters.clone();
-                                    let _ = turn::TurnEngine::execute_main_phase_action(
+                                    let _ = turn::TurnEngine::execute_main_phase_action_with_ability_index(
                                         &mut gs,
                                         &act2.action_type,
                                         pp.as_ref().and_then(|x| x.card_id),
@@ -3603,6 +3622,7 @@ fn main() {
                                             x.stage_area.as_ref().and_then(|s| s.parse().ok())
                                         }),
                                         pp.as_ref().and_then(|x| x.use_baton_touch),
+                                        pp.as_ref().and_then(|x| x.ability_index),
                                     );
                                     if is_multiplayer {
                                         let my_id = if is_host { 0 } else { 1 };
@@ -3635,6 +3655,72 @@ fn main() {
                                     redraw = true;
                                     stage_handled = true;
                                     break;
+                                }
+
+                                // Filled stage slot: activate the selected Kidou ability.
+                                // This was documented as supported here, but the old code
+                                // only searched PlayMemberToStage actions, so tapping a
+                                // staged Kidou card could leave the stale Pass-only view.
+                                if !stage_handled {
+                                    for (ai, act) in acts_cache.iter().enumerate() {
+                                        if act.action_type != game_setup::ActionType::UseAbility {
+                                            continue;
+                                        }
+                                        let p = match &act.parameters {
+                                            Some(x) => x,
+                                            None => continue,
+                                        };
+                                        if p.card_id != viewing_card
+                                            || p.stage_area.as_deref() != Some(sa.as_str())
+                                        {
+                                            continue;
+                                        }
+                                        if p.disabled.unwrap_or(false) {
+                                            continue;
+                                        }
+                                        let action = act.clone();
+                                        let params = action.parameters.clone();
+                                        let _ = turn::TurnEngine::execute_main_phase_action_with_ability_index(
+                                            &mut gs,
+                                            &action.action_type,
+                                            params.as_ref().and_then(|x| x.card_id),
+                                            params.as_ref().and_then(|x| x.card_indices.clone()),
+                                            params.as_ref().and_then(|x| {
+                                                x.stage_area.as_ref().and_then(|s| s.parse().ok())
+                                            }),
+                                            params.as_ref().and_then(|x| x.use_baton_touch),
+                                            params.as_ref().and_then(|x| x.ability_index),
+                                        );
+                                        if is_multiplayer {
+                                            let sync = uds::ActionSync {
+                                                action_tag: 15,
+                                                card_id: params.as_ref().and_then(|x| x.card_id),
+                                                card_indices: params
+                                                    .as_ref()
+                                                    .and_then(|x| x.card_indices.clone())
+                                                    .unwrap_or_default(),
+                                                stage_area: match sa.as_str() {
+                                                    "left" => 1,
+                                                    "center" => 2,
+                                                    "right" => 3,
+                                                    _ => 0,
+                                                },
+                                                use_baton_touch: false,
+                                                ability_index: params
+                                                    .as_ref()
+                                                    .and_then(|x| x.ability_index)
+                                                    .map(|x| x as u16),
+                                            };
+                                            let _ = uds::uds_send(&sync.to_bytes());
+                                        }
+                                        gs.reset_loop_detection();
+                                        detail_mode = false;
+                                        viewing_card = None;
+                                        cur = 0;
+                                        redraw = true;
+                                        stage_handled = true;
+                                        break;
+                                    }
                                 }
                             }
                             // ChoicePosition: select stage position during choice prompt
@@ -5322,37 +5408,53 @@ fn main() {
                                                             .unwrap_or_default(),
                                                         current_lang(),
                                                     );
-                                                    let desc = act
-                                                        .display_desc(
-                                                            current_lang() == Lang::Japanese,
-                                                        )
-                                                        .to_string();
-                                                    let ability_text = if act.action_type
-                                                        == game_setup::ActionType::ChoiceOption
-                                                    {
-                                                        gs.get_pending_choice().and_then(|c| {
-                                                            use rabuka_engine::ability::types::Choice;
-                                                            if let Choice::SelectAutoAbility { options, .. } = c {
-                                                                act.parameters.as_ref().and_then(|p| p.card_id)
-                                                                    .and_then(|idx| options.get(idx as usize))
-                                                                    .map(|o| o.ability_text.clone())
-                                                            } else { None }
-                                                        }).unwrap_or_default()
+                                                    let line = if let Some(sel) = act.selected {
+                                                        let label = if sel {
+                                                            tl("selected_label")
+                                                        } else {
+                                                            tl("unselected_label")
+                                                        };
+                                                        if !cn.is_empty() && !name.is_empty() {
+                                                            format!("[{}] [{}] {}", cn, label, name)
+                                                        } else if !cn.is_empty() {
+                                                            format!("[{}] [{}]", cn, label)
+                                                        } else {
+                                                            format!("[{}] {}", label, name)
+                                                        }
                                                     } else {
-                                                        String::new()
+                                                        let desc = act
+                                                            .display_desc(
+                                                                current_lang() == Lang::Japanese,
+                                                            )
+                                                            .to_string();
+                                                        let ability_text = if act.action_type
+                                                            == game_setup::ActionType::ChoiceOption
+                                                        {
+                                                            gs.get_pending_choice().and_then(|c| {
+                                                                use rabuka_engine::ability::types::Choice;
+                                                                if let Choice::SelectAutoAbility { options, .. } = c {
+                                                                    act.parameters.as_ref().and_then(|p| p.card_id)
+                                                                        .and_then(|idx| options.get(idx as usize))
+                                                                        .map(|o| o.ability_text.clone())
+                                                                } else { None }
+                                                            }).unwrap_or_default()
+                                                        } else {
+                                                            String::new()
+                                                        };
+                                                        let display = if !ability_text.is_empty() {
+                                                            ability_text
+                                                        } else {
+                                                            desc
+                                                        };
+                                                        if !cn.is_empty() && !name.is_empty() {
+                                                            format!("[{}] {} {}", cn, name, display)
+                                                        } else if !cn.is_empty() {
+                                                            format!("[{}] {}", cn, display)
+                                                        } else {
+                                                            display
+                                                        }
                                                     };
-                                                    let display = if !ability_text.is_empty() {
-                                                        &ability_text
-                                                    } else {
-                                                        &desc
-                                                    };
-                                                    if !cn.is_empty() && !name.is_empty() {
-                                                        format!("[{}] {} {}", cn, name, display)
-                                                    } else if !cn.is_empty() {
-                                                        format!("[{}] {}", cn, display)
-                                                    } else {
-                                                        display.to_string()
-                                                    }
+                                                    line
                                                 }
                                             };
                                             let color = if is_disabled {
@@ -5778,8 +5880,9 @@ fn main() {
                                                 0.50f32,
                                                 format!(
                                                     "{}\0",
-                                                    if label.len() > 60 {
-                                                        &label[..60]
+                                                    if label.chars().count() > 60 {
+                                                        let cutoff = label.char_indices().nth(60).map(|(i, _)| i).unwrap_or(label.len());
+                                                        &label[..cutoff]
                                                     } else {
                                                         &label
                                                     }
@@ -6003,37 +6106,6 @@ fn main() {
     }
     unsafe {
         _3ds_exit();
-    }
-}
-
-/// 3DS-native settle: same logic as game_setup::settle_single_player_state but
-/// calls aptMainLoop() every 10 iterations to keep the OS watchdog happy, and
-/// avoids ALL eprintln!/log calls (which can deadlock the GPU console renderer).
-#[cfg(feature = "3ds")]
-fn settle_3ds(gs: &mut GameState) {
-    let mut iters = 0u32;
-    loop {
-        iters += 1;
-        // Yield to OS every 10 iterations to avoid watchdog timeout
-        if iters % 10 == 0 {
-            if unsafe { _3ds_main_loop() } == 0 {
-                return;
-            }
-        }
-        if iters > 500 {
-            break;
-        }
-        if gs.has_pending_choice() {
-            break;
-        }
-        if gs.game_result != GameResult::Ongoing {
-            break;
-        }
-        if game_setup::is_automatic_phase(gs) {
-            turn::TurnEngine::advance_phase(gs);
-        } else {
-            break;
-        }
     }
 }
 

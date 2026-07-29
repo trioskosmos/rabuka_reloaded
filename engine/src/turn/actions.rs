@@ -35,6 +35,26 @@ impl super::TurnEngine {
         stage_area: Option<crate::zones::MemberArea>,
         use_baton_touch: Option<bool>,
     ) -> Result<(), String> {
+        Self::execute_main_phase_action_with_ability_index(
+            game_state,
+            action,
+            card_id,
+            card_indices,
+            stage_area,
+            use_baton_touch,
+            None,
+        )
+    }
+
+    pub fn execute_main_phase_action_with_ability_index(
+        game_state: &mut GameState,
+        action: &crate::game_setup::ActionType,
+        card_id: Option<i16>,
+        card_indices: Option<Vec<usize>>,
+        stage_area: Option<crate::zones::MemberArea>,
+        use_baton_touch: Option<bool>,
+        ability_index: Option<usize>,
+    ) -> Result<(), String> {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("execute_main_phase_action");
         // UseAbility must check activation legality independently — never
@@ -44,7 +64,7 @@ impl super::TurnEngine {
             if game_state.has_pending_choice() {
                 return Err("Cannot activate ability while another choice is pending".to_string());
             }
-            return Self::handle_use_ability(game_state, card_id);
+            return Self::handle_use_ability(game_state, card_id, ability_index);
         }
 
         if game_state.has_pending_choice() {
@@ -159,13 +179,17 @@ impl super::TurnEngine {
                 Err("FinishLiveCardSet action is obsolete - use Pass instead".into())
             }
             crate::game_setup::ActionType::UseAbility => {
-                Self::handle_use_ability(game_state, card_id)
+                Self::handle_use_ability(game_state, card_id, ability_index)
             }
             _ => Ok(()),
         }
     }
 
-    fn handle_use_ability(game_state: &mut GameState, card_id: Option<i16>) -> Result<(), String> {
+    fn handle_use_ability(
+        game_state: &mut GameState,
+        card_id: Option<i16>,
+        requested_ability_index: Option<usize>,
+    ) -> Result<(), String> {
         let card_id = card_id.ok_or("No card specified for ability activation")?;
         if game_state.is_action_prohibited("cannot_activate")
             || game_state.is_action_prohibited("cannot_activate_by_effect")
@@ -193,9 +217,13 @@ impl super::TurnEngine {
             loc: Zone,
         }
 
-        // Find the first ability that can be activated from the current location
+        // Find the requested ability, or the first one for legacy callers, that can
+        // be activated from the current location.
         let mut ability_to_activate: Option<AbilityActivation> = None;
         for (idx, ar) in card.abilities.iter().enumerate() {
+            if requested_ability_index.is_some_and(|requested| requested != idx) {
+                continue;
+            }
             let ability = ar.resolve();
             if ability
                 .triggers
@@ -266,11 +294,7 @@ impl super::TurnEngine {
                             continue;
                         }
                     }
-                    ability_to_activate = Some(AbilityActivation {
-                        idx,
-                        ability: ar.resolve(),
-                        loc,
-                    });
+                    ability_to_activate = Some(AbilityActivation { idx, ability, loc });
                     break;
                 }
             }

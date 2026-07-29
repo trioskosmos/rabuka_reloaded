@@ -12,8 +12,14 @@ use inferno::flamegraph::{from_reader, Options};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
-    let input = args.get(1).cloned().unwrap_or_else(|| "folded.txt".to_string());
-    let output = args.get(2).cloned().unwrap_or_else(|| "flamegraph.svg".to_string());
+    let input = args
+        .get(1)
+        .cloned()
+        .unwrap_or_else(|| "folded.txt".to_string());
+    let output = args
+        .get(2)
+        .cloned()
+        .unwrap_or_else(|| "flamegraph.svg".to_string());
 
     let infile = File::open(&input)?;
     let reader = BufReader::new(infile);

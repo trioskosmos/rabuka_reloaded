@@ -1,6 +1,3 @@
-/// Simulates the exact 3DS main loop behavior using REAL cards
-use std::sync::Arc;
-use std::path::Path;
 use rabuka_engine::card::{Card, CardDatabase};
 use rabuka_engine::deck_builder::DeckBuilder;
 use rabuka_engine::deck_parser::DeckParser;
@@ -8,12 +5,16 @@ use rabuka_engine::game_setup::{self, ActionType};
 use rabuka_engine::game_state::{GameResult, GameState};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn;
+use std::path::Path;
+/// Simulates the exact 3DS main loop behavior using REAL cards
+use std::sync::Arc;
 
 fn main() {
     println!("=== Building game with real cards ===");
     let json_path = Path::new("../cards/cards.json");
     let mut db = if json_path.exists() {
-        let cards: std::collections::HashMap<String, Card> = serde_json::from_str(&std::fs::read_to_string(json_path).unwrap()).unwrap();
+        let cards: std::collections::HashMap<String, Card> =
+            serde_json::from_str(&std::fs::read_to_string(json_path).unwrap()).unwrap();
         let cards_vec: Vec<Card> = cards.into_values().collect();
         Arc::new(CardDatabase::load_or_create(cards_vec))
     } else {
@@ -23,10 +24,10 @@ fn main() {
     let deck_dir = Path::new("../web_ui/decks");
     let v = DeckParser::parse_all_decks_from_directory(deck_dir).expect("deck parse");
     let nums = DeckParser::deck_list_to_card_numbers(&v[0]);
-    
+
     let mut pd1 = DeckBuilder::build_deck_from_database(&mut db, nums.clone()).expect("pd1");
     let mut pd2 = DeckBuilder::build_deck_from_database(&mut db, nums).expect("pd2");
-    
+
     DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
     DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
 
@@ -48,7 +49,7 @@ fn main() {
     println!("=== Game Ready. Phase: {:?} ===", gs.current_phase);
 
     let script: &[(&str, usize)] = &[
-        ("RPS Rock",   0),
+        ("RPS Rock", 0),
         ("RPS Scissors", 2),
         ("Choose First Attacker", 0),
         ("Skip Mulligan P1", 99),
@@ -74,7 +75,10 @@ fn main() {
         {
             let before = format!("{:?}", gs.current_phase);
             game_setup::settle_single_player_state(&mut gs);
-            println!("[frame {}] AUTO-ADVANCE {} -> {:?}", frames, before, gs.current_phase);
+            println!(
+                "[frame {}] AUTO-ADVANCE {} -> {:?}",
+                frames, before, gs.current_phase
+            );
             dirty = true;
         }
 
@@ -85,14 +89,19 @@ fn main() {
             if frames % 100 == 0 || frames < 10 {
                 println!(
                     "[frame {}] ACTIONS({}): phase={:?}",
-                    frames, acts_cache.len(), gs.current_phase
+                    frames,
+                    acts_cache.len(),
+                    gs.current_phase
                 );
             }
             stall_count = 0;
         } else {
             stall_count += 1;
             if stall_count > 5 && acts_cache.is_empty() {
-                println!("[frame {}] !! stall: no actions and not dirty, phase={:?}", frames, gs.current_phase);
+                println!(
+                    "[frame {}] !! stall: no actions and not dirty, phase={:?}",
+                    frames, gs.current_phase
+                );
                 break;
             }
         }
@@ -118,7 +127,8 @@ fn main() {
                     &action.action_type,
                     p.as_ref().and_then(|x| x.card_id),
                     p.as_ref().and_then(|x| x.card_indices.clone()),
-                    p.as_ref().and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
+                    p.as_ref()
+                        .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
                     p.as_ref().and_then(|x| x.use_baton_touch),
                 );
                 gs.reset_loop_detection();
@@ -128,22 +138,35 @@ fn main() {
                 script_step += 1;
             }
         } else if script_step >= script.len() && !acts_cache.is_empty() {
-            if let Some((_, confirm)) = acts_cache.iter().enumerate().find(|(_, a)| a.action_type == ActionType::ConfirmLiveCardSet) {
+            if let Some((_, confirm)) = acts_cache
+                .iter()
+                .enumerate()
+                .find(|(_, a)| a.action_type == ActionType::ConfirmLiveCardSet)
+            {
                 // println!("[frame {}] AUTO-CONFIRM-LIVE at {:?}", frames, gs.current_phase);
                 let _ = turn::TurnEngine::execute_main_phase_action(
                     &mut gs,
                     &confirm.action_type,
-                    None, None, None, None,
+                    None,
+                    None,
+                    None,
+                    None,
                 );
                 gs.reset_loop_detection();
                 dirty = true;
-            }
-            else if let Some((_, pass)) = acts_cache.iter().enumerate().find(|(_, a)| a.action_type == ActionType::Pass) {
+            } else if let Some((_, pass)) = acts_cache
+                .iter()
+                .enumerate()
+                .find(|(_, a)| a.action_type == ActionType::Pass)
+            {
                 // println!("[frame {}] AUTO-PASS at {:?}", frames, gs.current_phase);
                 let _ = turn::TurnEngine::execute_main_phase_action(
                     &mut gs,
                     &pass.action_type,
-                    None, None, None, None,
+                    None,
+                    None,
+                    None,
+                    None,
                 );
                 gs.reset_loop_detection();
                 dirty = true;
@@ -157,7 +180,8 @@ fn main() {
                     &action.action_type,
                     p.as_ref().and_then(|x| x.card_id),
                     p.as_ref().and_then(|x| x.card_indices.clone()),
-                    p.as_ref().and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
+                    p.as_ref()
+                        .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
                     p.as_ref().and_then(|x| x.use_baton_touch),
                 );
                 gs.reset_loop_detection();
@@ -165,7 +189,7 @@ fn main() {
             }
         }
     }
-    
+
     println!("=== Final Frame: {} ===", frames);
     println!("Final Phase: {:?}", gs.current_phase);
     println!("Result: {:?}", gs.game_result);

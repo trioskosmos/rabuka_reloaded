@@ -2,7 +2,10 @@ use crate::card::CardDatabase;
 use crate::Arc;
 use crate::VecDeque;
 #[cfg(feature = "no_std")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 #[derive(Debug, Clone)]
 pub struct Deck {

@@ -1,8 +1,11 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-23T02:07:49.008012",
-  "generated_by": "tools/ability_extraction/extract_card_abilities.py",
-  "source_file": "/home/trios/OneDrive/Documents/rabuka_reloaded/cards/cards.json",
+  "generated_at": "2026-07-29T15:00:44.092431",
+  "generated_by": "cards/ability_extraction/extract_card_abilities.py",
+  "source_file": "cards/cards.json",
+  "engine_commit": "f0def581",
+  "parser_version": "1.0",
+  "input_hash": null,
   "statistics": {
     "total_cards": 2280,
     "cards_with_abilities": 1373,
@@ -2868,24 +2871,15 @@
             "action": "change_state"
           },
           {
+            "text": "それぞれ{{heart_04.png|heart04}}を得る",
+            "multiple_targets": true,
             "action": "gain_resource",
             "resource": "heart",
             "count": 1,
             "heart_colors": [
               "heart04"
             ],
-            "duration": "live_end",
-            "target_from_selection": true
-          },
-          {
-            "action": "gain_resource",
-            "resource": "heart",
-            "count": 1,
-            "heart_colors": [
-              "heart04"
-            ],
-            "duration": "live_end",
-            "self_target": true
+            "duration": "live_end"
           }
         ],
         "conditional": true,
@@ -7872,12 +7866,9 @@
       "cost": null,
       "effect": {
         "text": "このメンバーはアクティブにしない",
-        "card_type": "member_card",
         "action": "restriction",
         "restriction_type": "cannot_activate",
-        "target": null,
-        "phase": null,
-        "count": 1,
+        "card_type": "member_card",
         "condition": {
           "type": "temporal_condition",
           "phase": "active_phase",
@@ -8803,11 +8794,11 @@
           "source": "stage",
           "destination": "discard"
         },
+        "state_change": "active",
         "count": 1,
         "card_type": "member_card",
         "optional": true,
-        "action": "change_state",
-        "state_change": "active"
+        "action": "change_state"
       }
     },
     {
@@ -18137,6 +18128,7 @@
           {
             "text": "自分のステージにいるウェイト状態の『みらくらぱーく！』のメンバー1人をアクティブにしてもよい。",
             "source": "stage",
+            "state_change": "active",
             "count": 1,
             "card_type": "member_card",
             "target": "self",
@@ -18144,8 +18136,7 @@
               "みらくらぱーく！"
             ],
             "optional": true,
-            "action": "change_state",
-            "state_change": "active"
+            "action": "change_state"
           },
           {
             "text": "自分の控え室から『みらくらぱーく！』のライブカードを1枚手札に加える",
@@ -25551,14 +25542,13 @@
         "primary_effect": {
           "text": "このカードのスコアを+1する。さらに、自分の『虹ヶ咲』のカードの効果によって自分のステージにいるウェイト状態のメンバーもアクティブにしていた場合、",
           "source": "stage",
+          "state_change": "active",
           "card_type": "member_card",
           "target": "self",
           "group_names": [
             "虹ヶ咲"
           ],
-          "action": "modify_score",
-          "value": 1,
-          "operation": "add",
+          "action": "change_state",
           "self_target": true
         },
         "group_names": [
@@ -27894,13 +27884,25 @@
         "action": "choice",
         "options": [
           {
-            "text": "ウェイト状態のメンバー1人をアクティブにし、ライブ終了時まで、そのメンバーは{{icon_blade.png|ブレード}}を得る。",
-            "duration": "live_end",
-            "count": 1,
-            "card_type": "member_card",
-            "action": "gain_resource",
-            "resource": "blade",
-            "target_count": 1
+            "action": "sequential",
+            "actions": [
+              {
+                "text": "ウェイト状態のメンバー1人をアクティブにし",
+                "state_change": "active",
+                "count": 1,
+                "card_type": "member_card",
+                "action": "change_state"
+              },
+              {
+                "text": "そのメンバーは{{icon_blade.png|ブレード}}を得る",
+                "card_type": "member_card",
+                "action": "gain_resource",
+                "resource": "blade",
+                "count": 1,
+                "duration": "live_end"
+              }
+            ],
+            "text": "ウェイト状態のメンバー1人をアクティブにし、ライブ終了時まで、そのメンバーは{{icon_blade.png|ブレード}}を得る。"
           },
           {
             "text": "相手のステージにいる元々持つ{{icon_blade.png|ブレード}}が3つ以下のメンバー1人をウェイトにする",
@@ -28364,15 +28366,31 @@
           "location": "stage",
           "type": "location_condition"
         },
-        "source": "discard",
-        "destination": "hand",
-        "count": 1,
-        "card_type": "live_card",
-        "target": "self",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "エネルギーを1枚アクティブにし",
+            "state_change": "active",
+            "count": 1,
+            "action": "change_state",
+            "card_type": "energy_card"
+          },
+          {
+            "text": "自分の控え室から『蓮ノ空』のライブカードを1枚手札に加える",
+            "source": "discard",
+            "destination": "hand",
+            "count": 1,
+            "card_type": "live_card",
+            "target": "self",
+            "group_names": [
+              "蓮ノ空"
+            ],
+            "action": "move_cards"
+          }
+        ],
         "group_names": [
           "蓮ノ空"
-        ],
-        "action": "move_cards"
+        ]
       }
     },
     {

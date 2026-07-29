@@ -1,6 +1,9 @@
-#[cfg(feature = "no_std")]
-use alloc::{string::{String, ToString}, vec::Vec};
 use crate::HashMap;
+#[cfg(feature = "no_std")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use std::sync::Mutex;
 use std::time::Instant;
 

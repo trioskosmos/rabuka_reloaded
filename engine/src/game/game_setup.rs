@@ -131,6 +131,8 @@ pub struct Action {
     pub description_ja: Option<String>,
     pub action_type: ActionType,
     pub parameters: Option<ActionParameters>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected: Option<bool>,
 }
 
 impl Action {
@@ -345,6 +347,7 @@ fn make_action(action_type: ActionType, description: impl Into<String>) -> Actio
         description_ja: None,
         action_type,
         parameters: None,
+        selected: None,
     }
 }
 
@@ -358,6 +361,7 @@ fn make_action_params(
         description_ja: None,
         action_type,
         parameters: Some(params),
+        selected: None,
     }
 }
 
@@ -1130,11 +1134,9 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
 
     for (hand_index, card_id) in mulligan_player.hand.cards.iter().enumerate() {
         let is_selected = game_state.mulligan_selected_indices.contains(&hand_index);
-        let card_name = game_state
-            .card_database
-            .get_card(*card_id)
-            .map(|c| c.name.as_ref())
-            .unwrap_or("Unknown");
+        let card = game_state.card_database.get_card(*card_id);
+        let card_name = card.map(|c| c.name.as_ref()).unwrap_or("Unknown");
+        let card_no_str = card.map(|c| c.card_no.to_string()).unwrap_or_default();
         let sel_ja = if is_selected {
             "の選択解除"
         } else {
@@ -1149,10 +1151,14 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
             ),
             ActionParameters {
                 card_id: Some(*card_id),
+                card_index: Some(hand_index),
                 card_indices: Some(vec![hand_index]),
+                card_name: Some(card_name.to_string()),
+                card_no: Some(card_no_str),
                 ..make_params()
             },
         );
+        a.selected = Some(is_selected);
         a.description_ja = Some(action_desc!("{} {} マリガン", card_name, sel_ja));
         actions.push(a);
     }
@@ -1831,11 +1837,9 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
         if at_limit && !is_selected {
             continue;
         }
-        let card_name = game_state
-            .card_database
-            .get_card(*card_id)
-            .map(|c| c.name.as_ref())
-            .unwrap_or("Unknown");
+        let card = game_state.card_database.get_card(*card_id);
+        let card_name = card.map(|c| c.name.as_ref()).unwrap_or("Unknown");
+        let card_no_str = card.map(|c| c.card_no.to_string()).unwrap_or_default();
         let sel_ja = if is_selected {
             "の選択解除"
         } else {
@@ -1852,9 +1856,12 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
                 card_id: Some(*card_id),
                 card_index: Some(hand_index),
                 card_indices: Some(vec![hand_index]),
+                card_name: Some(card_name.to_string()),
+                card_no: Some(card_no_str),
                 ..make_params()
             },
         );
+        a.selected = Some(is_selected);
         a.description_ja = Some(action_desc!("{} {} ライブカード", card_name, sel_ja));
         actions.push(a);
     }

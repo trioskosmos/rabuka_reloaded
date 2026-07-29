@@ -94,5 +94,7 @@
   "Pass": "Pass",
   "T": "T",
   "Score:": "Score:",
-  "Success:": "Success:"
+  "Success:": "Success:",
+  "selected_label": "Selected",
+  "unselected_label": "Unselected"
 }

@@ -1,5 +1,8 @@
 #[cfg(feature = "no_std")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use rabuka_engine::game_setup::{ActionParameters, AreaInfo, DoubleBatonPair};
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
@@ -12,6 +15,8 @@ pub struct Action {
     pub description: String,
     pub action_type: String,
     pub parameters: Option<ActionParameters>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -220,6 +225,7 @@ fn output_actions() {
                             .collect()
                     }),
                 }),
+                selected: sa.selected,
             })
             .collect();
         let response = ActionsResponse { actions };
