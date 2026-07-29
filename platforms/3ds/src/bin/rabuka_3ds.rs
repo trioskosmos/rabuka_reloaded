@@ -3097,7 +3097,7 @@ fn main() {
                 // In multiplayer: opponent's turn is handled via UDS receive, not AI
                 // Uses mp_can_act(gs, 0) which correctly handles pending choices (choice_player_id).
                 let is_ai_turn = *ai_vs_ai || (*vs_ai && !mp_can_act(&gs, 0));
-                if is_ai_turn && !dirty && (_frame % 10 == 0) {
+                if is_ai_turn && !dirty {
                     if acts_cache.len() > 0 {
                         let ai_idx = (unsafe { _3ds_system_tick() } as usize) % acts_cache.len();
                         let action = acts_cache[ai_idx].clone();
@@ -3132,14 +3132,7 @@ fn main() {
                     cur = 0;
                     dirty = true;
                 }
-                if gs.has_pending_choice()
-                    || game_setup::is_automatic_phase(&gs)
-                    || gs.game_result != GameResult::Ongoing
-                {
-                    cur = 0;
-                    dirty = true;
-                    redraw = true;
-                }
+
 
                 // Touch: tap board zones to view card details, or overlay to select action
                 let touching = unsafe { _3ds_touch_down() };

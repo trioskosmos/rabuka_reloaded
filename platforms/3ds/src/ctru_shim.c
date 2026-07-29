@@ -1354,7 +1354,7 @@ static void audio_loop_thread_func(void* arg) {
             u8 status = 0;
             csndIsPlaying(0, &status);
             if (!status) {
-                // Restart playback
+                // Restart playback automatically to loop music forever
                 DSP_FlushDataCache(s_audio_data, s_audio_size);
                 csndPlaySound(0,
                     SOUND_FORMAT_16BIT | SOUND_LINEAR_INTERP,
