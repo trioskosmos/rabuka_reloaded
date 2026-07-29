@@ -73,7 +73,7 @@ pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
             if sel + 1 < items.len() {
                 sel += 1;
             }
-        } else if ui.just_pressed_a() {
+        } else if ui.just_pressed_a() || ui.just_pressed_b() {
             return sel;
         }
         ui.wait_vblank();
@@ -115,7 +115,7 @@ pub fn menu_select(
                 return None;
             }
             return Some(sel);
-        } else if ui.just_pressed_b() && allow_skip {
+        } else if ui.just_pressed_b() {
             return None;
         }
         ui.wait_vblank();

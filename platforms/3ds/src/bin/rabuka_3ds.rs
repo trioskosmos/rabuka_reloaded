@@ -34,7 +34,7 @@ use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
 
-use rabuka_engine::card::{Card, CardDatabase};
+use rabuka_engine::card::{Card, CardDatabase, HeartColor};
 use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::deck_builder::DeckBuilder;
 use rabuka_engine::deck_parser::DeckEntry;
@@ -79,6 +79,14 @@ fn tl(key: &str) -> String {
 #[cfg(feature = "3ds")]
 fn tl_fmt(key: &str, params: &[(&str, &str)]) -> String {
     i18n::t_fmt(key, current_lang(), params)
+}
+
+/// Map HeartColor to index 0-6 (skip BAll/Draw/Score). Returns None for non-color hearts.
+fn heart_color_index(color: &HeartColor) -> Option<usize> {
+    match color {
+        HeartColor::BAll | HeartColor::Draw | HeartColor::Score => None,
+        _ => Some(color.index()),
+    }
 }
 
 /// Translate stage area labels for display.
@@ -336,7 +344,7 @@ fn card_stat_line(
             s.push_str("  ");
         }
         if blade > 0 {
-            s.push_str(&format!("{{{{icon_blade.png|BLADE}}}}{}", blade));
+            s.push_str(&format!("{{{{blade.png|BLADE}}}}{}", blade));
         }
     } else if variant == "live_card" {
         // Live: score → need_heart
@@ -957,7 +965,7 @@ fn main() {
                                         format!("{} [{}] {}\n\0", arrow, i, tl(m)).as_ptr(),
                                     );
                                 }
-                                _3ds_text_add_top("\nUP/DOWN=select A=confirm\0".as_ptr());
+                                _3ds_text_add_top("\nUP/DOWN=select A=confirm B=back\0".as_ptr());
                             } else {
                                 _3ds_top_clear();
                                 _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
@@ -1006,7 +1014,7 @@ fn main() {
                                         230.0,
                                         COL_MED,
                                         0.60f32,
-                                        format!("{}\0", tl("UP/DOWN=select  A=confirm")).as_ptr(),
+                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back")).as_ptr(),
                                     );
                                 }
                             }
@@ -1033,6 +1041,8 @@ fn main() {
                                 SetupPhase::PickMode(cur),
                                 true,
                             )
+                        } else if keys & 0x00000002 != 0 {
+                            Step::Done(Ok(()))
                         } else if keys & 0x00000001 != 0 {
                             if cur == 2 {
                                 // "QR Scan"
@@ -1089,7 +1099,7 @@ fn main() {
                                     }
                                 }
                                 unsafe {
-                                    _3ds_text_add_top("\nA=select\0".as_ptr());
+                                    _3ds_text_add_top("\nA=select B=back\0".as_ptr());
                                 }
                             } else {
                                 unsafe {
@@ -1141,7 +1151,7 @@ fn main() {
                                         228.0,
                                         COL_MED,
                                         0.65f32,
-                                        format!("{}\0", tl("UP/DOWN=select  A=confirm")).as_ptr(),
+                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back")).as_ptr(),
                                     );
                                 }
                             }
@@ -1158,6 +1168,13 @@ fn main() {
                                 cards.clone(),
                                 decks.clone(),
                                 SetupPhase::PickDeck(cur + 1, vs_ai, is_multiplayer),
+                                true,
+                            )
+                        } else if keys & 0x00000002 != 0 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickMode(4),
                                 true,
                             )
                         } else if keys & 0x00000001 != 0 {
@@ -1214,7 +1231,7 @@ fn main() {
                                     }
                                 }
                                 unsafe {
-                                    _3ds_text_add_top("\nA=select\0".as_ptr());
+                                    _3ds_text_add_top("\nA=select B=back\0".as_ptr());
                                 }
                             } else {
                                 unsafe {
@@ -1265,7 +1282,7 @@ fn main() {
                                         228.0,
                                         COL_MED,
                                         0.65f32,
-                                        format!("{}\0", tl("UP/DOWN=select  A=confirm")).as_ptr(),
+                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back")).as_ptr(),
                                     );
                                 }
                             }
@@ -1282,6 +1299,13 @@ fn main() {
                                 cards.clone(),
                                 decks.clone(),
                                 SetupPhase::MultiplayerDeck(cur + 1),
+                                true,
+                            )
+                        } else if keys & 0x00000002 != 0 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickMode(4),
                                 true,
                             )
                         } else if keys & 0x00000001 != 0 {
@@ -1512,119 +1536,135 @@ fn main() {
                             Step::Setup(cards.clone(), decks.clone(), SetupPhase::Testing, false)
                         }
                     }
-                    SetupPhase::QrScan => {
-                        if was_dirty {
-                            unsafe {
-                                _3ds_qr_start();
-                            }
-                            if unsafe { _3ds_is_cli_mode() } {
-                                unsafe {
-                                    _3ds_clear_top();
-                                    _3ds_text_add_top(format!("{}\n\0", tl("QR SCAN")).as_ptr());
-                                    _3ds_text_add_top(
-                                        format!(
-                                            "{}\n{}\0",
-                                            tl("Point camera at QR code"),
-                                            tl("B=cancel")
-                                        )
-                                        .as_ptr(),
-                                    );
-                                }
-                            } else {
-                                unsafe {
-                                    _3ds_top_clear();
-                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                                    let qr_hdr = tl("QR SCAN");
-                                    _3ds_top_queue_text(
-                                        120.0,
-                                        8.0,
-                                        COL_GOLD,
-                                        0.85f32,
-                                        format!("{}\0", qr_hdr).as_ptr(),
-                                    );
-                                    let qr_msg = tl("Point camera at deck QR code");
-                                    _3ds_top_queue_text(
-                                        40.0,
-                                        60.0,
-                                        COL_LIGHT,
-                                        0.70f32,
-                                        format!("{}\0", qr_msg).as_ptr(),
-                                    );
-                                    let qr_auto = tl("Auto-detects when QR is visible");
-                                    _3ds_top_queue_text(
-                                        40.0,
-                                        85.0,
-                                        COL_MED,
-                                        0.65f32,
-                                        format!("{}\0", qr_auto).as_ptr(),
-                                    );
-                                    let qr_cancel = tl("B=cancel");
-                                    _3ds_top_queue_text(
-                                        40.0,
-                                        230.0,
-                                        COL_MED,
-                                        0.60f32,
-                                        format!("{}\0", qr_cancel).as_ptr(),
-                                    );
-                                }
-                            }
-                        }
-                        if keys & 0x00000002 != 0 {
-                            unsafe {
-                                _3ds_qr_stop();
-                            }
-                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
-                        } else {
-                            let mut buf = [0u8; 2048];
-                            let r = unsafe { _3ds_qr_poll(buf.as_mut_ptr(), buf.len() as u32) };
-                            if r > 0 {
-                                unsafe {
-                                    _3ds_qr_stop();
-                                }
-                                let text = String::from_utf8_lossy(&buf[..r as usize]).to_string();
-                                let cards_read = DeckParser::parse_deck_content(&text);
-                                if cards_read.is_empty() {
-                                    Step::Setup(
-                                        cards.clone(),
-                                        decks.clone(),
-                                        SetupPhase::QrScan,
-                                        true,
-                                    )
-                                } else {
-                                    Step::Setup(
-                                        cards.clone(),
-                                        decks.clone(),
-                                        SetupPhase::QrResult(cards_read),
-                                        true,
-                                    )
-                                }
-                            } else if r < -10 {
-                                // Fatal error (alloc failed, quirc failed, re-arm failed)
-                                unsafe {
-                                    _3ds_clear_both();
-                                    _3ds_text_add_top(
-                                        format!(
-                                            "{}\n\0",
-                                            tl_fmt("Camera error", &[("e", &r.to_string())])
-                                        )
-                                        .as_ptr(),
-                                    );
-                                    _3ds_text_add_top(format!("{}\0", tl("B=back")).as_ptr());
-                                }
-                                unsafe {
-                                    _3ds_qr_stop();
-                                }
-                                Step::Setup(
-                                    cards.clone(),
-                                    decks.clone(),
-                                    SetupPhase::PickMode(5),
-                                    true,
-                                )
-                            } else {
-                                Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan, false)
-                            }
-                        }
-                    }
+SetupPhase::QrScan => {
+                          let mut qr_start_failed = false;
+                          if was_dirty {
+                              let qr_start_res = unsafe { _3ds_qr_start() };
+                              if qr_start_res != 0 {
+                                  unsafe {
+                                      _3ds_clear_both();
+                                      _3ds_text_add_top(
+                                          format!("{}\n\0", tl("Camera init failed")).as_ptr(),
+                                      );
+                                      _3ds_text_add_top(format!("{}\0", tl("B=back")).as_ptr());
+                                  }
+                                  unsafe {
+                                      _3ds_qr_stop();
+                                  }
+                                  qr_start_failed = true;
+                              } else {
+                                  if unsafe { _3ds_is_cli_mode() } {
+                                      unsafe {
+                                          _3ds_clear_top();
+                                      }
+                                      unsafe {
+                                          _3ds_text_add_top(format!("{}\n\0", tl("QR SCAN")).as_ptr());
+                                          _3ds_text_add_top(
+                                              format!(
+                                                  "{}\n{}\0",
+                                                  tl("Point camera at QR code"),
+                                                  tl("B=cancel")
+                                              )
+                                              .as_ptr(),
+                                          );
+                                      }
+                                  } else {
+                                      unsafe {
+                                          _3ds_top_clear();
+                                          _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                          let qr_hdr = tl("QR SCAN");
+                                          _3ds_top_queue_text(
+                                              120.0,
+                                              8.0,
+                                              COL_GOLD,
+                                              0.85f32,
+                                              format!("{}\0", qr_hdr).as_ptr(),
+                                          );
+                                          let qr_msg = tl("Point camera at deck QR code");
+                                          _3ds_top_queue_text(
+                                              40.0,
+                                              60.0,
+                                              COL_LIGHT,
+                                              0.70f32,
+                                              format!("{}\0", qr_msg).as_ptr(),
+                                          );
+                                          let qr_auto = tl("Auto-detects when QR is visible");
+                                          _3ds_top_queue_text(
+                                              40.0,
+                                              85.0,
+                                              COL_MED,
+                                              0.65f32,
+                                              format!("{}\0", qr_auto).as_ptr(),
+                                          );
+                                          let qr_cancel = tl("B=cancel");
+                                          _3ds_top_queue_text(
+                                              40.0,
+                                              230.0,
+                                              COL_MED,
+                                              0.60f32,
+                                              format!("{}\0", qr_cancel).as_ptr(),
+                                          );
+                                  }
+                              }
+                          }
+                          if qr_start_failed {
+                              Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
+                          } else if keys & 0x00000002 != 0 {
+                             unsafe {
+                                 _3ds_qr_stop();
+                             }
+                             Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
+                         } else {
+                             let mut buf = [0u8; 2048];
+                             let r = unsafe { _3ds_qr_poll(buf.as_mut_ptr(), buf.len() as u32) };
+                             if r > 0 {
+                                 unsafe {
+                                     _3ds_qr_stop();
+                                 }
+                                 let text = String::from_utf8_lossy(&buf[..r as usize]).to_string();
+                                 let cards_read = DeckParser::parse_deck_content(&text);
+                                 if cards_read.is_empty() {
+                                     Step::Setup(
+                                         cards.clone(),
+                                         decks.clone(),
+                                         SetupPhase::QrScan,
+                                         true,
+                                     )
+                                 } else {
+                                     Step::Setup(
+                                         cards.clone(),
+                                         decks.clone(),
+                                         SetupPhase::QrResult(cards_read),
+                                         true,
+                                     )
+                                 }
+} else if r < 0 {
+                                  // Camera error (not running, alloc failed, etc.)
+                                  unsafe {
+                                      _3ds_clear_both();
+                                      _3ds_text_add_top(
+                                          format!(
+                                              "{}\n\0",
+                                              tl_fmt("Camera error", &[("e", &r.to_string())])
+                                          )
+                                          .as_ptr(),
+                                      );
+                                      _3ds_text_add_top(format!("{}\0", tl("B=back")).as_ptr());
+                                  }
+                                  unsafe {
+                                      _3ds_qr_stop();
+                                  }
+                                  Step::Setup(
+                                      cards.clone(),
+                                      decks.clone(),
+                                      SetupPhase::PickMode(5),
+                                      true,
+                                  )
+                             } else {
+                                 Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan, false)
+                             }
+                         }
+                     }
                     SetupPhase::QrResult(cards_read) => {
                         if was_dirty {
                             if unsafe { _3ds_is_cli_mode() } {
@@ -1747,7 +1787,7 @@ fn main() {
                                     _3ds_text_add_top(
                                         format!("{} {}\n\0", arrow_c, client_label).as_ptr(),
                                     );
-                                    _3ds_text_add_top("\nUP/DOWN=select A=confirm\0".as_ptr());
+                                _3ds_text_add_top("\nUP/DOWN=select A=confirm B=back\0".as_ptr());
                                 }
                             } else {
                                 unsafe {
@@ -4385,13 +4425,13 @@ fn main() {
                         //
                         // Top screen: 400x240. Bottom screen: 320x240.
                         // Line advance ≈ ceil(scale * 0.714 * 31) pixels per line.
-                        // Top screen: stats bar (0-40px) + content panel (42-240px).
+                        // Top screen: stats bar (0-50px) + content panel (52-240px).
                         // Clear the top screen so old menu content doesn't overlap
                         unsafe {
                             _3ds_top_clear();
                         }
                         unsafe {
-                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 40.0, COL_PANEL);
+                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 50.0, COL_PANEL);
                             _3ds_top_queue_text(
                                 4.0,
                                 2.0,
@@ -4445,20 +4485,244 @@ fn main() {
                                     Some(total)
                                 })
                                 .sum::<u32>();
-                            _3ds_top_queue_text(
+                            let p2_blade: u32 = gs
+                                .player2
+                                .stage
+                                .stage
+                                .iter()
+                                .filter_map(|&cid| {
+                                    if cid == -1 {
+                                        return None;
+                                    }
+                                    let card = gs.card_database.get_card(cid)?;
+                                    let is_wait = gs
+                                        .mods
+                                        .orientation_modifiers
+                                        .get(&cid)
+                                        .map(|o| o.as_str() == "wait")
+                                        .unwrap_or(false);
+                                    if is_wait {
+                                        return Some(0u32);
+                                    }
+                                    let m = gs.mods.blade_modifiers.get(&cid);
+                                    let total = if let Some(e) = m {
+                                        if e.set != 0 {
+                                            e.total().max(0) as u32
+                                        } else {
+                                            (card.blade as i32 + e.total()).max(0) as u32
+                                        }
+                                    } else {
+                                        card.blade
+                                    };
+                                    Some(total)
+                                })
+                                .sum::<u32>();
+                            // Compute total hearts per player from stage members
+                            // (mirrors display.rs player_to_display total_hearts logic)
+                            let mut p1_hearts = vec![0u32; 8];
+                            let mut p2_hearts = vec![0u32; 8];
+                            for &cid in &gs.player1.stage.stage {
+                                if cid == -1 {
+                                    continue;
+                                }
+                                if let Some(card) = gs.card_database.get_card(cid) {
+                                    if let Some(ref base_heart) = card.base_heart {
+                                        let h_mult = gs
+                                            .mods
+                                            .heart_color_multiplier
+                                            .get(&cid)
+                                            .copied();
+                                        for (color, count) in &base_heart.hearts {
+                                            if let Some(idx) =
+                                                heart_color_index(color)
+                                            {
+                                                if let Some(hc) = h_mult {
+                                                    if hc == *color {
+                                                        p1_hearts[idx] += count;
+                                                    }
+                                                } else {
+                                                    p1_hearts[idx] += count;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            for (cid, modifier) in &gs.mods.heart_modifiers {
+                                if !gs.player1.stage.stage.contains(cid) {
+                                    continue;
+                                }
+                                for (color, val) in modifier {
+                                    if let Some(idx) =
+                                        heart_color_index(color)
+                                    {
+                                        p1_hearts[idx] =
+                                            (p1_hearts[idx] as i32 + val.total()).max(0) as u32;
+                                    }
+                                }
+                            }
+                            for &cid in &gs.player2.stage.stage {
+                                if cid == -1 {
+                                    continue;
+                                }
+                                if let Some(card) = gs.card_database.get_card(cid) {
+                                    if let Some(ref base_heart) = card.base_heart {
+                                        let h_mult = gs
+                                            .mods
+                                            .heart_color_multiplier
+                                            .get(&cid)
+                                            .copied();
+                                        for (color, count) in &base_heart.hearts {
+                                            if let Some(idx) =
+                                                heart_color_index(color)
+                                            {
+                                                if let Some(hc) = h_mult {
+                                                    if hc == *color {
+                                                        p2_hearts[idx] += count;
+                                                    }
+                                                } else {
+                                                    p2_hearts[idx] += count;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            for (cid, modifier) in &gs.mods.heart_modifiers {
+                                if !gs.player2.stage.stage.contains(cid) {
+                                    continue;
+                                }
+                                for (color, val) in modifier {
+                                    if let Some(idx) =
+                                        heart_color_index(color)
+                                    {
+                                        p2_hearts[idx] =
+                                            (p2_hearts[idx] as i32 + val.total()).max(0) as u32;
+                                    }
+                                }
+                            }
+                            // Format hearts as texticon string
+                            let format_hearts = |hearts: &[u32]| -> String {
+                                let mut parts = Vec::new();
+                                for (i, &count) in hearts.iter().enumerate() {
+                                    if count > 0 {
+                                        let label = format!("h{:02}{}", i, count);
+                                        parts.push(heart_label_to_icon(&label));
+                                    }
+                                }
+                                if parts.is_empty() {
+                                    return String::new();
+                                }
+                                parts.join(" ")
+                            };
+                            let p1_heart_str = format_hearts(&p1_hearts);
+                            let p2_heart_str = format_hearts(&p2_hearts);
+                            // Render P1 hearts+blades on top screen line 2
+                            let p1_stats = if p1_heart_str.is_empty() {
+                                format!("BL:{}", p1_blade)
+                            } else {
+                                format!(
+                                    "{}  {{blade.png|BLADE}}{}",
+                                    p1_heart_str, p1_blade
+                                )
+                            };
+                            render_text_with_icons(
                                 4.0,
                                 22.0,
+                                &p1_stats,
                                 COL_LIGHT,
-                                0.60f32,
-                                format!(
-                                    "W:{} L:{}  taps:{}  BL:{}\0",
-                                    p1.waitroom.cards.len(),
-                                    p1.success_live_card_zone.cards.len(),
-                                    touch_tap_count,
-                                    p1_blade,
-                                )
-                                .as_ptr(),
+                                0.55f32,
                             );
+                            // Render P2 hearts+blades on top screen line 3
+                            let p2_stats = if p2_heart_str.is_empty() {
+                                format!("BL:{}", p2_blade)
+                            } else {
+                                format!(
+                                    "{}  {{blade.png|BLADE}}{}",
+                                    p2_heart_str, p2_blade
+                                )
+                            };
+                            render_text_with_icons(
+                                4.0,
+                                34.0,
+                                &p2_stats,
+                                COL_LIGHT,
+                                0.55f32,
+                            );
+                            // Show need hearts during live set phase
+                            // Rule 8.2.x: opponent's need hearts are hidden
+                            // until their cards are revealed (performed).
+                            let is_live_set = matches!(
+                                gs.current_phase,
+                                Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker
+                            );
+                            if is_live_set {
+                                // Compute live_need_hearts from live zone cards
+                                let compute_live_need = |player: &Player, gs: &GameState| -> Vec<u32> {
+                                    let mut nh = vec![0u32; 8];
+                                    for &cid in &player.live_card_zone.cards {
+                                        if cid == -1 { continue; }
+                                        if let Some(card) = gs.card_database.get_card(cid) {
+                                            if let Some(ref need) = card.need_heart {
+                                                for (color, count) in &need.hearts {
+                                                    if let Some(idx) = heart_color_index(color) {
+                                                        nh[idx] += count;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    for (&cid, colors) in &gs.mods.need_heart_modifiers {
+                                        if player.live_card_zone.cards.contains(&cid) {
+                                            for (color, &val) in colors {
+                                                if let Some(idx) = heart_color_index(color) {
+                                                    nh[idx] = (nh[idx] as i32 + val.total()).max(0) as u32;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    nh
+                                };
+                                let opp_is_first = gs.player2.is_first_attacker;
+                                let opp_performed = matches!(
+                                    gs.current_phase,
+                                    Phase::SecondAttackerPerformance | Phase::LiveVictoryDetermination
+                                ) || (matches!(gs.current_phase, Phase::FirstAttackerPerformance) && opp_is_first);
+                                // P1 (perspective) need hearts
+                                let p1_nh = compute_live_need(&gs.player1, &gs);
+                                if p1_nh.iter().any(|&v| v > 0) {
+                                    let nh_str = format_hearts(&p1_nh);
+                                    let need_display = format!(
+                                        "{{icon_heart_06.png|NEED}} {}",
+                                        nh_str
+                                    );
+                                    render_text_with_icons(
+                                        4.0,
+                                        46.0,
+                                        &need_display,
+                                        COL_GOLD,
+                                        0.50f32,
+                                    );
+                                }
+                                // P2 (opponent) need hearts — only after performed
+                                if opp_performed {
+                                    let p2_nh = compute_live_need(&gs.player2, &gs);
+                                    if p2_nh.iter().any(|&v| v > 0) {
+                                        let nh_str = format_hearts(&p2_nh);
+                                        let need_display = format!(
+                                            "{{icon_heart_06.png|NEED}} {}",
+                                            nh_str
+                                        );
+                                        render_text_with_icons(
+                                            4.0,
+                                            46.0,
+                                            &need_display,
+                                            COL_GOLD,
+                                            0.50f32,
+                                        );
+                                    }
+                                }
+                            }
                         }
 
                         // Content panel — rendering stack (bottom to top):
@@ -4467,7 +4731,7 @@ fn main() {
                         //   3. ability_queue      — compact ability banner (CLI/text only)
                         //   4. choice_image_mode  — ability banner + card choice grid
                         //   5. action list        — text action list (bottom text area)
-                        let mut content_y: f32 = 42.0;
+                        let mut content_y: f32 = 52.0;
 
                         if let Some((ref zlabel, ref zcards)) = zone_viewer {
                             if viewing_card.is_none() {
@@ -4623,10 +4887,10 @@ fn main() {
                                             * 3.0;
                                     let min_h = 86.0 + 18.0; // at least one line
                                     let panel_end = (text_h.max(min_h) + 8.0).min(232.0);
-                                    let rect_h = panel_end - 42.0;
+                                    let rect_h = panel_end - 52.0;
 
                                     unsafe {
-                                        _3ds_top_queue_rect(0.0, 42.0, 400.0, rect_h, COL_CARD);
+                                        _3ds_top_queue_rect(0.0, 52.0, 400.0, rect_h, COL_CARD);
                                         let display_name =
                                             i18n::card_display_name(&card.name, current_lang());
                                         _3ds_top_queue_text(
@@ -4687,7 +4951,7 @@ fn main() {
                                 if let Some(card) = gs.card_database.get_card(vcid) {
                                     let stats = compute_card_stats(card, vcid, &gs);
                                     unsafe {
-                                        _3ds_top_queue_rect(0.0, 42.0, 400.0, 76.0, COL_CARD);
+                                        _3ds_top_queue_rect(0.0, 52.0, 400.0, 76.0, COL_CARD);
                                         let btm_name =
                                             i18n::card_display_name(&card.name, current_lang());
                                         _3ds_top_queue_text(
@@ -4756,10 +5020,10 @@ fn main() {
                                     let n_lines = ab_lines.len();
                                     let h = 22.0 + n_lines as f32 * 14.0;
                                     unsafe {
-                                        _3ds_top_queue_rect(0.0, 42.0, 400.0, h, COL_ABILITY);
+                                        _3ds_top_queue_rect(0.0, 52.0, 400.0, h, COL_ABILITY);
                                         render_text_with_icons(
                                             4.0,
-                                            44.0,
+                                            54.0,
                                             &ab_lines[0],
                                             COL_LIGHT,
                                             0.65,
@@ -4767,14 +5031,14 @@ fn main() {
                                         for (li, line) in ab_lines.iter().enumerate().skip(1) {
                                             render_text_with_icons(
                                                 8.0,
-                                                44.0 + li as f32 * 14.0,
+                                                54.0 + li as f32 * 14.0,
                                                 line,
                                                 COL_LIGHT,
                                                 0.65,
                                             );
                                         }
                                     }
-                                    content_y = 42.0 + h + 6.0;
+                                    content_y = 52.0 + h + 6.0;
                                 }
                             }
                         }
@@ -4838,7 +5102,7 @@ fn main() {
                                         .unwrap_or_default();
 
                                     // ---- Render ability banner first ----
-                                    let mut grid_iy: f32 = 42.0;
+                                    let mut grid_iy: f32 = 52.0;
                                     if !banner_text.is_empty() {
                                         let ab_lines: Vec<String> =
                                             wrap_ability_text(&banner_text, 392.0, 0.60)
@@ -4849,20 +5113,20 @@ fn main() {
                                         let n_lines = ab_lines.len();
                                         let h = 16.0 + n_lines as f32 * 13.0;
                                         unsafe {
-                                            _3ds_top_queue_rect(0.0, 42.0, 400.0, h, COL_ABILITY);
+_3ds_top_queue_rect(0.0, 52.0, 400.0, h, COL_ABILITY);
                                         }
                                         for (li, line) in ab_lines.iter().enumerate() {
-                                            render_text_with_icons(
-                                                4.0,
-                                                44.0 + li as f32 * 13.0,
-                                                line,
-                                                COL_LIGHT,
-                                                0.60,
-                                            );
+render_text_with_icons(
+                                            4.0,
+                                            52.0 + 2.0 + li as f32 * 13.0,
+                                            line,
+                                            COL_LIGHT,
+                                            0.60,
+                                        );
                                         }
-                                        grid_iy = 42.0 + h + 4.0;
+                                        grid_iy = 52.0 + h + 4.0;
                                     }
-                                    let cw = 72.0f32;
+                                    let cw = 50.0f32;
                                     let ch = cw / 0.711;
                                     let gap = 4.0f32;
                                     let cols = 5usize;
@@ -5075,7 +5339,7 @@ fn main() {
                                             let end_line = (start_line + lpp).min(ab_lines.len());
                                             unsafe {
                                                 _3ds_top_queue_rect(
-                                                    0.0, 42.0, 400.0, 198.0, 0xCC000000,
+                                                    0.0, 52.0, 400.0, 198.0, 0xCC000000,
                                                 );
                                                 _3ds_top_queue_text(
                                                     4.0,

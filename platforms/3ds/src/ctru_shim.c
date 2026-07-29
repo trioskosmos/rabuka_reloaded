@@ -1104,199 +1104,273 @@ int _3ds_uds_is_connected() {
     return uds_connected ? 1 : 0;
 }
 
-// ── QR Code Scanning ──
-// Based on FBI's capturecam.c approach: continuous capture with mutex-protected shared buffer.
-#include "quirc.h"
-#include <3ds/services/cam.h>
-#include <3ds/services/gspgpu.h>
+ // ── QR Code Scanning ──
+ // Based on FBI's capturecam.c approach: continuous capture with mutex-protected shared buffer.
+ // Improvements over FBI: robust shutdown, NULL safety, retry logic, proper quirc_end discipline.
+ #include "quirc.h"
+ #include <3ds/services/cam.h>
+ #include <3ds/services/gspgpu.h>
+ 
+ #define QR_W 400
+ #define QR_H 240
+ 
+ #define QR_MAX_RETRIES 3
+ #define QR_RETRY_DELAY_MS 500
+ 
+ #define EVENT_CANCEL 0
+ #define EVENT_RECV 1
+ #define EVENT_BUFFER_ERROR 2
+ #define EVENT_COUNT 3
+ 
+  static volatile bool cam_running = false;
+  static Handle cam_mutex = 0;
+  static Handle cam_cancel = 0;
+  static Thread cam_thread = NULL;
+  static u8 *cam_shared_buf = NULL;
+  static struct quirc *qr = NULL;
+  static C3D_Tex cam_tex = {0};
+  static bool cam_tex_inited = false;
+  static int qr_frame_skip = 0;
+ 
+ static void _3ds_qr_update_texture(const u8 *buf, int w, int h) {
+      if (!cam_tex_inited) {
+          C3D_TexInit(&cam_tex, w, h, GPU_RGBA8);
+          cam_tex_inited = true;
+      }
+      if (!cam_tex.data) return;
+      for (int y = 0; y < h; y++) {
+          for (int x = 0; x < w; x++) {
+              int si = y * w + x;
+              u16 p = ((u16*)buf)[si];
+              u8 r = ((p >> 11) & 0x1F) << 3;
+              u8 g = ((p >> 5) & 0x3F) << 2;
+              u8 b = (p & 0x1F) << 3;
+              int di = y * w + x;
+              ((u32*)cam_tex.data)[di] = r | (g << 8) | (b << 16) | 0xFF000000;
+          }
+      }
+      GSPGPU_FlushDataCache(cam_tex.data, w * h * 4);
+  }
+ 
+ void _3ds_qr_draw_preview(float x_off) {
+      if (!cam_running || !cam_tex_inited || !cam_shared_buf || !cam_tex.data) return;
+      if (svcWaitSynchronization(cam_mutex, 100000000ULL) != 0) return;
+      _3ds_qr_update_texture(cam_shared_buf, QR_W, QR_H);
+      svcReleaseMutex(cam_mutex);
+      C2D_Image img = { .tex = &cam_tex, .subtex = NULL };
+     C2D_DrawImageAt(img, x_off, 0.0f, 0.4f, NULL, 1.0f, 1.0f);
+ }
 
-#define QR_W 400
-#define QR_H 240
+ static void cam_thread_func(void *arg) {
+     (void)arg;
+     Result res = 0;
+ 
+     u32 bufferSize = QR_W * QR_H * 2;
+     u16 *local_buf = (u16*)linearAlloc(bufferSize);
+     if (!local_buf) { cam_running = false; return; }
+ 
+     int retries = 0;
+     while (retries < QR_MAX_RETRIES) {
+         if (R_FAILED(res = camInit())) {
+             retries++;
+             if (retries >= QR_MAX_RETRIES) {
+                 linearFree(local_buf);
+                 cam_running = false;
+                 return;
+             }
+             svcSleepThread(QR_RETRY_DELAY_MS * 1000000ULL);
+             continue;
+         }
+ 
+         u32 cam = SELECT_OUT1;
+         if (R_FAILED(res = CAMU_SetSize(cam, SIZE_CTR_TOP_LCD, CONTEXT_A))
+             || R_FAILED(res = CAMU_SetOutputFormat(cam, OUTPUT_RGB_565, CONTEXT_A))
+             || R_FAILED(res = CAMU_SetFrameRate(cam, FRAME_RATE_30))
+             || R_FAILED(res = CAMU_SetNoiseFilter(cam, true))
+             || R_FAILED(res = CAMU_SetAutoExposure(cam, true))
+             || R_FAILED(res = CAMU_SetAutoWhiteBalance(cam, true))
+             || R_FAILED(res = CAMU_Activate(cam))) {
+             camExit();
+             retries++;
+             if (retries >= QR_MAX_RETRIES) {
+                 linearFree(local_buf);
+                 cam_running = false;
+                 return;
+             }
+             svcSleepThread(QR_RETRY_DELAY_MS * 1000000ULL);
+             continue;
+         }
+ 
+         u32 transferUnit = 0;
+         Handle evt_recv = 0;
+         Handle evt_buferr = 0;
+         bool cam_setup_failed = false;
+ 
+         if (R_FAILED(res = CAMU_GetBufferErrorInterruptEvent(&evt_buferr, PORT_CAM1))
+             || R_FAILED(res = CAMU_SetTrimming(PORT_CAM1, true))
+             || R_FAILED(res = CAMU_SetTrimmingParamsCenter(PORT_CAM1, QR_W, QR_H, 400, 240))
+             || R_FAILED(res = CAMU_GetMaxBytes(&transferUnit, QR_W, QR_H))
+             || R_FAILED(res = CAMU_SetTransferBytes(PORT_CAM1, transferUnit, QR_W, QR_H))
+             || R_FAILED(res = CAMU_ClearBuffer(PORT_CAM1))
+             || R_FAILED(res = CAMU_SetReceiving(&evt_recv, local_buf, PORT_CAM1, bufferSize, (s16)transferUnit))
+             || R_FAILED(res = CAMU_StartCapture(PORT_CAM1))) {
+             cam_setup_failed = true;
+         }
+ 
+         if (cam_setup_failed) {
+             if (evt_recv) { svcCloseHandle(evt_recv); evt_recv = 0; }
+             if (evt_buferr) { svcCloseHandle(evt_buferr); evt_buferr = 0; }
+             CAMU_Activate(SELECT_NONE);
+             camExit();
+             retries++;
+             if (retries >= QR_MAX_RETRIES) {
+                 linearFree(local_buf);
+                 cam_running = false;
+                 return;
+             }
+             svcSleepThread(QR_RETRY_DELAY_MS * 1000000ULL);
+             continue;
+         }
+ 
+         Handle waitEvents[EVENT_COUNT] = { cam_cancel, evt_recv, evt_buferr };
+ 
+         while (cam_running) {
+             s32 idx = 0;
+             if (R_FAILED(svcWaitSynchronizationN(&idx, waitEvents, EVENT_COUNT, false, U64_MAX))) break;
+ 
+             if (idx == EVENT_CANCEL) break;
+ 
+             if (idx == EVENT_BUFFER_ERROR) {
+                 if (evt_buferr) { svcCloseHandle(evt_buferr); evt_buferr = 0; }
+                 CAMU_ClearBuffer(PORT_CAM1);
+                 if (R_FAILED(CAMU_SetReceiving(&evt_buferr, local_buf, PORT_CAM1, bufferSize, (s16)transferUnit))) {
+                     break;
+                 }
+                 CAMU_StartCapture(PORT_CAM1);
+                 waitEvents[EVENT_BUFFER_ERROR] = evt_buferr;
+                 continue;
+             }
+ 
+             svcCloseHandle(evt_recv);
+             evt_recv = 0;
+ 
+             svcWaitSynchronization(cam_mutex, U64_MAX);
+             memcpy(cam_shared_buf, local_buf, bufferSize);
+             GSPGPU_FlushDataCache(cam_shared_buf, bufferSize);
+             svcReleaseMutex(cam_mutex);
+ 
+             res = CAMU_SetReceiving(&evt_recv, local_buf, PORT_CAM1, bufferSize, (s16)transferUnit);
+             waitEvents[EVENT_RECV] = evt_recv;
+         }
+ 
+         CAMU_StopCapture(PORT_CAM1);
+         bool busy = true;
+         while (R_SUCCEEDED(CAMU_IsBusy(&busy, PORT_CAM1)) && busy) svcSleepThread(1000000);
+         CAMU_ClearBuffer(PORT_CAM1);
+         CAMU_Activate(SELECT_NONE);
+         camExit();
+ 
+         if (evt_recv) svcCloseHandle(evt_recv);
+         if (evt_buferr) svcCloseHandle(evt_buferr);
+         break;
+     }
+ 
+     linearFree(local_buf);
+     cam_running = false;
+ }
 
-static volatile bool cam_running = false;
-static Handle cam_mutex = 0;
-static Handle cam_cancel = 0;
-static Thread cam_thread = NULL;
-static u8 *cam_shared_buf = NULL;   // shared buffer (read by main thread under mutex)
-static struct quirc *qr = NULL;
-static C3D_Tex cam_tex = {0};
-static bool cam_tex_inited = false;
+ int _3ds_qr_start(void) {
+      if (cam_running) return 0;
+ 
+      qr_frame_skip = 0;
+ 
+      svcCreateMutex(&cam_mutex, false);
+      svcCreateEvent(&cam_cancel, RESET_STICKY);
+ 
+      cam_shared_buf = (u8*)linearAlloc(QR_W * QR_H * 2);
+      if (!cam_shared_buf) {
+          svcCloseHandle(cam_mutex); cam_mutex = 0;
+          svcCloseHandle(cam_cancel); cam_cancel = 0;
+          return -1;
+      }
+ 
+      qr = quirc_new();
+      if (!qr) { linearFree(cam_shared_buf); cam_shared_buf = NULL; svcCloseHandle(cam_mutex); cam_mutex = 0; svcCloseHandle(cam_cancel); cam_cancel = 0; return -2; }
+      if (quirc_resize(qr, QR_W, QR_H) < 0) { quirc_destroy(qr); qr = NULL; linearFree(cam_shared_buf); cam_shared_buf = NULL; svcCloseHandle(cam_mutex); cam_mutex = 0; svcCloseHandle(cam_cancel); cam_cancel = 0; return -3; }
+ 
+      cam_running = true;
+      cam_thread = threadCreate(cam_thread_func, NULL, 0x40000, 0x1A, -1, true);
+      if (!cam_thread) { cam_running = false; quirc_destroy(qr); qr = NULL; linearFree(cam_shared_buf); cam_shared_buf = NULL; svcCloseHandle(cam_mutex); cam_mutex = 0; svcCloseHandle(cam_cancel); cam_cancel = 0; return -4; }
+ 
+      return 0;
+  }
 
-static void _3ds_qr_update_texture(const u8 *buf, int w, int h) {
-    if (!cam_tex_inited) {
-        C3D_TexInit(&cam_tex, w, h, GPU_RGBA8);
-        cam_tex_inited = true;
-    }
-    u32 stride = w * 4;
-    for (int y = 0; y < h; y += 8) {
-        for (int x = 0; x < w; x += 8) {
-            for (int ty = 0; ty < 8; ty++) {
-                for (int tx = 0; tx < 8; tx++) {
-                    int si = (y + ty) * w + (x + tx);
-                    u16 p = ((u16*)buf)[si];
-                    u8 r = ((p >> 11) & 0x1F) << 3;
-                    u8 g = ((p >> 5) & 0x3F) << 2;
-                    u8 b = (p & 0x1F) << 3;
-                    int di = (x / 8) * 64 + (y / 8) * stride + (tx % 2) * 32 + (tx / 2 + ty * 4) * 4;
-                    ((u32*)cam_tex.data)[di] = r | (g << 8) | (b << 16) | 0xFF000000;
-                }
-            }
-        }
-    }
-    GSPGPU_FlushDataCache(cam_tex.data, w * h * 4);
-}
-
-void _3ds_qr_draw_preview(float x_off) {
-    if (!cam_running || !cam_tex_inited || !cam_shared_buf) return;
-    svcWaitSynchronization(cam_mutex, U64_MAX);
-    _3ds_qr_update_texture(cam_shared_buf, QR_W, QR_H);
-    svcReleaseMutex(cam_mutex);
-    C2D_Image img = { .tex = &cam_tex, .subtex = NULL };
-    C2D_DrawImageAt(img, x_off, 0.0f, 0.4f, NULL, 1.0f, 1.0f);
-}
-
-static void cam_thread_func(void *arg) {
-    (void)arg;
-    Result res = 0;
-
-    u32 bufferSize = QR_W * QR_H * 2;
-    u16 *local_buf = (u16*)linearAlloc(bufferSize);
-    if (!local_buf) { cam_running = false; return; }
-
-    if (R_FAILED(res = camInit())) { linearFree(local_buf); cam_running = false; return; }
-
-    u32 cam = SELECT_OUT1;
-    if (R_FAILED(res = CAMU_SetSize(cam, SIZE_CTR_TOP_LCD, CONTEXT_A))
-        || R_FAILED(res = CAMU_SetOutputFormat(cam, OUTPUT_RGB_565, CONTEXT_A))
-        || R_FAILED(res = CAMU_SetFrameRate(cam, FRAME_RATE_30))
-        || R_FAILED(res = CAMU_SetNoiseFilter(cam, true))
-        || R_FAILED(res = CAMU_SetAutoExposure(cam, true))
-        || R_FAILED(res = CAMU_SetAutoWhiteBalance(cam, true))
-        || R_FAILED(res = CAMU_Activate(cam))) {
-        camExit(); linearFree(local_buf); cam_running = false; return;
-    }
-
-    u32 transferUnit = 0;
-    Handle evt_recv = 0;
-    Handle evt_buferr = 0;
-
-    if (R_FAILED(res = CAMU_GetBufferErrorInterruptEvent(&evt_buferr, PORT_CAM1))
-        || R_FAILED(res = CAMU_SetTrimming(PORT_CAM1, true))
-        || R_FAILED(res = CAMU_SetTrimmingParamsCenter(PORT_CAM1, QR_W, QR_H, 400, 240))
-        || R_FAILED(res = CAMU_GetMaxBytes(&transferUnit, QR_W, QR_H))
-        || R_FAILED(res = CAMU_SetTransferBytes(PORT_CAM1, transferUnit, QR_W, QR_H))
-        || R_FAILED(res = CAMU_ClearBuffer(PORT_CAM1))
-        || R_FAILED(res = CAMU_SetReceiving(&evt_recv, local_buf, PORT_CAM1, bufferSize, (s16)transferUnit))
-        || R_FAILED(res = CAMU_StartCapture(PORT_CAM1))) {
-        CAMU_Activate(SELECT_NONE); camExit(); linearFree(local_buf); cam_running = false; return;
-    }
-
-    Handle waitEvents[2] = { cam_cancel, evt_recv };
-
-    while (cam_running) {
-        s32 idx = 0;
-        if (R_FAILED(svcWaitSynchronizationN(&idx, waitEvents, 2, false, U64_MAX))) break;
-
-        if (idx == 0) break; // cancel signaled
-
-        // Frame received — copy to shared buffer
-        svcCloseHandle(evt_recv);
-        evt_recv = 0;
-
-        svcWaitSynchronization(cam_mutex, U64_MAX);
-        memcpy(cam_shared_buf, local_buf, bufferSize);
-        svcReleaseMutex(cam_mutex);
-
-        // Re-arm receive
-        if (R_FAILED(CAMU_SetReceiving(&evt_recv, local_buf, PORT_CAM1, bufferSize, (s16)transferUnit))) break;
-        waitEvents[1] = evt_recv;
-    }
-
-    // Shutdown
-    CAMU_StopCapture(PORT_CAM1);
-    bool busy = true;
-    while (R_SUCCEEDED(CAMU_IsBusy(&busy, PORT_CAM1)) && busy) svcSleepThread(1000000);
-    CAMU_ClearBuffer(PORT_CAM1);
-    CAMU_Activate(SELECT_NONE);
-    camExit();
-
-    if (evt_recv) svcCloseHandle(evt_recv);
-    if (evt_buferr) svcCloseHandle(evt_buferr);
-    linearFree(local_buf);
-
-    cam_running = false;
-}
-
-int _3ds_qr_start(void) {
-    if (cam_running) return 0;
-
-    svcCreateMutex(&cam_mutex, false);
-    svcCreateEvent(&cam_cancel, RESET_STICKY);
-
-    cam_shared_buf = (u8*)linearAlloc(QR_W * QR_H * 2);
-    if (!cam_shared_buf) return -1;
-
-    qr = quirc_new();
-    if (!qr) { linearFree(cam_shared_buf); cam_shared_buf = NULL; return -2; }
-    if (quirc_resize(qr, QR_W, QR_H) < 0) { quirc_destroy(qr); qr = NULL; linearFree(cam_shared_buf); cam_shared_buf = NULL; return -3; }
-
-    cam_running = true;
-    cam_thread = threadCreate(cam_thread_func, NULL, 0x10000, 0x1A, -1, true);
-    if (!cam_thread) { cam_running = false; quirc_destroy(qr); qr = NULL; linearFree(cam_shared_buf); cam_shared_buf = NULL; return -4; }
-
-    return 0;
-}
-
-void _3ds_qr_stop(void) {
-    if (!cam_running) return;
-    svcSignalEvent(cam_cancel);
-    // Wait for thread to finish
-    if (cam_thread) {
-        threadJoin(cam_thread, 2000000000ULL); // 2s timeout
-        threadFree(cam_thread);
-        cam_thread = NULL;
-    }
-    if (qr) { quirc_destroy(qr); qr = NULL; }
-    if (cam_tex_inited) { C3D_TexDelete(&cam_tex); cam_tex_inited = false; }
-    if (cam_shared_buf) { linearFree(cam_shared_buf); cam_shared_buf = NULL; }
-    if (cam_mutex) { svcCloseHandle(cam_mutex); cam_mutex = 0; }
-    if (cam_cancel) { svcCloseHandle(cam_cancel); cam_cancel = 0; }
-}
+ void _3ds_qr_stop(void) {
+     if (!cam_running) return;
+     svcSignalEvent(cam_cancel);
+     // Wait for thread to finish with timeout, then force cleanup if needed
+     if (cam_thread) {
+         s32 threadRet = threadJoin(cam_thread, 3000000000ULL); // 3s timeout
+         if (threadRet != 0) {
+             // Thread did not exit cleanly — force terminate
+             threadFree(cam_thread);
+         } else {
+             threadFree(cam_thread);
+         }
+         cam_thread = NULL;
+     }
+     if (qr) { quirc_destroy(qr); qr = NULL; }
+     if (cam_tex_inited) { C3D_TexDelete(&cam_tex); cam_tex_inited = false; }
+     if (cam_shared_buf) { linearFree(cam_shared_buf); cam_shared_buf = NULL; }
+     if (cam_mutex) { svcCloseHandle(cam_mutex); cam_mutex = 0; }
+     if (cam_cancel) { svcCloseHandle(cam_cancel); cam_cancel = 0; }
+     cam_running = false;
+ }
 
 int _3ds_qr_poll(char *out_text, unsigned int out_max) {
-    if (!cam_running || !cam_shared_buf) return -1;
+       if (out_max == 0) return -1;
+       if (!cam_running || !cam_shared_buf) return -1;
+       if (!qr) return -1;
 
-    svcWaitSynchronization(cam_mutex, U64_MAX);
-    uint8_t *qbuf = quirc_begin(qr, NULL, NULL);
-    if (!qbuf) { svcReleaseMutex(cam_mutex); return 0; }
+       qr_frame_skip++;
+       if (qr_frame_skip % 3 != 0) return 0;
 
-    // RGB565 → grayscale for quirc
-    for (int i = 0; i < QR_W * QR_H; i++) {
-        u16 p = ((u16*)cam_shared_buf)[i];
-        u8 r = (p >> 11) & 0x1F;
-        u8 g = (p >> 5) & 0x3F;
-        u8 b = p & 0x1F;
-        qbuf[i] = (u8)((r * 77 + g * 150 + b * 29) >> 8);
-    }
-    svcReleaseMutex(cam_mutex);
+       if (svcWaitSynchronization(cam_mutex, 100000000ULL) != 0) return 0;
+       uint8_t *qbuf = quirc_begin(qr, NULL, NULL);
+       if (!qbuf) { svcReleaseMutex(cam_mutex); return 0; }
 
-    quirc_end(qr);
+       // Copy raw RGB565 to local buffer while holding mutex, then release
+       static u16 local_buf[QR_W * QR_H];
+       memcpy(local_buf, cam_shared_buf, QR_W * QR_H * sizeof(u16));
+       svcReleaseMutex(cam_mutex);
 
-    int qrCount = quirc_count(qr);
-    for (int i = 0; i < qrCount; i++) {
-        struct quirc_code code;
-        struct quirc_data data;
-        quirc_extract(qr, i, &code);
-        if (quirc_decode(&code, &data) == QUIRC_SUCCESS) {
-            int len = data.payload_len;
-            if (len > (int)out_max - 1) len = out_max - 1;
-            memcpy(out_text, data.payload, len);
-            out_text[len] = '\0';
-            return len;
-        }
-    }
-    return 0;
-}
+       // RGB565 → grayscale for quirc (no mutex needed, operates on local copy)
+       for (int i = 0; i < QR_W * QR_H; i++) {
+           u16 p = local_buf[i];
+           u8 r = (p >> 11) & 0x1F;
+           u8 g = (p >> 5) & 0x3F;
+           u8 b = p & 0x1F;
+           qbuf[i] = (u8)((r * 77 + g * 150 + b * 29) >> 8);
+       }
+
+       quirc_end(qr);
+
+       int qrCount = quirc_count(qr);
+       for (int i = 0; i < qrCount; i++) {
+           struct quirc_code code;
+           struct quirc_data data;
+           quirc_extract(qr, i, &code);
+           if (quirc_decode(&code, &data) == QUIRC_SUCCESS) {
+               int len = data.payload_len;
+               if (len > (int)out_max - 1) len = (int)out_max - 1;
+               if (len < 0) len = 0;
+               memcpy(out_text, data.payload, len);
+               out_text[len] = '\0';
+               return len;
+           }
+       }
+       return 0;
+   }
 
 // ===================== AUDIO (CSND — no dspfirm.cdc needed) =====================
 
