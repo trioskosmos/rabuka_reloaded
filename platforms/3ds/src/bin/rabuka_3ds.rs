@@ -4713,6 +4713,8 @@ fn main() {
                                 if choice_image_mode
                                     && gs.has_pending_choice()
                                     && !(detail_mode && viewing_card.is_some())
+                                    && !is_ai_turn
+                                    && !is_opponent_turn_mp
                                 {
                                     // ---- Render ability banner first ----
                                     let mut grid_iy: f32 = 42.0;
@@ -5410,88 +5412,108 @@ fn main() {
                         }
 
                         // Highlight interactive zones for all tap-to-deploy action types
-                        for act in &acts_cache {
-                            let p = match &act.parameters {
-                                Some(x) => x,
-                                None => continue,
-                            };
-                            if p.disabled.unwrap_or(false) {
-                                continue;
-                            }
-                            match act.action_type {
-                                // Stage slots for PlayMemberToStage (detail mode, own stage)
-                                game_setup::ActionType::PlayMemberToStage => {
-                                    if detail_mode && viewing_card.is_some() {
-                                        if p.card_id != viewing_card {
-                                            continue;
-                                        }
-                                        if let Some(sa) = &p.stage_area {
-                                            let slot = match sa.as_str() {
-                                                "left" => 0i32,
-                                                "center" => 1,
-                                                "right" => 2,
-                                                _ => continue,
-                                            };
-                                            unsafe {
-                                                _3ds_board_set_action_highlight(1, slot, false);
+                        {
+                            let ai_turn =
+                                *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
+                            let opp_turn =
+                                is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
+                            if !ai_turn && !opp_turn {
+                                for act in &acts_cache {
+                                    let p = match &act.parameters {
+                                        Some(x) => x,
+                                        None => continue,
+                                    };
+                                    if p.disabled.unwrap_or(false) {
+                                        continue;
+                                    }
+                                    match act.action_type {
+                                        // Stage slots for PlayMemberToStage (detail mode, own stage)
+                                        game_setup::ActionType::PlayMemberToStage => {
+                                            if detail_mode && viewing_card.is_some() {
+                                                if p.card_id != viewing_card {
+                                                    continue;
+                                                }
+                                                if let Some(sa) = &p.stage_area {
+                                                    let slot = match sa.as_str() {
+                                                        "left" => 0i32,
+                                                        "center" => 1,
+                                                        "right" => 2,
+                                                        _ => continue,
+                                                    };
+                                                    unsafe {
+                                                        _3ds_board_set_action_highlight(
+                                                            1, slot, false,
+                                                        );
+                                                    }
+                                                }
                                             }
                                         }
-                                    }
-                                }
-                                // Stage slots for ChoicePosition (choice mode)
-                                game_setup::ActionType::ChoicePosition => {
-                                    if choice_image_mode && gs.has_pending_choice() {
-                                        if let Some(sa) = &p.stage_area {
-                                            let slot = match sa.as_str() {
-                                                "left" => 0i32,
-                                                "center" => 1,
-                                                "right" => 2,
-                                                _ => continue,
-                                            };
-                                            unsafe {
-                                                _3ds_board_set_action_highlight(1, slot, false);
+                                        // Stage slots for ChoicePosition (choice mode)
+                                        game_setup::ActionType::ChoicePosition => {
+                                            if choice_image_mode && gs.has_pending_choice() {
+                                                if let Some(sa) = &p.stage_area {
+                                                    let slot = match sa.as_str() {
+                                                        "left" => 0i32,
+                                                        "center" => 1,
+                                                        "right" => 2,
+                                                        _ => continue,
+                                                    };
+                                                    unsafe {
+                                                        _3ds_board_set_action_highlight(
+                                                            1, slot, false,
+                                                        );
+                                                    }
+                                                }
                                             }
                                         }
-                                    }
-                                }
-                                // Hand cards for SelectMulligan
-                                game_setup::ActionType::SelectMulligan => {
-                                    if let Some(hidx) =
-                                        p.card_indices.as_ref().and_then(|v| v.first())
-                                    {
-                                        unsafe {
-                                            _3ds_board_set_action_highlight(3, *hidx as i32, false);
-                                        }
-                                    }
-                                }
-                                // Hand cards for SelectLiveCard
-                                game_setup::ActionType::SelectLiveCard => {
-                                    if let Some(hidx) =
-                                        p.card_indices.as_ref().and_then(|v| v.first())
-                                    {
-                                        unsafe {
-                                            _3ds_board_set_action_highlight(3, *hidx as i32, false);
-                                        }
-                                    }
-                                }
-                                // Board cards for choice image mode (ChoiceSelect, ChoiceDecision, ChoiceOption)
-                                _ => {
-                                    if choice_image_mode
-                                        && gs.has_pending_choice()
-                                        && matches!(
-                                            act.action_type,
-                                            game_setup::ActionType::ChoiceSelect
-                                                | game_setup::ActionType::ChoiceDecision
-                                        )
-                                    {
-                                        if let Some(cid) = p.card_id {
-                                            if let Some((zone, slot, opp)) =
-                                                find_card_zone_slot(&gs, cid)
+                                        // Hand cards for SelectMulligan
+                                        game_setup::ActionType::SelectMulligan => {
+                                            if let Some(hidx) =
+                                                p.card_indices.as_ref().and_then(|v| v.first())
                                             {
                                                 unsafe {
                                                     _3ds_board_set_action_highlight(
-                                                        zone, slot, opp,
+                                                        3,
+                                                        *hidx as i32,
+                                                        false,
                                                     );
+                                                }
+                                            }
+                                        }
+                                        // Hand cards for SelectLiveCard
+                                        game_setup::ActionType::SelectLiveCard => {
+                                            if let Some(hidx) =
+                                                p.card_indices.as_ref().and_then(|v| v.first())
+                                            {
+                                                unsafe {
+                                                    _3ds_board_set_action_highlight(
+                                                        3,
+                                                        *hidx as i32,
+                                                        false,
+                                                    );
+                                                }
+                                            }
+                                        }
+                                        // Board cards for choice image mode (ChoiceSelect, ChoiceDecision, ChoiceOption)
+                                        _ => {
+                                            if choice_image_mode
+                                                && gs.has_pending_choice()
+                                                && matches!(
+                                                    act.action_type,
+                                                    game_setup::ActionType::ChoiceSelect
+                                                        | game_setup::ActionType::ChoiceDecision
+                                                )
+                                            {
+                                                if let Some(cid) = p.card_id {
+                                                    if let Some((zone, slot, opp)) =
+                                                        find_card_zone_slot(&gs, cid)
+                                                    {
+                                                        unsafe {
+                                                            _3ds_board_set_action_highlight(
+                                                                zone, slot, opp,
+                                                            );
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -5500,7 +5522,11 @@ fn main() {
                             }
                         }
                         // Also highlight SelectAutoAbility option cards
-                        if choice_image_mode && gs.has_pending_choice() {
+                        if !(*ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id))
+                            && !(is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 }))
+                            && choice_image_mode
+                            && gs.has_pending_choice()
+                        {
                             if let Some(c) = gs.get_pending_choice() {
                                 use rabuka_engine::ability::types::Choice;
                                 if let Choice::SelectAutoAbility { options, .. } = c {
