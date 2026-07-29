@@ -1,0 +1,2323 @@
+{
+  "schema": "ability_contract.v1",
+  "description": "Machine-readable contract for the ability system. Single source of truth for action types, condition types, field definitions, and handler locations. Used by parser validation, bytecode compiler, and runtime decoder.",
+  "field_types": {
+    "zone": {
+      "kind": "enum",
+      "values": [
+        "hand",
+        "stage",
+        "center",
+        "left",
+        "right",
+        "discard",
+        "waitroom",
+        "energy",
+        "energy_zone",
+        "deck",
+        "deck_top",
+        "deck_bottom",
+        "success_zone",
+        "live_card_zone",
+        "success_live_zone",
+        "energy_deck",
+        "empty_area",
+        "same_area",
+        "under_member",
+        "looked_at",
+        "revealed_cards",
+        "selected_cards",
+        "resolution",
+        "exclusion_zone",
+        "deck_or_discard"
+      ]
+    },
+    "player": {
+      "kind": "enum",
+      "values": [
+        "self",
+        "opponent",
+        "both",
+        "owner"
+      ]
+    },
+    "card_type": {
+      "kind": "enum",
+      "values": [
+        "card",
+        "member_card",
+        "live_card",
+        "energy_card",
+        "event_card",
+        "character_card",
+        "baton_touch_card",
+        "climax_card"
+      ]
+    },
+    "resource": {
+      "kind": "enum",
+      "values": [
+        "heart",
+        "blade",
+        "yell",
+        "shield",
+        "energy"
+      ]
+    },
+    "heart": {
+      "kind": "enum",
+      "values": [
+        "smile",
+        "pure",
+        "cool",
+        "active",
+        "natural",
+        "elegant"
+      ]
+    },
+    "state": {
+      "kind": "enum",
+      "values": [
+        "rest",
+        "stand",
+        "reverse",
+        "wait"
+      ]
+    },
+    "duration": {
+      "kind": "enum",
+      "values": [
+        "this_turn",
+        "until_end_of_live",
+        "permanent",
+        "until_used",
+        "next_turn"
+      ]
+    },
+    "operator": {
+      "kind": "enum",
+      "values": [
+        "=",
+        "==",
+        "!=",
+        ">",
+        ">=",
+        "<",
+        "<="
+      ]
+    },
+    "bool": {
+      "kind": "scalar"
+    },
+    "u8": {
+      "kind": "scalar"
+    },
+    "u16": {
+      "kind": "scalar"
+    },
+    "u32": {
+      "kind": "scalar"
+    },
+    "i32": {
+      "kind": "scalar"
+    },
+    "string": {
+      "kind": "scalar"
+    },
+    "str_list": {
+      "kind": "list_of_strings"
+    },
+    "condition": {
+      "kind": "nested",
+      "ref": "conditions"
+    },
+    "effect": {
+      "kind": "nested",
+      "ref": "actions"
+    },
+    "dynamic_count": {
+      "kind": "nested"
+    },
+    "position": {
+      "kind": "nested"
+    },
+    "state_type": {
+      "kind": "nested"
+    },
+    "ability_filter": {
+      "kind": "nested"
+    }
+  },
+  "shared_fields": {
+    "source": {
+      "type": "zone"
+    },
+    "target": {
+      "type": "player"
+    },
+    "destination": {
+      "type": "zone"
+    },
+    "count": {
+      "type": "u32"
+    },
+    "card_type": {
+      "type": "card_type"
+    },
+    "text": {
+      "type": "string"
+    },
+    "group_names": {
+      "type": "str_list"
+    },
+    "exclude_group_names": {
+      "type": "str_list"
+    },
+    "characters": {
+      "type": "str_list"
+    },
+    "exclude_characters": {
+      "type": "str_list"
+    },
+    "cost_limit": {
+      "type": "u32"
+    },
+    "cost_limit_operator": {
+      "type": "operator"
+    },
+    "exclude_self": {
+      "type": "bool"
+    },
+    "self_target": {
+      "type": "bool"
+    },
+    "location": {
+      "type": "zone"
+    },
+    "state": {
+      "type": "state_type"
+    },
+    "activation_position": {
+      "type": "zone"
+    },
+    "per_unit": {
+      "type": "bool"
+    },
+    "per_unit_count": {
+      "type": "u32"
+    },
+    "per_unit_type": {
+      "type": "string"
+    },
+    "heart_colors": {
+      "type": "str_list"
+    },
+    "duration": {
+      "type": "duration"
+    },
+    "distinct": {
+      "type": "string"
+    },
+    "position": {
+      "type": "position"
+    },
+    "card_names": {
+      "type": "str_list"
+    },
+    "card_property": {
+      "type": "string"
+    },
+    "original_value": {
+      "type": "bool"
+    },
+    "negation": {
+      "type": "bool"
+    },
+    "operation": {
+      "type": "string"
+    },
+    "value": {
+      "type": "u32"
+    },
+    "optional": {
+      "type": "bool"
+    },
+    "dynamic_count": {
+      "type": "dynamic_count"
+    },
+    "action_by": {
+      "type": "string"
+    }
+  },
+  "actions": {
+    "move_cards": {
+      "opcode": 20,
+      "rust_variant": "MoveCards",
+      "effect_kind": "MoveCards",
+      "handler": "effects/mod.rs:287",
+      "handler_fn": "execute_move_cards",
+      "aliases": [
+        "discard_card"
+      ],
+      "fields": {
+        "source": {
+          "type": "zone",
+          "default": "stage"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "destination": {
+          "type": "zone",
+          "default": "discard"
+        },
+        "count": {
+          "type": "u32"
+        },
+        "card_type": {
+          "type": "card_type",
+          "default": "member_card"
+        },
+        "target_count": {
+          "type": "u32"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "exclude_group_names": {
+          "type": "str_list"
+        },
+        "characters": {
+          "type": "str_list"
+        },
+        "exclude_characters": {
+          "type": "str_list"
+        },
+        "cost_limit": {
+          "type": "u32"
+        },
+        "cost_limit_operator": {
+          "type": "operator"
+        },
+        "card_names": {
+          "type": "str_list"
+        },
+        "shuffle": {
+          "type": "bool"
+        },
+        "any_number": {
+          "type": "bool"
+        },
+        "discard_remaining": {
+          "type": "bool"
+        },
+        "multiple_targets": {
+          "type": "bool"
+        },
+        "exclude_self": {
+          "type": "bool"
+        },
+        "name_constraint": {
+          "type": "string"
+        },
+        "self_target": {
+          "type": "bool"
+        },
+        "state_change": {
+          "type": "state_type"
+        },
+        "self_cost": {
+          "type": "bool"
+        },
+        "dynamic_count": {
+          "type": "dynamic_count"
+        },
+        "or_card_types": {
+          "type": "str_list"
+        },
+        "position": {
+          "type": "position"
+        },
+        "per_group": {
+          "type": "bool"
+        },
+        "per_group_count": {
+          "type": "u32"
+        },
+        "baton_touch_trigger": {
+          "type": "bool"
+        },
+        "target_member": {
+          "type": "string"
+        },
+        "same_unit_name": {
+          "type": "bool"
+        },
+        "activation_position": {
+          "type": "zone"
+        },
+        "activation_condition_parsed": {
+          "type": "condition"
+        }
+      }
+    },
+    "draw_card": {
+      "opcode": 8,
+      "rust_variant": "DrawCard",
+      "effect_kind": "DrawCards",
+      "handler": "effects/draw.rs:208",
+      "handler_fn": "execute_draw_wrapper",
+      "aliases": [
+        "draw"
+      ],
+      "fields": {
+        "source": {
+          "type": "zone",
+          "default": "deck"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "destination": {
+          "type": "zone",
+          "default": "hand"
+        },
+        "count": {
+          "type": "u32",
+          "default": 1
+        },
+        "target_count": {
+          "type": "u32"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "dynamic_count": {
+          "type": "dynamic_count"
+        },
+        "card_names": {
+          "type": "str_list"
+        },
+        "location": {
+          "type": "zone"
+        },
+        "exclude_self": {
+          "type": "bool"
+        },
+        "per_unit": {
+          "type": "bool"
+        },
+        "per_unit_count": {
+          "type": "u32"
+        },
+        "per_unit_type": {
+          "type": "string"
+        },
+        "per_unit_heart_colors": {
+          "type": "str_list"
+        },
+        "position": {
+          "type": "position"
+        },
+        "state": {
+          "type": "state_type"
+        },
+        "heart_colors": {
+          "type": "str_list"
+        },
+        "trigger_type": {
+          "type": "string"
+        },
+        "original_value": {
+          "type": "bool"
+        },
+        "action_by": {
+          "type": "string"
+        }
+      }
+    },
+    "change_state": {
+      "opcode": 2,
+      "rust_variant": "ChangeState",
+      "effect_kind": "ChangeState",
+      "handler": "effects/state.rs:18",
+      "handler_fn": "execute_change_state",
+      "aliases": [],
+      "fields": {
+        "source": {
+          "type": "zone"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "destination": {
+          "type": "zone"
+        },
+        "state_change": {
+          "type": "state_type"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "cost_limit": {
+          "type": "u32"
+        },
+        "cost_limit_operator": {
+          "type": "operator"
+        },
+        "cost_from_revealed": {
+          "type": "bool"
+        },
+        "optional": {
+          "type": "bool"
+        },
+        "self_cost": {
+          "type": "bool"
+        },
+        "characters": {
+          "type": "str_list"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "exclude_group_names": {
+          "type": "str_list"
+        },
+        "blade_limit": {
+          "type": "u32"
+        },
+        "blade_limit_operator": {
+          "type": "operator"
+        },
+        "per_unit": {
+          "type": "bool"
+        },
+        "per_unit_count": {
+          "type": "u32"
+        },
+        "per_unit_type": {
+          "type": "string"
+        },
+        "location": {
+          "type": "zone"
+        },
+        "distinct": {
+          "type": "string"
+        },
+        "exclude_self": {
+          "type": "bool"
+        },
+        "self_target": {
+          "type": "bool"
+        },
+        "heart_colors": {
+          "type": "str_list"
+        },
+        "all": {
+          "type": "bool"
+        },
+        "position": {
+          "type": "position"
+        },
+        "activation_position": {
+          "type": "zone"
+        },
+        "action_by": {
+          "type": "string"
+        },
+        "activation_condition_parsed": {
+          "type": "condition"
+        }
+      }
+    },
+    "gain_ability": {
+      "opcode": 10,
+      "rust_variant": "GainAbility",
+      "effect_kind": "AbilityOp",
+      "handler": "effects/ability_effects.rs:13",
+      "handler_fn": "execute_gain_ability_effect",
+      "aliases": [],
+      "fields": {
+        "source": {
+          "type": "zone"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "destination": {
+          "type": "zone"
+        },
+        "ability_gain": {
+          "type": "string"
+        },
+        "ability_gain_trigger": {
+          "type": "string"
+        },
+        "gained_effect": {
+          "type": "effect"
+        },
+        "ability_text": {
+          "type": "string"
+        },
+        "target_trigger": {
+          "type": "string"
+        },
+        "source_card": {
+          "type": "string"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "exclude_group_names": {
+          "type": "str_list"
+        },
+        "characters": {
+          "type": "str_list"
+        },
+        "cost_limit": {
+          "type": "u32"
+        },
+        "cost_limit_operator": {
+          "type": "operator"
+        },
+        "location": {
+          "type": "zone"
+        },
+        "trigger_filter": {
+          "type": "str_list"
+        },
+        "duration": {
+          "type": "duration"
+        },
+        "self_target": {
+          "type": "bool"
+        },
+        "exclude_self": {
+          "type": "bool"
+        },
+        "all": {
+          "type": "bool"
+        },
+        "activation_position": {
+          "type": "zone"
+        }
+      }
+    },
+    "gain_ability_from_source": {
+      "opcode": 11,
+      "rust_variant": "GainAbilityFromSource",
+      "effect_kind": "AbilityOp",
+      "handler": "effects/ability_effects.rs:319",
+      "handler_fn": "execute_gain_ability_from_source",
+      "aliases": [],
+      "fields": {
+        "source": {
+          "type": "zone"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "cost_limit": {
+          "type": "u32"
+        },
+        "cost_limit_operator": {
+          "type": "operator"
+        },
+        "trigger_filter": {
+          "type": "str_list"
+        },
+        "all": {
+          "type": "bool"
+        }
+      }
+    },
+    "invalidate_ability": {
+      "opcode": 13,
+      "rust_variant": "InvalidateAbility",
+      "effect_kind": "AbilityOp",
+      "handler": "effects/ability_effects.rs:143",
+      "handler_fn": "execute_invalidate_ability",
+      "aliases": [],
+      "fields": {
+        "source": {
+          "type": "zone"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "count": {
+          "type": "u32"
+        },
+        "duration": {
+          "type": "duration"
+        },
+        "heart_colors": {
+          "type": "str_list"
+        },
+        "optional": {
+          "type": "bool"
+        },
+        "self_target": {
+          "type": "bool"
+        },
+        "exclude_self": {
+          "type": "bool"
+        },
+        "all": {
+          "type": "bool"
+        }
+      }
+    },
+    "suppress_ability_trigger": {
+      "opcode": 40,
+      "rust_variant": "SuppressAbilityTrigger",
+      "effect_kind": "AbilityOp",
+      "handler": "effects/ability_effects.rs:196",
+      "handler_fn": "execute_suppress_ability_trigger",
+      "aliases": [],
+      "fields": {
+        "source": {
+          "type": "zone"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "suppressed_trigger": {
+          "type": "string"
+        },
+        "card_type": {
+          "type": "card_type"
+        }
+      }
+    },
+    "activate_ability": {
+      "opcode": 1,
+      "rust_variant": "ActivateAbility",
+      "effect_kind": "AbilityOp",
+      "handler": "effects/ability_effects.rs:61",
+      "handler_fn": "execute_activate_ability",
+      "aliases": [],
+      "fields": {
+        "ability_text": {
+          "type": "string"
+        },
+        "target_trigger": {
+          "type": "string"
+        },
+        "count": {
+          "type": "u32"
+        },
+        "source_card": {
+          "type": "string"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "optional": {
+          "type": "bool"
+        }
+      }
+    },
+    "modify_score": {
+      "opcode": 18,
+      "rust_variant": "ModifyScore",
+      "effect_kind": "ModifyScore",
+      "handler": "effects/score.rs:14",
+      "handler_fn": "execute_modify_score",
+      "aliases": [],
+      "fields": {
+        "source": {
+          "type": "zone"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "destination": {
+          "type": "zone"
+        },
+        "operation": {
+          "type": "string",
+          "default": "add"
+        },
+        "value": {
+          "type": "u32"
+        },
+        "duration": {
+          "type": "duration"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "per_unit": {
+          "type": "bool"
+        },
+        "per_unit_count": {
+          "type": "u32"
+        },
+        "per_unit_type": {
+          "type": "string"
+        },
+        "per_unit_location": {
+          "type": "zone"
+        },
+        "per_unit_heart_colors": {
+          "type": "str_list"
+        },
+        "location": {
+          "type": "zone"
+        },
+        "effect_constraint": {
+          "type": "string"
+        },
+        "self_target": {
+          "type": "bool"
+        },
+        "heart_colors": {
+          "type": "str_list"
+        },
+        "exclude_self": {
+          "type": "bool"
+        },
+        "distinct": {
+          "type": "string"
+        },
+        "position": {
+          "type": "position"
+        },
+        "activation_position": {
+          "type": "zone"
+        },
+        "card_names": {
+          "type": "str_list"
+        },
+        "card_property": {
+          "type": "string"
+        },
+        "state": {
+          "type": "state_type"
+        },
+        "negation": {
+          "type": "bool"
+        },
+        "max_repeats": {
+          "type": "u32"
+        },
+        "need_heart_operator": {
+          "type": "operator"
+        },
+        "need_heart_total": {
+          "type": "u32"
+        }
+      }
+    },
+    "modify_required_hearts": {
+      "opcode": 16,
+      "rust_variant": "ModifyRequiredHearts",
+      "effect_kind": "ModifyHearts",
+      "handler": "effects/score.rs:248",
+      "handler_fn": "execute_modify_required_hearts",
+      "aliases": [
+        "modify_required_hearts_global"
+      ],
+      "fields": {
+        "operation": {
+          "type": "string",
+          "default": "decrease"
+        },
+        "value": {
+          "type": "u32"
+        },
+        "duration": {
+          "type": "duration"
+        },
+        "heart_colors": {
+          "type": "str_list"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "per_unit": {
+          "type": "bool"
+        },
+        "per_unit_count": {
+          "type": "u32"
+        },
+        "per_unit_heart_colors": {
+          "type": "str_list"
+        },
+        "location": {
+          "type": "zone"
+        },
+        "timing_condition": {
+          "type": "string"
+        },
+        "original_value": {
+          "type": "bool"
+        },
+        "exclude_self": {
+          "type": "bool"
+        },
+        "self_target": {
+          "type": "bool"
+        },
+        "exclude_heart_colors": {
+          "type": "str_list"
+        },
+        "repeat_limit": {
+          "type": "u32"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "all": {
+          "type": "bool"
+        },
+        "distinct": {
+          "type": "string"
+        },
+        "replace_all": {
+          "type": "bool"
+        }
+      }
+    },
+    "gain_resource": {
+      "opcode": 12,
+      "rust_variant": "GainResource",
+      "effect_kind": "GainResource",
+      "handler": "effects/mod.rs:303",
+      "handler_fn": "execute_gain_resource",
+      "aliases": [],
+      "fields": {
+        "resource": {
+          "type": "resource"
+        },
+        "heart_colors": {
+          "type": "str_list"
+        },
+        "heart_colors_from_selected_card": {
+          "type": "bool"
+        },
+        "sign": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "value": {
+          "type": "u32"
+        },
+        "energy_count": {
+          "type": "u32"
+        },
+        "dynamic_count": {
+          "type": "dynamic_count"
+        },
+        "optional": {
+          "type": "bool"
+        },
+        "duration": {
+          "type": "duration"
+        },
+        "position": {
+          "type": "position"
+        },
+        "any_number": {
+          "type": "bool"
+        },
+        "per_unit": {
+          "type": "bool"
+        },
+        "per_unit_count": {
+          "type": "u32"
+        },
+        "per_unit_type": {
+          "type": "string"
+        },
+        "per_unit_heart_colors": {
+          "type": "str_list"
+        },
+        "location": {
+          "type": "zone"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "cost_limit": {
+          "type": "u32"
+        },
+        "cost_limit_operator": {
+          "type": "operator"
+        },
+        "characters": {
+          "type": "str_list"
+        },
+        "exclude_group_names": {
+          "type": "str_list"
+        },
+        "self_target": {
+          "type": "bool"
+        },
+        "card_property": {
+          "type": "string"
+        },
+        "original_value": {
+          "type": "bool"
+        },
+        "negation": {
+          "type": "bool"
+        },
+        "activation_position": {
+          "type": "zone"
+        },
+        "state": {
+          "type": "state_type"
+        },
+        "heart_type": {
+          "type": "string"
+        },
+        "exclude_self": {
+          "type": "bool"
+        },
+        "all": {
+          "type": "bool"
+        },
+        "same_name": {
+          "type": "bool"
+        },
+        "group_reference": {
+          "type": "string"
+        },
+        "trigger_type": {
+          "type": "string"
+        },
+        "distinct": {
+          "type": "string"
+        },
+        "heart_color": {
+          "type": "string"
+        },
+        "action_by": {
+          "type": "string"
+        },
+        "activation_condition_parsed": {
+          "type": "condition"
+        },
+        "multiple_targets": {
+          "type": "bool"
+        },
+        "repeat_limit": {
+          "type": "u32"
+        },
+        "timing_condition": {
+          "type": "string"
+        }
+      }
+    },
+    "look_at": {
+      "opcode": 14,
+      "rust_variant": "LookAt",
+      "effect_kind": "LookReveal",
+      "handler": "look.rs",
+      "handler_fn": "execute_look_at",
+      "aliases": [
+        "look",
+        "reveal_effect"
+      ],
+      "fields": {
+        "source": {
+          "type": "zone",
+          "default": "deck_top"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "count": {
+          "type": "u32",
+          "default": 1
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "location": {
+          "type": "zone"
+        },
+        "per_unit": {
+          "type": "bool"
+        },
+        "per_unit_count": {
+          "type": "u32"
+        },
+        "per_unit_type": {
+          "type": "string"
+        }
+      }
+    },
+    "reveal": {
+      "opcode": 30,
+      "rust_variant": "Reveal",
+      "effect_kind": "LookReveal",
+      "handler": "effects/misc.rs:21",
+      "handler_fn": "execute_reveal_effect",
+      "aliases": [],
+      "fields": {
+        "source": {
+          "type": "zone"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "count": {
+          "type": "u32"
+        }
+      }
+    },
+    "reveal_until_live_card": {
+      "opcode": 31,
+      "rust_variant": "RevealUntilLiveCard",
+      "effect_kind": "LookReveal",
+      "handler": "effects/misc.rs",
+      "handler_fn": "execute_reveal_until_live_card",
+      "aliases": [],
+      "fields": {
+        "target": {
+          "type": "player",
+          "default": "self"
+        }
+      }
+    },
+    "reveal_until_chosen_card": {
+      "opcode": 29,
+      "rust_variant": "RevealUntilChosenCard",
+      "effect_kind": "LookReveal",
+      "handler": "effects/misc.rs:138",
+      "handler_fn": "execute_reveal_until_chosen_card",
+      "aliases": [],
+      "fields": {}
+    },
+    "reveal_per_group": {
+      "opcode": 27,
+      "rust_variant": "RevealPerGroup",
+      "effect_kind": "LookReveal",
+      "handler": "effects/misc.rs",
+      "handler_fn": "execute_reveal_per_group",
+      "aliases": [],
+      "fields": {
+        "source": {
+          "type": "zone",
+          "default": "hand"
+        },
+        "count": {
+          "type": "u32",
+          "default": 1
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        }
+      }
+    },
+    "select": {
+      "opcode": 32,
+      "rust_variant": "Select",
+      "effect_kind": "SelectTarget",
+      "handler": "effects/draw.rs:264",
+      "handler_fn": "execute_select_effect",
+      "aliases": [],
+      "fields": {
+        "source": {
+          "type": "zone"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "destination": {
+          "type": "zone"
+        },
+        "count": {
+          "type": "u32"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "exclude_self": {
+          "type": "bool"
+        }
+      }
+    },
+    "select_cards": {
+      "opcode": 33,
+      "rust_variant": "SelectCards",
+      "effect_kind": "SelectTarget",
+      "handler": "look.rs",
+      "handler_fn": "execute_select_cards",
+      "aliases": [],
+      "fields": {
+        "source": {
+          "type": "zone"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "destination": {
+          "type": "zone"
+        },
+        "count": {
+          "type": "u32"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "exclude_self": {
+          "type": "bool"
+        },
+        "discard_remaining": {
+          "type": "bool"
+        }
+      }
+    },
+    "select_number": {
+      "opcode": 34,
+      "rust_variant": "SelectNumber",
+      "effect_kind": "SelectTarget",
+      "handler": "effects/draw.rs:568",
+      "handler_fn": "execute_select_number",
+      "aliases": [],
+      "fields": {}
+    },
+    "look_and_select": {
+      "opcode": 0,
+      "rust_variant": "LookAndSelect",
+      "effect_kind": "CompoundEffect",
+      "handler": "look.rs",
+      "handler_fn": "execute_look_and_select",
+      "aliases": [],
+      "fields": {
+        "look_action": {
+          "type": "effect"
+        },
+        "select_action": {
+          "type": "effect"
+        },
+        "source": {
+          "type": "zone"
+        },
+        "target": {
+          "type": "player"
+        },
+        "count": {
+          "type": "u32"
+        }
+      }
+    },
+    "position_change": {
+      "opcode": 25,
+      "rust_variant": "PositionChange",
+      "effect_kind": "PositionOp",
+      "handler": "effects/state.rs",
+      "handler_fn": "execute_position_change",
+      "aliases": [],
+      "fields": {
+        "source": {
+          "type": "zone"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "destination": {
+          "type": "zone"
+        },
+        "position": {
+          "type": "position"
+        },
+        "target_member": {
+          "type": "string"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "exclude_self": {
+          "type": "bool"
+        },
+        "optional": {
+          "type": "bool"
+        },
+        "multiple_targets": {
+          "type": "bool"
+        },
+        "self_target": {
+          "type": "bool"
+        },
+        "activation_position": {
+          "type": "zone"
+        }
+      }
+    },
+    "place_energy_under_member": {
+      "opcode": 23,
+      "rust_variant": "PlaceEnergyUnderMember",
+      "effect_kind": "PositionOp",
+      "handler": "effects/state.rs",
+      "handler_fn": "execute_place_energy_under_member",
+      "aliases": [],
+      "fields": {
+        "source": {
+          "type": "zone"
+        },
+        "destination": {
+          "type": "zone"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "count": {
+          "type": "u32"
+        },
+        "energy_count": {
+          "type": "u32"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "cost_limit": {
+          "type": "u32"
+        },
+        "cost_limit_operator": {
+          "type": "operator"
+        },
+        "optional": {
+          "type": "bool"
+        },
+        "any_number": {
+          "type": "bool"
+        },
+        "state_change": {
+          "type": "state_type"
+        },
+        "target_member": {
+          "type": "string"
+        },
+        "dynamic_count": {
+          "type": "dynamic_count"
+        }
+      }
+    },
+    "rotation": {
+      "opcode": 20,
+      "rust_variant": "Rotation",
+      "effect_kind": "PositionOp",
+      "handler": "effects/state.rs",
+      "handler_fn": "execute_rotation",
+      "aliases": [],
+      "fields": {
+        "target": {
+          "type": "player",
+          "default": "self"
+        }
+      }
+    },
+    "pay_energy": {
+      "opcode": 21,
+      "rust_variant": "PayEnergy",
+      "effect_kind": "GainResource",
+      "handler": "effects/misc.rs:3357",
+      "handler_fn": "execute_pay_energy",
+      "aliases": [],
+      "fields": {
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "count": {
+          "type": "u32"
+        },
+        "energy_count": {
+          "type": "u32"
+        },
+        "optional": {
+          "type": "bool"
+        },
+        "dynamic_count": {
+          "type": "dynamic_count"
+        }
+      }
+    },
+    "set_card_identity": {
+      "opcode": 37,
+      "rust_variant": "SetCardIdentity",
+      "effect_kind": "ChangeState",
+      "handler": "effects/state.rs:997",
+      "handler_fn": "execute_set_card_identity",
+      "aliases": [],
+      "fields": {
+        "identities": {
+          "type": "str_list"
+        },
+        "all_regions": {
+          "type": "bool"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "self_target": {
+          "type": "bool"
+        }
+      }
+    },
+    "set_blade_type": {
+      "opcode": 36,
+      "rust_variant": "SetBladeType",
+      "effect_kind": "MiscOp",
+      "handler": "effects/state.rs:821",
+      "handler_fn": "execute_set_blade_type",
+      "aliases": [],
+      "fields": {
+        "blade_type": {
+          "type": "string"
+        },
+        "duration": {
+          "type": "duration"
+        }
+      }
+    },
+    "set_blade_count": {
+      "opcode": 35,
+      "rust_variant": "SetBladeCount",
+      "effect_kind": "MiscOp",
+      "handler": "effects/state.rs:1025",
+      "handler_fn": "execute_set_blade_count",
+      "aliases": [],
+      "fields": {
+        "value": {
+          "type": "u32"
+        },
+        "count": {
+          "type": "u32"
+        }
+      }
+    },
+    "set_heart_type": {
+      "opcode": 38,
+      "rust_variant": "SetHeartType",
+      "effect_kind": "MiscOp",
+      "handler": "effects/state.rs:903",
+      "handler_fn": "execute_set_heart_type",
+      "aliases": [],
+      "fields": {
+        "heart_type": {
+          "type": "string"
+        },
+        "heart_colors": {
+          "type": "str_list"
+        },
+        "count": {
+          "type": "u32"
+        },
+        "duration": {
+          "type": "duration"
+        },
+        "self_target": {
+          "type": "bool"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "card_type": {
+          "type": "card_type"
+        }
+      }
+    },
+    "specify_heart_color": {
+      "opcode": 39,
+      "rust_variant": "SpecifyHeartColor",
+      "effect_kind": "MiscOp",
+      "handler": "effects/state.rs:1092",
+      "handler_fn": "execute_specify_heart_color",
+      "aliases": [],
+      "fields": {
+        "choice": {
+          "type": "bool"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "count": {
+          "type": "u32"
+        },
+        "position": {
+          "type": "position"
+        }
+      }
+    },
+    "choose_required_hearts": {
+      "opcode": 41,
+      "rust_variant": "ChooseRequiredHearts",
+      "effect_kind": "MiscOp",
+      "handler": "effects/misc.rs:3520",
+      "handler_fn": "execute_choose_required_hearts",
+      "aliases": [],
+      "fields": {}
+    },
+    "choose_target_player": {
+      "opcode": 3,
+      "rust_variant": "ChooseTargetPlayer",
+      "effect_kind": "MiscOp",
+      "handler": "effects/misc.rs:3533",
+      "handler_fn": "execute_choose_target_player",
+      "aliases": [],
+      "fields": {
+        "optional": {
+          "type": "bool"
+        },
+        "choice_options": {
+          "type": "str_list"
+        }
+      }
+    },
+    "sequential": {
+      "opcode": 0,
+      "rust_variant": "Sequential",
+      "effect_kind": "CompoundEffect",
+      "handler": "compound.rs:43",
+      "handler_fn": "execute_sequential_effect",
+      "aliases": [],
+      "is_compound": true,
+      "fields": {
+        "actions": {
+          "type": "effect"
+        },
+        "conditional": {
+          "type": "bool"
+        },
+        "all": {
+          "type": "bool"
+        },
+        "count": {
+          "type": "u32"
+        },
+        "activation_position": {
+          "type": "zone"
+        }
+      }
+    },
+    "conditional_alternative": {
+      "opcode": 41,
+      "rust_variant": "ConditionalAlternative",
+      "effect_kind": "CompoundEffect",
+      "handler": "compound.rs:638",
+      "handler_fn": "execute_conditional_alternative",
+      "aliases": [],
+      "is_compound": true,
+      "fields": {
+        "condition": {
+          "type": "condition"
+        },
+        "primary_effect": {
+          "type": "effect"
+        },
+        "alternative_effect": {
+          "type": "effect"
+        },
+        "alternative_condition": {
+          "type": "condition"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "activation_position": {
+          "type": "zone"
+        },
+        "parenthetical": {
+          "type": "str_list"
+        }
+      }
+    },
+    "conditional_on_result": {
+      "opcode": 5,
+      "rust_variant": "ConditionalOnResult",
+      "effect_kind": "CompoundEffect",
+      "handler": "compound.rs:776",
+      "handler_fn": "execute_conditional_on_result",
+      "aliases": [],
+      "is_compound": true,
+      "fields": {
+        "primary_effect": {
+          "type": "effect"
+        },
+        "followup_action": {
+          "type": "effect"
+        },
+        "duration": {
+          "type": "duration"
+        },
+        "shuffle": {
+          "type": "bool"
+        }
+      }
+    },
+    "conditional_on_optional": {
+      "opcode": 4,
+      "rust_variant": "ConditionalOnOptional",
+      "effect_kind": "CompoundEffect",
+      "handler": "compound.rs:854",
+      "handler_fn": "execute_conditional_on_optional",
+      "aliases": [
+        "conditional_optional"
+      ],
+      "is_compound": true,
+      "fields": {
+        "optional": {
+          "type": "bool"
+        },
+        "conditional": {
+          "type": "bool"
+        },
+        "exclude_self": {
+          "type": "bool"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "trigger_type": {
+          "type": "string"
+        }
+      }
+    },
+    "choice": {
+      "opcode": 0,
+      "rust_variant": "Choice",
+      "effect_kind": "CompoundEffect",
+      "handler": "effects/misc.rs:3224",
+      "handler_fn": "execute_choice",
+      "aliases": [],
+      "is_compound": true,
+      "fields": {
+        "count": {
+          "type": "u32"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "choice_condition": {
+          "type": "condition"
+        },
+        "alternative_condition": {
+          "type": "condition"
+        },
+        "alternative_count_type": {
+          "type": "string"
+        },
+        "options": {
+          "type": "effect"
+        }
+      }
+    },
+    "repeat_procedure": {
+      "opcode": 28,
+      "rust_variant": "RepeatProcedure",
+      "effect_kind": "CompoundEffect",
+      "handler": "compound.rs:759",
+      "handler_fn": "execute_repeat_procedure",
+      "aliases": [],
+      "fields": {
+        "max_repeats": {
+          "type": "u32"
+        },
+        "optional": {
+          "type": "bool"
+        }
+      }
+    },
+    "restriction": {
+      "opcode": 29,
+      "rust_variant": "Restriction",
+      "effect_kind": "RestrictionOp",
+      "handler": "effects/misc.rs:3416",
+      "handler_fn": "execute_restriction",
+      "aliases": [],
+      "fields": {
+        "restriction_type": {
+          "type": "string"
+        },
+        "restricted_destination": {
+          "type": "string"
+        },
+        "delayed": {
+          "type": "bool"
+        },
+        "timing": {
+          "type": "string"
+        },
+        "treat_as": {
+          "type": "string"
+        },
+        "duration": {
+          "type": "duration"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        }
+      }
+    },
+    "activation_restriction": {
+      "opcode": 17,
+      "rust_variant": "ActivationRestriction",
+      "effect_kind": "RestrictionOp",
+      "handler": "effects/misc.rs:3506",
+      "handler_fn": "execute_activation_restriction",
+      "aliases": [],
+      "fields": {
+        "target": {
+          "type": "player",
+          "default": "self"
+        }
+      }
+    },
+    "modify_cost": {
+      "opcode": 15,
+      "rust_variant": "ModifyCost",
+      "effect_kind": "ChangeState",
+      "handler": "effects/state.rs:1192",
+      "handler_fn": "execute_modify_cost",
+      "aliases": [],
+      "fields": {
+        "source": {
+          "type": "zone"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "operation": {
+          "type": "string",
+          "default": "decrease"
+        },
+        "value": {
+          "type": "u32"
+        },
+        "count": {
+          "type": "u32"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "per_unit": {
+          "type": "bool"
+        },
+        "per_unit_count": {
+          "type": "u32"
+        },
+        "per_unit_type": {
+          "type": "string"
+        },
+        "duration": {
+          "type": "duration"
+        },
+        "self_target": {
+          "type": "bool"
+        },
+        "exclude_self": {
+          "type": "bool"
+        },
+        "location": {
+          "type": "zone"
+        },
+        "non_stackable": {
+          "type": "bool"
+        },
+        "conditional": {
+          "type": "bool"
+        },
+        "cost_limit": {
+          "type": "u32"
+        },
+        "cost_limit_operator": {
+          "type": "operator"
+        }
+      }
+    },
+    "set_cost": {
+      "opcode": 21,
+      "rust_variant": "SetCost",
+      "effect_kind": "ChangeState",
+      "handler": "effects/state.rs:769",
+      "handler_fn": "execute_set_cost",
+      "aliases": [],
+      "fields": {
+        "value": {
+          "type": "u32"
+        }
+      }
+    },
+    "set_cost_to_use": {
+      "opcode": 35,
+      "rust_variant": "SetCostToUse",
+      "effect_kind": "ChangeState",
+      "handler": "effects/state.rs:1151",
+      "handler_fn": "execute_set_cost_to_use",
+      "aliases": [],
+      "fields": {
+        "value": {
+          "type": "u32"
+        }
+      }
+    },
+    "modify_yell_count": {
+      "opcode": 19,
+      "rust_variant": "ModifyYellCount",
+      "effect_kind": "ModifyHearts",
+      "handler": "effects/score.rs:529",
+      "handler_fn": "execute_modify_yell_count",
+      "aliases": [],
+      "fields": {
+        "operation": {
+          "type": "string",
+          "default": "subtract"
+        },
+        "count": {
+          "type": "u32"
+        },
+        "duration": {
+          "type": "duration"
+        },
+        "exclude_self": {
+          "type": "bool"
+        },
+        "group_names": {
+          "type": "str_list"
+        }
+      }
+    },
+    "modify_limit": {
+      "opcode": 24,
+      "rust_variant": "ModifyLimit",
+      "effect_kind": "ModifyHearts",
+      "handler": "effects/score.rs:558",
+      "handler_fn": "execute_modify_limit",
+      "aliases": [],
+      "fields": {
+        "operation": {
+          "type": "string",
+          "default": "decrease"
+        },
+        "count": {
+          "type": "u32"
+        }
+      }
+    },
+    "activation_cost": {
+      "opcode": 17,
+      "rust_variant": "ActivationCost",
+      "effect_kind": "ChangeState",
+      "handler": "effects/state.rs:963",
+      "handler_fn": "execute_activation_cost",
+      "aliases": [],
+      "fields": {
+        "operation": {
+          "type": "string",
+          "default": "increase"
+        },
+        "value": {
+          "type": "u32"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "duration": {
+          "type": "duration"
+        }
+      }
+    },
+    "all_blade_timing": {
+      "opcode": 42,
+      "rust_variant": "AllBladeTiming",
+      "effect_kind": "RestrictionOp",
+      "handler": "effects/state.rs:1170",
+      "handler_fn": "execute_all_blade_timing",
+      "aliases": [],
+      "fields": {
+        "timing": {
+          "type": "string"
+        },
+        "treat_as": {
+          "type": "string"
+        }
+      }
+    },
+    "shuffle": {
+      "opcode": 28,
+      "rust_variant": "Shuffle",
+      "effect_kind": "MiscOp",
+      "handler": "effects/misc.rs:3557",
+      "handler_fn": "execute_shuffle",
+      "aliases": [],
+      "fields": {
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "source": {
+          "type": "zone",
+          "default": "deck"
+        }
+      }
+    },
+    "re_yell": {
+      "opcode": 26,
+      "rust_variant": "ReYell",
+      "effect_kind": "MiscOp",
+      "handler": "effects/misc.rs:3468",
+      "handler_fn": "execute_re_yell",
+      "aliases": [],
+      "fields": {
+        "lose_blade_hearts": {
+          "type": "bool"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        }
+      }
+    },
+    "perform_yell": {
+      "opcode": 22,
+      "rust_variant": "PerformYell",
+      "effect_kind": "MiscOp",
+      "handler": "effects/misc.rs:3615",
+      "handler_fn": "execute_perform_yell",
+      "aliases": [],
+      "fields": {
+        "count": {
+          "type": "u32"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "per_unit": {
+          "type": "bool"
+        },
+        "per_unit_count": {
+          "type": "u32"
+        },
+        "per_unit_source": {
+          "type": "string"
+        },
+        "max_repeats": {
+          "type": "u32"
+        },
+        "dynamic_count": {
+          "type": "dynamic_count"
+        }
+      }
+    },
+    "play_baton_touch": {
+      "opcode": 24,
+      "rust_variant": "PlayBatonTouch",
+      "effect_kind": "MiscOp",
+      "handler": "effects/misc.rs:1772",
+      "handler_fn": "execute_play_baton_touch",
+      "aliases": [],
+      "fields": {
+        "count": {
+          "type": "u32",
+          "default": 1
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "group_names": {
+          "type": "str_list"
+        },
+        "optional": {
+          "type": "bool"
+        },
+        "source": {
+          "type": "zone"
+        }
+      }
+    },
+    "discard_until_count": {
+      "opcode": 6,
+      "rust_variant": "DiscardUntilCount",
+      "effect_kind": "MiscOp",
+      "handler": "effects/misc.rs:3377",
+      "handler_fn": "execute_discard_until_count",
+      "aliases": [],
+      "fields": {
+        "target_count": {
+          "type": "u32"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        }
+      }
+    },
+    "draw_until_count": {
+      "opcode": 9,
+      "rust_variant": "DrawUntilCount",
+      "effect_kind": "DrawCards",
+      "handler": "effects/draw.rs",
+      "handler_fn": "execute_draw_until_count",
+      "aliases": [],
+      "fields": {
+        "count": {
+          "type": "u32"
+        },
+        "destination": {
+          "type": "zone",
+          "default": "hand"
+        },
+        "source": {
+          "type": "zone",
+          "default": "deck"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "target_count": {
+          "type": "u32"
+        }
+      }
+    },
+    "reduce_live_card_set_limit": {
+      "opcode": 27,
+      "rust_variant": "ReduceLiveCardSetLimit",
+      "effect_kind": "MiscOp",
+      "handler": "effects/state.rs:1011",
+      "handler_fn": "execute_reduce_live_card_set_limit",
+      "aliases": [],
+      "fields": {
+        "count": {
+          "type": "u32",
+          "default": 1
+        },
+        "card_type": {
+          "type": "card_type"
+        }
+      }
+    },
+    "set_card_identity_all_regions": {
+      "opcode": 43,
+      "rust_variant": "SetCardIdentityAllRegions",
+      "effect_kind": "ChangeState",
+      "handler": "effects/state.rs:1126",
+      "handler_fn": "execute_set_card_identity_all_regions",
+      "aliases": [],
+      "fields": {
+        "identities": {
+          "type": "str_list"
+        }
+      }
+    },
+    "modify_required_hearts_success": {
+      "opcode": 20,
+      "rust_variant": "ModifyRequiredHeartsSuccess",
+      "effect_kind": "ModifyHearts",
+      "handler": "effects/score.rs:587",
+      "handler_fn": "execute_modify_required_hearts_success",
+      "aliases": [],
+      "fields": {
+        "operation": {
+          "type": "string",
+          "default": "increase"
+        },
+        "value": {
+          "type": "u32"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        },
+        "card_type": {
+          "type": "card_type"
+        },
+        "heart_colors": {
+          "type": "str_list"
+        }
+      }
+    },
+    "custom": {
+      "opcode": 44,
+      "rust_variant": "Custom",
+      "effect_kind": "CustomOp",
+      "handler": "effects/misc.rs:88",
+      "handler_fn": "execute_custom",
+      "aliases": [],
+      "fields": {
+        "action_by": {
+          "type": "string"
+        },
+        "opponent_action": {
+          "type": "effect"
+        },
+        "effect_type": {
+          "type": "string"
+        },
+        "replaces_event": {
+          "type": "string"
+        },
+        "choice_based": {
+          "type": "bool"
+        }
+      }
+    },
+    "do_nothing": {
+      "opcode": 7,
+      "rust_variant": "DoNothing",
+      "effect_kind": "MiscOp",
+      "handler": "effects/mod.rs:787",
+      "handler_fn": "(no-op)",
+      "aliases": [],
+      "fields": {}
+    },
+    "modify_required_hearts_global": {
+      "opcode": 17,
+      "rust_variant": "ModifyRequiredHearts",
+      "effect_kind": "ModifyHearts",
+      "handler": "effects/score.rs:488",
+      "handler_fn": "execute_modify_required_hearts_standard",
+      "aliases": [],
+      "fields": {
+        "operation": {
+          "type": "string",
+          "default": "decrease"
+        },
+        "value": {
+          "type": "u32"
+        },
+        "heart_colors": {
+          "type": "str_list"
+        },
+        "all": {
+          "type": "bool"
+        },
+        "target": {
+          "type": "player",
+          "default": "self"
+        }
+      }
+    }
+  },
+  "conditions": {
+    "card_count_condition": {
+      "opcode": 64,
+      "fields": [
+        "location",
+        "operator",
+        "count",
+        "card_type",
+        "group_names",
+        "target"
+      ]
+    },
+    "location_condition": {
+      "opcode": 65,
+      "fields": [
+        "location",
+        "card_type",
+        "exclude_self",
+        "target"
+      ]
+    },
+    "comparison_condition": {
+      "opcode": 66,
+      "fields": [
+        "location",
+        "comparison_type",
+        "aggregate",
+        "operator",
+        "count",
+        "target",
+        "resource_type",
+        "card_type",
+        "group_names"
+      ]
+    },
+    "group_condition": {
+      "opcode": 67,
+      "fields": [
+        "group_names",
+        "count",
+        "operator"
+      ]
+    },
+    "movement_condition": {
+      "opcode": 68,
+      "fields": [
+        "movement",
+        "location",
+        "target",
+        "cost_limit",
+        "exclude_self",
+        "group_names",
+        "card_type"
+      ]
+    },
+    "temporal_condition": {
+      "opcode": 69,
+      "fields": [
+        "count",
+        "operator"
+      ]
+    },
+    "appearance_condition": {
+      "opcode": 70,
+      "fields": [
+        "location",
+        "count"
+      ]
+    },
+    "state_condition": {
+      "opcode": 71,
+      "fields": [
+        "state",
+        "operator",
+        "value"
+      ]
+    },
+    "energy_state_condition": {
+      "opcode": 72,
+      "fields": [
+        "operator",
+        "count"
+      ]
+    },
+    "position_condition": {
+      "opcode": 73,
+      "fields": [
+        "location"
+      ]
+    },
+    "or_condition": {
+      "opcode": 74,
+      "fields": [
+        "conditions"
+      ]
+    },
+    "and_condition": {
+      "opcode": 75,
+      "fields": [
+        "conditions"
+      ]
+    },
+    "end_condition": {
+      "opcode": 76,
+      "fields": []
+    },
+    "highest_cost_on_stage_condition": {
+      "opcode": 77,
+      "fields": []
+    },
+    "state_change_condition": {
+      "opcode": 78,
+      "fields": [
+        "state_change"
+      ]
+    },
+    "card_blade_condition": {
+      "opcode": 79,
+      "fields": [
+        "operator",
+        "count"
+      ]
+    },
+    "all_cost_comparison_condition": {
+      "opcode": 80,
+      "fields": [
+        "operator",
+        "count"
+      ]
+    },
+    "ability_filter_condition": {
+      "opcode": 81,
+      "fields": [
+        "text"
+      ]
+    },
+    "has_moved": {
+      "opcode": 82,
+      "fields": [
+        "position",
+        "group_names"
+      ]
+    },
+    "not_moved": {
+      "opcode": 83,
+      "fields": []
+    },
+    "opponent_live_success": {
+      "opcode": 84,
+      "fields": [
+        "no_excess_heart"
+      ]
+    },
+    "no_excess_heart": {
+      "opcode": 85,
+      "fields": []
+    }
+  }
+}

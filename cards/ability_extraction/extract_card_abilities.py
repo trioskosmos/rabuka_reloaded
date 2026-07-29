@@ -8,11 +8,17 @@ Source: data/cards.json
 """
 
 import json
+import logging
 import re
 import sys
 import io
 from pathlib import Path
 from datetime import datetime
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(levelname)s: %(message)s",
+)
 from collections import defaultdict
 
 # Ensure stdout can handle Unicode (cp932 is the default on Windows Japanese)

@@ -2,39 +2,6 @@
 
 import json, struct, re, hashlib
 from pathlib import Path
-from collections import defaultdict
-
-
-def _parse_list_fields():
-    """Return the set of EffectKind/Condition field names whose Rust type is a
-    Vec-of-strings. These are encoded/decoded as `str_list` so multi-element
-    lists (e.g. heart_colors) round-trip losslessly."""
-    fields = set()
-    try:
-        content = (
-            Path(__file__).parent / ".." / "engine" / "src" / "core" / "card.rs"
-        ).read_text(encoding="utf-8")
-    except OSError:
-        return fields
-    for enum in ("pub enum EffectKind", "pub enum Condition"):
-        ei = content.find(enum)
-        if ei < 0:
-            continue
-        ee = content.find("};", ei) + 2
-        cur = None
-        for line in content[ei:ee].split("\n"):
-            m = re.match(r"    (\w+) \{", line)
-            if m:
-                cur = m.group(1)
-            m2 = re.match(r"        (\w+): (.+),", line)
-            if m2 and cur:
-                t = m2.group(2)
-                if "Vec<String>" in t or "Vec<ArcStr" in t:
-                    fields.add(m2.group(1))
-    return fields
-
-
-LIST_FIELDS = _parse_list_fields()
 
 # ── Value vocabulary tables for type inference ──
 ZONES = {
@@ -318,123 +285,6 @@ class StringTable:
 
     def __len__(self):
         return len(self._strings)
-
-
-# ── Field type inference ──
-def infer_type(name, values):
-    ints = [v for v in values if isinstance(v, int) and not isinstance(v, bool)]
-    if ints and all(v == 0 or v == 1 for v in ints):
-        bools = [v for v in values if isinstance(v, bool)]
-        if len(bools) > len(ints):
-            return "bool"
-    if any(isinstance(v, bool) for v in values):
-        return "bool"
-    if ints:
-        return "u16" if any(v > 255 for v in ints) else "u8"
-    strs = [norm(v) for v in values if isinstance(v, str) and v]
-    if strs:
-        for vtype, vocab in VOCAB.items():
-            if all(s in vocab for s in strs):
-                return vtype
-        for s in strs:
-            if s in ZONES:
-                return "zone"
-    return "str_idx"
-
-
-# ── Scan abilities.json ──
-def scan_abilities(abilities):
-    action_fields = defaultdict(lambda: defaultdict(set))
-    compound_actions = {
-        "sequential",
-        "choice",
-        "conditional",
-        "conditional_alternative",
-        "conditional_on_optional",
-        "conditional_on_result",
-        "look_and_select",
-    }
-
-    def scan(eff, is_sub=False):
-        if not isinstance(eff, dict):
-            return
-        a = eff.get("action", "")
-        if not a:
-            return
-        if a in compound_actions:
-            for k, v in eff.items():
-                if k in (
-                    "action",
-                    "condition",
-                    "alternative",
-                    "actions",
-                    "look_action",
-                    "select_action",
-                    "options",
-                    "choice_condition",
-                    "alternative_condition",
-                    "choice_modifier",
-                    "primary_effect",
-                    "alternative_effect",
-                    "optional_action",
-                    "conditional_action",
-                    "followup_action",
-                    "result_condition",
-                    "gained_effect",
-                    "trigger_event",
-                    "text",
-                    "activation_condition_parsed",
-                    "quoted_text",
-                ):
-                    continue
-                if isinstance(v, (dict, list)):
-                    if isinstance(v, list) and v and isinstance(v[0], str):
-                        action_fields[a][k].add(v[0])
-                    continue
-                action_fields[a][k].add(v)
-            for sk in ("actions", "options"):
-                for sub in eff.get(sk, []):
-                    scan(sub, True)
-            for sk in (
-                "look_action",
-                "select_action",
-                "primary_effect",
-                "alternative_effect",
-                "optional_action",
-                "conditional_action",
-                "followup_action",
-                "result_condition",
-                "gained_effect",
-            ):
-                sub = eff.get(sk)
-                if isinstance(sub, dict):
-                    scan(sub, True)
-            return
-        for k, v in eff.items():
-            if k in ("action", "condition", "alternative", "text", "continuation"):
-                continue
-            if isinstance(v, (dict, list)):
-                if isinstance(v, list) and v and isinstance(v[0], str):
-                    action_fields[a][k].add(v[0])
-                continue
-            action_fields[a][k].add(v)
-
-    for entry in abilities:
-        eff = entry.get("effect")
-        if isinstance(eff, dict):
-            scan(eff)
-
-    result = {}
-    for a, fields in action_fields.items():
-        field_list = [
-            (
-                "str_list" if fn in LIST_FIELDS else infer_type(fn, list(vals)),
-                fn,
-            )
-            for fn, vals in sorted(fields.items())
-        ]
-        result[a] = field_list
-    return result
 
 
 # ── Condition compiler ──
@@ -966,16 +816,6 @@ def main():
         data = json.load(f)
     abilities = data["unique_abilities"]
     print(f"Compiling {len(abilities)} abilities...")
-
-    # scan_abilities is kept for diagnostic reporting of the action-type
-    # vocabulary; it no longer drives the decoder.
-    field_map = scan_abilities(abilities)
-    print(f"Discovered {len(field_map)} action types:")
-    for a in sorted(field_map.keys(), key=lambda x: EFFECT_OPCODES.get(x, 999)):
-        fields = field_map[a]
-        print(
-            f"  0x{EFFECT_OPCODES.get(a, 0):02x} {a}: {[f[0] + ':' + f[1] for f in fields]}"
-        )
 
     bytecode, offsets, strings, card_ability_pairs = compile_all(abilities)
     build_dir = root / "build"

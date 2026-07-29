@@ -536,3 +536,170 @@ impl Default for AbilityQueue {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game_state::AbilityTrigger;
+
+    fn make_entry(card_no: &str, player_id: &str) -> AbilityQueueEntry {
+        AbilityQueueEntry {
+            id: AbilityId::new(card_no, 0, "auto"),
+            card_no: card_no.to_string(),
+            player_id: player_id.to_string(),
+            ability: Arc::new(Ability::default()),
+            ability_index: 0,
+            card_id: None,
+            trigger_type: AbilityTrigger::Auto,
+            completed: false,
+            cost_paid: false,
+            cost_paid_index: 0,
+            choice_card_no: None,
+            conditional_choice: None,
+            effect_started: false,
+            optional_cost_result: None,
+            choice_player_id: None,
+            trigger_moved_cards: None,
+            pending_actions: Vec::new(),
+            resolver: None,
+            triggering_member_id: None,
+            snapshot_movements: SmallVec::new(),
+            choice_effect_text: None,
+            condition_cache: SmallVec::new(),
+        }
+    }
+
+    #[test]
+    fn queue_starts_idle() {
+        let q = AbilityQueue::new();
+        assert!(q.is_idle());
+        assert!(q.is_empty());
+        assert!(q.is_waiting_for_choice().is_none());
+    }
+
+    #[test]
+    fn start_next_skips_completed() {
+        let mut q = AbilityQueue::new();
+        let mut e1 = make_entry("card_1", "p1");
+        e1.completed = true;
+        q.enqueue(e1);
+        q.enqueue(make_entry("card_2", "p1"));
+
+        assert!(q.start_next());
+        assert!(matches!(q.state, QueueState::PayingCost { entry_index: 1 }));
+    }
+
+    #[test]
+    fn start_next_refuses_when_busy() {
+        let mut q = AbilityQueue::new();
+        q.enqueue(make_entry("card_1", "p1"));
+        assert!(q.start_next());
+        assert!(!q.start_next());
+    }
+
+    #[test]
+    fn complete_returns_to_idle() {
+        let mut q = AbilityQueue::new();
+        q.enqueue(make_entry("card_1", "p1"));
+        q.start_next();
+        q.complete_current();
+        assert!(q.is_idle());
+    }
+
+    #[test]
+    fn complete_marks_entry_completed() {
+        let mut q = AbilityQueue::new();
+        q.enqueue(make_entry("card_1", "p1"));
+        q.start_next();
+        q.complete_current();
+        assert!(q.get_entry(0).unwrap().completed);
+    }
+
+    #[test]
+    fn pause_and_resume_choice() {
+        let mut q = AbilityQueue::new();
+        q.enqueue(make_entry("card_1", "p1"));
+        q.start_next();
+
+        q.pause_for_choice(Choice::SelectTarget {
+            target: "test".into(),
+            description: "test".into(),
+            description_en: None,
+            description_ja: None,
+            allow_skip: false,
+            options: None,
+        });
+        assert!(q.is_waiting_for_choice().is_some());
+        assert!(matches!(q.state, QueueState::WaitingForChoice { .. }));
+
+        q.resume_with_choice();
+        assert!(matches!(q.state, QueueState::ExecutingEffect { .. }));
+    }
+
+    #[test]
+    fn complete_sets_choice_player_id() {
+        let mut q = AbilityQueue::new();
+        q.enqueue(make_entry("card_1", "p1"));
+        q.start_next();
+
+        q.pause_for_choice(Choice::SelectTarget {
+            target: "test".into(),
+            description: "test".into(),
+            description_en: None,
+            description_ja: None,
+            allow_skip: false,
+            options: None,
+        });
+
+        let entry = q.get_entry(0).unwrap();
+        assert_eq!(entry.choice_player_id.as_deref(), Some("p1"));
+    }
+
+    #[test]
+    fn sequential_complete_advances_index() {
+        let mut q = AbilityQueue::new();
+        q.enqueue(make_entry("card_1", "p1"));
+        q.enqueue(make_entry("card_2", "p1"));
+        q.start_next();
+        q.complete_current();
+        assert!(q.start_next());
+        assert!(matches!(q.state, QueueState::PayingCost { entry_index: 1 }));
+    }
+
+    #[test]
+    fn all_completed_returns_idle() {
+        let mut q = AbilityQueue::new();
+        let mut e1 = make_entry("card_1", "p1");
+        e1.completed = true;
+        q.enqueue(e1);
+        q.enqueue(make_entry("card_2", "p1"));
+        q.start_next();
+        q.complete_current();
+        assert!(!q.start_next());
+        assert!(q.is_idle());
+    }
+
+    #[test]
+    fn auto_ability_choice_returns_to_idle() {
+        let mut q = AbilityQueue::new();
+        q.pause_for_auto_ability_choice(Choice::SelectTarget {
+            target: "test".into(),
+            description: "test".into(),
+            description_en: None,
+            description_ja: None,
+            allow_skip: false,
+            options: None,
+        });
+        assert!(q.is_waiting_for_choice().is_some());
+        q.resume_with_choice();
+        assert!(q.is_idle());
+    }
+
+    #[test]
+    fn has_entry_with_id_detects_duplicates() {
+        let mut q = AbilityQueue::new();
+        q.enqueue(make_entry("card_1", "p1"));
+        assert!(q.has_entry_with_id(&AbilityId::new("card_1", 0, "auto")));
+        assert!(!q.has_entry_with_id(&AbilityId::new("card_99", 0, "auto")));
+    }
+}

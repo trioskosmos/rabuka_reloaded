@@ -5939,11 +5939,11 @@ def _try_per_unit(text):
                 for st in sub_texts:
                     spa = parse_effect(st)
                     if spa.get("action") != "custom" or spa.get("actions"):
-                        _propagate_if_missing(result, spa)
+                        _propagate(result, spa, skip_existing=True)
                         sub_actions.append(spa)
                 if len(sub_actions) >= 2:
                     fa = {"action": "sequential", "actions": sub_actions}
-                    _propagate_if_missing(result, fa)
+                    _propagate(result, fa, skip_existing=True)
                 else:
                     fa = parse_action(fa_text)
                     _propagate(result, fa)
@@ -5967,58 +5967,38 @@ def _try_per_unit(text):
     return action
 
 
-def _propagate(src, dst):
-    """Copy common per-unit fields from src to dst (overwrites existing)."""
-    for k in (
-        "per_unit",
-        "per_unit_count",
-        "per_unit_type",
-        "per_unit_heart_colors",
-        "card_type",
-        "group_names",
-        "exclude_group_names",
-        "exclude_heart_colors",
-        "distinct",
-        "timing_condition",
-        "state",
-        "location",
-        "cost_limit",
-        "cost_limit_operator",
-        "duration",
-        "condition",
-        "target",
-        "exclude_self",
-        "card_property",
-        "negation",
-        "resource_icon_count",
-    ):
-        if k in src:
-            dst[k] = src[k]
+_PROPAGATE_FIELDS = (
+    "per_unit",
+    "per_unit_count",
+    "per_unit_type",
+    "per_unit_heart_colors",
+    "card_type",
+    "group_names",
+    "exclude_group_names",
+    "exclude_heart_colors",
+    "distinct",
+    "timing_condition",
+    "state",
+    "location",
+    "cost_limit",
+    "cost_limit_operator",
+    "duration",
+    "condition",
+    "target",
+    "exclude_self",
+    "card_property",
+    "negation",
+    "resource_icon_count",
+)
 
 
-def _propagate_if_missing(src, dst):
-    """Copy common per-unit fields from src to dst only if not already present."""
-    for k in (
-        "per_unit",
-        "per_unit_count",
-        "per_unit_type",
-        "per_unit_heart_colors",
-        "card_type",
-        "group_names",
-        "exclude_group_names",
-        "exclude_heart_colors",
-        "distinct",
-        "timing_condition",
-        "state",
-        "location",
-        "cost_limit",
-        "cost_limit_operator",
-        "duration",
-        "condition",
-        "target",
-        "exclude_self",
-    ):
-        if k in src and k not in dst:
+def _propagate(src, dst, skip_existing=False):
+    """Copy common per-unit fields from src to dst.
+
+    If skip_existing is True, only copy fields not already present in dst.
+    """
+    for k in _PROPAGATE_FIELDS:
+        if k in src and (not skip_existing or k not in dst):
             dst[k] = src[k]
 
 
@@ -10699,17 +10679,174 @@ _VALIDATORS = {
     "change_state": {"required": ["state_change"]},
 }
 
+# Known action names that the Rust engine and bytecode compiler accept.
+# Anything not in this set will trigger a warning during extraction.
+_KNOWN_ACTIONS = {
+    "activate_ability",
+    "change_state",
+    "choose_target_player",
+    "conditional_on_optional",
+    "conditional_on_result",
+    "discard_until_count",
+    "do_nothing",
+    "draw_card",
+    "draw_until_count",
+    "gain_ability",
+    "gain_ability_from_source",
+    "gain_resource",
+    "invalidate_ability",
+    "look_at",
+    "modify_cost",
+    "modify_required_hearts",
+    "modify_required_hearts_global",
+    "modify_score",
+    "modify_yell_count",
+    "move_cards",
+    "pay_energy",
+    "perform_yell",
+    "place_energy_under_member",
+    "play_baton_touch",
+    "position_change",
+    "re_yell",
+    "reduce_live_card_set_limit",
+    "repeat_procedure",
+    "restriction",
+    "reveal",
+    "reveal_until_live_card",
+    "select",
+    "select_cards",
+    "select_number",
+    "set_blade_count",
+    "set_blade_type",
+    "set_card_identity",
+    "set_heart_type",
+    "specify_heart_color",
+    "suppress_ability_trigger",
+    "conditional_alternative",
+    # Compound / structural types
+    "sequential",
+    "choice",
+    "look_and_select",
+    # Legacy / alias names accepted by the engine
+    "draw",
+    "look",
+    "reveal_effect",
+    "modify_required_hearts_success",
+    "set_cost",
+    "set_cost_to_use",
+    "activation_cost",
+    "activation_restriction",
+    "all_blade_timing",
+    "shuffle",
+    "custom",
+    # Special / internal
+    "conditional_optional",
+    "set_card_identity_all_regions",
+}
+
+# Known condition types that the Rust engine and bytecode compiler accept.
+_KNOWN_CONDITIONS = {
+    "card_count_condition",
+    "location_condition",
+    "comparison_condition",
+    "group_condition",
+    "movement_condition",
+    "temporal_condition",
+    "appearance_condition",
+    "state_condition",
+    "energy_state_condition",
+    "position_condition",
+    "or_condition",
+    "and_condition",
+    "end_condition",
+    "highest_cost_on_stage_condition",
+    "state_change_condition",
+    "card_blade_condition",
+    "all_cost_comparison_condition",
+    "ability_filter_condition",
+    "has_moved",
+    "not_moved",
+    "opponent_live_success",
+    "no_excess_heart",
+    # Compound / structural
+    "compound",
+    "or_condition",
+    # Legacy / alias names
+    "both_condition",
+    "complex_condition",
+    "otherwise_condition",
+    "action_success_condition",
+    "custom",
+    "revealed_condition",
+    "member_state",
+    "zone_placement_condition",
+    "position_change_condition",
+    "opponent_choice_condition",
+    "any_of_condition",
+    "all_revealed_match_heart_color",
+    "score_threshold_condition",
+    "choice_condition",
+}
+
+
+def _validate_condition_types(cond, context=""):
+    """Recursively validate condition types. Non-fatal warnings."""
+    import logging
+
+    _log = logging.getLogger("parser")
+    if not isinstance(cond, dict):
+        return
+    ctype = cond.get("type", "")
+    if ctype and ctype not in _KNOWN_CONDITIONS:
+        _log.warning("Unknown condition type '%s' in %s", ctype, context or "(root)")
+    # Recurse into compound conditions
+    if ctype in ("compound", "or_condition"):
+        for sub in cond.get("conditions", []):
+            _validate_condition_types(sub, context)
+
 
 def _validate_effect(eff, context=""):
-    """Check required fields for each action type. Non-fatal warnings."""
+    """Check required fields, known action names, and condition types. Non-fatal warnings."""
+    import logging
+
+    _log = logging.getLogger("parser")
     if not isinstance(eff, dict):
         return
     action = eff.get("action", eff.get("type", ""))
+    if action and action not in _KNOWN_ACTIONS:
+        _log.warning("Unknown action type '%s' in %s", action, context or "(root)")
+
     rules = _VALIDATORS.get(action)
     if rules:
         for field in rules["required"]:
             if field not in eff or eff[field] is None:
-                pass
+                _log.warning(
+                    "Action '%s' missing required field '%s' in %s",
+                    action,
+                    field,
+                    context or "(root)",
+                )
+
+    # Validate condition types
+    cond = eff.get("condition")
+    if isinstance(cond, dict):
+        ctype = cond.get("type", "")
+        if ctype and ctype not in _KNOWN_CONDITIONS:
+            _log.warning(
+                "Unknown condition type '%s' in %s (action=%s)",
+                ctype,
+                context or "(root)",
+                action,
+            )
+        # Recurse into compound conditions
+        if ctype in ("compound", "or_condition"):
+            for sub_cond in cond.get("conditions", []):
+                _validate_condition_types(sub_cond, context)
+    # Also check alternative_condition, choice_condition
+    for cond_key in ("alternative_condition", "choice_condition", "result_condition"):
+        sub_cond = eff.get(cond_key)
+        if isinstance(sub_cond, dict):
+            _validate_condition_types(sub_cond, context)
 
     for sub_key in (
         "actions",

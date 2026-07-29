@@ -56,7 +56,7 @@ mod bytecode_deep_compare {
         let mut mismatches = 0usize;
         let mut first: Option<(usize, String, String)> = None;
         for (idx, entry) in json_abilities.iter().enumerate() {
-            let bc = get_ability(idx);
+            let bc = get_ability(idx).ok();
             let jp = json_path_decode(entry);
             match (bc, jp) {
                 (Some(a), Some(b)) => {

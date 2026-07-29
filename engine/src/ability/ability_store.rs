@@ -24,8 +24,9 @@ impl AbilityRef {
     }
 
     /// Decode the ability from bytecode and return an owned `Arc<Ability>`.
-    /// Unlike the old Deref-based lazy cache, this decodes fresh each time
-    /// and the caller drops the Arc when done — no memory leak.
+    /// On decode failure, logs the error and returns a default (empty) ability
+    /// so the game continues running. The error includes the ability index and
+    /// byte range for debugging.
     pub fn resolve(&self) -> Arc<Ability> {
         #[cfg(feature = "ds_debug")]
         {
@@ -40,7 +41,13 @@ impl AbilityRef {
                 nds_println(msg.as_ptr());
             }
         }
-        Arc::new(crate::ability::vm::get_ability(self.0 as usize).unwrap_or_default())
+        match crate::ability::vm::get_ability(self.0 as usize) {
+            Ok(ability) => Arc::new(ability),
+            Err(e) => {
+                log::error!("AbilityRef::resolve() failed for index {}: {e}", self.0);
+                Arc::new(crate::card::Ability::default())
+            }
+        }
     }
 
     /// Legacy alias: returns `self.resolve()`.

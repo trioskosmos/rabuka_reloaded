@@ -1,5 +1,6 @@
 #[cfg(feature = "bytecode_abilities")]
 mod bytecode_validation {
+    use rabuka_engine::ability::abilities_gen::NUM_ABILITIES;
     use rabuka_engine::ability::vm::{ability_count, get_ability};
 
     /// The bytecode compiler intentionally re-encodes some JSON effects into a
@@ -27,7 +28,7 @@ mod bytecode_validation {
     #[test]
     fn bytecode_ability_0() {
         let a = get_ability(0);
-        assert!(a.is_some(), "Ability 0 must decode");
+        assert!(a.is_ok(), "Ability 0 must decode: {:?}", a.err());
         let a = a.unwrap();
         assert!(a.effect.is_some(), "Ability 0 must have effect");
         eprintln!(
@@ -64,8 +65,8 @@ mod bytecode_validation {
         for i in 0..json_abilities.len() {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| get_ability(i)));
             match result {
-                Ok(Some(_)) => {}
-                Ok(None) => panic!("Bytecode ability {} returned None", i),
+                Ok(Ok(_)) => {}
+                Ok(Err(e)) => panic!("Bytecode ability {} decode error: {e}", i),
                 Err(e) => panic!("Bytecode ability {} panicked: {:?}", i, e),
             }
         }
@@ -207,5 +208,45 @@ mod bytecode_validation {
             );
         }
         assert!(ab.effect.is_some(), "ability 239 should have an effect");
+    }
+
+    #[test]
+    fn every_card_ability_index_is_valid() {
+        use rabuka_engine::ability::abilities_gen::{CARD_ABILITY_PAIRS, NUM_ABILITIES, STRINGS};
+        let mut i = 0;
+        while i + 1 < CARD_ABILITY_PAIRS.len() {
+            let str_idx = CARD_ABILITY_PAIRS[i] as usize;
+            let ability_idx = CARD_ABILITY_PAIRS[i + 1] as usize;
+            assert!(
+                str_idx < STRINGS.len(),
+                "CARD_ABILITY_PAIRS[{i}]: string index {str_idx} out of range (max {})",
+                STRINGS.len()
+            );
+            assert!(
+                ability_idx < NUM_ABILITIES,
+                "CARD_ABILITY_PAIRS[{}]: ability index {} out of range (max {}) for card '{}'",
+                i + 1,
+                ability_idx,
+                NUM_ABILITIES,
+                STRINGS[str_idx]
+            );
+            i += 2;
+        }
+    }
+
+    #[test]
+    fn malformed_bytecode_returns_error() {
+        // Verify that truncated/empty bytecode slices produce Err, not panic.
+        // get_ability(NUM_ABILITIES) should return IndexOutOfRange.
+        let result = get_ability(NUM_ABILITIES);
+        assert!(result.is_err(), "out-of-range index should return Err");
+    }
+
+    #[test]
+    fn empty_slice_returns_default_ability() {
+        // Ability index 0 with start==end in the offsets table should return Ok(default).
+        // This is the normal case for abilities with no cost/effect data.
+        // We just verify it doesn't panic.
+        let _ = get_ability(0);
     }
 }

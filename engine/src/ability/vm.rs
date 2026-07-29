@@ -6,6 +6,45 @@ use crate::core::types::ArcStr;
 #[cfg(feature = "no_std")]
 use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
 
+/// Errors that can occur when decoding an ability from bytecode.
+#[derive(Debug, Clone)]
+pub enum DecodeError {
+    /// Ability index is out of range.
+    IndexOutOfRange { idx: usize, max: usize },
+    /// Bytecode slice is empty (offset start >= end).
+    EmptySlice { idx: usize },
+    /// Direct decoder failed and serde fallback also failed.
+    DecodeFailed {
+        idx: usize,
+        byte_range: (usize, usize),
+    },
+    /// Serde deserialization failed after successful JSON reconstruction.
+    SerdeFailed { idx: usize, detail: String },
+}
+
+impl core::fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            DecodeError::IndexOutOfRange { idx, max } => {
+                write!(f, "ability index {idx} out of range (max {max})")
+            }
+            DecodeError::EmptySlice { idx } => {
+                write!(f, "ability {idx} has empty bytecode slice")
+            }
+            DecodeError::DecodeFailed { idx, byte_range } => {
+                write!(
+                    f,
+                    "ability {idx} decode failed (bytes {}..{})",
+                    byte_range.0, byte_range.1
+                )
+            }
+            DecodeError::SerdeFailed { idx, detail } => {
+                write!(f, "ability {idx} serde failed: {detail}")
+            }
+        }
+    }
+}
+
 // DS debug screen print
 #[cfg(feature = "ds_debug")]
 extern "C" {
@@ -36,28 +75,29 @@ pub fn ability_count() -> usize {
 
 /// Decode a single ability from the bytecode blob.
 ///
-/// This is now called ONLY on demand — when an ability is first accessed
-/// via `AbilityRef::deref()`. The decoded ability is cached in a global
-/// `HashMap<u16, &'static Arc<Ability>>` and never decoded again.
+/// Returns `Ok(Ability)` on success, or `Err(DecodeError)` with the ability
+/// index and byte range so callers can log precise diagnostics.
 ///
 /// # Lazy decoding flow
 /// 1. `card_loader` stores only u16 indices (no decode at load time)
-/// 2. On first trigger/access, `AbilityRef::deref()` calls `resolve_arc(idx)`
-/// 3. Cache miss → `get_ability(idx)` decodes from bytecode
-/// 4. Decoded Ability is wrapped in Arc, leaked via Box::leak for 'static lifetime
-/// 5. Subsequent accesses return the cached Arc (pointer deref, no clone)
+/// 2. On first trigger/access, `AbilityRef::resolve()` calls `get_ability(idx)`
+/// 3. Decode from bytecode, falling back to serde path if direct decode fails
+/// 4. Caller wraps in Arc and drops when done — no memory leak
 ///
 /// # RAM savings
 /// Before: All 800 abilities decoded eagerly at load = ~2.8MB
 /// After: Only ~30-45 abilities triggered per game decoded = ~120KB
-pub fn get_ability(idx: usize) -> Option<Ability> {
+pub fn get_ability(idx: usize) -> Result<Ability, DecodeError> {
     if idx >= NUM_ABILITIES {
-        return None;
+        return Err(DecodeError::IndexOutOfRange {
+            idx,
+            max: NUM_ABILITIES,
+        });
     }
     let start = OFFSETS[idx] as usize;
     let end = OFFSETS[idx + 1] as usize;
     if start >= end {
-        return Some(Ability::default());
+        return Ok(Ability::default());
     }
     let slice = &BYTECODE[start..end];
     #[cfg(feature = "ds_debug")]
@@ -76,13 +116,23 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
         }
     }
     let mut bc = BcReader::new(slice);
-    decode_ability(&mut bc).or_else(|| {
-        log::error!(
-            "bytecode: direct decoder failed for ability {idx}, falling back to serde path"
-        );
-        let mut cursor = slice;
-        let value = read_value(&mut cursor)?;
-        decode_like_json(value)
+    if let Some(ability) = decode_ability(&mut bc) {
+        return Ok(ability);
+    }
+    // Direct decoder failed — try serde fallback
+    log::error!(
+        "bytecode: direct decoder failed for ability {idx} (bytes {start}..{end}), \
+         falling back to serde path"
+    );
+    let mut cursor = slice;
+    if let Some(value) = read_value(&mut cursor) {
+        if let Some(ability) = decode_like_json(value) {
+            return Ok(ability);
+        }
+    }
+    Err(DecodeError::DecodeFailed {
+        idx,
+        byte_range: (start, end),
     })
 }
 
