@@ -3133,7 +3133,6 @@ fn main() {
                     dirty = true;
                 }
 
-
                 // Touch: tap board zones to view card details, or overlay to select action
                 let touching = unsafe { _3ds_touch_down() };
                 if touching && !was_touching {
@@ -4795,15 +4794,54 @@ fn main() {
                                     && !is_ai_turn
                                     && !is_opponent_turn_mp
                                 {
+                                    // ---- Build option→text map from SelectAutoAbility ----
+                                    let (opt_map, opt_ability_texts): (
+                                        std::collections::HashMap<i16, i16>,
+                                        std::collections::HashMap<i16, String>,
+                                    ) = {
+                                        let mut m = std::collections::HashMap::new();
+                                        let mut t = std::collections::HashMap::new();
+                                        if let Some(c) = gs.get_pending_choice() {
+                                            use rabuka_engine::ability::types::Choice;
+                                            if let Choice::SelectAutoAbility { options, .. } = c {
+                                                for (i, opt) in options.iter().enumerate() {
+                                                    let idx = i as i16;
+                                                    if let Some(cid) = opt.card_id {
+                                                        m.insert(idx, cid);
+                                                    }
+                                                    t.insert(idx, opt.ability_text.clone());
+                                                }
+                                            }
+                                        }
+                                        (m, t)
+                                    };
+
+                                    // ---- Resolve ability text for hovered card ----
+                                    let hovered_ability_text: Option<String> =
+                                        display_order.get(display_pos).and_then(|&fi| {
+                                            let act = &acts_cache[fi];
+                                            act.parameters.as_ref().and_then(|p| {
+                                                p.card_id.and_then(|cid| {
+                                                    opt_ability_texts.get(&cid).cloned()
+                                                })
+                                            })
+                                        });
+                                    let banner_text: String = hovered_ability_text
+                                        .or_else(|| {
+                                            gs.ability_queue.current_entry().map(|e| {
+                                                i18n::translate_ability(
+                                                    &e.ability.full_text,
+                                                    current_lang(),
+                                                )
+                                            })
+                                        })
+                                        .unwrap_or_default();
+
                                     // ---- Render ability banner first ----
                                     let mut grid_iy: f32 = 42.0;
-                                    if let Some(entry) = gs.ability_queue.current_entry() {
-                                        let ab_text = i18n::translate_ability(
-                                            &entry.ability.full_text,
-                                            current_lang(),
-                                        );
+                                    if !banner_text.is_empty() {
                                         let ab_lines: Vec<String> =
-                                            wrap_ability_text(&ab_text, 392.0, 0.60)
+                                            wrap_ability_text(&banner_text, 392.0, 0.60)
                                                 .lines()
                                                 .take(2)
                                                 .map(|l| l.to_string())
@@ -4824,22 +4862,6 @@ fn main() {
                                         }
                                         grid_iy = 42.0 + h + 4.0;
                                     }
-
-                                    // ---- Choice cards grid (below ability) ----
-                                    let opt_map: std::collections::HashMap<i16, i16> = {
-                                        let mut m = std::collections::HashMap::new();
-                                        if let Some(c) = gs.get_pending_choice() {
-                                            use rabuka_engine::ability::types::Choice;
-                                            if let Choice::SelectAutoAbility { options, .. } = c {
-                                                for (i, opt) in options.iter().enumerate() {
-                                                    if let Some(cid) = opt.card_id {
-                                                        m.insert(i as i16, cid);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        m
-                                    };
                                     let cw = 72.0f32;
                                     let ch = cw / 0.711;
                                     let gap = 4.0f32;
@@ -5874,7 +5896,11 @@ fn main() {
                                                 format!(
                                                     "{}\0",
                                                     if label.chars().count() > 60 {
-                                                        let cutoff = label.char_indices().nth(60).map(|(i, _)| i).unwrap_or(label.len());
+                                                        let cutoff = label
+                                                            .char_indices()
+                                                            .nth(60)
+                                                            .map(|(i, _)| i)
+                                                            .unwrap_or(label.len());
                                                         &label[..cutoff]
                                                     } else {
                                                         &label
