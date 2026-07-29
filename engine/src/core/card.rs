@@ -2977,22 +2977,6 @@ impl AbilityEffect {
 }
 
 impl AbilityEffect {
-    setter!(set_ability_filter, ability_filter: AbilityFilter => [MoveCards, SelectTarget, LookReveal, ChangeState]);
-    box_setter!(set_ability_filter_triggers, ability_filter_triggers: Vec<String> => [MoveCards, SelectTarget, LookReveal, ChangeState]);
-    setter!(set_ability_gain, ability_gain: ArcStr => [AbilityOp]);
-    setter!(set_ability_gain_trigger, ability_gain_trigger: ArcStr => [AbilityOp]);
-    setter!(set_ability_text, ability_text: ArcStr => [AbilityOp]);
-    setter!(set_action_by, action_by: ArcStr => [CustomOp]);
-    setter!(set_activation_position, activation_position: ArcStr => [MoveCards, SelectTarget, LookReveal, GainResource, ChangeState, PositionOp], boxed [MiscOp]);
-
-    setter!(set_allow_occupied_stage, allow_occupied_stage: bool => [MoveCards, PositionOp]);
-    box_setter!(set_alternative_count_type, alternative_count_type: ArcStr => [MiscOp]);
-    box_setter!(set_answers, answers: Vec<String> => [SelectTarget, CompoundEffect, CustomOp]);
-    setter!(set_any_number, any_number: bool => [MoveCards, GainResource, PositionOp, SelectTarget]);
-    setter!(set_blade_limit, blade_limit: u32 => [ChangeState, MiscOp]);
-    setter!(set_blade_limit_operator, blade_limit_operator: Operator => [ChangeState, MiscOp]);
-    box_setter!(set_blade_type, blade_type: ArcStr => [MiscOp]);
-
     pub fn set_card_names(&mut self, val: Vec<String>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
@@ -3016,120 +3000,17 @@ impl AbilityEffect {
             _ => {}
         }
     }
-    setter!(set_card_property, card_property: ArcStr => [MoveCards, SelectTarget, LookReveal, GainResource, ChangeState]);
-    box_setter!(set_characters, characters: Vec<String> => [MoveCards, SelectTarget, LookReveal, GainResource, ChangeState, AbilityOp, RestrictionOp, PositionOp, MiscOp, CustomOp]);
-
-    setter!(set_choice_based, choice_based: bool => [RestrictionOp, CustomOp]);
-    setter!(set_choice_maker, choice_maker: ArcStr => [SelectTarget, CompoundEffect, CustomOp]);
-    box_setter!(set_choice_options, choice_options: Vec<String> => [SelectTarget, CompoundEffect]);
-    setter!(set_choice_type, choice_type: ArcStr => [SelectTarget, CompoundEffect]);
-    setter!(set_cost_from_revealed, cost_from_revealed: bool => [MoveCards, ChangeState, PositionOp]);
-    setter!(set_cost_limit, cost_limit: u32 => [MoveCards, SelectTarget, LookReveal, GainResource, ChangeState, AbilityOp, PositionOp, MiscOp]);
-    setter!(set_cost_limit_max, cost_limit_max: u32 => [MoveCards, SelectTarget, LookReveal]);
-    setter!(set_cost_limit_min, cost_limit_min: u32 => [MoveCards, SelectTarget, LookReveal]);
-    setter!(set_cost_limit_operator, cost_limit_operator: Operator => [MoveCards, SelectTarget, LookReveal, GainResource, ChangeState, AbilityOp, PositionOp, MiscOp]);
-    setter!(set_cost_offset, cost_offset: i32 => [MiscOp]);
-    box_setter!(set_cost_reference, cost_reference: ArcStr => [MiscOp]);
-    setter!(set_cost_total, cost_total: u32 => [MoveCards, SelectTarget, ModifyScore, ModifyHearts, ChangeState, MiscOp]);
-    setter!(set_cost_total_operator, cost_total_operator: Operator => [MoveCards, SelectTarget, ModifyScore, ModifyHearts, ChangeState, MiscOp]);
-
-    setter!(set_discard_remaining, discard_remaining: bool => [MoveCards]);
-    setter!(set_distinct, distinct: DistinctType => [], boxed [MoveCards, SelectTarget, LookReveal, ModifyScore, ChangeState]);
-    setter!(set_duration, duration: ArcStr => [ModifyScore, ModifyHearts, GainResource, AbilityOp, RestrictionOp, CustomOp], boxed [MiscOp]);
-    setter!(set_effect_constraint, effect_constraint: ArcStr => [ModifyScore], boxed [MiscOp]);
-    setter!(set_effect_type, effect_type: ArcStr => [AbilityOp, RestrictionOp, CustomOp]);
-    setter!(set_energy_count, energy_count: u32 => [GainResource, PositionOp, MiscOp]);
-    setter!(set_exclude_by_name_source, exclude_by_name_source: ArcStr => [MoveCards]);
-    box_setter!(set_exclude_characters, exclude_characters: Vec<String> => [MoveCards, SelectTarget, LookReveal, GainResource, ChangeState, AbilityOp, RestrictionOp, PositionOp, MiscOp, CustomOp]);
-    box_setter!(set_exclude_group_names, exclude_group_names: Vec<String> => [MoveCards, SelectTarget, LookReveal, GainResource, ChangeState, AbilityOp, RestrictionOp, PositionOp, MiscOp, CustomOp]);
-    box_setter!(set_exclude_heart_colors, exclude_heart_colors: Vec<String> => [MoveCards, ModifyHearts, ChangeState]);
-    setter!(set_exclude_position, exclude_position: ArcStr => [MoveCards, PositionOp]);
-    setter!(set_exclude_selected, exclude_selected: bool => [MoveCards, SelectTarget]);
-    setter!(set_exclude_self, exclude_self: bool => [MoveCards, SelectTarget, LookReveal, ModifyScore, ModifyHearts, ChangeState, AbilityOp, RestrictionOp, PositionOp, MiscOp, CustomOp]);
-    setter!(set_filter_targets_by_heart_colors, filter_targets_by_heart_colors: bool => [MoveCards, SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState]);
     box_setter!(set_group_names, group_names: Vec<String> => [MoveCards, SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, AbilityOp, RestrictionOp, PositionOp, MiscOp, CustomOp]);
-    setter!(set_group_reference, group_reference: ArcStr => [MoveCards, SelectTarget, LookReveal, ModifyHearts, ChangeState, PositionOp], boxed [MiscOp]);
-    setter!(set_heart_color_count, heart_color_count: u32 => [MiscOp]);
-    setter!(set_heart_color, heart_color: ArcStr => [GainResource]);
-    setter!(set_heart_colors_from_selected_card, heart_colors_from_selected_card: bool => [GainResource]);
-
-    box_setter!(set_heart_type, heart_type: ArcStr => [MiscOp]);
-    box_setter!(set_id, id: ArcStr => [MiscOp]);
-    box_setter!(set_identities, identities: Vec<String> => [ChangeState, MiscOp, CustomOp]);
-    setter!(set_location, location: ArcStr => [MoveCards, DrawCards, SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, AbilityOp, RestrictionOp, CustomOp], boxed [MiscOp]);
-
-    setter!(set_multiple_targets, multiple_targets: bool => [MoveCards, SelectTarget, PositionOp]);
-    setter!(set_name_constraint, name_constraint: ArcStr => [MoveCards, SelectTarget, LookReveal, ChangeState]);
-    setter!(set_name_constraint_source, name_constraint_source: ArcStr => [MoveCards, SelectTarget, LookReveal, ChangeState]);
-    setter!(set_negation, negation: bool => [MoveCards, SelectTarget, LookReveal, ModifyHearts, GainResource, ChangeState, MiscOp]);
-
-    setter!(set_operation, operation: ArcStr => [ModifyScore, ModifyHearts, GainResource, RestrictionOp], boxed [MiscOp]);
-
     pub fn set_optional(&mut self, val: Option<bool>) {
         self.optional = val;
-        match self.kind.as_deref_mut() {
-            Some(EffectKind::SelectTarget {
-                ref mut optional, ..
-            }) => *optional = val,
-            Some(EffectKind::LookReveal {
-                ref mut optional, ..
-            }) => *optional = val,
-            Some(EffectKind::GainResource {
-                ref mut optional, ..
-            }) => *optional = val,
-            Some(EffectKind::ChangeState {
-                ref mut optional, ..
-            }) => *optional = val,
-            Some(EffectKind::CompoundEffect {
-                ref mut optional, ..
-            }) => *optional = val,
-            Some(EffectKind::PositionOp {
-                ref mut optional, ..
-            }) => *optional = val,
-            _ => {}
-        }
     }
-    box_setter!(set_or_card_types, or_card_types: Vec<String> => [MoveCards, SelectTarget, MiscOp]);
-    setter!(set_original_count, original_count: u32 => [ModifyHearts, MiscOp]);
-    setter!(set_original_operator, original_operator: Operator => [ModifyHearts, MiscOp]);
-    setter!(set_original_value, original_value: bool => [MoveCards, SelectTarget, LookReveal, ModifyHearts, GainResource, ChangeState, MiscOp, CustomOp]);
-
-    setter!(set_per_group_count, per_group_count: u32 => [MoveCards, MiscOp]);
+    setter!(set_energy_count, energy_count: u32 => [GainResource, PositionOp, MiscOp]);
     setter!(set_per_unit, per_unit: bool => [SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, MiscOp]);
     setter!(set_per_unit_count, per_unit_count: u32 => [SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, MiscOp]);
-    setter!(set_per_unit_location, per_unit_location: ArcStr => [SelectTarget, LookReveal, ModifyScore, GainResource, ChangeState], boxed [MiscOp]);
     setter!(set_per_unit_type, per_unit_type: ArcStr => [SelectTarget, LookReveal, ModifyScore, GainResource, ChangeState], boxed [MiscOp]);
-
-    box_setter!(set_picker, picker: ArcStr => [MiscOp]);
-    setter!(set_placement_order, placement_order: PlacementOrder => [MoveCards, SelectTarget, MiscOp]);
-    setter!(set_question, question: ArcStr => [SelectTarget, CompoundEffect, CustomOp]);
-    box_setter!(set_ref_value, ref_value: ArcStr => [MiscOp]);
-    setter!(set_repeat_limit, repeat_limit: u32 => [ModifyScore, ModifyHearts, CompoundEffect, MiscOp]);
-    setter!(set_replaces_event, replaces_event: ArcStr => [RestrictionOp, CustomOp]);
-
-    setter!(set_reveal, reveal: bool => [LookReveal, SelectTarget]);
-    setter!(set_resource, resource: ArcStr => [GainResource]);
-    setter!(set_restricted_destination, restricted_destination: ArcStr => [RestrictionOp]);
-    setter!(set_restriction_type, restriction_type: ArcStr => [RestrictionOp]);
-    setter!(set_same_unit_name, same_unit_name: bool => [MiscOp]);
-    setter!(set_self_cost, self_cost: bool => [ChangeState]);
     setter!(set_self_target, self_target: bool => [MoveCards, SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, AbilityOp, RestrictionOp, PositionOp, MiscOp, CustomOp]);
-    setter!(set_shuffle, shuffle: bool => [MoveCards]);
-    setter!(set_sign, sign: ArcStr => [GainResource], boxed [MiscOp]);
-    setter!(set_source_card, source_card: ArcStr => [AbilityOp]);
-    setter!(set_source_position, source_position: ArcStr => [MoveCards, PositionOp]);
     setter!(set_target_count, target_count: u32 => [MoveCards, DrawCards, SelectTarget, ModifyScore, ModifyHearts, CompoundEffect, MiscOp]);
-    setter!(set_target_from_selection, target_from_selection: bool => [MoveCards, GainResource]);
     setter!(set_target_member, target_member: ArcStr => [PositionOp]);
-    setter!(set_target_trigger, target_trigger: ArcStr => [AbilityOp]);
-    setter!(set_timing, timing: ArcStr => [RestrictionOp, CustomOp], boxed [MiscOp]);
-    setter!(set_timing_condition, timing_condition: ArcStr => [ModifyHearts, RestrictionOp]);
-    setter!(set_treat_as, treat_as: ArcStr => [RestrictionOp, CustomOp], boxed [MiscOp]);
-    box_setter!(set_trigger_filter, trigger_filter: Vec<String> => [AbilityOp, RestrictionOp, CustomOp]);
-    setter!(set_trigger_type, trigger_type: ArcStr => [AbilityOp, RestrictionOp, CustomOp]);
-    setter!(set_triggers, triggers: ArcStr => [AbilityOp, CustomOp]);
-
-    setter!(set_value, value: u32 => [ModifyScore, ModifyHearts, GainResource, MiscOp]);
 }
 
 impl AbilityEffect {
