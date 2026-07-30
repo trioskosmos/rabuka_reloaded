@@ -261,7 +261,7 @@ Enum shrinks from 544 -> ~140 bytes (largest variant with only unique fields). ~
 | 1 | Low | `refactor: replace conditional_choice JSON string with tagged enum` | DONE |
 | 2 | Medium | `refactor: downsize u32/i32 fields to u8/i8 in ability types` | DONE |
 | 3 | Low | `perf: single-byte indices for common bytecode field names` | **DONE** |
-| 4 | Medium | `perf: encode EffectKind variant tags in bytecode` | TODO |
+| 4 | Medium | `perf: encode EffectKind variant tags in bytecode` | **DONE** |
 | 5 | High | `perf: direct binary decoder, eliminate serde_json::from_value` | TODO |
 | 6 | High | `refactor: extract EffectFilter sub-struct from EffectKind` | TODO |
 
