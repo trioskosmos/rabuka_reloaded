@@ -1104,9 +1104,11 @@ int _3ds_uds_is_connected() {
     return uds_connected ? 1 : 0;
 }
 
- // ── QR Code Scanning ──
- // Based on FBI's capturecam.c approach: continuous capture with mutex-protected shared buffer.
- // Improvements over FBI: robust shutdown, NULL safety, retry logic, proper quirc_end discipline.
+// ── QR Code Scanning ──
+// Based on Anemone3DS camera.c approach: continuous capture with reader-writer sync.
+// Key differences from FBI: RGB565 texture format (not RGBA8), Morton-order tiling,
+// proper shutdown with event-based thread synchronization, correct grayscale conversion.
+// Improvements over FBI: robust shutdown, NULL safety, retry logic, proper quirc_end discipline.
  #include "quirc.h"
  #include <3ds/services/cam.h>
  #include <3ds/services/gspgpu.h>
@@ -1132,34 +1134,31 @@ int _3ds_uds_is_connected() {
   static bool cam_tex_inited = false;
   static int qr_frame_skip = 0;
  
- static void _3ds_qr_update_texture(const u8 *buf, int w, int h) {
-      if (!cam_tex_inited) {
-          C3D_TexInit(&cam_tex, w, h, GPU_RGBA8);
-          cam_tex_inited = true;
-      }
-      if (!cam_tex.data) return;
-      for (int y = 0; y < h; y++) {
-          for (int x = 0; x < w; x++) {
-              int si = y * w + x;
-              u16 p = ((u16*)buf)[si];
-              u8 r = ((p >> 11) & 0x1F) << 3;
-              u8 g = ((p >> 5) & 0x3F) << 2;
-              u8 b = (p & 0x1F) << 3;
-              int di = y * w + x;
-              ((u32*)cam_tex.data)[di] = r | (g << 8) | (b << 16) | 0xFF000000;
-          }
-      }
-      GSPGPU_FlushDataCache(cam_tex.data, w * h * 4);
-  }
+static void _3ds_qr_update_texture(const u16 *buf, int w, int h) {
+       if (!cam_tex_inited) {
+           C3D_TexInit(&cam_tex, w, h, GPU_RGB565);
+           C3D_TexSetFilter(&cam_tex, GPU_LINEAR, GPU_LINEAR);
+           cam_tex_inited = true;
+       }
+       if (!cam_tex.data) return;
+       for (int y = 0; y < h; y++) {
+           for (int x = 0; x < w; x++) {
+               int si = y * w + x;
+               int di = ((((y >> 3) * (w >> 3) + (x >> 3)) << 6) + ((x & 1) | ((y & 1) << 1) | ((x & 2) << 1) | ((y & 2) << 2) | ((x & 4) << 2) | ((y & 4) << 3)));
+               ((u16*)cam_tex.data)[di] = buf[si];
+           }
+       }
+       GSPGPU_FlushDataCache(cam_tex.data, w * h * 2);
+   }
  
- void _3ds_qr_draw_preview(float x_off) {
-      if (!cam_running || !cam_tex_inited || !cam_shared_buf || !cam_tex.data) return;
-      if (svcWaitSynchronization(cam_mutex, 100000000ULL) != 0) return;
-      _3ds_qr_update_texture(cam_shared_buf, QR_W, QR_H);
-      svcReleaseMutex(cam_mutex);
-      C2D_Image img = { .tex = &cam_tex, .subtex = NULL };
-     C2D_DrawImageAt(img, x_off, 0.0f, 0.4f, NULL, 1.0f, 1.0f);
- }
+void _3ds_qr_draw_preview(float x_off) {
+       if (!cam_running || !cam_tex_inited || !cam_shared_buf || !cam_tex.data) return;
+       if (svcWaitSynchronization(cam_mutex, 100000000ULL) != 0) return;
+       _3ds_qr_update_texture((const u16*)cam_shared_buf, QR_W, QR_H);
+       svcReleaseMutex(cam_mutex);
+       C2D_Image img = { .tex = &cam_tex, .subtex = NULL };
+       C2D_DrawImageAt(img, x_off, 0.0f, 0.4f, NULL, 1.0f, 1.0f);
+   }
 
  static void cam_thread_func(void *arg) {
      (void)arg;
@@ -1305,27 +1304,30 @@ int _3ds_uds_is_connected() {
       return 0;
   }
 
- void _3ds_qr_stop(void) {
-     if (!cam_running) return;
-     svcSignalEvent(cam_cancel);
-     // Wait for thread to finish with timeout, then force cleanup if needed
-     if (cam_thread) {
-         s32 threadRet = threadJoin(cam_thread, 3000000000ULL); // 3s timeout
-         if (threadRet != 0) {
-             // Thread did not exit cleanly — force terminate
-             threadFree(cam_thread);
-         } else {
-             threadFree(cam_thread);
-         }
-         cam_thread = NULL;
-     }
-     if (qr) { quirc_destroy(qr); qr = NULL; }
-     if (cam_tex_inited) { C3D_TexDelete(&cam_tex); cam_tex_inited = false; }
-     if (cam_shared_buf) { linearFree(cam_shared_buf); cam_shared_buf = NULL; }
-     if (cam_mutex) { svcCloseHandle(cam_mutex); cam_mutex = 0; }
-     if (cam_cancel) { svcCloseHandle(cam_cancel); cam_cancel = 0; }
-     cam_running = false;
- }
+void _3ds_qr_stop(void) {
+       if (!cam_running) return;
+       cam_running = false;
+       svcSignalEvent(cam_cancel);
+       // Wait for camera thread to finish, with timeout
+       if (cam_thread) {
+           s32 threadRet = threadJoin(cam_thread, 5000000000ULL); // 5s timeout
+           if (threadRet != 0) {
+               // Thread did not exit cleanly — force cleanup
+               threadFree(cam_thread);
+           } else {
+               threadFree(cam_thread);
+           }
+           cam_thread = NULL;
+       }
+       // Clean up quirc and texture
+       if (qr) { quirc_destroy(qr); qr = NULL; }
+       if (cam_tex_inited) { C3D_TexDelete(&cam_tex); cam_tex_inited = false; }
+       // Free shared buffer
+       if (cam_shared_buf) { linearFree(cam_shared_buf); cam_shared_buf = NULL; }
+       // Close kernel handles
+       if (cam_mutex) { svcCloseHandle(cam_mutex); cam_mutex = 0; }
+       if (cam_cancel) { svcCloseHandle(cam_cancel); cam_cancel = 0; }
+   }
 
 int _3ds_qr_poll(char *out_text, unsigned int out_max) {
        if (out_max == 0) return -1;
@@ -1344,13 +1346,13 @@ int _3ds_qr_poll(char *out_text, unsigned int out_max) {
        memcpy(local_buf, cam_shared_buf, QR_W * QR_H * sizeof(u16));
        svcReleaseMutex(cam_mutex);
 
-       // RGB565 → grayscale for quirc (no mutex needed, operates on local copy)
+       // RGB565 → grayscale for quirc (scale channels to 8-bit before averaging)
        for (int i = 0; i < QR_W * QR_H; i++) {
            u16 p = local_buf[i];
            u8 r = (p >> 11) & 0x1F;
            u8 g = (p >> 5) & 0x3F;
            u8 b = p & 0x1F;
-           qbuf[i] = (u8)((r * 77 + g * 150 + b * 29) >> 8);
+           qbuf[i] = (u8)(((r << 3) + (g << 2) + (b << 3)) / 3);
        }
 
        quirc_end(qr);

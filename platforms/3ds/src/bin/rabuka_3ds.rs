@@ -196,17 +196,19 @@ fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32) {
         let after = &rest[start + 2..];
         if let Some(end) = after.find("}}") {
             let inner = &after[..end];
-            if let Some(bar) = inner.find('|') {
-                let file = &inner[..bar];
-                let iw = icon_width_for(file, icon_h);
-                let icon_name = file.strip_suffix(".png").unwrap_or(file);
-                let atlas_name = format!("icon_{}.png.t3x", icon_name);
-                let c_str = std::ffi::CString::new(atlas_name.as_str()).unwrap_or_default();
-                unsafe {
-                    _3ds_top_queue_card(c_str.as_ptr() as *const u8, 0, cx, icon_y, iw, icon_h);
-                }
-                cx += iw + scale * 6.0;
+            let (file, _label) = if let Some(bar) = inner.find('|') {
+                (&inner[..bar], &inner[bar + 1..])
+            } else {
+                (inner, "")
+            };
+            let icon_name = file.strip_suffix(".png").unwrap_or(file);
+            let iw = icon_width_for(file, icon_h);
+            let atlas_name = format!("icon_{}.png.t3x", icon_name);
+            let c_str = std::ffi::CString::new(atlas_name.as_str()).unwrap_or_default();
+            unsafe {
+                _3ds_top_queue_card(c_str.as_ptr() as *const u8, 0, cx, icon_y, iw, icon_h);
             }
+            cx += iw + scale * 6.0;
             rest = &after[end + 2..];
         } else {
             break;
@@ -224,7 +226,9 @@ fn icon_width_for(file: &str, h: f32) -> f32 {
     // Known icon dimensions (from docs/img/texticon/*.png)
     // Square icons (160x160): hearts, blades, energy, score, etc.
     // Rectangular: triggers and position icons
-    let (w, ih) = match file {
+    // Strip optional "icon_" prefix so both "kidou.png" and "icon_kidou.png" match
+    let clean = file.strip_prefix("icon_").unwrap_or(file);
+    let (w, ih) = match clean {
         // Triggers: kidou=378x160, jidou=427x160, jyouji=378x160, toujyou=378x160
         f if f.starts_with("kidou") || f.starts_with("jyouji") || f.starts_with("toujyou") => {
             (378.0, 160.0)
@@ -344,7 +348,7 @@ fn card_stat_line(
             s.push_str("  ");
         }
         if blade > 0 {
-            s.push_str(&format!("{{{{blade.png|BLADE}}}}{}", blade));
+            s.push_str(&format!("{{{{icon_blade.png|BLADE}}}}{}", blade));
         }
     } else if variant == "live_card" {
         // Live: score → need_heart
@@ -445,6 +449,20 @@ fn compute_card_stats(
         heart_str,
         need_heart_str,
     }
+}
+
+/// Check if a choice action is text-only (no card image to render).
+/// Used to separate card choices from text choices in the choice grid.
+fn is_text_only(act: &game_setup::Action) -> bool {
+    if let Some(cn) = act.parameters.as_ref().and_then(|p| p.card_no.as_deref()) {
+        if matches!(
+            cn,
+            "pay_optional_cost" | "skip_optional_cost" | "yes" | "no" | "select"
+        ) {
+            return true;
+        }
+    }
+    act.parameters.as_ref().and_then(|p| p.card_id).is_none()
 }
 
 /// Find a break point in a string so the prefix fits within max_px pixels.
@@ -1014,7 +1032,8 @@ fn main() {
                                         230.0,
                                         COL_MED,
                                         0.60f32,
-                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back")).as_ptr(),
+                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back"))
+                                            .as_ptr(),
                                     );
                                 }
                             }
@@ -1151,7 +1170,8 @@ fn main() {
                                         228.0,
                                         COL_MED,
                                         0.65f32,
-                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back")).as_ptr(),
+                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back"))
+                                            .as_ptr(),
                                     );
                                 }
                             }
@@ -1171,12 +1191,7 @@ fn main() {
                                 true,
                             )
                         } else if keys & 0x00000002 != 0 {
-                            Step::Setup(
-                                cards.clone(),
-                                decks.clone(),
-                                SetupPhase::PickMode(4),
-                                true,
-                            )
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(4), true)
                         } else if keys & 0x00000001 != 0 {
                             if is_multiplayer {
                                 // Local Multiplayer: go to role selection
@@ -1282,7 +1297,8 @@ fn main() {
                                         228.0,
                                         COL_MED,
                                         0.65f32,
-                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back")).as_ptr(),
+                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back"))
+                                            .as_ptr(),
                                     );
                                 }
                             }
@@ -1302,12 +1318,7 @@ fn main() {
                                 true,
                             )
                         } else if keys & 0x00000002 != 0 {
-                            Step::Setup(
-                                cards.clone(),
-                                decks.clone(),
-                                SetupPhase::PickMode(4),
-                                true,
-                            )
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(4), true)
                         } else if keys & 0x00000001 != 0 {
                             // A = select deck, go to role selection with deck index
                             Step::Setup(
@@ -1536,135 +1547,132 @@ fn main() {
                             Step::Setup(cards.clone(), decks.clone(), SetupPhase::Testing, false)
                         }
                     }
-SetupPhase::QrScan => {
-                          let mut qr_start_failed = false;
-                          if was_dirty {
-                              let qr_start_res = unsafe { _3ds_qr_start() };
-                              if qr_start_res != 0 {
-                                  unsafe {
-                                      _3ds_clear_both();
-                                      _3ds_text_add_top(
-                                          format!("{}\n\0", tl("Camera init failed")).as_ptr(),
-                                      );
-                                      _3ds_text_add_top(format!("{}\0", tl("B=back")).as_ptr());
-                                  }
-                                  unsafe {
-                                      _3ds_qr_stop();
-                                  }
-                                  qr_start_failed = true;
-                              } else {
-                                  if unsafe { _3ds_is_cli_mode() } {
-                                      unsafe {
-                                          _3ds_clear_top();
-                                      }
-                                      unsafe {
-                                          _3ds_text_add_top(format!("{}\n\0", tl("QR SCAN")).as_ptr());
-                                          _3ds_text_add_top(
-                                              format!(
-                                                  "{}\n{}\0",
-                                                  tl("Point camera at QR code"),
-                                                  tl("B=cancel")
-                                              )
-                                              .as_ptr(),
-                                          );
-                                      }
-                                  } else {
-                                      unsafe {
-                                          _3ds_top_clear();
-                                          _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                                          let qr_hdr = tl("QR SCAN");
-                                          _3ds_top_queue_text(
-                                              120.0,
-                                              8.0,
-                                              COL_GOLD,
-                                              0.85f32,
-                                              format!("{}\0", qr_hdr).as_ptr(),
-                                          );
-                                          let qr_msg = tl("Point camera at deck QR code");
-                                          _3ds_top_queue_text(
-                                              40.0,
-                                              60.0,
-                                              COL_LIGHT,
-                                              0.70f32,
-                                              format!("{}\0", qr_msg).as_ptr(),
-                                          );
-                                          let qr_auto = tl("Auto-detects when QR is visible");
-                                          _3ds_top_queue_text(
-                                              40.0,
-                                              85.0,
-                                              COL_MED,
-                                              0.65f32,
-                                              format!("{}\0", qr_auto).as_ptr(),
-                                          );
-                                          let qr_cancel = tl("B=cancel");
-                                          _3ds_top_queue_text(
-                                              40.0,
-                                              230.0,
-                                              COL_MED,
-                                              0.60f32,
-                                              format!("{}\0", qr_cancel).as_ptr(),
-                                          );
-                                  }
-                              }
-                          }
-                          if qr_start_failed {
-                              Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
-                          } else if keys & 0x00000002 != 0 {
-                             unsafe {
-                                 _3ds_qr_stop();
-                             }
-                             Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
-                         } else {
-                             let mut buf = [0u8; 2048];
-                             let r = unsafe { _3ds_qr_poll(buf.as_mut_ptr(), buf.len() as u32) };
-                             if r > 0 {
-                                 unsafe {
-                                     _3ds_qr_stop();
-                                 }
-                                 let text = String::from_utf8_lossy(&buf[..r as usize]).to_string();
-                                 let cards_read = DeckParser::parse_deck_content(&text);
-                                 if cards_read.is_empty() {
-                                     Step::Setup(
-                                         cards.clone(),
-                                         decks.clone(),
-                                         SetupPhase::QrScan,
-                                         true,
-                                     )
-                                 } else {
-                                     Step::Setup(
-                                         cards.clone(),
-                                         decks.clone(),
-                                         SetupPhase::QrResult(cards_read),
-                                         true,
-                                     )
-                                 }
-} else if r < 0 {
-                                  // Camera error (not running, alloc failed, etc.)
-                                  unsafe {
-                                      _3ds_clear_both();
-                                      _3ds_text_add_top(
-                                          format!(
-                                              "{}\n\0",
-                                              tl_fmt("Camera error", &[("e", &r.to_string())])
-                                          )
-                                          .as_ptr(),
-                                      );
-                                      _3ds_text_add_top(format!("{}\0", tl("B=back")).as_ptr());
-                                  }
-                                  unsafe {
-                                      _3ds_qr_stop();
-                                  }
-                                  Step::Setup(
-                                      cards.clone(),
-                                      decks.clone(),
-                                      SetupPhase::PickMode(5),
-                                      true,
-                                  )
-                             } else {
-                                 Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan, false)
-                             }
-                         }
-                     }
+                    SetupPhase::QrScan => {
+                        let mut qr_start_failed = false;
+                        if was_dirty {
+                            let qr_start_res = unsafe { _3ds_qr_start() };
+                            if qr_start_res != 0 {
+                                unsafe {
+                                    _3ds_clear_both();
+                                    _3ds_text_add_top(
+                                        format!("{}\n\0", tl("Camera init failed")).as_ptr(),
+                                    );
+                                    _3ds_text_add_top(format!("{}\0", tl("B=back")).as_ptr());
+                                }
+                                unsafe {
+                                    _3ds_qr_stop();
+                                }
+                                qr_start_failed = true;
+                            } else if unsafe { _3ds_is_cli_mode() } {
+                                unsafe {
+                                    _3ds_clear_top();
+                                    _3ds_text_add_top(format!("{}\n\0", tl("QR SCAN")).as_ptr());
+                                    _3ds_text_add_top(
+                                        format!(
+                                            "{}\n{}\0",
+                                            tl("Point camera at QR code"),
+                                            tl("B=cancel")
+                                        )
+                                        .as_ptr(),
+                                    );
+                                }
+                            } else {
+                                unsafe {
+                                    _3ds_top_clear();
+                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                    let qr_hdr = tl("QR SCAN");
+                                    _3ds_top_queue_text(
+                                        120.0,
+                                        8.0,
+                                        COL_GOLD,
+                                        0.85f32,
+                                        format!("{}\0", qr_hdr).as_ptr(),
+                                    );
+                                    let qr_msg = tl("Point camera at deck QR code");
+                                    _3ds_top_queue_text(
+                                        40.0,
+                                        60.0,
+                                        COL_LIGHT,
+                                        0.70f32,
+                                        format!("{}\0", qr_msg).as_ptr(),
+                                    );
+                                    let qr_auto = tl("Auto-detects when QR is visible");
+                                    _3ds_top_queue_text(
+                                        40.0,
+                                        85.0,
+                                        COL_MED,
+                                        0.65f32,
+                                        format!("{}\0", qr_auto).as_ptr(),
+                                    );
+                                    let qr_cancel = tl("B=cancel");
+                                    _3ds_top_queue_text(
+                                        40.0,
+                                        230.0,
+                                        COL_MED,
+                                        0.60f32,
+                                        format!("{}\0", qr_cancel).as_ptr(),
+                                    );
+                                }
+                            }
+                        }
+                        if qr_start_failed {
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
+                        } else if keys & 0x00000002 != 0 {
+                            unsafe {
+                                _3ds_qr_stop();
+                            }
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
+                        } else {
+                            let mut buf = [0u8; 2048];
+                            let r = unsafe { _3ds_qr_poll(buf.as_mut_ptr(), buf.len() as u32) };
+                            if r > 0 {
+                                unsafe {
+                                    _3ds_qr_stop();
+                                }
+                                let text = String::from_utf8_lossy(&buf[..r as usize]).to_string();
+                                let cards_read = DeckParser::parse_deck_content(&text);
+                                if cards_read.is_empty() {
+                                    Step::Setup(
+                                        cards.clone(),
+                                        decks.clone(),
+                                        SetupPhase::QrScan,
+                                        true,
+                                    )
+                                } else {
+                                    Step::Setup(
+                                        cards.clone(),
+                                        decks.clone(),
+                                        SetupPhase::QrResult(cards_read),
+                                        true,
+                                    )
+                                }
+                            } else if r < 0 {
+                                // Camera error (not running, alloc failed, etc.)
+                                unsafe {
+                                    _3ds_clear_both();
+                                    _3ds_text_add_top(
+                                        format!(
+                                            "{}\n\0",
+                                            tl_fmt("Camera error", &[("e", &r.to_string())])
+                                        )
+                                        .as_ptr(),
+                                    );
+                                    _3ds_text_add_top(format!("{}\0", tl("B=back")).as_ptr());
+                                }
+                                unsafe {
+                                    _3ds_qr_stop();
+                                }
+                                Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::PickMode(5),
+                                    true,
+                                )
+                            } else {
+                                Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan, false)
+                            }
+                        }
+                    }
                     SetupPhase::QrResult(cards_read) => {
                         if was_dirty {
                             if unsafe { _3ds_is_cli_mode() } {
@@ -1748,14 +1756,8 @@ SetupPhase::QrScan => {
                                 entries,
                             };
                             let mut new_decks = decks.clone();
-                            let dlen = new_decks.len();
                             new_decks.push(qr_deck);
-                            Step::Setup(
-                                cards.clone(),
-                                new_decks,
-                                SetupPhase::PickDeck(dlen, true, false),
-                                true,
-                            )
+                            Step::Setup(cards.clone(), new_decks, SetupPhase::PickMode(0), true)
                         } else {
                             Step::Setup(
                                 cards.clone(),
@@ -1787,7 +1789,9 @@ SetupPhase::QrScan => {
                                     _3ds_text_add_top(
                                         format!("{} {}\n\0", arrow_c, client_label).as_ptr(),
                                     );
-                                _3ds_text_add_top("\nUP/DOWN=select A=confirm B=back\0".as_ptr());
+                                    _3ds_text_add_top(
+                                        "\nUP/DOWN=select A=confirm B=back\0".as_ptr(),
+                                    );
                                 }
                             } else {
                                 unsafe {
@@ -2652,8 +2656,13 @@ SetupPhase::QrScan => {
                             _3ds_text_set_scroll_y(sy + 10);
                         }
                     }
-                } else {
+                } else if !(choice_image_mode
+                    && gs.has_pending_choice()
+                    && zone_viewer.is_none()
+                    && overlay == Overlay::None)
+                {
                     // Navigate in display space with wrap-around
+                    // Skipped when choice grid handles its own navigation
                     let n = display_order.len();
                     if n > 0 {
                         if keys & 0x00000040 != 0 {
@@ -2718,7 +2727,8 @@ SetupPhase::QrScan => {
                             }
                         }
                     } else {
-                        // === Choices grid: L opens text overlay, DPAD navigates items ===
+                        // === Choices: L opens text overlay, DPAD navigates items ===
+                        // Card items use grid navigation; text items use vertical list navigation.
                         if keys & 0x00000200 != 0 {
                             let has_ab_entry = gs.ability_queue.current_entry().is_some();
                             if has_ab_entry {
@@ -2729,50 +2739,43 @@ SetupPhase::QrScan => {
                         }
                         let n = display_order.len();
                         if n > 0 {
-                            if keys & 0x00000040 != 0 {
-                                // UP: move back by one row (5 items)
-                                let row = 5usize;
-                                if display_pos >= row {
-                                    display_pos -= row;
-                                } else {
-                                    display_pos = 0;
-                                }
-                                if display_pos < choice_grid_offset {
-                                    choice_grid_offset = display_pos / row * row;
-                                }
-                                cur = display_order[display_pos];
-                                redraw = true;
-                            }
-                            if keys & 0x00000080 != 0 {
-                                // DOWN: move forward by one row (5 items)
-                                let row = 5usize;
-                                display_pos = (display_pos + row).min(n - 1);
-                                let visible_end = choice_grid_offset + 10;
-                                if display_pos >= visible_end {
-                                    choice_grid_offset = (display_pos / row) * row;
-                                    choice_grid_offset = choice_grid_offset.saturating_sub(row);
-                                }
-                                cur = display_order[display_pos];
-                                redraw = true;
-                            }
-                            if keys & 0x00000020 != 0 {
-                                // LEFT: move back by 1, don't cross row boundary
-                                let row_start = choice_grid_offset;
-                                if display_pos > row_start {
+                            let cols_c = 5usize;
+                            let has_ability = gs.ability_queue.current_entry().is_some();
+                            let pp = if has_ability { cols_c } else { cols_c * 2 };
+
+                            // Detect current item type for navigation style
+                            let cur_is_text = display_order
+                                .get(display_pos)
+                                .map_or(false, |&fi| is_text_only(&acts_cache[fi]));
+
+                            if cur_is_text {
+                                // Text item: navigate by 1
+                                if keys & 0x00000040 != 0 && display_pos > 0 {
                                     display_pos -= 1;
                                 }
-                                cur = display_order[display_pos];
-                                redraw = true;
-                            }
-                            if keys & 0x00000010 != 0 {
-                                // RIGHT: move forward by 1, don't cross row boundary
-                                let row_end = (choice_grid_offset + 5).min(n);
-                                if display_pos + 1 < row_end {
+                                if keys & 0x00000080 != 0 && display_pos + 1 < n {
                                     display_pos += 1;
                                 }
-                                cur = display_order[display_pos];
-                                redraw = true;
+                            } else {
+                                // Card item: grid navigation by row
+                                if keys & 0x00000040 != 0 {
+                                    display_pos = display_pos.saturating_sub(cols_c);
+                                }
+                                if keys & 0x00000080 != 0 {
+                                    display_pos = (display_pos + cols_c).min(n - 1);
+                                }
                             }
+                            // LEFT/RIGHT always by 1
+                            if keys & 0x00000020 != 0 && display_pos > 0 {
+                                display_pos -= 1;
+                            }
+                            if keys & 0x00000010 != 0 && display_pos + 1 < n {
+                                display_pos += 1;
+                            }
+
+                            choice_grid_offset = (display_pos / pp) * pp;
+                            cur = display_order[display_pos];
+                            redraw = true;
                         }
                     }
                 }
@@ -4527,15 +4530,10 @@ SetupPhase::QrScan => {
                                 }
                                 if let Some(card) = gs.card_database.get_card(cid) {
                                     if let Some(ref base_heart) = card.base_heart {
-                                        let h_mult = gs
-                                            .mods
-                                            .heart_color_multiplier
-                                            .get(&cid)
-                                            .copied();
+                                        let h_mult =
+                                            gs.mods.heart_color_multiplier.get(&cid).copied();
                                         for (color, count) in &base_heart.hearts {
-                                            if let Some(idx) =
-                                                heart_color_index(color)
-                                            {
+                                            if let Some(idx) = heart_color_index(color) {
                                                 if let Some(hc) = h_mult {
                                                     if hc == *color {
                                                         p1_hearts[idx] += count;
@@ -4553,9 +4551,7 @@ SetupPhase::QrScan => {
                                     continue;
                                 }
                                 for (color, val) in modifier {
-                                    if let Some(idx) =
-                                        heart_color_index(color)
-                                    {
+                                    if let Some(idx) = heart_color_index(color) {
                                         p1_hearts[idx] =
                                             (p1_hearts[idx] as i32 + val.total()).max(0) as u32;
                                     }
@@ -4567,15 +4563,10 @@ SetupPhase::QrScan => {
                                 }
                                 if let Some(card) = gs.card_database.get_card(cid) {
                                     if let Some(ref base_heart) = card.base_heart {
-                                        let h_mult = gs
-                                            .mods
-                                            .heart_color_multiplier
-                                            .get(&cid)
-                                            .copied();
+                                        let h_mult =
+                                            gs.mods.heart_color_multiplier.get(&cid).copied();
                                         for (color, count) in &base_heart.hearts {
-                                            if let Some(idx) =
-                                                heart_color_index(color)
-                                            {
+                                            if let Some(idx) = heart_color_index(color) {
                                                 if let Some(hc) = h_mult {
                                                     if hc == *color {
                                                         p2_hearts[idx] += count;
@@ -4593,9 +4584,7 @@ SetupPhase::QrScan => {
                                     continue;
                                 }
                                 for (color, val) in modifier {
-                                    if let Some(idx) =
-                                        heart_color_index(color)
-                                    {
+                                    if let Some(idx) = heart_color_index(color) {
                                         p2_hearts[idx] =
                                             (p2_hearts[idx] as i32 + val.total()).max(0) as u32;
                                     }
@@ -4622,33 +4611,21 @@ SetupPhase::QrScan => {
                                 format!("BL:{}", p1_blade)
                             } else {
                                 format!(
-                                    "{}  {{blade.png|BLADE}}{}",
+                                    "{}  {{{{icon_blade.png|BLADE}}}}{}",
                                     p1_heart_str, p1_blade
                                 )
                             };
-                            render_text_with_icons(
-                                4.0,
-                                22.0,
-                                &p1_stats,
-                                COL_LIGHT,
-                                0.55f32,
-                            );
+                            render_text_with_icons(4.0, 22.0, &p1_stats, COL_LIGHT, 0.55f32);
                             // Render P2 hearts+blades on top screen line 3
                             let p2_stats = if p2_heart_str.is_empty() {
                                 format!("BL:{}", p2_blade)
                             } else {
                                 format!(
-                                    "{}  {{blade.png|BLADE}}{}",
+                                    "{}  {{{{icon_blade.png|BLADE}}}}{}",
                                     p2_heart_str, p2_blade
                                 )
                             };
-                            render_text_with_icons(
-                                4.0,
-                                34.0,
-                                &p2_stats,
-                                COL_LIGHT,
-                                0.55f32,
-                            );
+                            render_text_with_icons(4.0, 34.0, &p2_stats, COL_LIGHT, 0.55f32);
                             // Show need hearts during live set phase
                             // Rule 8.2.x: opponent's need hearts are hidden
                             // until their cards are revealed (performed).
@@ -4658,44 +4635,52 @@ SetupPhase::QrScan => {
                             );
                             if is_live_set {
                                 // Compute live_need_hearts from live zone cards
-                                let compute_live_need = |player: &Player, gs: &GameState| -> Vec<u32> {
-                                    let mut nh = vec![0u32; 8];
-                                    for &cid in &player.live_card_zone.cards {
-                                        if cid == -1 { continue; }
-                                        if let Some(card) = gs.card_database.get_card(cid) {
-                                            if let Some(ref need) = card.need_heart {
-                                                for (color, count) in &need.hearts {
-                                                    if let Some(idx) = heart_color_index(color) {
-                                                        nh[idx] += count;
+                                let compute_live_need =
+                                    |player: &Player, gs: &GameState| -> Vec<u32> {
+                                        let mut nh = vec![0u32; 8];
+                                        for &cid in &player.live_card_zone.cards {
+                                            if cid == -1 {
+                                                continue;
+                                            }
+                                            if let Some(card) = gs.card_database.get_card(cid) {
+                                                if let Some(ref need) = card.need_heart {
+                                                    for (color, count) in &need.hearts {
+                                                        if let Some(idx) = heart_color_index(color)
+                                                        {
+                                                            nh[idx] += count;
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
-                                    }
-                                    for (&cid, colors) in &gs.mods.need_heart_modifiers {
-                                        if player.live_card_zone.cards.contains(&cid) {
-                                            for (color, &val) in colors {
-                                                if let Some(idx) = heart_color_index(color) {
-                                                    nh[idx] = (nh[idx] as i32 + val.total()).max(0) as u32;
+                                        for (&cid, colors) in &gs.mods.need_heart_modifiers {
+                                            if player.live_card_zone.cards.contains(&cid) {
+                                                for (color, &val) in colors {
+                                                    if let Some(idx) = heart_color_index(color) {
+                                                        nh[idx] = (nh[idx] as i32 + val.total())
+                                                            .max(0)
+                                                            as u32;
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
-                                    nh
-                                };
+                                        nh
+                                    };
                                 let opp_is_first = gs.player2.is_first_attacker;
                                 let opp_performed = matches!(
                                     gs.current_phase,
-                                    Phase::SecondAttackerPerformance | Phase::LiveVictoryDetermination
-                                ) || (matches!(gs.current_phase, Phase::FirstAttackerPerformance) && opp_is_first);
+                                    Phase::SecondAttackerPerformance
+                                        | Phase::LiveVictoryDetermination
+                                ) || (matches!(
+                                    gs.current_phase,
+                                    Phase::FirstAttackerPerformance
+                                ) && opp_is_first);
                                 // P1 (perspective) need hearts
                                 let p1_nh = compute_live_need(&gs.player1, &gs);
                                 if p1_nh.iter().any(|&v| v > 0) {
                                     let nh_str = format_hearts(&p1_nh);
-                                    let need_display = format!(
-                                        "{{icon_heart_06.png|NEED}} {}",
-                                        nh_str
-                                    );
+                                    let need_display =
+                                        format!("{{{{icon_heart_06.png|NEED}}}} {}", nh_str);
                                     render_text_with_icons(
                                         4.0,
                                         46.0,
@@ -4709,10 +4694,8 @@ SetupPhase::QrScan => {
                                     let p2_nh = compute_live_need(&gs.player2, &gs);
                                     if p2_nh.iter().any(|&v| v > 0) {
                                         let nh_str = format_hearts(&p2_nh);
-                                        let need_display = format!(
-                                            "{{icon_heart_06.png|NEED}} {}",
-                                            nh_str
-                                        );
+                                        let need_display =
+                                            format!("{{{{icon_heart_06.png|NEED}}}} {}", nh_str);
                                         render_text_with_icons(
                                             4.0,
                                             46.0,
@@ -5113,91 +5096,65 @@ SetupPhase::QrScan => {
                                         let n_lines = ab_lines.len();
                                         let h = 16.0 + n_lines as f32 * 13.0;
                                         unsafe {
-_3ds_top_queue_rect(0.0, 52.0, 400.0, h, COL_ABILITY);
+                                            _3ds_top_queue_rect(0.0, 52.0, 400.0, h, COL_ABILITY);
                                         }
                                         for (li, line) in ab_lines.iter().enumerate() {
-render_text_with_icons(
-                                            4.0,
-                                            52.0 + 2.0 + li as f32 * 13.0,
-                                            line,
-                                            COL_LIGHT,
-                                            0.60,
-                                        );
+                                            render_text_with_icons(
+                                                4.0,
+                                                52.0 + 2.0 + li as f32 * 13.0,
+                                                line,
+                                                COL_LIGHT,
+                                                0.60,
+                                            );
                                         }
                                         grid_iy = 52.0 + h + 4.0;
                                     }
-                                    let cw = 50.0f32;
-                                    let ch = cw / 0.711;
-                                    let gap = 4.0f32;
+                                    // ---- Dynamic card sizing (matches waitroom) ----
+                                    let has_ability = gs.ability_queue.current_entry().is_some();
                                     let cols = 5usize;
-                                    let grid_start = choice_grid_offset;
-                                    let grid_len =
-                                        display_order.len().saturating_sub(grid_start).min(10);
-                                    for gi in 0..grid_len {
-                                        let fi = display_order[grid_start + gi];
-                                        let di = grid_start + gi;
+                                    let gap = 4.0f32;
+                                    let max_rows = if has_ability { 1 } else { 2 };
+                                    let max_ch = ((230.0 - grid_iy) / max_rows as f32) - 14.0;
+                                    let cw = (max_ch * 0.711).min(
+                                        (400.0 - 8.0 - (cols as f32 - 1.0) * gap) / cols as f32,
+                                    );
+                                    let ch = cw / 0.711;
+                                    let row_h = ch + 16.0 + gap;
+                                    let pp = cols * max_rows;
+                                    let page = (choice_grid_offset / pp) * pp;
+                                    let n = display_order.len();
+
+                                    // ---- Classify items on this page ----
+                                    let mut card_gis: Vec<usize> = Vec::new();
+                                    let mut text_gis: Vec<usize> = Vec::new();
+                                    for gi in 0..pp {
+                                        let di = page + gi;
+                                        if di >= n {
+                                            break;
+                                        }
+                                        let fi = display_order[di];
+                                        if is_text_only(&acts_cache[fi]) {
+                                            text_gis.push(gi);
+                                        } else {
+                                            card_gis.push(gi);
+                                        }
+                                    }
+
+                                    // ---- Render card items in grid ----
+                                    for (ci, &gi) in card_gis.iter().enumerate() {
+                                        let di = page + gi;
+                                        let fi = display_order[di];
                                         let act = &acts_cache[fi];
                                         let is_disabled = act
                                             .parameters
                                             .as_ref()
                                             .and_then(|p| p.disabled)
                                             .unwrap_or(false);
-                                        let col = gi % cols;
-                                        let row = gi / cols;
+                                        let col = ci % cols;
+                                        let row = ci / cols;
                                         let ix = 4.0 + col as f32 * (cw + gap);
-                                        let iy_card = grid_iy + row as f32 * (ch + 16.0 + gap);
-                                        if iy_card + ch + 16.0 > 230.0 {
-                                            break;
-                                        }
-                                        // Skip card-image rendering for special
-                                        // pay/skip optional cost actions — they use
-                                        // card_id as option index, not real card ID.
-                                        let is_special_choice = act
-                                            .parameters
-                                            .as_ref()
-                                            .and_then(|p| p.card_no.as_deref())
-                                            .map(|cn| {
-                                                matches!(
-                                                    cn,
-                                                    "pay_optional_cost"
-                                                        | "skip_optional_cost"
-                                                        | "yes"
-                                                        | "no"
-                                                        | "select"
-                                                )
-                                            })
-                                            .unwrap_or(false);
-                                        if is_special_choice {
-                                            // Render as text label instead
-                                            let desc = act
-                                                .description
-                                                .lines()
-                                                .next()
-                                                .unwrap_or("")
-                                                .to_string();
-                                            if !desc.is_empty() {
-                                                let c = if is_disabled {
-                                                    COL_MED
-                                                } else if di == display_pos {
-                                                    COL_GOLD
-                                                } else {
-                                                    COL_LIGHT
-                                                };
-                                                let pfx =
-                                                    if di == display_pos { "> " } else { "  " };
-                                                let txt = format!("{}{}", pfx, desc);
-                                                unsafe {
-                                                    _3ds_top_queue_text(
-                                                        ix + 1.0,
-                                                        iy_card + 1.0,
-                                                        c,
-                                                        0.55f32,
-                                                        format!("{}\0", txt).as_ptr(),
-                                                    );
-                                                }
-                                            }
-                                            continue;
-                                        }
+                                        let iy_card = grid_iy + row as f32 * row_h;
+
                                         let real_cid = act
                                             .parameters
                                             .as_ref()
@@ -5251,48 +5208,92 @@ render_text_with_icons(
                                                             format!("{}\0", cn).as_ptr(),
                                                         );
                                                     }
-                                                    continue;
                                                 }
                                             }
                                         }
-                                        // Non-card actions (skip etc.): render as text
+                                    }
+
+                                    // ---- Render text items as vertical list ----
+                                    let card_rows_used =
+                                        ((card_gis.len() + cols - 1) / cols).min(max_rows);
+                                    let text_grid_iy =
+                                        grid_iy + card_rows_used as f32 * row_h + 4.0;
+                                    let text_row_h = 20.0f32;
+                                    for (ti, &gi) in text_gis.iter().enumerate() {
+                                        let di = page + gi;
+                                        let fi = display_order[di];
+                                        let act = &acts_cache[fi];
+                                        let is_disabled = act
+                                            .parameters
+                                            .as_ref()
+                                            .and_then(|p| p.disabled)
+                                            .unwrap_or(false);
+                                        let iy = text_grid_iy + ti as f32 * text_row_h;
+                                        if iy + text_row_h > 232.0 {
+                                            break;
+                                        }
+
+                                        // Background highlight
+                                        let bg = if di == display_pos { COL_SEL } else { COL_DIM };
+                                        unsafe {
+                                            _3ds_top_queue_rect(
+                                                4.0,
+                                                iy,
+                                                392.0,
+                                                text_row_h - 2.0,
+                                                bg,
+                                            );
+                                        }
+                                        if di == display_pos {
+                                            unsafe {
+                                                _3ds_top_queue_rect(
+                                                    4.0,
+                                                    iy,
+                                                    392.0,
+                                                    text_row_h - 2.0,
+                                                    COL_HIGHLIGHT,
+                                                );
+                                            }
+                                        }
+
                                         let desc = act
                                             .description
                                             .lines()
                                             .next()
                                             .unwrap_or("")
                                             .to_string();
-                                        if !desc.is_empty() {
-                                            let c = if is_disabled {
-                                                COL_MED
-                                            } else if di == display_pos {
-                                                COL_GOLD
-                                            } else {
-                                                COL_LIGHT
-                                            };
-                                            let pfx = if di == display_pos { "> " } else { "  " };
-                                            let txt = format!("{}{}", pfx, desc);
-                                            if txt.contains("{{") {
-                                                render_text_with_icons(
-                                                    ix + 1.0,
-                                                    iy_card + 1.0,
-                                                    &txt,
-                                                    c,
-                                                    0.55,
+                                        let color = if is_disabled {
+                                            COL_MED
+                                        } else if di == display_pos {
+                                            COL_GOLD
+                                        } else {
+                                            COL_LIGHT
+                                        };
+                                        let pfx = if di == display_pos { "> " } else { "  " };
+                                        let txt = format!("{}{}", pfx, desc);
+                                        let scale =
+                                            if di == display_pos { 0.70f32 } else { 0.65f32 };
+                                        if txt.contains("{{") {
+                                            render_text_with_icons(
+                                                8.0,
+                                                iy + 2.0,
+                                                &txt,
+                                                color,
+                                                scale,
+                                            );
+                                        } else {
+                                            unsafe {
+                                                _3ds_top_queue_text(
+                                                    8.0,
+                                                    iy + 2.0,
+                                                    color,
+                                                    scale,
+                                                    format!("{}\0", txt).as_ptr(),
                                                 );
-                                            } else {
-                                                unsafe {
-                                                    _3ds_top_queue_text(
-                                                        ix + 1.0,
-                                                        iy_card + 1.0,
-                                                        c,
-                                                        0.55f32,
-                                                        format!("{}\0", txt).as_ptr(),
-                                                    );
-                                                }
                                             }
                                         }
                                     }
+
                                     // Hint: L opens text
                                     unsafe {
                                         _3ds_top_queue_text(
@@ -5304,16 +5305,16 @@ render_text_with_icons(
                                         );
                                     }
                                     // Page indicator when more choices than visible
-                                    if display_order.len() > 10 {
-                                        let page = grid_start / 10 + 1;
-                                        let total_p = (display_order.len() + 9) / 10;
+                                    if n > pp {
+                                        let pg = page / pp + 1;
+                                        let total_p = (n + pp - 1) / pp;
                                         unsafe {
                                             _3ds_top_queue_text(
                                                 300.0,
                                                 228.0,
                                                 COL_MED,
                                                 0.45f32,
-                                                format!("{}\0", format!("{}/{}", page, total_p))
+                                                format!("{}\0", format!("{}/{}", pg, total_p))
                                                     .as_ptr(),
                                             );
                                         }
