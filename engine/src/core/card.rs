@@ -883,6 +883,8 @@ pub enum EffectKind {
         activation_condition_parsed: Option<Box<Condition>>,
         #[serde(default)]
         quoted_text: Option<Box<QuotedText>>,
+        #[serde(default)]
+        same_name: Option<bool>,
     },
     /// DrawCards effect fields
     DrawCards {
@@ -928,6 +930,10 @@ pub enum EffectKind {
         original_value: Option<bool>,
         #[serde(default)]
         action_by: Option<ArcStr>,
+        #[serde(default)]
+        same_name: Option<bool>,
+        #[serde(default)]
+        same_unit_name: Option<bool>,
     },
     /// SelectTarget effect fields
     SelectTarget {
@@ -1045,6 +1051,10 @@ pub enum EffectKind {
         any_number: Option<bool>,
         #[serde(default)]
         discard_remaining: Option<bool>,
+        #[serde(default)]
+        same_name: Option<bool>,
+        #[serde(default)]
+        same_unit_name: Option<bool>,
     },
     /// LookReveal effect fields
     LookReveal {
@@ -1140,6 +1150,10 @@ pub enum EffectKind {
         require_all_heart_colors: Option<bool>,
         #[serde(default)]
         heart_color_count: Option<u32>,
+        #[serde(default)]
+        same_name: Option<bool>,
+        #[serde(default)]
+        same_unit_name: Option<bool>,
     },
     /// ModifyScore effect fields
     ModifyScore {
@@ -1209,6 +1223,10 @@ pub enum EffectKind {
         need_heart_operator: Option<Operator>,
         #[serde(default)]
         need_heart_total: Option<u32>,
+        #[serde(default)]
+        same_name: Option<bool>,
+        #[serde(default)]
+        same_unit_name: Option<bool>,
     },
     /// ModifyHearts effect fields
     ModifyHearts {
@@ -1270,6 +1288,10 @@ pub enum EffectKind {
         per_unit_type: Option<ArcStr>,
         #[serde(default)]
         distinct: Option<Box<DistinctType>>,
+        #[serde(default)]
+        same_name: Option<bool>,
+        #[serde(default)]
+        same_unit_name: Option<bool>,
     },
     /// GainResource effect fields
     GainResource {
@@ -1371,6 +1393,8 @@ pub enum EffectKind {
         require_all_heart_colors: Option<bool>,
         #[serde(default)]
         heart_color_count: Option<u32>,
+        #[serde(default)]
+        same_unit_name: Option<bool>,
     },
     /// ChangeState effect fields
     ChangeState {
@@ -1470,6 +1494,10 @@ pub enum EffectKind {
         action_by: Option<ArcStr>,
         #[serde(default)]
         activation_condition_parsed: Option<Box<Condition>>,
+        #[serde(default)]
+        same_name: Option<bool>,
+        #[serde(default)]
+        same_unit_name: Option<bool>,
     },
     /// AbilityOp effect fields
     AbilityOp {
@@ -1537,6 +1565,10 @@ pub enum EffectKind {
         heart_colors: Box<Vec<String>>,
         #[serde(default)]
         dynamic_count: Option<Box<DynamicCount>>,
+        #[serde(default)]
+        same_name: Option<bool>,
+        #[serde(default)]
+        same_unit_name: Option<bool>,
     },
     /// CompoundEffect effect fields
     CompoundEffect {
@@ -1606,6 +1638,10 @@ pub enum EffectKind {
         choice_condition: Option<Box<Condition>>,
         #[serde(default)]
         alternative_condition: Option<Box<Condition>>,
+        #[serde(default)]
+        same_name: Option<bool>,
+        #[serde(default)]
+        same_unit_name: Option<bool>,
     },
     /// RestrictionOp effect fields
     RestrictionOp {
@@ -1655,6 +1691,10 @@ pub enum EffectKind {
         characters: Option<Box<Vec<String>>>,
         #[serde(default)]
         exclude_characters: Option<Box<Vec<String>>>,
+        #[serde(default)]
+        same_name: Option<bool>,
+        #[serde(default)]
+        same_unit_name: Option<bool>,
     },
     /// PositionOp effect fields
     PositionOp {
@@ -1710,6 +1750,10 @@ pub enum EffectKind {
         activation_position: Option<ArcStr>,
         #[serde(default)]
         group_reference: Option<ArcStr>,
+        #[serde(default)]
+        same_name: Option<bool>,
+        #[serde(default)]
+        same_unit_name: Option<bool>,
     },
     /// MiscOp effect fields
     MiscOp {
@@ -1855,6 +1899,8 @@ pub enum EffectKind {
         position: Option<Box<PositionInfo>>,
         #[serde(default)]
         ability_filter: Option<AbilityFilter>,
+        #[serde(default)]
+        same_name: Option<bool>,
     },
     /// CustomOp effect fields
     CustomOp {
@@ -1916,6 +1962,10 @@ pub enum EffectKind {
         use_limit: Option<u32>,
         #[serde(default)]
         triggers: Option<ArcStr>,
+        #[serde(default)]
+        same_name: Option<bool>,
+        #[serde(default)]
+        same_unit_name: Option<bool>,
     },
 }
 
@@ -2605,8 +2655,8 @@ impl AbilityEffect {
 
     bool_getter!(reveal_any, [LookReveal => reveal, SelectTarget => reveal]);
 
-    bool_getter!(same_unit_name_any, [MiscOp => same_unit_name, MoveCards => same_unit_name]);
-    bool_getter!(same_name_any, [GainResource => same_name]);
+    bool_getter!(same_unit_name_any, [MoveCards => same_unit_name, DrawCards => same_unit_name, SelectTarget => same_unit_name, LookReveal => same_unit_name, ModifyScore => same_unit_name, ModifyHearts => same_unit_name, GainResource => same_unit_name, ChangeState => same_unit_name, AbilityOp => same_unit_name, CompoundEffect => same_unit_name, RestrictionOp => same_unit_name, PositionOp => same_unit_name, MiscOp => same_unit_name, CustomOp => same_unit_name]);
+    bool_getter!(same_name_any, [MoveCards => same_name, DrawCards => same_name, SelectTarget => same_name, LookReveal => same_name, ModifyScore => same_name, ModifyHearts => same_name, GainResource => same_name, ChangeState => same_name, AbilityOp => same_name, CompoundEffect => same_name, RestrictionOp => same_name, PositionOp => same_name, MiscOp => same_name, CustomOp => same_name]);
 
     bool_getter!(self_cost_any, [ChangeState => self_cost, MoveCards => self_cost]);
 

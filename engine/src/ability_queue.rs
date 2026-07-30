@@ -8,9 +8,24 @@ use crate::card::{Ability, AbilityEffect};
 use crate::game_state::AbilityTrigger;
 #[cfg(feature = "no_std")]
 use alloc::{
+    boxed::Box,
     string::{String, ToString},
     vec::Vec,
 };
+
+/// Discriminator data for choice routing. Replaces the old `conditional_choice: Option<String>`
+/// which serialized three different types to JSON strings at runtime.
+#[derive(Debug, Clone)]
+pub enum ConditionalChoice {
+    /// Plain string value (color name, sentinel like "pay_optional_cost")
+    Str(String),
+    /// Vec of string options (or_card_types, numeric options, heart colors)
+    Strings(Vec<String>),
+    /// Vec of ability effect options (choice routes)
+    Effects(Vec<Box<AbilityEffect>>),
+    /// A single ability effect (conditional_on_optional sub-effect)
+    Effect(AbilityEffect),
+}
 
 /// Unique identifier for an ability instance in the queue
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,8 +72,8 @@ pub struct AbilityQueueEntry {
     pub cost_paid_index: usize,
     /// Discriminator for routing choice results to the correct handler.
     pub choice_card_no: Option<crate::ability::types::ChoiceRoute>,
-    /// JSON-serialized options for choice/choice_string discriminators
-    pub conditional_choice: Option<String>,
+    /// Discriminator data for choice routing
+    pub conditional_choice: Option<ConditionalChoice>,
     /// Whether the effect has started executing (prevents re-processing)
     pub effect_started: bool,
     /// Result of the optional cost evaluation.

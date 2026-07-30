@@ -3,6 +3,7 @@ use super::resolver::AbilityResolver;
 use super::types::{AbilityTraceNode, Choice, ExecutionContext, StepOutput, ZoneSnapshot};
 use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability::enums::ActionType;
+use crate::ability_queue::ConditionalChoice;
 use crate::card::{AbilityEffect, Condition};
 use crate::game_state::GameState;
 #[cfg(feature = "no_std")]
@@ -909,9 +910,7 @@ impl AbilityResolver {
                 return self.resume_pending_actions(gs);
             }
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                if let Ok(json) = serde_json::to_string(&effect) {
-                    entry.conditional_choice = Some(json);
-                }
+                entry.conditional_choice = Some(ConditionalChoice::Effect(effect.clone()));
             }
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "conditional_optional".to_string(),
@@ -942,19 +941,17 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         selected: &str,
-        conditional_choice: Option<String>,
+        conditional_choice: Option<ConditionalChoice>,
     ) -> Result<(), String> {
-        if let Some(ref options_json) = conditional_choice {
-            if let Ok(options) = serde_json::from_str::<Vec<String>>(options_json) {
-                if let Ok(idx) = selected.parse::<usize>() {
-                    if idx > 0 && idx <= options.len() {
-                        let val = &options[idx - 1];
-                        if val.starts_with("heart")
-                            || ["赤", "桃", "緑", "青", "黄", "紫"].contains(&val.as_str())
-                        {
-                            gs.prohibition_effects
-                                .push(format!("selected_heart_color:{}", val));
-                        }
+        if let Some(ConditionalChoice::Strings(options)) = conditional_choice {
+            if let Ok(idx) = selected.parse::<usize>() {
+                if idx > 0 && idx <= options.len() {
+                    let val = &options[idx - 1];
+                    if val.starts_with("heart")
+                        || ["赤", "桃", "緑", "青", "黄", "紫"].contains(&val.as_str())
+                    {
+                        gs.prohibition_effects
+                            .push(format!("selected_heart_color:{}", val));
                     }
                 }
             }
@@ -969,17 +966,14 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         selected: &str,
-        conditional_choice: Option<String>,
+        conditional_choice: Option<ConditionalChoice>,
     ) -> Result<(), String> {
-        let chosen = conditional_choice.and_then(|json| {
-            serde_json::from_str::<Vec<String>>(&json)
+        let chosen = conditional_choice.and_then(|cc| match cc {
+            ConditionalChoice::Strings(opts) => selected
+                .parse::<usize>()
                 .ok()
-                .and_then(|opts| {
-                    selected
-                        .parse::<usize>()
-                        .ok()
-                        .and_then(|idx| opts.get(idx).cloned())
-                })
+                .and_then(|idx| opts.get(idx).cloned()),
+            _ => None,
         });
         log::debug!(
             "[DBG_CHOICE] handle_choice_string_store: selected={} chosen_is_some={}",
@@ -989,7 +983,7 @@ impl AbilityResolver {
         if let Some(ref s) = chosen {
             gs.ability_queue
                 .current_entry_mut()
-                .map(|e| e.conditional_choice = Some(s.clone()));
+                .map(|e| e.conditional_choice = Some(ConditionalChoice::Str(s.clone())));
             log::debug!("[DBG_CHOICE] stored conditional_choice");
         }
         self.pending_choice = None;

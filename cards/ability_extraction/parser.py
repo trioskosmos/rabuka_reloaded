@@ -5187,8 +5187,15 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         if "名前の異なる" in text:
             action["distinct"] = "card_name"
         # Extract same_name from "と同じ名前" / "同じ名前" (same name constraint)
-        if "と同じ名前" in text or ("同じ名前" in text and "持つ" in text):
+        if "same_name" not in action and (
+            "と同じ名前" in text or ("同じ名前" in text and "持つ" in text)
+        ):
             action["same_name"] = True
+    # same_name: applied to ALL action types, not just gain_resource
+    if "same_name" not in action and (
+        "と同じ名前" in text or ("同じ名前" in text and "持つ" in text)
+    ):
+        action["same_name"] = True
     # Extract heart_colors for ALL action types, not just gain_resource
     if "heart_colors" not in action:
         hm = re.findall(r"\{\{heart_(\d+)\.png\|heart\d+\}\}", text)
@@ -8845,6 +8852,14 @@ def _walk_propagate_text_context_fields(d, d_ctx, ctx_text):
     ):
         d["distinct"] = "card_name"
 
+    # Propagate same_name from text context
+    if (
+        "same_name" not in d
+        and d_ctx
+        and ("相同的名前" in d_ctx or ("同じ名前" in d_ctx and "持つ" in d_ctx))
+    ):
+        d["same_name"] = True
+
     # Propagate original_value from text context (元々持つ for blade/heart comparisons)
     if "original_value" not in d and d_ctx and _has_original_modifier(d_ctx):
         d["original_value"] = True
@@ -9213,6 +9228,16 @@ def _walk_propagate_flags(d, d_ctx):
     # Set same_unit_name for cost text containing '同じユニット名'
     if "same_unit_name" not in d and "同じユニット名" in (d.get("text", "") or ""):
         d["same_unit_name"] = True
+
+    # Propagate same_name from text context — "と同じ名前" / "同じ名前"
+    if (
+        "same_name" not in d
+        and d_ctx
+        and ("相同的名前" in d_ctx or ("同じ名前" in d_ctx and "持つ" in d_ctx))
+    ):
+        d["same_name"] = True
+    if "same_name" not in d and "相同的名前" in (d.get("text", "") or ""):
+        d["same_name"] = True
 
 
 def _walk_propagate_heart_colors_to_conditions(d):

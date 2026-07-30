@@ -6,6 +6,7 @@ use super::types::{
 };
 use super::util;
 use crate::ability::debug::ABILITY_DEBUG;
+use crate::ability_queue::ConditionalChoice;
 use crate::card::{AbilityEffect, EffectKind};
 use crate::game_state::GameState;
 #[cfg(feature = "no_std")]
@@ -2104,67 +2105,61 @@ impl super::resolver::AbilityResolver {
         // choice_card_no-based routing
         match choice_card_no.as_ref() {
             Some(ChoiceRoute::Choice) => {
-                if let Some(ref options_json) = conditional_choice {
-                    if let Ok(all_options) =
-                        serde_json::from_str::<Vec<AbilityEffect>>(options_json)
-                    {
-                        let idx: usize = selected.parse().unwrap_or(0);
-                        if idx < all_options.len() {
-                            let selected_effect = all_options[idx].clone();
-                            let mut remaining = all_options.clone();
-                            remaining.remove(idx);
-                            // Schedule the selected effect and optional re-prompt
-                            // as pending commands. resume_pending_commands runs them
-                            // sequentially — after the selected effect completes (and
-                            // any sub-choices), the re-prompt command re-enters
-                            // execute_choice which sees the updated conditional_choice
-                            // JSON array and creates a new SelectTarget for the
-                            // remaining options.
-                            let commands = vec![selected_effect];
-                            let wants_re_prompt = !remaining.is_empty()
-                                && gs.entry_effect().map_or(false, |eff| {
-                                    if eff.any_number_any().unwrap_or(false) {
-                                        return true;
-                                    }
-                                    if let Some(ref alt_cond) = eff.compound.alternative_condition {
-                                        let ctx = ConditionContext::with_moved_cards(
-                                            gs,
-                                            &self.moved_cards,
-                                        );
-                                        ctx.evaluate_condition(alt_cond)
-                                            && eff.alternative_count_type_any().as_deref()
-                                                == Some("any_number")
-                                    } else {
-                                        false
-                                    }
-                                });
-                            if wants_re_prompt {
-                                if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                                    entry.conditional_choice =
-                                        serde_json::to_string(&remaining).ok();
+                if let Some(ConditionalChoice::Effects(all_options)) = conditional_choice {
+                    let idx: usize = selected.parse().unwrap_or(0);
+                    if idx < all_options.len() {
+                        let selected_effect = (*all_options[idx]).clone();
+                        let mut remaining = all_options.clone();
+                        remaining.remove(idx);
+                        // Schedule the selected effect and optional re-prompt
+                        // as pending commands. resume_pending_commands runs them
+                        // sequentially — after the selected effect completes (and
+                        // any sub-choices), the re-prompt command re-enters
+                        // execute_choice which sees the updated conditional_choice
+                        // enum and creates a new SelectTarget for the
+                        // remaining options.
+                        let commands = vec![selected_effect];
+                        let wants_re_prompt = !remaining.is_empty()
+                            && gs.entry_effect().map_or(false, |eff| {
+                                if eff.any_number_any().unwrap_or(false) {
+                                    return true;
                                 }
-                                let desc: Vec<String> = remaining
-                                    .iter()
-                                    .map(|o| {
-                                        o.answers_any()
-                                            .as_ref()
-                                            .map(|a| a.join(", "))
-                                            .unwrap_or_else(|| o.text.to_string())
-                                    })
-                                    .collect();
-                                self.pending_reprompt_choice = Some(Choice::SelectTarget {
-                                    target: "choice".to_string(),
-                                    description: desc.join(" / "),
-                                    description_en: Some(desc.join(" / ")),
-                                    description_ja: Some(desc.join(" / ")),
-                                    allow_skip: true,
-                                    options: None,
-                                });
+                                if let Some(ref alt_cond) = eff.compound.alternative_condition {
+                                    let ctx =
+                                        ConditionContext::with_moved_cards(gs, &self.moved_cards);
+                                    ctx.evaluate_condition(alt_cond)
+                                        && eff.alternative_count_type_any().as_deref()
+                                            == Some("any_number")
+                                } else {
+                                    false
+                                }
+                            });
+                        if wants_re_prompt {
+                            let desc: Vec<String> = remaining
+                                .iter()
+                                .map(|o| {
+                                    o.answers_any()
+                                        .as_ref()
+                                        .map(|a| a.join(", "))
+                                        .unwrap_or_else(|| o.text.to_string())
+                                })
+                                .collect();
+                            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                                entry.conditional_choice =
+                                    Some(ConditionalChoice::Effects(remaining));
                             }
-                            gs.ability_queue.set_pending_actions(commands);
-                            self.pending_choice = None; // clear stale
-                            return self.resume_pending_actions(gs);
+                            self.pending_reprompt_choice = Some(Choice::SelectTarget {
+                                target: "choice".to_string(),
+                                description: desc.join(" / "),
+                                description_en: Some(desc.join(" / ")),
+                                description_ja: Some(desc.join(" / ")),
+                                allow_skip: true,
+                                options: None,
+                            });
                         }
+                        gs.ability_queue.set_pending_actions(commands);
+                        self.pending_choice = None; // clear stale
+                        return self.resume_pending_actions(gs);
                     }
                 } else if self.pending_choice.is_some() {
                     self.pending_choice = None;
@@ -2945,7 +2940,10 @@ impl super::resolver::AbilityResolver {
         // Prefer cond_choice (the sub-effect with optional_action/conditional_action)
         // over entry_eff (which may return a parent sequential effect lacking these fields).
         let effect = cond_choice
-            .and_then(|json| serde_json::from_str::<AbilityEffect>(&json).ok())
+            .and_then(|cc| match cc {
+                ConditionalChoice::Effect(e) => Some(e),
+                _ => None,
+            })
             .or_else(|| entry_eff);
         if let Some(effect) = effect {
             let is_negation = effect.compound.conditional_negation.unwrap_or(false);
@@ -3004,7 +3002,7 @@ impl super::resolver::AbilityResolver {
             gs.prohibition_effects
                 .push(format!("selected_heart_color:{}", color));
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.conditional_choice = Some(color.to_string());
+                entry.conditional_choice = Some(ConditionalChoice::Str(color.to_string()));
             }
         }
         self.clear_choice_state(gs);
@@ -3072,7 +3070,7 @@ impl super::resolver::AbilityResolver {
                 gs.set_heart_override(card_id, color, count.max(1), "live_end");
             }
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.conditional_choice = Some(chosen.clone());
+                entry.conditional_choice = Some(ConditionalChoice::Str(chosen.clone()));
             }
         }
         self.pending_choice = None;

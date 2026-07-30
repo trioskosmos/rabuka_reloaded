@@ -1675,7 +1675,7 @@ impl GameState {
             .and_then(|e| e.choice_card_no.clone())
     }
 
-    pub fn entry_conditional_choice(&self) -> Option<String> {
+    pub fn entry_conditional_choice(&self) -> Option<crate::ability_queue::ConditionalChoice> {
         self.ability_queue
             .current_entry()
             .and_then(|e| e.conditional_choice.clone())

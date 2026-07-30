@@ -3,6 +3,7 @@ use core::sync::atomic::Ordering;
 use super::debug::AbDebug;
 use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability::enums::{ConditionType, Zone};
+use crate::ability_queue::ConditionalChoice;
 use crate::card::{CardState, Condition};
 use crate::game_state::Phase;
 #[cfg(feature = "no_std")]
@@ -583,11 +584,12 @@ impl<'a> ConditionContext<'a> {
     /// Reads the chosen heart color from conditional_choice (set by specify_heart_color action).
     /// Member cards must have the color in base_heart; live cards must have it in need_heart.
     pub fn evaluate_all_revealed_match_heart_color(&self, condition: &Condition) -> bool {
-        let chosen_color = self
-            .game_state
-            .ability_queue
-            .current_entry()
-            .and_then(|e| e.conditional_choice.clone());
+        let chosen_color = self.game_state.ability_queue.current_entry().and_then(|e| {
+            match &e.conditional_choice {
+                Some(ConditionalChoice::Str(s)) => Some(s.clone()),
+                _ => None,
+            }
+        });
         let color = match chosen_color {
             Some(ref c) => c.clone(),
             None => {

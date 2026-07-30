@@ -4,6 +4,7 @@ use crate::ability::debug::AbDebug;
 use crate::ability::enums::Zone;
 use crate::ability::util;
 use crate::ability::util::compare_counts;
+use crate::ability_queue::ConditionalChoice;
 use crate::card::{
     AbilityFilter, CardProperty, CardState, ComparisonTarget, Condition, HeartColor,
 };
@@ -242,12 +243,13 @@ impl<'a> ConditionContext<'a> {
                     .unwrap_or(comparison_default_count(condition))
             }
         } else if condition.get_comparison_type() == Some("cost") {
-            let entry_choice = self
-                .game_state
-                .ability_queue
-                .current_entry()
-                .and_then(|e| e.conditional_choice.as_ref())
-                .and_then(|s| s.parse::<u32>().ok());
+            let entry_choice =
+                self.game_state.ability_queue.current_entry().and_then(|e| {
+                    match &e.conditional_choice {
+                        Some(ConditionalChoice::Str(s)) => s.parse::<u32>().ok(),
+                        _ => None,
+                    }
+                });
             condition
                 .get_cost_limit()
                 .or(condition.get_count())
@@ -256,12 +258,13 @@ impl<'a> ConditionContext<'a> {
         } else if condition.get_comparison_type() == Some("score") {
             condition.get_count().unwrap_or(0)
         } else {
-            let entry_choice = self
-                .game_state
-                .ability_queue
-                .current_entry()
-                .and_then(|e| e.conditional_choice.as_ref())
-                .and_then(|s| s.parse::<u32>().ok());
+            let entry_choice =
+                self.game_state.ability_queue.current_entry().and_then(|e| {
+                    match &e.conditional_choice {
+                        Some(ConditionalChoice::Str(s)) => s.parse::<u32>().ok(),
+                        _ => None,
+                    }
+                });
             entry_choice
                 .or(condition.get_count())
                 .unwrap_or(comparison_default_count(condition))

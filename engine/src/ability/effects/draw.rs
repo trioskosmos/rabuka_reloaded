@@ -2,6 +2,7 @@ use super::super::enums::Zone;
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ExecutionContext};
 use super::super::util;
+use crate::ability_queue::ConditionalChoice;
 use crate::card::{AbilityEffect, DistinctType};
 use crate::game_state::GameState;
 #[cfg(feature = "no_std")]
@@ -552,7 +553,7 @@ impl AbilityResolver {
         }
         if unique_colors.len() == 1 {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.conditional_choice = Some(unique_colors[0].clone());
+                entry.conditional_choice = Some(ConditionalChoice::Str(unique_colors[0].clone()));
             }
             return;
         }
@@ -579,51 +580,36 @@ impl AbilityResolver {
             .unwrap_or(10);
         let mut options: Vec<String> = (1..=max_cost).map(|n| n.to_string()).collect();
         options.push("67".to_string());
-        let options_json = serde_json::to_string(&options).unwrap_or_default();
+        let options_display = if options.len() > 10 {
+            format!(
+                "{}~{}",
+                options.first().unwrap_or(&"1".to_string()),
+                options.last().unwrap_or(&"67".to_string())
+            )
+        } else {
+            options.join(", ")
+        };
+        let options_display_ja = if options.len() > 10 {
+            format!(
+                "{}〜{}",
+                options.first().unwrap_or(&"1".to_string()),
+                options.last().unwrap_or(&"67".to_string())
+            )
+        } else {
+            options.join(", ")
+        };
+        let choice_options = options.clone();
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.choice_card_no = None;
-            entry.conditional_choice = Some(options_json);
+            entry.conditional_choice = Some(ConditionalChoice::Strings(options));
         }
         self.pending_choice = Some(Choice::SelectTarget {
             target: "choice_string".to_string(),
-            description: format!(
-                "Choose a number: {}",
-                if options.len() > 10 {
-                    format!(
-                        "{}~{}",
-                        options.first().unwrap_or(&"1".to_string()),
-                        options.last().unwrap_or(&"67".to_string())
-                    )
-                } else {
-                    options.join(", ")
-                }
-            ),
-            description_en: Some(format!(
-                "Choose a number: {}",
-                if options.len() > 10 {
-                    format!(
-                        "{}~{}",
-                        options.first().unwrap_or(&"1".to_string()),
-                        options.last().unwrap_or(&"67".to_string())
-                    )
-                } else {
-                    options.join(", ")
-                }
-            )),
-            description_ja: Some(format!(
-                "数値を選択: {}",
-                if options.len() > 10 {
-                    format!(
-                        "{}〜{}",
-                        options.first().unwrap_or(&"1".to_string()),
-                        options.last().unwrap_or(&"67".to_string())
-                    )
-                } else {
-                    options.join(", ")
-                }
-            )),
+            description: format!("Choose a number: {}", options_display),
+            description_en: Some(format!("Choose a number: {}", options_display)),
+            description_ja: Some(format!("数値を選択: {}", options_display_ja)),
             allow_skip: effect.optional.unwrap_or(false),
-            options: Some(options),
+            options: Some(choice_options),
         });
         let pp = self.player_prefix(gs);
         let act_name = gs

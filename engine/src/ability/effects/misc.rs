@@ -2,6 +2,7 @@ use super::super::enums::Zone;
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
 use super::super::util;
+use crate::ability_queue::ConditionalChoice;
 use crate::card::{AbilityEffect, PlacementOrder, PositionInfo};
 use crate::core::types::ArcStr;
 use crate::game_state::GameState;
@@ -43,7 +44,10 @@ impl AbilityResolver {
             let chosen = gs
                 .ability_queue
                 .current_entry()
-                .and_then(|e| e.conditional_choice.clone())
+                .and_then(|e| match &e.conditional_choice {
+                    Some(ConditionalChoice::Str(s)) => Some(s.clone()),
+                    _ => None,
+                })
                 .or_else(|| effect.card_type_any().map(|s| s.to_string()));
             // cost_limit and operator come from the reveal effect itself if set,
             // or from the conditional_choice JSON if stored there by select.
@@ -144,7 +148,10 @@ impl AbilityResolver {
         let chosen_card_type = gs
             .ability_queue
             .current_entry()
-            .and_then(|e| e.conditional_choice.clone())
+            .and_then(|e| match &e.conditional_choice {
+                Some(ConditionalChoice::Str(s)) => Some(s.clone()),
+                _ => None,
+            })
             .or_else(|| effect.card_type_any().map(|s| s.to_string()));
 
         if let Some(card_type) = chosen_card_type {
@@ -218,8 +225,7 @@ impl AbilityResolver {
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             // Store the or_card_types so the choice handler can look them up
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.conditional_choice =
-                    Some(serde_json::to_string(or_types).unwrap_or_default());
+                entry.conditional_choice = Some(ConditionalChoice::Strings(or_types.to_vec()));
             }
         } else {
             // If no card type was chosen and no available types, just clear any looked_at_cards
@@ -804,16 +810,22 @@ impl AbilityResolver {
         // conditional_choice, use it directly — skip any heart_colors prompt.
         // This handles both per_unit and non-per_unit gain_resource that
         // follow a select in a sequential effect.
-        let existing_choice = gs
-            .ability_queue
-            .current_entry()
-            .and_then(|e| e.conditional_choice.clone());
+        let existing_choice =
+            gs.ability_queue
+                .current_entry()
+                .and_then(|e| match &e.conditional_choice {
+                    Some(ConditionalChoice::Str(s)) => Some(s.clone()),
+                    _ => None,
+                });
         let single_fixed_heart = if let Some(chosen) = existing_choice {
             Some(chosen)
         } else if per_unit && resource == "heart" {
             gs.ability_queue
                 .current_entry()
-                .and_then(|e| e.conditional_choice.clone())
+                .and_then(|e| match &e.conditional_choice {
+                    Some(ConditionalChoice::Str(s)) => Some(s.clone()),
+                    _ => None,
+                })
         } else {
             let effective_heart_colors: Vec<String> = effect
                 .heart_color_any()
@@ -834,7 +846,10 @@ impl AbilityResolver {
                 if resource == "heart" || resource == "ハート" {
                     gs.ability_queue
                         .current_entry()
-                        .and_then(|e| e.conditional_choice.clone())
+                        .and_then(|e| match &e.conditional_choice {
+                            Some(ConditionalChoice::Str(s)) => Some(s.clone()),
+                            _ => None,
+                        })
                         .or_else(|| {
                             // Fallback: handle_heart_color_selection stores the color in
                             // prohibition_effects as "selected_heart_color:{color}" before
@@ -3295,7 +3310,7 @@ impl AbilityResolver {
         // execute the selected option's effect instead of creating another choice.
         if let Some(effect_options) = options {
             if let Some(entry) = gs.ability_queue.current_entry() {
-                if let Some(ref cc) = entry.conditional_choice {
+                if let Some(ConditionalChoice::Str(ref cc)) = entry.conditional_choice {
                     if let Ok(idx) = cc.parse::<usize>() {
                         if idx < effect_options.len() {
                             let selected = &effect_options[idx];
@@ -3307,7 +3322,7 @@ impl AbilityResolver {
         }
         if let Some(alt_options) = choice_options {
             if let Some(entry) = gs.ability_queue.current_entry() {
-                if let Some(ref cc) = entry.conditional_choice {
+                if let Some(ConditionalChoice::Str(ref cc)) = entry.conditional_choice {
                     if alt_options.contains(cc) {
                         // String-based choice matched — nothing to execute, choice was just informational
                         return Ok(());
@@ -3339,11 +3354,15 @@ impl AbilityResolver {
         } else {
             None
         };
-        let options_json = propagated_options
-            .as_ref()
-            .and_then(|opts| serde_json::to_string(opts).ok())
-            .or_else(|| options.and_then(|opts| serde_json::to_string(opts).ok()))
-            .or_else(|| choice_options.and_then(|opts| serde_json::to_string(opts).ok()));
+        let conditional_choice_val = if let Some(ref opts) = propagated_options {
+            Some(ConditionalChoice::Effects(opts.clone()))
+        } else if let Some(opts) = options {
+            Some(ConditionalChoice::Effects(opts.iter().cloned().collect()))
+        } else if let Some(opts) = choice_options {
+            Some(ConditionalChoice::Strings(opts.to_vec()))
+        } else {
+            None
+        };
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.choice_card_no = if options.is_some() {
                 Some(ChoiceRoute::Choice)
@@ -3352,7 +3371,7 @@ impl AbilityResolver {
             } else {
                 Some(ChoiceRoute::Choice)
             };
-            entry.conditional_choice = options_json;
+            entry.conditional_choice = conditional_choice_val;
 
             // Set choice_player_id based on choice_maker
             if choice_maker == Some("opponent") {

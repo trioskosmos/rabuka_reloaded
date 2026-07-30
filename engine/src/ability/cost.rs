@@ -3,6 +3,7 @@ use super::enums::{ActionType, Zone};
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ChoiceRoute};
 use super::util;
+use crate::ability_queue::ConditionalChoice;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 use crate::HashMap;
@@ -164,7 +165,11 @@ impl AbilityResolver {
         }
     }
 
-    fn pay_cost_move_cards(&mut self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
+    fn pay_cost_move_cards(
+        &mut self,
+        gs: &mut GameState,
+        cost: &AbilityEffect,
+    ) -> Result<(), String> {
         let source = cost.source.as_deref().unwrap_or("");
         // any_number means player chooses 0..N
         let is_any_number = cost.any_number_any().unwrap_or(false);
@@ -241,7 +246,10 @@ impl AbilityResolver {
             let effective_count = if is_any_number { 0 } else { count };
             log::debug!(
                 "▶ cost(move_cards, {}=>discard, effective_count={}, any_number={}, optional={})",
-                source, effective_count, is_any_number, is_optional
+                source,
+                effective_count,
+                is_any_number,
+                is_optional
             );
             log::debug!(
                 "  ├─ hand[{}] → {} match{}: [{}]",
@@ -275,9 +283,7 @@ impl AbilityResolver {
                 }
             } else if is_any_number && matching_indices.is_empty() {
                 if is_optional {
-                    log::debug!(
-                        "  └─ skip (optional any_number, no eligible cards in hand)"
-                    );
+                    log::debug!("  └─ skip (optional any_number, no eligible cards in hand)");
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
                         entry.cost_paid = true;
                         entry.optional_cost_result = Some(false);
@@ -316,14 +322,8 @@ impl AbilityResolver {
                 } else {
                     None
                 };
-                self.pending_choice =
-                    Some(
-                        Choice::select_cards(
-                            source.to_string(),
-                            effective_count,
-                            desc,
-                            is_optional,
-                        )
+                self.pending_choice = Some(
+                    Choice::select_cards(source.to_string(), effective_count, desc, is_optional)
                         .description_ja(Some(if is_any_number {
                             format!("手札から任意枚選択（スキップ可）")
                         } else {
@@ -342,16 +342,17 @@ impl AbilityResolver {
                             cost.cost_limit_any(),
                             cost.cost_limit_operator_any().map(|s| s.to_string()),
                         )
-                        .group(None::<String>.or_else(|| {
-                            cost.group_names_any().clone().map(|v| v.join(","))
-                        }))
+                        .group(
+                            None::<String>
+                                .or_else(|| cost.group_names_any().clone().map(|v| v.join(","))),
+                        )
                         .characters(cost.characters_any().cloned())
                         .target_player_id(Some(
                             cost.target.as_deref().unwrap_or("self").to_string(),
                         ))
                         .filtered_indices(filtered)
                         .build(),
-                    );
+                );
                 return Ok(());
             } else if !is_optional {
                 // Non-optional, no matches — fall through to error
@@ -407,8 +408,7 @@ impl AbilityResolver {
                         count
                     ));
                 }
-                let desc_en =
-                    format!("Select 1 card (need {} with the same unit name)", count);
+                let desc_en = format!("Select 1 card (need {} with the same unit name)", count);
                 let desc_ja = format!("同名ユニットが{}枚必要なカードを1枚選択", count);
                 self.pending_choice = Some(
                     Choice::select_cards(Zone::Hand.to_str(), 1, desc_en, is_optional)
@@ -428,8 +428,7 @@ impl AbilityResolver {
             } else {
                 source
             };
-            let matching_count =
-                util::count_in_zone(player, zone_name, &filter, card_db) as usize;
+            let matching_count = util::count_in_zone(player, zone_name, &filter, card_db) as usize;
 
             // Q104 / Rule 10.2.1: For deck_top costs, if the deck has fewer
             // cards than needed but the waitroom has cards, allow the cost to
@@ -449,8 +448,7 @@ impl AbilityResolver {
             }
             if matching_count < count && is_deck_top {
                 let waitroom_matching =
-                    util::count_in_zone(player, Zone::Waitroom.to_str(), &filter, card_db)
-                        as usize;
+                    util::count_in_zone(player, Zone::Waitroom.to_str(), &filter, card_db) as usize;
                 if matching_count + waitroom_matching == 0 {
                     return Err(format!(
                         "Cannot pay cost: {} and waitroom are both empty, need {}",
@@ -473,7 +471,11 @@ impl AbilityResolver {
         self.execute_move_cards(gs, &effect)
     }
 
-    fn pay_cost_change_state(&mut self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
+    fn pay_cost_change_state(
+        &mut self,
+        gs: &mut GameState,
+        cost: &AbilityEffect,
+    ) -> Result<(), String> {
         let state_change_binding = cost.state_change_any();
         let state_change = state_change_binding.unwrap_or("");
         let target = cost.target.as_deref().unwrap_or("self");
@@ -513,10 +515,7 @@ impl AbilityResolver {
             };
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "pay_optional_cost:skip_optional_cost".to_string(),
-                description: format!(
-                    "Pay optional cost: {}? (pay or skip)",
-                    cost_description
-                ),
+                description: format!("Pay optional cost: {}? (pay or skip)", cost_description),
                 description_en: Some(format!(
                     "Pay optional cost: {}? (pay or skip)",
                     cost_description
@@ -578,9 +577,7 @@ impl AbilityResolver {
                     .description_ja(Some(desc_ja))
                     .card_type(cost.card_type_any().map(|s| s.to_string()))
                     .is_select_action(true)
-                    .target_player_id(Some(
-                        cost.target.as_deref().unwrap_or("self").to_string(),
-                    ))
+                    .target_player_id(Some(cost.target.as_deref().unwrap_or("self").to_string()))
                     .build(),
                 );
                 return Ok(());
@@ -680,9 +677,7 @@ impl AbilityResolver {
                 }
                 Ok(())
             }
-            ActionType::MoveCards => {
-                self.pay_cost_move_cards(gs, cost)
-            }
+            ActionType::MoveCards => self.pay_cost_move_cards(gs, cost),
             // Q144 / Q145 / Q183 / Q257: Change state cost (wait/rest)
             //
             // Q144: "Can I wait 1 member when only 1 eligible exists even
@@ -700,9 +695,7 @@ impl AbilityResolver {
             // Q257: "Do I have to wait the member even if target is gone?"
             //   → Yes, if the cost is mandatory. Costs are paid regardless
             //   of whether the effect can resolve (Rule 9.4.2).
-            ActionType::ChangeState => {
-                self.pay_cost_change_state(gs, cost)
-            }
+            ActionType::ChangeState => self.pay_cost_change_state(gs, cost),
             // Rule 5.9 / Rule 9.4.2 / Q215: Pay energy cost
             //
             // Rule 5.9: Paying N energy means tapping N active energy cards
@@ -1026,7 +1019,8 @@ impl AbilityResolver {
             entry.optional_cost_result = Some(true);
             if !has_cost && is_deck_top {
                 entry.effect_started = false;
-                entry.conditional_choice = Some("pay_optional_cost".to_string());
+                entry.conditional_choice =
+                    Some(ConditionalChoice::Str("pay_optional_cost".to_string()));
                 entry.optional_cost_result = None;
             }
         }

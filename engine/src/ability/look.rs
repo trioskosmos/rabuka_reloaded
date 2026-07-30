@@ -2,6 +2,7 @@ use super::enums::Zone;
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ChoiceRoute, ExecutionContext, LookAndSelectStep};
 use super::util;
+use crate::ability_queue::ConditionalChoice;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 use crate::HashMap;
@@ -357,10 +358,13 @@ impl AbilityResolver {
         let chosen_card_type: Option<String> =
             if let Some(ref or_types) = effect.or_card_types_any() {
                 if !or_types.is_empty() {
-                    let maybe_cc = gs
-                        .ability_queue
-                        .current_entry()
-                        .and_then(|e| e.conditional_choice.clone());
+                    let maybe_cc = gs.ability_queue.current_entry().and_then(|e| {
+                        match &e.conditional_choice {
+                            Some(ConditionalChoice::Str(s)) => Some(s.clone()),
+                            Some(ConditionalChoice::Strings(v)) => v.first().cloned(),
+                            _ => None,
+                        }
+                    });
                     if let Some(ref cc) = maybe_cc {
                         if or_types.contains(cc) {
                             Some(cc.clone())
@@ -402,7 +406,8 @@ impl AbilityResolver {
                         });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         if let Some(e) = gs.ability_queue.current_entry_mut() {
-                            e.conditional_choice = Some(serde_json::to_string(or_types).unwrap());
+                            e.conditional_choice =
+                                Some(ConditionalChoice::Strings(or_types.to_vec()));
                         }
                         return Ok(());
                     }
@@ -648,10 +653,13 @@ impl AbilityResolver {
         let chosen_card_type: Option<String> =
             if let Some(ref or_types) = effect.or_card_types_any() {
                 if !or_types.is_empty() {
-                    let maybe_cc = gs
-                        .ability_queue
-                        .current_entry()
-                        .and_then(|e| e.conditional_choice.clone());
+                    let maybe_cc = gs.ability_queue.current_entry().and_then(|e| {
+                        match &e.conditional_choice {
+                            Some(ConditionalChoice::Str(s)) => Some(s.clone()),
+                            Some(ConditionalChoice::Strings(v)) => v.first().cloned(),
+                            _ => None,
+                        }
+                    });
                     if let Some(ref cc) = maybe_cc {
                         if or_types.contains(cc) {
                             Some(cc.clone())
@@ -693,7 +701,8 @@ impl AbilityResolver {
                         });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         if let Some(e) = gs.ability_queue.current_entry_mut() {
-                            e.conditional_choice = Some(serde_json::to_string(or_types).unwrap());
+                            e.conditional_choice =
+                                Some(ConditionalChoice::Strings(or_types.to_vec()));
                         }
                         // Save a copy of this effect so it re-executes after the choice.
                         {

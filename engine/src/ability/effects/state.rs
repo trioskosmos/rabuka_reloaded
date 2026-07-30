@@ -2,6 +2,7 @@ use super::super::enums::Zone;
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
 use super::super::util;
+use crate::ability_queue::ConditionalChoice;
 use crate::card::AbilityEffect;
 use crate::core::game_modifiers::CardOrientation;
 use crate::game_state::GameState;
@@ -918,10 +919,14 @@ impl AbilityResolver {
         // "selected" means the heart type was chosen by a preceding select action
         // in a Sequential effect; look up the choice from the queue entry.
         let resolved_heart_type = match heart_type {
-            Some("selected") => gs
-                .ability_queue
-                .current_entry()
-                .and_then(|e| e.conditional_choice.as_deref()),
+            Some("selected") => {
+                gs.ability_queue
+                    .current_entry()
+                    .and_then(|e| match &e.conditional_choice {
+                        Some(ConditionalChoice::Str(s)) => Some(s.as_str()),
+                        _ => None,
+                    })
+            }
             other => other,
         };
         let ht = resolved_heart_type.unwrap_or("heart00").to_string();

@@ -2,6 +2,7 @@ use super::enums::Zone;
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ExecutionContext, LookAndSelectStep};
 use super::util;
+use crate::ability_queue::ConditionalChoice;
 use crate::card::{AbilityEffect, CardDatabase, DistinctType, Operator, PlacementOrder};
 use crate::game_state::GameState;
 use crate::player::Player;
@@ -1431,8 +1432,8 @@ impl AbilityResolver {
                     .current_entry()
                     .and_then(|e| e.conditional_choice.clone());
                 match chosen {
-                    Some(s) => Some(s),
-                    None => {
+                    Some(ConditionalChoice::Str(s)) => Some(s),
+                    _ => {
                         let type_labels: Vec<String> = or_types
                             .iter()
                             .map(|t| crate::ability::describe::card_type_label(Some(t)).to_string())
@@ -1453,7 +1454,8 @@ impl AbilityResolver {
                         });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         if let Some(e) = gs.ability_queue.current_entry_mut() {
-                            e.conditional_choice = Some(serde_json::to_string(&or_types).unwrap());
+                            e.conditional_choice =
+                                Some(ConditionalChoice::Strings(or_types.to_vec()));
                         }
                         return Ok(());
                     }
