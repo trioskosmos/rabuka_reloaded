@@ -31,12 +31,12 @@ pub enum ConditionalChoice {
 }
 ```
 
-- [ ] Define `ConditionalChoice` enum in `ability_queue.rs`
-- [ ] Change field type on `AbilityQueueEntry`
-- [ ] Update all serialize sites (choice.rs, compound.rs, move_cards.rs, look.rs, effects/misc.rs, effects/draw.rs)
-- [ ] Update all deserialize sites (choice.rs:2109,2948, compound.rs:948,975)
-- [ ] Remove `serde_json::to_string` / `serde_json::from_str` calls
-- [ ] `cargo test`
+- [x] Define `ConditionalChoice` enum in `ability_queue.rs`
+- [x] Change field type on `AbilityQueueEntry`
+- [x] Update all serialize sites (choice.rs, compound.rs, move_cards.rs, look.rs, effects/misc.rs, effects/draw.rs)
+- [x] Update all deserialize sites (choice.rs:2109,2948, compound.rs:948,975)
+- [x] Remove `serde_json::to_string` / `serde_json::from_str` calls
+- [x] `cargo test`
 
 ---
 
@@ -86,17 +86,17 @@ All `Option<u32>` fields named any of:
 
 ### Steps
 
-- [ ] Change `Ability` struct: `use_limit: Option<u32>` -> `Option<u8>`
-- [ ] Change `AbilityEffect` struct: `count: Option<u32>` -> `Option<u8>`
-- [ ] Change all `EffectKind` variant fields (bulk find-replace per type above)
-- [ ] Change all `Condition` variant fields
-- [ ] Change `TriggerEvent`, `CostComparison`, `LocationSubChecks`, `DynamicCount`, `HeartIcon`
-- [ ] Change `Card` numeric fields
-- [ ] Update `i32` -> `i8` for cost_offset, ref_offset
-- [ ] Update all getter macros: `u32_getter!` returns `Option<u8>` now (rename to `u8_getter!` or parameterize)
-- [ ] Update all setter macros
-- [ ] Update handler code that does arithmetic on these fields (cast/compare)
-- [ ] `cargo test`
+- [x] Change `Ability` struct: `use_limit: Option<u32>` -> `Option<u8>`
+- [x] Change `AbilityEffect` struct: `count: Option<u32>` -> `Option<u8>`
+- [x] Change all `EffectKind` variant fields (bulk find-replace per type above)
+- [x] Change all `Condition` variant fields
+- [x] Change `TriggerEvent`, `CostComparison`, `LocationSubChecks`, `DynamicCount`, `HeartIcon`
+- [x] Change `Card` numeric fields
+- [x] Update `i32` -> `i8` for cost_offset, ref_offset
+- [x] Update all getter macros: `u32_getter!` returns `Option<u8>` now (rename to `u8_getter!` or parameterize)
+- [x] Update all setter macros
+- [x] Update handler code that does arithmetic on these fields (cast/compare)
+- [x] `cargo test`
 
 ### Estimated RAM savings
 
@@ -243,26 +243,26 @@ Enum shrinks from 544 -> ~140 bytes (largest variant with only unique fields). ~
 
 ## Summary Table
 
-| Phase | What | RAM savings | Bytecode savings | Complexity |
-|---|---|---|---|---|
-| 1 | Kill JSON round-trips in choice.rs | Removes runtime alloc+parse | — | Low |
-| 2 | Downsize u32->u8 | ~540 KB | — | Medium (mechanical) |
-| 3 | u8 field indices | — | ~7.5 KB | Low |
-| 4 | EffectKind variant tags | — | — | Medium |
-| 5 | Direct binary decoder | Eliminates Value allocs | — | High |
-| 6 | EffectFilter sub-struct | ~390 KB | — | High |
+| Phase | What | RAM savings | Bytecode savings | Complexity | Status |
+|---|---|---|---|---|---|
+| 1 | Kill JSON round-trips in choice.rs | Removes runtime alloc+parse | — | Low | **DONE** |
+| 2 | Downsize u32->u8 | ~540 KB | — | Medium (mechanical) | **DONE** |
+| 3 | u8 field indices | — | ~7.5 KB | Low | TODO |
+| 4 | EffectKind variant tags | — | — | Medium | TODO |
+| 5 | Direct binary decoder | Eliminates Value allocs | — | High | TODO |
+| 6 | EffectFilter sub-struct | ~390 KB | — | High | TODO |
 
 **Combined estimated savings:** ~930 KB RAM, ~7.5 KB binary, ~60-80% faster ability decode.
 
 ## Execution Order
 
-| Phase | Risk | Commit message |
-|---|---|---|
-| 1 | Low | `refactor: replace conditional_choice JSON string with tagged enum` |
-| 2 | Medium | `refactor: downsize u32/i32 fields to u8/i8 in ability types` |
-| 3 | Low | `perf: single-byte indices for common bytecode field names` |
-| 4 | Medium | `perf: encode EffectKind variant tags in bytecode` |
-| 5 | High | `perf: direct binary decoder, eliminate serde_json::from_value` |
-| 6 | High | `refactor: extract EffectFilter sub-struct from EffectKind` |
+| Phase | Risk | Commit message | Status |
+|---|---|---|---|
+| 1 | Low | `refactor: replace conditional_choice JSON string with tagged enum` | DONE |
+| 2 | Medium | `refactor: downsize u32/i32 fields to u8/i8 in ability types` | DONE |
+| 3 | Low | `perf: single-byte indices for common bytecode field names` | TODO |
+| 4 | Medium | `perf: encode EffectKind variant tags in bytecode` | TODO |
+| 5 | High | `perf: direct binary decoder, eliminate serde_json::from_value` | TODO |
+| 6 | High | `refactor: extract EffectFilter sub-struct from EffectKind` | TODO |
 
 Each phase: make changes -> `cargo test` -> commit if green.
