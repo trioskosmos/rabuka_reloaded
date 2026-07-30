@@ -146,6 +146,15 @@ static int hl_zones[MAX_HIGHLIGHTS];
 static int hl_slots[MAX_HIGHLIGHTS];
 static bool hl_opponent[MAX_HIGHLIGHTS];
 
+// ---- Need hearts text per player (drawn next to live zone) ----
+static char need_hearts_text[2][256] = {{0}, {0}};
+void _3ds_set_need_hearts_text(int player, const char* text) {
+    if (player < 0 || player > 1) return;
+    if (!text) { need_hearts_text[player][0] = '\0'; return; }
+    strncpy(need_hearts_text[player], text, 255);
+    need_hearts_text[player][255] = '\0';
+}
+
 // ---- Action overlay (Phase 2: show actions on bottom screen) ----
 #define MAX_OVERLAY_LINES 16
 #define OVERLAY_LINE_LEN  48
@@ -571,6 +580,82 @@ void _3ds_draw_label(const char* label, float x, float y, u32 color, float scale
     C2D_DrawText(&t, C2D_WithColor, x, y, 0.6f, scale, scale, color);
 }
 
+// Draw label with inline {{icon.png|label}} tokens (mirrors render_text_with_icons for bottom screen)
+void _3ds_draw_label_icons(const char* label, float x, float y, u32 color, float scale) {
+    if (!label || label[0] == '\0') return;
+    C2D_Font f = custom_font ? custom_font : NULL;
+    float cx = x;
+    float text_h = scale * 30.0f;
+    float icon_h = (scale * 16.0f);
+    if (icon_h < 11.0f) icon_h = 11.0f;
+    float icon_y = y + (text_h - icon_h) / 2.0f;
+    const char* p = label;
+    while (*p) {
+        // Find next {{
+        const char* open = strstr(p, "{{");
+        if (!open) {
+            // Draw remaining as plain text
+            C2D_TextBufClear(tmp_text_buf);
+            C2D_Text t;
+            C2D_TextFontParse(&t, f, tmp_text_buf, p);
+            C2D_TextOptimize(&t);
+            C2D_DrawText(&t, C2D_WithColor, cx, y, 0.6f, scale, scale, color);
+            break;
+        }
+        if (open > p) {
+            // Draw text segment before {{
+            char seg[256];
+            int len = (int)(open - p);
+            if (len > 255) len = 255;
+            memcpy(seg, p, len);
+            seg[len] = '\0';
+            C2D_TextBufClear(tmp_text_buf);
+            C2D_Text t;
+            C2D_TextFontParse(&t, f, tmp_text_buf, seg);
+            C2D_TextOptimize(&t);
+            C2D_DrawText(&t, C2D_WithColor, cx, y, 0.6f, scale, scale, color);
+            // Measure width to advance cx
+            float sw = 0;
+            C2D_TextGetDimensions(&t, scale, scale, &sw, NULL);
+            cx += sw;
+        }
+        // Find }}
+        const char* close = strstr(open + 2, "}}");
+        if (!close) break;
+        // Parse inner: "file.png|label"
+        char inner[256];
+        int ilen = (int)(close - open - 2);
+        if (ilen > 255) ilen = 255;
+        memcpy(inner, open + 2, ilen);
+        inner[ilen] = '\0';
+        const char* bar = strchr(inner, '|');
+        char file[256];
+        if (bar) {
+            int flen = (int)(bar - inner);
+            memcpy(file, inner, flen);
+            file[flen] = '\0';
+        } else {
+            strncpy(file, inner, 255);
+            file[255] = '\0';
+        }
+        // Strip .png suffix for atlas lookup: "heart_06.png" -> "heart_06"
+        char atlas_base[256];
+        strncpy(atlas_base, file, 255);
+        atlas_base[255] = '\0';
+        char* dotpng = strstr(atlas_base, ".png");
+        if (dotpng) *dotpng = '\0';
+        char atlas_name[280];
+        snprintf(atlas_name, sizeof(atlas_name), "icon_%s.png.t3x", atlas_base);
+        C2D_Image img = _3ds_get_card_image(atlas_name, 0);
+        if (img.tex) {
+            float iw = icon_h * ((float)img.subtex->width / (float)img.subtex->height);
+            C2D_DrawImageAt(img, cx, icon_y, 0.5f, NULL, iw / (float)img.subtex->width, icon_h / (float)img.subtex->height);
+            cx += iw + scale * 6.0f;
+        }
+        p = close + 2;
+    }
+}
+
 void _3ds_draw_card_at(CardSlot* slot, float x, float y, float w, float h) {
     if (!slot->active) return;
 
@@ -657,6 +742,14 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
         if (pb->live[i].active) _3ds_draw_card_at(&pb->live[i], lx, live_y + 1, live_slot_w, live_card_h);
         lx += live_slot_w + 2;
     }
+    // Draw need hearts text to the right of live cards
+    {
+        int pi = opponent ? 1 : 0;
+        if (need_hearts_text[pi][0] && lx < W - M - 4) {
+            float fs = 0.40f;
+            _3ds_draw_label_icons(need_hearts_text[pi], lx + 2, live_y + 2, COL_GOLD, fs);
+        }
+    }
 
 // === STAGE + UTILITY ===
     float st_x = M;
@@ -725,10 +818,14 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float hand_card_h = hand_h - 4;
     float h_slot_w = hand_card_h * PORTRAIT;
     for (int i = 0; i < pb->hand_count && i < MAX_SLOTS; i++) {
-        if (!cli_mode && _is_highlighted(3, i, opponent)) {
-            _3ds_draw_border(hx, hand_y + 2, h_slot_w, hand_card_h, COL_SEL, 2);
-        }
         if (pb->hand[i].active) _3ds_draw_card_at(&pb->hand[i], hx, hand_y + 2, h_slot_w, hand_card_h);
+        if (!cli_mode && _is_highlighted(3, i, opponent)) {
+            // Draw highlight border above card (z=0.6 > card z=0.5)
+            C2D_DrawRectSolid(hx, hand_y + 2, 0.6f, h_slot_w, 2, COL_SEL);
+            C2D_DrawRectSolid(hx, hand_y + hand_card_h, 0.6f, h_slot_w, 2, COL_SEL);
+            C2D_DrawRectSolid(hx, hand_y + 2, 0.6f, 2, hand_card_h, COL_SEL);
+            C2D_DrawRectSolid(hx + h_slot_w - 2, hand_y + 2, 0.6f, 2, hand_card_h, COL_SEL);
+        }
         hx += h_slot_w + 1;
         if (hx > W - M) break;
     }
@@ -1109,34 +1206,35 @@ int _3ds_uds_is_connected() {
 // Key differences from FBI: RGB565 texture format (not RGBA8), Morton-order tiling,
 // proper shutdown with event-based thread synchronization, correct grayscale conversion.
 // Improvements over FBI: robust shutdown, NULL safety, retry logic, proper quirc_end discipline.
- #include "quirc.h"
- #include <3ds/services/cam.h>
- #include <3ds/services/gspgpu.h>
- 
- #define QR_W 400
- #define QR_H 240
- 
- #define QR_MAX_RETRIES 3
- #define QR_RETRY_DELAY_MS 500
- 
- #define EVENT_CANCEL 0
- #define EVENT_RECV 1
- #define EVENT_BUFFER_ERROR 2
- #define EVENT_COUNT 3
- 
-  static volatile bool cam_running = false;
-  static Handle cam_mutex = 0;
-  static Handle cam_cancel = 0;
-  static Thread cam_thread = NULL;
-  static u8 *cam_shared_buf = NULL;
-  static struct quirc *qr = NULL;
-  static C3D_Tex cam_tex = {0};
-  static bool cam_tex_inited = false;
-  static int qr_frame_skip = 0;
- 
-static void _3ds_qr_update_texture(const u16 *buf, int w, int h) {
+  #include "quirc.h"
+  #include <3ds/services/cam.h>
+  #include <3ds/services/gspgpu.h>
+  
+  #define QR_W 400
+  #define QR_H 240
+  
+  #define QR_MAX_RETRIES 3
+  #define QR_RETRY_DELAY_MS 500
+  
+  #define EVENT_STOP 0
+  #define EVENT_RECV 1
+  #define EVENT_BUFFER_ERROR 2
+  #define EVENT_COUNT 3
+  
+   static volatile bool cam_running = false;
+   static Handle cam_mutex = 0;
+   static Handle cam_cancel = 0;
+   static Handle cam_stop_event = 0;
+   static Thread cam_thread = NULL;
+   static u8 *cam_shared_buf = NULL;
+   static struct quirc *qr = NULL;
+   static C3D_Tex cam_tex = {0};
+   static bool cam_tex_inited = false;
+   static int qr_frame_skip = 0;
+  
+  static void _3ds_qr_update_texture(const u16 *buf, int w, int h) {
        if (!cam_tex_inited) {
-           C3D_TexInit(&cam_tex, w, h, GPU_RGB565);
+           C3D_TexInit(&cam_tex, 512, 256, GPU_RGB565);
            C3D_TexSetFilter(&cam_tex, GPU_LINEAR, GPU_LINEAR);
            cam_tex_inited = true;
        }
@@ -1144,14 +1242,14 @@ static void _3ds_qr_update_texture(const u16 *buf, int w, int h) {
        for (int y = 0; y < h; y++) {
            for (int x = 0; x < w; x++) {
                int si = y * w + x;
-               int di = ((((y >> 3) * (w >> 3) + (x >> 3)) << 6) + ((x & 1) | ((y & 1) << 1) | ((x & 2) << 1) | ((y & 2) << 2) | ((x & 4) << 2) | ((y & 4) << 3)));
+               int di = ((((y >> 3) * (512 >> 3) + (x >> 3)) << 6) + ((x & 1) | ((y & 1) << 1) | ((x & 2) << 1) | ((y & 2) << 2) | ((x & 4) << 2) | ((y & 4) << 3)));
                ((u16*)cam_tex.data)[di] = buf[si];
            }
        }
-       GSPGPU_FlushDataCache(cam_tex.data, w * h * 2);
+       GSPGPU_FlushDataCache(cam_tex.data, 512 * 256 * 2);
    }
- 
-void _3ds_qr_draw_preview(float x_off) {
+  
+  void _3ds_qr_draw_preview(float x_off) {
        if (!cam_running || !cam_tex_inited || !cam_shared_buf || !cam_tex.data) return;
        if (svcWaitSynchronization(cam_mutex, 100000000ULL) != 0) return;
        _3ds_qr_update_texture((const u16*)cam_shared_buf, QR_W, QR_H);
@@ -1159,154 +1257,157 @@ void _3ds_qr_draw_preview(float x_off) {
        C2D_Image img = { .tex = &cam_tex, .subtex = NULL };
        C2D_DrawImageAt(img, x_off, 0.0f, 0.4f, NULL, 1.0f, 1.0f);
    }
-
- static void cam_thread_func(void *arg) {
-     (void)arg;
-     Result res = 0;
- 
-     u32 bufferSize = QR_W * QR_H * 2;
-     u16 *local_buf = (u16*)linearAlloc(bufferSize);
-     if (!local_buf) { cam_running = false; return; }
- 
-     int retries = 0;
-     while (retries < QR_MAX_RETRIES) {
-         if (R_FAILED(res = camInit())) {
-             retries++;
-             if (retries >= QR_MAX_RETRIES) {
-                 linearFree(local_buf);
-                 cam_running = false;
-                 return;
-             }
-             svcSleepThread(QR_RETRY_DELAY_MS * 1000000ULL);
-             continue;
-         }
- 
-         u32 cam = SELECT_OUT1;
-         if (R_FAILED(res = CAMU_SetSize(cam, SIZE_CTR_TOP_LCD, CONTEXT_A))
-             || R_FAILED(res = CAMU_SetOutputFormat(cam, OUTPUT_RGB_565, CONTEXT_A))
-             || R_FAILED(res = CAMU_SetFrameRate(cam, FRAME_RATE_30))
-             || R_FAILED(res = CAMU_SetNoiseFilter(cam, true))
-             || R_FAILED(res = CAMU_SetAutoExposure(cam, true))
-             || R_FAILED(res = CAMU_SetAutoWhiteBalance(cam, true))
-             || R_FAILED(res = CAMU_Activate(cam))) {
-             camExit();
-             retries++;
-             if (retries >= QR_MAX_RETRIES) {
-                 linearFree(local_buf);
-                 cam_running = false;
-                 return;
-             }
-             svcSleepThread(QR_RETRY_DELAY_MS * 1000000ULL);
-             continue;
-         }
- 
-         u32 transferUnit = 0;
-         Handle evt_recv = 0;
-         Handle evt_buferr = 0;
-         bool cam_setup_failed = false;
- 
-         if (R_FAILED(res = CAMU_GetBufferErrorInterruptEvent(&evt_buferr, PORT_CAM1))
-             || R_FAILED(res = CAMU_SetTrimming(PORT_CAM1, true))
-             || R_FAILED(res = CAMU_SetTrimmingParamsCenter(PORT_CAM1, QR_W, QR_H, 400, 240))
-             || R_FAILED(res = CAMU_GetMaxBytes(&transferUnit, QR_W, QR_H))
-             || R_FAILED(res = CAMU_SetTransferBytes(PORT_CAM1, transferUnit, QR_W, QR_H))
-             || R_FAILED(res = CAMU_ClearBuffer(PORT_CAM1))
-             || R_FAILED(res = CAMU_SetReceiving(&evt_recv, local_buf, PORT_CAM1, bufferSize, (s16)transferUnit))
-             || R_FAILED(res = CAMU_StartCapture(PORT_CAM1))) {
-             cam_setup_failed = true;
-         }
- 
-         if (cam_setup_failed) {
-             if (evt_recv) { svcCloseHandle(evt_recv); evt_recv = 0; }
-             if (evt_buferr) { svcCloseHandle(evt_buferr); evt_buferr = 0; }
-             CAMU_Activate(SELECT_NONE);
-             camExit();
-             retries++;
-             if (retries >= QR_MAX_RETRIES) {
-                 linearFree(local_buf);
-                 cam_running = false;
-                 return;
-             }
-             svcSleepThread(QR_RETRY_DELAY_MS * 1000000ULL);
-             continue;
-         }
- 
-         Handle waitEvents[EVENT_COUNT] = { cam_cancel, evt_recv, evt_buferr };
- 
-         while (cam_running) {
-             s32 idx = 0;
-             if (R_FAILED(svcWaitSynchronizationN(&idx, waitEvents, EVENT_COUNT, false, U64_MAX))) break;
- 
-             if (idx == EVENT_CANCEL) break;
- 
-             if (idx == EVENT_BUFFER_ERROR) {
-                 if (evt_buferr) { svcCloseHandle(evt_buferr); evt_buferr = 0; }
-                 CAMU_ClearBuffer(PORT_CAM1);
-                 if (R_FAILED(CAMU_SetReceiving(&evt_buferr, local_buf, PORT_CAM1, bufferSize, (s16)transferUnit))) {
-                     break;
-                 }
-                 CAMU_StartCapture(PORT_CAM1);
-                 waitEvents[EVENT_BUFFER_ERROR] = evt_buferr;
-                 continue;
-             }
- 
-             svcCloseHandle(evt_recv);
-             evt_recv = 0;
- 
-             svcWaitSynchronization(cam_mutex, U64_MAX);
-             memcpy(cam_shared_buf, local_buf, bufferSize);
-             GSPGPU_FlushDataCache(cam_shared_buf, bufferSize);
-             svcReleaseMutex(cam_mutex);
- 
-             res = CAMU_SetReceiving(&evt_recv, local_buf, PORT_CAM1, bufferSize, (s16)transferUnit);
-             waitEvents[EVENT_RECV] = evt_recv;
-         }
- 
-         CAMU_StopCapture(PORT_CAM1);
-         bool busy = true;
-         while (R_SUCCEEDED(CAMU_IsBusy(&busy, PORT_CAM1)) && busy) svcSleepThread(1000000);
-         CAMU_ClearBuffer(PORT_CAM1);
-         CAMU_Activate(SELECT_NONE);
-         camExit();
- 
-         if (evt_recv) svcCloseHandle(evt_recv);
-         if (evt_buferr) svcCloseHandle(evt_buferr);
-         break;
-     }
- 
-     linearFree(local_buf);
-     cam_running = false;
- }
-
- int _3ds_qr_start(void) {
-      if (cam_running) return 0;
- 
-      qr_frame_skip = 0;
- 
-      svcCreateMutex(&cam_mutex, false);
-      svcCreateEvent(&cam_cancel, RESET_STICKY);
- 
-      cam_shared_buf = (u8*)linearAlloc(QR_W * QR_H * 2);
-      if (!cam_shared_buf) {
-          svcCloseHandle(cam_mutex); cam_mutex = 0;
-          svcCloseHandle(cam_cancel); cam_cancel = 0;
-          return -1;
+  
+  static void cam_thread_func(void *arg) {
+      (void)arg;
+      Result res = 0;
+  
+      u32 bufferSize = QR_W * QR_H * 2;
+      u16 *local_buf = (u16*)linearAlloc(bufferSize);
+      if (!local_buf) { cam_running = false; return; }
+  
+      int retries = 0;
+      while (retries < QR_MAX_RETRIES) {
+          if (R_FAILED(res = camInit())) {
+              retries++;
+              if (retries >= QR_MAX_RETRIES) {
+                  linearFree(local_buf);
+                  cam_running = false;
+                  return;
+              }
+              svcSleepThread(QR_RETRY_DELAY_MS * 1000000ULL);
+              continue;
+          }
+  
+          u32 cam = SELECT_OUT1;
+          if (R_FAILED(res = CAMU_SetSize(cam, SIZE_CTR_TOP_LCD, CONTEXT_A))
+              || R_FAILED(res = CAMU_SetOutputFormat(cam, OUTPUT_RGB_565, CONTEXT_A))
+              || R_FAILED(res = CAMU_SetFrameRate(cam, FRAME_RATE_30))
+              || R_FAILED(res = CAMU_SetNoiseFilter(cam, true))
+              || R_FAILED(res = CAMU_SetAutoExposure(cam, true))
+              || R_FAILED(res = CAMU_SetAutoWhiteBalance(cam, true))
+              || R_FAILED(res = CAMU_Activate(cam))) {
+              camExit();
+              retries++;
+              if (retries >= QR_MAX_RETRIES) {
+                  linearFree(local_buf);
+                  cam_running = false;
+                  return;
+              }
+              svcSleepThread(QR_RETRY_DELAY_MS * 1000000ULL);
+              continue;
+          }
+  
+          u32 transferUnit = 0;
+          Handle evt_recv = 0;
+          Handle evt_buferr = 0;
+          bool cam_setup_failed = false;
+  
+          if (R_FAILED(res = CAMU_GetBufferErrorInterruptEvent(&evt_buferr, PORT_CAM1))
+              || R_FAILED(res = CAMU_SetTrimming(PORT_CAM1, true))
+              || R_FAILED(res = CAMU_SetTrimmingParamsCenter(PORT_CAM1, QR_W, QR_H, 400, 240))
+              || R_FAILED(res = CAMU_GetMaxBytes(&transferUnit, QR_W, QR_H))
+              || R_FAILED(res = CAMU_SetTransferBytes(PORT_CAM1, transferUnit, QR_W, QR_H))
+              || R_FAILED(res = CAMU_ClearBuffer(PORT_CAM1))
+              || R_FAILED(res = CAMU_SetReceiving(&evt_recv, local_buf, PORT_CAM1, bufferSize, (s16)transferUnit))
+              || R_FAILED(res = CAMU_StartCapture(PORT_CAM1))) {
+              cam_setup_failed = true;
+          }
+  
+          if (cam_setup_failed) {
+              if (evt_recv) { svcCloseHandle(evt_recv); evt_recv = 0; }
+              if (evt_buferr) { svcCloseHandle(evt_buferr); evt_buferr = 0; }
+              CAMU_Activate(SELECT_NONE);
+              camExit();
+              retries++;
+              if (retries >= QR_MAX_RETRIES) {
+                  linearFree(local_buf);
+                  cam_running = false;
+                  return;
+              }
+              svcSleepThread(QR_RETRY_DELAY_MS * 1000000ULL);
+              continue;
+          }
+  
+          Handle waitEvents[EVENT_COUNT] = { cam_stop_event, evt_recv, evt_buferr };
+  
+          while (cam_running) {
+              s32 idx = 0;
+              if (R_FAILED(svcWaitSynchronizationN(&idx, waitEvents, EVENT_COUNT, false, U64_MAX))) break;
+  
+              if (idx == EVENT_STOP) break;
+  
+              if (idx == EVENT_BUFFER_ERROR) {
+                  if (evt_buferr) { svcCloseHandle(evt_buferr); evt_buferr = 0; }
+                  CAMU_ClearBuffer(PORT_CAM1);
+                  if (R_FAILED(CAMU_SetReceiving(&evt_buferr, local_buf, PORT_CAM1, bufferSize, (s16)transferUnit))) {
+                      break;
+                  }
+                  CAMU_StartCapture(PORT_CAM1);
+                  waitEvents[EVENT_BUFFER_ERROR] = evt_buferr;
+                  continue;
+              }
+  
+              svcCloseHandle(evt_recv);
+              evt_recv = 0;
+  
+              svcWaitSynchronization(cam_mutex, U64_MAX);
+              memcpy(cam_shared_buf, local_buf, bufferSize);
+              GSPGPU_FlushDataCache(cam_shared_buf, bufferSize);
+              svcReleaseMutex(cam_mutex);
+  
+              res = CAMU_SetReceiving(&evt_recv, local_buf, PORT_CAM1, bufferSize, (s16)transferUnit);
+              waitEvents[EVENT_RECV] = evt_recv;
+          }
+  
+          CAMU_StopCapture(PORT_CAM1);
+          bool busy = true;
+          while (R_SUCCEEDED(CAMU_IsBusy(&busy, PORT_CAM1)) && busy) svcSleepThread(1000000);
+          CAMU_ClearBuffer(PORT_CAM1);
+          CAMU_Activate(SELECT_NONE);
+          camExit();
+  
+          if (evt_recv) svcCloseHandle(evt_recv);
+          if (evt_buferr) svcCloseHandle(evt_buferr);
+          break;
       }
- 
-      qr = quirc_new();
-      if (!qr) { linearFree(cam_shared_buf); cam_shared_buf = NULL; svcCloseHandle(cam_mutex); cam_mutex = 0; svcCloseHandle(cam_cancel); cam_cancel = 0; return -2; }
-      if (quirc_resize(qr, QR_W, QR_H) < 0) { quirc_destroy(qr); qr = NULL; linearFree(cam_shared_buf); cam_shared_buf = NULL; svcCloseHandle(cam_mutex); cam_mutex = 0; svcCloseHandle(cam_cancel); cam_cancel = 0; return -3; }
- 
-      cam_running = true;
-      cam_thread = threadCreate(cam_thread_func, NULL, 0x40000, 0x1A, -1, true);
-      if (!cam_thread) { cam_running = false; quirc_destroy(qr); qr = NULL; linearFree(cam_shared_buf); cam_shared_buf = NULL; svcCloseHandle(cam_mutex); cam_mutex = 0; svcCloseHandle(cam_cancel); cam_cancel = 0; return -4; }
- 
-      return 0;
+  
+      linearFree(local_buf);
+      cam_running = false;
   }
-
-void _3ds_qr_stop(void) {
+  
+  int _3ds_qr_start(void) {
+       if (cam_running) return 0;
+  
+       qr_frame_skip = 0;
+  
+       svcCreateMutex(&cam_mutex, false);
+       svcCreateEvent(&cam_cancel, RESET_STICKY);
+       svcCreateEvent(&cam_stop_event, RESET_STICKY);
+  
+       cam_shared_buf = (u8*)linearAlloc(QR_W * QR_H * 2);
+       if (!cam_shared_buf) {
+           svcCloseHandle(cam_mutex); cam_mutex = 0;
+           svcCloseHandle(cam_cancel); cam_cancel = 0;
+           svcCloseHandle(cam_stop_event); cam_stop_event = 0;
+           return -1;
+       }
+  
+       qr = quirc_new();
+       if (!qr) { linearFree(cam_shared_buf); cam_shared_buf = NULL; svcCloseHandle(cam_mutex); cam_mutex = 0; svcCloseHandle(cam_cancel); cam_cancel = 0; svcCloseHandle(cam_stop_event); cam_stop_event = 0; return -2; }
+       if (quirc_resize(qr, QR_W, QR_H) < 0) { quirc_destroy(qr); qr = NULL; linearFree(cam_shared_buf); cam_shared_buf = NULL; svcCloseHandle(cam_mutex); cam_mutex = 0; svcCloseHandle(cam_cancel); cam_cancel = 0; svcCloseHandle(cam_stop_event); cam_stop_event = 0; return -3; }
+  
+       cam_running = true;
+       cam_thread = threadCreate(cam_thread_func, NULL, 0x40000, 0x1A, -1, true);
+       if (!cam_thread) { cam_running = false; quirc_destroy(qr); qr = NULL; linearFree(cam_shared_buf); cam_shared_buf = NULL; svcCloseHandle(cam_mutex); cam_mutex = 0; svcCloseHandle(cam_cancel); cam_cancel = 0; svcCloseHandle(cam_stop_event); cam_stop_event = 0; return -4; }
+  
+       return 0;
+   }
+  
+  void _3ds_qr_stop(void) {
        if (!cam_running) return;
        cam_running = false;
+       svcSignalEvent(cam_stop_event);
        svcSignalEvent(cam_cancel);
        // Wait for camera thread to finish, with timeout
        if (cam_thread) {
@@ -1327,6 +1428,7 @@ void _3ds_qr_stop(void) {
        // Close kernel handles
        if (cam_mutex) { svcCloseHandle(cam_mutex); cam_mutex = 0; }
        if (cam_cancel) { svcCloseHandle(cam_cancel); cam_cancel = 0; }
+       if (cam_stop_event) { svcCloseHandle(cam_stop_event); cam_stop_event = 0; }
    }
 
 int _3ds_qr_poll(char *out_text, unsigned int out_max) {

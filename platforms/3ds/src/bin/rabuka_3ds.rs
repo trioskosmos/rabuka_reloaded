@@ -89,6 +89,22 @@ fn heart_color_index(color: &HeartColor) -> Option<usize> {
     }
 }
 
+/// Format need hearts with text icons matching top screen format.
+fn format_need_hearts_icons(hearts: &[u32]) -> String {
+    let mut parts = Vec::new();
+    for (i, &count) in hearts.iter().enumerate() {
+        if count > 0 {
+            let label = format!("h{:02}{}", i, count);
+            parts.push(heart_label_to_icon(&label));
+        }
+    }
+    if parts.is_empty() {
+        String::new()
+    } else {
+        format!("{{{{icon_heart_06.png|NEED}}}} {}", parts.join(" "))
+    }
+}
+
 /// Translate stage area labels for display.
 #[cfg(feature = "3ds")]
 fn tl_area(area: &str) -> &str {
@@ -1029,7 +1045,7 @@ fn main() {
                                 unsafe {
                                     _3ds_top_queue_text(
                                         50.0,
-                                        230.0,
+                                        220.0,
                                         COL_MED,
                                         0.60f32,
                                         format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back"))
@@ -1607,7 +1623,7 @@ fn main() {
                                     let qr_cancel = tl("B=cancel");
                                     _3ds_top_queue_text(
                                         40.0,
-                                        230.0,
+                                        220.0,
                                         COL_MED,
                                         0.60f32,
                                         format!("{}\0", qr_cancel).as_ptr(),
@@ -1843,7 +1859,7 @@ fn main() {
                                 unsafe {
                                     _3ds_top_queue_text(
                                         50.0,
-                                        230.0,
+                                        220.0,
                                         COL_MED,
                                         0.60f32,
                                         format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back"))
@@ -2242,7 +2258,7 @@ fn main() {
                                 unsafe {
                                     _3ds_top_queue_text(
                                         40.0,
-                                        230.0,
+                                        220.0,
                                         COL_MED,
                                         0.60f32,
                                         format!("{}\0", tl("A=connect B=back")).as_ptr(),
@@ -3830,8 +3846,10 @@ fn main() {
                 was_touching = touching;
 
                 if dirty || redraw {
-                    acts_cache = game_setup::generate_possible_actions(&gs);
-                    choice_grid_offset = 0;
+                    if dirty {
+                        acts_cache = game_setup::generate_possible_actions(&gs);
+                        choice_grid_offset = 0;
+                    }
 
                     // Rebuild display order from freshly generated acts_cache.
                     display_order = {
@@ -4046,6 +4064,78 @@ fn main() {
                         // Hide AI opponent's hand — shouldn't be visible to player
                         unsafe {
                             _3ds_board_set_opp_hand_count(0);
+                        }
+                    }
+
+                    // Compute and set need hearts text for bottom screen live zone
+                    {
+                        let compute_live_need = |player: &Player, gs: &GameState| -> Vec<u32> {
+                            let mut nh = vec![0u32; 8];
+                            for &cid in &player.live_card_zone.cards {
+                                if cid == -1 {
+                                    continue;
+                                }
+                                if let Some(card) = gs.card_database.get_card(cid) {
+                                    if let Some(ref need) = card.need_heart {
+                                        for (color, count) in &need.hearts {
+                                            if let Some(idx) = heart_color_index(color) {
+                                                nh[idx] += count;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            for (&cid, colors) in &gs.mods.need_heart_modifiers {
+                                if player.live_card_zone.cards.contains(&cid) {
+                                    for (color, &val) in colors {
+                                        if let Some(idx) = heart_color_index(color) {
+                                            nh[idx] = (nh[idx] as i32 + val.total()).max(0) as u32;
+                                        }
+                                    }
+                                }
+                            }
+                            nh
+                        };
+                        // P1 (perspective player) need hearts — always show if any
+                        let p1_nh = compute_live_need(&gs.player1, &gs);
+                        if p1_nh.iter().any(|&v| v > 0) {
+                            let nh_str = format_need_hearts_icons(&p1_nh);
+                            let c_str =
+                                std::ffi::CString::new(nh_str.as_bytes()).unwrap_or_default();
+                            unsafe {
+                                _3ds_set_need_hearts_text(0, c_str.as_ptr());
+                            }
+                        } else {
+                            unsafe {
+                                _3ds_set_need_hearts_text(0, std::ptr::null());
+                            }
+                        }
+                        // P2 (opponent) need hearts — hidden until performed
+                        let opp_is_first = gs.player2.is_first_attacker;
+                        let opp_performed =
+                            matches!(
+                                gs.current_phase,
+                                Phase::SecondAttackerPerformance | Phase::LiveVictoryDetermination
+                            ) || (matches!(gs.current_phase, Phase::FirstAttackerPerformance)
+                                && opp_is_first);
+                        if opp_performed {
+                            let p2_nh = compute_live_need(&gs.player2, &gs);
+                            if p2_nh.iter().any(|&v| v > 0) {
+                                let nh_str = format_need_hearts_icons(&p2_nh);
+                                let c_str =
+                                    std::ffi::CString::new(nh_str.as_bytes()).unwrap_or_default();
+                                unsafe {
+                                    _3ds_set_need_hearts_text(1, c_str.as_ptr());
+                                }
+                            } else {
+                                unsafe {
+                                    _3ds_set_need_hearts_text(1, std::ptr::null());
+                                }
+                            }
+                        } else {
+                            unsafe {
+                                _3ds_set_need_hearts_text(1, std::ptr::null());
+                            }
                         }
                     }
 
@@ -5695,9 +5785,9 @@ fn main() {
                                                             tl("unselected_label")
                                                         };
                                                         if !cn.is_empty() && !name.is_empty() {
-                                                            format!("[{}] [{}] {}", cn, label, name)
+                                                            format!("[{}] [{}] {}", label, cn, name)
                                                         } else if !cn.is_empty() {
-                                                            format!("[{}] [{}]", cn, label)
+                                                            format!("[{}] [{}]", label, cn)
                                                         } else {
                                                             format!("[{}] {}", label, name)
                                                         }
@@ -5809,9 +5899,10 @@ fn main() {
                                         continue;
                                     }
                                     match act.action_type {
-                                        // Stage slots for PlayMemberToStage (detail mode, own stage)
+                                        // Hand card for PlayMemberToStage + stage slots in detail mode
                                         game_setup::ActionType::PlayMemberToStage => {
                                             if detail_mode && viewing_card.is_some() {
+                                                // In detail mode: highlight stage target slots
                                                 if p.card_id != viewing_card {
                                                     continue;
                                                 }
@@ -5825,6 +5916,35 @@ fn main() {
                                                     unsafe {
                                                         _3ds_board_set_action_highlight(
                                                             1, slot, false,
+                                                        );
+                                                    }
+                                                }
+                                            } else {
+                                                // Normal mode: highlight the hand card that can be played
+                                                if let Some(cid) = p.card_id {
+                                                    if let Some((zone, slot, opp)) =
+                                                        find_card_zone_slot(&gs, cid)
+                                                    {
+                                                        if zone == 3 {
+                                                            unsafe {
+                                                                _3ds_board_set_action_highlight(
+                                                                    zone, slot, opp,
+                                                                );
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        // Stage cards for UseAbility
+                                        game_setup::ActionType::UseAbility => {
+                                            if let Some(cid) = p.card_id {
+                                                if let Some((zone, slot, opp)) =
+                                                    find_card_zone_slot(&gs, cid)
+                                                {
+                                                    unsafe {
+                                                        _3ds_board_set_action_highlight(
+                                                            zone, slot, opp,
                                                         );
                                                     }
                                                 }
@@ -5848,31 +5968,35 @@ fn main() {
                                                 }
                                             }
                                         }
-                                        // Hand cards for SelectMulligan
+                                        // Hand cards for SelectMulligan — only highlight if selected
                                         game_setup::ActionType::SelectMulligan => {
-                                            if let Some(hidx) =
-                                                p.card_indices.as_ref().and_then(|v| v.first())
-                                            {
-                                                unsafe {
-                                                    _3ds_board_set_action_highlight(
-                                                        3,
-                                                        *hidx as i32,
-                                                        false,
-                                                    );
+                                            if act.selected == Some(true) {
+                                                if let Some(hidx) =
+                                                    p.card_indices.as_ref().and_then(|v| v.first())
+                                                {
+                                                    unsafe {
+                                                        _3ds_board_set_action_highlight(
+                                                            3,
+                                                            *hidx as i32,
+                                                            false,
+                                                        );
+                                                    }
                                                 }
                                             }
                                         }
-                                        // Hand cards for SelectLiveCard
+                                        // Hand cards for SelectLiveCard — only highlight if selected
                                         game_setup::ActionType::SelectLiveCard => {
-                                            if let Some(hidx) =
-                                                p.card_indices.as_ref().and_then(|v| v.first())
-                                            {
-                                                unsafe {
-                                                    _3ds_board_set_action_highlight(
-                                                        3,
-                                                        *hidx as i32,
-                                                        false,
-                                                    );
+                                            if act.selected == Some(true) {
+                                                if let Some(hidx) =
+                                                    p.card_indices.as_ref().and_then(|v| v.first())
+                                                {
+                                                    unsafe {
+                                                        _3ds_board_set_action_highlight(
+                                                            3,
+                                                            *hidx as i32,
+                                                            false,
+                                                        );
+                                                    }
                                                 }
                                             }
                                         }
@@ -6569,6 +6693,8 @@ extern "C" {
     fn _3ds_board_get_overlay_action_idx(display_line: i32) -> i32;
     fn _3ds_board_get_overlay_selected() -> i32;
     fn _3ds_board_clear_action_overlay();
+    // Need hearts text displayed next to live zone on bottom screen
+    fn _3ds_set_need_hearts_text(player: i32, text: *const u8);
     // QR code scanning (camera + quirc, same tech used by FBI installer)
     fn _3ds_qr_start() -> i32;
     fn _3ds_qr_stop();
