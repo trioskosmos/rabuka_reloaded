@@ -1883,30 +1883,53 @@ fn main() {
                             let mut buf = [0u8; 2048];
                             let r = unsafe { _3ds_qr_poll(buf.as_mut_ptr(), buf.len() as u32) };
                             if r > 0 {
+                                dprintln!("[QR] poll r={}", r);
                                 unsafe {
                                     _3ds_qr_stop();
                                 }
+                                dprintln!("[QR] stopped camera");
                                 let text = String::from_utf8_lossy(&buf[..r as usize]).to_string();
+                                dprintln!(
+                                    "[QR] text len={} b64={}",
+                                    text.len(),
+                                    looks_like_b64(&text)
+                                );
                                 // Try binary QR: base64-encoded binary index format
                                 let cards_read = if looks_like_b64(&text) {
+                                    dprintln!("[QR] b64 decode...");
                                     if let Some(decoded) = base64_decode(&text) {
+                                        dprintln!(
+                                            "[QR] b64 ok len={} building sorted...",
+                                            decoded.len()
+                                        );
                                         if let Some(sorted) = CardAtlas::build_qr_sorted(&cards) {
-                                            CardAtlas::decode_qr_binary(&sorted, &decoded)
-                                                .unwrap_or_default()
+                                            dprintln!("[QR] sorted={} decode...", sorted.len());
+                                            let result =
+                                                CardAtlas::decode_qr_binary(&sorted, &decoded);
+                                            dprintln!("[QR] decode={:?})", result.is_some());
+                                            result.unwrap_or_default()
                                         } else {
+                                            dprintln!("[QR] sorted alloc FAILED");
                                             Vec::new()
                                         }
                                     } else {
+                                        dprintln!("[QR] b64 decode FAILED");
                                         Vec::new()
                                     }
                                 } else {
+                                    dprintln!("[QR] not b64, text={}", &text[..text.len().min(40)]);
                                     Vec::new()
                                 };
+                                dprintln!("[QR] cards_read={}", cards_read.len());
                                 let cards_read = if cards_read.is_empty() {
                                     DeckParser::parse_deck_content(&text)
                                 } else {
                                     cards_read
                                 };
+                                dprintln!(
+                                    "[QR] final={} entering QrResult/NotDeck",
+                                    cards_read.len()
+                                );
                                 if cards_read.is_empty() {
                                     Step::Setup(
                                         cards.clone(),
@@ -1950,6 +1973,11 @@ fn main() {
                         }
                     }
                     SetupPhase::QrResult(cards_read) => {
+                        dprintln!(
+                            "[QR] QrResult entered, {} cards, dirty={}",
+                            cards_read.len(),
+                            was_dirty
+                        );
                         if was_dirty {
                             if unsafe { _3ds_is_cli_mode() } {
                                 unsafe {
