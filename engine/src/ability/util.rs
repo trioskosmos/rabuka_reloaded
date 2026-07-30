@@ -744,7 +744,7 @@ pub struct CardFilter<'a> {
     pub distinct: Option<DistinctType>,
     pub exclude_self: Option<i16>,
     /// Group names to exclude from matching (e.g. 「スリーズブーケ」以外)
-    pub exclude_group_names: Option<&'a Vec<String>>,
+    pub exclude_group_names: Option<&'a [String]>,
     pub original_blade_limit: Option<u32>,
     pub original_blade_operator: Option<&'a str>,
     /// Card IDs to exclude from matching (e.g. previously selected by a prior sequential action)
@@ -1235,7 +1235,7 @@ impl<'a> CardFilter<'a> {
             cost_total_operator,
             characters: effect.characters_any(),
             exclude_characters: effect.exclude_characters_any(),
-            exclude_group_names: effect.exclude_group_names_any(),
+            exclude_group_names: effect.exclude_group_names_any().map(Vec::as_slice),
             heart_colors: &effect.heart_colors_any(),
             require_all_heart_colors: effect.require_all_heart_colors_any().unwrap_or(false),
             heart_color_count: effect.heart_color_count_any(),
@@ -1739,9 +1739,7 @@ pub fn place_card_in_zone(
             if let Some(pos) = stage_first_empty(&player.stage.stage) {
                 player.stage.stage[pos] = card_id;
                 // Rule 9.6.2.1.2.1: Card deployed to stage, track it.
-                if !player.deployed_this_turn.contains(&card_id) {
-                    player.deployed_this_turn.push(card_id);
-                }
+                player.track_deployment(card_id);
             } else {
                 // Stage full — return card to discard instead of hand
                 player.waitroom.add_card(card_id);
@@ -1785,22 +1783,16 @@ pub fn place_card_in_zone(
             if let Some(pos) = vacated_stage_area {
                 if pos < 3 && player.stage.stage[pos] == -1 {
                     player.stage.stage[pos] = card_id;
-                    if !player.deployed_this_turn.contains(&card_id) {
-                        player.deployed_this_turn.push(card_id);
-                    }
+                    player.track_deployment(card_id);
                 } else if let Some(ep) = stage_first_empty(&player.stage.stage) {
                     player.stage.stage[ep] = card_id;
-                    if !player.deployed_this_turn.contains(&card_id) {
-                        player.deployed_this_turn.push(card_id);
-                    }
+                    player.track_deployment(card_id);
                 } else {
                     player.hand.add_card(card_id);
                 }
             } else if let Some(ep) = stage_first_empty(&player.stage.stage) {
                 player.stage.stage[ep] = card_id;
-                if !player.deployed_this_turn.contains(&card_id) {
-                    player.deployed_this_turn.push(card_id);
-                }
+                player.track_deployment(card_id);
             } else {
                 player.hand.add_card(card_id);
             }

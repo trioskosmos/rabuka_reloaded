@@ -383,9 +383,7 @@ impl Player {
 
             self.stage.stage[index] = card_id;
             // Rule 9.6.2.1.2.1: Card moved from hand (non-stage) to stage, track it.
-            if !self.deployed_this_turn.contains(&card_id) {
-                self.deployed_this_turn.push(card_id);
-            }
+            self.track_deployment(card_id);
 
             // Rule 9.6.2.3.2.1: If baton touch performed, trigger 'baton touch' event
 
@@ -608,5 +606,12 @@ impl Player {
             || self.success_live_card_zone.cards.contains(&cid)
             || self.energy_zone.cards.contains(&cid)
             || self.waitroom.cards.contains(&cid)
+    }
+
+    /// Track a card as deployed this turn (idempotent).
+    pub fn track_deployment(&mut self, card_id: i16) {
+        if !self.deployed_this_turn.contains(&card_id) {
+            self.deployed_this_turn.push(card_id);
+        }
     }
 }

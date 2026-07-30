@@ -690,7 +690,7 @@ impl AbilityCost {
             } else {
                 None
             },
-            exclude_group_names: self.exclude_group_names_any(),
+            exclude_group_names: self.exclude_group_names_any().map(Vec::as_slice),
             card_property: self.card_property_any(),
             negation: self.negation_any().unwrap_or(false),
             ..Default::default()
@@ -2761,7 +2761,7 @@ impl AbilityEffect {
             } else {
                 None
             },
-            exclude_group_names: self.exclude_group_names_any(),
+            exclude_group_names: self.exclude_group_names_any().map(Vec::as_slice),
             name_fragments: match self.card_names_any() {
                 Some(names) if !names.is_empty() => Some(names),
                 _ => None,
@@ -4478,7 +4478,7 @@ impl Condition {
             characters: characters.map(|b| b.as_ref()),
             exclude_characters: exclude_characters.map(|b| b.as_ref()),
             exclude_self: None,
-            exclude_group_names: exclude_group_names.map(|b| b.as_ref()),
+            exclude_group_names: exclude_group_names.map(|b| b.as_slice()),
             ..Default::default()
         }
     }

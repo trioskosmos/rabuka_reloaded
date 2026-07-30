@@ -2063,6 +2063,15 @@ impl GameState {
         }
     }
 
+    /// Return the opponent's player ID given a player ID.
+    pub fn opponent_id(&self, player_id: &str) -> String {
+        if player_id == self.player1.id {
+            self.player2.id.clone()
+        } else {
+            self.player1.id.clone()
+        }
+    }
+
     pub fn resolve_target<'a>(
         &'a self,
         target: &str,

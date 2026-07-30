@@ -615,11 +615,7 @@ impl super::TurnEngine {
         Self::trigger_auto_abilities_for_player(game_state, &pid);
         game_state.process_pending_auto_abilities(&pid);
         // Also scan the opponent's auto-abilities (e.g. "when opponent performs a live")
-        let opponent_id = if pid == game_state.player1.id {
-            game_state.player2.id.clone()
-        } else {
-            game_state.player1.id.clone()
-        };
+        let opponent_id = game_state.opponent_id(&pid);
         Self::trigger_auto_abilities_for_player(game_state, &opponent_id);
         game_state.process_pending_auto_abilities(&opponent_id);
         if perf_data.draw_effects_occurred {
@@ -1065,9 +1061,7 @@ impl super::TurnEngine {
             player.stage.stage[area as usize] = card_id;
             // Rule 9.6.2.1.2.1: Card came from hand (non-stage), track it.
             // remove_member_from_stage_with_recycling already cleaned up the old card IDs.
-            if !player.deployed_this_turn.contains(&card_id) {
-                player.deployed_this_turn.push(card_id);
-            }
+            player.track_deployment(card_id);
             // Record 2 baton touches
             for _ in 0..2 {
                 game_state.record_baton_touch(&player_id, Some(card_id));
@@ -1083,11 +1077,7 @@ impl super::TurnEngine {
 
             Self::trigger_debut_abilities(game_state, &player_id, &card_no, final_cost, true);
             Self::trigger_auto_abilities_for_player(game_state, &player_id);
-            let db_opponent_id = if player_id == game_state.player1.id {
-                game_state.player2.id.clone()
-            } else {
-                game_state.player1.id.clone()
-            };
+            let db_opponent_id = game_state.opponent_id(&player_id);
             Self::trigger_auto_abilities_for_player(game_state, &db_opponent_id);
             game_state.process_pending_auto_abilities(&player_id);
             tdbg!("PHASE_AUTO:0 recalc");
@@ -1142,11 +1132,7 @@ impl super::TurnEngine {
             // Enqueue movement-triggered auto abilities (baton_touch, discard, etc.)
             // but do NOT process yet — let them queue before appearance triggers.
             Self::trigger_auto_abilities_for_player(game_state, &player_id);
-            let bt_opponent_id = if player_id == game_state.player1.id {
-                game_state.player2.id.clone()
-            } else {
-                game_state.player1.id.clone()
-            };
+            let bt_opponent_id = game_state.opponent_id(&player_id);
             Self::trigger_auto_abilities_for_player(game_state, &bt_opponent_id);
         }
 
@@ -1175,11 +1161,7 @@ impl super::TurnEngine {
             ds_print("HPM:4");
         }
         Self::trigger_auto_abilities_for_player(game_state, &player_id);
-        let sb_opponent_id = if player_id == game_state.player1.id {
-            game_state.player2.id.clone()
-        } else {
-            game_state.player1.id.clone()
-        };
+        let sb_opponent_id = game_state.opponent_id(&player_id);
         Self::trigger_auto_abilities_for_player(game_state, &sb_opponent_id);
         // Process ALL queued abilities now: movement-triggered (baton_touch, etc.)
         // are ahead of appearance-triggered in the queue, so they resolve first.

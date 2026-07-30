@@ -197,9 +197,7 @@ impl AbilityResolver {
                         player.stage.stage[va] = card_id;
                         if source_zone != Zone::Stage.to_str() {
                             // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
-                            if !player.deployed_this_turn.contains(&card_id) {
-                                player.deployed_this_turn.push(card_id);
-                            }
+                            player.track_deployment(card_id);
                         }
                         return Ok(false);
                     }
@@ -253,9 +251,7 @@ impl AbilityResolver {
                 player.stage.stage[slot] = card_id;
                 if source_zone != Zone::Stage.to_str() {
                     // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
-                    if !player.deployed_this_turn.contains(&card_id) {
-                        player.deployed_this_turn.push(card_id);
-                    }
+                    player.track_deployment(card_id);
                 }
                 return Ok(false);
             }
@@ -1026,7 +1022,7 @@ impl AbilityResolver {
                     }
                     if !stage_groups.is_empty() {
                         let groups_vec: Vec<String> = stage_groups.into_iter().collect();
-                        filter.exclude_group_names = Some(Box::leak(Box::new(groups_vec)));
+                        filter.exclude_group_names = Some(Vec::leak(groups_vec));
                     }
                 }
 
@@ -1673,9 +1669,7 @@ impl AbilityResolver {
                                 player.stage.stage[idx] = card_id;
                                 if should_lock {
                                     // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
-                                    if !player.deployed_this_turn.contains(&card_id) {
-                                        player.deployed_this_turn.push(card_id);
-                                    }
+                                    player.track_deployment(card_id);
                                 }
                             }
                             match pos_idx {
@@ -1710,9 +1704,7 @@ impl AbilityResolver {
                         player.stage.stage[idx] = card_id;
                         if should_lock {
                             // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
-                            if !player.deployed_this_turn.contains(&card_id) {
-                                player.deployed_this_turn.push(card_id);
-                            }
+                            player.track_deployment(card_id);
                         }
                         true
                     }
@@ -1726,9 +1718,7 @@ impl AbilityResolver {
                             player.stage.stage[idx] = card_id;
                             if should_lock {
                                 // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
-                                if !player.deployed_this_turn.contains(&card_id) {
-                                    player.deployed_this_turn.push(card_id);
-                                }
+                                player.track_deployment(card_id);
                             }
                             placed = true;
                         }
