@@ -1329,11 +1329,6 @@ static void cam_thread_func(void *arg) {
 }
 
 static void _3ds_qr_update_texture(const u16 *buf, int w, int h) {
-    if (!cam_tex_inited) {
-        C3D_TexInit(&cam_tex, 512, 256, GPU_RGB565);
-        C3D_TexSetFilter(&cam_tex, GPU_LINEAR, GPU_LINEAR);
-        cam_tex_inited = true;
-    }
     if (!cam_tex.data) return;
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
@@ -1348,13 +1343,10 @@ static void _3ds_qr_update_texture(const u16 *buf, int w, int h) {
 
 void _3ds_qr_draw_preview(float x_off) {
     if (!cam_running || !cam_shared_buf) return;
-    if (svcWaitSynchronization(cam_mutex, 100000000ULL) != 0) return;
 
-    static u16 local_buf[QR_W * QR_H];
-    memcpy(local_buf, cam_shared_buf, QR_W * QR_H * sizeof(u16));
+    svcWaitSynchronization(cam_mutex, U64_MAX);
+    _3ds_qr_update_texture((const u16*)cam_shared_buf, QR_W, QR_H);
     svcReleaseMutex(cam_mutex);
-
-    _3ds_qr_update_texture(local_buf, QR_W, QR_H);
 
     C2D_Image img = { .tex = &cam_tex, .subtex = &cam_subtex };
     C2D_DrawImageAt(img, x_off, 0.0f, 0.4f, NULL, 1.0f, 1.0f);
@@ -1368,6 +1360,10 @@ int _3ds_qr_start(void) {
     if (cam_shared_buf) { linearFree(cam_shared_buf); cam_shared_buf = NULL; }
     if (cam_mutex) { svcCloseHandle(cam_mutex); cam_mutex = 0; }
     if (cam_stop_event) { svcCloseHandle(cam_stop_event); cam_stop_event = 0; }
+
+    C3D_TexInit(&cam_tex, 512, 256, GPU_RGB565);
+    C3D_TexSetFilter(&cam_tex, GPU_LINEAR, GPU_LINEAR);
+    cam_tex_inited = true;
 
     svcCreateMutex(&cam_mutex, false);
     svcCreateEvent(&cam_stop_event, RESET_STICKY);
@@ -1418,21 +1414,20 @@ int _3ds_qr_poll(char *out_text, unsigned int out_max) {
     if (!cam_running || !cam_shared_buf) return -1;
     if (!qr) return -1;
 
-    if (svcWaitSynchronization(cam_mutex, 100000000ULL) != 0) return 0;
-    uint8_t *qbuf = quirc_begin(qr, NULL, NULL);
-    if (!qbuf) { svcReleaseMutex(cam_mutex); return 0; }
+    int w = 0, h = 0;
+    uint8_t *qbuf = quirc_begin(qr, &w, &h);
+    if (!qbuf) return 0;
 
-    static u16 local_buf[QR_W * QR_H];
-    memcpy(local_buf, cam_shared_buf, QR_W * QR_H * sizeof(u16));
-    svcReleaseMutex(cam_mutex);
+    svcWaitSynchronization(cam_mutex, U64_MAX);
 
-    for (int i = 0; i < QR_W * QR_H; i++) {
-        u16 p = local_buf[i];
-        u8 r = (p >> 11) & 0x1F;
-        u8 g = (p >> 5) & 0x3F;
-        u8 b = p & 0x1F;
-        qbuf[i] = (u8)(((r << 3) + (g << 2) + (b << 3)) / 3);
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            u16 px = ((u16*)cam_shared_buf)[y * QR_W + x];
+            qbuf[y * w + x] = (u8)(((((px >> 11) & 0x1F) << 3) + (((px >> 5) & 0x3F) << 2) + ((px & 0x1F) << 3)) / 3);
+        }
     }
+
+    svcReleaseMutex(cam_mutex);
 
     quirc_end(qr);
 

@@ -8763,9 +8763,540 @@ def _clean_action_list(actions, parent_effect=None, parent_text=""):
     return cleaned
 
 
+def _walk_ensure_text(d, ctx_text, full_text):
+    # Ensure every condition/effect dict has a text field
+    if "text" not in d and ("type" in d or "action" in d):
+        if ctx_text:
+            d["text"] = ctx_text
+        elif full_text:
+            d["text"] = full_text
+
+
+def _walk_propagate_activation_position(d, original_text, full_text):
+    # Check activation position if not set — first from parenthetical notes,
+    # then from position icons ({{center.png}}, {{leftside.png}}, {{rightside.png}})
+    # in the original text (e.g. {{leftside.png|左サイド}} after a trigger).
+    if "activation_position" not in d:
+        parenthetical = d.get("parenthetical", [])
+        for note in (
+            parenthetical if isinstance(parenthetical, list) else [parenthetical]
+        ):
+            if "起動できる" in note or "発動する" in note:
+                pos = _has_position_keywords(note)
+                if pos:
+                    d["activation_position"] = pos
+                    break
+
+    if "activation_position" not in d:
+        raw = original_text or full_text
+        _positions = []
+        if "{{center.png|センター}}" in raw:
+            _positions.append("center")
+        if "{{leftside.png|左サイド}}" in raw:
+            _positions.append("left_side")
+        if "{{rightside.png|右サイド}}" in raw:
+            _positions.append("right_side")
+        if _positions:
+            d["activation_position"] = ",".join(_positions)
+
+
+def _walk_propagate_text_context_fields(d, d_ctx, ctx_text):
+    # Propagate exclude_self from text context to sub-actions.
+    # "このメンバー以外" = "other than this member" → always exclude the activating card.
+    # per_unit gain_resource/heart effects should receive exclude_self
+    # (e.g. "ほかのメンバー1人につき" needs self excluded from the count).
+    # Non-per_unit self-buffs (plain "gain_resource" without "per_unit")
+    # are excluded since target="self" + exclude_self is contradictory,
+    # UNLESS the text explicitly says "このメンバー以外".
+    if (
+        "exclude_self" not in d
+        and "exclude_by_name_source" not in d
+        and d_ctx
+        and ("このメンバー以外" in d_ctx or "ほかの" in d_ctx or "他の" in d_ctx)
+    ):
+        is_per_unit = d.get("per_unit", False)
+        is_self_buff = d.get("action") in (
+            "set_heart_type",
+            "heart_selection",
+            "modify_score",
+            "change_state",
+        ) or (d.get("action") in ("gain_resource",) and not is_per_unit)
+        if (
+            "このメンバー以外" in d_ctx
+            or d.get("action") == "position_change"
+            or d.get("target") != "self"
+        ) and not is_self_buff:
+            d["exclude_self"] = True
+
+    # Propagate distinct from text context — use string form for serde compat
+    if (
+        "distinct" not in d
+        and d_ctx
+        and ("名前の異なる" in d_ctx or "異なる名前" in d_ctx)
+    ):
+        d["distinct"] = "card_name"
+
+    # Propagate original_value from text context (元々持つ for blade/heart comparisons)
+    if "original_value" not in d and d_ctx and _has_original_modifier(d_ctx):
+        d["original_value"] = True
+
+    # Propagate group_names from text context (including parent context) to any dict node
+    if "group_names" not in d:
+        gms = re.findall(r"『([^』]+)』", d_ctx or "")
+        from_parent = not gms and ctx_text
+        if from_parent:
+            gms = re.findall(r"『([^』]+)』", ctx_text or "")
+        if gms and (
+            d.get("action") or d.get("type") or d.get("condition") or "text" in d
+        ):
+            # Deduplicate group_names (same group may appear multiple times in text)
+            gms = list(dict.fromkeys(gms))
+            # Skip group_names for energy change_state actions entirely.
+            # Energy cards are generic and should not be filtered by group.
+            if not (
+                d.get("action") == "change_state"
+                and d.get("card_type") == "energy_card"
+            ):
+                # Also skip when group_names came from parent context (not this
+                # node's own text) and this node is a pure action (no type or
+                # condition of its own).  This prevents parent-context groups
+                # like "『みらくらぱーく！』" from leaking into primary_effect /
+                # followup_action sub-actions of conditional_on_result structures
+                # where the group applies only to the result_condition.
+                if from_parent:
+                    # When the group came from parent context (not the node's own
+                    # text), check if it's only in an attached condition's text.
+                    # If so, skip — the group belongs to the condition, not the
+                    # action (e.g. "『Liella!』のメンバーからバトンタッチ" in the
+                    # condition should not make the action filter by Liella!).
+                    # Only propagate to sub-conditions with `distinct` (name
+                    # distinctness checks) since they need the group context to
+                    # know which cards to compare. Avoid blind propagation to
+                    # all sub-conditions (e.g. card_count_condition) which would
+                    # incorrectly filter counts by group.
+                    own_has_group = any(g in (d.get("text", "") or "") for g in gms)
+                    needs_group = own_has_group or d.get("distinct")
+                    if (
+                        needs_group
+                        and d.get("action") != "gain_resource"
+                        and d.get("type") != "card_count_condition"
+                        and (d.get("action") != "modify_cost" or d.get("per_unit"))
+                    ):
+                        d["group_names"] = gms
+                else:
+                    # Don't propagate group_names to gain_resource actions.
+                    # Leaked group_names cause the engine to distribute resources
+                    # to ALL matching group members instead of the activating card.
+                    # Also skip card_count_condition — the parser already handles
+                    # pure group-filtered counts; _walk would incorrectly add
+                    # group_names to inclusion-pattern counts ("1人を含む").
+                    # Only propagate if this action depends on the condition's
+                    # context (source="those_cards") or the group name actually
+                    # appears in the action's own text (not just the condition).
+                    # Otherwise the group name may only belong to the condition
+                    # (e.g. "『スリーズブーケ』のメンバーがいる場合") and should not
+                    # filter the action.
+                    node_text = d.get("text", "") or ""
+                    cond_text = d.get("condition", {}).get("text", "")
+                    if cond_text:
+                        for sep in ("、", "場合、", "とき、", "なら、"):
+                            combined = cond_text + sep
+                            if combined in node_text:
+                                node_text = node_text.split(combined, 1)[-1]
+                                break
+                    if d.get("source") == "those_cards" or any(
+                        g in node_text for g in gms
+                    ):
+                        if (
+                            d.get("action") != "gain_resource"
+                            and d.get("type") != "card_count_condition"
+                            and (d.get("action") != "modify_cost" or d.get("per_unit"))
+                        ):
+                            d["group_names"] = gms
+
+    # Propagate shuffle from text context
+    if "shuffle" not in d and d_ctx and "シャッフル" in d_ctx:
+        d["shuffle"] = True
+
+
+def _walk_extract_heart_colors(d, d_text, ctx_text):
+    # Extract heart_colors from action text for gain_resource / modify_required_hearts
+    if "heart_colors" not in d and d.get("action") in (
+        "gain_resource",
+        "modify_required_hearts",
+        "move_cards",
+    ):
+        # gain_resource uses the heart color selected by a
+        # preceding select action (stored in conditional_choice) —
+        # never inherit heart_colors from parent context.
+        if d.get("action") == "gain_resource":
+            search_text = d_text or ""
+        else:
+            # Check own text first, then parent context
+            search_text = d_text or ""
+            # Actions with explicit heart_color (e.g. from character_effects)
+            # should not inherit aggregate heart_colors from parent context
+            if not re.search(r"heart_\d+", search_text) and ctx_text:
+                if not d.get("heart_color"):
+                    search_text = ctx_text
+        hc = list(
+            dict.fromkeys(
+                f"heart{m.zfill(2)}" for m in re.findall(r"heart_(\d+)", search_text)
+            )
+        )
+        if hc or "heart_00" in search_text:
+            if not hc:
+                hc = ["heart00"]
+        if hc:
+            d["heart_colors"] = hc
+    # For modify_required_hearts, set value = per-color count (not total).
+    # The icon sequence {heart02×3, heart03×3, ...} means 3 per color, not 12 total.
+    # When all colors have the same count, value = that per-color count.
+    if d.get("action") == "modify_required_hearts" and "value" not in d:
+        search_val = d_text or ""
+        if not re.search(r"heart_\d+", search_val) and ctx_text:
+            search_val = ctx_text
+        target_colors = d.get("heart_colors", [])
+        color_counts = {}
+        for m in re.finditer(r"heart_(\d+)", search_val):
+            h = f"heart{m.group(1).zfill(2)}"
+            if not target_colors or h in target_colors:
+                color_counts[h] = color_counts.get(h, 0) + 1
+        if color_counts:
+            counts = list(color_counts.values())
+            if len(set(counts)) == 1:
+                d["value"] = counts[0]
+            else:
+                d["value"] = min(counts)
+
+    # Detect possession pattern (を持つ) in gain_resource heart effects:
+    # when the text says "member POSSESSING heartXX", the heart_colors
+    # should act as a TARGET FILTER, not just the resource to grant.
+    # Only set the filter when a heart icon appears BEFORE "を持つ"
+    # (e.g. "{{heart_01.png|heart01}}を持つ"), not when the heart is
+    # the thing being gained after "を持つ" (e.g. "グループ名を持つ...heart01を得る").
+    if (
+        d.get("action") == "gain_resource"
+        and d.get("resource") in ("heart", "ハート")
+        and d.get("heart_colors")
+    ):
+        d_text_local = d.get("text", "") or ""
+        possess_pos = d_text_local.find("を持つ")
+        if possess_pos >= 0:
+            before = d_text_local[:possess_pos]
+            if re.search(r"\{\{heart_\d+\.png\|heart\d+\}\}", before):
+                d["filter_targets_by_heart_colors"] = True
+
+    # Extract heart_colors from the node's own text for look_and_select select_actions.
+    # Uses d.get("text") instead of ctx_text to avoid inheriting heart colors
+    # from unrelated parts of the parent effect (e.g. a followup condition like
+    # "30以上の場合、さらにこのカードの必要ハートを{{heart_00.png|heart0}}減らす").
+    node_text = d.get("text") or ""
+    if "heart_colors" not in d and d.get("action") == "select_cards" and node_text:
+        hc = list(
+            dict.fromkeys(
+                f"heart{m.zfill(2)}" for m in re.findall(r"heart_(\d+)", node_text)
+            )
+        )
+        if hc:
+            d["heart_colors"] = hc
+            if detect_require_all_hearts(node_text):
+                d["require_all_heart_colors"] = True
+
+
+def _walk_propagate_all_and_targets(d, d_ctx):
+    # Propagate all from text context (must match _fill_defaults patterns)
+    if (
+        "all" not in d
+        and d_ctx
+        and re.search(r"すべての|全ての|全部の|全て|全員|全体|カードをすべて", d_ctx)
+    ):
+        d["all"] = True
+
+    # Propagate multiple_targets from parent text to sub-actions
+    if d_ctx and "それぞれ" in d_ctx:
+        for sub_key in ("actions", "options"):
+            if sub_key in d:
+                for sub in d.get(sub_key, []):
+                    if "multiple_targets" not in sub:
+                        if (
+                            "それぞれ" in sub.get("text", "")
+                            or sub.get("target") == "both"
+                        ):
+                            sub["multiple_targets"] = True
+
+
+def _walk_propagate_sequential_links(d):
+    # Propagate count/source from move_cards to subsequent conditions
+    # "すべて"/"全部": "If ALL moved cards match" → count=N, operator="="
+    # "それらの中に": "If any among moved cards match" → source="preceding_moved"
+    if d.get("action") == "sequential" and "actions" in d:
+        acts = d["actions"]
+        prev_cost_limit = None
+        prev_cost_op = None
+        prev_count = None
+        prev_pm_cond = None
+        for act in acts:
+            # Propagate cost_limit from select to subsequent reveal
+            if act.get("action") == "select":
+                prev_cost_limit = act.get("cost_limit")
+                prev_cost_op = act.get("cost_limit_operator")
+            elif act.get("action") == "reveal" and prev_cost_limit is not None:
+                if "cost_limit" not in act:
+                    act["cost_limit"] = prev_cost_limit
+                if "cost_limit_operator" not in act and prev_cost_op is not None:
+                    act["cost_limit_operator"] = prev_cost_op
+            if act.get("action") == "move_cards" and act.get("count"):
+                prev_count = act["count"]
+            # Also look inside a nested sequential (e.g. draw+discard grouped together)
+            elif act.get("action") == "sequential" and "actions" in act:
+                for _sub in act["actions"]:
+                    if _sub.get("action") == "move_cards" and _sub.get("count"):
+                        prev_count = _sub["count"]
+            cond = act.get("condition", {})
+            cond_text = cond.get("text", "")
+            if (
+                "すべて" in cond_text or "全部" in cond_text
+            ) and prev_count is not None:
+                if cond.get("type") == "card_count_condition":
+                    if cond.get("count", 1) == 1 and cond.get("operator", ">=") == ">=":
+                        cond["count"] = prev_count
+                        cond["operator"] = "="
+                        cond["source"] = "preceding_moved"
+                elif cond.get("type") == "group_condition":
+                    cond["type"] = "card_count_condition"
+                    cond["count"] = prev_count
+                    cond["operator"] = "="
+                    cond["source"] = "preceding_moved"
+            if (
+                "それらの中に" in cond_text or "これにより" in cond_text
+            ) and prev_count is not None:
+                if cond.get("type") in (
+                    "card_count_condition",
+                    "location_condition",
+                    "group_condition",
+                ) and cond.get("source") in (None, "card", "discard"):
+                    cond["type"] = "card_count_condition"
+                    cond["source"] = "preceding_moved"
+                    cond.pop("location", None)
+            # Track the last preceding_moved condition so bare follow-up count
+            # conditions ("2枚ある場合") can inherit its filter fields.
+            if cond.get("source") == "preceding_moved":
+                prev_pm_cond = cond
+            elif (
+                prev_pm_cond is not None
+                and cond.get("type") == "card_count_condition"
+                and cond.get("source") is None
+                and "location" not in cond
+                and "card_type" not in cond
+                and re.search(r"^\d+枚ある場合$", cond_text.strip())
+            ):
+                # Bare count escalation — inherit the preceding_moved filter
+                cond["source"] = "preceding_moved"
+                for _key in ("card_type", "negation", "card_property"):
+                    if _key in prev_pm_cond and _key not in cond:
+                        cond[_key] = prev_pm_cond[_key]
+
+
+def _walk_collapse_sequential(d):
+    # Collapse single-action sequential wrappers (preserve condition + trigger_type + text)
+    if d.get("action") == "sequential" and d.get("actions") and len(d["actions"]) == 1:
+        inner = d["actions"][0]
+        if not d.get("condition") and not d.get("conditional"):
+            outer_fields = {}
+            for k in ("condition", "trigger_type", "text"):
+                if k in d:
+                    outer_fields[k] = d[k]
+            d.clear()
+            d.update(inner)
+            for k, v in outer_fields.items():
+                if k not in d:
+                    d[k] = v
+
+
+def _walk_set_defaults(d, d_text, ct):
+    # Default target to "self" for location_conditions if missing
+    if d.get("type") == "location_condition" and "target" not in d:
+        d["target"] = "self"
+
+    # Infer operator for comparison conditions when counts are present
+    if ct in ("comparison_condition", "card_count_condition", "location_condition"):
+        # Always override for "以上"/"以下" even if operator was pre-set.
+        # Check "以下" BEFORE "以上" so that compound texts like
+        # "1枚以上公開...2枚以下の場合" pick ≤2 (the real condition),
+        # not ≥1 (the trigger clause).
+        _text = d.get("text", "")
+        if d.get("count") is not None and not d.get("comparison_target"):
+            if "以下" in _text:
+                d["operator"] = "<="
+            elif "以上" in _text:
+                d["operator"] = ">="
+            elif "operator" not in d:
+                d["operator"] = "="
+        if "operator" not in d:
+            if d.get("values"):
+                d["operator"] = "in"
+            elif d.get("comparison_target"):
+                if "高い" in _text or "多い" in _text or "大きい" in _text:
+                    d["operator"] = ">"
+                elif "低い" in _text or "少ない" in _text or "小さい" in _text:
+                    d["operator"] = "<"
+
+    # Infer count from cost_limit for comparison_conditions (non-cost comparisons)
+    if (
+        ct == "comparison_condition"
+        and "count" not in d
+        and d.get("cost_limit") is not None
+        and d.get("comparison_type") != "cost"
+    ):
+        d["count"] = d["cost_limit"]
+
+    # Default per_unit_count to 1 when missing
+    if d.get("per_unit") and "per_unit_count" not in d:
+        d["per_unit_count"] = 1
+
+
+def _walk_propagate_position(d, d_ctx, d_text):
+    # Propagate position from text context (for condition+action splits)
+    # Don't set position if source_position or exclude_position already set,
+    # or if positions_characters already encodes per-position mappings.
+    # Also don't set position when multiple positions are detected (comma-separated):
+    # "left_side,right_side" belongs in activation_position, not position.
+    # The position field is a cross-comparison filter expecting a single value.
+    if (
+        "position" not in d
+        and "source_position" not in d
+        and "exclude_position" not in d
+        and "positions_characters" not in d
+        and d_ctx
+    ):
+        pos = _has_position_keywords(d_ctx)
+        if pos and "," not in pos:
+            d["position"] = pos
+        elif pos:
+            # Multi-position: set activation_position instead
+            if "activation_position" not in d:
+                d["activation_position"] = pos
+
+    # Strip {{center.png|センター}} etc from text when extracted as position
+    if d.get("position") and d_text:
+        d["text"] = re.sub(
+            r"\{\{.+?\.png\|(?:センター|左サイド|右サイド)\}\}", "", d_text
+        ).strip()
+
+    # Mark original_value flag for 元々持つ patterns
+    if "original_value" not in d and d_text and _has_original_modifier(d_text):
+        d["original_value"] = True
+
+
+def _walk_propagate_flags(d, d_ctx):
+    # Mark group_reference for non-bracket group name patterns (safe string field)
+    if "group_reference" not in d and d_ctx:
+        if "同じグループ名" in d_ctx:
+            d["group_reference"] = "same_group_name"
+        elif (
+            "グループ名が異なる" in d_ctx
+            or "グループ名がそれぞれ異なる" in d_ctx
+            or "異なるグループ名" in d_ctx
+        ):
+            d["group_reference"] = "different_group_names"
+
+    # Set same_unit_name for cost text containing '同じユニット名'
+    if "same_unit_name" not in d and "同じユニット名" in (d.get("text", "") or ""):
+        d["same_unit_name"] = True
+
+
+def _walk_propagate_heart_colors_to_conditions(d):
+    # Propagate heart_colors from effect into condition for collective heart checks.
+    # Only propagate when the condition's location is a zone that CAN have heart colors
+    # (stage, hand — NOT energy_zone, discard, energy_deck, success_live_zone which store colorless game pieces).
+    # Also skip card_count_condition (pure count check — heart colors don't apply).
+    # Skip check_self conditions (they check a specific card's location, not collective
+    # heart presence — heart_colors on the condition is effect metadata leakage).
+    # Q148: Skip blade-aggregate conditions — "ブレードの合計がN以上" is a blade total
+    # check, not a heart filter. The heart_colors in the effect text is the modification
+    # target (what gets decreased), not a condition filter (what triggers the effect).
+    if "heart_colors" in d and "condition" in d:
+        cond = d["condition"]
+        if isinstance(cond, dict) and "heart_colors" not in cond:
+            cond_type = cond.get("type", "")
+            loc = cond.get("location", "")
+            cond_text = cond.get("text", "")
+            if (
+                cond_type == "card_count_condition"
+                and cond.get("source") != "preceding_moved"
+            ):
+                pass
+            elif cond.get("check_self"):
+                pass
+            elif "ブレード" in cond_text and cond.get("aggregate") == "total":
+                pass
+            elif loc in ("stage", "hand", "live_card_zone", ""):
+                if cond_type == "or_condition":
+                    for sub in cond.get("conditions", []):
+                        if isinstance(sub, dict) and "heart_colors" not in sub:
+                            sub["heart_colors"] = d["heart_colors"]
+                elif cond_type in ("location_condition",):
+                    cond["heart_colors"] = d["heart_colors"]
+
+
+def _walk_cleanup_text(d, d_text):
+    # Strip leading comma from text artifacts (e.g. "、{{icon_energy.png|E}}支払ってもよい")
+    if d_text and (d_text.startswith("、") or d_text.startswith("，")):
+        d["text"] = d_text.lstrip("、，").strip()
+
+
 def _walk(d, full_text, original_text, ctx_text=None):
     if not isinstance(d, dict):
         return d
+    d_ctx = d.get("text") or ctx_text or full_text
+    d_text = d.get("text") or ""
+    ct = d.get("condition_type") or d.get("type")
+
+    _walk_ensure_text(d, ctx_text, full_text)
+    _walk_propagate_activation_position(d, original_text, full_text)
+    _walk_propagate_text_context_fields(d, d_ctx, ctx_text)
+    _walk_extract_heart_colors(d, d_text, ctx_text)
+    _walk_propagate_all_and_targets(d, d_ctx)
+    _walk_propagate_sequential_links(d)
+    _walk_collapse_sequential(d)
+    _walk_set_defaults(d, d_text, ct)
+    _walk_propagate_position(d, d_ctx, d_text)
+    _walk_propagate_flags(d, d_ctx)
+    _walk_propagate_heart_colors_to_conditions(d)
+    _walk_cleanup_text(d, d_text)
+
+    # Recurse into sub-actions
+    for sub_key in (
+        "actions",
+        "options",
+        "conditions",
+        "condition",
+        "primary_effect",
+        "alternative_effect",
+        "select_action",
+        "look_action",
+        "opponent_action",
+        "followup_action",
+        "optional_action",
+        "conditional_action",
+    ):
+        sub = d.get(sub_key)
+        if isinstance(sub, list):
+            # Filter out do_nothing from action lists
+            if sub_key == "actions":
+                d[sub_key] = _clean_action_list(sub, d, d_ctx)
+                sub = d[sub_key]
+            for item in sub:
+                _walk(item, full_text, original_text, d_ctx)
+        elif isinstance(sub, dict):
+            _walk(sub, full_text, original_text, d_ctx)
+
+    # Clean up empty actions
+    if d.get("action") == "sequential" and not d.get("actions"):
+        d.pop("action", None)
+
+    return d
     d_ctx = d.get("text") or ctx_text or full_text
     d_text = d.get("text") or ""
 
@@ -9762,514 +10293,485 @@ def _apply_recursive_fixes(d, fix_stats):
                 _apply_recursive_fixes(item, fix_stats)
 
 
-def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Post-process already-parsed abilities: infer actions, apply targeted fixes."""
-
-    # Add a DO NOT EDIT warning
-    data["_warning"] = (
-        "DO NOT EDIT THIS MANUALLY. Run cards/ability_extraction/parser.py to regenerate."
-    )
-
-    fix_stats = {
-        "movement": 0,
-        "each_time": 0,
-        "card_property": 0,
-        "ability_filter": 0,
-        "temporal": 0,
-        "local_cond": 0,
-        "group_cond": 0,
-        "result_cond": 0,
-        "primary_neg": 0,
-        "leak": 0,
-        "compound_split": 0,
-        "auto_trigger": 0,
-    }
-
+def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None:
+    """Pre-fix pass: condition re-parse, target fix, action inference, sequential chain fixes, targeted fixes."""
     # ─── Pre-fix pass (merged from 3 separate loops) ───────────────────────────
     # 1. Re-parse condition texts to pick up newer parser fields (cost_limit etc.)
     # 2. Fix target=both when comparison_target is set → target should be self.
     # 3. Infer action for effects with no action; apply sequential chain fixes.
     # ─────────────────────────────────────────────────────────────────────────────
-    for ability in data["unique_abilities"]:
-        ability_text = ability.get("full_text") or ability.get("triggerless_text", "")
-        if ability_text:
-            set_debug_section(f"Ability: {ability_text}")
-        eff = ability.get("effect")
-        if not isinstance(eff, dict):
-            continue
-        cond = eff.get("condition")
+    ability_text = ability.get("full_text") or ability.get("triggerless_text", "")
+    if ability_text:
+        set_debug_section(f"Ability: {ability_text}")
+    eff = ability.get("effect")
+    if not isinstance(eff, dict):
+        return
+    cond = eff.get("condition")
 
-        # --- 1. Pre-fix pass logic ---
+    # --- 1. Pre-fix pass logic ---
 
-        # --- 1. Condition re-parse ---
-        if isinstance(cond, dict) and cond.get("text"):
-            cond_text = cond["text"]
-            reparse = parse_condition(cond_text)
-            if reparse:
-                # Merge missing fields — never overwrite existing values.
-                for key in ("cost_limit", "cost_limit_operator"):
-                    if key in reparse and key not in cond:
-                        cond[key] = reparse[key]
-                # Merge movement and direction fields.
-                if "movement" in reparse and reparse["movement"] != cond.get(
-                    "movement"
-                ):
-                    cond["movement"] = reparse["movement"]
-                if "area_direction" in reparse and "area_direction" not in cond:
-                    cond["area_direction"] = reparse["area_direction"]
-            # Fix missing yell_trigger for "エールにより公開された" cards.
-            # Only applies to auto abilities (自動) — not ライブ成功時 etc.
-            # Skip when the condition checks for a specific card_type with negation
-            # (e.g. "no live card among revealed") — yell_trigger would short-circuit
-            # to "did a yell happen?" instead of checking the actual revealed cards.
-            if ability.get("triggers") == "自動":
-                has_yell_text = (
-                    "エールしたとき" in cond_text
-                    or "エールにより公開された" in cond_text
-                )
-                has_specific_type_check = cond.get("card_type") and cond.get("negation")
+    # --- 1. Condition re-parse ---
+    if isinstance(cond, dict) and cond.get("text"):
+        cond_text = cond["text"]
+        reparse = parse_condition(cond_text)
+        if reparse:
+            # Merge missing fields — never overwrite existing values.
+            for key in ("cost_limit", "cost_limit_operator"):
+                if key in reparse and key not in cond:
+                    cond[key] = reparse[key]
+            # Merge movement and direction fields.
+            if "movement" in reparse and reparse["movement"] != cond.get("movement"):
+                cond["movement"] = reparse["movement"]
+            if "area_direction" in reparse and "area_direction" not in cond:
+                cond["area_direction"] = reparse["area_direction"]
+        # Fix missing yell_trigger for "エールにより公開された" cards.
+        # Only applies to auto abilities (自動) — not ライブ成功時 etc.
+        # Skip when the condition checks for a specific card_type with negation
+        # (e.g. "no live card among revealed") — yell_trigger would short-circuit
+        # to "did a yell happen?" instead of checking the actual revealed cards.
+        if ability.get("triggers") == "自動":
+            has_yell_text = (
+                "エールしたとき" in cond_text or "エールにより公開された" in cond_text
+            )
+            has_specific_type_check = cond.get("card_type") and cond.get("negation")
+            if (
+                cond.get("yell_trigger") is None
+                and has_yell_text
+                and not has_specific_type_check
+            ):
+                cond["yell_trigger"] = True
+
+    # --- 2. Fix target=both when comparison_target is set ---
+    # comparison_target handles the opponent side, so target should be self.
+    if isinstance(cond, dict):
+        if cond.get("target") == "both" and cond.get("comparison_target"):
+            cond["target"] = "self"
+
+    # --- 3. Action inference ---
+    if not eff.get("action"):
+        if eff.get("source") and eff.get("destination"):
+            eff["action"] = "move_cards"
+        elif eff.get("actions"):
+            eff["action"] = "sequential"
+        elif eff.get("opponent_action"):
+            eff["action"] = "opponent_action"
+
+    # --- 4. Sequential chain fixes ---
+    if eff.get("action") == "sequential":
+        parent_card_type = eff.get("card_type")
+        prev_was_select = False
+        prev_was_look_at = False
+        prev_was_baton_touch = False
+        for sub in eff.get("actions", []):
+            if not isinstance(sub, dict):
+                prev_was_select = prev_was_look_at = prev_was_baton_touch = False
+                continue
+            # Propagate card_type from parent and infer missing sub-action.
+            if not sub.get("card_type") and parent_card_type:
+                sub["card_type"] = parent_card_type
+            if not sub.get("action"):
+                if sub.get("source") and sub.get("destination"):
+                    sub["action"] = "move_cards"
+                elif sub.get("actions"):
+                    sub["action"] = "sequential"
+            # Chain select→move, look_at→move, and play_baton_touch→move source inference.
+            if sub.get("action") in ("select_cards", "look_and_select", "select"):
+                prev_was_select = True
+                prev_was_look_at = prev_was_baton_touch = False
+            elif sub.get("action") == "look_at":
+                prev_was_look_at = True
+                prev_was_select = prev_was_baton_touch = False
+            elif sub.get("action") == "play_baton_touch":
+                prev_was_baton_touch = True
+                prev_was_select = prev_was_look_at = False
+            elif sub.get("action") == "move_cards" and prev_was_look_at:
+                if sub.get("source") != "looked_at":
+                    sub["source"] = "looked_at"
                 if (
-                    cond.get("yell_trigger") is None
-                    and has_yell_text
-                    and not has_specific_type_check
+                    sub.get("destination") == "discard"
+                    and sub.get("discard_remaining") is not False
                 ):
-                    cond["yell_trigger"] = True
-
-        # --- 2. Fix target=both when comparison_target is set ---
-        # comparison_target handles the opponent side, so target should be self.
-        if isinstance(cond, dict):
-            if cond.get("target") == "both" and cond.get("comparison_target"):
-                cond["target"] = "self"
-
-        # --- 3. Action inference ---
-        if not eff.get("action"):
-            if eff.get("source") and eff.get("destination"):
-                eff["action"] = "move_cards"
-            elif eff.get("actions"):
-                eff["action"] = "sequential"
-            elif eff.get("opponent_action"):
-                eff["action"] = "opponent_action"
-
-        # --- 4. Sequential chain fixes ---
-        if eff.get("action") == "sequential":
-            parent_card_type = eff.get("card_type")
-            prev_was_select = False
-            prev_was_look_at = False
-            prev_was_baton_touch = False
-            for sub in eff.get("actions", []):
-                if not isinstance(sub, dict):
-                    prev_was_select = prev_was_look_at = prev_was_baton_touch = False
-                    continue
-                # Propagate card_type from parent and infer missing sub-action.
-                if not sub.get("card_type") and parent_card_type:
-                    sub["card_type"] = parent_card_type
-                if not sub.get("action"):
-                    if sub.get("source") and sub.get("destination"):
-                        sub["action"] = "move_cards"
-                    elif sub.get("actions"):
-                        sub["action"] = "sequential"
-                # Chain select→move, look_at→move, and play_baton_touch→move source inference.
-                if sub.get("action") in ("select_cards", "look_and_select", "select"):
-                    prev_was_select = True
-                    prev_was_look_at = prev_was_baton_touch = False
-                elif sub.get("action") == "look_at":
-                    prev_was_look_at = True
-                    prev_was_select = prev_was_baton_touch = False
-                elif sub.get("action") == "play_baton_touch":
-                    prev_was_baton_touch = True
-                    prev_was_select = prev_was_look_at = False
-                elif sub.get("action") == "move_cards" and prev_was_look_at:
-                    if sub.get("source") != "looked_at":
-                        sub["source"] = "looked_at"
-                    if (
-                        sub.get("destination") == "discard"
-                        and sub.get("discard_remaining") is not False
-                    ):
-                        sub["discard_remaining"] = False
-                    prev_was_look_at = False
-                elif sub.get("action") == "move_cards" and prev_was_select:
-                    if sub.get("source") != "selected_cards":
-                        sub["source"] = "selected_cards"
-                    if sub.get("count") is not None and "count" not in sub.get(
-                        "text", ""
-                    ):
-                        sub.pop("count", None)
-                    prev_was_select = False
-                elif sub.get("action") == "move_cards" and prev_was_baton_touch:
-                    if sub.get("source") != "those_cards":
-                        sub["source"] = "those_cards"
-                    if not sub.get("group_names") and eff.get("group_names"):
-                        sub["group_names"] = eff["group_names"]
-                    prev_was_baton_touch = False
-                elif (
-                    sub.get("action") == "gain_resource"
-                    and sub.get("resource") == "heart"
-                    and prev_was_select
+                    sub["discard_remaining"] = False
+                prev_was_look_at = False
+            elif sub.get("action") == "move_cards" and prev_was_select:
+                if sub.get("source") != "selected_cards":
+                    sub["source"] = "selected_cards"
+                if sub.get("count") is not None and "count" not in sub.get("text", ""):
+                    sub.pop("count", None)
+                prev_was_select = False
+            elif sub.get("action") == "move_cards" and prev_was_baton_touch:
+                if sub.get("source") != "those_cards":
+                    sub["source"] = "those_cards"
+                if not sub.get("group_names") and eff.get("group_names"):
+                    sub["group_names"] = eff["group_names"]
+                prev_was_baton_touch = False
+            elif (
+                sub.get("action") == "gain_resource"
+                and sub.get("resource") == "heart"
+                and prev_was_select
+            ):
+                sub_text = sub.get("text", "")
+                if (
+                    "選んだカードが持つ色" in sub_text
+                    or "これにより選んだカード" in sub_text
                 ):
-                    sub_text = sub.get("text", "")
-                    if (
-                        "選んだカードが持つ色" in sub_text
-                        or "これにより選んだカード" in sub_text
-                    ):
-                        sub["heart_colors_from_selected_card"] = True
-                    prev_was_select = False
-                else:
-                    prev_was_select = prev_was_look_at = prev_was_baton_touch = False
+                    sub["heart_colors_from_selected_card"] = True
+                prev_was_select = False
+            else:
+                prev_was_select = prev_was_look_at = prev_was_baton_touch = False
 
-        # --- 2. Targeted fixes logic ---
-        t = ability.get("triggerless_text", "")
+    # --- 2. Targeted fixes logic ---
+    t = ability.get("triggerless_text", "")
 
-        # FIX 2: each_time sequential → conditional_on_optional
-        if eff.get("trigger_type") == "each_time" and eff.get("action") == "sequential":
-            acts = eff.get("actions", [])
-            if len(acts) == 2:
-                first, second = acts[0], acts[1]
-                if isinstance(first, dict) and isinstance(second, dict):
-                    if (
-                        first.get("action") == "pay_energy"
-                        and first.get("optional") is True
-                    ):
-                        for leak in ("exclude_self", "group_names", "optional"):
-                            first.pop(leak, None)
-                        eff["action"] = "conditional_on_optional"
-                        eff["optional_action"] = first
-                        eff["conditional_action"] = second
-                        eff.pop("actions", None)
-                        fix_stats["each_time"] += 1
-
-        # FIX 3: conditional_on_optional cleanup
-        if eff.get("action") == "conditional_on_optional":
-            if "positive_action" in eff and "conditional_action" not in eff:
-                eff["conditional_action"] = eff.pop("positive_action")
-            eff.pop("negative_action", None)
-            for sub_key in ("optional_action", "conditional_action"):
-                sub = eff.get(sub_key)
-                if isinstance(sub, dict):
-                    sub.pop("optional", None)
-
-        # FIX 6: Flatten opponent_action wrappers
-        if eff.get("opponent_action") and isinstance(eff["opponent_action"], dict):
-            oa = eff.pop("opponent_action")
-            for k, v in oa.items():
-                if k not in eff:
-                    eff[k] = v
-            inner_action = oa.get("action")
-            if inner_action:
-                eff["action"] = inner_action
-            eff.setdefault("target", "opponent")
-            eff.setdefault("action_by", "opponent")
-
-        # FIX 7: Ability filter — 能力を持たない → ability_filter:no_ability
-        if "能力を持たない" in t:
-            if eff.get("action") == "modify_cost" and not eff.get("ability_filter"):
-                eff["ability_filter"] = "no_ability"
-                fix_stats["ability_filter"] += 1
-
-        # FIX 7b: Ability filter for select actions within sequential compounds
-        # (e.g. 黒澤ダイヤ: "ライブ開始時能力を持たない" → select action filter)
-        if eff.get("action") == "sequential":
-            for sub in eff.get("actions", []):
-                if isinstance(sub, dict) and sub.get("action") in (
-                    "select",
-                    "select_cards",
+    # FIX 2: each_time sequential → conditional_on_optional
+    if eff.get("trigger_type") == "each_time" and eff.get("action") == "sequential":
+        acts = eff.get("actions", [])
+        if len(acts) == 2:
+            first, second = acts[0], acts[1]
+            if isinstance(first, dict) and isinstance(second, dict):
+                if (
+                    first.get("action") == "pay_energy"
+                    and first.get("optional") is True
                 ):
-                    sub_text = sub.get("text", "")
-                    if "能力を持たない" in sub_text or "能力も持たない" in sub_text:
-                        _enrich_from_text(sub, sub_text)
-                        fix_stats["ability_filter"] += 1
+                    for leak in ("exclude_self", "group_names", "optional"):
+                        first.pop(leak, None)
+                    eff["action"] = "conditional_on_optional"
+                    eff["optional_action"] = first
+                    eff["conditional_action"] = second
+                    eff.pop("actions", None)
+                    fix_stats["each_time"] += 1
 
-        # FIX 8: Condition fixes — card_property + enrichment
-        cond = eff.get("condition")
-        if isinstance(cond, dict):
-            ct = cond.get("text", "") or t
+    # FIX 3: conditional_on_optional cleanup
+    if eff.get("action") == "conditional_on_optional":
+        if "positive_action" in eff and "conditional_action" not in eff:
+            eff["conditional_action"] = eff.pop("positive_action")
+        eff.pop("negative_action", None)
+        for sub_key in ("optional_action", "conditional_action"):
+            sub = eff.get(sub_key)
+            if isinstance(sub, dict):
+                sub.pop("optional", None)
 
-            # 8b: card_property enrichment for card_count_condition
-            if cond.get("type") == "card_count_condition":
-                if "ブレードハート" in ct:
-                    cond["card_property"] = "has_blade_heart"
-                    if "持たない" in ct or "ない" in ct:
-                        cond["negation"] = True
-                    fix_stats["card_property"] += 1
-                if "{{icon_score.png|スコア}}を持つ" in ct and not cond.get(
-                    "card_property"
-                ):
-                    cond["card_property"] = "has_score_icon"
-                    fix_stats["card_property"] += 1
-                _infer_heart_source(cond, ct)
-                _infer_baton_touch(cond, ct)
+    # FIX 6: Flatten opponent_action wrappers
+    if eff.get("opponent_action") and isinstance(eff["opponent_action"], dict):
+        oa = eff.pop("opponent_action")
+        for k, v in oa.items():
+            if k not in eff:
+                eff[k] = v
+        inner_action = oa.get("action")
+        if inner_action:
+            eff["action"] = inner_action
+        eff.setdefault("target", "opponent")
+        eff.setdefault("action_by", "opponent")
 
-            # 8d: Enrich temporal_condition with aggregate
-            if cond.get("type") == "temporal_condition":
-                changed = False
-                hc = len(re.findall(r"\{\{heart_\d+\.png", ct))
-                has_req_heart = "必要ハート" in ct
-                has_aggregate_keyword = "含まれ" in ct or "のうち" in ct
-                has_total_or_each = "合計" in ct or "それぞれ" in ct
-                if has_req_heart and has_aggregate_keyword and has_total_or_each:
-                    cond["aggregate"] = "total"
-                    changed = True
-                if not cond.get("heart_colors"):
-                    hm = re.findall(
-                        r"{{heart_(\d+)\.png\|heart\d+}}", cond.get("text", "") or ct
-                    )
-                    if hm:
-                        cond["heart_colors"] = sorted(
-                            set(f"heart{m.zfill(2)}" for m in hm)
-                        )
-                        changed = True
-                ct2 = cond.get("text", "") or ct
-                if not cond.get("count"):
-                    cm = re.search(r"(\d+)以上", ct2)
-                    if cm:
-                        cond["count"] = int(cm.group(1))
-                        changed = True
-                if changed:
-                    fix_stats["temporal"] += 1
+    # FIX 7: Ability filter — 能力を持たない → ability_filter:no_ability
+    if "能力を持たない" in t:
+        if eff.get("action") == "modify_cost" and not eff.get("ability_filter"):
+            eff["ability_filter"] = "no_ability"
+            fix_stats["ability_filter"] += 1
 
-            # Remove check_self (reference doesn't have it)
+    # FIX 7b: Ability filter for select actions within sequential compounds
+    # (e.g. 黒澤ダイヤ: "ライブ開始時能力を持たない" → select action filter)
+    if eff.get("action") == "sequential":
+        for sub in eff.get("actions", []):
+            if isinstance(sub, dict) and sub.get("action") in (
+                "select",
+                "select_cards",
+            ):
+                sub_text = sub.get("text", "")
+                if "能力を持たない" in sub_text or "能力も持たない" in sub_text:
+                    _enrich_from_text(sub, sub_text)
+                    fix_stats["ability_filter"] += 1
 
-        # FIX 8e: card_property: has_score_icon for effects/conditions with score icon
-        if "{{icon_score.png|スコア}}を持つ" in t:
-            # Set on the effect for move_cards/select actions
-            if eff.get("action") in ("move_cards", "select") and not eff.get(
+    # FIX 8: Condition fixes — card_property + enrichment
+    cond = eff.get("condition")
+    if isinstance(cond, dict):
+        ct = cond.get("text", "") or t
+
+        # 8b: card_property enrichment for card_count_condition
+        if cond.get("type") == "card_count_condition":
+            if "ブレードハート" in ct:
+                cond["card_property"] = "has_blade_heart"
+                if "持たない" in ct or "ない" in ct:
+                    cond["negation"] = True
+                fix_stats["card_property"] += 1
+            if "{{icon_score.png|スコア}}を持つ" in ct and not cond.get(
                 "card_property"
             ):
-                eff["card_property"] = "has_score_icon"
-                fix_stats["card_property"] += 1
-            # Also set on the condition (any action type including modify_score)
-            cond = eff.get("condition")
-            if isinstance(cond, dict) and not cond.get("card_property"):
                 cond["card_property"] = "has_score_icon"
                 fix_stats["card_property"] += 1
+            _infer_heart_source(cond, ct)
+            _infer_baton_touch(cond, ct)
 
-        # FIX 8f: need_heart_total from "ハートをNつ以上持つ" (heart threshold)
-        # Only in per_unit contexts (move_cards already handled by _try_virtuoso_move_cards).
-        if (
-            eff.get("per_unit")
-            and not eff.get("need_heart_total")
-            and not eff.get("dynamic_count")
+        # 8d: Enrich temporal_condition with aggregate
+        if cond.get("type") == "temporal_condition":
+            changed = False
+            hc = len(re.findall(r"\{\{heart_\d+\.png", ct))
+            has_req_heart = "必要ハート" in ct
+            has_aggregate_keyword = "含まれ" in ct or "のうち" in ct
+            has_total_or_each = "合計" in ct or "それぞれ" in ct
+            if has_req_heart and has_aggregate_keyword and has_total_or_each:
+                cond["aggregate"] = "total"
+                changed = True
+            if not cond.get("heart_colors"):
+                hm = re.findall(
+                    r"{{heart_(\d+)\.png\|heart\d+}}", cond.get("text", "") or ct
+                )
+                if hm:
+                    cond["heart_colors"] = sorted(set(f"heart{m.zfill(2)}" for m in hm))
+                    changed = True
+            ct2 = cond.get("text", "") or ct
+            if not cond.get("count"):
+                cm = re.search(r"(\d+)以上", ct2)
+                if cm:
+                    cond["count"] = int(cm.group(1))
+                    changed = True
+            if changed:
+                fix_stats["temporal"] += 1
+
+        # Remove check_self (reference doesn't have it)
+
+    # FIX 8e: card_property: has_score_icon for effects/conditions with score icon
+    if "{{icon_score.png|スコア}}を持つ" in t:
+        # Set on the effect for move_cards/select actions
+        if eff.get("action") in ("move_cards", "select") and not eff.get(
+            "card_property"
         ):
-            nh = re.search(r"ハートを(\d+)つ以上持つ", t)
-            if nh:
-                eff["need_heart_total"] = int(nh.group(1))
-                eff["need_heart_operator"] = ">="
-                fix_stats["need_heart"] = fix_stats.get("need_heart", 0) + 1
+            eff["card_property"] = "has_score_icon"
+            fix_stats["card_property"] += 1
+        # Also set on the condition (any action type including modify_score)
+        cond = eff.get("condition")
+        if isinstance(cond, dict) and not cond.get("card_property"):
+            cond["card_property"] = "has_score_icon"
+            fix_stats["card_property"] += 1
 
-        # FIX 9: Result condition enrichment in conditional_on_result
-        rc = eff.get("result_condition")
-        if isinstance(rc, dict) and not rc.get("card_property"):
-            rct = rc.get("text", "")
-            if "ブレードハート" in rct:
-                rc["card_property"] = "has_blade_heart"
-                if "持たない" in rct or "ない" in rct:
-                    rc["negation"] = True
-                fix_stats["result_cond"] += 1
-            if "{{icon_score.png|スコア}}を持つ" in rct:
-                rc["card_property"] = "has_score_icon"
-                fix_stats["result_cond"] += 1
-            _infer_heart_source(rc, rct)
-            _infer_baton_touch(rc, rct)
+    # FIX 8f: need_heart_total from "ハートをNつ以上持つ" (heart threshold)
+    # Only in per_unit contexts (move_cards already handled by _try_virtuoso_move_cards).
+    if (
+        eff.get("per_unit")
+        and not eff.get("need_heart_total")
+        and not eff.get("dynamic_count")
+    ):
+        nh = re.search(r"ハートを(\d+)つ以上持つ", t)
+        if nh:
+            eff["need_heart_total"] = int(nh.group(1))
+            eff["need_heart_operator"] = ">="
+            fix_stats["need_heart"] = fix_stats.get("need_heart", 0) + 1
 
-        # FIX 9b: followup_action with "このメンバー" → self_target / self_cost
-        fa = eff.get("followup_action")
-        if isinstance(fa, dict) and "このメンバー" in fa.get("text", ""):
-            if not fa.get("target") and fa.get("self_target") is None:
-                fa["self_target"] = True
-            # For change_state, also set self_cost so the Rust handler
-            # restricts targets to the activating card and skips when
-            # the card is already in the target state (e.g. already wait).
-            if fa.get("action") == "change_state" and fa.get("self_cost") is None:
-                fa["self_cost"] = True
+    # FIX 9: Result condition enrichment in conditional_on_result
+    rc = eff.get("result_condition")
+    if isinstance(rc, dict) and not rc.get("card_property"):
+        rct = rc.get("text", "")
+        if "ブレードハート" in rct:
+            rc["card_property"] = "has_blade_heart"
+            if "持たない" in rct or "ない" in rct:
+                rc["negation"] = True
+            fix_stats["result_cond"] += 1
+        if "{{icon_score.png|スコア}}を持つ" in rct:
+            rc["card_property"] = "has_score_icon"
+            fix_stats["result_cond"] += 1
+        _infer_heart_source(rc, rct)
+        _infer_baton_touch(rc, rct)
 
-        # FIX 10: Primary effect fixes — negation condition
-        pe = eff.get("primary_effect")
-        if isinstance(pe, dict):
-            pet = pe.get("text", "") or ""
-            # Negation condition from text — extract just the condition part (before first 、after とき)
-            if (
-                not pe.get("condition")
-                and ("ない" in pet or "いない" in pet)
-                and "とき" in pet
-            ):
-                idx = pet.find("とき")
-                if idx > 0:
-                    rest = pet[idx + 2 :]
-                    comma = rest.find("、")
-                    if comma > 0:
-                        neg_text = pet[: idx + 2 + comma]
-                    else:
-                        neg_text = pet[: idx + 2]
+    # FIX 9b: followup_action with "このメンバー" → self_target / self_cost
+    fa = eff.get("followup_action")
+    if isinstance(fa, dict) and "このメンバー" in fa.get("text", ""):
+        if not fa.get("target") and fa.get("self_target") is None:
+            fa["self_target"] = True
+        # For change_state, also set self_cost so the Rust handler
+        # restricts targets to the activating card and skips when
+        # the card is already in the target state (e.g. already wait).
+        if fa.get("action") == "change_state" and fa.get("self_cost") is None:
+            fa["self_cost"] = True
+
+    # FIX 10: Primary effect fixes — negation condition
+    pe = eff.get("primary_effect")
+    if isinstance(pe, dict):
+        pet = pe.get("text", "") or ""
+        # Negation condition from text — extract just the condition part (before first 、after とき)
+        if (
+            not pe.get("condition")
+            and ("ない" in pet or "いない" in pet)
+            and "とき" in pet
+        ):
+            idx = pet.find("とき")
+            if idx > 0:
+                rest = pet[idx + 2 :]
+                comma = rest.find("、")
+                if comma > 0:
+                    neg_text = pet[: idx + 2 + comma]
                 else:
-                    neg_text = pet
-                neg_text = neg_text.rstrip("。")
-                neg_cond = {
-                    "type": "location_condition",
-                    "location": "revealed_cards",
-                    "target": "self",
-                    "text": neg_text,
-                    "negation": True,
-                }
-                pe["condition"] = neg_cond
-                pe["card_type"] = "card"
-                pe.pop("target", None)
-                fix_stats["primary_neg"] += 1
-            # all:false on single-target primary when parent has all:true
-            if eff.get("all") and "all" not in pe and pe.get("count") == 1:
-                pe["all"] = False
+                    neg_text = pet[: idx + 2]
+            else:
+                neg_text = pet
+            neg_text = neg_text.rstrip("。")
+            neg_cond = {
+                "type": "location_condition",
+                "location": "revealed_cards",
+                "target": "self",
+                "text": neg_text,
+                "negation": True,
+            }
+            pe["condition"] = neg_cond
+            pe["card_type"] = "card"
+            pe.pop("target", None)
+            fix_stats["primary_neg"] += 1
+        # all:false on single-target primary when parent has all:true
+        if eff.get("all") and "all" not in pe and pe.get("count") == 1:
+            pe["all"] = False
 
-        # FIX 11: Remove leaking fields from sub-actions in sequential
-        if eff.get("action") in ("sequential", "conditional_on_result"):
-            for sub in eff.get("actions", []):
+    # FIX 11: Remove leaking fields from sub-actions in sequential
+    if eff.get("action") in ("sequential", "conditional_on_result"):
+        for sub in eff.get("actions", []):
+            if isinstance(sub, dict):
+                if sub.get("action") == "pay_energy":
+                    sub.pop("exclude_self", None)
+                    sub.pop("group_names", None)
+        fa = eff.get("followup_action")
+        if isinstance(fa, dict):
+            for sub in fa.get("actions", []):
                 if isinstance(sub, dict):
-                    if sub.get("action") == "pay_energy":
-                        sub.pop("exclude_self", None)
-                        sub.pop("group_names", None)
-            fa = eff.get("followup_action")
-            if isinstance(fa, dict):
-                for sub in fa.get("actions", []):
-                    if isinstance(sub, dict):
-                        sub.pop(
-                            "activation_position", None
-                        ) if "activation_position" in sub else None
+                    sub.pop(
+                        "activation_position", None
+                    ) if "activation_position" in sub else None
 
-        # FIX 12: compound condition → split gain_resource into sequential with two actions
-        if isinstance(cond, dict) and cond.get("type") == "compound":
-            if eff.get("action") == "gain_resource":
-                et = eff.get("text", "") or t
-                if (
-                    "{{icon_all.png|ハート}}" in et
-                    and "{{icon_blade.png|ブレード}}" in et
-                ):
-                    blade_count = et.count("{{icon_blade.png|ブレード}}")
-                    heart_count = et.count("{{icon_all.png|ハート}}")
-                    actions = [
-                        {
-                            "action": "gain_resource",
-                            "resource": "blade",
-                            "count": blade_count,
-                            "text": et,
-                        },
-                        {
-                            "action": "gain_resource",
-                            "resource": "heart",
-                            "heart_type": "all",
-                            "count": heart_count,
-                            "text": et,
-                        },
-                    ]
-                    eff["action"] = "sequential"
-                    eff["actions"] = actions
-                    eff.pop("resource", None)
-                    eff.pop("count", None)
-                    # Propagate group_names from condition or any sub-condition
-                    if isinstance(cond, dict):
-                        gns = cond.get("group_names")
-                        if not gns:
-                            for sc in cond.get("conditions", []):
-                                if isinstance(sc, dict) and sc.get("group_names"):
-                                    gns = sc["group_names"]
-                                    break
-                        if gns:
-                            eff["group_names"] = gns
+    # FIX 12: compound condition → split gain_resource into sequential with two actions
+    if isinstance(cond, dict) and cond.get("type") == "compound":
+        if eff.get("action") == "gain_resource":
+            et = eff.get("text", "") or t
+            if "{{icon_all.png|ハート}}" in et and "{{icon_blade.png|ブレード}}" in et:
+                blade_count = et.count("{{icon_blade.png|ブレード}}")
+                heart_count = et.count("{{icon_all.png|ハート}}")
+                actions = [
+                    {
+                        "action": "gain_resource",
+                        "resource": "blade",
+                        "count": blade_count,
+                        "text": et,
+                    },
+                    {
+                        "action": "gain_resource",
+                        "resource": "heart",
+                        "heart_type": "all",
+                        "count": heart_count,
+                        "text": et,
+                    },
+                ]
+                eff["action"] = "sequential"
+                eff["actions"] = actions
+                eff.pop("resource", None)
+                eff.pop("count", None)
+                # Propagate group_names from condition or any sub-condition
+                if isinstance(cond, dict):
+                    gns = cond.get("group_names")
+                    if not gns:
+                        for sc in cond.get("conditions", []):
+                            if isinstance(sc, dict) and sc.get("group_names"):
+                                gns = sc["group_names"]
+                                break
+                    if gns:
+                        eff["group_names"] = gns
 
-        # FIX 13: Remove spurious change_state actions inside sequential containers.
-        # When _try_implicit_sequential splits "これによりアクティブにしたメンバーと、このメンバーは"
-        # the conjunction phrase "これにより...と" is incorrectly parsed as change_state.
-        # This pollutes selected_cards with wrong members. Remove the spurious change_state
-        # so the subsequent gain_resource with multiple_targets targets correctly.
-        if eff.get("action") == "sequential":
-            new_actions = []
-            for sub in eff.get("actions", []):
-                if isinstance(sub, dict) and sub.get("action") == "sequential":
-                    inner_acts = sub.get("actions", [])
-                    filtered = [
-                        a
-                        for a in inner_acts
-                        if not (
-                            isinstance(a, dict)
-                            and a.get("action") == "change_state"
-                            and "これにより" in a.get("text", "")
-                            and "と" in a.get("text", "")
-                        )
-                    ]
-                    if len(filtered) < len(inner_acts):
-                        if len(filtered) == 1:
-                            new_actions.append(filtered[0])
-                        else:
-                            sub["actions"] = filtered
-                            new_actions.append(sub)
+    # FIX 13: Remove spurious change_state actions inside sequential containers.
+    # When _try_implicit_sequential splits "これによりアクティブにしたメンバーと、このメンバーは"
+    # the conjunction phrase "これにより...と" is incorrectly parsed as change_state.
+    # This pollutes selected_cards with wrong members. Remove the spurious change_state
+    # so the subsequent gain_resource with multiple_targets targets correctly.
+    if eff.get("action") == "sequential":
+        new_actions = []
+        for sub in eff.get("actions", []):
+            if isinstance(sub, dict) and sub.get("action") == "sequential":
+                inner_acts = sub.get("actions", [])
+                filtered = [
+                    a
+                    for a in inner_acts
+                    if not (
+                        isinstance(a, dict)
+                        and a.get("action") == "change_state"
+                        and "これにより" in a.get("text", "")
+                        and "と" in a.get("text", "")
+                    )
+                ]
+                if len(filtered) < len(inner_acts):
+                    if len(filtered) == 1:
+                        new_actions.append(filtered[0])
                     else:
+                        sub["actions"] = filtered
                         new_actions.append(sub)
                 else:
                     new_actions.append(sub)
-            if new_actions != eff.get("actions", []):
-                eff["actions"] = new_actions
+            else:
+                new_actions.append(sub)
+        if new_actions != eff.get("actions", []):
+            eff["actions"] = new_actions
 
-        # FIX 14: sequential chaining — infer select_cards → move_cards implied source
-        fix_stats["compound_split"] += 1
+    # FIX 14: sequential chaining — infer select_cards → move_cards implied source
+    fix_stats["compound_split"] += 1
 
-        # FIX 13: Auto abilities with no condition — extract from text
-        if (
-            ability.get("triggers") == "自動"
-            and isinstance(eff, dict)
-            and not eff.get("condition")
+    # FIX 13: Auto abilities with no condition — extract from text
+    if (
+        ability.get("triggers") == "自動"
+        and isinstance(eff, dict)
+        and not eff.get("condition")
+    ):
+        for sep in ["とき、", "場合、", "たび、", "なら、"]:
+            idx = t.find(sep)
+            if idx >= 0:
+                ct = t[: idx + 2]
+                tc = parse_condition(ct)
+                if tc and tc.get("type") not in (None, "custom"):
+                    eff["condition"] = copy.deepcopy(tc)
+                    fix_stats["auto_trigger"] += 1
+                    break
+
+    # FIX 15: Backfill exclude_self for single-target position_change effects
+    # Rule 11.10.1: Position change MUST move to a different area.
+    if eff.get("action") == "position_change" and not eff.get("exclude_self"):
+        et = eff.get("text", "") or t
+        # Only for single-target moves (not "メンバー1人を" or "それぞれ" formation change)
+        if "それぞれ" not in et and not (
+            "メンバー" in et and ("1人" in et or "N人" in et)
         ):
-            for sep in ["とき、", "場合、", "たび、", "なら、"]:
-                idx = t.find(sep)
-                if idx >= 0:
-                    ct = t[: idx + 2]
-                    tc = parse_condition(ct)
-                    if tc and tc.get("type") not in (None, "custom"):
-                        eff["condition"] = copy.deepcopy(tc)
-                        fix_stats["auto_trigger"] += 1
-                        break
+            eff["exclude_self"] = True
+            fix_stats.setdefault("exclude_self", 0)
+            fix_stats["exclude_self"] += 1
 
-        # FIX 15: Backfill exclude_self for single-target position_change effects
-        # Rule 11.10.1: Position change MUST move to a different area.
-        if eff.get("action") == "position_change" and not eff.get("exclude_self"):
-            et = eff.get("text", "") or t
-            # Only for single-target moves (not "メンバー1人を" or "それぞれ" formation change)
-            if "それぞれ" not in et and not (
-                "メンバー" in et and ("1人" in et or "N人" in et)
-            ):
-                eff["exclude_self"] = True
-                fix_stats.setdefault("exclude_self", 0)
-                fix_stats["exclude_self"] += 1
+    # FIX N: All-revealed-match-heart-color condition for specify_heart_color+reveal+select_cards
+    if (
+        eff.get("action") == "sequential"
+        and "公開されたカードの中に" in t
+        and "合計" in t
+        and "枚含まれる場合" in t
+    ):
+        acts = eff.get("actions", [])
+        cond_m = re.search(r"合計(\d+)枚含まれる場合", t)
+        if cond_m:
+            cond_count = int(cond_m.group(1))
+            cond = {
+                "type": "all_revealed_match_heart_color",
+                "count": cond_count,
+                "operator": ">=",
+                "cache": True,
+                "text": f"公開されたカードの中に指定した色に合致するカードが合計{cond_count}枚含まれる場合",
+            }
+            for sub in acts:
+                if isinstance(sub, dict) and sub.get("action") in (
+                    "select_cards",
+                    "gain_resource",
+                ):
+                    if not sub.get("condition"):
+                        sub["condition"] = cond
+                    if sub.get("action") == "select_cards":
+                        sub.pop("discard_remaining", None)
+                # Remove leaked group_names from actions that don't need them
+                if isinstance(sub, dict) and sub.get("action") in (
+                    "specify_heart_color",
+                    "reveal",
+                ):
+                    sub.pop("group_names", None)
 
-        # FIX N: All-revealed-match-heart-color condition for specify_heart_color+reveal+select_cards
-        if (
-            eff.get("action") == "sequential"
-            and "公開されたカードの中に" in t
-            and "合計" in t
-            and "枚含まれる場合" in t
-        ):
-            acts = eff.get("actions", [])
-            cond_m = re.search(r"合計(\d+)枚含まれる場合", t)
-            if cond_m:
-                cond_count = int(cond_m.group(1))
-                cond = {
-                    "type": "all_revealed_match_heart_color",
-                    "count": cond_count,
-                    "operator": ">=",
-                    "cache": True,
-                    "text": f"公開されたカードの中に指定した色に合致するカードが合計{cond_count}枚含まれる場合",
-                }
-                for sub in acts:
-                    if isinstance(sub, dict) and sub.get("action") in (
-                        "select_cards",
-                        "gain_resource",
-                    ):
-                        if not sub.get("condition"):
-                            sub["condition"] = cond
-                        if sub.get("action") == "select_cards":
-                            sub.pop("discard_remaining", None)
-                    # Remove leaked group_names from actions that don't need them
-                    if isinstance(sub, dict) and sub.get("action") in (
-                        "specify_heart_color",
-                        "reveal",
-                    ):
-                        sub.pop("group_names", None)
 
+def _process_post_fixes(data: Dict[str, Any], fix_stats: Dict[str, int]) -> None:
+    """Post-processing: recursive fixes, action inference & engine compat fixes, post-hoc fixes."""
     _apply_recursive_fixes(data["unique_abilities"], fix_stats)
 
     # ====================================================================
@@ -10599,7 +11101,33 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     # Validate parsed JSON against text patterns for missing mechanics
     _validate_semantic(data["unique_abilities"])
 
-    # Group/unit filter fields are validated in extract_card_abilities.py
+
+def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Post-process already-parsed abilities: infer actions, apply targeted fixes."""
+
+    # Add a DO NOT EDIT warning
+    data["_warning"] = (
+        "DO NOT EDIT THIS MANUALLY. Run cards/ability_extraction/parser.py to regenerate."
+    )
+
+    fix_stats = {
+        "movement": 0,
+        "each_time": 0,
+        "card_property": 0,
+        "ability_filter": 0,
+        "temporal": 0,
+        "local_cond": 0,
+        "group_cond": 0,
+        "result_cond": 0,
+        "primary_neg": 0,
+        "leak": 0,
+        "compound_split": 0,
+        "auto_trigger": 0,
+    }
+
+    for ability in data["unique_abilities"]:
+        _process_pre_fix(ability, fix_stats)
+    _process_post_fixes(data, fix_stats)
     return data
 
 
