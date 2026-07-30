@@ -389,7 +389,8 @@ def extract_all_abilities(cards_file: Path) -> dict:
         if cost_text:
             try:
                 cost = parse_cost(cost_text)
-            except:
+            except Exception as e:
+                print(f"WARNING: parse_cost failed for '{cost_text}': {e}")
                 cost = None
 
         # Parse effect
