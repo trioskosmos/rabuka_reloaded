@@ -2072,6 +2072,20 @@ impl GameState {
         }
     }
 
+    /// Set just_completed_ability_key, process pending auto abilities, then clear it.
+    pub fn process_with_completed_key(&mut self, key: Option<u32>, player_id: &str) {
+        self.just_completed_ability_key = key;
+        self.process_pending_auto_abilities(player_id);
+        self.just_completed_ability_key = None;
+    }
+
+    /// Clear movement tracking state after ability resolution.
+    pub fn clear_movement_tracking(&mut self) {
+        self.recently_moved_cards = None;
+        self.recently_appeared_cards.clear();
+        self.recently_state_changed.clear();
+    }
+
     pub fn resolve_target<'a>(
         &'a self,
         target: &str,

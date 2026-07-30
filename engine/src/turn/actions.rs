@@ -903,9 +903,7 @@ impl super::TurnEngine {
                 game_state.just_completed_ability_key = just_completed_key.clone();
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
-                game_state.recently_moved_cards = None;
-                game_state.recently_appeared_cards.clear();
-                game_state.recently_state_changed.clear();
+                game_state.clear_movement_tracking();
             } else if needs_reprocess {
                 log::debug!("[RWC] needs_reprocess=true: storing resolver and calling PCA");
                 game_state.ability_queue.set_resolver(resolver);
@@ -916,18 +914,14 @@ impl super::TurnEngine {
                         .current_entry()
                         .map(|e| e.player_id.clone())
                         .unwrap_or_else(|| "p1".to_string().into());
-                    game_state.just_completed_ability_key = just_completed_key.clone();
-                    game_state.process_pending_auto_abilities(&player_id);
-                    game_state.just_completed_ability_key = None;
+                    game_state.process_with_completed_key(just_completed_key.clone(), &player_id);
                 } else {
                     // Effect completed without sub-choice — process any newly
                     // enqueued watcher abilities (e.g. each_time triggers).
                     let player_id = entry_player_id
                         .clone()
                         .unwrap_or_else(|| "p1".to_string().into());
-                    game_state.just_completed_ability_key = just_completed_key.clone();
-                    game_state.process_pending_auto_abilities(&player_id);
-                    game_state.just_completed_ability_key = None;
+                    game_state.process_with_completed_key(just_completed_key.clone(), &player_id);
                 }
             } else if cost_was_paid {
                 // Record use_limit when ability completes (cost+effect both resolved).
@@ -1007,12 +1001,8 @@ impl super::TurnEngine {
                     game_state.trigger_auto_abilities_for_player_with_event(&player_id, &event);
                     game_state.just_completed_ability_key = None;
                 }
-                game_state.just_completed_ability_key = just_completed_key.clone();
-                game_state.process_pending_auto_abilities(&player_id);
-                game_state.just_completed_ability_key = None;
-                game_state.recently_moved_cards = None;
-                game_state.recently_appeared_cards.clear();
-                game_state.recently_state_changed.clear();
+                game_state.process_with_completed_key(just_completed_key.clone(), &player_id);
+                game_state.clear_movement_tracking();
             } else {
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
@@ -1041,12 +1031,8 @@ impl super::TurnEngine {
                     game_state.trigger_auto_abilities_for_player_with_event(&player_id, &event);
                     game_state.just_completed_ability_key = None;
                 }
-                game_state.just_completed_ability_key = just_completed_key.clone();
-                game_state.process_pending_auto_abilities(&player_id);
-                game_state.just_completed_ability_key = None;
-                game_state.recently_moved_cards = None;
-                game_state.recently_appeared_cards.clear();
-                game_state.recently_state_changed.clear();
+                game_state.process_with_completed_key(just_completed_key.clone(), &player_id);
+                game_state.clear_movement_tracking();
             }
         }
         Ok(())
