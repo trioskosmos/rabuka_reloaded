@@ -704,22 +704,21 @@ impl CardAtlas {
 
     /// Build sorted card list from loaded Card database (matches cards.json order).
     /// Returns (normalized, original) pairs sorted by normalized key.
-    fn build_qr_sorted(cards: &[Card]) -> Vec<(String, String)> {
-        let mut sorted: Vec<(String, String)> = cards
-            .iter()
-            .map(|c| {
-                let orig = c.card_no.to_string();
-                // Normalize to match web UI: full-width ＋→+, －→-, ー→-
-                let norm = orig
-                    .replace('＋', "+")
-                    .replace('－', "-")
-                    .replace('ー', "-")
-                    .to_uppercase();
-                (norm, orig)
-            })
-            .collect();
+    /// Returns None if allocation fails (3DS has limited heap).
+    fn build_qr_sorted(cards: &[Card]) -> Option<Vec<(String, String)>> {
+        let mut sorted: Vec<(String, String)> = Vec::new();
+        sorted.try_reserve(cards.len()).ok()?;
+        for c in cards {
+            let orig = c.card_no.to_string();
+            let norm = orig
+                .replace('\u{FF0B}', "+")
+                .replace('\u{FF0D}', "-")
+                .replace('\u{30FC}', "-")
+                .to_uppercase();
+            sorted.push((norm, orig));
+        }
         sorted.sort_by(|a, b| a.0.cmp(&b.0));
-        sorted
+        Some(sorted)
     }
 
     /// Decode binary QR data: [count+1] [idx_hi+1 idx_lo+1 qty+1] ...
@@ -1891,9 +1890,12 @@ fn main() {
                                 // Try binary QR: base64-encoded binary index format
                                 let cards_read = if looks_like_b64(&text) {
                                     if let Some(decoded) = base64_decode(&text) {
-                                        let sorted = CardAtlas::build_qr_sorted(&cards);
-                                        CardAtlas::decode_qr_binary(&sorted, &decoded)
-                                            .unwrap_or_default()
+                                        if let Some(sorted) = CardAtlas::build_qr_sorted(&cards) {
+                                            CardAtlas::decode_qr_binary(&sorted, &decoded)
+                                                .unwrap_or_default()
+                                        } else {
+                                            Vec::new()
+                                        }
                                     } else {
                                         Vec::new()
                                     }
