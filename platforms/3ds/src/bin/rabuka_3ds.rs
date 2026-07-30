@@ -713,7 +713,8 @@ impl CardAtlas {
                 let norm = orig
                     .replace('＋', "+")
                     .replace('－', "-")
-                    .replace('ー', "-");
+                    .replace('ー', "-")
+                    .to_uppercase();
                 (norm, orig)
             })
             .collect();
@@ -743,29 +744,47 @@ impl CardAtlas {
         }
         Some(result)
     }
+}
 
-    /// Decode binary QR data: [count+1] [idx_hi+1 idx_lo+1 qty+1] ...
-    fn decode_qr_binary(sorted_cards: &[String], data: &[u8]) -> Option<Vec<String>> {
-        if data.is_empty() {
-            return None;
-        }
-        let count = (data[0] as usize).wrapping_sub(1);
-        if count == 0 || data.len() < 1 + count * 3 {
-            return None;
-        }
-        let mut result = Vec::with_capacity(count);
-        for i in 0..count {
-            let base = 1 + i * 3;
-            let idx = (((data[base] as usize).wrapping_sub(1)) << 8)
-                | ((data[base + 1] as usize).wrapping_sub(1));
-            let qty = data[base + 2].wrapping_sub(1).max(1) as usize;
-            let card_no = sorted_cards.get(idx)?;
-            for _ in 0..qty {
-                result.push(card_no.clone());
-            }
-        }
-        Some(result)
+/// Check if a string looks like base64 (QR binary format).
+fn looks_like_b64(s: &str) -> bool {
+    if s.len() < 4 || s.len() > 3000 {
+        return false;
     }
+    // Must be all ASCII base64 chars, no spaces/newlines
+    s.bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'+' || b == b'/' || b == b'=')
+}
+
+/// Minimal base64 decoder (no_std friendly).
+fn base64_decode(s: &str) -> Option<Vec<u8>> {
+    const TABLE: [i8; 128] = [
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 62, -1, -1,
+        -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4,
+        5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1,
+        -1, -1, -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45,
+        46, 47, 48, 49, 50, 51, -1, -1, -1, -1, -1,
+    ];
+    let mut out = Vec::with_capacity(s.len() * 3 / 4);
+    let mut buf: u32 = 0;
+    let mut bits: i32 = 0;
+    for &b in s.as_bytes() {
+        if b == b'=' {
+            break;
+        }
+        let val = TABLE.get(b as usize)?;
+        if *val < 0 {
+            return None;
+        }
+        buf = (buf << 6) | (*val as u32);
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((buf >> bits) as u8);
+        }
+    }
+    Some(out)
 }
 
 #[cfg(feature = "3ds")]
@@ -1868,18 +1887,20 @@ fn main() {
                                 unsafe {
                                     _3ds_qr_stop();
                                 }
-                                let raw = &buf[..r as usize];
-                                let text = String::from_utf8_lossy(raw).to_string();
-                                // Try binary QR decode first (first byte is count+1, non-printable)
-                                // Build sorted dictionary from loaded Card database (matches cards.json)
-                                let cards_read = if r >= 4 && raw[0] >= 2 && raw[0] <= 255 {
-                                    let sorted = CardAtlas::build_qr_sorted(&cards);
-                                    CardAtlas::decode_qr_binary(&sorted, raw).unwrap_or_default()
+                                let text = String::from_utf8_lossy(&buf[..r as usize]).to_string();
+                                // Try binary QR: base64-encoded binary index format
+                                let cards_read = if looks_like_b64(&text) {
+                                    if let Some(decoded) = base64_decode(&text) {
+                                        let sorted = CardAtlas::build_qr_sorted(&cards);
+                                        CardAtlas::decode_qr_binary(&sorted, &decoded)
+                                            .unwrap_or_default()
+                                    } else {
+                                        Vec::new()
+                                    }
                                 } else {
                                     Vec::new()
                                 };
                                 let cards_read = if cards_read.is_empty() {
-                                    // Fall back to plain text parsing
                                     DeckParser::parse_deck_content(&text)
                                 } else {
                                     cards_read

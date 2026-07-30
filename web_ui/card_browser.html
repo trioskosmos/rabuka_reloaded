@@ -750,8 +750,8 @@ function importDeckText(text) {
   let imported = 0;
   const add = (id, qty) => { if (addImportedCard(newCards, id, qty)) imported++; };
 
-  // 0. Binary QR: first char is a non-printable count byte (0x01-0xFF)
-  if (text.length >= 4 && text.charCodeAt(0) >= 1 && text.charCodeAt(0) <= 255) {
+  // 0. Binary QR (base64 encoded): no newlines, only base64 chars, try decode
+  if (text.length >= 4 && !text.includes('\n') && /^[A-Za-z0-9+/=]+$/.test(text)) {
     const decoded = decodeQRBinary(text);
     if (decoded) {
       for (const [cardNo, qty] of decoded) add(cardNo, qty);
@@ -1130,7 +1130,7 @@ function qrDictLookup(index) {
 
 // Show QR code for current deck (binary index format)
 // Encodes deck as compact binary instead of "card_no x qty\n..." plain text.
-// A 30-line deck goes from ~580 bytes → ~91 bytes raw binary.
+// A 30-line deck goes from ~580 bytes → ~91 bytes raw binary, then base64 for QR safety.
 function showQR() {
   if (deckState.cards.size === 0) { toast('Deck is empty'); return; }
   const name = document.getElementById('deck-name').value || 'deck';
@@ -1138,8 +1138,6 @@ function showQR() {
   if (!dict) { toast('Card database not loaded'); return; }
   const entries = [...deckState.cards.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   // Build binary: [count] [index_hi index_lo qty] ... (offset +1 to avoid null bytes)
-  // Null bytes (0x00) can cause issues with some QR scanners/libraries, so all values
-  // are stored as value+1 and subtracted back on decode.
   const count = entries.length;
   const buf = new ArrayBuffer(1 + count * 3);
   const view = new DataView(buf);
@@ -1155,14 +1153,16 @@ function showQR() {
     view.setUint8(1 + i * 3 + 2, Math.min(qty, 255) + 1);
   }
   if (!ok) { toast('Card not in QR dictionary'); return; }
+  // Base64 encode so all chars are ASCII (QR library mangles bytes > 127)
   const bytes = new Uint8Array(buf);
   let binStr = '';
   for (let i = 0; i < bytes.length; i++) binStr += String.fromCharCode(bytes[i]);
+  const b64 = btoa(binStr);
   document.getElementById('qr-deck-name').textContent = name;
   const canvas = document.getElementById('qr-canvas');
   canvas.innerHTML = '';
   new QRCode(canvas, {
-    text: binStr,
+    text: b64,
     width: 200,
     height: 200,
     colorDark: '#000000',
@@ -1173,18 +1173,21 @@ function showQR() {
 }
 
 // Decode binary QR data into deck entries (values offset +1 to avoid null bytes)
-// Called when importing/pasting binary QR data back into the deck builder.
-function decodeQRBinary(data) {
+// Input is base64-encoded binary. Called when importing/pasting QR data back into deck builder.
+function decodeQRBinary(b64) {
   const dict = getQRCardDict();
   if (!dict) return null;
-  if (data.length < 4) return null;
-  const count = data.charCodeAt(0) - 1;
-  if (count < 1 || data.length < 1 + count * 3) return null;
+  try {
+    var binStr = atob(b64);
+  } catch(e) { return null; }
+  if (binStr.length < 4) return null;
+  const count = binStr.charCodeAt(0) - 1;
+  if (count < 1 || binStr.length < 1 + count * 3) return null;
   const result = [];
   for (let i = 0; i < count; i++) {
     const base = 1 + i * 3;
-    const idx = ((data.charCodeAt(base) - 1) << 8) | (data.charCodeAt(base + 1) - 1);
-    const qty = data.charCodeAt(base + 2) - 1;
+    const idx = ((binStr.charCodeAt(base) - 1) << 8) | (binStr.charCodeAt(base + 1) - 1);
+    const qty = binStr.charCodeAt(base + 2) - 1;
     const cardNo = qrDictLookup(idx);
     if (!cardNo) return null;
     result.push([cardNo, qty || 1]);
