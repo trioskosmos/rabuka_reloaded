@@ -528,6 +528,7 @@ OPERATOR_PATTERNS: List[Tuple[str, str]] = [
 ]
 
 # ============== POSITION KEYWORDS ==============
+# SYNC: Keep in sync with parser.py POSITION_KEYWORDS
 POSITION_KEYWORDS: Dict[str, str] = {
     "センターエリア": "center",
     "左サイドエリア": "left_side",

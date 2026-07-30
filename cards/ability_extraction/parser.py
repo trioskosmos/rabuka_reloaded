@@ -124,6 +124,30 @@ MAX_CHARACTER_NAME_LENGTH = 10
 SPLIT_LIMIT = 1
 
 
+# ============== POSITION FIELD SEMANTICS ==============
+# The parser outputs three different position-related fields. They have different
+# meanings and the Rust engine interprets them differently:
+#
+# "position" — Target card filter (single value only).
+#   Used by: conditions (where must the target be?), actions (which cards to target?).
+#   Engine check: compares against a specific stage slot. Expects ONE position
+#   like "left_side" or "center". A comma-separated string here WILL BREAK
+#   the engine's appearance condition cross-comparison check.
+#
+# "position_compare" — Second position for cross-comparison (single value only).
+#   Used by: conditions that compare values at two positions
+#   (e.g. "compare left vs right blade count"). Only set alongside "position".
+#
+# "activation_position" — Where the activating card must be (comma-separated OR).
+#   Used by: effects to gate ability activation. "left_side,right_side" means
+#   the ability works on EITHER side. The engine splits on comma and checks
+#   if the card is at any listed position. This is the ONLY field that should
+#   contain comma-separated multi-position values.
+#
+# RULE: When multi-position detection finds both left and right, set
+#   activation_position = "left_side,right_side"
+# Do NOT set position to "left_side,right_side" — that will break the engine.
+
 # ============== POSITION KEYWORDS ==============
 POSITION_KEYWORDS = {
     "センターエリア": "center",
@@ -167,6 +191,31 @@ def detect_icon_positions(text: str) -> list:
 def format_positions(positions: list) -> str:
     """Join position list into comma-separated string, or return empty string."""
     return ",".join(positions)
+
+
+def set_cross_position_fields(target, text):
+    """Detect positions in text and set position/position_compare on target.
+
+    For cross-comparison patterns like "left vs right" where the engine
+    needs to compare values at two positions. Sets target["position"] to
+    the first detected position and target["position_compare"] to the second.
+    Returns True if any position was set. Does not overwrite existing position.
+    """
+    if "position" in target:
+        return False
+    matched = set(detect_positions(text))
+    if "left_side" in matched and "right_side" in matched:
+        target["position"] = "left_side"
+        target["position_compare"] = "right_side"
+    elif len(matched) == 1:
+        target["position"] = next(iter(matched))
+    elif len(matched) > 1:
+        positions_list = sorted(matched)
+        target["position"] = positions_list[0]
+        target["position_compare"] = positions_list[1]
+    else:
+        return False
+    return True
 
 
 # ============== TEMPORAL CONDITION PATTERNS ==============
@@ -682,16 +731,7 @@ def _extract_basic_cost_fields(cost, text):
     # position from bare (non-icon) keywords which indicate target filtering.
     if "position" not in cost:
         clean_text = re.sub(r"\{\{[^}]+?\}\}", "", text)
-        matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in clean_text}
-        if "left_side" in matched and "right_side" in matched:
-            cost["position"] = "left_side"
-            cost["position_compare"] = "right_side"
-        elif len(matched) == 1:
-            cost["position"] = next(iter(matched))
-        elif len(matched) > 1:
-            positions = sorted(matched)
-            cost["position"] = positions[0]
-            cost["position_compare"] = positions[1]
+        set_cross_position_fields(cost, clean_text)
 
 
 def _try_duration_prefix(text):
@@ -1404,13 +1444,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
             # _try_appearance's intentional multi-position detection).
             # Skip when positions_characters already encodes per-position mappings.
             if "position" not in result and "positions_characters" not in result:
-                matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in text}
-                if len(matched) == 1:
-                    result["position"] = next(iter(matched))
-                elif len(matched) > 1:
-                    positions_list = sorted(matched)
-                    result["position"] = positions_list[0]
-                    result["position_compare"] = positions_list[1]
+                set_cross_position_fields(result, text)
             elif (
                 "position_compare" not in result
                 and result.get("comparison_type") == "equality"
@@ -1444,17 +1478,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     # Extract position from POSITION_KEYWORDS for fall-through conditions
     # Skip when positions_characters already encodes per-position mappings.
     if "position" not in condition and "positions_characters" not in condition:
-        matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in text}
-        # Cross-position equality: left vs right (center comes from activation icon)
-        if "left_side" in matched and "right_side" in matched:
-            condition["position"] = "left_side"
-            condition["position_compare"] = "right_side"
-        elif len(matched) == 1:
-            condition["position"] = next(iter(matched))
-        elif len(matched) > 1:
-            positions_list = sorted(matched)
-            condition["position"] = positions_list[0]
-            condition["position_compare"] = positions_list[1]
+        set_cross_position_fields(condition, text)
     elif (
         "position_compare" not in condition
         and condition.get("comparison_type") == "equality"
@@ -1869,16 +1893,7 @@ def parse_action(text: str) -> Dict[str, Any]:
 
     # Extract position restrictions (e.g., "センター", "センターエリア")
     # Also detect cross-position patterns (e.g. "右サイドエリアと左サイドエリア")
-    matched_positions = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in text}
-    if "left_side" in matched_positions and "right_side" in matched_positions:
-        action["position"] = "left_side"
-        action["position_compare"] = "right_side"
-    elif len(matched_positions) == 1:
-        action["position"] = next(iter(matched_positions))
-    elif len(matched_positions) > 1:
-        positions_list = sorted(matched_positions)
-        action["position"] = positions_list[0]
-        action["position_compare"] = positions_list[1]
+    set_cross_position_fields(action, text)
 
     # Extract exclude_self for actions (e.g., "このメンバー以外の" or "「character name」以外")
     # Only for filtering actions, NOT for gain_resource/select (self-buffs)
@@ -4002,17 +4017,7 @@ def _try_appearance(text):
     # Extract position (左サイド/右サイド/センター) — skip when
     # positions_characters already encodes per-position character mappings.
     if "positions_characters" not in result:
-        matched = set()
-        for kw, pos in POSITION_KEYWORDS.items():
-            if kw in text:
-                matched.add(pos)
-        if len(matched) == 1:
-            result["position"] = matched.pop()
-        elif len(matched) > 1:
-            # Cross-position comparison (e.g. "右サイドエリアと左サイドエリア")
-            positions_list = sorted(matched)
-            result["position"] = positions_list[0]
-            result["position_compare"] = positions_list[1]
+        set_cross_position_fields(result, text)
     if "position" in result:
         result["trigger_event"]["position"] = result["position"]
     return result
