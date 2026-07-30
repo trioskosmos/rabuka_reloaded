@@ -5,7 +5,7 @@ use rabuka_engine::core::types::ArcStr;
 use rabuka_engine::zones::MemberArea;
 
 /// Helper to calculate total score in P1's success_live_card_zone
-fn total_success_score(game: &TestGame) -> u32 {
+fn total_success_score(game: &TestGame) -> u8 {
     let db = game.state.card_database.clone();
     game.state
         .player1

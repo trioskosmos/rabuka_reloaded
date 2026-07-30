@@ -661,7 +661,7 @@ fn issue7_hajimari_set_modifier_replaces_not_adds() {
         if let Some(color_mods) = game.state.mods.need_heart_modifiers.get(&live_card) {
             for (color, me) in color_mods {
                 if me.set != 0 {
-                    hearts.insert(*color, me.set as u32);
+                    hearts.insert(*color, me.set as u8);
                 }
             }
         }

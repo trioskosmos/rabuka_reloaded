@@ -81,7 +81,7 @@ fn performance_pipeline_blade_yell_heart_score() {
         .expect("P1 should have a performance snapshot");
 
     // --- Rule 8.3.10: Blade sum ---
-    let total_blades: u32 = perf
+    let total_blades: u8 = perf
         .member_contributions
         .iter()
         .map(|m| m.base_blades + m.bonus_blades)
@@ -90,7 +90,7 @@ fn performance_pipeline_blade_yell_heart_score() {
 
     // --- Rule 8.3.11-12: Yell produced cards with blade hearts ---
     assert!(!perf.yell_cards.is_empty(), "P1: yell cards exist");
-    let yell_blade_hearts: u32 = perf
+    let yell_blade_hearts: u8 = perf
         .yell_cards
         .iter()
         .flat_map(|y| y.blade_hearts.iter())
@@ -98,12 +98,12 @@ fn performance_pipeline_blade_yell_heart_score() {
     assert!(yell_blade_hearts > 0, "P1: yell blade hearts > 0");
 
     // --- Rule 8.3.14: Total hearts = member hearts + yell blade hearts ---
-    let member_hearts: u32 = perf
+    let member_hearts: u8 = perf
         .member_contributions
         .iter()
         .flat_map(|m| m.base_hearts.iter().chain(m.bonus_hearts.iter()))
         .sum();
-    let total_hearts: u32 = perf.total_hearts.iter().sum();
+    let total_hearts: u8 = perf.total_hearts.iter().sum();
     assert_eq!(
         total_hearts,
         member_hearts + yell_blade_hearts,
@@ -280,7 +280,7 @@ fn heart00_passes_check_fails_when_insufficient() {
     assert!(
         !second.passed,
         "Second live card should FAIL: Heart00=4 needed but only {} hearts available after first card",
-        perf.total_hearts.iter().sum::<u32>()
+        perf.total_hearts.iter().sum::<u8>()
     );
 
     // First card should pass (it gets all 4 hearts)

@@ -163,7 +163,7 @@ fn kanan_livestart_converts_all_hearts_to_heart04() {
         "Kanan's 6 hearts become heart04"
     );
     assert_eq!(
-        after.hearts.values().sum::<u32>(),
+        after.hearts.values().sum::<u8>(),
         game.state
             .player1
             .calculate_stage_hearts(
@@ -174,7 +174,7 @@ fn kanan_livestart_converts_all_hearts_to_heart04() {
             )
             .hearts
             .values()
-            .sum::<u32>(),
+            .sum::<u8>(),
         "Total unchanged (filler + Kanan)"
     );
 

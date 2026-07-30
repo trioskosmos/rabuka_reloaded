@@ -16,7 +16,7 @@ use crate::helpers::*;
 use rabuka_engine::ability::types::Choice;
 use rabuka_engine::zones::MemberArea;
 
-fn get_cost(game: &TestGame, card_id: i16) -> u32 {
+fn get_cost(game: &TestGame, card_id: i16) -> u8 {
     game.state
         .card_database
         .get_card(card_id)

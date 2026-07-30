@@ -16,7 +16,7 @@ fn source_dest_condition(source: &str, destination: &str) -> Condition {
     source_dest_condition_with_count(source, destination, 1)
 }
 
-fn source_dest_condition_with_count(source: &str, destination: &str, count: u32) -> Condition {
+fn source_dest_condition_with_count(source: &str, destination: &str, count: u8) -> Condition {
     Condition::Location {
         text: None,
         negation: None,

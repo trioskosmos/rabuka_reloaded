@@ -754,7 +754,159 @@ def compile_all(abilities):
         offsets.append(len(bytecode))
         enc_entry(entry, bytecode)
     offsets.append(len(bytecode))
+
+    # ── Phase 3: Reorder strings by frequency, rewrite with u8 indices ──
+    bytecode, offsets, strings, card_ability_pairs = compact_bytecode(
+        bytes(bytecode), offsets, strings, card_ability_pairs
+    )
+
     return bytes(bytecode), offsets, strings, card_ability_pairs
+
+
+def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
+    """Reorder strings by frequency and rewrite bytecode with u8+escape indices."""
+    freq = [0] * len(strings)
+
+    def count_one(bc, pos):
+        """Count string references in a single value starting at pos. Return new pos."""
+        if pos >= len(bc):
+            return pos
+        tag = bc[pos]
+        pos += 1
+        if tag in (0x00, 0x01, 0x02):
+            return pos
+        elif tag == 0x03:
+            return pos + 8
+        elif tag == 0x04:
+            return pos + 8
+        elif tag == 0x06:
+            if pos + 2 > len(bc):
+                return len(bc)
+            idx = bc[pos] | (bc[pos + 1] << 8)
+            pos += 2
+            if idx < len(freq):
+                freq[idx] += 1
+            return pos
+        elif tag == 0x07:
+            if pos + 4 > len(bc):
+                return len(bc)
+            n = bc[pos] | (bc[pos + 1] << 8) | (bc[pos + 2] << 16) | (bc[pos + 3] << 24)
+            pos += 4
+            for _ in range(n):
+                pos = count_one(bc, pos)
+            return pos
+        elif tag == 0x08:
+            if pos + 4 > len(bc):
+                return len(bc)
+            n = bc[pos] | (bc[pos + 1] << 8) | (bc[pos + 2] << 16) | (bc[pos + 3] << 24)
+            pos += 4
+            for _ in range(n):
+                if pos + 2 > len(bc):
+                    return len(bc)
+                kidx = bc[pos] | (bc[pos + 1] << 8)
+                pos += 2
+                if kidx < len(freq):
+                    freq[kidx] += 1
+                pos = count_one(bc, pos)
+            return pos
+        return pos
+
+    # Count frequencies by walking each ability slice
+    for i in range(len(offsets) - 1):
+        s, e = offsets[i], offsets[i + 1]
+        if s < e:
+            count_one(bytecode, s)
+
+    # Build reorder map: most frequent strings get indices 0..253
+    indexed = list(range(len(strings)))
+    indexed.sort(key=lambda i: (-freq[i], i))
+    new_idx = [0] * len(strings)
+    for new_pos, old_pos in enumerate(indexed):
+        new_idx[old_pos] = new_pos
+
+    new_strings = [strings[old] for old in indexed]
+
+    # Remap card_ability_pairs
+    new_pairs = []
+    for str_idx, ability_idx in card_ability_pairs:
+        new_pairs.append((new_idx[str_idx], ability_idx))
+
+    # Rewrite bytecode with new indices using u8+escape encoding
+    new_bytecode = bytearray()
+    new_offsets = []
+
+    def write_idx(out, idx):
+        if idx < 0xFE:
+            out.append(idx)
+        else:
+            out.append(0xFE)
+            out.extend(struct.pack("<H", idx))
+
+    def rewrite_one(bc, pos, out):
+        """Rewrite a single value from old bytecode at pos into out. Return new pos."""
+        if pos >= len(bc):
+            return pos
+        tag = bc[pos]
+        pos += 1
+        out.append(tag)
+        if tag in (0x00, 0x01, 0x02):
+            return pos
+        elif tag == 0x03:
+            out.extend(bc[pos : pos + 8])
+            return pos + 8
+        elif tag == 0x04:
+            out.extend(bc[pos : pos + 8])
+            return pos + 8
+        elif tag == 0x06:
+            if pos + 2 > len(bc):
+                return len(bc)
+            old_idx = bc[pos] | (bc[pos + 1] << 8)
+            pos += 2
+            write_idx(out, new_idx[old_idx])
+            return pos
+        elif tag == 0x07:
+            if pos + 4 > len(bc):
+                return len(bc)
+            n = bc[pos] | (bc[pos + 1] << 8) | (bc[pos + 2] << 16) | (bc[pos + 3] << 24)
+            pos += 4
+            out.extend(struct.pack("<I", n))
+            for _ in range(n):
+                pos = rewrite_one(bc, pos, out)
+            return pos
+        elif tag == 0x08:
+            if pos + 4 > len(bc):
+                return len(bc)
+            n = bc[pos] | (bc[pos + 1] << 8) | (bc[pos + 2] << 16) | (bc[pos + 3] << 24)
+            pos += 4
+            out.extend(struct.pack("<I", n))
+            for _ in range(n):
+                if pos + 2 > len(bc):
+                    return len(bc)
+                old_kidx = bc[pos] | (bc[pos + 1] << 8)
+                pos += 2
+                write_idx(out, new_idx[old_kidx])
+                pos = rewrite_one(bc, pos, out)
+            return pos
+        return pos
+
+    for i in range(len(offsets) - 1):
+        s, e = offsets[i], offsets[i + 1]
+        new_offsets.append(len(new_bytecode))
+        if s < e:
+            rewrite_one(bytecode, s, new_bytecode)
+    new_offsets.append(len(new_bytecode))
+
+    print(
+        f"Bytecode: {len(bytecode)} -> {len(new_bytecode)} bytes ({100 * (1 - len(new_bytecode) / len(bytecode)):.1f}% smaller)"
+    )
+    top_n = min(254, len(indexed))
+    top_freq = sum(freq[indexed[j]] for j in range(top_n))
+    total_freq = sum(freq)
+    print(
+        f"Strings: {len(strings)} unique, top {top_n} cover {top_freq}/{total_freq} refs ({100 * top_freq / total_freq:.1f}%)"
+    )
+
+    return new_bytecode, new_offsets, new_strings, new_pairs
 
 
 # ── Rust code generation ──

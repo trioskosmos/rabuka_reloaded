@@ -5,7 +5,7 @@ use rabuka_engine::game_state::{GameState, Phase};
 use rabuka_engine::player::Player;
 use std::sync::Arc;
 
-fn make_game_state(turn: u32, phase: Phase) -> GameState {
+fn make_game_state(turn: u8, phase: Phase) -> GameState {
     let db = Arc::new(CardDatabase::new());
     let p1 = Player::new("player1".into(), "Player 1".into(), true);
     let p2 = Player::new("player2".into(), "Player 2".into(), false);
@@ -15,7 +15,7 @@ fn make_game_state(turn: u32, phase: Phase) -> GameState {
     gs
 }
 
-fn temporal_condition(turn_number: Option<u32>, text: &str) -> Condition {
+fn temporal_condition(turn_number: Option<u8>, text: &str) -> Condition {
     Condition::Temporal {
         text: Some(text.to_string()),
         negation: None,

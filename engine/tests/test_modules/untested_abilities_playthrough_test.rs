@@ -1086,7 +1086,7 @@ fn hs_bp5_021_precise_heart_count_after_transform() {
         "Original heart04 should have 0 after transform"
     );
     assert_eq!(
-        stage_hearts.hearts.values().sum::<u32>(),
+        stage_hearts.hearts.values().sum::<u8>(),
         3,
         "Total heart count unchanged at 3"
     );

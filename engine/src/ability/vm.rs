@@ -192,11 +192,20 @@ impl<'a> BcReader<'a> {
     }
 
     fn key(&mut self) -> Option<&'a str> {
-        let idx = self.u16()? as usize;
+        let idx = self.read_idx()?;
         if idx >= STRINGS.len() {
             return None;
         }
         Some(STRINGS[idx])
+    }
+
+    fn read_idx(&mut self) -> Option<usize> {
+        let b = self.read_u8()?;
+        if b == 0xFE {
+            self.u16().map(|v| v as usize)
+        } else {
+            Some(b as usize)
+        }
     }
 
     fn skip_value(&mut self) -> Option<()> {
@@ -209,7 +218,7 @@ impl<'a> BcReader<'a> {
         match tag {
             TAG_NULL => None,
             TAG_STR => {
-                let idx = self.u16()? as usize;
+                let idx = self.read_idx()?;
                 if idx >= STRINGS.len() {
                     return None;
                 }
@@ -224,7 +233,7 @@ impl<'a> BcReader<'a> {
         match tag {
             TAG_NULL => None,
             TAG_STR => {
-                let idx = self.u16()? as usize;
+                let idx = self.read_idx()?;
                 if idx >= STRINGS.len() {
                     return None;
                 }
@@ -269,7 +278,7 @@ fn skip_value_with_tag(bc: &mut BcReader, tag: u8) -> Option<()> {
             Some(())
         }
         TAG_STR => {
-            bc.u16()?;
+            bc.read_idx()?;
             Some(())
         }
         TAG_ARRAY => {
@@ -282,7 +291,7 @@ fn skip_value_with_tag(bc: &mut BcReader, tag: u8) -> Option<()> {
         TAG_OBJECT => {
             let len = bc.read_u32()? as usize;
             for _ in 0..len {
-                bc.u16()?; // key index
+                bc.read_idx()?; // key index
                 bc.skip_value()?;
             }
             Some(())
@@ -311,7 +320,7 @@ fn read_value_from_bc(bc: &mut BcReader) -> Option<serde_json::Value> {
             Some(serde_json::Value::from(v))
         }
         TAG_STR => {
-            let idx = bc.u16()? as usize;
+            let idx = bc.read_idx()?;
             if idx >= STRINGS.len() {
                 return None;
             }
@@ -329,7 +338,7 @@ fn read_value_from_bc(bc: &mut BcReader) -> Option<serde_json::Value> {
             let len = bc.read_u32()? as usize;
             let mut obj = serde_json::Map::with_capacity(len);
             for _ in 0..len {
-                let kidx = bc.u16()? as usize;
+                let kidx = bc.read_idx()?;
                 if kidx >= STRINGS.len() {
                     return None;
                 }
@@ -462,7 +471,7 @@ fn collect_json_map(
 ) -> Option<serde_json::Map<String, serde_json::Value>> {
     let mut map = serde_json::Map::with_capacity(count);
     for _ in 0..count {
-        let key_idx = bc.u16()? as usize;
+        let key_idx = bc.read_idx()?;
         if key_idx >= STRINGS.len() {
             return None;
         }

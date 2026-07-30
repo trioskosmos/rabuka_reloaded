@@ -57,8 +57,8 @@ fn setsuna_q205_all_heart_granted() {
         .find(|mc| mc.source_id == setsuna)
         .expect("Setsuna should have a performance contribution");
 
-    let total_hearts: u32 = setsuna_contrib.base_hearts.iter().sum::<u32>()
-        + setsuna_contrib.bonus_hearts.iter().sum::<u32>();
+    let total_hearts: u8 = setsuna_contrib.base_hearts.iter().sum::<u8>()
+        + setsuna_contrib.bonus_hearts.iter().sum::<u8>();
 
     assert_eq!(
         total_hearts, 6,
@@ -120,8 +120,8 @@ fn setsuna_q205_condition_not_met_no_bonus() {
         .find(|mc| mc.source_id == setsuna)
         .expect("Setsuna should have a performance contribution");
 
-    let total_hearts: u32 = setsuna_contrib.base_hearts.iter().sum::<u32>()
-        + setsuna_contrib.bonus_hearts.iter().sum::<u32>();
+    let total_hearts: u8 = setsuna_contrib.base_hearts.iter().sum::<u8>()
+        + setsuna_contrib.bonus_hearts.iter().sum::<u8>();
 
     assert_eq!(
         total_hearts, 5,

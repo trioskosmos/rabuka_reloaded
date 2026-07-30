@@ -43,7 +43,7 @@ fn advance_to_live_start(game: &mut TestGame) {
 fn get_setsuna_heart_contribution(
     game: &TestGame,
     setsuna_id: i16,
-) -> (u32, u32, u32, u32, u32, u32, u32) {
+) -> (u8, u8, u8, u8, u8, u8, u8) {
     use rabuka_engine::card::HeartColor;
 
     let snapshot = game.state.performance_snapshots.first();
@@ -57,8 +57,7 @@ fn get_setsuna_heart_contribution(
             .iter()
             .find(|mc| mc.source_id == setsuna_id)
         {
-            let total: u32 =
-                mc.base_hearts.iter().sum::<u32>() + mc.bonus_hearts.iter().sum::<u32>();
+            let total: u8 = mc.base_hearts.iter().sum::<u8>() + mc.bonus_hearts.iter().sum::<u8>();
             // base hearts + bonus hearts (bonus includes constant ability ALL heart)
             let base = &mc.base_hearts;
             let bonus = &mc.bonus_hearts;

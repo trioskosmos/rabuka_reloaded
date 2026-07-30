@@ -1,6 +1,6 @@
 use crate::helpers::*;
 
-fn base_heart02(db: &rabuka_engine::card::CardDatabase, card_id: i16) -> u32 {
+fn base_heart02(db: &rabuka_engine::card::CardDatabase, card_id: i16) -> u8 {
     db.get_card(card_id)
         .and_then(|c| c.base_heart.as_ref())
         .map(|bh| {

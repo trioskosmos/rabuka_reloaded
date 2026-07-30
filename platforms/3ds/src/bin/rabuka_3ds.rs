@@ -403,7 +403,7 @@ struct CardDisplayStats {
     is_tapped: bool,
     total_blade: i32,
     score: i32,
-    cost: u32,
+    cost: u8,
     heart_str: String,
     need_heart_str: String,
 }
@@ -703,26 +703,35 @@ impl CardAtlas {
     }
 
     /// Build sorted card list from loaded Card database (matches cards.json order).
-    /// Returns (normalized, original) pairs sorted by normalized key.
-    /// Returns None if allocation fails (3DS has limited heap).
-    fn build_qr_sorted(cards: &[Card]) -> Option<Vec<(String, String)>> {
-        let mut sorted: Vec<(String, String)> = Vec::new();
-        sorted.try_reserve(cards.len()).ok()?;
-        for c in cards {
-            let orig = c.card_no.to_string();
-            let norm = orig
+    /// Build sorted indices into the cards slice by normalized card_no.
+    /// Returns just Vec<usize> (18KB) instead of cloning all card strings.
+    /// Temporarily allocates normalized strings for sorting, then drops them.
+    fn build_qr_sorted(cards: &[Card]) -> Option<Vec<usize>> {
+        let n = cards.len();
+        let mut pairs: Vec<(String, usize)> = Vec::new();
+        pairs.try_reserve(n).ok()?;
+        for (i, c) in cards.iter().enumerate() {
+            let norm = c
+                .card_no
                 .replace('\u{FF0B}', "+")
                 .replace('\u{FF0D}', "-")
                 .replace('\u{30FC}', "-")
                 .to_uppercase();
-            sorted.push((norm, orig));
+            pairs.push((norm, i));
         }
-        sorted.sort_by(|a, b| a.0.cmp(&b.0));
-        Some(sorted)
+        pairs.sort_by(|a, b| a.0.cmp(&b.0));
+        let indices: Vec<usize> = pairs.into_iter().map(|(_, idx)| idx).collect();
+        Some(indices)
     }
 
     /// Decode binary QR data: [count+1] [idx_hi+1 idx_lo+1 qty+1] ...
-    fn decode_qr_binary(sorted_cards: &[(String, String)], data: &[u8]) -> Option<Vec<String>> {
+    /// Uses sorted indices to look up card_no from the original cards slice
+    /// instead of cloning card_no strings into the sorted list.
+    fn decode_qr_binary(
+        sorted_indices: &[usize],
+        cards: &[Card],
+        data: &[u8],
+    ) -> Option<Vec<String>> {
         if data.is_empty() {
             return None;
         }
@@ -736,9 +745,10 @@ impl CardAtlas {
             let idx = (((data[base] as usize).wrapping_sub(1)) << 8)
                 | ((data[base + 1] as usize).wrapping_sub(1));
             let qty = data[base + 2].wrapping_sub(1).max(1) as usize;
-            let card_no = &sorted_cards.get(idx)?.1; // .1 = original card_no
+            let card_idx = *sorted_indices.get(idx)?;
+            let card_no = &cards.get(card_idx)?.card_no;
             for _ in 0..qty {
-                result.push(card_no.clone());
+                result.push(card_no.to_string());
             }
         }
         Some(result)
@@ -803,8 +813,8 @@ enum SetupPhase {
     MultiplayerClientHostSelect(usize, Vec<u16>, usize), // p1_idx, host_node_ids, cursor
     MultiplayerSyncDeck(usize, usize, bool), // p1_idx, p2_idx, is_host
     MultiplayerLoading(usize, usize, bool, Option<Vec<u8>>), // p1_idx, p2_idx, is_host, deck_sync_bytes
-    QrScan,                                                  // QR code scanning for deck import
-    QrResult(Vec<String>),                                   // QR scan result, user can confirm
+    QrScan(usize),          // QR code scanning (usize = context pointer, 0=not started)
+    QrResult(Vec<String>),  // QR scan result, user can confirm
     QrNotDeck(String, u32), // QR scanned but not a valid deck, shows decoded text, countdown frames
 }
 
@@ -969,7 +979,7 @@ fn render_card_detail(card_id: i16, gs: &GameState) {
                     stats.total_blade,
                     &stats.heart_str,
                     stats.score,
-                    stats.cost,
+                    stats.cost.into(),
                     stats.is_tapped,
                     card.card_type.as_card_str(),
                     &stats.need_heart_str,
@@ -1262,6 +1272,7 @@ fn main() {
                 let was_dirty = *dirty;
                 let new_step = match phase.clone() {
                     SetupPhase::PickMode(cur) => unsafe {
+                        dprintln!("[PM] PickMode cur={} dirty={}", cur, was_dirty);
                         if was_dirty {
                             if _3ds_is_cli_mode() {
                                 _3ds_clear_top();
@@ -1349,7 +1360,12 @@ fn main() {
                         } else if keys & 0x00000001 != 0 {
                             if cur == 2 {
                                 // "QR Scan"
-                                Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan, true)
+                                Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::QrScan(0),
+                                    true,
+                                )
                             } else if cur == 3 {
                                 // "Local Multiplayer" — pick deck then connect
                                 Step::Setup(
@@ -1805,11 +1821,12 @@ fn main() {
                             Step::Setup(cards.clone(), decks.clone(), SetupPhase::Testing, false)
                         }
                     }
-                    SetupPhase::QrScan => {
+                    SetupPhase::QrScan(ctx) => {
+                        let mut qr_ctx = ctx;
                         let mut qr_start_failed = false;
-                        if was_dirty {
-                            let qr_start_res = unsafe { _3ds_qr_start() };
-                            if qr_start_res != 0 {
+                        if was_dirty && qr_ctx == 0 {
+                            let ptr = unsafe { _3ds_qr_start() };
+                            if ptr.is_null() {
                                 unsafe {
                                     _3ds_clear_both();
                                     _3ds_text_add_top(
@@ -1817,77 +1834,91 @@ fn main() {
                                     );
                                     _3ds_text_add_top(format!("{}\0", tl("B=back")).as_ptr());
                                 }
-                                unsafe {
-                                    _3ds_qr_stop();
-                                }
                                 qr_start_failed = true;
-                            } else if unsafe { _3ds_is_cli_mode() } {
-                                unsafe {
-                                    _3ds_clear_top();
-                                    _3ds_text_add_top(format!("{}\n\0", tl("QR SCAN")).as_ptr());
-                                    _3ds_text_add_top(
-                                        format!(
-                                            "{}\n{}\0",
-                                            tl("Point camera at QR code"),
-                                            tl("B=cancel")
-                                        )
-                                        .as_ptr(),
-                                    );
-                                }
                             } else {
-                                unsafe {
-                                    _3ds_top_clear();
-                                    let qr_hdr = tl("QR SCAN");
-                                    _3ds_top_queue_text(
-                                        120.0,
-                                        8.0,
-                                        COL_GOLD,
-                                        0.85f32,
-                                        format!("{}\0", qr_hdr).as_ptr(),
-                                    );
-                                    let qr_msg = tl("Point camera at deck QR code");
-                                    _3ds_top_queue_text(
-                                        40.0,
-                                        60.0,
-                                        COL_LIGHT,
-                                        0.70f32,
-                                        format!("{}\0", qr_msg).as_ptr(),
-                                    );
-                                    let qr_auto = tl("Auto-detects when QR is visible");
-                                    _3ds_top_queue_text(
-                                        40.0,
-                                        85.0,
-                                        COL_MED,
-                                        0.65f32,
-                                        format!("{}\0", qr_auto).as_ptr(),
-                                    );
-                                    let qr_cancel = tl("B=cancel");
-                                    _3ds_top_queue_text(
-                                        40.0,
-                                        220.0,
-                                        COL_MED,
-                                        0.60f32,
-                                        format!("{}\0", qr_cancel).as_ptr(),
-                                    );
+                                qr_ctx = ptr as usize;
+                                if unsafe { _3ds_is_cli_mode() } {
+                                    unsafe {
+                                        _3ds_clear_top();
+                                        _3ds_text_add_top(
+                                            format!("{}\n\0", tl("QR SCAN")).as_ptr(),
+                                        );
+                                        _3ds_text_add_top(
+                                            format!(
+                                                "{}\n{}\0",
+                                                tl("Point camera at QR code"),
+                                                tl("B=cancel")
+                                            )
+                                            .as_ptr(),
+                                        );
+                                    }
+                                } else {
+                                    unsafe {
+                                        _3ds_top_clear();
+                                        let qr_hdr = tl("QR SCAN");
+                                        _3ds_top_queue_text(
+                                            120.0,
+                                            8.0,
+                                            COL_GOLD,
+                                            0.85f32,
+                                            format!("{}\0", qr_hdr).as_ptr(),
+                                        );
+                                        let qr_msg = tl("Point camera at deck QR code");
+                                        _3ds_top_queue_text(
+                                            40.0,
+                                            60.0,
+                                            COL_LIGHT,
+                                            0.70f32,
+                                            format!("{}\0", qr_msg).as_ptr(),
+                                        );
+                                        let qr_auto = tl("Auto-detects when QR is visible");
+                                        _3ds_top_queue_text(
+                                            40.0,
+                                            85.0,
+                                            COL_MED,
+                                            0.65f32,
+                                            format!("{}\0", qr_auto).as_ptr(),
+                                        );
+                                        let qr_cancel = tl("B=cancel");
+                                        _3ds_top_queue_text(
+                                            40.0,
+                                            220.0,
+                                            COL_MED,
+                                            0.60f32,
+                                            format!("{}\0", qr_cancel).as_ptr(),
+                                        );
+                                    }
                                 }
                             }
                         }
                         if qr_start_failed {
+                            unsafe {
+                                _3ds_clear_both();
+                            }
                             Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
                         } else if keys & 0x00000002 != 0 {
+                            if qr_ctx != 0 {
+                                unsafe {
+                                    _3ds_qr_free(qr_ctx as *mut u8);
+                                }
+                            }
                             unsafe {
-                                _3ds_qr_stop();
+                                _3ds_clear_both();
                             }
                             Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
                         } else {
                             let mut buf = [0u8; 2048];
-                            let r = unsafe { _3ds_qr_poll(buf.as_mut_ptr(), buf.len() as u32) };
+                            let r = unsafe {
+                                _3ds_qr_poll(qr_ctx as *mut u8, buf.as_mut_ptr(), buf.len() as u32)
+                            };
                             if r > 0 {
                                 dprintln!("[QR] poll r={}", r);
-                                unsafe {
-                                    _3ds_qr_stop();
+                                if qr_ctx != 0 {
+                                    unsafe {
+                                        _3ds_qr_free(qr_ctx as *mut u8);
+                                    }
                                 }
-                                dprintln!("[QR] stopped camera");
+                                dprintln!("[QR] freed context");
                                 let text = String::from_utf8_lossy(&buf[..r as usize]).to_string();
                                 dprintln!(
                                     "[QR] text len={} b64={}",
@@ -1904,8 +1935,9 @@ fn main() {
                                         );
                                         if let Some(sorted) = CardAtlas::build_qr_sorted(&cards) {
                                             dprintln!("[QR] sorted={} decode...", sorted.len());
-                                            let result =
-                                                CardAtlas::decode_qr_binary(&sorted, &decoded);
+                                            let result = CardAtlas::decode_qr_binary(
+                                                &sorted, &cards, &decoded,
+                                            );
                                             dprintln!("[QR] decode={:?})", result.is_some());
                                             result.unwrap_or_default()
                                         } else {
@@ -1946,7 +1978,11 @@ fn main() {
                                     )
                                 }
                             } else if r < 0 {
-                                // Camera error (not running, alloc failed, etc.)
+                                if qr_ctx != 0 {
+                                    unsafe {
+                                        _3ds_qr_free(qr_ctx as *mut u8);
+                                    }
+                                }
                                 unsafe {
                                     _3ds_clear_both();
                                     _3ds_text_add_top(
@@ -1958,9 +1994,6 @@ fn main() {
                                     );
                                     _3ds_text_add_top(format!("{}\0", tl("B=back")).as_ptr());
                                 }
-                                unsafe {
-                                    _3ds_qr_stop();
-                                }
                                 Step::Setup(
                                     cards.clone(),
                                     decks.clone(),
@@ -1968,7 +2001,12 @@ fn main() {
                                     true,
                                 )
                             } else {
-                                Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan, false)
+                                Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::QrScan(qr_ctx),
+                                    false,
+                                )
                             }
                         }
                     }
@@ -2038,6 +2076,9 @@ fn main() {
                             }
                         }
                         if keys & 0x00000002 != 0 {
+                            unsafe {
+                                _3ds_clear_both();
+                            }
                             Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
                         } else if keys & 0x00000001 != 0 {
                             // Build a DeckList from the scanned cards and add to decks list
@@ -2052,7 +2093,7 @@ fn main() {
                                 .into_iter()
                                 .map(|(card_no, qty)| DeckEntry {
                                     card_no: card_no.to_string(),
-                                    quantity: qty,
+                                    quantity: qty as u8,
                                 })
                                 .collect();
                             let qr_deck = DeckList {
@@ -2061,6 +2102,9 @@ fn main() {
                             };
                             let mut new_decks = decks.clone();
                             new_decks.push(qr_deck);
+                            unsafe {
+                                _3ds_clear_both();
+                            }
                             Step::Setup(cards.clone(), new_decks, SetupPhase::PickMode(0), true)
                         } else {
                             Step::Setup(
@@ -2130,7 +2174,7 @@ fn main() {
                                 false,
                             )
                         } else {
-                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan, true)
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan(0), true)
                         }
                     }
                     // Multiplayer: Host or Client?
@@ -4450,6 +4494,49 @@ fn main() {
                         }
                     }
 
+                    // Set per-card live stats (score + need hearts) on the C board
+                    {
+                        let set_live_stats = |player: &Player, gs: &GameState, is_opp: bool| {
+                            for (i, &cid) in player.live_card_zone.cards.iter().enumerate().take(3)
+                            {
+                                if cid == -1 || cid == 0 {
+                                    continue;
+                                }
+                                if let Some(card) = gs.card_database.get_card(cid) {
+                                    let stats = compute_card_stats(card, cid, gs);
+                                    let stat_line = card_stat_line(
+                                        stats.total_blade,
+                                        &stats.heart_str,
+                                        stats.score,
+                                        stats.cost.into(),
+                                        stats.is_tapped,
+                                        card.card_type.as_card_str(),
+                                        &stats.need_heart_str,
+                                    );
+                                    let c_line = std::ffi::CString::new(stat_line.as_bytes())
+                                        .unwrap_or_default();
+                                    unsafe {
+                                        if is_opp {
+                                            _3ds_board_set_opp_live_stats(
+                                                i as i32,
+                                                stats.score,
+                                                c_line.as_ptr() as *const u8,
+                                            );
+                                        } else {
+                                            _3ds_board_set_live_stats(
+                                                i as i32,
+                                                stats.score,
+                                                c_line.as_ptr() as *const u8,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        };
+                        set_live_stats(&gs.player1, &gs, false);
+                        set_live_stats(&gs.player2, &gs, true);
+                    }
+
                     // Compute and set need hearts text for bottom screen live zone
                     {
                         let compute_live_need = |player: &Player, gs: &GameState| -> Vec<u32> {
@@ -4462,7 +4549,7 @@ fn main() {
                                     if let Some(ref need) = card.need_heart {
                                         for (color, count) in &need.hearts {
                                             if let Some(idx) = heart_color_index(color) {
-                                                nh[idx] += count;
+                                                nh[idx] += *count as u32;
                                             }
                                         }
                                     }
@@ -4956,7 +5043,7 @@ fn main() {
                                             (card.blade as i32 + e.total()).max(0) as u32
                                         }
                                     } else {
-                                        card.blade
+                                        card.blade as u32
                                     };
                                     Some(total)
                                 })
@@ -4988,7 +5075,7 @@ fn main() {
                                             (card.blade as i32 + e.total()).max(0) as u32
                                         }
                                     } else {
-                                        card.blade
+                                        card.blade as u32
                                     };
                                     Some(total)
                                 })
@@ -5009,10 +5096,10 @@ fn main() {
                                             if let Some(idx) = heart_color_index(color) {
                                                 if let Some(hc) = h_mult {
                                                     if hc == *color {
-                                                        p1_hearts[idx] += count;
+                                                        p1_hearts[idx] += *count as u32;
                                                     }
                                                 } else {
-                                                    p1_hearts[idx] += count;
+                                                    p1_hearts[idx] += *count as u32;
                                                 }
                                             }
                                         }
@@ -5042,10 +5129,10 @@ fn main() {
                                             if let Some(idx) = heart_color_index(color) {
                                                 if let Some(hc) = h_mult {
                                                     if hc == *color {
-                                                        p2_hearts[idx] += count;
+                                                        p2_hearts[idx] += *count as u32;
                                                     }
                                                 } else {
-                                                    p2_hearts[idx] += count;
+                                                    p2_hearts[idx] += *count as u32;
                                                 }
                                             }
                                         }
@@ -5120,7 +5207,7 @@ fn main() {
                                                     for (color, count) in &need.hearts {
                                                         if let Some(idx) = heart_color_index(color)
                                                         {
-                                                            nh[idx] += count;
+                                                            nh[idx] += *count as u32;
                                                         }
                                                     }
                                                 }
@@ -5264,7 +5351,7 @@ fn main() {
                                                 stats.total_blade,
                                                 &stats.heart_str,
                                                 stats.score,
-                                                stats.cost,
+                                                stats.cost.into(),
                                                 stats.is_tapped,
                                                 card.card_type.as_card_str(),
                                                 &stats.need_heart_str,
@@ -5324,7 +5411,7 @@ fn main() {
                                                 stats.total_blade,
                                                 &stats.heart_str,
                                                 stats.score,
-                                                stats.cost,
+                                                stats.cost.into(),
                                                 stats.is_tapped,
                                                 card.card_type.as_card_str(),
                                                 &stats.need_heart_str,
@@ -6551,7 +6638,7 @@ fn main() {
                                             s.turn,
                                             s.player_id,
                                             s.total_score,
-                                            s.total_hearts.iter().sum::<u32>(),
+                                            s.total_hearts.iter().copied().map(u32::from).sum::<u32>(),
                                             s.lives.iter().filter(|l| l.passed).count(),
                                             s.lives.len(),
                                             s.success
@@ -6871,6 +6958,8 @@ extern "C" {
         landscape: bool,
         tapped: bool,
     );
+    fn _3ds_board_set_live_stats(slot: i32, score: i32, stat_text: *const u8);
+    fn _3ds_board_set_opp_live_stats(slot: i32, score: i32, stat_text: *const u8);
     fn _3ds_board_set_energy(
         slot: i32,
         active: bool,
@@ -6958,9 +7047,10 @@ extern "C" {
     // Need hearts text displayed next to live zone on bottom screen
     fn _3ds_set_need_hearts_text(player: i32, text: *const u8);
     // QR code scanning (camera + quirc, same tech used by FBI installer)
-    fn _3ds_qr_start() -> i32;
-    fn _3ds_qr_stop();
-    fn _3ds_qr_poll(out_text: *mut u8, out_max: u32) -> i32;
+    fn _3ds_qr_start() -> *mut u8;
+    fn _3ds_qr_stop(ctx: *mut u8);
+    fn _3ds_qr_free(ctx: *mut u8);
+    fn _3ds_qr_poll(ctx: *mut u8, out_text: *mut u8, out_max: u32) -> i32;
     // Audio (CSND + tremor OGG)
     fn _3ds_audio_init();
     fn _3ds_audio_play_ogg(path: *const u8);
