@@ -870,22 +870,26 @@ impl<'a> CardFilter<'a> {
             || self.distinct.is_some()
     }
 
-    /// Check whether a single card matches ALL present filter fields.
-    pub fn matches(&self, db: &CardDatabase, id: i16, skip_empty: bool) -> bool {
-        if skip_empty && id == -1 {
-            return false;
-        }
+    fn check_exclude_self(&self, id: i16) -> bool {
         if let Some(exclude_id) = self.exclude_self {
             if id == exclude_id {
                 log::debug!("[DBG matches] exclude_self id={} matched, excluding", id);
                 return false;
             }
         }
+        true
+    }
+
+    fn check_exclude_cards(&self, id: i16) -> bool {
         if let Some(ex) = self.exclude_cards {
             if ex.contains(&id) {
                 return false;
             }
         }
+        true
+    }
+
+    fn check_exclude_names(&self, db: &CardDatabase, id: i16) -> bool {
         if let Some(ex_names) = self.exclude_names {
             if let Some(card) = db.get_card(id) {
                 let normalized_name: String =
@@ -899,11 +903,10 @@ impl<'a> CardFilter<'a> {
                 }
             }
         }
-        if let Some(ct) = self.card_type {
-            if !card_matches_type(db, id, Some(ct)) {
-                return false;
-            }
-        }
+        true
+    }
+
+    fn check_group(&self, db: &CardDatabase, id: i16) -> bool {
         if let Some(g) = self.group {
             if !card_matches_group_str(db, id, Some(g)) {
                 if let Some(gs) = self.groups {
@@ -919,7 +922,6 @@ impl<'a> CardFilter<'a> {
                 return false;
             }
         }
-        // exclude_group_names: card passes if its group is NOT in the excluded list
         if let Some(ex_gns) = self.exclude_group_names {
             for g in ex_gns {
                 if card_matches_group_str(db, id, Some(g.as_str())) {
@@ -927,26 +929,10 @@ impl<'a> CardFilter<'a> {
                 }
             }
         }
-        if let Some(lim) = self.cost_limit {
-            if !card_matches_cost_limit_op(db, id, Some(lim), self.cost_operator) {
-                return false;
-            }
-        }
-        if let Some(min) = self.cost_limit_min {
-            if !card_matches_cost_limit_op(db, id, Some(min), Some(">=")) {
-                return false;
-            }
-        }
-        if let Some(ch) = self.characters {
-            if !card_matches_characters(db, id, Some(ch)) {
-                return false;
-            }
-        }
-        if let Some(ex_ch) = self.exclude_characters {
-            if card_matches_characters(db, id, Some(ex_ch)) {
-                return false;
-            }
-        }
+        true
+    }
+
+    fn check_heart_colors(&self, db: &CardDatabase, id: i16) -> bool {
         if !self.heart_colors.is_empty() {
             let matches = if self.require_all_heart_colors {
                 card_matches_all_heart_colors(db, id, self.heart_colors)
@@ -1031,37 +1017,10 @@ impl<'a> CardFilter<'a> {
                 }
             }
         }
-        if let Some(name) = self.name_fragments {
-            if !card_matches_name_fragments(db, id, name) {
-                return false;
-            }
-        }
-        // "元々持つブレード" — checks the card's base/printed blade value
-        // (card.blade from DB, no modifiers applied). Per Q195 (qa_data.json:1071-1074):
-        // "元々持つブレードの数を変更した後、ブレードを得る効果が適用される" —
-        // setting the original blade changes the base, then +blade effects stack
-        // on top. Rules 9.9.1.4→9.9.1.5 (rules.txt:1196-1212) defines this order:
-        // printed base → set-to-value → add/subtract.
-        // For current/modified blade checks (e.g. "ブレードの合計"), use
-        // evaluate_card_blade_condition() which sums base + blade_modifiers.
-        // Per Q116 (lines 2487-2488): current total blade ≥ 10 condition uses
-        // modified values.
-        if let Some(bl) = self.original_blade_limit {
-            let card_blade = db.get_card(id).map(|c| c.blade).unwrap_or(0);
-            if !compare_counts(self.original_blade_operator, card_blade, bl) {
-                return false;
-            }
-        }
-        // Per-card cost_total check — each individual card's cost must
-        // satisfy the total-budget comparison (e.g. card.cost <= 4).
-        if let Some(ct) = self.cost_total {
-            if let Some(op) = self.cost_total_operator {
-                let card_cost = db.get_card(id).and_then(|c| c.cost).unwrap_or(99);
-                if !compare_counts(Some(op), card_cost, ct) {
-                    return false;
-                }
-            }
-        }
+        true
+    }
+
+    fn check_ability_filter(&self, db: &CardDatabase, id: i16) -> bool {
         // ability_filter: filter by presence/absence of abilities or trigger types
         if let Some(af) = self.ability_filter {
             if let Some(card) = db.get_card(id) {
@@ -1162,7 +1121,10 @@ impl<'a> CardFilter<'a> {
                 }
             }
         }
-        // card_property filter (e.g. "has_blade_heart")
+        true
+    }
+
+    fn check_card_property(&self, db: &CardDatabase, id: i16) -> bool {
         if let Some(prop) = self.card_property {
             let has_property = match prop {
                 "has_blade_heart" => db.get_card(id).is_some_and(|c| c.has_blade_heart()),
@@ -1178,6 +1140,91 @@ impl<'a> CardFilter<'a> {
             if !passes {
                 return false;
             }
+        }
+        true
+    }
+
+    /// Check whether a single card matches ALL present filter fields.
+    pub fn matches(&self, db: &CardDatabase, id: i16, skip_empty: bool) -> bool {
+        if skip_empty && id == -1 {
+            return false;
+        }
+        if !self.check_exclude_self(id) {
+            return false;
+        }
+        if !self.check_exclude_cards(id) {
+            return false;
+        }
+        if !self.check_exclude_names(db, id) {
+            return false;
+        }
+        if let Some(ct) = self.card_type {
+            if !card_matches_type(db, id, Some(ct)) {
+                return false;
+            }
+        }
+        if !self.check_group(db, id) {
+            return false;
+        }
+        if let Some(lim) = self.cost_limit {
+            if !card_matches_cost_limit_op(db, id, Some(lim), self.cost_operator) {
+                return false;
+            }
+        }
+        if let Some(min) = self.cost_limit_min {
+            if !card_matches_cost_limit_op(db, id, Some(min), Some(">=")) {
+                return false;
+            }
+        }
+        if let Some(ch) = self.characters {
+            if !card_matches_characters(db, id, Some(ch)) {
+                return false;
+            }
+        }
+        if let Some(ex_ch) = self.exclude_characters {
+            if card_matches_characters(db, id, Some(ex_ch)) {
+                return false;
+            }
+        }
+        if !self.check_heart_colors(db, id) {
+            return false;
+        }
+        if let Some(name) = self.name_fragments {
+            if !card_matches_name_fragments(db, id, name) {
+                return false;
+            }
+        }
+        // "元々持つブレード" — checks the card's base/printed blade value
+        // (card.blade from DB, no modifiers applied). Per Q195 (qa_data.json:1071-1074):
+        // "元々持つブレードの数を変更した後、ブレードを得る効果が適用される" —
+        // setting the original blade changes the base, then +blade effects stack
+        // on top. Rules 9.9.1.4→9.9.1.5 (rules.txt:1196-1212) defines this order:
+        // printed base → set-to-value → add/subtract.
+        // For current/modified blade checks (e.g. "ブレードの合計"), use
+        // evaluate_card_blade_condition() which sums base + blade_modifiers.
+        // Per Q116 (lines 2487-2488): current total blade ≥ 10 condition uses
+        // modified values.
+        if let Some(bl) = self.original_blade_limit {
+            let card_blade = db.get_card(id).map(|c| c.blade).unwrap_or(0);
+            if !compare_counts(self.original_blade_operator, card_blade, bl) {
+                return false;
+            }
+        }
+        // Per-card cost_total check — each individual card's cost must
+        // satisfy the total-budget comparison (e.g. card.cost <= 4).
+        if let Some(ct) = self.cost_total {
+            if let Some(op) = self.cost_total_operator {
+                let card_cost = db.get_card(id).and_then(|c| c.cost).unwrap_or(99);
+                if !compare_counts(Some(op), card_cost, ct) {
+                    return false;
+                }
+            }
+        }
+        if !self.check_ability_filter(db, id) {
+            return false;
+        }
+        if !self.check_card_property(db, id) {
+            return false;
         }
         true
     }
