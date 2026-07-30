@@ -659,6 +659,8 @@ fn ticks_to_ms(ticks: u64) -> f64 {
 struct CardAtlas {
     /// Map card_no -> (atlas_filename, index)
     map: HashMap<String, (String, usize)>,
+    /// Sorted card_no list for QR binary index lookup
+    sorted_cards: Vec<String>,
 }
 
 #[cfg(feature = "3ds")]
@@ -670,6 +672,7 @@ impl CardAtlas {
             Err(_) => {
                 return CardAtlas {
                     map: HashMap::new(),
+                    sorted_cards: Vec::new(),
                 }
             }
         };
@@ -677,6 +680,7 @@ impl CardAtlas {
         if f.read_to_string(&mut s).is_err() {
             return CardAtlas {
                 map: HashMap::new(),
+                sorted_cards: Vec::new(),
             };
         }
         let raw: HashMap<String, serde_json::Value> = match serde_json::from_str(&s) {
@@ -684,9 +688,12 @@ impl CardAtlas {
             Err(_) => {
                 return CardAtlas {
                     map: HashMap::new(),
+                    sorted_cards: Vec::new(),
                 }
             }
         };
+        let mut sorted_cards: Vec<String> = raw.keys().cloned().collect();
+        sorted_cards.sort();
         let map = raw
             .into_iter()
             .filter_map(|(k, v)| {
@@ -695,11 +702,34 @@ impl CardAtlas {
                 Some((k, (atlas, index)))
             })
             .collect();
-        CardAtlas { map }
+        CardAtlas { map, sorted_cards }
     }
 
     fn lookup(&self, card_no: &str) -> Option<&(String, usize)> {
         self.map.get(card_no)
+    }
+
+    /// Decode binary QR data: [count+1] [idx_hi+1 idx_lo+1 qty+1] ...
+    fn decode_qr_binary(&self, data: &[u8]) -> Option<Vec<String>> {
+        if data.is_empty() {
+            return None;
+        }
+        let count = (data[0] as usize).wrapping_sub(1);
+        if count == 0 || data.len() < 1 + count * 3 {
+            return None;
+        }
+        let mut result = Vec::with_capacity(count);
+        for i in 0..count {
+            let base = 1 + i * 3;
+            let idx = (((data[base] as usize).wrapping_sub(1)) << 8)
+                | ((data[base + 1] as usize).wrapping_sub(1));
+            let qty = data[base + 2].wrapping_sub(1).max(1) as usize;
+            let card_no = self.sorted_cards.get(idx)?;
+            for _ in 0..qty {
+                result.push(card_no.clone());
+            }
+        }
+        Some(result)
     }
 }
 
@@ -1803,8 +1833,21 @@ fn main() {
                                 unsafe {
                                     _3ds_qr_stop();
                                 }
-                                let text = String::from_utf8_lossy(&buf[..r as usize]).to_string();
-                                let cards_read = DeckParser::parse_deck_content(&text);
+                                let raw = &buf[..r as usize];
+                                let text = String::from_utf8_lossy(raw).to_string();
+                                // Try binary QR decode first (first byte is count+1, non-printable)
+                                let cards_read = if r >= 4 && raw[0] >= 2 && raw[0] <= 255 {
+                                    let atlas = CardAtlas::load();
+                                    atlas.decode_qr_binary(raw).unwrap_or_default()
+                                } else {
+                                    Vec::new()
+                                };
+                                let cards_read = if cards_read.is_empty() {
+                                    // Fall back to plain text parsing
+                                    DeckParser::parse_deck_content(&text)
+                                } else {
+                                    cards_read
+                                };
                                 if cards_read.is_empty() {
                                     Step::Setup(
                                         cards.clone(),
