@@ -17,6 +17,24 @@ use serde::{Deserialize, Serialize};
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
+pub fn area_label_en(area: &str) -> &str {
+    match area {
+        "left" | "left_side" => "Left",
+        "center" => "Center",
+        "right" | "right_side" => "Right",
+        other => other,
+    }
+}
+
+pub fn area_label_ja(area: &str) -> &str {
+    match area {
+        "left" | "left_side" => "左",
+        "center" => "センター",
+        "right" | "right_side" => "右",
+        other => other,
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActionType {
     Pass,
@@ -501,12 +519,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                 Some(f) => f.to_uppercase().to_string() + c.as_str(),
                             }
                         };
-                        let ja_area = match stage_area.as_str() {
-                            "left" => "左",
-                            "center" => "センター",
-                            "right" => "右",
-                            _ => &stage_area,
-                        };
+                        let ja_area = area_label_ja(&stage_area);
                         let label = if is_source {
                             action_desc!("Select {}", capitalize(&stage_area))
                         } else if let Some(ref src) = from_pos {
@@ -1387,18 +1400,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                             if !area.available {
                                 continue;
                             }
-                            let area_label = match area.area.as_str() {
-                                "left" => "Left",
-                                "center" => "Center",
-                                "right" => "Right",
-                                o => o,
-                            };
-                            let area_label_ja = match area.area.as_str() {
-                                "left" => "左",
-                                "center" => "センター",
-                                "right" => "右",
-                                o => o,
-                            };
+                            let area_label = area_label_en(area.area.as_str());
+                            let area_label_ja = area_label_ja(area.area.as_str());
                             let cost_display = area.cost;
                             let bt = if area.is_baton_touch {
                                 action_desc!(
@@ -1484,58 +1487,16 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         _ => 0,
                                     })
                                     .collect();
-                                let (src0_en, src1_en, dst_en) = match (
-                                    pair.areas[0].as_str(),
-                                    pair.areas[1].as_str(),
-                                    pair.placement.as_str(),
-                                ) {
-                                    (a, b, p) => (
-                                        match a {
-                                            "left" => "Left",
-                                            "center" => "Center",
-                                            "right" => "Right",
-                                            o => o,
-                                        },
-                                        match b {
-                                            "left" => "Left",
-                                            "center" => "Center",
-                                            "right" => "Right",
-                                            o => o,
-                                        },
-                                        match p {
-                                            "left" => "Left",
-                                            "center" => "Center",
-                                            "right" => "Right",
-                                            o => o,
-                                        },
-                                    ),
-                                };
-                                let (src0_ja, src1_ja, dst_ja) = match (
-                                    pair.areas[0].as_str(),
-                                    pair.areas[1].as_str(),
-                                    pair.placement.as_str(),
-                                ) {
-                                    (a, b, p) => (
-                                        match a {
-                                            "left" => "左",
-                                            "center" => "センター",
-                                            "right" => "右",
-                                            o => o,
-                                        },
-                                        match b {
-                                            "left" => "左",
-                                            "center" => "センター",
-                                            "right" => "右",
-                                            o => o,
-                                        },
-                                        match p {
-                                            "left" => "左",
-                                            "center" => "センター",
-                                            "right" => "右",
-                                            o => o,
-                                        },
-                                    ),
-                                };
+                                let (src0_en, src1_en, dst_en) = (
+                                    area_label_en(pair.areas[0].as_str()),
+                                    area_label_en(pair.areas[1].as_str()),
+                                    area_label_en(pair.placement.as_str()),
+                                );
+                                let (src0_ja, src1_ja, dst_ja) = (
+                                    area_label_ja(pair.areas[0].as_str()),
+                                    area_label_ja(pair.areas[1].as_str()),
+                                    area_label_ja(pair.placement.as_str()),
+                                );
                                 {
                                     let mut a = make_action_params(
                                         ActionType::PlayMemberToStage,
