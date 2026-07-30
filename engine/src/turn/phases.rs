@@ -934,8 +934,6 @@ impl super::TurnEngine {
                 ];
                 if let Some(empty) = areas.iter().find(|&&a| player.stage.get_area(a).is_none()) {
                     *empty
-                } else if !use_baton_touch {
-                    areas[0]
                 } else {
                     areas[0]
                 }

@@ -262,7 +262,6 @@ impl AbilityResolver {
                 let count = cost.count.unwrap_or(1) as usize;
                 let card_type = cost.card_type_any().map(|s| s.to_string());
                 let optional = cost.optional.unwrap_or(false);
-                let _text = &cost.text;
                 let is_activation = self
                     .current_ability
                     .as_ref()
@@ -275,8 +274,6 @@ impl AbilityResolver {
                     let target_str = cost.target.as_deref().unwrap_or("self");
                     let pl = gs.resolve_target_player(target_str);
                     let card_db = &gs.card_database;
-                    let _cost_limit = cost.cost_limit_any();
-                    let _card_type_filter = card_type.as_deref();
                     let is_same_group_name =
                         cost.group_reference_any().as_deref() == Some("same_group_name");
                     let matching_indices: Vec<usize> = if is_same_group_name {
@@ -349,10 +346,6 @@ impl AbilityResolver {
                         match_names.join(", ")
                     );
 
-                    let _has_restrictions = cost.characters_any().is_some()
-                        || cost.group_names_any().is_some()
-                        || cost.card_type_any().is_some()
-                        || cost.cost_limit_any().is_some();
                     if !is_any_number && matching_indices.len() < count {
                         if is_optional {
                             // If optional cost, we should auto-skip if the hand is completely empty or doesn't have enough matching cards for name-restricted costs.
@@ -1032,192 +1025,188 @@ impl AbilityResolver {
         if has_pending {
             return self.resume_pending_actions(gs);
         }
-        let is_pay = true;
-        if is_pay {
-            if let Some(cost) = gs.entry_cost().cloned() {
-                if let Some(energy) = cost.energy_count_any() {
-                    if energy > 0 {
-                        let tgt = cost.target.as_deref().unwrap_or("self");
-                        gs.resolve_target_player_mut(tgt)
-                            .energy_zone
-                            .pay_energy(energy as usize)?;
-                    }
+        if let Some(cost) = gs.entry_cost().cloned() {
+            if let Some(energy) = cost.energy_count_any() {
+                if energy > 0 {
+                    let tgt = cost.target.as_deref().unwrap_or("self");
+                    gs.resolve_target_player_mut(tgt)
+                        .energy_zone
+                        .pay_energy(energy as usize)?;
                 }
-                if cost.state_change_any().as_deref() == Some("wait") {
-                    if cost.self_cost_any() == Some(true) {
-                        if let Some(id) = gs.activating_card {
-                            // Q159: The card must be on stage to be put to wait.
-                            // When activated from discard (e.g. via activate_ability),
-                            // the card is not on stage, so the cost cannot be paid.
-                            let on_stage = gs
-                                .resolve_target_player_mut("self")
-                                .stage
-                                .stage
-                                .iter()
-                                .any(|&sid| sid == id);
-                            if !on_stage {
-                                return Err("Cannot pay cost: member is not on stage".to_string());
-                            }
-                            // Q137: 「ウェイトにする」はアクティブ状態のメンバーをウェイト
-                            // 状態にすることを意味します。既にウェイト状態の場合、
-                            // その行為自体が行われません（Rule 1.3.2.1）。
-                            let already_waited = gs
-                                .mods
-                                .get_orientation_modifier(id)
-                                .is_some_and(|o| o == "wait");
-                            if !already_waited {
-                                gs.mods.add_orientation_modifier(id, "wait");
+            }
+            if cost.state_change_any().as_deref() == Some("wait") {
+                if cost.self_cost_any() == Some(true) {
+                    if let Some(id) = gs.activating_card {
+                        // Q159: The card must be on stage to be put to wait.
+                        // When activated from discard (e.g. via activate_ability),
+                        // the card is not on stage, so the cost cannot be paid.
+                        let on_stage = gs
+                            .resolve_target_player_mut("self")
+                            .stage
+                            .stage
+                            .iter()
+                            .any(|&sid| sid == id);
+                        if !on_stage {
+                            return Err("Cannot pay cost: member is not on stage".to_string());
+                        }
+                        // Q137: 「ウェイトにする」はアクティブ状態のメンバーをウェイト
+                        // 状態にすることを意味します。既にウェイト状態の場合、
+                        // その行為自体が行われません（Rule 1.3.2.1）。
+                        let already_waited = gs
+                            .mods
+                            .get_orientation_modifier(id)
+                            .is_some_and(|o| o == "wait");
+                        if !already_waited {
+                            gs.mods.add_orientation_modifier(id, "wait");
+                        }
+                    }
+                } else {
+                    let target = cost.target.as_deref().unwrap_or("self");
+                    let count = cost.count.unwrap_or(1) as usize;
+                    let exclude_self = cost.exclude_self_any().unwrap_or(false);
+                    let state_change_binding = cost.state_change_any();
+                    let state_change = state_change_binding.unwrap_or("");
+
+                    let candidates = get_change_state_candidates(
+                        gs,
+                        target,
+                        cost.card_type_any().map(|ct| ct.as_card_str()),
+                        cost.group_names_any(),
+                        exclude_self,
+                        false,
+                        false,
+                        Some("active"),
+                    );
+
+                    // Q137 / Rule 1.3.2.1: No active members to wait — cost cannot be paid.
+                    if candidates.is_empty() {
+                        return Err("No matching members on stage to change state".to_string());
+                    }
+
+                    if candidates.len() <= count {
+                        for &card_id in &candidates {
+                            if state_change == "wait" {
+                                gs.mods.add_orientation_modifier(card_id, "wait");
+                            } else if state_change == "rest" || state_change == "rested" {
+                                gs.mods.add_orientation_modifier(card_id, "rest");
                             }
                         }
                     } else {
-                        let target = cost.target.as_deref().unwrap_or("self");
-                        let count = cost.count.unwrap_or(1) as usize;
-                        let exclude_self = cost.exclude_self_any().unwrap_or(false);
-                        let state_change_binding = cost.state_change_any();
-                        let state_change = state_change_binding.unwrap_or("");
-
-                        let candidates = get_change_state_candidates(
-                            gs,
-                            target,
-                            cost.card_type_any().map(|ct| ct.as_card_str()),
-                            cost.group_names_any(),
-                            exclude_self,
-                            false,
-                            false,
-                            Some("active"),
+                        self.pending_choice = Some(
+                            Choice::select_cards(
+                                crate::ability::enums::Zone::Stage.to_str(),
+                                count,
+                                format!("Select {} stage member(s) to {}", count, state_change,),
+                                false,
+                            )
+                            .card_type(cost.card_type_any().map(|s| s.to_string()))
+                            .group(cost.group_names_any().clone().map(|v| v.join(",")))
+                            .target_player_id(Some(
+                                cost.target.as_deref().unwrap_or("self").to_string(),
+                            ))
+                            .is_reveal(true)
+                            .build(),
                         );
-
-                        // Q137 / Rule 1.3.2.1: No active members to wait — cost cannot be paid.
-                        if candidates.is_empty() {
-                            return Err("No matching members on stage to change state".to_string());
-                        }
-
-                        if candidates.len() <= count {
-                            for &card_id in &candidates {
-                                if state_change == "wait" {
-                                    gs.mods.add_orientation_modifier(card_id, "wait");
-                                } else if state_change == "rest" || state_change == "rested" {
-                                    gs.mods.add_orientation_modifier(card_id, "rest");
-                                }
-                            }
-                        } else {
-                            self.pending_choice =
-                                Some(
-                                    Choice::select_cards(
-                                        crate::ability::enums::Zone::Stage.to_str(),
-                                        count,
-                                        format!(
-                                            "Select {} stage member(s) to {}",
-                                            count, state_change,
-                                        ),
-                                        false,
-                                    )
-                                    .card_type(cost.card_type_any().map(|s| s.to_string()))
-                                    .group(cost.group_names_any().clone().map(|v| v.join(",")))
-                                    .target_player_id(Some(
-                                        cost.target.as_deref().unwrap_or("self").to_string(),
-                                    ))
-                                    .is_reveal(true)
-                                    .build(),
-                                );
-                            return Ok(());
-                        }
+                        return Ok(());
                     }
-                }
-                // Handle sequential_cost sub-costs — pay each after user confirmed
-                if let Some(ref costs) = cost.compound.actions {
-                    for sub_cost in costs {
-                        if sub_cost.state_change_any().as_deref() == Some("wait")
-                            && sub_cost.self_cost_any() == Some(true)
-                        {
-                            if let Some(id) = gs.activating_card {
-                                gs.mods.add_orientation_modifier(id, "wait");
-                            }
-                        } else if let Err(e) = self.pay_cost(gs, sub_cost) {
-                            log::debug!("Warning: sub-cost payment error: {}", e);
-                        }
-                        if self.pending_choice.is_some() {
-                            return Ok(());
-                        }
-                    }
-                }
-                log::debug!("[OPT_COST] checking cost_type: {:?}, entry_cost: {:?}, entry_effect_action: {:?}",
-                    cost.action, gs.entry_cost().is_some(),
-                    gs.entry_effect().map(|e| e.action.clone()));
-                if cost.action == ActionType::PlaceEnergyUnderMember {
-                    self.execute_place_energy_under_member(
-                        gs,
-                        cost.count.unwrap_or(1),
-                        cost.target.as_deref().unwrap_or("self"),
-                        cost.position_any(),
-                        false,
-                        cost.source.as_deref(),
-                        cost.any_number_any().unwrap_or(false),
-                    );
                 }
             }
-            self.pending_choice = None;
-            let is_effect_optional = gs.entry_choice_card_no() == Some(ChoiceRoute::OptionalCost);
+            // Handle sequential_cost sub-costs — pay each after user confirmed
+            if let Some(ref costs) = cost.compound.actions {
+                for sub_cost in costs {
+                    if sub_cost.state_change_any().as_deref() == Some("wait")
+                        && sub_cost.self_cost_any() == Some(true)
+                    {
+                        if let Some(id) = gs.activating_card {
+                            gs.mods.add_orientation_modifier(id, "wait");
+                        }
+                    } else if let Err(e) = self.pay_cost(gs, sub_cost) {
+                        log::debug!("Warning: sub-cost payment error: {}", e);
+                    }
+                    if self.pending_choice.is_some() {
+                        return Ok(());
+                    }
+                }
+            }
             log::debug!(
-                "[HANDLE_OPT_COST] entry_cost={:?} entry_effect={:?} effect_action={:?}",
-                gs.entry_cost().and_then(|c| c.state_change_any()),
-                gs.entry_effect().map(|e| e.action.clone()),
+                "[OPT_COST] checking cost_type: {:?}, entry_cost: {:?}, entry_effect_action: {:?}",
+                cost.action,
+                gs.entry_cost().is_some(),
                 gs.entry_effect().map(|e| e.action.clone())
             );
-            log::debug!(
-                "[HANDLE_OPT_COST2] entering if: entry_cost.is_some={}",
-                gs.entry_cost().is_some()
-            );
-            let effect_started = gs
-                .ability_queue
-                .current_entry()
-                .is_some_and(|e| e.effect_started);
-            if gs.entry_cost().is_some() && !effect_started {
-                log::debug!(
-                    "[HANDLE_OPT_COST2] inside if: entry_effect.is_some={}",
-                    gs.entry_effect().is_some()
+            if cost.action == ActionType::PlaceEnergyUnderMember {
+                self.execute_place_energy_under_member(
+                    gs,
+                    cost.count.unwrap_or(1),
+                    cost.target.as_deref().unwrap_or("self"),
+                    cost.position_any(),
+                    false,
+                    cost.source.as_deref(),
+                    cost.any_number_any().unwrap_or(false),
                 );
-                if let Some(effect) = gs.entry_effect().cloned() {
-                    log::debug!(
-                        "[HANDLE_OPT_COST2] calling execute_effect with action={}",
-                        effect.action
-                    );
-                    // For PlaceEnergyUnderMember, call directly with optional=false
-                    // to avoid re-creating the optional cost choice (infinite loop).
-                    if effect.action == ActionType::PlaceEnergyUnderMember {
-                        self.execute_place_energy_under_member(
-                            gs,
-                            effect.energy_count_any().unwrap_or(effect.count_or(1)),
-                            effect.target_name(),
-                            effect.position_any(),
-                            false,
-                            effect.source_any(),
-                            effect.any_number_any().unwrap_or(false),
-                        );
-                    } else if let Err(e) = self.execute_effect(gs, &effect) {
-                        log::debug!("Failed to execute effect after optional cost: {}", e);
-                    }
-                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        entry.effect_started = true;
-                    }
-                }
-            } else if gs.ability_queue.has_pending_actions() {
-                if let Err(e) = self.resume_pending_actions(gs) {
-                    log::debug!("Failed to execute action after optional: {}", e);
-                }
-            } else if is_effect_optional {
-                if let Some(effect) = gs.entry_effect().cloned() {
-                    let new_count = effect.energy_count_any().unwrap_or(effect.count_or(1));
+            }
+        }
+        self.pending_choice = None;
+        let is_effect_optional = gs.entry_choice_card_no() == Some(ChoiceRoute::OptionalCost);
+        log::debug!(
+            "[HANDLE_OPT_COST] entry_cost={:?} entry_effect={:?} effect_action={:?}",
+            gs.entry_cost().and_then(|c| c.state_change_any()),
+            gs.entry_effect().map(|e| e.action.clone()),
+            gs.entry_effect().map(|e| e.action.clone())
+        );
+        log::debug!(
+            "[HANDLE_OPT_COST2] entering if: entry_cost.is_some={}",
+            gs.entry_cost().is_some()
+        );
+        let effect_started = gs
+            .ability_queue
+            .current_entry()
+            .is_some_and(|e| e.effect_started);
+        if gs.entry_cost().is_some() && !effect_started {
+            log::debug!(
+                "[HANDLE_OPT_COST2] inside if: entry_effect.is_some={}",
+                gs.entry_effect().is_some()
+            );
+            if let Some(effect) = gs.entry_effect().cloned() {
+                log::debug!(
+                    "[HANDLE_OPT_COST2] calling execute_effect with action={}",
+                    effect.action
+                );
+                // For PlaceEnergyUnderMember, call directly with optional=false
+                // to avoid re-creating the optional cost choice (infinite loop).
+                if effect.action == ActionType::PlaceEnergyUnderMember {
                     self.execute_place_energy_under_member(
                         gs,
-                        new_count,
+                        effect.energy_count_any().unwrap_or(effect.count_or(1)),
                         effect.target_name(),
                         effect.position_any(),
                         false,
                         effect.source_any(),
                         effect.any_number_any().unwrap_or(false),
                     );
+                } else if let Err(e) = self.execute_effect(gs, &effect) {
+                    log::debug!("Failed to execute effect after optional cost: {}", e);
                 }
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.effect_started = true;
+                }
+            }
+        } else if gs.ability_queue.has_pending_actions() {
+            if let Err(e) = self.resume_pending_actions(gs) {
+                log::debug!("Failed to execute action after optional: {}", e);
+            }
+        } else if is_effect_optional {
+            if let Some(effect) = gs.entry_effect().cloned() {
+                let new_count = effect.energy_count_any().unwrap_or(effect.count_or(1));
+                self.execute_place_energy_under_member(
+                    gs,
+                    new_count,
+                    effect.target_name(),
+                    effect.position_any(),
+                    false,
+                    effect.source_any(),
+                    effect.any_number_any().unwrap_or(false),
+                );
             }
         }
         Ok(())

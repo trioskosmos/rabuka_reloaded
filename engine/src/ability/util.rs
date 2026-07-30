@@ -1036,11 +1036,6 @@ impl<'a> CardFilter<'a> {
                 return false;
             }
         }
-        if let Some(ex_id) = self.exclude_self {
-            if id == ex_id {
-                return false;
-            }
-        }
         // "元々持つブレード" — checks the card's base/printed blade value
         // (card.blade from DB, no modifiers applied). Per Q195 (qa_data.json:1071-1074):
         // "元々持つブレードの数を変更した後、ブレードを得る効果が適用される" —

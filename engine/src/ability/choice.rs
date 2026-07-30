@@ -18,8 +18,6 @@ use core::sync::atomic::Ordering;
 use smallvec::SmallVec;
 
 pub(crate) struct SelectionContext {
-    #[allow(dead_code)]
-    pub zone: String,
     pub card_type: Option<String>,
     pub count: usize,
     pub allow_skip: bool,
@@ -408,9 +406,6 @@ impl super::resolver::AbilityResolver {
         is_reveal: bool,
         discard_remaining: Option<bool>,
     ) -> Result<(), String> {
-        eprintln!("[KANAN_DEBUG] handle_select_card entered: zone={} indices={:?} count={} allow_skip={} effect_started={}",
-            zone, indices, count, allow_skip,
-            gs.ability_queue.current_entry().is_some_and(|e| e.effect_started));
         if ABILITY_DEBUG.load(Ordering::Relaxed) {
             log::debug!(
                 "[SEL_CARD] zone='{}' indices={:?} count={} allow_skip={} context={:?} is_reveal={}",
@@ -427,7 +422,6 @@ impl super::resolver::AbilityResolver {
 
         // Handle reveal action: push selected cards to revealed_cards, don't discard.
         let ctx = SelectionContext {
-            zone: zone.to_string(),
             card_type: card_type.clone(),
             count,
             allow_skip,
@@ -818,7 +812,6 @@ impl super::resolver::AbilityResolver {
                 gs,
                 Zone::Deck.to_str(),
                 indices,
-                count,
                 card_type.as_deref(),
                 cost_limit,
                 cost_limit_operator.as_deref(),
@@ -1141,7 +1134,6 @@ impl super::resolver::AbilityResolver {
                     gs,
                     Zone::Hand.to_str(),
                     hand_idx,
-                    ctx.count,
                     ctx.card_type.as_deref(),
                     ctx.cost_limit,
                     ctx.cost_limit_operator.as_deref(),
@@ -1207,7 +1199,6 @@ impl super::resolver::AbilityResolver {
                 gs,
                 Zone::Hand.to_str(),
                 &all_idxs,
-                ctx.count,
                 ctx.card_type.as_deref(),
                 ctx.cost_limit,
                 ctx.cost_limit_operator.as_deref(),
@@ -1930,7 +1921,6 @@ impl super::resolver::AbilityResolver {
                     gs,
                     Zone::Discard.to_str(),
                     &mapped_indices,
-                    ctx.count,
                     ctx.card_type.as_deref(),
                     ctx.cost_limit,
                     ctx.cost_limit_operator.as_deref(),
@@ -2066,7 +2056,6 @@ impl super::resolver::AbilityResolver {
                 gs,
                 Zone::Discard.to_str(),
                 &all_idxs,
-                ctx.count,
                 ctx.card_type.as_deref(),
                 ctx.cost_limit,
                 ctx.cost_limit_operator.as_deref(),
@@ -2172,7 +2161,6 @@ impl super::resolver::AbilityResolver {
                                     options: None,
                                 });
                             }
-                            let _n_cmds = commands.len();
                             gs.ability_queue.set_pending_actions(commands);
                             self.pending_choice = None; // clear stale
                             return self.resume_pending_actions(gs);
@@ -3148,9 +3136,6 @@ impl super::resolver::AbilityResolver {
         }
         if let Some(ref mut pri) = effect.compound.primary_effect {
             Self::set_chosen_target(pri, target);
-        }
-        if let Some(ref mut oa2) = effect.compound.optional_action {
-            Self::set_chosen_target(oa2, target);
         }
         if let Some(ref mut ca) = effect.compound.conditional_action {
             Self::set_chosen_target(ca, target);

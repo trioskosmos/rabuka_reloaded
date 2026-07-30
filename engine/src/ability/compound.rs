@@ -874,11 +874,7 @@ impl AbilityResolver {
                             "{}: [[log_cost_skip:reason=compound_insufficient_energy,need={},active={}]]",
                             pp, need, active
                         ));
-                        let cmd = if is_negation {
-                            *cond.clone()
-                        } else {
-                            *cond.clone()
-                        };
+                        let cmd = *cond.clone();
                         gs.ability_queue.set_pending_actions(vec![cmd]);
                         return self.resume_pending_actions(gs);
                     }

@@ -974,7 +974,6 @@ impl super::TurnEngine {
                 // created by the current effect — it would be orphaned.
                 if game_state.has_pending_choice() {
                     log::debug!("[RWC] skipping complete_current — pending choice exists");
-                    log::debug!("[RWC] skipping complete_current — pending choice exists");
                     return Ok(());
                 }
                 // Post-resolution TAS scan for movement-based triggers.

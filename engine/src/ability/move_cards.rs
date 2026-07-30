@@ -2111,7 +2111,6 @@ impl AbilityResolver {
         gs: &mut GameState,
         zone: &str,
         indices: &[usize],
-        _count: usize,
         card_type_filter: Option<&str>,
         cost_limit: Option<u32>,
         cost_limit_operator: Option<&str>,
