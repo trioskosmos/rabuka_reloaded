@@ -46,75 +46,54 @@ impl<'a> ConditionContext<'a> {
         gs: &'a crate::game_state::GameState,
     ) -> Option<&'a crate::player::Player> {
         gs.activating_card.and_then(|cid| {
-            let p1 = &gs.player1;
-            let p2 = &gs.player2;
-            if p1.stage.stage.contains(&cid)
-                || p1.hand.cards.contains(&cid)
-                || p1.live_card_zone.cards.contains(&cid)
-                || p1.success_live_card_zone.cards.contains(&cid)
-                || p1.energy_zone.cards.contains(&cid)
-                || p1.waitroom.cards.contains(&cid)
-            {
-                Some(p1)
-            } else if p2.stage.stage.contains(&cid)
-                || p2.hand.cards.contains(&cid)
-                || p2.live_card_zone.cards.contains(&cid)
-                || p2.success_live_card_zone.cards.contains(&cid)
-                || p2.energy_zone.cards.contains(&cid)
-                || p2.waitroom.cards.contains(&cid)
-            {
-                Some(p2)
+            if gs.player1.contains_card(cid) {
+                Some(&gs.player1)
+            } else if gs.player2.contains_card(cid) {
+                Some(&gs.player2)
             } else {
                 None
             }
         })
     }
 
-    pub fn new(game_state: &'a crate::game_state::GameState) -> Self {
-        let activating_card_id = game_state.activating_card;
-        ConditionContext {
-            game_state,
-            activating_card_id,
-            moved_cards: &[],
-            selected_card_ids: &[],
-            position_change_occurred: game_state.position_change_occurred_this_turn,
-            self_player: Self::resolve_self_player(game_state),
-            skip_phase_gate: false,
-        }
-    }
-
-    /// Create a ConditionContext with a pre-resolved self_player.
-    /// Avoids the zone-scan in resolve_self_player when the owner is already known
-    /// (e.g. during constant effect evaluation where the card's zone is fixed).
-    pub fn new_with_self(
+    fn build(
         game_state: &'a crate::game_state::GameState,
+        moved_cards: &'a [i16],
+        selected_card_ids: &'a [i16],
         self_player: Option<&'a crate::player::Player>,
     ) -> Self {
         ConditionContext {
             game_state,
             activating_card_id: game_state.activating_card,
-            moved_cards: &[],
-            selected_card_ids: &[],
+            moved_cards,
+            selected_card_ids,
             position_change_occurred: game_state.position_change_occurred_this_turn,
             self_player,
             skip_phase_gate: false,
         }
     }
 
+    pub fn new(game_state: &'a crate::game_state::GameState) -> Self {
+        Self::build(game_state, &[], &[], Self::resolve_self_player(game_state))
+    }
+
+    pub fn new_with_self(
+        game_state: &'a crate::game_state::GameState,
+        self_player: Option<&'a crate::player::Player>,
+    ) -> Self {
+        Self::build(game_state, &[], &[], self_player)
+    }
+
     pub fn with_moved_cards(
         game_state: &'a crate::game_state::GameState,
         moved_cards: &'a [i16],
     ) -> Self {
-        let activating_card_id = game_state.activating_card;
-        ConditionContext {
+        Self::build(
             game_state,
-            activating_card_id,
             moved_cards,
-            selected_card_ids: &[],
-            position_change_occurred: game_state.position_change_occurred_this_turn,
-            self_player: Self::resolve_self_player(game_state),
-            skip_phase_gate: false,
-        }
+            &[],
+            Self::resolve_self_player(game_state),
+        )
     }
 
     pub fn with_moved_and_selected(
@@ -122,16 +101,12 @@ impl<'a> ConditionContext<'a> {
         moved_cards: &'a [i16],
         selected_card_ids: &'a [i16],
     ) -> Self {
-        let activating_card_id = game_state.activating_card;
-        ConditionContext {
+        Self::build(
             game_state,
-            activating_card_id,
             moved_cards,
             selected_card_ids,
-            position_change_occurred: game_state.position_change_occurred_this_turn,
-            self_player: Self::resolve_self_player(game_state),
-            skip_phase_gate: false,
-        }
+            Self::resolve_self_player(game_state),
+        )
     }
 
     /// Returns true if the effect has no condition, or if its condition passes.

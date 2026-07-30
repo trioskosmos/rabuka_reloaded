@@ -478,7 +478,7 @@ fn collect_json_map(
 /// objects use "type" (not "action"), "zone" (not "source"), and
 /// "options"/"costs" (not "actions") — because the legacy AbilityCost
 /// custom Deserialize handles these aliases.
-fn normalize_cost_keys(map: &mut serde_json::Map<String, serde_json::Value>) {
+pub fn normalize_cost_keys(map: &mut serde_json::Map<String, serde_json::Value>) {
     if !map.contains_key("action") {
         if let Some(v) = map.remove("type").or_else(|| map.remove("cost_type")) {
             map.insert("action".into(), v);

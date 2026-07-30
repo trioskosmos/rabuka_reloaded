@@ -599,4 +599,14 @@ impl Player {
         // Rule 10.2.2.2: Handled by the caller before look_at operations
         // (see execute_look_at in look.rs which implements the Q85 multi-step)
     }
+
+    /// Returns true if the given card ID exists in any of this player's zones.
+    pub fn contains_card(&self, cid: i16) -> bool {
+        self.stage.stage.contains(&cid)
+            || self.hand.cards.contains(&cid)
+            || self.live_card_zone.cards.contains(&cid)
+            || self.success_live_card_zone.cards.contains(&cid)
+            || self.energy_zone.cards.contains(&cid)
+            || self.waitroom.cards.contains(&cid)
+    }
 }

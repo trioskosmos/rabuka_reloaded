@@ -17,10 +17,22 @@ mod bytecode_deep_compare {
     /// Decode an ability exactly as the default (non-bytecode) JSON loader does:
     /// serde `from_value::<Ability>` + `populate_from_json` + draw-count fix.
     fn json_path_decode(entry: &serde_json::Value) -> Option<Ability> {
-        let mut ab: Ability = serde_json::from_value::<Ability>(entry.clone()).ok()?;
+        // Normalize cost keys before deserializing (legacy "type"→"action", "zone"→"source").
+        let mut normalized = entry.clone();
+        if let Some(cost_val) = normalized.get_mut("cost") {
+            if let Some(obj) = cost_val.as_object_mut() {
+                rabuka_engine::ability::vm::normalize_cost_keys(obj);
+            }
+        }
+        let mut ab: Ability = serde_json::from_value::<Ability>(normalized.clone()).ok()?;
         if let Some(ref mut effect) = ab.effect {
-            if let Some(ref je) = entry.get("effect") {
+            if let Some(ref je) = normalized.get("effect") {
                 effect.populate_from_json(je);
+            }
+        }
+        if let Some(ref mut cost) = ab.cost {
+            if let Some(ref ce) = normalized.get("cost") {
+                cost.0.populate_from_json(ce);
             }
         }
         if let Some(ref mut effect) = ab.effect {

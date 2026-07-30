@@ -633,7 +633,8 @@ impl Ability {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct AbilityCost(pub AbilityEffect);
 
 impl AbilityCost {
@@ -665,186 +666,6 @@ impl core::ops::Deref for AbilityCost {
 impl core::ops::DerefMut for AbilityCost {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
-    }
-}
-
-impl serde::Serialize for AbilityCost {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        // Serialize as the legacy cost JSON shape so any existing consumers
-        // (frontend, debug tooling) keep working. Map the few renames:
-        //   action        → "type"
-        //   energy_count  → "energy"
-        //   sub-effects via compound.actions → "options" (preferred) or "costs"
-        use serde::ser::SerializeMap;
-        let inner = &self.0;
-        let mut map = s.serialize_map(None)?;
-        map.serialize_entry("text", &inner.text)?;
-        if let Some(ref v) = inner.source {
-            map.serialize_entry("source", v)?;
-        }
-        if let Some(ref v) = inner.source {
-            // legacy duplicate key kept for compat
-            map.serialize_entry("zone", v)?;
-        }
-        if let Some(ref v) = inner.destination {
-            map.serialize_entry("destination", v)?;
-        }
-        if let Some(ref v) = inner.count {
-            map.serialize_entry("count", v)?;
-        }
-        if let Some(v) = inner.card_type_any() {
-            map.serialize_entry("card_type", v.as_card_str())?;
-        }
-        if let Some(ref v) = inner.target {
-            map.serialize_entry("target", v)?;
-        }
-        if let Some(v) = inner.optional_any() {
-            map.serialize_entry("optional", &v)?;
-        }
-        if let Some(v) = inner.energy_count_any() {
-            map.serialize_entry("energy", &v)?;
-        }
-        if let Some(v) = inner.state_change_any() {
-            map.serialize_entry("state_change", v)?;
-        }
-        if let Some(v) = inner.position_any() {
-            map.serialize_entry("position", v)?;
-        }
-        if let Some(v) = inner.self_cost_any() {
-            map.serialize_entry("self_cost", &v)?;
-        }
-        if let Some(v) = inner.exclude_self_any() {
-            map.serialize_entry("exclude_self", &v)?;
-        }
-        if let Some(v) = inner.same_unit_name_any() {
-            map.serialize_entry("same_unit_name", &v)?;
-        }
-        if let Some(v) = inner.shuffle_any() {
-            map.serialize_entry("shuffle", &v)?;
-        }
-        if let Some(v) = inner.any_number_any() {
-            map.serialize_entry("any_number", &v)?;
-        }
-        if let Some(v) = inner.cost_limit_any() {
-            map.serialize_entry("cost_limit", &v)?;
-        }
-        if let Some(v) = inner.cost_limit_operator_any() {
-            map.serialize_entry("cost_limit_operator", v.as_str())?;
-        }
-        if let Some(v) = inner.characters_any() {
-            map.serialize_entry("characters", v)?;
-        }
-        if let Some(v) = inner.exclude_characters_any() {
-            map.serialize_entry("exclude_characters", v)?;
-        }
-        if let Some(v) = inner.group_names_any() {
-            map.serialize_entry("group_names", v)?;
-        }
-        if let Some(v) = inner.placement_order_any() {
-            map.serialize_entry("placement_order", v.as_str())?;
-        }
-        if let Some(v) = inner.alternative_effect_any() {
-            map.serialize_entry("alternative_effect", v)?;
-        }
-        if inner.action != ActionType::Custom {
-            map.serialize_entry("type", inner.action.to_str())?;
-        }
-        // sub-costs: emit as both "options" and "costs" (legacy treated them
-        // as the same field)
-        if let Some(ref actions) = inner.compound.actions {
-            map.serialize_entry("options", actions)?;
-            map.serialize_entry("costs", actions)?;
-        }
-        map.end()
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for AbilityCost {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        use serde::de::MapAccess;
-        #[derive(Default)]
-        struct Visitor;
-        impl<'de> serde::de::Visitor<'de> for Visitor {
-            type Value = AbilityCost;
-            fn expecting(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-                f.write_str("an ability cost object (legacy or unified form)")
-            }
-            fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<AbilityCost, M::Error> {
-                let mut effect = AbilityEffect::default();
-                let mut all_fields = serde_json::Map::new();
-                while let Some(key) = map.next_key::<String>()? {
-                    let value: serde_json::Value = map.next_value()?;
-                    all_fields.insert(key.clone(), value.clone());
-                    match key.as_str() {
-                        "text" => {
-                            if let Some(s) = value.as_str() {
-                                effect.text = s.into();
-                            }
-                        }
-                        "type" | "action" | "cost_type" => {
-                            if let Some(s) = value.as_str() {
-                                effect.action = ActionType::from_str(s).unwrap_or_default();
-                            }
-                        }
-                        "source" | "zone" => {
-                            if let Some(s) = value.as_str() {
-                                effect.source = Some(s.into());
-                            }
-                        }
-                        "destination" => {
-                            if let Some(s) = value.as_str() {
-                                effect.destination = Some(s.into());
-                            }
-                        }
-                        "count" => {
-                            if let Some(n) = value.as_u64() {
-                                effect.count = Some(n as u32);
-                            }
-                        }
-                        "target" => {
-                            if let Some(s) = value.as_str() {
-                                effect.target = Some(s.into());
-                            }
-                        }
-                        "optional" => {
-                            if let Some(b) = value.as_bool() {
-                                effect.optional = Some(b);
-                            }
-                        }
-                        "max" => {
-                            if let Some(b) = value.as_bool() {
-                                effect.max = Some(b);
-                            }
-                        }
-                        "options" | "costs" => {
-                            if let Ok(sub) =
-                                serde_json::from_value::<Option<Vec<AbilityCost>>>(value)
-                            {
-                                if let Some(sub) = sub {
-                                    effect.compound.actions = Some(
-                                        sub.into_iter()
-                                            .map(|c| Box::new(AbilityCost::into_effect(c)))
-                                            .collect(),
-                                    );
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                if !all_fields.is_empty() {
-                    if let Some(kind) = AbilityEffect::kind_from_action(
-                        effect.action.to_str(),
-                        &serde_json::Value::Object(all_fields),
-                    ) {
-                        effect.kind = Some(crate::card::ek_box_new(kind));
-                    }
-                }
-
-                Ok(AbilityCost(effect))
-            }
-        }
-        d.deserialize_map(Visitor)
     }
 }
 
@@ -2308,6 +2129,17 @@ macro_rules! box_setter {
     };
 }
 
+macro_rules! copy_getter {
+    ($name:ident, $ty:ident, [$($variant:ident => $field:ident),+ $(,)?]) => {
+        pub fn $name(&self) -> Option<$ty> {
+            match self.kind.as_deref() {
+                $(Some(EffectKind::$variant { $field, .. }) => *$field,)+
+                _ => None,
+            }
+        }
+    };
+}
+
 impl AbilityEffect {
     pub fn ability_filter_any(&self) -> Option<AbilityFilter> {
         match self.kind.as_deref() {
@@ -2384,19 +2216,7 @@ impl AbilityEffect {
 
     u32_getter!(blade_limit_any, [ChangeState => blade_limit, MiscOp => blade_limit]);
 
-    pub fn blade_limit_operator_any(&self) -> Option<Operator> {
-        match self.kind.as_deref() {
-            Some(EffectKind::ChangeState {
-                blade_limit_operator,
-                ..
-            }) => *blade_limit_operator,
-            Some(EffectKind::MiscOp {
-                blade_limit_operator,
-                ..
-            }) => *blade_limit_operator,
-            _ => None,
-        }
-    }
+    copy_getter!(blade_limit_operator_any, Operator, [ChangeState => blade_limit_operator, MiscOp => blade_limit_operator]);
 
     str_getter!(blade_type_any, [MiscOp => blade_type]);
 
@@ -2444,43 +2264,7 @@ impl AbilityEffect {
 
     u32_getter!(cost_limit_min_any, [MoveCards => cost_limit_min, SelectTarget => cost_limit_min, LookReveal => cost_limit_min]);
 
-    pub fn cost_limit_operator_any(&self) -> Option<Operator> {
-        match self.kind.as_deref() {
-            Some(EffectKind::MoveCards {
-                cost_limit_operator,
-                ..
-            }) => *cost_limit_operator,
-            Some(EffectKind::SelectTarget {
-                cost_limit_operator,
-                ..
-            }) => *cost_limit_operator,
-            Some(EffectKind::LookReveal {
-                cost_limit_operator,
-                ..
-            }) => *cost_limit_operator,
-            Some(EffectKind::GainResource {
-                cost_limit_operator,
-                ..
-            }) => *cost_limit_operator,
-            Some(EffectKind::ChangeState {
-                cost_limit_operator,
-                ..
-            }) => *cost_limit_operator,
-            Some(EffectKind::AbilityOp {
-                cost_limit_operator,
-                ..
-            }) => *cost_limit_operator,
-            Some(EffectKind::PositionOp {
-                cost_limit_operator,
-                ..
-            }) => *cost_limit_operator,
-            Some(EffectKind::MiscOp {
-                cost_limit_operator,
-                ..
-            }) => *cost_limit_operator,
-            _ => None,
-        }
-    }
+    copy_getter!(cost_limit_operator_any, Operator, [MoveCards => cost_limit_operator, SelectTarget => cost_limit_operator, LookReveal => cost_limit_operator, GainResource => cost_limit_operator, ChangeState => cost_limit_operator, AbilityOp => cost_limit_operator, PositionOp => cost_limit_operator, MiscOp => cost_limit_operator]);
 
     pub fn cost_offset_any(&self) -> Option<i32> {
         match self.kind.as_deref() {
@@ -2494,35 +2278,7 @@ impl AbilityEffect {
 
     u32_getter!(cost_total_any, [MoveCards => cost_total, SelectTarget => cost_total, ModifyScore => cost_total, ModifyHearts => cost_total, ChangeState => cost_total, MiscOp => cost_total]);
 
-    pub fn cost_total_operator_any(&self) -> Option<Operator> {
-        match self.kind.as_deref() {
-            Some(EffectKind::MoveCards {
-                cost_total_operator,
-                ..
-            }) => *cost_total_operator,
-            Some(EffectKind::SelectTarget {
-                cost_total_operator,
-                ..
-            }) => *cost_total_operator,
-            Some(EffectKind::ModifyScore {
-                cost_total_operator,
-                ..
-            }) => *cost_total_operator,
-            Some(EffectKind::ModifyHearts {
-                cost_total_operator,
-                ..
-            }) => *cost_total_operator,
-            Some(EffectKind::ChangeState {
-                cost_total_operator,
-                ..
-            }) => *cost_total_operator,
-            Some(EffectKind::MiscOp {
-                cost_total_operator,
-                ..
-            }) => *cost_total_operator,
-            _ => None,
-        }
-    }
+    copy_getter!(cost_total_operator_any, Operator, [MoveCards => cost_total_operator, SelectTarget => cost_total_operator, ModifyScore => cost_total_operator, ModifyHearts => cost_total_operator, ChangeState => cost_total_operator, MiscOp => cost_total_operator]);
 
     bool_getter!(delayed_any, [RestrictionOp => delayed]);
 
@@ -2674,19 +2430,7 @@ impl AbilityEffect {
 
     str_getter!(need_heart_color_any, [MoveCards => need_heart_color]);
 
-    pub fn need_heart_operator_any(&self) -> Option<Operator> {
-        match self.kind.as_deref() {
-            Some(EffectKind::MoveCards {
-                need_heart_operator,
-                ..
-            }) => *need_heart_operator,
-            Some(EffectKind::ModifyScore {
-                need_heart_operator,
-                ..
-            }) => *need_heart_operator,
-            _ => None,
-        }
-    }
+    copy_getter!(need_heart_operator_any, Operator, [MoveCards => need_heart_operator, ModifyScore => need_heart_operator]);
 
     u32_getter!(need_heart_total_any, [MoveCards => need_heart_total, ModifyScore => need_heart_total]);
 
@@ -2729,17 +2473,7 @@ impl AbilityEffect {
 
     u32_getter!(original_count_any, [ModifyHearts => original_count, MiscOp => original_count]);
 
-    pub fn original_operator_any(&self) -> Option<Operator> {
-        match self.kind.as_deref() {
-            Some(EffectKind::ModifyHearts {
-                original_operator, ..
-            }) => *original_operator,
-            Some(EffectKind::MiscOp {
-                original_operator, ..
-            }) => *original_operator,
-            _ => None,
-        }
-    }
+    copy_getter!(original_operator_any, Operator, [ModifyHearts => original_operator, MiscOp => original_operator]);
 
     bool_getter!(original_value_any, [MoveCards => original_value, SelectTarget => original_value, LookReveal => original_value, ModifyHearts => original_value, GainResource => original_value, ChangeState => original_value, MiscOp => original_value, CustomOp => original_value, DrawCards => original_value, CompoundEffect => original_value]);
 
@@ -2816,20 +2550,7 @@ impl AbilityEffect {
 
     str_getter!(per_unit_type_any, [SelectTarget => per_unit_type, LookReveal => per_unit_type, ModifyScore => per_unit_type, GainResource => per_unit_type, DrawCards => per_unit_type, ChangeState => per_unit_type, MiscOp => per_unit_type, CompoundEffect => per_unit_type, ModifyHearts => per_unit_type]);
 
-    pub fn placement_order_any(&self) -> Option<PlacementOrder> {
-        match self.kind.as_deref() {
-            Some(EffectKind::MoveCards {
-                placement_order, ..
-            }) => *placement_order,
-            Some(EffectKind::SelectTarget {
-                placement_order, ..
-            }) => *placement_order,
-            Some(EffectKind::MiscOp {
-                placement_order, ..
-            }) => *placement_order,
-            _ => None,
-        }
-    }
+    copy_getter!(placement_order_any, PlacementOrder, [MoveCards => placement_order, SelectTarget => placement_order, MiscOp => placement_order]);
 
     pub fn position_any(&self) -> Option<&PositionInfo> {
         match self.kind.as_deref() {
@@ -4096,6 +3817,45 @@ impl Default for Condition {
 
 // ============== Condition field accessor methods ==============
 
+/// Generate the 4 common Condition getters from a single variant list.
+/// These fields exist on ALL 20 Condition variants.
+macro_rules! condition_all_variants {
+    ($($variant:ident),+ $(,)?) => {
+        impl Condition {
+            pub fn get_negation(&self) -> Option<bool> {
+                match self {
+                    $(Condition::$variant { negation, .. } => *negation,)+
+                }
+            }
+
+            pub fn get_phase(&self) -> Option<&str> {
+                match self {
+                    $(Condition::$variant { phase, .. } => phase.as_deref(),)+
+                }
+            }
+
+            pub fn get_phase_target(&self) -> Option<&str> {
+                match self {
+                    $(Condition::$variant { phase_target, .. } => phase_target.as_deref(),)+
+                }
+            }
+
+            pub fn get_cache(&self) -> Option<bool> {
+                match self {
+                    $(Condition::$variant { cache, .. } => *cache,)+
+                }
+            }
+        }
+    };
+}
+
+condition_all_variants! {
+    Compound, Location, Comparison, Movement, Group, Appearance,
+    Temporal, State, Resource, AbilityFilter, ScoreThreshold, Choice,
+    Complex, PositionCond, OpponentChoice, OpponentLiveSuccess,
+    NoExcessHeart, AlwaysTrue, AnyOf, AllRevealedMatchHeartColor,
+}
+
 impl Condition {
     pub fn get_text(&self) -> Option<&str> {
         #[cfg(feature = "debug_conditions")]
@@ -4122,9 +3882,6 @@ impl Condition {
                 | Condition::AnyOf { text, .. }
                 | Condition::AllRevealedMatchHeartColor { text, .. } => text.as_deref(),
             };
-            // Preserve old behavior: text was always "" even when absent.
-            // Code that compares condition text (e.g. same_as_prev in compound.rs)
-            // relies on None == None matching the old "" == "".
             if t.is_none() {
                 Some("")
             } else {
@@ -4134,106 +3891,6 @@ impl Condition {
         #[cfg(not(feature = "debug_conditions"))]
         {
             None
-        }
-    }
-
-    pub fn get_negation(&self) -> Option<bool> {
-        match self {
-            Condition::Compound { negation, .. }
-            | Condition::Location { negation, .. }
-            | Condition::Comparison { negation, .. }
-            | Condition::Movement { negation, .. }
-            | Condition::Group { negation, .. }
-            | Condition::Appearance { negation, .. }
-            | Condition::Temporal { negation, .. }
-            | Condition::State { negation, .. }
-            | Condition::Resource { negation, .. }
-            | Condition::AbilityFilter { negation, .. }
-            | Condition::ScoreThreshold { negation, .. }
-            | Condition::Choice { negation, .. }
-            | Condition::Complex { negation, .. }
-            | Condition::PositionCond { negation, .. }
-            | Condition::OpponentChoice { negation, .. }
-            | Condition::OpponentLiveSuccess { negation, .. }
-            | Condition::NoExcessHeart { negation, .. }
-            | Condition::AlwaysTrue { negation, .. }
-            | Condition::AnyOf { negation, .. }
-            | Condition::AllRevealedMatchHeartColor { negation, .. } => *negation,
-        }
-    }
-
-    pub fn get_phase(&self) -> Option<&str> {
-        match self {
-            Condition::Compound { phase, .. }
-            | Condition::Location { phase, .. }
-            | Condition::Comparison { phase, .. }
-            | Condition::Movement { phase, .. }
-            | Condition::Group { phase, .. }
-            | Condition::Appearance { phase, .. }
-            | Condition::Temporal { phase, .. }
-            | Condition::State { phase, .. }
-            | Condition::Resource { phase, .. }
-            | Condition::AbilityFilter { phase, .. }
-            | Condition::ScoreThreshold { phase, .. }
-            | Condition::Choice { phase, .. }
-            | Condition::Complex { phase, .. }
-            | Condition::PositionCond { phase, .. }
-            | Condition::OpponentChoice { phase, .. }
-            | Condition::OpponentLiveSuccess { phase, .. }
-            | Condition::NoExcessHeart { phase, .. }
-            | Condition::AlwaysTrue { phase, .. }
-            | Condition::AnyOf { phase, .. }
-            | Condition::AllRevealedMatchHeartColor { phase, .. } => phase.as_deref(),
-        }
-    }
-
-    pub fn get_phase_target(&self) -> Option<&str> {
-        match self {
-            Condition::Compound { phase_target, .. }
-            | Condition::Location { phase_target, .. }
-            | Condition::Comparison { phase_target, .. }
-            | Condition::Movement { phase_target, .. }
-            | Condition::Group { phase_target, .. }
-            | Condition::Appearance { phase_target, .. }
-            | Condition::Temporal { phase_target, .. }
-            | Condition::State { phase_target, .. }
-            | Condition::Resource { phase_target, .. }
-            | Condition::AbilityFilter { phase_target, .. }
-            | Condition::ScoreThreshold { phase_target, .. }
-            | Condition::Choice { phase_target, .. }
-            | Condition::Complex { phase_target, .. }
-            | Condition::PositionCond { phase_target, .. }
-            | Condition::OpponentChoice { phase_target, .. }
-            | Condition::OpponentLiveSuccess { phase_target, .. }
-            | Condition::NoExcessHeart { phase_target, .. }
-            | Condition::AlwaysTrue { phase_target, .. }
-            | Condition::AnyOf { phase_target, .. }
-            | Condition::AllRevealedMatchHeartColor { phase_target, .. } => phase_target.as_deref(),
-        }
-    }
-
-    pub fn get_cache(&self) -> Option<bool> {
-        match self {
-            Condition::Compound { cache, .. }
-            | Condition::Location { cache, .. }
-            | Condition::Comparison { cache, .. }
-            | Condition::Movement { cache, .. }
-            | Condition::Group { cache, .. }
-            | Condition::Appearance { cache, .. }
-            | Condition::Temporal { cache, .. }
-            | Condition::State { cache, .. }
-            | Condition::Resource { cache, .. }
-            | Condition::AbilityFilter { cache, .. }
-            | Condition::ScoreThreshold { cache, .. }
-            | Condition::Choice { cache, .. }
-            | Condition::Complex { cache, .. }
-            | Condition::PositionCond { cache, .. }
-            | Condition::OpponentChoice { cache, .. }
-            | Condition::OpponentLiveSuccess { cache, .. }
-            | Condition::NoExcessHeart { cache, .. }
-            | Condition::AlwaysTrue { cache, .. }
-            | Condition::AnyOf { cache, .. }
-            | Condition::AllRevealedMatchHeartColor { cache, .. } => *cache,
         }
     }
 
@@ -5383,41 +5040,51 @@ pub fn check_heart_requirement(need: &BaseHeart, provided: &BaseHeart) -> bool {
     true
 }
 
+/// Single macro table for HeartColor variants. Generates Display, as_str,
+/// short_label, index, from_index, and the core FromStr match arms.
+macro_rules! heart_color_table {
+    ($macro:ident) => {
+        $macro! {
+            Heart00 => "heart00", "h00", 0,
+            Heart01 => "heart01", "h01", 1,
+            Heart02 => "heart02", "h02", 2,
+            Heart03 => "heart03", "h03", 3,
+            Heart04 => "heart04", "h04", 4,
+            Heart05 => "heart05", "h05", 5,
+            Heart06 => "heart06", "h06", 6,
+            BAll   => "b_all",   "b_all", 0,
+            Draw   => "draw",    "draw",  0,
+            Score  => "score",   "score", 0,
+            All    => "all",     "all",   7,
+        }
+    };
+}
+
 impl core::fmt::Display for HeartColor {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            HeartColor::Heart00 => write!(f, "heart00"),
-            HeartColor::Heart01 => write!(f, "heart01"),
-            HeartColor::Heart02 => write!(f, "heart02"),
-            HeartColor::Heart03 => write!(f, "heart03"),
-            HeartColor::Heart04 => write!(f, "heart04"),
-            HeartColor::Heart05 => write!(f, "heart05"),
-            HeartColor::Heart06 => write!(f, "heart06"),
-            HeartColor::BAll => write!(f, "b_all"),
-            HeartColor::Draw => write!(f, "draw"),
-            HeartColor::Score => write!(f, "score"),
-            HeartColor::All => write!(f, "all"),
+        macro_rules! disp {
+            ($($variant:ident => $s:expr, $sl:expr, $idx:expr),+ $(,)?) => {
+                match self {
+                    $(HeartColor::$variant => f.write_str($s),)+
+                }
+            };
         }
+        heart_color_table!(disp)
     }
 }
 
 impl HeartColor {
-    /// Returns the index of this heart color (0-6, 0=Heart00 wildcard, 1-6=Heart01-Heart06).
     pub fn index(&self) -> usize {
-        match self {
-            HeartColor::Heart00 => 0,
-            HeartColor::Heart01 => 1,
-            HeartColor::Heart02 => 2,
-            HeartColor::Heart03 => 3,
-            HeartColor::Heart04 => 4,
-            HeartColor::Heart05 => 5,
-            HeartColor::Heart06 => 6,
-            HeartColor::All => 7,
-            _ => 0,
+        macro_rules! idx {
+            ($($variant:ident => $s:expr, $sl:expr, $idx:expr),+ $(,)?) => {
+                match self {
+                    $(HeartColor::$variant => $idx,)+
+                }
+            };
         }
+        heart_color_table!(idx)
     }
 
-    /// Reconstruct a HeartColor from an index (0-7).
     pub fn from_index(i: usize) -> Self {
         match i {
             0 => HeartColor::Heart00,
@@ -5432,61 +5099,44 @@ impl HeartColor {
         }
     }
 
-    /// Returns the short label used in display output ("h00"-"h06").
     pub fn short_label(&self) -> &'static str {
-        match self {
-            HeartColor::Heart00 => "h00",
-            HeartColor::Heart01 => "h01",
-            HeartColor::Heart02 => "h02",
-            HeartColor::Heart03 => "h03",
-            HeartColor::Heart04 => "h04",
-            HeartColor::Heart05 => "h05",
-            HeartColor::Heart06 => "h06",
-            HeartColor::BAll => "b_all",
-            HeartColor::Draw => "draw",
-            HeartColor::Score => "score",
-            HeartColor::All => "all",
+        macro_rules! sl {
+            ($($variant:ident => $s:expr, $sl:expr, $idx:expr),+ $(,)?) => {
+                match self {
+                    $(HeartColor::$variant => $sl,)+
+                }
+            };
         }
+        heart_color_table!(sl)
     }
 
-    /// Returns the canonical string representation ("heart00"-"all").
     pub fn as_str(&self) -> &'static str {
-        match self {
-            HeartColor::Heart00 => "heart00",
-            HeartColor::Heart01 => "heart01",
-            HeartColor::Heart02 => "heart02",
-            HeartColor::Heart03 => "heart03",
-            HeartColor::Heart04 => "heart04",
-            HeartColor::Heart05 => "heart05",
-            HeartColor::Heart06 => "heart06",
-            HeartColor::BAll => "b_all",
-            HeartColor::Draw => "draw",
-            HeartColor::Score => "score",
-            HeartColor::All => "all",
+        macro_rules! as_s {
+            ($($variant:ident => $s:expr, $sl:expr, $idx:expr),+ $(,)?) => {
+                match self {
+                    $(HeartColor::$variant => $s,)+
+                }
+            };
         }
+        heart_color_table!(as_s)
     }
 }
 
 impl core::str::FromStr for HeartColor {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
-            "heart00" => HeartColor::Heart00,
-            "heart01" => HeartColor::Heart01,
-            "heart02" => HeartColor::Heart02,
-            "heart03" => HeartColor::Heart03,
-            "heart04" => HeartColor::Heart04,
-            "heart05" => HeartColor::Heart05,
-            "heart06" => HeartColor::Heart06,
-            "b_all" => HeartColor::BAll,
-            "draw" => HeartColor::Draw,
-            "score" => HeartColor::Score,
-            "all" => HeartColor::All,
-            _ if s.starts_with("b_") => {
-                HeartColor::from_str(&s[2..]).unwrap_or(HeartColor::Heart00)
-            }
-            _ => HeartColor::Heart00,
-        })
+        macro_rules! from_s {
+            ($($variant:ident => $str:expr, $sl:expr, $idx:expr),+ $(,)?) => {
+                Ok(match s {
+                    $($str => HeartColor::$variant,)+
+                    _ if s.starts_with("b_") => {
+                        HeartColor::from_str(&s[2..]).unwrap_or(HeartColor::Heart00)
+                    }
+                    _ => HeartColor::Heart00,
+                })
+            };
+        }
+        heart_color_table!(from_s)
     }
 }
 
