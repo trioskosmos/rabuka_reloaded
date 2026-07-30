@@ -68,7 +68,6 @@ fn coco_center_does_not_draw() {
     }
 
     let hand_after = hand_size(&game);
-    // Card moved to stage (-1), no draw = hand_before - 1
     assert_eq!(
         hand_after,
         hand_before - 1,
@@ -103,32 +102,69 @@ fn coco_right_side_does_not_draw() {
     );
 }
 
-/// PL!SP-bp4-003-R (嵐千砂都): 登場, 左サイド, 右サイド — draw 2, discard 2 if on left or right.
 #[test]
-fn chisato_left_side_activates() {
+fn chisato_left_side_draws_and_discards() {
     let mut game = setup_game();
     let chisato = chisato_id(&game);
+    let filler = game.id("PL!-sd1-010-SD");
+
     game.state.player1.hand.cards.push(chisato);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
     game.give_energy(10);
 
+    let hand_before = hand_size(&game);
     game.play_to_stage(chisato, MemberArea::LeftSide);
+
+    assert!(
+        game.has_pending_choice(),
+        "Chisato on Left: ability should have triggered (pending choice expected)"
+    );
+
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    let hand_after = hand_size(&game);
     assert_eq!(
-        game.state.player1.stage.stage[0], chisato,
-        "Chisato on left"
+        hand_after,
+        hand_before - 1,
+        "Chisato on Left: draw 2 + discard 2 should net hand_before - 1. hand {} -> {}",
+        hand_before,
+        hand_after
     );
 }
 
 #[test]
-fn chisato_right_side_activates() {
+fn chisato_right_side_draws_and_discards() {
     let mut game = setup_game();
     let chisato = chisato_id(&game);
+    let filler = game.id("PL!-sd1-010-SD");
+
     game.state.player1.hand.cards.push(chisato);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
     game.give_energy(10);
 
+    let hand_before = hand_size(&game);
     game.play_to_stage(chisato, MemberArea::RightSide);
+
+    assert!(
+        game.has_pending_choice(),
+        "Chisato on Right: ability should have triggered (pending choice expected)"
+    );
+
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    let hand_after = hand_size(&game);
     assert_eq!(
-        game.state.player1.stage.stage[2], chisato,
-        "Chisato on right"
+        hand_after,
+        hand_before - 1,
+        "Chisato on Right: draw 2 + discard 2 should net hand_before - 1. hand {} -> {}",
+        hand_before,
+        hand_after
     );
 }
 
@@ -143,6 +179,22 @@ fn chisato_center_does_not_activate() {
 
     let hand_before = hand_size(&game);
     game.play_to_stage(chisato, MemberArea::Center);
+
+    while game.has_pending_choice() {
+        let choice = game.get_pending_choice().clone();
+        match &choice {
+            rabuka_engine::ability::types::Choice::SelectCard { count, zone, .. } => {
+                panic!(
+                    "Chisato on Center: ability should NOT have fired, but got SelectCard zone={} count={}",
+                    zone, count
+                );
+            }
+            _ => {
+                game.select_indices(&[]);
+            }
+        }
+    }
+
     let hand_after = hand_size(&game);
     assert_eq!(
         hand_after,

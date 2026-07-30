@@ -135,6 +135,40 @@ POSITION_KEYWORDS = {
     "正面": "front",
 }
 
+
+def detect_positions(text: str) -> list:
+    """Return all position values found in text via POSITION_KEYWORDS.
+
+    Returns a list of position strings (e.g. ["left_side", "right_side"]).
+    Deduplicates by position value so e.g. "左サイドエリア" and "左サイド"
+    both contribute only one "left_side".
+    """
+    positions = []
+    for _keyword, pos in POSITION_KEYWORDS.items():
+        if pos in positions:
+            continue
+        if _keyword in text:
+            positions.append(pos)
+    return positions
+
+
+def detect_icon_positions(text: str) -> list:
+    """Return all positions from {{center.png|...}}, {{leftside.png|...}}, {{rightside.png|...}} icon templates."""
+    positions = []
+    if "{{center.png|センター}}" in text:
+        positions.append("center")
+    if "{{leftside.png|左サイド}}" in text:
+        positions.append("left_side")
+    if "{{rightside.png|右サイド}}" in text:
+        positions.append("right_side")
+    return positions
+
+
+def format_positions(positions: list) -> str:
+    """Join position list into comma-separated string, or return empty string."""
+    return ",".join(positions)
+
+
 # ============== TEMPORAL CONDITION PATTERNS ==============
 TEMPORAL_PATTERNS = [
     ("移動していない", "not_moved"),
@@ -9111,6 +9145,9 @@ def _walk(d, full_text, original_text, ctx_text=None):
     # Propagate position from text context (for condition+action splits)
     # Don't set position if source_position or exclude_position already set,
     # or if positions_characters already encodes per-position mappings.
+    # Also don't set position when multiple positions are detected (comma-separated):
+    # "left_side,right_side" belongs in activation_position, not position.
+    # The position field is a cross-comparison filter expecting a single value.
     if (
         "position" not in d
         and "source_position" not in d
@@ -9119,8 +9156,12 @@ def _walk(d, full_text, original_text, ctx_text=None):
         and d_ctx
     ):
         pos = _has_position_keywords(d_ctx)
-        if pos:
+        if pos and "," not in pos:
             d["position"] = pos
+        elif pos:
+            # Multi-position: set activation_position instead
+            if "activation_position" not in d:
+                d["activation_position"] = pos
 
     # Strip {{center.png|センター}} etc from text when extracted as position
     if d.get("position") and d_text:
@@ -10698,6 +10739,14 @@ def _merge_parenthetical(target, parenthetical):
                         del acp["position"]
                         del acp["position_compare"]
                         acp["activation_position"] = target["activation_position"]
+                # Remove spurious "position" field when it matches activation_position.
+                # The "position" field is a cross-comparison filter (expects single value
+                # like "left_side"). When both positions are listed, it should be
+                # activation_position instead. Keeping "position" as a comma-separated
+                # string causes the engine's can_activate_effect to merge it into the
+                # appearance condition, where it breaks the cross-comparison check.
+                if target.get("position") == target.get("activation_position"):
+                    del target["position"]
             break
 
 

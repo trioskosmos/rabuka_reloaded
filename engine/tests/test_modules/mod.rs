@@ -284,7 +284,6 @@ pub mod pl_s_bp5_010_test;
 pub mod pl_s_bp6_006_test;
 pub mod pl_sp_sd1_002_test;
 pub mod pr_energy_place_cost_test;
-pub mod sp_bp4_003_side_activation_test;
 pub mod sp_bp5_choice_energy_test;
 pub mod sp_bp5_leftside_cost_test;
 pub mod stellar_phoenix_test;
