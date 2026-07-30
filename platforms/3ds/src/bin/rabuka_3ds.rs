@@ -1272,7 +1272,6 @@ fn main() {
                 let was_dirty = *dirty;
                 let new_step = match phase.clone() {
                     SetupPhase::PickMode(cur) => unsafe {
-                        dprintln!("[PM] PickMode cur={} dirty={}", cur, was_dirty);
                         if was_dirty {
                             if _3ds_is_cli_mode() {
                                 _3ds_clear_top();
@@ -6638,7 +6637,11 @@ fn main() {
                                             s.turn,
                                             s.player_id,
                                             s.total_score,
-                                            s.total_hearts.iter().copied().map(u32::from).sum::<u32>(),
+                                            s.total_hearts
+                                                .iter()
+                                                .copied()
+                                                .map(u32::from)
+                                                .sum::<u32>(),
                                             s.lives.iter().filter(|l| l.passed).count(),
                                             s.lives.len(),
                                             s.success

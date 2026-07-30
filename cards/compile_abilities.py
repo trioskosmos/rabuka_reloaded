@@ -701,6 +701,74 @@ def compile_all(abilities):
             strings.append(s)
         return string_idx[s]
 
+    ACTION_TO_VARIANT_TAG = {
+        "move_cards": 1,
+        "discard_card": 1,
+        "discard_until_count": 1,
+        "place_energy_under_member": 1,
+        "re_yell": 1,
+        "shuffle": 1,
+        "play_baton_touch": 1,
+        "double_baton_touch": 1,
+        "draw": 2,
+        "draw_card": 2,
+        "draw_until_count": 2,
+        "select": 3,
+        "select_cards": 3,
+        "select_number": 3,
+        "choose_target_player": 3,
+        "look": 4,
+        "look_at": 4,
+        "reveal": 4,
+        "reveal_effect": 4,
+        "reveal_per_group": 4,
+        "reveal_until_live_card": 4,
+        "reveal_until_chosen_card": 4,
+        "look_and_select": 4,
+        "modify_score": 5,
+        "modify_required_hearts": 6,
+        "modify_required_hearts_global": 6,
+        "modify_required_hearts_success": 6,
+        "gain_resource": 7,
+        "pay_energy": 7,
+        "change_state": 8,
+        "set_card_identity": 8,
+        "set_card_identity_all_regions": 8,
+        "gain_ability": 9,
+        "gain_ability_from_source": 9,
+        "invalidate_ability": 9,
+        "suppress_ability_trigger": 9,
+        "activate_ability": 9,
+        "sequential": 10,
+        "choice": 10,
+        "repeat_procedure": 10,
+        "conditional_alternative": 10,
+        "conditional_on_optional": 10,
+        "conditional_on_result": 10,
+        "restriction": 11,
+        "activation_restriction": 11,
+        "modify_limit": 11,
+        "all_blade_timing": 11,
+        "reduce_live_card_set_limit": 11,
+        "position_change": 12,
+        "rotation": 12,
+        "set_cost": 13,
+        "set_cost_to_use": 13,
+        "modify_cost": 13,
+        "activation_cost": 13,
+        "set_blade_type": 13,
+        "set_blade_count": 13,
+        "set_heart_type": 13,
+        "specify_heart_color": 13,
+        "choose_required_hearts": 13,
+        "perform_yell": 13,
+        "modify_yell_count": 13,
+        "custom": 14,
+        "do_nothing": 14,
+        "action_by": 14,
+        "opponent_action": 14,
+    }
+
     def enc_val(v, out: bytearray):
         if v is None:
             out.append(0x00)
@@ -721,7 +789,13 @@ def compile_all(abilities):
             for item in v:
                 enc_val(item, out)
         elif isinstance(v, dict):
-            out.append(0x08)
+            action = v.get("action", "")
+            vtag = ACTION_TO_VARIANT_TAG.get(action, 0)
+            if vtag:
+                out.append(0x09)  # TAG_OBJECT_VARIANT
+                out.append(vtag)
+            else:
+                out.append(0x08)  # TAG_OBJECT
             out.extend(struct.pack("<I", len(v)))
             for k, val in v.items():
                 out.extend(struct.pack("<H", intern(str(k))))
@@ -796,6 +870,21 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
                 pos = count_one(bc, pos)
             return pos
         elif tag == 0x08:
+            if pos + 4 > len(bc):
+                return len(bc)
+            n = bc[pos] | (bc[pos + 1] << 8) | (bc[pos + 2] << 16) | (bc[pos + 3] << 24)
+            pos += 4
+            for _ in range(n):
+                if pos + 2 > len(bc):
+                    return len(bc)
+                kidx = bc[pos] | (bc[pos + 1] << 8)
+                pos += 2
+                if kidx < len(freq):
+                    freq[kidx] += 1
+                pos = count_one(bc, pos)
+            return pos
+        elif tag == 0x09:
+            pos += 1  # skip variant tag byte
             if pos + 4 > len(bc):
                 return len(bc)
             n = bc[pos] | (bc[pos + 1] << 8) | (bc[pos + 2] << 16) | (bc[pos + 3] << 24)
@@ -884,7 +973,26 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
                     return len(bc)
                 old_kidx = bc[pos] | (bc[pos + 1] << 8)
                 pos += 2
-                write_idx(out, new_idx[old_kidx])
+                mapped = new_idx[old_kidx]
+                write_idx(out, mapped)
+                pos = rewrite_one(bc, pos, out)
+            return pos
+        elif tag == 0x09:
+            vtag = bc[pos]
+            pos += 1
+            out.append(vtag)
+            if pos + 4 > len(bc):
+                return len(bc)
+            n = bc[pos] | (bc[pos + 1] << 8) | (bc[pos + 2] << 16) | (bc[pos + 3] << 24)
+            pos += 4
+            out.extend(struct.pack("<I", n))
+            for _ in range(n):
+                if pos + 2 > len(bc):
+                    return len(bc)
+                old_kidx = bc[pos] | (bc[pos + 1] << 8)
+                pos += 2
+                mapped = new_idx[old_kidx]
+                write_idx(out, mapped)
                 pos = rewrite_one(bc, pos, out)
             return pos
         return pos

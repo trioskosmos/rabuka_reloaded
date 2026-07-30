@@ -68,6 +68,7 @@ const TAG_F64: u8 = 0x04;
 const TAG_STR: u8 = 0x06;
 const TAG_ARRAY: u8 = 0x07;
 const TAG_OBJECT: u8 = 0x08;
+const TAG_OBJECT_VARIANT: u8 = 0x09;
 
 pub fn ability_count() -> usize {
     NUM_ABILITIES
@@ -288,10 +289,13 @@ fn skip_value_with_tag(bc: &mut BcReader, tag: u8) -> Option<()> {
             }
             Some(())
         }
-        TAG_OBJECT => {
+        TAG_OBJECT | TAG_OBJECT_VARIANT => {
+            if tag == TAG_OBJECT_VARIANT {
+                bc.read_u8()?;
+            }
             let len = bc.read_u32()? as usize;
             for _ in 0..len {
-                bc.read_idx()?; // key index
+                bc.read_idx()?;
                 bc.skip_value()?;
             }
             Some(())
@@ -334,7 +338,10 @@ fn read_value_from_bc(bc: &mut BcReader) -> Option<serde_json::Value> {
             }
             Some(serde_json::Value::Array(arr))
         }
-        TAG_OBJECT => {
+        TAG_OBJECT | TAG_OBJECT_VARIANT => {
+            if tag == TAG_OBJECT_VARIANT {
+                bc.read_u8()?; // skip variant tag byte
+            }
             let len = bc.read_u32()? as usize;
             let mut obj = serde_json::Map::with_capacity(len);
             for _ in 0..len {
@@ -457,6 +464,16 @@ fn decode_ability_effect(bc: &mut BcReader) -> Option<Option<AbilityEffect>> {
     match tag {
         TAG_NULL => Some(None),
         TAG_OBJECT => {
+            let inner = decode_ability_effect_from_object(bc)?;
+            Some(Some(inner))
+        }
+        TAG_OBJECT_VARIANT => {
+            bc.read_u8()?;
+            let inner = decode_ability_effect_from_object(bc)?;
+            Some(Some(inner))
+        }
+        TAG_OBJECT_VARIANT => {
+            bc.read_u8()?; // skip variant tag byte, fall through to JSON path
             let inner = decode_ability_effect_from_object(bc)?;
             Some(Some(inner))
         }

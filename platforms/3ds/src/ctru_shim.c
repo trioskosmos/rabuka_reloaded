@@ -992,6 +992,9 @@ void _3ds_swap_buffers() {
     }
 
     C3D_FrameEnd(0);
+
+    // Now GPU is idle — safe to free any deferred QR resources
+    _3ds_qr_process_pending_free();
 }
 
 // ---- Input + system ----
@@ -1230,8 +1233,10 @@ int _3ds_uds_is_connected() {
 #include <3ds/services/cam.h>
 #include <3ds/services/gspgpu.h>
 
-// Forward declaration (defined below, called by _3ds_qr_start error paths)
+// Forward declarations (defined below, called by _3ds_qr_start cleanup)
+void _3ds_qr_stop(void *p);
 void _3ds_qr_free(void *p);
+void _3ds_qr_process_pending_free(void);
 
 #define QR_W 400
 #define QR_H 240
@@ -1258,6 +1263,7 @@ typedef struct {
 } qr_context_t;
 
 static qr_context_t *g_qr_ctx = NULL;
+static qr_context_t *g_qr_pending_free = NULL;
 static const Tex3DS_SubTexture qr_subtex = { 400, 240, 0.0f, 1.0f, 400.0f/512.0f, 1.0f - (240.0f/256.0f) };
 
 static void qr_apt_hook(APT_HookType hook, void* param) {
@@ -1385,6 +1391,15 @@ void _3ds_qr_draw_preview(float x_off) {
 }
 
 void *_3ds_qr_start(void) {
+    // Clean up any leftover context from a previous scan
+    _3ds_qr_process_pending_free();
+    if (g_qr_ctx) {
+        qr_context_t *old = g_qr_ctx;
+        g_qr_ctx = NULL;
+        _3ds_qr_stop(old);
+        qr_destroy_context(old);
+    }
+
     qr_context_t *ctx = (qr_context_t*)calloc(1, sizeof(qr_context_t));
     if (!ctx) return NULL;
     C3D_TexInit(&ctx->tex, 512, 256, GPU_RGB565);
@@ -1420,21 +1435,41 @@ void _3ds_qr_stop(void *p) {
     if (ctx->capture_buf) memset(ctx->capture_buf, 0, QR_W * QR_H * 2);
 }
 
-void _3ds_qr_free(void *p) {
-    qr_context_t *ctx = (qr_context_t*)p;
+// Actually free a QR context. Called after GPU is idle (C3D_FrameEnd).
+static void qr_destroy_context(qr_context_t *ctx) {
     if (!ctx) return;
-    if (g_qr_ctx == ctx) g_qr_ctx = NULL;
-    _3ds_qr_stop(ctx);
     if (ctx->qr) { quirc_destroy(ctx->qr); ctx->qr = NULL; }
-    // Do NOT C3D_TexDelete here - GPU may still reference it.
-    // Texture is leaked (256KB) until app exit. FBI does the same via
-    // screen_unload_texture which manages textures at app-lifetime scope.
+    if (ctx->tex_inited) { C3D_TexDelete(&ctx->tex); ctx->tex_inited = false; }
     if (ctx->capture_buf) { linearFree(ctx->capture_buf); ctx->capture_buf = NULL; }
     aptUnhook(&ctx->apt_cookie);
     if (ctx->pause_event) { svcCloseHandle(ctx->pause_event); ctx->pause_event = 0; }
     if (ctx->mutex) { svcCloseHandle(ctx->mutex); ctx->mutex = 0; }
     if (ctx->stop_event) { svcCloseHandle(ctx->stop_event); ctx->stop_event = 0; }
     free(ctx);
+}
+
+// Called from _3ds_swap_buffers AFTER C3D_FrameEnd(0) — GPU is idle here.
+void _3ds_qr_process_pending_free(void) {
+    if (!g_qr_pending_free) return;
+    qr_context_t *old = g_qr_pending_free;
+    g_qr_pending_free = NULL;
+    qr_destroy_context(old);
+}
+
+void _3ds_qr_free(void *p) {
+    qr_context_t *ctx = (qr_context_t*)p;
+    if (!ctx) return;
+    if (g_qr_ctx == ctx) g_qr_ctx = NULL;
+    _3ds_qr_stop(ctx);
+    // Defer actual resource cleanup to next frame's _3ds_swap_buffers,
+    // after C3D_FrameEnd ensures the GPU is idle. This prevents:
+    // - READ abort from C3D_TexDelete while GPU still references the texture
+    // - APT hook firing on freed memory (unhook happens in qr_destroy_context)
+    // - Linear memory starvation during heavy Loading phase
+    if (g_qr_pending_free) {
+        qr_destroy_context(g_qr_pending_free);
+    }
+    g_qr_pending_free = ctx;
 }
 
 int _3ds_qr_poll(void *p, char *out_text, unsigned int out_max) {
