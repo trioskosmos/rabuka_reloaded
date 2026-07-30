@@ -252,7 +252,7 @@
     "perf_engine_header": "ライブフェーズ — ステップバイステップ",
     "perf_engine_live_zone": "1. ライブゾーン — {count}枚",
     "perf_engine_triggers": "2. ライブ開始時 — {count}トリガー",
-    "perf_engine_blades_yell": "3. ブラシ→エール — {blades}ブラシ→{yell}エール",
+    "perf_engine_blades_yell": "3. ブラシ→エール — {count}枚",
     "perf_engine_stage_hearts": "4. ステージハート — {hearts}",
     "perf_engine_yell_cards": "5. エールカード — {count}枚",
     "perf_engine_transforms": "6. 色変換 — {count}回",

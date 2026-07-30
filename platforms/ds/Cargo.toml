@@ -11,13 +11,6 @@ serde_json = { version = "=1.0.99", default-features = false, features = ["alloc
 
 
 
-[profile.release]
-opt-level = "z"
-panic = "abort"
-strip = true
-lto = true
-codegen-units = 1
-
 [[bin]]
 name = "rabuka_ds"
 path = "src/bin/rabuka_ds.rs"

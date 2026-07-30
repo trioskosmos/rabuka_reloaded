@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-30T20:02:12.079937",
+  "generated_at": "2026-07-30T22:08:34.715011",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "6b5a28ba",
+  "engine_commit": "18a38d9b",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -4151,7 +4151,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のすべてのメンバーをウェイトにする",
+        "text": "{{center.png|センター}}自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のすべてのメンバーをウェイトにする",
         "condition": {
           "text": "自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合",
           "target": "self",
@@ -4174,8 +4174,7 @@
         "all": true,
         "blade_limit": 3,
         "blade_limit_operator": "<=",
-        "activation_position": "center",
-        "position": "left_side,right_side,center"
+        "activation_position": "center"
       }
     },
     {
@@ -11449,7 +11448,7 @@
         "value": 2,
         "operation": "add",
         "self_target": true,
-        "position": "center,left_side,right_side"
+        "activation_position": "center,left_side,right_side"
       }
     },
     {
@@ -14331,7 +14330,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "カードを2枚引き、手札を2枚控え室に置く",
+        "text": "{{leftside.png|左サイド}}{{rightside.png|右サイド}}カードを2枚引き、手札を2枚控え室に置く",
         "action": "sequential",
         "actions": [
           {
@@ -14351,7 +14350,6 @@
             "count": 2,
             "action": "move_cards",
             "card_type": "card",
-            "position": "left_side,right_side",
             "activation_position": "left_side,right_side"
           }
         ],
@@ -14370,8 +14368,7 @@
           "location": "stage",
           "activation_position": "left_side,right_side"
         },
-        "activation_position": "left_side,right_side",
-        "position": "left_side,right_side"
+        "activation_position": "left_side,right_side"
       }
     },
     {

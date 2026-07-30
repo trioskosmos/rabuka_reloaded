@@ -24,6 +24,7 @@ pub struct RevealedCardMeta {
     pub source_name: Option<String>,
     pub is_private: bool,
     pub owner: Option<u8>,
+    pub reveal_type: &'static str,
 }
 
 pub use crate::types::{
@@ -660,6 +661,7 @@ impl GameState {
         source_card_id: Option<i16>,
         is_private: bool,
         owner: Option<u8>,
+        reveal_type: &'static str,
     ) {
         let source_name = source_card_id
             .and_then(|sid| self.card_database.get_card(sid))
@@ -670,6 +672,7 @@ impl GameState {
             source_name,
             is_private,
             owner,
+            reveal_type,
         });
     }
 
@@ -680,6 +683,7 @@ impl GameState {
         source_card_id: Option<i16>,
         is_private: bool,
         owner: Option<u8>,
+        reveal_type: &'static str,
     ) {
         let source_name = source_card_id
             .and_then(|sid| self.card_database.get_card(sid))
@@ -690,6 +694,7 @@ impl GameState {
             source_name,
             is_private,
             owner,
+            reveal_type,
         });
     }
 

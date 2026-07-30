@@ -503,6 +503,36 @@ impl super::TurnEngine {
             // Rule 8.3.16: If ANY live card's need_heart could not be satisfied,
             // ALL live cards fail. Success requires ALL cards to pass.
             snap.success = snap.lives.iter().all(|l| l.passed) && snap.total_score > 0;
+
+            // Pre-computed score breakdown for the UI display layer.
+            snap.base_score_total = snap
+                .lives
+                .iter()
+                .filter(|l| l.passed)
+                .map(|l| l.score)
+                .sum();
+            snap.card_bonus_total = snap
+                .lives
+                .iter()
+                .filter(|l| l.passed)
+                .map(|l| l.score.saturating_sub(l.base_score))
+                .sum();
+
+            // Pre-computed per-color transform delta for each member contribution.
+            // transform_delta = bonus_hearts - sum(ability_heart_bonuses per color).
+            for mc in &mut snap.member_contributions {
+                let mut ability_per_color = [0u32; 8];
+                for ab in &mc.ability_heart_bonuses {
+                    if let Some(color_idx) = ab.color {
+                        if color_idx < 8 {
+                            ability_per_color[color_idx] += ab.amount;
+                        }
+                    }
+                }
+                for i in 0..8 {
+                    mc.transform_delta[i] = mc.bonus_hearts[i].saturating_sub(ability_per_color[i]);
+                }
+            }
         }
 
         // Revert score modifiers added by LiveSuccess-triggered abilities.
@@ -1194,6 +1224,7 @@ impl super::TurnEngine {
                     .map(|c| crate::types::ArcStr::from(c.card_no.as_ref()))
                     .unwrap_or_default(),
                 is_wait,
+                transform_delta: [0u32; 8],
             });
         }
 
@@ -2577,6 +2608,8 @@ pub fn build_snapshot(
         p0_wins: false,
         p1_wins: false,
         performance_need_heart_modifiers: performance_need_heart_modifiers.to_vec(),
+        base_score_total: 0,
+        card_bonus_total: 0,
     }
 }
 

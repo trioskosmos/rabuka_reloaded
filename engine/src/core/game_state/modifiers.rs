@@ -1185,7 +1185,7 @@ impl GameState {
             .ability_master_id()
             .as_deref()
             .and_then(|m| crate::ability::util::target_player_index("self", Some(m)));
-        self.push_revealed_card(card_id, src, false, owner);
+        self.push_revealed_card(card_id, src, false, owner, "ability");
     }
 
     pub fn remove_revealed_card(&mut self, card_id: i16) {

@@ -324,7 +324,7 @@ impl AbilityResolver {
         let reveal_src = gs.current_ability_source_card_id();
         let owner = util::target_player_index(target, gs.ability_master_id().as_deref());
         for card_id in &card_ids {
-            gs.push_revealed_card(*card_id, reveal_src, false, owner);
+            gs.push_revealed_card(*card_id, reveal_src, false, owner, "ability");
         }
 
         if !card_ids.is_empty() {
@@ -1007,7 +1007,7 @@ impl AbilityResolver {
         let pg_owner = util::target_player_index(target, gs.ability_master_id().as_deref());
         for members in by_group.values() {
             for &card_id in members {
-                gs.push_revealed_card(card_id, pg_source, false, pg_owner);
+                gs.push_revealed_card(card_id, pg_source, false, pg_owner, "ability");
             }
         }
 
@@ -1050,7 +1050,7 @@ impl AbilityResolver {
             match card_id {
                 Some(cid) => {
                     all_revealed.push(cid);
-                    gs.push_revealed_card(cid, ru_source, false, ru_owner);
+                    gs.push_revealed_card(cid, ru_source, false, ru_owner, "ability");
                     if termination_check(&card_db, cid) {
                         matched_idx = Some(all_revealed.len() - 1);
                         break;
@@ -1070,7 +1070,7 @@ impl AbilityResolver {
                     player.main_deck.shuffle();
                     if let Some(cid) = player.main_deck.draw() {
                         all_revealed.push(cid);
-                        gs.push_revealed_card(cid, ru_source, false, ru_owner);
+                        gs.push_revealed_card(cid, ru_source, false, ru_owner, "ability");
                         if termination_check(&card_db, cid) {
                             matched_idx = Some(all_revealed.len() - 1);
                             break;

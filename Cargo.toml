@@ -1,0 +1,41 @@
+[workspace]
+members = [
+    "engine",
+    "platforms/3ds",
+    "platforms/wii",
+    "platforms/psp",
+    "platforms/ds",
+    "platforms/dc",
+    "tools/bake",
+]
+resolver = "2"
+
+[profile.dev]
+opt-level = 1
+debug = 0
+incremental = true
+codegen-units = 16
+
+[profile.test]
+opt-level = 1
+debug = 1
+incremental = true
+codegen-units = 16
+
+[profile.bench]
+debug = true
+
+# Default release profile. Platform-specific overrides via env vars:
+#   DS:   CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=true CARGO_PROFILE_RELEASE_STRIP=true CARGO_PROFILE_RELEASE_PANIC=abort CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo build -p rabuka_ds --release
+#   3DS:  CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 cargo build -p rabuka_3ds --release
+#   PSP:  CARGO_PROFILE_RELEASE_LTO=true CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 cargo build -p rabuka_psp --release
+#   Wii:  CARGO_PROFILE_RELEASE_PANIC=abort cargo build -p rabuka_wii --release
+#   DC:   CARGO_PROFILE_RELEASE_PANIC=abort cargo build -p rabuka_dc --release
+[profile.release]
+opt-level = 2
+lto = false
+panic = "unwind"
+codegen-units = 16
+
+[patch.crates-io]
+psp = { path = "platforms/psp/vendored/psp" }

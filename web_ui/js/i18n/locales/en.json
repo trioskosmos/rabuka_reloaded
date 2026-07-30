@@ -205,7 +205,7 @@
     "perf_engine_header": "Live Phase — Step by Step",
     "perf_engine_live_zone": "1. Live Zone — {count} card(s)",
     "perf_engine_triggers": "2. Live Start — {count} trigger(s)",
-    "perf_engine_blades_yell": "3. Blades → Yell — {blades} blades → {yell} yell",
+    "perf_engine_blades_yell": "3. Blades → Yell — {count}",
     "perf_engine_stage_hearts": "4. Stage Hearts — {hearts}",
     "perf_engine_yell_cards": "5. Yell Cards — {count} card(s)",
     "perf_engine_transforms": "6. Color Transforms — {count} change(s)",

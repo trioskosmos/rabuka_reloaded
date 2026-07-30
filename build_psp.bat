@@ -13,6 +13,8 @@ echo.
 
 echo [2/3] Building PSP binary (requires nightly + cargo-psp)...
 cd /d "%~dp0platforms\psp"
+set CARGO_PROFILE_RELEASE_LTO=true
+set CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16
 rustup override set nightly 2>nul
 cargo psp --release --features psp
 if errorlevel 1 (

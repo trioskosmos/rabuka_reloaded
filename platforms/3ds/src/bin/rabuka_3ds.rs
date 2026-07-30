@@ -722,6 +722,7 @@ enum SetupPhase {
     MultiplayerLoading(usize, usize, bool, Option<Vec<u8>>), // p1_idx, p2_idx, is_host, deck_sync_bytes
     QrScan,                                                  // QR code scanning for deck import
     QrResult(Vec<String>),                                   // QR scan result, user can confirm
+    QrNotDeck(String, u32), // QR scanned but not a valid deck, shows decoded text, countdown frames
 }
 
 #[cfg(feature = "3ds")]
@@ -906,6 +907,24 @@ fn render_card_detail(card_id: i16, gs: &GameState) {
                 ty += 3.0;
             }
         }
+    }
+}
+
+/// Render a consistent hint bar at the bottom of the top screen.
+/// Place this in the overlay's rendering code to show button hints.
+/// The y position is always 225 (above the 240px bottom edge).
+const HINT_BAR_Y: f32 = 225.0;
+const HINT_BAR_SCALE: f32 = 0.55;
+#[cfg(feature = "3ds")]
+fn render_hint_bar(text: &str) {
+    unsafe {
+        _3ds_top_queue_text(
+            4.0,
+            HINT_BAR_Y,
+            COL_MED,
+            HINT_BAR_SCALE,
+            format!("{}\0", text).as_ptr(),
+        );
     }
 }
 
@@ -1217,16 +1236,7 @@ fn main() {
                                         );
                                     }
                                 }
-                                unsafe {
-                                    _3ds_top_queue_text(
-                                        50.0,
-                                        220.0,
-                                        COL_MED,
-                                        0.60f32,
-                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back"))
-                                            .as_ptr(),
-                                    );
-                                }
+                                render_hint_bar(&tl("UP/DOWN=select  A=confirm  B=back"));
                             }
                         }
                         if keys & 0x00000040 != 0 && cur > 0 {
@@ -1355,16 +1365,7 @@ fn main() {
                                         );
                                     }
                                 }
-                                unsafe {
-                                    _3ds_top_queue_text(
-                                        20.0,
-                                        228.0,
-                                        COL_MED,
-                                        0.65f32,
-                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back"))
-                                            .as_ptr(),
-                                    );
-                                }
+                                render_hint_bar(&tl("UP/DOWN=select  A=confirm  B=back"));
                             }
                         }
                         if keys & 0x00000040 != 0 && cur > 0 {
@@ -1482,16 +1483,7 @@ fn main() {
                                         );
                                     }
                                 }
-                                unsafe {
-                                    _3ds_top_queue_text(
-                                        20.0,
-                                        228.0,
-                                        COL_MED,
-                                        0.65f32,
-                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back"))
-                                            .as_ptr(),
-                                    );
-                                }
+                                render_hint_bar(&tl("UP/DOWN=select  A=confirm  B=back"));
                             }
                         }
                         if keys & 0x00000040 != 0 && cur > 0 {
@@ -1593,15 +1585,7 @@ fn main() {
                                         );
                                     }
                                 }
-                                unsafe {
-                                    _3ds_top_queue_text(
-                                        20.0,
-                                        228.0,
-                                        COL_MED,
-                                        0.65f32,
-                                        format!("{}\0", tl("A=select  B=use same")).as_ptr(),
-                                    );
-                                }
+                                render_hint_bar(&tl("A=select  B=use same"));
                             }
                         }
                         if keys & 0x00000040 != 0 && cur > 0 {
@@ -1770,7 +1754,6 @@ fn main() {
                             } else {
                                 unsafe {
                                     _3ds_top_clear();
-                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
                                     let qr_hdr = tl("QR SCAN");
                                     _3ds_top_queue_text(
                                         120.0,
@@ -1826,7 +1809,7 @@ fn main() {
                                     Step::Setup(
                                         cards.clone(),
                                         decks.clone(),
-                                        SetupPhase::QrScan,
+                                        SetupPhase::QrNotDeck(text, 90),
                                         true,
                                     )
                                 } else {
@@ -1958,6 +1941,68 @@ fn main() {
                             )
                         }
                     }
+                    SetupPhase::QrNotDeck(scanned_text, frames_left) => {
+                        if was_dirty {
+                            if unsafe { _3ds_is_cli_mode() } {
+                                unsafe {
+                                    _3ds_clear_top();
+                                    _3ds_text_add_top(
+                                        format!("{}\n\0", tl("NOT A DECK QR")).as_ptr(),
+                                    );
+                                    let preview = if scanned_text.len() > 40 {
+                                        &scanned_text[..40]
+                                    } else {
+                                        &scanned_text
+                                    };
+                                    _3ds_text_add_top(format!("  {}\n\0", preview).as_ptr());
+                                    _3ds_text_add_top(format!("\n{}\n\0", tl("B=back")).as_ptr());
+                                }
+                            } else {
+                                unsafe {
+                                    _3ds_top_clear();
+                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                    _3ds_top_queue_text(
+                                        100.0,
+                                        8.0,
+                                        COL_GOLD,
+                                        0.85f32,
+                                        format!("{}\0", tl("NOT A DECK QR")).as_ptr(),
+                                    );
+                                    let preview = if scanned_text.len() > 40 {
+                                        &scanned_text[..40]
+                                    } else {
+                                        &scanned_text
+                                    };
+                                    _3ds_top_queue_text(
+                                        20.0,
+                                        60.0,
+                                        COL_LIGHT,
+                                        0.60f32,
+                                        format!("{}\0", preview).as_ptr(),
+                                    );
+                                    _3ds_top_queue_text(
+                                        20.0,
+                                        220.0,
+                                        COL_MED,
+                                        0.60f32,
+                                        format!("{}\0", tl("B=back")).as_ptr(),
+                                    );
+                                }
+                            }
+                        }
+                        if keys & 0x00000002 != 0 {
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
+                        } else if frames_left > 0 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::QrNotDeck(scanned_text, frames_left - 1),
+                                false,
+                            )
+                        } else {
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan, true)
+                        }
+                    }
                     // Multiplayer: Host or Client?
                     SetupPhase::MultiplayerPickRole(deck_idx, cur) => {
                         if was_dirty {
@@ -2031,16 +2076,7 @@ fn main() {
                                         );
                                     }
                                 }
-                                unsafe {
-                                    _3ds_top_queue_text(
-                                        50.0,
-                                        220.0,
-                                        COL_MED,
-                                        0.60f32,
-                                        format!("{}\0", tl("UP/DOWN=select  A=confirm  B=back"))
-                                            .as_ptr(),
-                                    );
-                                }
+                                render_hint_bar(&tl("UP/DOWN=select  A=confirm  B=back"));
                             }
                         }
                         if keys & 0x00000040 != 0 && cur > 0 {
@@ -5573,13 +5609,7 @@ fn main() {
                                                     0.50f32,
                                                     format!("{}\0", page_str).as_ptr(),
                                                 );
-                                                _3ds_top_queue_text(
-                                                    4.0,
-                                                    228.0,
-                                                    COL_MED,
-                                                    0.50f32,
-                                                    format!("{}\0", tl("L/B=close")).as_ptr(),
-                                                );
+                                                render_hint_bar(&tl("L/B=close"));
                                             }
                                         }
                                     }
@@ -6225,13 +6255,7 @@ fn main() {
                                         format!("{}{}\0", prefix, item).as_ptr(),
                                     );
                                 }
-                                _3ds_top_queue_text(
-                                    60.0,
-                                    210.0,
-                                    COL_MED,
-                                    0.50f32,
-                                    format!("{}\0", tl("UP/DOWN=move, A=select, B=close")).as_ptr(),
-                                );
+                                render_hint_bar(&tl("UP/DOWN=move, A=select, B=close"));
                             },
                             Overlay::GameLog(offset, cursor) => {
                                 let logs = &gs.rule_log;

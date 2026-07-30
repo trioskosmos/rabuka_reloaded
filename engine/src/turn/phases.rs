@@ -377,7 +377,7 @@ impl super::TurnEngine {
             Some(1)
         };
         for cid in &revealed_ids {
-            game_state.push_revealed_card(*cid, None, false, yell_owner);
+            game_state.push_revealed_card(*cid, None, false, yell_owner, "yell");
         }
         // Save initial yell cards BEFORE auto abilities fire, since
         // re-yell abilities may discard them (clearing revealed_cards).

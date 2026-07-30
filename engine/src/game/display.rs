@@ -260,6 +260,8 @@ pub struct RevealedCardDisplay {
     pub owner: i8,
     #[serde(default)]
     pub is_private: bool,
+    #[serde(default)]
+    pub reveal_type: String,
 }
 
 impl RevealedCardDisplay {
@@ -273,6 +275,7 @@ impl RevealedCardDisplay {
             source_card_name: meta.and_then(|m| m.source_name.clone()),
             owner: meta.and_then(|m| m.owner).map(|o| o as i8).unwrap_or(-1i8),
             is_private: meta.map(|m| m.is_private).unwrap_or(false),
+            reveal_type: meta.map(|m| m.reveal_type.to_string()).unwrap_or_default(),
         }
     }
 }

@@ -12,9 +12,6 @@ log = { version = "0.4", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
 
-[patch.crates-io]
-psp = { path = "vendored/psp" }
-
 [features]
 default = []
 psp = ["dep:psp", "dep:embedded-graphics"]
@@ -25,8 +22,3 @@ path = "src/bin/rabuka_psp.rs"
 required-features = ["psp"]
 
 # bake_cards moved to tools/bake_cards/ (standalone crate for host builds)
-
-[profile.release]
-codegen-units = 16
-lto = true
-opt-level = 2

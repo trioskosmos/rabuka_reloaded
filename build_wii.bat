@@ -6,6 +6,8 @@ set PATH=%DEVKITPPC%\bin;%DEVKITPRO%\tools\bin;%PATH%
 
 echo [1/5] Rust staticlib...
 cd /d "%~dp0platforms\wii"
+set CARGO_PROFILE_RELEASE_PANIC=abort
+set CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
 cargo +nightly build -Z build-std=core,alloc,panic_abort -Z json-target-spec --target powerpc-unknown-eabi.json --release
 if %ERRORLEVEL% neq 0 ( echo FAIL; pause; exit /b 1 )
 

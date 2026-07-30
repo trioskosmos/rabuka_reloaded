@@ -33,6 +33,11 @@ echo.
 
 echo [2/3] Building DS binary...
 cd /d "%~dp0platforms\ds"
+set CARGO_PROFILE_RELEASE_OPT_LEVEL=z
+set CARGO_PROFILE_RELEASE_LTO=true
+set CARGO_PROFILE_RELEASE_STRIP=true
+set CARGO_PROFILE_RELEASE_PANIC=abort
+set CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
 call cargo +nightly build --release -Zbuild-std=core,alloc -Zjson-target-spec --target armv5te-nintendo-ds.json
 cd /d "%~dp0"
 if %ERRORLEVEL% neq 0 (

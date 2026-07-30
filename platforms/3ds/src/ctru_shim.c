@@ -1363,6 +1363,12 @@ void _3ds_qr_draw_preview(float x_off) {
 int _3ds_qr_start(void) {
     if (cam_running) return 0;
 
+    // Clean up leftover resources from a previous session
+    if (cam_tex_inited) { C3D_TexDelete(&cam_tex); cam_tex_inited = false; }
+    if (cam_shared_buf) { linearFree(cam_shared_buf); cam_shared_buf = NULL; }
+    if (cam_mutex) { svcCloseHandle(cam_mutex); cam_mutex = 0; }
+    if (cam_stop_event) { svcCloseHandle(cam_stop_event); cam_stop_event = 0; }
+
     svcCreateMutex(&cam_mutex, false);
     svcCreateEvent(&cam_stop_event, RESET_STICKY);
 
@@ -1401,10 +1407,10 @@ void _3ds_qr_stop(void) {
         cam_thread = NULL;
     }
     if (qr) { quirc_destroy(qr); qr = NULL; }
-    if (cam_tex_inited) { C3D_TexDelete(&cam_tex); cam_tex_inited = false; }
-    if (cam_shared_buf) { linearFree(cam_shared_buf); cam_shared_buf = NULL; }
-    if (cam_mutex) { svcCloseHandle(cam_mutex); cam_mutex = 0; }
-    if (cam_stop_event) { svcCloseHandle(cam_stop_event); cam_stop_event = 0; }
+    // Do NOT free cam_tex, cam_shared_buf, cam_mutex, or cam_stop_event here.
+    // The render thread uses them in _3ds_qr_draw_preview and may still be
+    // mid-draw when this function returns. They are freed in _3ds_qr_start()
+    // before re-allocating, or on app exit.
 }
 
 int _3ds_qr_poll(char *out_text, unsigned int out_max) {

@@ -3695,7 +3695,7 @@ impl AbilityResolver {
                 gs.ability_master_id().as_deref(),
             );
             for cid in total_blade {
-                gs.push_revealed_card(cid, reyell_source, false, reyell_owner);
+                gs.push_revealed_card(cid, reyell_source, false, reyell_owner, "re_yell");
             }
         }
         gs.re_yell_revealed_cards = gs.revealed_cards.clone();

@@ -356,6 +356,10 @@ pub struct PerformanceSnapshot {
     pub surplus_hearts: [u32; 8],
     /// Card IDs revealed during yell/cheer (from resolution zone).
     pub revealed_ids: Vec<i16>,
+    /// Sum of individual live card scores (l.score) for passed lives only.
+    pub base_score_total: u32,
+    /// Sum of triggered score bonuses (l.score - l.base_score) for passed lives.
+    pub card_bonus_total: u32,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -386,6 +390,8 @@ pub struct MemberContribution {
     pub ability_blade_bonuses: Vec<AbilityBonus>,
     pub card_no: ArcStr,
     pub is_wait: bool,
+    /// Per-color heart delta from color transforms (bonus_hearts minus ability bonuses).
+    pub transform_delta: [u32; 8],
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

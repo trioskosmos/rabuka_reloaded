@@ -224,7 +224,7 @@ impl super::resolver::AbilityResolver {
         for &idx in indices.iter() {
             if idx < gs.looked_at_cards.len() {
                 let cid = gs.looked_at_cards[idx];
-                gs.push_revealed_card(cid, source, false, looked_owner);
+                gs.push_revealed_card(cid, source, false, looked_owner, "ability");
                 revealed_ids.push(cid);
             }
         }
@@ -1323,7 +1323,7 @@ impl super::resolver::AbilityResolver {
         let source = gs.current_ability_source_card_id();
         let owner = util::target_player_index(&target, gs.ability_master_id().as_deref());
         for &cid in &revealed_card_ids {
-            gs.push_revealed_card(cid, source, false, owner);
+            gs.push_revealed_card(cid, source, false, owner, "ability");
         }
         if !revealed_card_ids.is_empty() {
             let names: Vec<String> = revealed_card_ids
@@ -1344,7 +1344,7 @@ impl super::resolver::AbilityResolver {
             let cost_source = gs.current_ability_source_card_id();
             let cost_owner = util::target_player_index(&target, gs.ability_master_id().as_deref());
             for &cid in &revealed_card_ids {
-                gs.push_revealed_cost_card(cid, cost_source, false, cost_owner);
+                gs.push_revealed_cost_card(cid, cost_source, false, cost_owner, "cost");
             }
         }
 
@@ -1567,8 +1567,8 @@ impl super::resolver::AbilityResolver {
             Some(1)
         };
         for card_id in card_ids {
-            gs.push_revealed_card(card_id, cost_source, false, cost_owner);
-            gs.push_revealed_cost_card(card_id, cost_source, false, cost_owner);
+            gs.push_revealed_card(card_id, cost_source, false, cost_owner, "cost");
+            gs.push_revealed_cost_card(card_id, cost_source, false, cost_owner, "cost");
         }
         self.finalize_choice(gs, context)
     }

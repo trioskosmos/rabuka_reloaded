@@ -45,18 +45,6 @@ function countPassedLives(lives) {
     return lives.filter((live) => live && live.passed).length;
 }
 
-function sumPassedLiveScores(lives) {
-    return lives
-        .filter((live) => live && live.passed)
-        .reduce((total, live) => total + (live.score || 0), 0);
-}
-
-function sumPassedBaseScores(lives) {
-    return lives
-        .filter((live) => live && live.passed)
-        .reduce((total, live) => total + (live.base_score || 0), 0);
-}
-
 function findAbilitySource(triggered, sourceText) {
     if (!triggered || !sourceText) return null;
     for (const t of triggered) {
@@ -147,43 +135,17 @@ function renderTextMetric(label, value, detail = '') {
     `;
 }
 
-function renderHeartsGrid(hearts) {
-    const values = hearts;
-    const filtered = HEART_LABELS.map((label, index) => ({
-        label,
-        count: values[index] || 0,
-        icon: HEART_ICONS[index],
-        index
-    })).filter(h => h.count > 0);
-
-    if (filtered.length === 0) return `<div class="perf-hearts-grid empty">${tr('perf_none')}</div>`;
-
-    return `
-        <div class="perf-hearts-grid">
-            ${filtered.map(h => `
-                <div class="heart-grid-cell${h.index === 0 ? ' color-any' : ' color-'+h.index}">
-                    <img src="${h.icon}" class="heart-mini-icon" alt="${escapeHtml(h.label)}">
-                    <span class="count-value">${h.count}</span>
-                    ${h.index === 0 ? '<span class="heart-any-label">Any</span>' : ''}
-                </div>
-            `).join('')}
-        </div>
-    `;
-}
-
 function renderHeartsCompact(hearts) {
     if (!Array.isArray(hearts) || hearts.every((value) => !value)) {
         return `<span class="perf-empty-inline">${tr('perf_none')}</span>`;
     }
 
-    const heartLabels = ['Any', 'Pink', 'Red', 'Yellow', 'Green', 'Blue', 'Purple', 'All'];
-
     return `<div class="hearts-compact">${hearts.map((count, index) => {
         if (!count) return '';
         const iconSrc = HEART_ICONS[index];
         return `
-            <div class="heart-tag ${index === 0 ? 'color-any' : `color-${index}`}" title="${heartLabels[index]}">
-                <img src="${iconSrc}" class="heart-mini-icon" alt="${heartLabels[index]}">
+            <div class="heart-tag ${index === 0 ? 'color-any' : `color-${index}`}" title="${HEART_LABELS[index]}">
+                <img src="${iconSrc}" class="heart-mini-icon" alt="${HEART_LABELS[index]}">
                 <span>${count}</span>
             </div>
         `;
@@ -445,10 +407,8 @@ function renderPerfSteps(result) {
     const fmtHShortReq = (arr) => arr ? arr.map((v,i) => v > 0 ? `<img src="${fmtHeartIcon(i)}" class="heart-mini-icon">${v}` : '').join('') : '';
     const fmtHShortSrc = (arr) => arr ? arr.map((v,i) => v > 0 ? `<img src="${fmtHeartIcon(i)}" class="heart-mini-icon">${v}` : '').join('') : '';
 
-    const totalBlades = (result.member_contributions || []).reduce((s, m) => m.is_wait ? s : s + m.base_blades + m.bonus_blades, 0);
+    const totalBlades = result.yell_count || 0;
     const passedLives = (result.lives || []).filter(l => l.passed).length;
-    const baseLiveScore = (result.lives || []).reduce((s, l) => l.passed ? s + l.score : s, 0);
-    const baseRawScore = (result.lives || []).reduce((s, l) => l.passed ? s + (l.base_score || 0) : s, 0);
 
     return `
         <section class="perf-steps-all">
@@ -493,7 +453,7 @@ function renderPerfSteps(result) {
 
             <!-- Step 3: Blades + Yell -->
             <details class="perf-step-detail" open>
-                <summary class="perf-step-summary">${tr('perf_engine_blades_yell', { blades: totalBlades, yell: result.yell_count || 0 })}</summary>
+                <summary class="perf-step-summary">${tr('perf_engine_blades_yell', { count: totalBlades })}</summary>
                 <div class="perf-step-body">
                     <div class="perf-step-members">
                         ${(result.member_contributions || []).map(m => {
@@ -604,22 +564,24 @@ function renderPerfSteps(result) {
                     <div class="perf-step-result-row">
                         <div class="perf-step-result-item">
                             <img src="img/texticon/icon_score.png" class="heart-mini-icon">
-                            ${tr('perf_base_score')}: ${baseRawScore}
+                            ${tr('perf_base_score')}: ${result.base_score_total || 0}
                         </div>
+                        ${(result.card_bonus_total || 0) > 0 ? `
                         <div class="perf-step-result-item">
                             <img src="img/texticon/icon_score.png" class="heart-mini-icon">
-                            ${tr('perf_triggered_bonuses')}: ${baseLiveScore - baseRawScore > 0 ? '+' : ''}${baseLiveScore - baseRawScore}
+                            ${tr('perf_triggered_bonuses')}: +${result.card_bonus_total}
                         </div>
+                        ` : ''}
                         ${(result.note_icons || 0) > 0 ? `
                         <div class="perf-step-result-item">
                             <img src="img/texticon/icon_score.png" class="heart-mini-icon">
                             ${tr('perf_notes')}: +${result.note_icons}
                         </div>
                         ` : ''}
-                        ${(result.total_score || 0) - baseLiveScore - (result.note_icons || 0) > 0 ? `
+                        ${(result.total_score || 0) - (result.base_score_total || 0) - (result.card_bonus_total || 0) - (result.note_icons || 0) > 0 ? `
                         <div class="perf-step-result-item">
                             <img src="img/texticon/icon_score.png" class="heart-mini-icon">
-                            ${tr('perf_other_bonuses')}: +${(result.total_score || 0) - baseLiveScore - (result.note_icons || 0)}
+                            ${tr('perf_other_bonuses')}: +${(result.total_score || 0) - (result.base_score_total || 0) - (result.card_bonus_total || 0) - (result.note_icons || 0)}
                         </div>
                         ` : ''}
                         <div class="perf-step-result-item total">
@@ -675,59 +637,10 @@ function renderComparisonBanner(displayResults) {
     `;
 }
 
-function renderTotalSection(result) {
-    if (!result) return '';
-
-    const totalHearts = result.total_hearts || [0,0,0,0,0,0,0,0];
-
-    return `
-        <section class="perf-section-card">
-            <div class="perf-section-heading-row compact">
-                <div>
-                    <div class="perf-eyebrow">${tr('perf_total_hearts_title')}</div>
-                </div>
-            </div>
-            <div class="perf-total-breakdown">
-                <div class="perf-breakdown-row grand">
-                    <span class="perf-mini-heading">${tr('perf_stage_yell')}</span>
-                    ${renderHeartsCompact(totalHearts)}
-                    <span class="perf-breakdown-sum">${sumHearts(totalHearts)}</span>
-                </div>
-            </div>
-        </section>
-    `;
-}
-
-function renderLiveCards(result) {
+function renderLiveCards(result, globalTriggered) {
     const lives = Array.isArray(result?.lives) ? result.lives : [];
     const triggered = result?.triggered_abilities || [];
     const noLives = lives.length === 0;
-
-    // Collect triggered abilities already shown in per-member bonuses
-    // so global-bonuses only shows the ones not claimed by a specific card.
-    const claimedTexts = new Set();
-    if (!noLives) {
-        for (const live of lives) {
-            for (const sLine of (result?.breakdown?.scores || []).filter(s => s.value > 0)) {
-                const srcAbility = findAbilitySource(triggered, sLine.source);
-                if (srcAbility?.effect_text) claimedTexts.add(srcAbility.effect_text);
-            }
-            for (const adj of (live.adjustments || [])) {
-                const adjAbility = findAbilitySource(triggered, adj?.source || '');
-                if (adjAbility?.effect_text) claimedTexts.add(adjAbility.effect_text);
-            }
-        }
-        // Check per-member heart/blade bonuses (shown in renderContributionSection)
-        for (const member of (result?.member_contributions || [])) {
-            for (const hb of (member.ability_heart_bonuses || [])) {
-                if (hb?.ability_text) claimedTexts.add(hb.ability_text);
-            }
-            for (const bb of (member.ability_blade_bonuses || [])) {
-                if (bb?.ability_text) claimedTexts.add(bb.ability_text);
-            }
-        }
-    }
-    const globalTriggered = triggered.filter(t => !t.effect_text || !claimedTexts.has(t.effect_text));
 
     // Revealed member cards from yell (card images only)
     const revealedIds = Array.isArray(result?.revealed_ids) ? result.revealed_ids : [];
@@ -767,7 +680,7 @@ function renderLiveCards(result) {
                     const adjustments = live.adjustments;
                     const baseScore = live?.base_score || 0;
                     const totalScore = live?.score || 0;
-                    const bonusScore = totalScore > baseScore ? totalScore - baseScore : 0;
+                    const bonusScore = totalScore - baseScore;
                     return `
                         <article class="perf-live-card ${live?.passed ? 'success' : 'failure'}">
                             <div class="perf-live-card-head">
@@ -779,17 +692,17 @@ function renderLiveCards(result) {
                                         <div class="perf-breakdown-row total">
                                             <span class="perf-mini-heading"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> ${tr('perf_score')}</span>
                                             <span class="perf-breakdown-detail">${tr('perf_base')} ${baseScore}</span>
-                                            ${bonusScore > 0 ? `<span class="perf-breakdown-detail">+${bonusScore} ${tr('perf_abilities')}</span>` : ''}
+                                            ${bonusScore !== 0 ? `<span class="perf-breakdown-detail">${bonusScore > 0 ? '+' : ''}${bonusScore} ${tr('perf_abilities')}</span>` : ''}
                                             <span class="perf-breakdown-sum">${totalScore}</span>
                                         </div>
-                                        ${bonusScore > 0 ? `
+                                        ${bonusScore !== 0 ? `
                                         <div class="perf-breakdown-bonuses">
-                                            ${(result?.breakdown?.scores || []).filter(s => s.value > 0).map((sLine) => {
+                                            ${(result?.breakdown?.scores || []).filter(s => s.value !== 0).map((sLine) => {
                                                 const srcAbility = findAbilitySource(triggered, sLine.source);
                                                 const sourceLabel = srcAbility ? `${escapeHtml(srcAbility.card_name || '')}` : escapeHtml(sLine.source);
                                                 return `
                                                     <div class="perf-bonus-item compact">
-                                                        <div class="perf-bonus-title"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> ${sourceLabel} +${sLine.value}</div>
+                                                        <div class="perf-bonus-title"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> ${sourceLabel} ${sLine.value > 0 ? '+' : ''}${sLine.value}</div>
                                                         ${srcAbility?.effect_text ? `<div class="perf-bonus-text">${enrichText(srcAbility.effect_text)}</div>` : ''}
                                                     </div>
                                                 `;
@@ -839,22 +752,10 @@ function renderLiveCards(result) {
 }
 
 
-function renderContributionSection(result) {
+function renderContributionSection(result, globalTriggered) {
     if (!result?.member_contributions) return '';
     const members = result.member_contributions;
     const triggered = result.triggered_abilities || [];
-
-    // Filter triggered abilities to those not shown in per-member bonuses
-    const claimedTexts = new Set();
-    for (const member of members) {
-        for (const hb of (member.ability_heart_bonuses || [])) {
-            if (hb?.ability_text) claimedTexts.add(hb.ability_text);
-        }
-        for (const bb of (member.ability_blade_bonuses || [])) {
-            if (bb?.ability_text) claimedTexts.add(bb.ability_text);
-        }
-    }
-    const globalTriggered = triggered.filter(t => !t.effect_text || !claimedTexts.has(t.effect_text));
 
     if (members.length === 0 && triggered.length === 0) {
         return `
@@ -883,18 +784,8 @@ function renderContributionSection(result) {
         const memberImg = member.card_no ? (() => { const cd = State.resolveCardData(member.card_no); return cd?.img ? fixImg(cd.img) : ''; })() : '';
         const memberName = member.card_no ? (() => { const cd = State.resolveCardData(member.card_no); return cd?.name || member?.source || 'Member'; })() : (member?.source || 'Member');
 
-        // Step 1: base_hearts — the card's original hearts
-        // Step 2: transform changes the color of all base hearts (no addition/subtraction)
-        // Step 3: ability bonuses add hearts on top
-        // bonus_hearts = transform_delta + ability_total per color
-        // So: transform_delta = bonus_hearts - ability_total
-        const abilityPerColor = [0,0,0,0,0,0,0,0];
-        for (const ab of heartBonuses) {
-            if (ab.color !== undefined && ab.color >= 0 && ab.color < 8) {
-                abilityPerColor[ab.color] += ab.amount;
-            }
-        }
-        const transformDelta = bonus.map((v, i) => v - abilityPerColor[i]);
+        // Use engine-emitted transform_delta (bonus_hearts minus ability bonuses).
+        const transformDelta = member.transform_delta || [0,0,0,0,0,0,0,0];
         const afterTransform = base.map((v, i) => v + transformDelta[i]);
         const total = base.map((v, i) => v + bonus[i]);
 
@@ -969,17 +860,17 @@ function renderContributionSection(result) {
         `;
     });
 
-    // Compute totals across all 3 slots
+    // Use engine-emitted aggregates where available
     const grandTotal = [0,0,0,0,0,0,0,0];
-    let grandBlade = 0, grandNotes = 0, grandDraw = 0;
+    let grandDraw = 0;
     for (const m of members) {
         const b = m.base_hearts || [0,0,0,0,0,0,0,0];
         const bn = m.bonus_hearts || [0,0,0,0,0,0,0,0];
         for (let i = 0; i < 8; i++) grandTotal[i] += b[i] + bn[i];
-        if (!m.is_wait) grandBlade += (m.base_blades || 0) + (m.bonus_blades || 0);
-        grandNotes += (m.base_notes || 0) + (m.bonus_notes || 0);
         grandDraw += m.draw_icons || 0;
     }
+    const grandBlade = result?.yell_count || 0;
+    const grandNotes = result?.note_icons || 0;
 
     return `
         <section class="perf-section-card">
@@ -1071,21 +962,9 @@ function renderYellSection(result) {
         `;
     }
 
-    // Aggregate per-color total across all yell cards
-    const totalYellHearts = [0,0,0,0,0,0,0,0];
-    yellCards.forEach(c => {
-        const bh = c.blade_hearts || [0,0,0,0,0,0,0,0];
-        for (let i = 0; i < 7; i++) totalYellHearts[i] += bh[i];
-    });
-
-    // Per-color source: count how many yell cards contribute to each color
-    const perColorCount = [0,0,0,0,0,0,0,0];
-    yellCards.forEach(c => {
-        const bh = c.blade_hearts || [0,0,0,0,0,0,0,0];
-        for (let i = 1; i < 7; i++) {
-            if (bh[i] > 0) perColorCount[i]++;
-        }
-    });
+    // Use the yell aggregate from breakdown.hearts instead of recomputing from cards
+    const yellSource = heartSources.find(s => s.source_type === 'yell');
+    const totalYellHearts = yellSource?.value || [0,0,0,0,0,0,0,0];
 
     return `
         <section class="perf-section-card">
@@ -1166,7 +1045,6 @@ function renderPlayerPanel(playerId, result) {
     const otherWins = !!result[otherWinsKey];
 
     const totalHearts = sumHearts(result.total_hearts);
-    const baseLiveScore = sumPassedLiveScores(lives);
     
     // Outcome prioritizes comparative win/loss; heart-check pass/fail is fallback
     let outcome = tr('perf_outcome_fail');
@@ -1183,7 +1061,29 @@ function renderPlayerPanel(playerId, result) {
     }
 
     const members = result?.member_contributions || [];
-    const totalBlades = members.reduce((s, m) => m.is_wait ? s : s + (m.base_blades || 0) + (m.bonus_blades || 0), 0);
+
+    // Compute claimedTexts/globalTriggered ONCE for both sub-functions.
+    const triggered = result?.triggered_abilities || [];
+    const claimedTexts = new Set();
+    for (const live of lives) {
+        for (const sLine of (result?.breakdown?.scores || [])) {
+            const srcAbility = findAbilitySource(triggered, sLine.source);
+            if (srcAbility?.effect_text) claimedTexts.add(srcAbility.effect_text);
+        }
+        for (const adj of (live.adjustments || [])) {
+            const adjAbility = findAbilitySource(triggered, adj?.source || '');
+            if (adjAbility?.effect_text) claimedTexts.add(adjAbility.effect_text);
+        }
+    }
+    for (const member of members) {
+        for (const hb of (member.ability_heart_bonuses || [])) {
+            if (hb?.ability_text) claimedTexts.add(hb.ability_text);
+        }
+        for (const bb of (member.ability_blade_bonuses || [])) {
+            if (bb?.ability_text) claimedTexts.add(bb.ability_text);
+        }
+    }
+    const globalTriggered = triggered.filter(t => !t.effect_text || !claimedTexts.has(t.effect_text));
 
     // Panel success if either heart check passed OR player won comparative
     const panelSuccess = isSuccess || selfWins;
@@ -1222,9 +1122,8 @@ function renderPlayerPanel(playerId, result) {
                         </div>
                     </div>
                     ${renderTextMetric(tr('perf_lives_passed'), `${passedLives} / ${totalLives}`)}
-                    ${renderIconMetric('img/texticon/icon_score.png', tr('perf_live_pts'), String(baseLiveScore), 'score')}
+                    ${renderIconMetric('img/texticon/icon_score.png', tr('perf_live_pts'), String(result?.base_score_total || 0), 'score')}
                     ${renderIconMetric('img/texticon/icon_score.png', tr('perf_notes'), `${result?.note_icons || 0}`, 'notes')}
-                    ${renderIconMetric('img/texticon/icon_blade.png', tr('perf_stage_blades'), String(totalBlades), 'blades')}
                     ${renderIconMetric('img/texticon/icon_blade.png', tr('perf_yell_count'), String(result?.yell_count || 0), 'yells')}
                 </div>
             </section>
@@ -1232,12 +1131,11 @@ function renderPlayerPanel(playerId, result) {
             <div class="perf-panel-body-grid">
                 <div class="perf-column left">
                     ${renderAggregateHeartSummary(result)}
-                    ${renderTotalSection(result)}
                     ${renderYellSection(result)}
                 </div>
                 <div class="perf-column right">
-                    ${renderContributionSection(result)}
-                    ${renderLiveCards(result)}
+                    ${renderContributionSection(result, globalTriggered)}
+                    ${renderLiveCards(result, globalTriggered)}
                 </div>
             </div>
         </article>
@@ -1437,7 +1335,6 @@ export const PerformanceRenderer = {
         return 'wait';
     },
 
-    renderHeartsGrid,
     renderHeartsCompact,
     renderBladesCompact,
     renderAggregateHeartSummary,

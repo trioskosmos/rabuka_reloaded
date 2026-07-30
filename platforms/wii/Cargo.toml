@@ -13,9 +13,3 @@ serde_json = { version = "=1.0.99", default-features = false, features = ["alloc
 
 [lib]
 crate-type = ["staticlib"]
-
-[profile.release]
-codegen-units = 1
-lto = false
-opt-level = 2
-panic = "abort"

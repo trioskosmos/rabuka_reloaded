@@ -1252,67 +1252,37 @@ export const LogRenderer = {
         const content = document.getElementById(DOM_IDS.REVEALED_CONTENT);
         if (!title || !content) return;
 
-        // Collect card IDs per player with source labels
-        const p1Cards = [];  // {id, source}
+        const p1Cards = [];
         const p2Cards = [];
-        const sharedCards = [];
 
-        const addCard = (id, source, bucket) => {
+        const REVEAL_LABELS = { yell: 'Yell', re_yell: 'Re-Yell', ability: 'Ability', cost: 'Cost' };
+
+        const addCard = (id, revealType, owner) => {
             if (id === null || id === undefined || id <= 0) return;
+            const bucket = owner === 1 ? p2Cards : p1Cards;
             if (bucket.some(e => e.id === id)) return;
-            bucket.push({ id, source });
+            bucket.push({ id, source: REVEAL_LABELS[revealType] || revealType || 'Revealed' });
         };
 
-        // Build owner lookup from card_info arrays
-        const ownerOf = new Map();
+        // Primary source: revealed_card_info (has card_id, reveal_type, owner)
         (s.revealed_card_info || []).forEach(e => {
-            if (e.card_id !== undefined) ownerOf.set(e.card_id, e.owner);
+            if (e.card_id !== undefined) addCard(e.card_id, e.reveal_type, e.owner);
         });
+
+        // Cost-revealed cards
         (s.revealed_cost_card_info || []).forEach(e => {
-            if (e.card_id !== undefined) ownerOf.set(e.card_id, e.owner);
+            if (e.card_id !== undefined) addCard(e.card_id, e.reveal_type || 'cost', e.owner);
         });
 
-        const bucketForOwner = (owner) => {
-            if (owner === 0) return p1Cards;
-            if (owner === 1) return p2Cards;
-            return sharedCards;
-        };
-
-        // Yell sources
-        (s.initial_yell_revealed_cards || []).forEach(id => {
-            const owner = ownerOf.get(id);
-            addCard(id, 'Yell', bucketForOwner(owner));
-        });
-
-        // Re-Yell sources
-        (s.re_yell_revealed_cards || []).forEach(id => {
-            const owner = ownerOf.get(id);
-            addCard(id, 'Re-Yell', bucketForOwner(owner));
-        });
-
-        // Cost sources
-        (s.revealed_cost_cards || []).forEach(id => {
-            const owner = ownerOf.get(id);
-            addCard(id, 'Cost', bucketForOwner(owner));
-        });
-
-        // Effect sources
-        if (s.revealed_card_info?.length) {
-            s.revealed_card_info.forEach(e => {
-                if (e.card_id !== undefined) addCard(e.card_id, e.source || 'Effect', bucketForOwner(e.owner));
-            });
-        } else {
-            (s.revealed_cards || []).forEach(id => {
-                addCard(id, 'Effect', sharedCards);
-            });
-        }
-        if (s.revealed_cost_card_info?.length) {
-            s.revealed_cost_card_info.forEach(e => {
-                if (e.card_id !== undefined) addCard(e.card_id, e.source || 'Cost', bucketForOwner(e.owner));
-            });
+        // Fallback: if no card_info, use raw arrays (owner unknown → active player)
+        if (!p1Cards.length && !p2Cards.length) {
+            const activeIsP1 = !s.active_player || s.active_player === 'player1' || s.active_player === 'p1';
+            const fallbackOwner = activeIsP1 ? 0 : 1;
+            (s.revealed_cards || []).forEach(id => addCard(id, 'ability', fallbackOwner));
+            (s.revealed_cost_cards || []).forEach(id => addCard(id, 'cost', fallbackOwner));
         }
 
-        const totalCount = p1Cards.length + p2Cards.length + sharedCards.length;
+        const totalCount = p1Cards.length + p2Cards.length;
 
         const cardToHtml = (entry) => {
             const card = State.resolveCardData(entry.id);
@@ -1349,15 +1319,6 @@ export const LogRenderer = {
         html += '</div></div>';
 
         html += '</div>'; // .revealed-two-column
-
-        // Shared section
-        if (sharedCards.length) {
-            html += '<div class="revealed-shared">';
-            html += '<div class="revealed-player-header">Shared</div>';
-            html += '<div class="revealed-grid">';
-            sharedCards.forEach(entry => { html += cardToHtml(entry); });
-            html += '</div></div>';
-        }
 
         content.innerHTML = html;
         ModalManager.show(DOM_IDS.MODAL_REVEALED);
