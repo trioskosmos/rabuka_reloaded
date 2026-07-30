@@ -164,6 +164,431 @@ impl AbilityResolver {
         }
     }
 
+    fn pay_cost_move_cards(&mut self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
+        let source = cost.source.as_deref().unwrap_or("");
+        // any_number means player chooses 0..N
+        let is_any_number = cost.any_number_any().unwrap_or(false);
+        let count = cost.count.unwrap_or(1) as usize;
+        let card_type = cost.card_type_any().map(|s| s.to_string());
+        let optional = cost.optional.unwrap_or(false);
+        let is_activation = self
+            .current_ability
+            .as_ref()
+            .and_then(|a| a.triggers.as_ref())
+            .is_some_and(|t| &**t == crate::triggers::ACTIVATION);
+
+        let same_unit = cost.same_unit_name_any().unwrap_or(false);
+        let is_from_hand = Zone::from_str(source) == Some(Zone::Hand) && !same_unit;
+        if is_from_hand {
+            let target_str = cost.target.as_deref().unwrap_or("self");
+            let pl = gs.resolve_target_player(target_str);
+            let card_db = &gs.card_database;
+            let is_same_group_name =
+                cost.group_reference_any().as_deref() == Some("same_group_name");
+            let matching_indices: Vec<usize> = if is_same_group_name {
+                // "same_group_name" = 2 cards from hand that share a group name
+                // with each other (any group, not necessarily the activating card's).
+                // Build a group→count map, then only allow cards from groups with
+                // at least `count` members.
+                use std::collections::HashMap;
+                let mut group_counts: HashMap<String, Vec<usize>> = HashMap::new();
+                for (i, &cid) in pl.hand.cards.iter().enumerate() {
+                    if let Some(card) = card_db.get_card(cid) {
+                        if !card.group.is_empty() {
+                            group_counts
+                                .entry(card.group.to_string())
+                                .or_default()
+                                .push(i);
+                        }
+                    }
+                }
+                let needed = count;
+                let mut indices: Vec<usize> = Vec::new();
+                for (_group, members) in &group_counts {
+                    if members.len() >= needed {
+                        indices.extend(members);
+                    }
+                }
+                indices.sort_unstable();
+                indices
+            } else {
+                let mut filter = cost.filter_subset();
+                filter.card_type = card_type.as_deref();
+                filter.cost_limit = cost.cost_limit_any();
+                pl.hand
+                    .cards
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, &cid)| filter.matches(card_db, cid, false))
+                    .map(|(i, _)| i)
+                    .collect()
+            };
+            let is_optional = (optional || is_any_number) && !is_activation;
+            let match_names: Vec<String> = matching_indices
+                .iter()
+                .filter_map(|&i| {
+                    if i < pl.hand.cards.len() {
+                        card_db
+                            .get_card(pl.hand.cards[i])
+                            .map(|c| c.name.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            // For "any number" costs, the effective count is 0 (any number)
+            // unless `max` is also set, in which case count caps the max.
+            let effective_count = if is_any_number { 0 } else { count };
+            log::debug!(
+                "▶ cost(move_cards, {}=>discard, effective_count={}, any_number={}, optional={})",
+                source, effective_count, is_any_number, is_optional
+            );
+            log::debug!(
+                "  ├─ hand[{}] → {} match{}: [{}]",
+                pl.hand.cards.len(),
+                matching_indices.len(),
+                if matching_indices.len() == 1 {
+                    ""
+                } else {
+                    "es"
+                },
+                match_names.join(", ")
+            );
+
+            if !is_any_number && matching_indices.len() < count {
+                if is_optional {
+                    // If optional cost, we should auto-skip if the hand is completely empty or doesn't have enough matching cards for name-restricted costs.
+                    // But if we just don't have enough cards in hand for a general optional cost (like having 0 cards when needing 1), we should auto-skip it.
+                    log::debug!("  └─ skip (optional, not enough eligible cards in hand)");
+                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                        entry.cost_paid = true;
+                        entry.optional_cost_result = Some(false);
+                    }
+                    return Ok(());
+                } else {
+                    // Non-optional and not enough matching cards -> cannot pay the cost
+                    return Err(format!(
+                        "Not enough matching cards in hand to pay cost. Needs {}, has {}",
+                        count,
+                        matching_indices.len()
+                    ));
+                }
+            } else if is_any_number && matching_indices.is_empty() {
+                if is_optional {
+                    log::debug!(
+                        "  └─ skip (optional any_number, no eligible cards in hand)"
+                    );
+                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                        entry.cost_paid = true;
+                        entry.optional_cost_result = Some(false);
+                    }
+                    return Ok(());
+                } else {
+                    // Non-optional, any_number requires at least 0? Wait, standard any_number normally allows 0. But if matching_indices is empty we just skip.
+                    return Ok(());
+                }
+            } else if !matching_indices.is_empty() {
+                let desc = if is_any_number {
+                    let max_str = if cost.max.unwrap_or(false) {
+                        count.min(matching_indices.len())
+                    } else {
+                        matching_indices.len()
+                    };
+                    format!(
+                        "Select any number of card(s) from hand (0-{}) (or skip)",
+                        max_str
+                    )
+                } else {
+                    format!(
+                        "Select {} card(s) from hand{}",
+                        effective_count,
+                        if is_optional { " (or skip)" } else { "" }
+                    )
+                };
+                log::debug!("  └─ choice created (allow_skip={})", is_optional);
+                if optional {
+                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                        entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
+                    }
+                }
+                let filtered = if is_same_group_name {
+                    Some(matching_indices.clone())
+                } else {
+                    None
+                };
+                self.pending_choice =
+                    Some(
+                        Choice::select_cards(
+                            source.to_string(),
+                            effective_count,
+                            desc,
+                            is_optional,
+                        )
+                        .description_ja(Some(if is_any_number {
+                            format!("手札から任意枚選択（スキップ可）")
+                        } else {
+                            format!(
+                                "手札から{}枚選択{}",
+                                effective_count,
+                                if is_optional {
+                                    "（スキップ可）"
+                                } else {
+                                    ""
+                                }
+                            )
+                        }))
+                        .card_type(card_type.clone())
+                        .cost_limit(
+                            cost.cost_limit_any(),
+                            cost.cost_limit_operator_any().map(|s| s.to_string()),
+                        )
+                        .group(None::<String>.or_else(|| {
+                            cost.group_names_any().clone().map(|v| v.join(","))
+                        }))
+                        .characters(cost.characters_any().cloned())
+                        .target_player_id(Some(
+                            cost.target.as_deref().unwrap_or("self").to_string(),
+                        ))
+                        .filtered_indices(filtered)
+                        .build(),
+                    );
+                return Ok(());
+            } else if !is_optional {
+                // Non-optional, no matches — fall through to error
+            }
+        }
+        if !source.is_empty() {
+            let target = cost.target.as_deref().unwrap_or("self");
+            let cost_limit = cost.cost_limit_any();
+            let card_type_filter = card_type.as_deref();
+
+            let player = gs.resolve_target_player(target);
+            let card_db = &gs.card_database;
+            let mut filter = cost.filter_subset();
+            filter.card_type = card_type_filter;
+            filter.cost_limit = cost_limit;
+            let _zone_cards = util::zone_cards(player, source);
+
+            if same_unit {
+                let is_optional = optional && !is_activation;
+                let player_ref = gs.resolve_target_player(target);
+                let hand_cards = &player_ref.hand.cards;
+                // Group hand cards by unit name
+                let mut unit_groups: HashMap<String, Vec<i16>> = HashMap::default();
+                for &cid in hand_cards {
+                    if filter.matches(card_db, cid, false) {
+                        let unit = card_db
+                            .get_card(cid)
+                            .and_then(|c| c.unit.clone().map(|s| s.to_string()))
+                            .unwrap_or_default();
+                        unit_groups.entry(unit).or_default().push(cid);
+                    }
+                }
+                // Collect ALL hand indices from units with >= count members
+                let eligible_indices: Vec<usize> = hand_cards
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, &cid)| {
+                        if let Some(card) = card_db.get_card(cid) {
+                            let unit = card.unit.as_deref().unwrap_or("");
+                            unit_groups.get(unit).is_some_and(|g| g.len() >= count)
+                        } else {
+                            false
+                        }
+                    })
+                    .map(|(idx, _)| idx)
+                    .collect();
+                if eligible_indices.is_empty() {
+                    if is_optional {
+                        return Ok(());
+                    }
+                    return Err(format!(
+                        "Cannot pay cost: no unit has {} cards matching filter",
+                        count
+                    ));
+                }
+                let desc_en =
+                    format!("Select 1 card (need {} with the same unit name)", count);
+                let desc_ja = format!("同名ユニットが{}枚必要なカードを1枚選択", count);
+                self.pending_choice = Some(
+                    Choice::select_cards(Zone::Hand.to_str(), 1, desc_en, is_optional)
+                        .description_ja(Some(desc_ja))
+                        .card_type(cost.card_type_any().map(|s| s.to_string()))
+                        .target_player_id(Some(
+                            cost.target.as_deref().unwrap_or("self").to_string(),
+                        ))
+                        .filtered_indices(Some(eligible_indices))
+                        .build(),
+                );
+                return Ok(());
+            }
+
+            let zone_name = if Zone::from_str(source) == Some(Zone::DeckTop) {
+                Zone::Deck.to_str()
+            } else {
+                source
+            };
+            let matching_count =
+                util::count_in_zone(player, zone_name, &filter, card_db) as usize;
+
+            // Q104 / Rule 10.2.1: For deck_top costs, if the deck has fewer
+            // cards than needed but the waitroom has cards, allow the cost to
+            // proceed — the drawing loop will perform a refresh mid-draw and
+            // continue. Only fail if both deck AND waitroom are truly empty.
+            let is_deck_top = Zone::from_str(source) == Some(Zone::DeckTop);
+            if matching_count < count && !is_deck_top {
+                return Err(format!(
+                    "Cannot pay cost: {} has only {} cards matching cost limit {}, need {}",
+                    source,
+                    matching_count,
+                    cost_limit
+                        .map(|l| l.to_string())
+                        .unwrap_or("none".to_string()),
+                    count
+                ));
+            }
+            if matching_count < count && is_deck_top {
+                let waitroom_matching =
+                    util::count_in_zone(player, Zone::Waitroom.to_str(), &filter, card_db)
+                        as usize;
+                if matching_count + waitroom_matching == 0 {
+                    return Err(format!(
+                        "Cannot pay cost: {} and waitroom are both empty, need {}",
+                        source, count
+                    ));
+                }
+            }
+        }
+
+        let effect = AbilityEffect {
+            text: cost.text.clone(),
+            action: cost.action.clone(),
+            source: cost.source.clone(),
+            destination: cost.destination.clone(),
+            count: cost.count,
+            target: cost.target.clone(),
+            kind: cost.kind.clone(),
+            ..Default::default()
+        };
+        self.execute_move_cards(gs, &effect)
+    }
+
+    fn pay_cost_change_state(&mut self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
+        let state_change_binding = cost.state_change_any();
+        let state_change = state_change_binding.unwrap_or("");
+        let target = cost.target.as_deref().unwrap_or("self");
+        let optional = cost.optional.unwrap_or(false);
+        let is_activation = self
+            .current_ability
+            .as_ref()
+            .and_then(|a| a.triggers.as_ref())
+            .is_some_and(|t| &**t == crate::triggers::ACTIVATION);
+
+        if optional && !is_activation {
+            // Q137: 「ウェイトにする」とは、アクティブ状態のメンバーをウェイト
+            // 状態にすることを意味します。既にウェイト状態のメンバーをコストで
+            // 「ウェイトにする」ことはできません。
+            // Verify active candidates exist before prompting — applies to
+            // both self_cost and non-self_cost.
+            if state_change == "wait" {
+                let exclude_self = cost.exclude_self_any().unwrap_or(false);
+                let candidates = get_change_state_candidates(
+                    gs,
+                    target,
+                    cost.card_type_any().map(|ct| ct.as_card_str()),
+                    cost.group_names_any(),
+                    exclude_self,
+                    cost.self_cost_any().unwrap_or(false),
+                    false,
+                    Some("active"),
+                );
+                if candidates.is_empty() {
+                    return Ok(());
+                }
+            }
+            let cost_description = if state_change == "wait" {
+                "Put this member to wait state"
+            } else {
+                "Pay cost"
+            };
+            self.pending_choice = Some(Choice::SelectTarget {
+                target: "pay_optional_cost:skip_optional_cost".to_string(),
+                description: format!(
+                    "Pay optional cost: {}? (pay or skip)",
+                    cost_description
+                ),
+                description_en: Some(format!(
+                    "Pay optional cost: {}? (pay or skip)",
+                    cost_description
+                )),
+                description_ja: Some(if state_change == "wait" {
+                    "このメンバーをレスト状態にする（支払う/スキップ）？".to_string()
+                } else {
+                    "コストを支払う（支払う/スキップ）？".to_string()
+                }),
+                allow_skip: true,
+                options: None,
+            });
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
+            }
+            return Ok(());
+        }
+
+        if state_change == "wait" {
+            let count = cost.count.unwrap_or(1) as usize;
+            let exclude_self = cost.exclude_self_any().unwrap_or(false);
+            let candidates = get_change_state_candidates(
+                gs,
+                target,
+                cost.card_type_any().map(|ct| ct.as_card_str()),
+                cost.group_names_any(),
+                exclude_self,
+                cost.self_cost_any().unwrap_or(false),
+                true,
+                Some("active"),
+            );
+            log::debug!("[CHANGE_STATE] candidates={:?}", candidates);
+
+            // Q137: 「ウェイトにする」はアクティブ状態のメンバーをウェイト状態に
+            // することを意味します。対象がいない場合、その行為自体が行われません。
+            // For mandatory costs this means the cost cannot be paid.
+            if candidates.is_empty() {
+                return Err("No matching members on stage to change state".to_string());
+            }
+
+            if candidates.len() <= count {
+                for &card_id in &candidates {
+                    log::debug!(
+                        "[TRACE_COST_WAIT] setting card {} to wait, stage before={:?}",
+                        card_id,
+                        gs.player1.stage.stage
+                    );
+                    gs.mods.add_orientation_modifier(card_id, "wait");
+                }
+            } else {
+                let desc_ja = format!("ウェイトにするステージメンバーを{}体選択", count);
+                self.pending_choice = Some(
+                    Choice::select_cards(
+                        Zone::Stage.to_str(),
+                        count,
+                        format!("Select {} stage member(s) to wait", count),
+                        false,
+                    )
+                    .description_ja(Some(desc_ja))
+                    .card_type(cost.card_type_any().map(|s| s.to_string()))
+                    .is_select_action(true)
+                    .target_player_id(Some(
+                        cost.target.as_deref().unwrap_or("self").to_string(),
+                    ))
+                    .build(),
+                );
+                return Ok(());
+            }
+        }
+        Ok(())
+    }
+
     fn pay_cost_inner(&mut self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
         let mut dbg = AbDebug::new();
         dbg.cost_pay(cost, true);
@@ -256,312 +681,7 @@ impl AbilityResolver {
                 Ok(())
             }
             ActionType::MoveCards => {
-                let source = cost.source.as_deref().unwrap_or("");
-                // any_number means player chooses 0..N
-                let is_any_number = cost.any_number_any().unwrap_or(false);
-                let count = cost.count.unwrap_or(1) as usize;
-                let card_type = cost.card_type_any().map(|s| s.to_string());
-                let optional = cost.optional.unwrap_or(false);
-                let is_activation = self
-                    .current_ability
-                    .as_ref()
-                    .and_then(|a| a.triggers.as_ref())
-                    .is_some_and(|t| &**t == crate::triggers::ACTIVATION);
-
-                let same_unit = cost.same_unit_name_any().unwrap_or(false);
-                let is_from_hand = Zone::from_str(source) == Some(Zone::Hand) && !same_unit;
-                if is_from_hand {
-                    let target_str = cost.target.as_deref().unwrap_or("self");
-                    let pl = gs.resolve_target_player(target_str);
-                    let card_db = &gs.card_database;
-                    let is_same_group_name =
-                        cost.group_reference_any().as_deref() == Some("same_group_name");
-                    let matching_indices: Vec<usize> = if is_same_group_name {
-                        // "same_group_name" = 2 cards from hand that share a group name
-                        // with each other (any group, not necessarily the activating card's).
-                        // Build a group→count map, then only allow cards from groups with
-                        // at least `count` members.
-                        use std::collections::HashMap;
-                        let mut group_counts: HashMap<String, Vec<usize>> = HashMap::new();
-                        for (i, &cid) in pl.hand.cards.iter().enumerate() {
-                            if let Some(card) = card_db.get_card(cid) {
-                                if !card.group.is_empty() {
-                                    group_counts
-                                        .entry(card.group.to_string())
-                                        .or_default()
-                                        .push(i);
-                                }
-                            }
-                        }
-                        let needed = count;
-                        let mut indices: Vec<usize> = Vec::new();
-                        for (_group, members) in &group_counts {
-                            if members.len() >= needed {
-                                indices.extend(members);
-                            }
-                        }
-                        indices.sort_unstable();
-                        indices
-                    } else {
-                        let mut filter = cost.filter_subset();
-                        filter.card_type = card_type.as_deref();
-                        filter.cost_limit = cost.cost_limit_any();
-                        pl.hand
-                            .cards
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, &cid)| filter.matches(card_db, cid, false))
-                            .map(|(i, _)| i)
-                            .collect()
-                    };
-                    let is_optional = (optional || is_any_number) && !is_activation;
-                    let match_names: Vec<String> = matching_indices
-                        .iter()
-                        .filter_map(|&i| {
-                            if i < pl.hand.cards.len() {
-                                card_db
-                                    .get_card(pl.hand.cards[i])
-                                    .map(|c| c.name.to_string())
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    // For "any number" costs, the effective count is 0 (any number)
-                    // unless `max` is also set, in which case count caps the max.
-                    let effective_count = if is_any_number { 0 } else { count };
-                    log::debug!(
-                        "▶ cost(move_cards, {}=>discard, effective_count={}, any_number={}, optional={})",
-                        source, effective_count, is_any_number, is_optional
-                    );
-                    log::debug!(
-                        "  ├─ hand[{}] → {} match{}: [{}]",
-                        pl.hand.cards.len(),
-                        matching_indices.len(),
-                        if matching_indices.len() == 1 {
-                            ""
-                        } else {
-                            "es"
-                        },
-                        match_names.join(", ")
-                    );
-
-                    if !is_any_number && matching_indices.len() < count {
-                        if is_optional {
-                            // If optional cost, we should auto-skip if the hand is completely empty or doesn't have enough matching cards for name-restricted costs.
-                            // But if we just don't have enough cards in hand for a general optional cost (like having 0 cards when needing 1), we should auto-skip it.
-                            log::debug!("  └─ skip (optional, not enough eligible cards in hand)");
-                            if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                                entry.cost_paid = true;
-                                entry.optional_cost_result = Some(false);
-                            }
-                            return Ok(());
-                        } else {
-                            // Non-optional and not enough matching cards -> cannot pay the cost
-                            return Err(format!(
-                                "Not enough matching cards in hand to pay cost. Needs {}, has {}",
-                                count,
-                                matching_indices.len()
-                            ));
-                        }
-                    } else if is_any_number && matching_indices.is_empty() {
-                        if is_optional {
-                            log::debug!(
-                                "  └─ skip (optional any_number, no eligible cards in hand)"
-                            );
-                            if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                                entry.cost_paid = true;
-                                entry.optional_cost_result = Some(false);
-                            }
-                            return Ok(());
-                        } else {
-                            // Non-optional, any_number requires at least 0? Wait, standard any_number normally allows 0. But if matching_indices is empty we just skip.
-                            return Ok(());
-                        }
-                    } else if !matching_indices.is_empty() {
-                        let desc = if is_any_number {
-                            let max_str = if cost.max.unwrap_or(false) {
-                                count.min(matching_indices.len())
-                            } else {
-                                matching_indices.len()
-                            };
-                            format!(
-                                "Select any number of card(s) from hand (0-{}) (or skip)",
-                                max_str
-                            )
-                        } else {
-                            format!(
-                                "Select {} card(s) from hand{}",
-                                effective_count,
-                                if is_optional { " (or skip)" } else { "" }
-                            )
-                        };
-                        log::debug!("  └─ choice created (allow_skip={})", is_optional);
-                        if optional {
-                            if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                                entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
-                            }
-                        }
-                        let filtered = if is_same_group_name {
-                            Some(matching_indices.clone())
-                        } else {
-                            None
-                        };
-                        self.pending_choice =
-                            Some(
-                                Choice::select_cards(
-                                    source.to_string(),
-                                    effective_count,
-                                    desc,
-                                    is_optional,
-                                )
-                                .description_ja(Some(if is_any_number {
-                                    format!("手札から任意枚選択（スキップ可）")
-                                } else {
-                                    format!(
-                                        "手札から{}枚選択{}",
-                                        effective_count,
-                                        if is_optional {
-                                            "（スキップ可）"
-                                        } else {
-                                            ""
-                                        }
-                                    )
-                                }))
-                                .card_type(card_type.clone())
-                                .cost_limit(
-                                    cost.cost_limit_any(),
-                                    cost.cost_limit_operator_any().map(|s| s.to_string()),
-                                )
-                                .group(None::<String>.or_else(|| {
-                                    cost.group_names_any().clone().map(|v| v.join(","))
-                                }))
-                                .characters(cost.characters_any().cloned())
-                                .target_player_id(Some(
-                                    cost.target.as_deref().unwrap_or("self").to_string(),
-                                ))
-                                .filtered_indices(filtered)
-                                .build(),
-                            );
-                        return Ok(());
-                    } else if !is_optional {
-                        // Non-optional, no matches — fall through to error
-                    }
-                }
-                if !source.is_empty() {
-                    let target = cost.target.as_deref().unwrap_or("self");
-                    let cost_limit = cost.cost_limit_any();
-                    let card_type_filter = card_type.as_deref();
-
-                    let player = gs.resolve_target_player(target);
-                    let card_db = &gs.card_database;
-                    let mut filter = cost.filter_subset();
-                    filter.card_type = card_type_filter;
-                    filter.cost_limit = cost_limit;
-                    let _zone_cards = util::zone_cards(player, source);
-
-                    if same_unit {
-                        let is_optional = optional && !is_activation;
-                        let player_ref = gs.resolve_target_player(target);
-                        let hand_cards = &player_ref.hand.cards;
-                        // Group hand cards by unit name
-                        let mut unit_groups: HashMap<String, Vec<i16>> = HashMap::default();
-                        for &cid in hand_cards {
-                            if filter.matches(card_db, cid, false) {
-                                let unit = card_db
-                                    .get_card(cid)
-                                    .and_then(|c| c.unit.clone().map(|s| s.to_string()))
-                                    .unwrap_or_default();
-                                unit_groups.entry(unit).or_default().push(cid);
-                            }
-                        }
-                        // Collect ALL hand indices from units with >= count members
-                        let eligible_indices: Vec<usize> = hand_cards
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, &cid)| {
-                                if let Some(card) = card_db.get_card(cid) {
-                                    let unit = card.unit.as_deref().unwrap_or("");
-                                    unit_groups.get(unit).is_some_and(|g| g.len() >= count)
-                                } else {
-                                    false
-                                }
-                            })
-                            .map(|(idx, _)| idx)
-                            .collect();
-                        if eligible_indices.is_empty() {
-                            if is_optional {
-                                return Ok(());
-                            }
-                            return Err(format!(
-                                "Cannot pay cost: no unit has {} cards matching filter",
-                                count
-                            ));
-                        }
-                        let desc_en =
-                            format!("Select 1 card (need {} with the same unit name)", count);
-                        let desc_ja = format!("同名ユニットが{}枚必要なカードを1枚選択", count);
-                        self.pending_choice = Some(
-                            Choice::select_cards(Zone::Hand.to_str(), 1, desc_en, is_optional)
-                                .description_ja(Some(desc_ja))
-                                .card_type(cost.card_type_any().map(|s| s.to_string()))
-                                .target_player_id(Some(
-                                    cost.target.as_deref().unwrap_or("self").to_string(),
-                                ))
-                                .filtered_indices(Some(eligible_indices))
-                                .build(),
-                        );
-                        return Ok(());
-                    }
-
-                    let zone_name = if Zone::from_str(source) == Some(Zone::DeckTop) {
-                        Zone::Deck.to_str()
-                    } else {
-                        source
-                    };
-                    let matching_count =
-                        util::count_in_zone(player, zone_name, &filter, card_db) as usize;
-
-                    // Q104 / Rule 10.2.1: For deck_top costs, if the deck has fewer
-                    // cards than needed but the waitroom has cards, allow the cost to
-                    // proceed — the drawing loop will perform a refresh mid-draw and
-                    // continue. Only fail if both deck AND waitroom are truly empty.
-                    let is_deck_top = Zone::from_str(source) == Some(Zone::DeckTop);
-                    if matching_count < count && !is_deck_top {
-                        return Err(format!(
-                            "Cannot pay cost: {} has only {} cards matching cost limit {}, need {}",
-                            source,
-                            matching_count,
-                            cost_limit
-                                .map(|l| l.to_string())
-                                .unwrap_or("none".to_string()),
-                            count
-                        ));
-                    }
-                    if matching_count < count && is_deck_top {
-                        let waitroom_matching =
-                            util::count_in_zone(player, Zone::Waitroom.to_str(), &filter, card_db)
-                                as usize;
-                        if matching_count + waitroom_matching == 0 {
-                            return Err(format!(
-                                "Cannot pay cost: {} and waitroom are both empty, need {}",
-                                source, count
-                            ));
-                        }
-                    }
-                }
-
-                let effect = AbilityEffect {
-                    text: cost.text.clone(),
-                    action: cost.action.clone(),
-                    source: cost.source.clone(),
-                    destination: cost.destination.clone(),
-                    count: cost.count,
-                    target: cost.target.clone(),
-                    kind: cost.kind.clone(),
-                    ..Default::default()
-                };
-                self.execute_move_cards(gs, &effect)
+                self.pay_cost_move_cards(gs, cost)
             }
             // Q144 / Q145 / Q183 / Q257: Change state cost (wait/rest)
             //
@@ -581,119 +701,7 @@ impl AbilityResolver {
             //   → Yes, if the cost is mandatory. Costs are paid regardless
             //   of whether the effect can resolve (Rule 9.4.2).
             ActionType::ChangeState => {
-                let state_change_binding = cost.state_change_any();
-                let state_change = state_change_binding.unwrap_or("");
-                let target = cost.target.as_deref().unwrap_or("self");
-                let optional = cost.optional.unwrap_or(false);
-                let is_activation = self
-                    .current_ability
-                    .as_ref()
-                    .and_then(|a| a.triggers.as_ref())
-                    .is_some_and(|t| &**t == crate::triggers::ACTIVATION);
-
-                if optional && !is_activation {
-                    // Q137: 「ウェイトにする」とは、アクティブ状態のメンバーをウェイト
-                    // 状態にすることを意味します。既にウェイト状態のメンバーをコストで
-                    // 「ウェイトにする」ことはできません。
-                    // Verify active candidates exist before prompting — applies to
-                    // both self_cost and non-self_cost.
-                    if state_change == "wait" {
-                        let exclude_self = cost.exclude_self_any().unwrap_or(false);
-                        let candidates = get_change_state_candidates(
-                            gs,
-                            target,
-                            cost.card_type_any().map(|ct| ct.as_card_str()),
-                            cost.group_names_any(),
-                            exclude_self,
-                            cost.self_cost_any().unwrap_or(false),
-                            false,
-                            Some("active"),
-                        );
-                        if candidates.is_empty() {
-                            return Ok(());
-                        }
-                    }
-                    let cost_description = if state_change == "wait" {
-                        "Put this member to wait state"
-                    } else {
-                        "Pay cost"
-                    };
-                    self.pending_choice = Some(Choice::SelectTarget {
-                        target: "pay_optional_cost:skip_optional_cost".to_string(),
-                        description: format!(
-                            "Pay optional cost: {}? (pay or skip)",
-                            cost_description
-                        ),
-                        description_en: Some(format!(
-                            "Pay optional cost: {}? (pay or skip)",
-                            cost_description
-                        )),
-                        description_ja: Some(if state_change == "wait" {
-                            "このメンバーをレスト状態にする（支払う/スキップ）？".to_string()
-                        } else {
-                            "コストを支払う（支払う/スキップ）？".to_string()
-                        }),
-                        allow_skip: true,
-                        options: None,
-                    });
-                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
-                    }
-                    return Ok(());
-                }
-
-                if state_change == "wait" {
-                    let count = cost.count.unwrap_or(1) as usize;
-                    let exclude_self = cost.exclude_self_any().unwrap_or(false);
-                    let candidates = get_change_state_candidates(
-                        gs,
-                        target,
-                        cost.card_type_any().map(|ct| ct.as_card_str()),
-                        cost.group_names_any(),
-                        exclude_self,
-                        cost.self_cost_any().unwrap_or(false),
-                        true,
-                        Some("active"),
-                    );
-                    log::debug!("[CHANGE_STATE] candidates={:?}", candidates);
-
-                    // Q137: 「ウェイトにする」はアクティブ状態のメンバーをウェイト状態に
-                    // することを意味します。対象がいない場合、その行為自体が行われません。
-                    // For mandatory costs this means the cost cannot be paid.
-                    if candidates.is_empty() {
-                        return Err("No matching members on stage to change state".to_string());
-                    }
-
-                    if candidates.len() <= count {
-                        for &card_id in &candidates {
-                            log::debug!(
-                                "[TRACE_COST_WAIT] setting card {} to wait, stage before={:?}",
-                                card_id,
-                                gs.player1.stage.stage
-                            );
-                            gs.mods.add_orientation_modifier(card_id, "wait");
-                        }
-                    } else {
-                        let desc_ja = format!("ウェイトにするステージメンバーを{}体選択", count);
-                        self.pending_choice = Some(
-                            Choice::select_cards(
-                                Zone::Stage.to_str(),
-                                count,
-                                format!("Select {} stage member(s) to wait", count),
-                                false,
-                            )
-                            .description_ja(Some(desc_ja))
-                            .card_type(cost.card_type_any().map(|s| s.to_string()))
-                            .is_select_action(true)
-                            .target_player_id(Some(
-                                cost.target.as_deref().unwrap_or("self").to_string(),
-                            ))
-                            .build(),
-                        );
-                        return Ok(());
-                    }
-                }
-                Ok(())
+                self.pay_cost_change_state(gs, cost)
             }
             // Rule 5.9 / Rule 9.4.2 / Q215: Pay energy cost
             //
