@@ -210,7 +210,7 @@ STATUS: PL!N-bp4-003-R (Shizuku) ❌  no tests found (aggregate location)
 STATUS: PL!-bp6-002-R/P (Eri) ❌  OR ability filter — needs tests
 STATUS: PL!N-bp1-012-R+/P (Mia Taylor) ❌  combined icon_all+blade — needs tests
 STATUS: PL!-PR-001/002 (Honoka/Eri PR) ❌  movement trigger — needs tests
-STATUS: PL!HS-bp5-003 (Rurino) ❌  movement trigger — needs tests
+STATUS: PL!HS-bp5-003 (Rurino) ✅  9 tests in qa_new_tests238.rs (6 manual trigger + 3 baton touch)
 STATUS: PL!HS-bp2-012/013/015 (Kohaku/Tsuzuri/Shizuku) ❌  movement trigger — needs tests
 STATUS: PL!HS-bp6-017/018/019 (Kaho/Sayaka/Rurino) ❌  movement trigger — needs tests
 

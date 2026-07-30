@@ -2885,6 +2885,7 @@ impl AbilityEffect {
     bool_getter!(reveal_any, [LookReveal => reveal, SelectTarget => reveal]);
 
     bool_getter!(same_unit_name_any, [MiscOp => same_unit_name, MoveCards => same_unit_name]);
+    bool_getter!(same_name_any, [GainResource => same_name]);
 
     bool_getter!(self_cost_any, [ChangeState => self_cost, MoveCards => self_cost]);
 

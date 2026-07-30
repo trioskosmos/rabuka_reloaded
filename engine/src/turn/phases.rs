@@ -314,9 +314,9 @@ impl super::TurnEngine {
             .flat_map(|(&k, colors)| colors.iter().map(move |(&c, e)| (k, c, *e)))
             .collect();
         let player_id = if is_first {
-            game_state.player1.id.clone()
+            game_state.first_attacker().id.clone()
         } else {
-            game_state.player2.id.clone()
+            game_state.second_attacker().id.clone()
         };
         let cannot_live = game_state.cannot_live_players.contains(&player_id);
         let performer_id = player_id.clone();
@@ -332,9 +332,17 @@ impl super::TurnEngine {
             let om = &game_state.mods.orientation_modifiers;
             let hcm = &game_state.mods.heart_color_multiplier;
             let player = if is_first {
-                &mut game_state.player1
+                if game_state.player1.is_first_attacker {
+                    &mut game_state.player1
+                } else {
+                    &mut game_state.player2
+                }
             } else {
-                &mut game_state.player2
+                if game_state.player1.is_first_attacker {
+                    &mut game_state.player2
+                } else {
+                    &mut game_state.player1
+                }
             };
             Self::player_perform_live(
                 player,
@@ -377,10 +385,19 @@ impl super::TurnEngine {
         if game_state.initial_yell_revealed_cards.is_empty() {
             game_state.initial_yell_revealed_cards = game_state.revealed_cards.clone();
         }
+        let cheer_buf = if performer_id == game_state.player1.id {
+            &mut game_state.player1_cheer_revealed_cards
+        } else {
+            &mut game_state.player2_cheer_revealed_cards
+        };
         for cid in &revealed_ids {
-            game_state.cheer_revealed_cards_first(is_first).push(*cid);
+            cheer_buf.push(*cid);
         }
-        *game_state.cheer_blade_heart_count_mut(is_first) = note_icons;
+        if performer_id == game_state.player1.id {
+            game_state.player1_cheer_blade_heart_count = note_icons;
+        } else {
+            game_state.player2_cheer_blade_heart_count = note_icons;
+        }
 
         // If cards moved from live_card_zone to waitroom during yell phase
         // (cannot_live path), set recently_moved_cards so the 8.3.13 check
@@ -575,9 +592,9 @@ impl super::TurnEngine {
         // Add constant score source info into breakdown.scores
         {
             let stage_cards: Vec<i16> = if is_first {
-                game_state.player1.stage.stage.to_vec()
+                game_state.first_attacker().stage.stage.to_vec()
             } else {
-                game_state.player2.stage.stage.to_vec()
+                game_state.second_attacker().stage.stage.to_vec()
             };
             for (cid, text, val) in &game_state.mods.constant_score_sources {
                 if stage_cards.contains(cid) {

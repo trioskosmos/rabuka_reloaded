@@ -489,6 +489,17 @@ impl super::TurnEngine {
             } else {
                 player2_score
             };
+            // Rule 8.3.16 + 8.4.2 + Q47: If zone is empty (all cards discarded),
+            // there is no score to sum. Q47: a failed live has "no total score"
+            // (合計スコアがない状態), not 0. Represented as 0 in the snapshot.
+            let zone_empty = if is_first {
+                game_state.player1.live_card_zone.cards.is_empty()
+            } else {
+                game_state.player2.live_card_zone.cards.is_empty()
+            };
+            if zone_empty {
+                snap.total_score = 0;
+            }
             // Rule 8.3.16: If ANY live card's need_heart could not be satisfied,
             // ALL live cards fail. Success requires ALL cards to pass.
             snap.success = snap.lives.iter().all(|l| l.passed) && snap.total_score > 0;

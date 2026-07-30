@@ -242,7 +242,7 @@ impl AbilityResolver {
                 );
                 let desc_ja = format!(
                     "{}から公開するカードを選択",
-                    crate::ability::describe::zone_label(Some(&source))
+                    crate::ability::describe::zone_label_ja(Some(&source))
                 );
                 self.pending_choice = Some(
                     Choice::select_cards(source.to_string(), choices_count, desc_en, allow_skip)
@@ -559,7 +559,7 @@ impl AbilityResolver {
         );
         let desc_ja = format!(
             "{}から{}枚のカードを選択",
-            crate::ability::describe::zone_label(Some(&source)),
+            crate::ability::describe::zone_label_ja(Some(&source)),
             count
         );
         self.pending_choice = Some(

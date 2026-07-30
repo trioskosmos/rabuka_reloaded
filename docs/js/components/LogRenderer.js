@@ -1215,27 +1215,52 @@ export const LogRenderer = {
             bucket.push({ id, source });
         };
 
-        // P1 sources
-        (s.player1_cheer_revealed_cards || []).forEach(id => addCard(id, 'Cheer', p1Cards));
-        (s.initial_yell_revealed_cards || []).forEach(id => addCard(id, 'Initial Yell', p1Cards));
+        // Build owner lookup from card_info arrays
+        const ownerOf = new Map();
+        (s.revealed_card_info || []).forEach(e => {
+            if (e.card_id !== undefined) ownerOf.set(e.card_id, e.owner);
+        });
+        (s.revealed_cost_card_info || []).forEach(e => {
+            if (e.card_id !== undefined) ownerOf.set(e.card_id, e.owner);
+        });
 
-        // P2 sources
-        (s.player2_cheer_revealed_cards || []).forEach(id => addCard(id, 'Cheer', p2Cards));
-        (s.re_yell_revealed_cards || []).forEach(id => addCard(id, 'Re-Yell', p2Cards));
+        const bucketForOwner = (owner) => {
+            if (owner === 0) return p1Cards;
+            if (owner === 1) return p2Cards;
+            return sharedCards;
+        };
 
-        // Shared sources
-        (s.revealed_cost_cards || []).forEach(id => addCard(id, 'Cost', sharedCards));
+        // Yell sources
+        (s.initial_yell_revealed_cards || []).forEach(id => {
+            const owner = ownerOf.get(id);
+            addCard(id, 'Yell', bucketForOwner(owner));
+        });
 
+        // Re-Yell sources
+        (s.re_yell_revealed_cards || []).forEach(id => {
+            const owner = ownerOf.get(id);
+            addCard(id, 'Re-Yell', bucketForOwner(owner));
+        });
+
+        // Cost sources
+        (s.revealed_cost_cards || []).forEach(id => {
+            const owner = ownerOf.get(id);
+            addCard(id, 'Cost', bucketForOwner(owner));
+        });
+
+        // Effect sources
         if (s.revealed_card_info?.length) {
             s.revealed_card_info.forEach(e => {
-                if (e.card_id !== undefined) addCard(e.card_id, e.source || 'Effect', sharedCards);
+                if (e.card_id !== undefined) addCard(e.card_id, e.source || 'Effect', bucketForOwner(e.owner));
             });
         } else {
-            (s.revealed_cards || []).forEach(id => addCard(id, 'Effect', sharedCards));
+            (s.revealed_cards || []).forEach(id => {
+                addCard(id, 'Effect', sharedCards);
+            });
         }
         if (s.revealed_cost_card_info?.length) {
             s.revealed_cost_card_info.forEach(e => {
-                if (e.card_id !== undefined) addCard(e.card_id, e.source || 'Cost', sharedCards);
+                if (e.card_id !== undefined) addCard(e.card_id, e.source || 'Cost', bucketForOwner(e.owner));
             });
         }
 

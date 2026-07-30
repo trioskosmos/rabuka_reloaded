@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-29T15:00:44.092431",
+  "generated_at": "2026-07-30T20:02:12.079937",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "f0def581",
+  "engine_commit": "6b5a28ba",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -2202,13 +2202,32 @@
             "heart04"
           ]
         },
-        "duration": "live_end",
-        "count": 1,
-        "card_type": "member_card",
-        "target_count": 1,
-        "action": "gain_resource",
-        "resource": "blade",
-        "same_name": true,
+        "action": "sequential",
+        "actions": [
+          {
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": 1,
+            "target_count": 1,
+            "same_name": true,
+            "card_type": "member_card",
+            "text": "これにより控え室に置いたカードがメンバーカードの場合、控え室に置いたカードと同じ名前を持つメンバー1人は、ライブ終了時まで、{{heart_04.png|heart04}}{{icon_blade.png|ブレード}}を得る",
+            "duration": "live_end"
+          },
+          {
+            "action": "gain_resource",
+            "resource": "heart",
+            "heart_colors": [
+              "heart04"
+            ],
+            "count": 1,
+            "target_count": 1,
+            "same_name": true,
+            "card_type": "member_card",
+            "text": "これにより控え室に置いたカードがメンバーカードの場合、控え室に置いたカードと同じ名前を持つメンバー1人は、ライブ終了時まで、{{heart_04.png|heart04}}{{icon_blade.png|ブレード}}を得る",
+            "duration": "live_end"
+          }
+        ],
         "heart_colors": [
           "heart04"
         ]
@@ -4156,7 +4175,7 @@
         "blade_limit": 3,
         "blade_limit_operator": "<=",
         "activation_position": "center",
-        "position": "left_side"
+        "position": "left_side,right_side,center"
       }
     },
     {
@@ -5136,6 +5155,7 @@
             "action": "gain_resource",
             "resource": "blade",
             "count": 1,
+            "card_type": "card",
             "duration": "as_long_as",
             "text": "{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
           },
@@ -5146,6 +5166,7 @@
               "heart05"
             ],
             "count": 1,
+            "card_type": "card",
             "duration": "as_long_as",
             "text": "{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
           }
@@ -6045,6 +6066,7 @@
                 "action": "gain_resource",
                 "resource": "blade",
                 "count": 1,
+                "card_type": "card",
                 "duration": "live_end",
                 "text": "自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合、ライブ終了時まで、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
               },
@@ -6055,6 +6077,7 @@
                   "heart05"
                 ],
                 "count": 1,
+                "card_type": "card",
                 "duration": "live_end",
                 "text": "自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合、ライブ終了時まで、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
               }
@@ -8926,6 +8949,7 @@
             "action": "gain_resource",
             "resource": "blade",
             "count": 1,
+            "card_type": "card",
             "duration": "as_long_as",
             "text": "{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
           },
@@ -8936,6 +8960,7 @@
               "heart05"
             ],
             "count": 1,
+            "card_type": "card",
             "duration": "as_long_as",
             "text": "{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
           }
@@ -11424,7 +11449,7 @@
         "value": 2,
         "operation": "add",
         "self_target": true,
-        "position": "center"
+        "position": "center,left_side,right_side"
       }
     },
     {
@@ -14326,7 +14351,7 @@
             "count": 2,
             "action": "move_cards",
             "card_type": "card",
-            "position": "left_side",
+            "position": "left_side,right_side",
             "activation_position": "left_side,right_side"
           }
         ],
@@ -14346,7 +14371,7 @@
           "activation_position": "left_side,right_side"
         },
         "activation_position": "left_side,right_side",
-        "position": "left_side"
+        "position": "left_side,right_side"
       }
     },
     {
@@ -16540,6 +16565,7 @@
             "action": "gain_resource",
             "resource": "blade",
             "count": 1,
+            "card_type": "card",
             "duration": "live_end",
             "text": "{{heart_04.png|heart04}}{{icon_blade.png|ブレード}}を得る"
           },
@@ -16550,6 +16576,7 @@
               "heart04"
             ],
             "count": 1,
+            "card_type": "card",
             "duration": "live_end",
             "text": "{{heart_04.png|heart04}}{{icon_blade.png|ブレード}}を得る"
           }
@@ -16719,6 +16746,7 @@
             "action": "gain_resource",
             "resource": "blade",
             "count": 1,
+            "card_type": "card",
             "duration": "live_end",
             "text": "自分の手札からカードが1枚以上控え室に置かれるたび、ライブ終了時まで、{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
           },
@@ -16729,6 +16757,7 @@
               "heart01"
             ],
             "count": 1,
+            "card_type": "card",
             "duration": "live_end",
             "text": "自分の手札からカードが1枚以上控え室に置かれるたび、ライブ終了時まで、{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
           }
@@ -16934,6 +16963,7 @@
                 "action": "gain_resource",
                 "resource": "blade",
                 "count": 1,
+                "card_type": "card",
                 "duration": "live_end",
                 "text": "{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
               },
@@ -16944,6 +16974,7 @@
                   "heart01"
                 ],
                 "count": 1,
+                "card_type": "card",
                 "duration": "live_end",
                 "text": "{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
               }
@@ -20508,6 +20539,7 @@
             "action": "gain_resource",
             "resource": "blade",
             "count": 2,
+            "card_type": "card",
             "duration": "live_end",
             "text": "{{heart_04.png|heart04}}{{heart_04.png|heart04}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る"
           },
@@ -20518,6 +20550,7 @@
               "heart04"
             ],
             "count": 2,
+            "card_type": "card",
             "duration": "live_end",
             "text": "{{heart_04.png|heart04}}{{heart_04.png|heart04}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る"
           }
@@ -20557,6 +20590,7 @@
             "action": "gain_resource",
             "resource": "blade",
             "count": 2,
+            "card_type": "card",
             "duration": "live_end",
             "text": "{{heart_05.png|heart05}}{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る"
           },
@@ -20567,6 +20601,7 @@
               "heart05"
             ],
             "count": 2,
+            "card_type": "card",
             "duration": "live_end",
             "text": "{{heart_05.png|heart05}}{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る"
           }
@@ -28183,18 +28218,37 @@
       "effect": {
         "text": "自分のステージにいるこのメンバー以外の『蓮ノ空』のメンバー1人は、{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る",
         "duration": "live_end",
+        "action": "sequential",
+        "actions": [
+          {
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": 1,
+            "target_count": 1,
+            "card_type": "member_card",
+            "duration": "live_end",
+            "text": "自分のステージにいるこのメンバー以外の『蓮ノ空』のメンバー1人は、{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
+          },
+          {
+            "action": "gain_resource",
+            "resource": "heart",
+            "heart_colors": [
+              "heart01"
+            ],
+            "count": 1,
+            "target_count": 1,
+            "card_type": "member_card",
+            "duration": "live_end",
+            "text": "自分のステージにいるこのメンバー以外の『蓮ノ空』のメンバー1人は、{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
+          }
+        ],
+        "heart_colors": [
+          "heart01"
+        ],
         "count": 1,
-        "card_type": "member_card",
-        "target": "self",
         "exclude_self": true,
         "group_names": [
           "蓮ノ空"
-        ],
-        "target_count": 1,
-        "action": "gain_resource",
-        "resource": "blade",
-        "heart_colors": [
-          "heart01"
         ]
       }
     },
@@ -30966,12 +31020,34 @@
           {
             "text": "自分のステージにいるメンバー1人は、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る",
             "duration": "live_end",
-            "count": 1,
-            "card_type": "member_card",
-            "target": "self",
-            "target_count": 1,
-            "action": "gain_resource",
-            "resource": "blade"
+            "action": "sequential",
+            "actions": [
+              {
+                "action": "gain_resource",
+                "resource": "blade",
+                "count": 1,
+                "target_count": 1,
+                "card_type": "member_card",
+                "duration": "live_end",
+                "text": "自分のステージにいるメンバー1人は、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
+              },
+              {
+                "action": "gain_resource",
+                "resource": "heart",
+                "heart_colors": [
+                  "heart05"
+                ],
+                "count": 1,
+                "target_count": 1,
+                "card_type": "member_card",
+                "duration": "live_end",
+                "text": "自分のステージにいるメンバー1人は、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
+              }
+            ],
+            "heart_colors": [
+              "heart05"
+            ],
+            "count": 1
           }
         ],
         "conditional": true,

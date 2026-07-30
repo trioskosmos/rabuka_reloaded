@@ -729,9 +729,184 @@ enum SetupPhase {
 enum Overlay {
     None,
     StartMenu(usize),
-    GameLog(usize),
-    PerfStats(Option<usize>),
-    RevealedCards(bool, usize),
+    GameLog(usize, usize),                   // offset (from end), cursor
+    PerfStats(Option<usize>, usize),         // detail snapshot index, cursor
+    RevealedCards(bool, usize, Option<i16>), // show_self, flat cursor, viewing card id
+}
+
+#[cfg(feature = "3ds")]
+#[derive(Clone, Copy, PartialEq)]
+enum GridAction {
+    None,
+    CloseGrid,
+    CloseDetail,
+    OpenDetail(i16),
+    Navigate,
+}
+
+#[cfg(feature = "3ds")]
+fn card_grid_input(
+    keys: u32,
+    cursor: &mut usize,
+    viewing_card: &mut Option<i16>,
+    card_ids: &[i16],
+    cols: usize,
+) -> GridAction {
+    let total = card_ids.len();
+    if total == 0 {
+        return GridAction::None;
+    }
+    if keys & 0x00000002 != 0 {
+        if viewing_card.is_some() {
+            *viewing_card = None;
+            return GridAction::CloseDetail;
+        } else {
+            return GridAction::CloseGrid;
+        }
+    }
+    if keys & 0x00000400 != 0 && viewing_card.is_none() {
+        if *cursor < total {
+            *viewing_card = Some(card_ids[*cursor]);
+            return GridAction::OpenDetail(card_ids[*cursor]);
+        }
+    }
+    if viewing_card.is_none() {
+        let mut moved = false;
+        if keys & 0x00000040 != 0 {
+            *cursor = cursor.saturating_sub(cols);
+            moved = true;
+        }
+        if keys & 0x00000080 != 0 {
+            *cursor = (*cursor + cols).min(total - 1);
+            moved = true;
+        }
+        if keys & 0x00000020 != 0 && *cursor > 0 {
+            *cursor -= 1;
+            moved = true;
+        }
+        if keys & 0x00000010 != 0 && *cursor + 1 < total {
+            *cursor += 1;
+            moved = true;
+        }
+        if moved {
+            return GridAction::Navigate;
+        }
+    }
+    GridAction::None
+}
+
+#[cfg(feature = "3ds")]
+fn render_card_grid(
+    card_ids: &[i16],
+    cursor: usize,
+    cols: usize,
+    rows: usize,
+    y_start: f32,
+    gs: &GameState,
+    atlas: &CardAtlas,
+) {
+    let gap = 4.0f32;
+    let pp = cols * rows;
+    let max_ch = ((240.0 - y_start - gap) / rows as f32) - 14.0;
+    let cw = (max_ch * 0.711).min((400.0 - 8.0 - (cols as f32 - 1.0) * gap) / cols as f32);
+    let ch = cw / 0.711;
+    let page = (cursor / pp) * pp;
+    let n = card_ids.len();
+    for i in page..n.min(page + pp) {
+        let col = (i - page) % cols;
+        let row = (i - page) / cols;
+        let ix = 4.0 + col as f32 * (cw + gap);
+        let iy = y_start + row as f32 * (ch + 14.0 + gap);
+        let cid = card_ids[i];
+        let border = if i == cursor { COL_GOLD } else { COL_CARD };
+        unsafe {
+            _3ds_top_queue_rect(ix, iy, cw, ch + 14.0, border);
+        }
+        let cn = gs
+            .card_database
+            .get_card(cid)
+            .map(|c| c.card_no.as_ref())
+            .unwrap_or("?");
+        if let Some((atl, idx)) = atlas.lookup(cn) {
+            let c_str = std::ffi::CString::new(atl.as_bytes()).unwrap_or_default();
+            unsafe {
+                _3ds_top_queue_card(
+                    c_str.as_ptr() as *const u8,
+                    *idx as i32,
+                    ix + 1.0,
+                    iy + 1.0,
+                    cw - 2.0,
+                    ch,
+                );
+                _3ds_top_queue_text(
+                    ix + 1.0,
+                    iy + ch + 1.0,
+                    COL_LIGHT,
+                    0.45f32,
+                    format!("{}\0", cn).as_ptr(),
+                );
+            }
+        }
+    }
+    if n > pp {
+        let page_n = page / pp + 1;
+        let total_p = (n + pp - 1) / pp;
+        unsafe {
+            _3ds_top_queue_text(
+                300.0,
+                4.0,
+                COL_MED,
+                0.50f32,
+                format!("{}/{}\0", page_n, total_p).as_ptr(),
+            );
+        }
+    }
+}
+
+#[cfg(feature = "3ds")]
+fn render_card_detail(card_id: i16, gs: &GameState) {
+    if let Some(card) = gs.card_database.get_card(card_id) {
+        let stats = compute_card_stats(card, card_id, gs);
+        unsafe {
+            _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+            _3ds_top_queue_rect(0.0, 0.0, 400.0, 232.0, COL_CARD);
+            let display_name = i18n::card_display_name(&card.name, current_lang());
+            _3ds_top_queue_text(
+                4.0,
+                4.0,
+                COL_BLUE,
+                0.80f32,
+                format!("[{}] {}\0", card.card_no, display_name).as_ptr(),
+            );
+            render_text_with_icons(
+                4.0,
+                24.0,
+                &card_stat_line(
+                    stats.total_blade,
+                    &stats.heart_str,
+                    stats.score,
+                    stats.cost,
+                    stats.is_tapped,
+                    card.card_type.as_card_str(),
+                    &stats.need_heart_str,
+                ),
+                COL_LIGHT,
+                0.65f32,
+            );
+            let mut ty = 44.0;
+            for ab in card.resolved_abilities() {
+                let ab_text = i18n::translate_ability(&ab.full_text, current_lang());
+                let w = wrap_ability_text(&ab_text, 392.0, 0.65);
+                for line in w.lines() {
+                    if ty < 230.0 {
+                        render_text_with_icons(4.0, ty, line, COL_LIGHT, 0.65);
+                        ty += 18.0;
+                    }
+                }
+                ty += 3.0;
+            }
+        }
+    }
 }
 
 #[cfg(feature = "3ds")]
@@ -2575,9 +2750,9 @@ fn main() {
                             }
                             if keys & 0x00000001 != 0 {
                                 overlay = match *sel {
-                                    0 => Overlay::PerfStats(None),
-                                    1 => Overlay::GameLog(gs.rule_log.len().saturating_sub(16)),
-                                    2 => Overlay::RevealedCards(true, 0),
+                                    0 => Overlay::PerfStats(None, 0),
+                                    1 => Overlay::GameLog(0, 0),
+                                    2 => Overlay::RevealedCards(true, 0, None),
                                     3 => {
                                         // Toggle language
                                         set_lang(current_lang().toggle());
@@ -2593,46 +2768,136 @@ fn main() {
                                 redraw = true;
                             }
                         }
-                        Overlay::GameLog(ref mut offset) => {
-                            if keys & 0x00000040 != 0 {
-                                *offset = offset.saturating_sub(1);
-                                redraw = true;
-                            }
-                            if keys & 0x00000080 != 0 {
-                                *offset = offset.saturating_add(1);
-                                redraw = true;
-                            }
-                        }
-                        Overlay::PerfStats(ref mut detail) => {
-                            if keys & 0x00000001 != 0 {
-                                // A toggles detail view for the latest snapshot
-                                let snapshots = &gs.performance_snapshots;
-                                *detail = match *detail {
-                                    None => {
-                                        if !snapshots.is_empty() {
-                                            Some(snapshots.len() - 1)
-                                        } else {
-                                            None
-                                        }
+                        Overlay::GameLog(ref mut offset, ref mut cursor) => {
+                            let n = gs.rule_log.len();
+                            if n == 0 { /* nothing */
+                            } else {
+                                let max_vis = 12usize;
+                                if keys & 0x00000040 != 0 {
+                                    if *offset == 0 {
+                                        *offset = n.saturating_sub(max_vis);
+                                    } else {
+                                        *offset = offset.saturating_sub(1);
                                     }
-                                    Some(_) => None,
-                                };
-                                redraw = true;
+                                    if *cursor >= *offset + max_vis || *cursor < *offset {
+                                        *cursor = *offset;
+                                    }
+                                    redraw = true;
+                                }
+                                if keys & 0x00000080 != 0 {
+                                    let max_off = n.saturating_sub(max_vis);
+                                    if *offset >= max_off {
+                                        *offset = 0;
+                                    } else {
+                                        *offset = offset.saturating_add(1).min(max_off);
+                                    }
+                                    if *cursor >= *offset + max_vis || *cursor < *offset {
+                                        *cursor = *offset;
+                                    }
+                                    redraw = true;
+                                }
+                                if keys & 0x00000020 != 0 {
+                                    *offset = offset.saturating_sub(max_vis);
+                                    if *cursor >= *offset + max_vis || *cursor < *offset {
+                                        *cursor = *offset;
+                                    }
+                                    redraw = true;
+                                }
+                                if keys & 0x00000010 != 0 {
+                                    let max_off = n.saturating_sub(max_vis);
+                                    *offset = offset.saturating_add(max_vis).min(max_off);
+                                    if *cursor >= *offset + max_vis || *cursor < *offset {
+                                        *cursor = *offset;
+                                    }
+                                    redraw = true;
+                                }
                             }
                         }
-                        Overlay::RevealedCards(ref mut show_self, ref mut rev_scroll) => {
-                            if keys & 0x00000400 != 0 {
+                        Overlay::PerfStats(ref mut detail, ref mut cursor) => {
+                            let n = gs.performance_snapshots.len();
+                            if detail.is_some() {
+                                if keys & 0x00000002 != 0 {
+                                    *detail = None;
+                                    redraw = true;
+                                }
+                            } else {
+                                if keys & 0x00000040 != 0 && *cursor > 0 {
+                                    *cursor -= 1;
+                                    redraw = true;
+                                }
+                                if keys & 0x00000080 != 0 && *cursor + 1 < n {
+                                    *cursor += 1;
+                                    redraw = true;
+                                }
+                                if keys & 0x00000001 != 0 && n > 0 {
+                                    *detail = Some(*cursor);
+                                    redraw = true;
+                                }
+                            }
+                        }
+                        Overlay::RevealedCards(
+                            ref mut show_self,
+                            ref mut cursor,
+                            ref mut view_card,
+                        ) => {
+                            let filter_owner: Option<u8> = if *show_self {
+                                if is_host {
+                                    Some(0)
+                                } else {
+                                    Some(1)
+                                }
+                            } else {
+                                if is_host {
+                                    Some(1)
+                                } else {
+                                    Some(0)
+                                }
+                            };
+                            let mut owner_of: HashMap<i16, Option<u8>> = HashMap::new();
+                            for (i, &cid) in gs.revealed_cards.iter().enumerate() {
+                                if let Some(meta) = gs.revealed_card_meta.get(i) {
+                                    owner_of.insert(cid, meta.owner);
+                                }
+                            }
+                            for (i, &cid) in gs.revealed_cost_cards.iter().enumerate() {
+                                if let Some(meta) = gs.revealed_cost_card_meta.get(i) {
+                                    owner_of.insert(cid, meta.owner);
+                                }
+                            }
+                            let filter_cards = |cards: &[i16]| -> Vec<i16> {
+                                cards
+                                    .iter()
+                                    .filter(|&&cid| {
+                                        if let Some(owner) = owner_of.get(&cid) {
+                                            *owner == filter_owner || owner.is_none()
+                                        } else {
+                                            true
+                                        }
+                                    })
+                                    .copied()
+                                    .collect()
+                            };
+                            let mut flat: Vec<i16> = Vec::new();
+                            flat.extend(filter_cards(&gs.initial_yell_revealed_cards));
+                            flat.extend(filter_cards(&gs.re_yell_revealed_cards));
+                            flat.extend(filter_cards(&gs.revealed_cost_cards));
+                            flat.extend(filter_cards(&gs.revealed_cards));
+                            if keys & 0x00000100 != 0 || keys & 0x00000200 != 0 {
                                 *show_self = !*show_self;
-                                *rev_scroll = 0;
+                                *cursor = 0;
+                                *view_card = None;
                                 redraw = true;
-                            }
-                            if keys & 0x00000040 != 0 {
-                                *rev_scroll = rev_scroll.saturating_sub(1);
-                                redraw = true;
-                            }
-                            if keys & 0x00000080 != 0 {
-                                *rev_scroll = rev_scroll.saturating_add(1);
-                                redraw = true;
+                            } else {
+                                let action = card_grid_input(keys, cursor, view_card, &flat, 5);
+                                match action {
+                                    GridAction::CloseGrid => {
+                                        overlay = Overlay::None;
+                                    }
+                                    _ => {}
+                                }
+                                if !matches!(action, GridAction::None) {
+                                    redraw = true;
+                                }
                             }
                         }
                         Overlay::None => {}
@@ -2869,65 +3134,17 @@ fn main() {
 
                 // Zone viewer controls
                 if zone_viewer.is_some() {
-                    let cols_vis = 5; // must match rendering
-                    let pp = cols_vis * 2;
-                    // B: close detail overlay first, then viewer
-                    if keys & 0x00000002 != 0 {
-                        if viewing_card.is_some() {
-                            viewing_card = None;
-                        } else {
+                    let cards = zone_viewer.as_ref().map_or(&[][..], |z| &z.1);
+                    let action =
+                        card_grid_input(keys, &mut zone_viewer_offset, &mut viewing_card, cards, 5);
+                    match action {
+                        GridAction::CloseGrid => {
                             zone_viewer = None;
                         }
+                        _ => {}
+                    }
+                    if !matches!(action, GridAction::None) {
                         redraw = true;
-                    }
-                    // X: show card detail for selected card
-                    if keys & 0x00000400 != 0 && viewing_card.is_none() {
-                        if let Some((_, ref cards)) = zone_viewer {
-                            if zone_viewer_offset < cards.len() {
-                                viewing_card = Some(cards[zone_viewer_offset]);
-                                redraw = true;
-                            }
-                        }
-                    }
-                    // UP/DOWN: move cursor by row
-                    if viewing_card.is_none() {
-                        if keys & 0x00000040 != 0 {
-                            zone_viewer_offset = if zone_viewer_offset >= cols_vis {
-                                zone_viewer_offset - cols_vis
-                            } else {
-                                0
-                            };
-                            if zone_viewer_offset < zone_viewer_offset / pp * pp {
-                                zone_viewer_offset = zone_viewer_offset / pp * pp;
-                            }
-                            redraw = true;
-                        }
-                        if keys & 0x00000080 != 0 {
-                            let m = zone_viewer
-                                .as_ref()
-                                .map_or(0, |z| z.1.len().saturating_sub(1));
-                            zone_viewer_offset = zone_viewer_offset.saturating_add(cols_vis).min(m);
-                            redraw = true;
-                        }
-                        // LEFT/RIGHT: move cursor by 1
-                        if keys & 0x00000020 != 0 {
-                            if zone_viewer_offset > 0 {
-                                zone_viewer_offset -= 1;
-                                if zone_viewer_offset < zone_viewer_offset / pp * pp {
-                                    zone_viewer_offset = zone_viewer_offset / pp * pp;
-                                }
-                            }
-                            redraw = true;
-                        }
-                        if keys & 0x00000010 != 0 {
-                            let m = zone_viewer
-                                .as_ref()
-                                .map_or(0, |z| z.1.len().saturating_sub(1));
-                            if zone_viewer_offset < m {
-                                zone_viewer_offset += 1;
-                            }
-                            redraw = true;
-                        }
                     }
                 }
 
@@ -4808,16 +5025,6 @@ fn main() {
 
                         if let Some((ref zlabel, ref zcards)) = zone_viewer {
                             if viewing_card.is_none() {
-                                let gap = 4.0f32;
-                                let cols = 5usize;
-                                let rows = 2usize;
-                                let pp = cols * rows;
-                                let max_ch = ((240.0 - 28.0 - gap) / rows as f32) - 14.0;
-                                let cw = (max_ch * 0.711)
-                                    .min((400.0 - 8.0 - (cols as f32 - 1.0) * gap) / cols as f32);
-                                let ch = cw / 0.711;
-                                let page = zone_viewer_offset / pp * pp;
-                                let n = zcards.len();
                                 unsafe {
                                     _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
                                     _3ds_top_queue_text(
@@ -4828,112 +5035,17 @@ fn main() {
                                         format!("{}  (B=close, X=detail)\0", zlabel).as_ptr(),
                                     );
                                 }
-                                for i in page..n.min(page + pp) {
-                                    let col = (i - page) % cols;
-                                    let row = (i - page) / cols;
-                                    let ix = 4.0 + col as f32 * (cw + gap);
-                                    let iy = 28.0 + row as f32 * (ch + 14.0 + gap);
-                                    let cid = zcards[i];
-                                    let border = if i == zone_viewer_offset {
-                                        COL_GOLD
-                                    } else {
-                                        COL_CARD
-                                    };
-                                    unsafe {
-                                        _3ds_top_queue_rect(ix, iy, cw, ch + 14.0, border);
-                                    }
-                                    let cn = gs
-                                        .card_database
-                                        .get_card(cid)
-                                        .map(|c| c.card_no.as_ref())
-                                        .unwrap_or("?");
-                                    if let Some((atl, idx)) = atlas.lookup(cn) {
-                                        let c_str = std::ffi::CString::new(atl.as_bytes())
-                                            .unwrap_or_default();
-                                        unsafe {
-                                            _3ds_top_queue_card(
-                                                c_str.as_ptr() as *const u8,
-                                                *idx as i32,
-                                                ix + 1.0,
-                                                iy + 1.0,
-                                                cw - 2.0,
-                                                ch,
-                                            );
-                                            _3ds_top_queue_text(
-                                                ix + 1.0,
-                                                iy + ch + 1.0,
-                                                COL_LIGHT,
-                                                0.45f32,
-                                                format!("{}\0", cn).as_ptr(),
-                                            );
-                                        }
-                                    }
-                                }
-                                if n > pp {
-                                    let page_n = page / pp + 1;
-                                    let total_p = (n + pp - 1) / pp;
-                                    unsafe {
-                                        _3ds_top_queue_text(
-                                            300.0,
-                                            4.0,
-                                            COL_MED,
-                                            0.50f32,
-                                            format!("{}/{}\0", page_n, total_p).as_ptr(),
-                                        );
-                                    }
-                                }
+                                render_card_grid(
+                                    zcards,
+                                    zone_viewer_offset,
+                                    5,
+                                    2,
+                                    28.0,
+                                    &gs,
+                                    atlas,
+                                );
                             } else {
-                                // Active card detail overlay within zone viewer
-                                let vcid = viewing_card.unwrap();
-                                if let Some(card) = gs.card_database.get_card(vcid) {
-                                    let stats = compute_card_stats(card, vcid, &gs);
-                                    unsafe {
-                                        _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                                        _3ds_top_queue_rect(0.0, 0.0, 400.0, 232.0, COL_CARD);
-                                        let display_name =
-                                            i18n::card_display_name(&card.name, current_lang());
-                                        _3ds_top_queue_text(
-                                            4.0,
-                                            4.0,
-                                            COL_BLUE,
-                                            0.80f32,
-                                            format!("[{}] {}\0", card.card_no, display_name)
-                                                .as_ptr(),
-                                        );
-                                        render_text_with_icons(
-                                            4.0,
-                                            24.0,
-                                            &card_stat_line(
-                                                stats.total_blade,
-                                                &stats.heart_str,
-                                                stats.score,
-                                                stats.cost,
-                                                stats.is_tapped,
-                                                card.card_type.as_card_str(),
-                                                &stats.need_heart_str,
-                                            ),
-                                            COL_LIGHT,
-                                            0.65f32,
-                                        );
-                                        let mut ty = 44.0;
-                                        for ab in card.resolved_abilities() {
-                                            let ab_text = i18n::translate_ability(
-                                                &ab.full_text,
-                                                current_lang(),
-                                            );
-                                            let w = wrap_ability_text(&ab_text, 392.0, 0.65);
-                                            for line in w.lines() {
-                                                if ty < 230.0 {
-                                                    render_text_with_icons(
-                                                        4.0, ty, line, COL_LIGHT, 0.65,
-                                                    );
-                                                    ty += 18.0;
-                                                }
-                                            }
-                                            ty += 3.0;
-                                        }
-                                    }
-                                }
+                                render_card_detail(viewing_card.unwrap(), &gs);
                             }
                         } else if detail_mode {
                             let detail_cid = viewing_card.or_else(|| {
@@ -6121,7 +6233,9 @@ fn main() {
                                     format!("{}\0", tl("UP/DOWN=move, A=select, B=close")).as_ptr(),
                                 );
                             },
-                            Overlay::GameLog(offset) => {
+                            Overlay::GameLog(offset, cursor) => {
+                                let logs = &gs.rule_log;
+                                let n = logs.len();
                                 unsafe {
                                     _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, 0xCC000000);
                                     let log_hdr = tl("Game Log");
@@ -6130,58 +6244,58 @@ fn main() {
                                         2.0,
                                         COL_GOLD,
                                         0.65f32,
-                                        format!("{} (B=close, UP/DOWN=scroll)\0", log_hdr).as_ptr(),
+                                        format!(
+                                            "{}  {} entries (B=close, UP/DOWN=scroll)\0",
+                                            log_hdr, n
+                                        )
+                                        .as_ptr(),
                                     );
                                 }
-                                let logs = &gs.rule_log;
-                                let max_vis = 16usize;
-                                let mut o = offset;
-                                if o + max_vis > logs.len() && logs.len() > max_vis {
-                                    o = logs.len() - max_vis;
-                                }
-                                let mut ly = 22.0_f32;
-                                for i in o..logs.len().min(o + max_vis) {
-                                    let entry = &logs[i];
-                                    let truncated = if entry.chars().count() > 58 {
+                                let max_vis = 12usize;
+                                let end_idx = n.saturating_sub(offset);
+                                let start_idx = end_idx.saturating_sub(max_vis);
+                                let mut ly = 20.0_f32;
+                                for idx in (start_idx..end_idx).rev() {
+                                    let entry = &logs[idx];
+                                    let truncated = if entry.chars().count() > 55 {
                                         let cutoff = entry
                                             .char_indices()
-                                            .nth(58)
+                                            .nth(55)
                                             .map(|(i, _)| i)
                                             .unwrap_or(entry.len());
                                         &entry[..cutoff]
                                     } else {
                                         &entry[..]
                                     };
+                                    let is_cursor = idx == cursor;
+                                    let col = if is_cursor { COL_GOLD } else { 0xFFCCCCCC };
+                                    let prefix = if is_cursor { "> " } else { "  " };
                                     unsafe {
                                         _3ds_top_queue_text(
                                             4.0,
                                             ly,
-                                            0xFFCCCCCC,
-                                            0.50f32,
-                                            format!("{}\0", truncated).as_ptr(),
+                                            col,
+                                            0.60f32,
+                                            format!("{}{}\0", prefix, truncated).as_ptr(),
                                         );
                                     }
-                                    ly += 13.0;
+                                    ly += 16.0;
                                 }
-                                if logs.len() > max_vis {
+                                if n > max_vis {
+                                    let lo = start_idx + 1;
+                                    let hi = end_idx.min(n);
                                     unsafe {
                                         _3ds_top_queue_text(
                                             300.0,
                                             2.0,
                                             COL_MED,
                                             0.50f32,
-                                            format!(
-                                                "{}-{}/{}\0",
-                                                o + 1,
-                                                o + max_vis.min(logs.len() - o),
-                                                logs.len()
-                                            )
-                                            .as_ptr(),
+                                            format!("{}-{} of {}\0", lo, hi, n).as_ptr(),
                                         );
                                     }
                                 }
                             }
-                            Overlay::PerfStats(detail) => {
+                            Overlay::PerfStats(detail, cursor) => {
                                 unsafe {
                                     _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, 0xCC000000);
                                     let perf_hdr = tl("Performance");
@@ -6190,7 +6304,11 @@ fn main() {
                                         2.0,
                                         COL_GOLD,
                                         0.65f32,
-                                        format!("{} (B=close, A=detail)\0", perf_hdr).as_ptr(),
+                                        format!(
+                                            "{}  (B=close, A=detail, UP/DOWN=select)\0",
+                                            perf_hdr
+                                        )
+                                        .as_ptr(),
                                     );
                                 }
                                 let snapshots = &gs.performance_snapshots;
@@ -6211,7 +6329,7 @@ fn main() {
                                         unsafe {
                                             _3ds_top_queue_text(
                                                 4.0,
-                                                22.0,
+                                                20.0,
                                                 COL_LIGHT,
                                                 0.60f32,
                                                 format!(
@@ -6228,13 +6346,13 @@ fn main() {
                                             );
                                             _3ds_top_queue_text(
                                                 4.0,
-                                                36.0,
+                                                34.0,
                                                 COL_MED,
                                                 0.55f32,
                                                 format!("{}\0", tl("Lives:")).as_ptr(),
                                             );
                                         }
-                                        let mut ly = 50.0;
+                                        let mut ly = 48.0;
                                         for (li, lc) in s.lives.iter().enumerate() {
                                             let cn = gs
                                                 .card_database
@@ -6248,7 +6366,7 @@ fn main() {
                                                     8.0,
                                                     ly,
                                                     if lc.passed { 0xFF88FF88 } else { 0xFFFF8888 },
-                                                    0.50f32,
+                                                    0.60f32,
                                                     format!(
                                                         "{} #{} {} score:{}\0",
                                                         cn, li, status, lc.score
@@ -6256,15 +6374,24 @@ fn main() {
                                                     .as_ptr(),
                                                 );
                                             }
-                                            ly += 13.0;
-                                            if ly > 220.0 {
+                                            ly += 16.0;
+                                            if ly > 225.0 {
                                                 break;
                                             }
                                         }
                                     }
                                 } else {
-                                    let mut ly = 22.0;
-                                    for (_i, s) in snapshots.iter().enumerate().rev().take(10) {
+                                    let mut ly = 20.0;
+                                    let max_vis = 8usize;
+                                    let total = snapshots.len();
+                                    let display_start = total.saturating_sub(cursor + 1);
+                                    let display_end = display_start.saturating_sub(max_vis);
+                                    for idx in (display_end..display_start).rev() {
+                                        if idx >= total {
+                                            continue;
+                                        }
+                                        let s = &snapshots[idx];
+                                        let is_cur = idx == cursor;
                                         let label = format!(
                                             "T{} {} score:{} hearts:{} pass:{}/{} succ:{}",
                                             s.turn,
@@ -6275,179 +6402,160 @@ fn main() {
                                             s.lives.len(),
                                             s.success
                                         );
-                                        let col = if s.success { 0xFF88FF88 } else { 0xFFFF8888 };
+                                        let base_col =
+                                            if s.success { 0xFF88FF88 } else { 0xFFFF8888 };
+                                        let col = if is_cur { COL_GOLD } else { base_col };
+                                        let prefix = if is_cur { "> " } else { "  " };
+                                        let truncated = if label.chars().count() > 55 {
+                                            let cutoff = label
+                                                .char_indices()
+                                                .nth(55)
+                                                .map(|(i, _)| i)
+                                                .unwrap_or(label.len());
+                                            &label[..cutoff]
+                                        } else {
+                                            &label
+                                        };
                                         unsafe {
                                             _3ds_top_queue_text(
                                                 4.0,
                                                 ly,
                                                 col,
-                                                0.50f32,
-                                                format!(
-                                                    "{}\0",
-                                                    if label.chars().count() > 60 {
-                                                        let cutoff = label
-                                                            .char_indices()
-                                                            .nth(60)
-                                                            .map(|(i, _)| i)
-                                                            .unwrap_or(label.len());
-                                                        &label[..cutoff]
-                                                    } else {
-                                                        &label
-                                                    }
-                                                )
-                                                .as_ptr(),
+                                                0.60f32,
+                                                format!("{}{}\0", prefix, truncated).as_ptr(),
                                             );
                                         }
-                                        ly += 12.0;
+                                        ly += 15.0;
                                     }
                                 }
                             }
-                            Overlay::RevealedCards(show_self, rev_scroll) => {
-                                unsafe {
-                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, 0xCC000000);
+                            Overlay::RevealedCards(show_self, ref cursor, view_card) => {
+                                if let Some(vcid) = view_card {
+                                    render_card_detail(vcid, &gs);
+                                } else {
                                     let who = if show_self { tl("You") } else { tl("Opponent") };
                                     let rev_hdr = tl("Revealed Cards");
-                                    _3ds_top_queue_text(
-                                        4.0,
-                                        2.0,
-                                        COL_GOLD,
-                                        0.60f32,
-                                        format!("{} ({})  B=close X=toggle\0", rev_hdr, who)
-                                            .as_ptr(),
-                                    );
-                                }
-                                // Aggregate sections from all engine vectors
-                                struct RevSection<'a> {
-                                    label: &'a str,
-                                    cards: &'a [i16],
-                                }
-                                let cheer = if show_self {
-                                    &gs.player1_cheer_revealed_cards
-                                } else {
-                                    &gs.player2_cheer_revealed_cards
-                                };
-                                let sections: Vec<RevSection> = vec![
-                                    RevSection {
-                                        label: "Yell",
-                                        cards: &gs.initial_yell_revealed_cards,
-                                    },
-                                    RevSection {
-                                        label: "Re-Yell",
-                                        cards: &gs.re_yell_revealed_cards,
-                                    },
-                                    RevSection {
-                                        label: "Cheer",
-                                        cards: cheer,
-                                    },
-                                    RevSection {
-                                        label: "Cost",
-                                        cards: &gs.revealed_cost_cards,
-                                    },
-                                    RevSection {
-                                        label: "Effects",
-                                        cards: &gs.revealed_cards,
-                                    },
-                                ];
-                                let total_cards: usize =
-                                    sections.iter().map(|s| s.cards.len()).sum();
-                                if total_cards == 0 {
-                                    let msg = tl("No revealed cards");
+                                    let filter_owner: Option<u8> = if show_self {
+                                        if is_host {
+                                            Some(0)
+                                        } else {
+                                            Some(1)
+                                        }
+                                    } else {
+                                        if is_host {
+                                            Some(1)
+                                        } else {
+                                            Some(0)
+                                        }
+                                    };
+                                    let mut owner_of: HashMap<i16, Option<u8>> = HashMap::new();
+                                    for (i, &cid) in gs.revealed_cards.iter().enumerate() {
+                                        if let Some(meta) = gs.revealed_card_meta.get(i) {
+                                            owner_of.insert(cid, meta.owner);
+                                        }
+                                    }
+                                    for (i, &cid) in gs.revealed_cost_cards.iter().enumerate() {
+                                        if let Some(meta) = gs.revealed_cost_card_meta.get(i) {
+                                            owner_of.insert(cid, meta.owner);
+                                        }
+                                    }
+                                    let filter_cards = |cards: &[i16]| -> Vec<i16> {
+                                        cards
+                                            .iter()
+                                            .filter(|&&cid| {
+                                                if let Some(owner) = owner_of.get(&cid) {
+                                                    *owner == filter_owner || owner.is_none()
+                                                } else {
+                                                    true
+                                                }
+                                            })
+                                            .copied()
+                                            .collect()
+                                    };
+                                    struct RevSection {
+                                        label: &'static str,
+                                        cards: Vec<i16>,
+                                    }
+                                    let sections: Vec<RevSection> = vec![
+                                        RevSection {
+                                            label: "Yell",
+                                            cards: filter_cards(&gs.initial_yell_revealed_cards),
+                                        },
+                                        RevSection {
+                                            label: "Re-Yell",
+                                            cards: filter_cards(&gs.re_yell_revealed_cards),
+                                        },
+                                        RevSection {
+                                            label: "Cost",
+                                            cards: filter_cards(&gs.revealed_cost_cards),
+                                        },
+                                        RevSection {
+                                            label: "Effects",
+                                            cards: filter_cards(&gs.revealed_cards),
+                                        },
+                                    ];
+                                    let total_cards: usize =
+                                        sections.iter().map(|s| s.cards.len()).sum();
+                                    let mut flat: Vec<i16> = Vec::new();
+                                    for sec in &sections {
+                                        flat.extend(sec.cards.iter().copied());
+                                    }
                                     unsafe {
+                                        _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
                                         _3ds_top_queue_text(
-                                            40.0,
-                                            60.0,
-                                            COL_MED,
-                                            0.65f32,
-                                            format!("{}\0", msg).as_ptr(),
+                                            4.0,
+                                            4.0,
+                                            COL_GOLD,
+                                            0.70f32,
+                                            format!(
+                                                "{} ({})  {} cards  (B=close, X=detail)\0",
+                                                rev_hdr, who, total_cards
+                                            )
+                                            .as_ptr(),
                                         );
                                     }
-                                } else {
-                                    let gap = 4.0_f32;
-                                    let cw = 56.0_f32;
-                                    let ch = cw / 0.711;
-                                    let header_h = 14.0_f32;
-                                    let mut iy = 18.0_f32;
-                                    let mut skip = rev_scroll;
-                                    for sec in &sections {
-                                        if sec.cards.is_empty() {
-                                            continue;
+                                    if flat.is_empty() {
+                                        let msg = tl("No revealed cards");
+                                        unsafe {
+                                            _3ds_top_queue_text(
+                                                40.0,
+                                                60.0,
+                                                COL_MED,
+                                                0.65f32,
+                                                format!("{}\0", msg).as_ptr(),
+                                            );
                                         }
-                                        // Skip scrolled-off sections
-                                        if skip > 0 {
-                                            skip -= 1;
-                                            continue;
+                                    } else {
+                                        render_card_grid(
+                                            &flat,
+                                            *cursor as usize,
+                                            5,
+                                            2,
+                                            28.0,
+                                            &gs,
+                                            atlas,
+                                        );
+                                        let mut sec_text = String::new();
+                                        for sec in &sections {
+                                            if !sec.cards.is_empty() {
+                                                if !sec_text.is_empty() {
+                                                    sec_text.push_str("  ");
+                                                }
+                                                sec_text.push_str(sec.label);
+                                                sec_text.push('(');
+                                                sec_text.push_str(&sec.cards.len().to_string());
+                                                sec_text.push(')');
+                                            }
                                         }
-                                        // Section header
                                         unsafe {
                                             _3ds_top_queue_text(
                                                 4.0,
-                                                iy,
-                                                COL_GOLD,
-                                                0.55f32,
-                                                format!("{} ({})\0", sec.label, sec.cards.len())
-                                                    .as_ptr(),
+                                                228.0,
+                                                COL_MED,
+                                                0.45f32,
+                                                format!("{}\0", sec_text).as_ptr(),
                                             );
                                         }
-                                        iy += header_h;
-                                        if iy > 230.0 {
-                                            break;
-                                        }
-                                        // Card grid for this section
-                                        let mut ix = 4.0_f32;
-                                        for cid in sec.cards {
-                                            let cn = gs
-                                                .card_database
-                                                .get_card(*cid)
-                                                .map(|c| &c.card_no[..])
-                                                .unwrap_or("?");
-                                            if ix + cw > 396.0 {
-                                                ix = 4.0;
-                                                iy += ch + gap;
-                                                if iy > 230.0 {
-                                                    break;
-                                                }
-                                            }
-                                            if let Some((atl, idx)) = atlas.lookup(cn) {
-                                                let c_str = std::ffi::CString::new(atl.as_bytes())
-                                                    .unwrap_or_default();
-                                                unsafe {
-                                                    _3ds_top_queue_card(
-                                                        c_str.as_ptr() as *const u8,
-                                                        *idx as i32,
-                                                        ix,
-                                                        iy,
-                                                        cw,
-                                                        ch,
-                                                    );
-                                                }
-                                            } else {
-                                                unsafe {
-                                                    _3ds_top_queue_rect(ix, iy, cw, ch, 0xFF444444);
-                                                    _3ds_top_queue_text(
-                                                        ix + 2.0,
-                                                        iy + 2.0,
-                                                        COL_LIGHT,
-                                                        0.40f32,
-                                                        format!("{}\0", cn).as_ptr(),
-                                                    );
-                                                }
-                                            }
-                                            ix += cw + gap;
-                                        }
-                                        iy += ch + gap + 4.0;
-                                        if iy > 230.0 {
-                                            break;
-                                        }
-                                    }
-                                    // Scroll hint
-                                    unsafe {
-                                        _3ds_top_queue_text(
-                                            4.0,
-                                            228.0,
-                                            COL_MED,
-                                            0.45f32,
-                                            format!("{}\0", tl("UP/DOWN=scroll")).as_ptr(),
-                                        );
                                     }
                                 }
                             }

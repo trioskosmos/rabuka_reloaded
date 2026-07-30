@@ -217,10 +217,14 @@ impl super::resolver::AbilityResolver {
     fn reveal_selected_looked_at(&mut self, gs: &mut GameState, indices: &[usize]) {
         let mut revealed_ids = Vec::new();
         let source = gs.current_ability_source_card_id();
+        let looked_owner = gs
+            .ability_master_id()
+            .as_deref()
+            .and_then(|m| crate::ability::util::target_player_index("self", Some(m)));
         for &idx in indices.iter() {
             if idx < gs.looked_at_cards.len() {
                 let cid = gs.looked_at_cards[idx];
-                gs.push_revealed_card(cid, source, false, None);
+                gs.push_revealed_card(cid, source, false, looked_owner);
                 revealed_ids.push(cid);
             }
         }

@@ -170,7 +170,7 @@ impl AbilityResolver {
             );
             let desc_ja = format!(
                 "コストとして{}に置くカードを{}枚選択",
-                crate::ability::describe::zone_label(Some(zone_name)),
+                crate::ability::describe::zone_label_ja(Some(zone_name)),
                 count
             );
             self.pending_choice = Some(

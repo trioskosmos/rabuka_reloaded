@@ -1181,7 +1181,11 @@ impl GameState {
 
     pub fn add_revealed_card(&mut self, card_id: i16) {
         let src = self.current_ability_source_card_id();
-        self.push_revealed_card(card_id, src, false, None);
+        let owner = self
+            .ability_master_id()
+            .as_deref()
+            .and_then(|m| crate::ability::util::target_player_index("self", Some(m)));
+        self.push_revealed_card(card_id, src, false, owner);
     }
 
     pub fn remove_revealed_card(&mut self, card_id: i16) {

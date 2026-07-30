@@ -1001,9 +1001,11 @@ impl AbilityResolver {
                 pending.insert(0, saved);
                 gs.ability_queue.set_pending_actions(pending);
                 let desc_en = format!("Select {} card(s) to receive {} {}", tc, count, resource);
+                let resource_label =
+                    crate::ability::describe::resource_label_ja(Some(resource.as_str()));
                 let desc_ja = format!(
                     "リソースを受け取る{}枚のカードを選択（{} {}）",
-                    tc, count, resource
+                    tc, count, resource_label
                 );
                 self.pending_choice = Some(
                     Choice::select_cards(Zone::Stage.to_str().to_string(), tc, desc_en, false)
@@ -1186,6 +1188,31 @@ impl AbilityResolver {
                 all_candidates.retain(|cid| appeared_ids.contains(cid));
                 log::debug!("[APP_IDS] all_candidates after={:?}", all_candidates);
             }
+            // same_name: filter candidates to only members whose name matches
+            // the card(s) moved as cost (self.moved_cards).
+            if effect.same_name_any().unwrap_or(false) {
+                let ref_names: Vec<String> = self
+                    .moved_cards
+                    .iter()
+                    .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
+                    .collect();
+                log::debug!(
+                    "[SAME_NAME] ref_names={:?} before={}",
+                    ref_names,
+                    all_candidates.len()
+                );
+                if !ref_names.is_empty() {
+                    all_candidates.retain(|cid| {
+                        card_db
+                            .get_card(*cid)
+                            .map(|c| ref_names.contains(&c.name.to_string()))
+                            .unwrap_or(false)
+                    });
+                } else {
+                    all_candidates.clear();
+                }
+                log::debug!("[SAME_NAME] after={}", all_candidates.len());
+            }
 
             // If target_count is set and more candidates than needed,
             // create a choice for the player (unless already selected via previous choice).
@@ -1291,6 +1318,24 @@ impl AbilityResolver {
                 };
                 if effect.timing_condition_any().is_some() {
                     h.retain(|cid| appeared_ids.contains(cid));
+                }
+                // same_name: filter heart_targets to same-name members
+                if effect.same_name_any().unwrap_or(false) {
+                    let ref_names: Vec<String> = self
+                        .moved_cards
+                        .iter()
+                        .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
+                        .collect();
+                    if !ref_names.is_empty() {
+                        h.retain(|cid| {
+                            card_db
+                                .get_card(*cid)
+                                .map(|c| ref_names.contains(&c.name.to_string()))
+                                .unwrap_or(false)
+                        });
+                    } else {
+                        h.clear();
+                    }
                 }
                 h
             } else {
@@ -3645,8 +3690,12 @@ impl AbilityResolver {
                 drawn
             };
             let reyell_source = gs.current_ability_source_card_id();
+            let reyell_owner = crate::ability::util::target_player_index(
+                target,
+                gs.ability_master_id().as_deref(),
+            );
             for cid in total_blade {
-                gs.push_revealed_card(cid, reyell_source, false, None);
+                gs.push_revealed_card(cid, reyell_source, false, reyell_owner);
             }
         }
         gs.re_yell_revealed_cards = gs.revealed_cards.clone();

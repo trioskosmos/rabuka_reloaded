@@ -374,12 +374,15 @@ function renderAggregateHeartSummary(result) {
         }
     }
 
-    // Surplus = use snapshot surplus_hearts if available, fall back to spare
-    const finalRemaining = (result.surplus_hearts && Array.isArray(result.surplus_hearts))
-        ? result.surplus_hearts
-        : (lives.length > 0
-            ? (Array.isArray(lives[lives.length - 1].spare) ? lives[lives.length - 1].spare : [0,0,0,0,0,0,0,0])
-            : [...totalHearts]);
+    // Surplus hearts: only meaningful when performance succeeded.
+    // Q47/Rule 8.3.16: a failed live has no score/surplus — all cards discarded.
+    const finalRemaining = !isSuccess
+        ? [0,0,0,0,0,0,0,0]
+        : (result.surplus_hearts && Array.isArray(result.surplus_hearts))
+            ? result.surplus_hearts
+            : (lives.length > 0
+                ? (Array.isArray(lives[lives.length - 1].spare) ? lives[lives.length - 1].spare : [0,0,0,0,0,0,0,0])
+                : [...totalHearts]);
     const surplusTotal = sumHearts(finalRemaining);
     html += `
                 <div class="perf-agg-divider"></div>
@@ -595,8 +598,9 @@ function renderPerfSteps(result) {
 
             <!-- Step 9: Score + Winner -->
             <details class="perf-step-detail" open>
-                <summary class="perf-step-summary">${tr('perf_engine_result', { score: result.total_score || 0 })} ${result.success ? '✓ PASS' : '✗ FAIL'}</summary>
+                <summary class="perf-step-summary">${tr('perf_engine_result', { score: result.success ? (result.total_score || 0) : tr('perf_no_score') })} ${result.success ? '✓ PASS' : '✗ FAIL'}</summary>
                 <div class="perf-step-body">
+                    ${result.success ? `
                     <div class="perf-step-result-row">
                         <div class="perf-step-result-item">
                             <img src="img/texticon/icon_score.png" class="heart-mini-icon">
@@ -606,6 +610,18 @@ function renderPerfSteps(result) {
                             <img src="img/texticon/icon_score.png" class="heart-mini-icon">
                             ${tr('perf_triggered_bonuses')}: ${baseLiveScore - baseRawScore > 0 ? '+' : ''}${baseLiveScore - baseRawScore}
                         </div>
+                        ${(result.note_icons || 0) > 0 ? `
+                        <div class="perf-step-result-item">
+                            <img src="img/texticon/icon_score.png" class="heart-mini-icon">
+                            ${tr('perf_notes')}: +${result.note_icons}
+                        </div>
+                        ` : ''}
+                        ${(result.total_score || 0) - baseLiveScore - (result.note_icons || 0) > 0 ? `
+                        <div class="perf-step-result-item">
+                            <img src="img/texticon/icon_score.png" class="heart-mini-icon">
+                            ${tr('perf_other_bonuses')}: +${(result.total_score || 0) - baseLiveScore - (result.note_icons || 0)}
+                        </div>
+                        ` : ''}
                         <div class="perf-step-result-item total">
                             ${tr('perf_total')}: <b>${result.total_score || 0}</b>
                         </div>
@@ -616,6 +632,15 @@ function renderPerfSteps(result) {
                             ${result.p0_wins && result.p1_wins ? ` — ${tr('perf_draw')}` : ''}
                         </div>
                     </div>
+                    ` : `
+                    <div class="perf-step-result-row">
+                        <div class="perf-step-result-item outcome failure">
+                            ${tr('perf_no_score_live_failed')}
+                            ${result.p0_wins ? ` — ${tr('perf_p1_wins')}` : ''}
+                            ${result.p1_wins ? ` — ${tr('perf_p2_wins')}` : ''}
+                        </div>
+                    </div>
+                    `}
                     <div class="perf-step-note">${tr('perf_note_result')}</div>
                 </div>
             </details>
@@ -1171,7 +1196,7 @@ function renderPlayerPanel(playerId, result) {
                     <h2>${escapeHtml(outcome)}</h2>
                     ${isCannotLive
                         ? `<div class="perf-panel-subtitle cannot-live-subtitle">${cannotLiveCardName ? tr('perf_due_to_ability', { name: escapeHtml(cannotLiveCardName) }) : tr('perf_due_to_restriction')}</div>`
-                        : `<div class="perf-panel-subtitle">${tr('perf_judge_score_subtitle', { score: result?.total_score || 0, passed: passedLives, total: totalLives })}</div>`
+                        : `<div class="perf-panel-subtitle">${tr('perf_judge_score_subtitle', { score: isSuccess ? (result?.total_score || 0) : tr('perf_no_score'), passed: passedLives, total: totalLives })}</div>`
                     }
                 </div>
                 <div class="perf-panel-statuses">
@@ -1187,7 +1212,7 @@ function renderPlayerPanel(playerId, result) {
                 <div class="perf-metric-grid">
                     <div class="perf-metric-card highlight">
                         <div class="perf-metric-label">${tr('perf_judge_score')}</div>
-                        <div class="perf-metric-value" style="font-size: 1.8rem;">${result?.total_score || 0}</div>
+                        <div class="perf-metric-value" style="font-size: 1.8rem;">${isSuccess ? (result?.total_score || 0) : tr('perf_no_score')}</div>
                     </div>
                     <div class="perf-metric-card">
                         <div class="perf-metric-label">${tr('perf_heart_vector')}</div>

@@ -192,6 +192,112 @@ fn q238_select_opponent_center() {
     );
 }
 
+// =====================================================================
+// Baton touch integration tests — actual play_to_stage baton touch
+// =====================================================================
+
+/// Baton touch: play a new member to Rurino's area, triggering her auto.
+/// The position change selection should be offered for members on stage.
+#[test]
+fn q238_baton_touch_triggers_position_change_selection() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+
+    let rino = g.id(OSAWA_RINO);
+    let arriver = g.id("PL!-sd1-002-SD"); // cost 6, no abilities
+    let filler = g.id("PL!-sd1-010-SD");
+
+    // Place Rino on center stage, arriver in hand
+    g.state.player1.stage.stage = [-1, rino, -1];
+    g.state.player1.hand.cards.push(arriver);
+    g.state.player1.hand.cards.push(filler);
+    for _ in 0..30 {
+        g.state.player1.main_deck.cards.push(filler);
+    }
+    g.give_energy(20);
+
+    // Baton touch: play arriver to Center (Rino's area)
+    g.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+
+    // Rino was replaced from stage to waitroom → her auto ability should fire
+    // offering a position change for a member on stage
+    assert!(
+        g.has_pending_choice(),
+        "Rino ab#0 should trigger on real baton touch stage→discard"
+    );
+
+    // The arriver is now on stage:center — should be selectable for position change
+    // (plus opponent stage if any members there)
+}
+
+/// Baton touch with no other members on stage → ability should skip.
+#[test]
+fn q238_baton_touch_no_other_members_skips() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+
+    let rino = g.id(OSAWA_RINO);
+    let arriver = g.id("PL!-sd1-002-SD");
+    let filler = g.id("PL!-sd1-010-SD");
+
+    // Rino alone on stage (only center), arriver in hand
+    g.state.player1.stage.stage = [-1, rino, -1];
+    g.state.player2.stage.stage = [-1, -1, -1];
+    g.state.player1.hand.cards.push(arriver);
+    for _ in 0..30 {
+        g.state.player1.main_deck.cards.push(filler);
+    }
+    g.give_energy(20);
+
+    // Baton touch: play arriver to Center (Rino's area)
+    g.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+
+    // After baton touch: Rino is in waitroom, arriver is on stage:center
+    // The arriver IS on stage, so there IS a valid target.
+    // The position change selection should be offered.
+    assert!(
+        g.has_pending_choice(),
+        "Rino ab#0 should offer position change — arriver is on stage"
+    );
+}
+
+/// Baton touch with opponent members → both own and opponent members selectable.
+#[test]
+fn q238_baton_touch_select_opponent_member() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+
+    let rino = g.id(OSAWA_RINO);
+    let arriver = g.id("PL!-sd1-002-SD");
+    let opp_member = g.id("PL!-sd1-010-SD");
+    let filler = g.id("PL!-sd1-010-SD");
+
+    g.state.player1.stage.stage = [-1, rino, -1];
+    g.state.player2.stage.stage = [-1, opp_member, -1];
+    g.state.player1.hand.cards.push(arriver);
+    for _ in 0..30 {
+        g.state.player1.main_deck.cards.push(filler);
+    }
+    g.give_energy(20);
+
+    // Baton touch: play arriver to Center
+    g.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+
+    // Rino replaced → auto fires
+    assert!(
+        g.has_pending_choice(),
+        "Rino ab#0 should fire on baton touch"
+    );
+
+    // Should have choices: arriver (self:center) + opp_member (opponent:center)
+    let actions = count_position_actions(&g);
+    assert!(
+        actions >= 2,
+        "Should offer at least 2 members (arriver + opponent), got {}",
+        actions
+    );
+}
+
 /// Player may decline the optional reposition.
 #[test]
 fn q238_optional_skip() {

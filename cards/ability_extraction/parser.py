@@ -1126,17 +1126,15 @@ def parse_effect(text: str) -> Dict[str, Any]:
     # Also check the full_text/cost_text for position icon patterns
     # (e.g. {{center.png|センター}} in the cost/effect text)
     if extra_activation_pos is None:
-        if (
-            "{{center.png|センター}}" in text
-            or "{{left.png|左サイド}}" in text
-            or "{{right.png|右サイド}}" in text
-        ):
-            if "{{center.png|センター}}" in text:
-                extra_activation_pos = "center"
-            elif "{{left.png|左サイド}}" in text:
-                extra_activation_pos = "left_side"
-            elif "{{right.png|右サイド}}" in text:
-                extra_activation_pos = "right_side"
+        _icon_positions = []
+        if "{{center.png|センター}}" in text:
+            _icon_positions.append("center")
+        if "{{leftside.png|左サイド}}" in text:
+            _icon_positions.append("left_side")
+        if "{{rightside.png|右サイド}}" in text:
+            _icon_positions.append("right_side")
+        if _icon_positions:
+            extra_activation_pos = ",".join(_icon_positions)
 
     # Try all handlers in priority order
     for _priority, hn, handler in _effect_registry.sorted_handlers():
@@ -2747,7 +2745,6 @@ def parse_action(text: str) -> Dict[str, Any]:
         "{{icon_blade.png|ブレード}}" in text
         and "{{heart" in text
         and "得る" in text
-        and "1人は" not in text
         and "N人が" not in text
     ):
         blade_count = text.count("{{icon_blade.png|ブレード}}")
@@ -2772,6 +2769,22 @@ def parse_action(text: str) -> Dict[str, Any]:
                 }
             )
         if actions:
+            # Propagate target_count, same_name, card_type to each sub-action
+            # so the engine applies effects to the correct targets.
+            tc_match = re.search(r"(\d+)人", text)
+            target_count = int(tc_match.group(1)) if tc_match else None
+            is_same_name = "と同じ名前" in text or (
+                "同じ名前" in text and "持つ" in text
+            )
+            card_type = _infer_card_type(text, action)
+            for sub in actions:
+                if target_count is not None:
+                    sub["target_count"] = target_count
+                if is_same_name:
+                    sub["same_name"] = True
+                if card_type:
+                    sub["card_type"] = card_type
+                _fill_defaults(sub, text)
             result = {"text": text, "action": "sequential", "actions": actions}
             _fill_defaults(result, text)
             return result
@@ -8577,12 +8590,13 @@ for _i, _h in enumerate(_EFFECT_HANDLERS):
 
 
 def _has_position_keywords(text):
+    positions = []
     for keyword, position in POSITION_KEYWORDS.items():
-        if keyword in text:
-            return position
-    if "center" in text.lower():
+        if keyword in text and position not in positions:
+            positions.append(position)
+    if not positions and "center" in text.lower():
         return "center"
-    return None
+    return ",".join(positions) if positions else None
 
 
 def _has_original_modifier(text):
@@ -8739,12 +8753,15 @@ def _walk(d, full_text, original_text, ctx_text=None):
 
     if "activation_position" not in d:
         raw = original_text or full_text
+        _positions = []
         if "{{center.png|センター}}" in raw:
-            d["activation_position"] = "center"
-        elif "{{leftside.png|左サイド}}" in raw:
-            d["activation_position"] = "left_side"
-        elif "{{rightside.png|右サイド}}" in raw:
-            d["activation_position"] = "right_side"
+            _positions.append("center")
+        if "{{leftside.png|左サイド}}" in raw:
+            _positions.append("left_side")
+        if "{{rightside.png|右サイド}}" in raw:
+            _positions.append("right_side")
+        if _positions:
+            d["activation_position"] = ",".join(_positions)
 
     # Propagate exclude_self from text context to sub-actions.
     # "このメンバー以外" = "other than this member" → always exclude the activating card.
@@ -10243,7 +10260,22 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             # ---- A1: Structural transforms (keep) ----
 
         # C: conditional_on_result — N-action sequential with これにより condition
-        if eff.get("action") == "sequential" and "これにより" in t:
+        _acts_pre = eff.get("actions", [])
+        _has_blade_heart_seq = (
+            eff.get("action") == "sequential"
+            and len(_acts_pre) >= 2
+            and any(
+                a.get("resource") == "blade" for a in _acts_pre if isinstance(a, dict)
+            )
+            and any(
+                a.get("resource") == "heart" for a in _acts_pre if isinstance(a, dict)
+            )
+        )
+        if (
+            eff.get("action") == "sequential"
+            and "これにより" in t
+            and not _has_blade_heart_seq
+        ):
             acts = eff.get("actions", [])
             result_idx = -1
             for i, act in enumerate(acts):

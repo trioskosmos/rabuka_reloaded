@@ -658,7 +658,7 @@ fn card_type_label_ja(ct: Option<&str>) -> &str {
     }
 }
 
-fn state_verb_ja(state: Option<&str>) -> &str {
+pub fn state_verb_ja(state: Option<&str>) -> &str {
     match state {
         Some("wait") => "ウェイト",
         Some("active") => "アクティブ",
@@ -667,7 +667,7 @@ fn state_verb_ja(state: Option<&str>) -> &str {
     }
 }
 
-fn resource_label_ja(r: Option<&str>) -> &str {
+pub fn resource_label_ja(r: Option<&str>) -> &str {
     match r {
         Some("blade") => "ブレード",
         Some("heart") => "ハート",

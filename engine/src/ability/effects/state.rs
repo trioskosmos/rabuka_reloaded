@@ -357,7 +357,9 @@ impl AbilityResolver {
                 // Map candidate positions to stage indices for filtered_indices
                 let candidate_positions: Vec<usize> =
                     candidates.iter().map(|(pos, _)| *pos).collect();
-                let desc_ja = format!("{}に変更するメンバーを{}体選択", state_change, pick_count);
+                let state_label =
+                    crate::ability::describe::state_verb_ja(Some(state_change.as_str()));
+                let desc_ja = format!("{}に変更するメンバーを{}体選択", state_label, pick_count);
                 self.pending_choice = Some(
                     Choice::select_cards(
                         Zone::Stage.to_str(),

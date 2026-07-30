@@ -512,15 +512,6 @@ export const GameStateModal = {
             globalSections.push(section('Revealed Cost Cards',
                 `<div style="display:flex;flex-wrap:wrap;gap:4px;">${s.revealed_cost_cards.map(id => chip(cardName(id))).join('')}</div>`));
         }
-        // Cheer revealed cards
-        if (s.player1_cheer_revealed_cards && s.player1_cheer_revealed_cards.length > 0) {
-            globalSections.push(section('P1 Cheer Revealed',
-                `<div style="display:flex;flex-wrap:wrap;gap:4px;">${s.player1_cheer_revealed_cards.map(id => chip(cardName(id))).join('')}</div>`));
-        }
-        if (s.player2_cheer_revealed_cards && s.player2_cheer_revealed_cards.length > 0) {
-            globalSections.push(section('P2 Cheer Revealed',
-                `<div style="display:flex;flex-wrap:wrap;gap:4px;">${s.player2_cheer_revealed_cards.map(id => chip(cardName(id))).join('')}</div>`));
-        }
         globalSections.forEach(el => c.appendChild(el));
     },
 
