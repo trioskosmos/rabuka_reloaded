@@ -750,6 +750,22 @@ function importDeckText(text) {
   let imported = 0;
   const add = (id, qty) => { if (addImportedCard(newCards, id, qty)) imported++; };
 
+  // 0. Binary QR: first char is a non-printable count byte (0x01-0xFF)
+  if (text.length >= 4 && text.charCodeAt(0) >= 1 && text.charCodeAt(0) <= 255) {
+    const decoded = decodeQRBinary(text);
+    if (decoded) {
+      for (const [cardNo, qty] of decoded) add(cardNo, qty);
+      if (imported > 0) {
+        deckState.cards = newCards;
+        document.getElementById('import-area').classList.add('hidden');
+        document.getElementById('import-text').value = '';
+        updateDeckUI();
+        toast(`Imported ${imported} card types (QR binary)`);
+        return;
+      }
+    }
+  }
+
   // 1. Deck Log HTML: <span title="ID : Name"></span><span class="num">QTY</span>
   const decklogRe = /<span\s+title="([^"]*)"[^>]*>\s*<\/span>\s*<span[^>]*class\s*=\s*["']num["'][^>]*>(\d+)<\/span>/gi;
   let m;
@@ -1086,13 +1102,22 @@ function initDeckCreator() {
 }
 
 // ── Binary QR Card Dictionary ──
+// QR codes encode deck data as raw binary indices instead of plain text to reduce
+// QR density (~78% smaller). Each card_no is assigned an index based on its position
+// in the alphabetically sorted card database. The binary format is:
+//   [count+1] [idx_hi+1] [idx_lo+1] [qty+1] ... (all bytes offset +1 to avoid nulls)
+//
+// IMPORTANT: Both web UI and 3DS must use the same sorted card list for indices to match.
+// When new cards are added, BOTH sides must be updated together (same release).
+// The dictionary is rebuilt automatically from each side's card database on load.
 let _qrCardDict = null;
 let _qrCardDictReverse = null;
 function getQRCardDict() {
   if (_qrCardDict) return _qrCardDict;
-  const db = (typeof State !== 'undefined' && State.staticCardDatabase) || window._cardDatabase;
-  if (!db) return null;
-  const sorted = Object.keys(db).sort();
+  // allCardsArr is the global card list loaded from cards.json by init()
+  // Build dict keyed by NORMALIZED card_no so deck imports (half-width +, lowercase) still match
+  if (!allCardsArr || allCardsArr.length === 0) return null;
+  const sorted = allCardsArr.map(c => normalizeCode(c.card_no)).filter(Boolean).sort();
   _qrCardDict = {};
   _qrCardDictReverse = sorted;
   sorted.forEach((k, i) => { _qrCardDict[k] = i; });
@@ -1104,6 +1129,8 @@ function qrDictLookup(index) {
 }
 
 // Show QR code for current deck (binary index format)
+// Encodes deck as compact binary instead of "card_no x qty\n..." plain text.
+// A 30-line deck goes from ~580 bytes → ~91 bytes raw binary.
 function showQR() {
   if (deckState.cards.size === 0) { toast('Deck is empty'); return; }
   const name = document.getElementById('deck-name').value || 'deck';
@@ -1111,13 +1138,15 @@ function showQR() {
   if (!dict) { toast('Card database not loaded'); return; }
   const entries = [...deckState.cards.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   // Build binary: [count] [index_hi index_lo qty] ... (offset +1 to avoid null bytes)
+  // Null bytes (0x00) can cause issues with some QR scanners/libraries, so all values
+  // are stored as value+1 and subtracted back on decode.
   const count = entries.length;
   const buf = new ArrayBuffer(1 + count * 3);
   const view = new DataView(buf);
   view.setUint8(0, count + 1);
   let ok = true;
   for (let i = 0; i < count; i++) {
-    const cardNo = entries[i][0];
+    const cardNo = normalizeCode(entries[i][0]);
     const qty = entries[i][1].qty;
     const idx = dict[cardNo];
     if (idx === undefined) { ok = false; break; }
@@ -1144,6 +1173,7 @@ function showQR() {
 }
 
 // Decode binary QR data into deck entries (values offset +1 to avoid null bytes)
+// Called when importing/pasting binary QR data back into the deck builder.
 function decodeQRBinary(data) {
   const dict = getQRCardDict();
   if (!dict) return null;

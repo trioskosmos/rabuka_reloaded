@@ -659,8 +659,6 @@ fn ticks_to_ms(ticks: u64) -> f64 {
 struct CardAtlas {
     /// Map card_no -> (atlas_filename, index)
     map: HashMap<String, (String, usize)>,
-    /// Sorted card_no list for QR binary index lookup
-    sorted_cards: Vec<String>,
 }
 
 #[cfg(feature = "3ds")]
@@ -672,7 +670,6 @@ impl CardAtlas {
             Err(_) => {
                 return CardAtlas {
                     map: HashMap::new(),
-                    sorted_cards: Vec::new(),
                 }
             }
         };
@@ -680,7 +677,6 @@ impl CardAtlas {
         if f.read_to_string(&mut s).is_err() {
             return CardAtlas {
                 map: HashMap::new(),
-                sorted_cards: Vec::new(),
             };
         }
         let raw: HashMap<String, serde_json::Value> = match serde_json::from_str(&s) {
@@ -688,12 +684,9 @@ impl CardAtlas {
             Err(_) => {
                 return CardAtlas {
                     map: HashMap::new(),
-                    sorted_cards: Vec::new(),
                 }
             }
         };
-        let mut sorted_cards: Vec<String> = raw.keys().cloned().collect();
-        sorted_cards.sort();
         let map = raw
             .into_iter()
             .filter_map(|(k, v)| {
@@ -702,15 +695,34 @@ impl CardAtlas {
                 Some((k, (atlas, index)))
             })
             .collect();
-        CardAtlas { map, sorted_cards }
+        CardAtlas { map }
     }
 
     fn lookup(&self, card_no: &str) -> Option<&(String, usize)> {
         self.map.get(card_no)
     }
 
+    /// Build sorted card list from loaded Card database (matches cards.json order).
+    /// Returns (normalized, original) pairs sorted by normalized key.
+    fn build_qr_sorted(cards: &[Card]) -> Vec<(String, String)> {
+        let mut sorted: Vec<(String, String)> = cards
+            .iter()
+            .map(|c| {
+                let orig = c.card_no.to_string();
+                // Normalize to match web UI: full-width ＋→+, －→-, ー→-
+                let norm = orig
+                    .replace('＋', "+")
+                    .replace('－', "-")
+                    .replace('ー', "-");
+                (norm, orig)
+            })
+            .collect();
+        sorted.sort_by(|a, b| a.0.cmp(&b.0));
+        sorted
+    }
+
     /// Decode binary QR data: [count+1] [idx_hi+1 idx_lo+1 qty+1] ...
-    fn decode_qr_binary(&self, data: &[u8]) -> Option<Vec<String>> {
+    fn decode_qr_binary(sorted_cards: &[(String, String)], data: &[u8]) -> Option<Vec<String>> {
         if data.is_empty() {
             return None;
         }
@@ -724,7 +736,30 @@ impl CardAtlas {
             let idx = (((data[base] as usize).wrapping_sub(1)) << 8)
                 | ((data[base + 1] as usize).wrapping_sub(1));
             let qty = data[base + 2].wrapping_sub(1).max(1) as usize;
-            let card_no = self.sorted_cards.get(idx)?;
+            let card_no = &sorted_cards.get(idx)?.1; // .1 = original card_no
+            for _ in 0..qty {
+                result.push(card_no.clone());
+            }
+        }
+        Some(result)
+    }
+
+    /// Decode binary QR data: [count+1] [idx_hi+1 idx_lo+1 qty+1] ...
+    fn decode_qr_binary(sorted_cards: &[String], data: &[u8]) -> Option<Vec<String>> {
+        if data.is_empty() {
+            return None;
+        }
+        let count = (data[0] as usize).wrapping_sub(1);
+        if count == 0 || data.len() < 1 + count * 3 {
+            return None;
+        }
+        let mut result = Vec::with_capacity(count);
+        for i in 0..count {
+            let base = 1 + i * 3;
+            let idx = (((data[base] as usize).wrapping_sub(1)) << 8)
+                | ((data[base + 1] as usize).wrapping_sub(1));
+            let qty = data[base + 2].wrapping_sub(1).max(1) as usize;
+            let card_no = sorted_cards.get(idx)?;
             for _ in 0..qty {
                 result.push(card_no.clone());
             }
@@ -1836,9 +1871,10 @@ fn main() {
                                 let raw = &buf[..r as usize];
                                 let text = String::from_utf8_lossy(raw).to_string();
                                 // Try binary QR decode first (first byte is count+1, non-printable)
+                                // Build sorted dictionary from loaded Card database (matches cards.json)
                                 let cards_read = if r >= 4 && raw[0] >= 2 && raw[0] <= 255 {
-                                    let atlas = CardAtlas::load();
-                                    atlas.decode_qr_binary(raw).unwrap_or_default()
+                                    let sorted = CardAtlas::build_qr_sorted(&cards);
+                                    CardAtlas::decode_qr_binary(&sorted, raw).unwrap_or_default()
                                 } else {
                                     Vec::new()
                                 };
