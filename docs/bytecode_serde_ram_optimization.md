@@ -120,13 +120,13 @@ Reserve indices 0-255 for ~60 most common field names. Encode as u8 tag byte. On
 
 ### Steps
 
-- [ ] Profile `STRINGS` table: count frequency of each string across all 800 abilities
-- [ ] Select top 60 field names for u8 encoding
-- [ ] Update `compile_abilities.py`: reorder STRINGS so common names are first 254 slots, emit u8 for them
-- [ ] Update `vm.rs` BcReader: read key index as u8, check for 0xFE escape
-- [ ] Update `vm.rs` object decode loop
-- [ ] Regenerate `abilities_gen.rs`
-- [ ] `cargo test`
+- [x] Profile `STRINGS` table: count frequency of each string across all 800 abilities
+- [x] Select top 60 field names for u8 encoding
+- [x] Update `compile_abilities.py`: reorder STRINGS so common names are first 254 slots, emit u8 for them
+- [x] Update `vm.rs` BcReader: read key index as u8, check for 0xFE escape
+- [x] Update `vm.rs` object decode loop
+- [x] Regenerate `abilities_gen.rs`
+- [x] `cargo test`
 
 ### Estimated savings
 
@@ -260,7 +260,7 @@ Enum shrinks from 544 -> ~140 bytes (largest variant with only unique fields). ~
 |---|---|---|---|
 | 1 | Low | `refactor: replace conditional_choice JSON string with tagged enum` | DONE |
 | 2 | Medium | `refactor: downsize u32/i32 fields to u8/i8 in ability types` | DONE |
-| 3 | Low | `perf: single-byte indices for common bytecode field names` | TODO |
+| 3 | Low | `perf: single-byte indices for common bytecode field names` | **DONE** |
 | 4 | Medium | `perf: encode EffectKind variant tags in bytecode` | TODO |
 | 5 | High | `perf: direct binary decoder, eliminate serde_json::from_value` | TODO |
 | 6 | High | `refactor: extract EffectFilter sub-struct from EffectKind` | TODO |
