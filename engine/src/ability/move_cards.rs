@@ -397,11 +397,6 @@ impl AbilityResolver {
         } else {
             &mut gs.player1
         };
-        let cheer_buf = if use_p2 {
-            &mut gs.player2_cheer_revealed_cards
-        } else {
-            &mut gs.player1_cheer_revealed_cards
-        };
 
         // Get cards from source
         let source_str = if source.is_empty() {
@@ -422,276 +417,424 @@ impl AbilityResolver {
             return Ok(selected.to_vec());
         }
 
-        // Handle special source identifiers before the Zone match
         if source_str == "recently_moved" {
-            // Baton touch / cost payment — target the card(s) just moved.
-            // This ensures "the card placed by this baton touch" actually
-            // refers to the specific card that was moved, not any matching
-            // card from the zone.
-            let cards: Vec<i16> = gs
-                .recently_moved_cards
-                .clone()
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|&cid| {
-                    let ty = card_type_filter.unwrap_or("");
-                    ty.is_empty() || util::card_matches_type(card_db, cid, Some(ty))
-                })
-                .filter(|&cid| {
-                    group_name.is_none() || util::card_matches_group_str(card_db, cid, group_name)
-                })
-                .collect();
-            for &card_id in &cards {
-                remove_card_from_any_zone(player, &mut gs.last_vacated_stage_area, card_id);
-            }
-            // Card left any zone → clean up its gained abilities
-            for &card_id in &cards {
-                gs.clear_gained_abilities_for_card(card_id);
-            }
-            return Ok(cards);
+            return self.resolve_from_recently_moved(
+                gs,
+                card_type_filter,
+                group_name,
+                card_db,
+                use_p2,
+            );
         }
         if source_str == "looked_at_remaining" {
-            let cards: Vec<i16> = gs.looked_at_cards.drain(..).collect();
-            for &card in &cards {
-                player.waitroom.add_card(card);
-            }
-            return Ok(cards);
+            return self.resolve_from_looked_at(gs, use_p2);
         }
         if source_str == "revealed_cards" {
-            let take_count = if is_all {
-                gs.revealed_cards.len()
-            } else {
-                count.min(gs.revealed_cards.len())
-            };
-            let can_skip = is_max || effect.optional.unwrap_or(false);
-            let filter = util::filter_from_parts_full(
+            return self.resolve_from_revealed_cards(
+                gs,
+                count,
+                is_all,
+                is_max,
+                effect,
                 card_type_filter,
                 group_name,
                 cost_limit,
-                None,
-                character_filter,
-                name_fragments,
-                None,
-                None,
                 cost_total,
                 cost_total_operator,
+                character_filter,
+                name_fragments,
+                card_db,
             );
-            let neg = effect.negation_any().unwrap_or(false);
-            let matching: Vec<usize> = (0..gs.revealed_cards.len())
-                .filter(|&i| {
-                    let id = gs.revealed_cards[i];
-                    if !filter.matches(card_db, id, false) {
-                        return false;
-                    }
-                    if let Some(prop) = effect.card_property_any().as_deref() {
-                        let has_prop = match prop {
-                            "has_blade_heart" => {
-                                card_db.get_card(id).is_some_and(|c| c.has_blade_heart())
-                            }
-                            "has_score_icon" => {
-                                card_db.get_card(id).is_some_and(|c| c.has_score_icon())
-                            }
-                            _ => false,
-                        };
-                        if neg {
-                            if has_prop {
-                                return false;
-                            }
-                        } else {
-                            if !has_prop {
-                                return false;
-                            }
-                        }
-                    }
-                    true
-                })
-                .collect();
-            if matching.is_empty() {
-                return Ok(vec![]);
-            }
-            if take_count < matching.len() || can_skip {
-                self.prompt_card_selection(
-                    "revealed_cards",
-                    take_count,
-                    can_skip,
-                    effect,
-                    &filter,
-                    Some(matching),
-                );
-                return Ok(vec![]);
-            }
-            let actual_take = take_count.min(matching.len());
-            let taken: Vec<i16> = matching[..actual_take]
-                .iter()
-                .rev()
-                .map(|&i| {
-                    let id = gs.revealed_cards[i];
-                    gs.revealed_cards.remove(i);
-                    id
-                })
-                .collect();
-            gs.remove_from_source_hands(&taken);
-            // Remove from deck too — the reveal only peeked, not drained.
-            // If the card was from a deck-top reveal, it's still in the
-            // deck and must be removed here to avoid duplication.
-            for &id in &taken {
-                if let Some(pos) = gs.player1.main_deck.cards.iter().position(|&c| c == id) {
-                    gs.player1.main_deck.cards.remove(pos);
-                } else if let Some(pos) = gs.player2.main_deck.cards.iter().position(|&c| c == id) {
-                    gs.player2.main_deck.cards.remove(pos);
-                }
-            }
-            // Remove from waitroom too — yell cards went to waitroom after
-            // check_live_success drained the resolution zone (Rule 8.4.7).
-            for &id in &taken {
-                if let Some(pos) = gs.player1.waitroom.cards.iter().position(|&c| c == id) {
-                    gs.player1.waitroom.cards.remove(pos);
-                } else if let Some(pos) = gs.player2.waitroom.cards.iter().position(|&c| c == id) {
-                    gs.player2.waitroom.cards.remove(pos);
-                }
-            }
-            return Ok(taken);
         }
-
-        // Handle "those_cards" alias: resolve to the trigger_moved_cards stored
-        // in the ability queue entry (the cards that triggered the each_time
-        // ability), not the full discard pile (Q221).
         if source_str == "those_cards" {
-            if let Some(trigger_cards) = gs
-                .ability_queue
-                .current_entry()
-                .and_then(|e| e.trigger_moved_cards.clone())
-            {
-                if !trigger_cards.is_empty() {
-                    if crate::ability::debug::ABILITY_DEBUG
-                        .load(core::sync::atomic::Ordering::Relaxed)
-                    {
-                        log::debug!(
-                            "[THOSE_CARDS] trigger_cards={:?} count={}",
-                            trigger_cards,
-                            count
-                        );
-                    }
-                    let mut all_matching: Vec<i16> = Vec::new();
-                    for &cid in &trigger_cards {
-                        if card_type_filter
-                            .map_or(true, |ct| util::card_matches_type(card_db, cid, Some(ct)))
-                            && group_name.map_or(true, |gn| {
-                                util::card_matches_group_str(card_db, cid, Some(gn))
-                            })
-                        {
-                            all_matching.push(cid);
-                        }
-                    }
-                    if all_matching.is_empty() {
-                        // No matching cards — proceed to default source resolution.
-                    } else if all_matching.len() <= count as usize {
-                        // Exactly `count` or fewer match — take them directly.
-                        let found = all_matching[..count.min(all_matching.len())].to_vec();
-                        if !effect.optional.unwrap_or(false) {
-                            let player = if use_p2 {
-                                &mut gs.player2
-                            } else {
-                                &mut gs.player1
-                            };
-                            for &cid in &found {
-                                if let Some(pos) =
-                                    player.waitroom.cards.iter().position(|&c| c == cid)
-                                {
-                                    player.waitroom.cards.remove(pos);
-                                }
-                            }
-                        }
-                        return Ok(found);
-                    } else if &*destination == "deck_top_or_bottom" {
-                        // Q252: more matching cards than count, player chooses which one.
-                        // Directly create a SelectCard choice restricted to the
-                        // trigger_moved_cards' positions in the waitroom.
-                        let player = if use_p2 {
-                            &mut gs.player2
-                        } else {
-                            &mut gs.player1
-                        };
-                        let filtered_indices: Vec<usize> = {
-                            let mut indices = Vec::new();
-                            for &cid in &all_matching {
-                                for (i, &wc) in player.waitroom.cards.iter().enumerate() {
-                                    if wc == cid && !indices.contains(&i) {
-                                        indices.push(i);
-                                    }
-                                }
-                            }
-                            indices
-                        };
-                        let description = card_type_filter
-                            .and_then(|_| group_name)
-                            .map(|g| format!("Select 1 {g} card to place on deck"))
-                            .unwrap_or_else(|| "Select 1 card to place on deck".to_string().into());
-                        let description_ja = card_type_filter
-                            .and_then(|_| group_name)
-                            .map(|g| format!("{g}カードを山札に置く1枚を選択"))
-                            .unwrap_or_else(|| "山札に置く1枚を選択".to_string().into());
-                        self.pending_choice = Some(
-                            Choice::select_cards(Zone::Discard.to_str(), 1, description, false)
-                                .description_ja(Some(description_ja))
-                                .card_type(card_type_filter.map(|s| s.to_string()))
-                                .group(group_name.map(|s| s.to_string()))
-                                .filtered_indices(Some(filtered_indices))
-                                .target_player_id(Some("self".to_string()))
-                                .build(),
-                        );
-                        return Ok(vec![]);
-                    } else {
-                        // More matching than count — player must choose which cards.
-                        // Show a SelectCard choice restricted to the trigger_moved_cards'
-                        // positions in the waitroom, regardless of destination.
-                        let player = if use_p2 {
-                            &mut gs.player2
-                        } else {
-                            &mut gs.player1
-                        };
-                        let filtered_indices: Vec<usize> = {
-                            let mut indices = Vec::new();
-                            for &cid in &all_matching {
-                                for (i, &wc) in player.waitroom.cards.iter().enumerate() {
-                                    if wc == cid && !indices.contains(&i) {
-                                        indices.push(i);
-                                    }
-                                }
-                            }
-                            indices
-                        };
-                        let description = card_type_filter
-                            .and_then(|_| group_name)
-                            .map(|g| format!("Select {count} {g} card(s)"))
-                            .unwrap_or_else(|| "Select card(s)".to_string().into());
-                        let description_ja = card_type_filter
-                            .and_then(|_| group_name)
-                            .map(|g| format!("{g}カードを{count}枚選択"))
-                            .unwrap_or_else(|| "カードを選択".to_string().into());
-                        self.pending_choice = Some(
-                            Choice::select_cards(
-                                Zone::Discard.to_str(),
-                                count,
-                                description,
-                                effect.optional.unwrap_or(false),
-                            )
-                            .description_ja(Some(description_ja))
-                            .card_type(card_type_filter.map(|s| s.to_string()))
-                            .group(group_name.map(|s| s.to_string()))
-                            .filtered_indices(Some(filtered_indices))
-                            .target_player_id(Some("self".to_string()))
-                            .build(),
-                        );
-                        return Ok(vec![]);
-                    }
-                }
+            if let Some(result) = self.resolve_from_those_cards(
+                gs,
+                count,
+                card_type_filter,
+                group_name,
+                destination,
+                effect,
+                use_p2,
+                card_db,
+            )? {
+                return Ok(result);
             }
         }
         let effective_source = if source_str == "those_cards" {
             Zone::Discard.to_str()
         } else {
             source_str
+        };
+        self.resolve_from_zone(
+            gs,
+            effective_source,
+            source_str,
+            count,
+            effect,
+            card_type_filter,
+            group_name,
+            cost_limit,
+            cost_total,
+            cost_total_operator,
+            character_filter,
+            name_fragments,
+            is_self_cost,
+            is_max,
+            is_all,
+            exclude_self,
+            activating_card_id,
+            use_p2,
+            destination,
+            card_db,
+        )
+    }
+
+    fn resolve_from_recently_moved(
+        &mut self,
+        gs: &mut GameState,
+        card_type_filter: Option<&str>,
+        group_name: Option<&str>,
+        card_db: &crate::card::CardDatabase,
+        use_p2: bool,
+    ) -> Result<Vec<i16>, String> {
+        let player = if use_p2 {
+            &mut gs.player2
+        } else {
+            &mut gs.player1
+        };
+        // Baton touch / cost payment — target the card(s) just moved.
+        // This ensures "the card placed by this baton touch" actually
+        // refers to the specific card that was moved, not any matching
+        // card from the zone.
+        let cards: Vec<i16> = gs
+            .recently_moved_cards
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|&cid| {
+                let ty = card_type_filter.unwrap_or("");
+                ty.is_empty() || util::card_matches_type(card_db, cid, Some(ty))
+            })
+            .filter(|&cid| {
+                group_name.is_none() || util::card_matches_group_str(card_db, cid, group_name)
+            })
+            .collect();
+        for &card_id in &cards {
+            remove_card_from_any_zone(player, &mut gs.last_vacated_stage_area, card_id);
+        }
+        // Card left any zone → clean up its gained abilities
+        for &card_id in &cards {
+            gs.clear_gained_abilities_for_card(card_id);
+        }
+        Ok(cards)
+    }
+
+    fn resolve_from_looked_at(
+        &mut self,
+        gs: &mut GameState,
+        use_p2: bool,
+    ) -> Result<Vec<i16>, String> {
+        let player = if use_p2 {
+            &mut gs.player2
+        } else {
+            &mut gs.player1
+        };
+        let cards: Vec<i16> = gs.looked_at_cards.drain(..).collect();
+        for &card in &cards {
+            player.waitroom.add_card(card);
+        }
+        Ok(cards)
+    }
+
+    fn resolve_from_revealed_cards(
+        &mut self,
+        gs: &mut GameState,
+        count: usize,
+        is_all: bool,
+        is_max: bool,
+        effect: &AbilityEffect,
+        card_type_filter: Option<&str>,
+        group_name: Option<&str>,
+        cost_limit: Option<u32>,
+        cost_total: Option<u32>,
+        cost_total_operator: Option<&str>,
+        character_filter: Option<&Vec<String>>,
+        name_fragments: Option<&Vec<String>>,
+        card_db: &crate::card::CardDatabase,
+    ) -> Result<Vec<i16>, String> {
+        let take_count = if is_all {
+            gs.revealed_cards.len()
+        } else {
+            count.min(gs.revealed_cards.len())
+        };
+        let can_skip = is_max || effect.optional.unwrap_or(false);
+        let filter = util::filter_from_parts_full(
+            card_type_filter,
+            group_name,
+            cost_limit,
+            None,
+            character_filter,
+            name_fragments,
+            None,
+            None,
+            cost_total,
+            cost_total_operator,
+        );
+        let neg = effect.negation_any().unwrap_or(false);
+        let matching: Vec<usize> = (0..gs.revealed_cards.len())
+            .filter(|&i| {
+                let id = gs.revealed_cards[i];
+                if !filter.matches(card_db, id, false) {
+                    return false;
+                }
+                if let Some(prop) = effect.card_property_any().as_deref() {
+                    let has_prop = match prop {
+                        "has_blade_heart" => {
+                            card_db.get_card(id).is_some_and(|c| c.has_blade_heart())
+                        }
+                        "has_score_icon" => {
+                            card_db.get_card(id).is_some_and(|c| c.has_score_icon())
+                        }
+                        _ => false,
+                    };
+                    if neg {
+                        if has_prop {
+                            return false;
+                        }
+                    } else {
+                        if !has_prop {
+                            return false;
+                        }
+                    }
+                }
+                true
+            })
+            .collect();
+        if matching.is_empty() {
+            return Ok(vec![]);
+        }
+        if take_count < matching.len() || can_skip {
+            self.prompt_card_selection(
+                "revealed_cards",
+                take_count,
+                can_skip,
+                effect,
+                &filter,
+                Some(matching),
+            );
+            return Ok(vec![]);
+        }
+        let actual_take = take_count.min(matching.len());
+        let taken: Vec<i16> = matching[..actual_take]
+            .iter()
+            .rev()
+            .map(|&i| {
+                let id = gs.revealed_cards[i];
+                gs.revealed_cards.remove(i);
+                id
+            })
+            .collect();
+        gs.remove_from_source_hands(&taken);
+        // Remove from deck too — the reveal only peeked, not drained.
+        // If the card was from a deck-top reveal, it's still in the
+        // deck and must be removed here to avoid duplication.
+        for &id in &taken {
+            if let Some(pos) = gs.player1.main_deck.cards.iter().position(|&c| c == id) {
+                gs.player1.main_deck.cards.remove(pos);
+            } else if let Some(pos) = gs.player2.main_deck.cards.iter().position(|&c| c == id) {
+                gs.player2.main_deck.cards.remove(pos);
+            }
+        }
+        // Remove from waitroom too — yell cards went to waitroom after
+        // check_live_success drained the resolution zone (Rule 8.4.7).
+        for &id in &taken {
+            if let Some(pos) = gs.player1.waitroom.cards.iter().position(|&c| c == id) {
+                gs.player1.waitroom.cards.remove(pos);
+            } else if let Some(pos) = gs.player2.waitroom.cards.iter().position(|&c| c == id) {
+                gs.player2.waitroom.cards.remove(pos);
+            }
+        }
+        Ok(taken)
+    }
+
+    fn resolve_from_those_cards(
+        &mut self,
+        gs: &mut GameState,
+        count: usize,
+        card_type_filter: Option<&str>,
+        group_name: Option<&str>,
+        destination: &str,
+        effect: &AbilityEffect,
+        use_p2: bool,
+        card_db: &crate::card::CardDatabase,
+    ) -> Result<Option<Vec<i16>>, String> {
+        // Handle "those_cards" alias: resolve to the trigger_moved_cards stored
+        // in the ability queue entry (the cards that triggered the each_time
+        // ability), not the full discard pile (Q221).
+        if let Some(trigger_cards) = gs
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.trigger_moved_cards.clone())
+        {
+            if !trigger_cards.is_empty() {
+                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
+                {
+                    log::debug!(
+                        "[THOSE_CARDS] trigger_cards={:?} count={}",
+                        trigger_cards,
+                        count
+                    );
+                }
+                let mut all_matching: Vec<i16> = Vec::new();
+                for &cid in &trigger_cards {
+                    if card_type_filter
+                        .map_or(true, |ct| util::card_matches_type(card_db, cid, Some(ct)))
+                        && group_name.map_or(true, |gn| {
+                            util::card_matches_group_str(card_db, cid, Some(gn))
+                        })
+                    {
+                        all_matching.push(cid);
+                    }
+                }
+                if all_matching.is_empty() {
+                    // No matching cards — proceed to default source resolution.
+                } else if all_matching.len() <= count as usize {
+                    // Exactly `count` or fewer match — take them directly.
+                    let found = all_matching[..count.min(all_matching.len())].to_vec();
+                    if !effect.optional.unwrap_or(false) {
+                        let player = if use_p2 {
+                            &mut gs.player2
+                        } else {
+                            &mut gs.player1
+                        };
+                        for &cid in &found {
+                            if let Some(pos) = player.waitroom.cards.iter().position(|&c| c == cid)
+                            {
+                                player.waitroom.cards.remove(pos);
+                            }
+                        }
+                    }
+                    return Ok(Some(found));
+                } else if &*destination == "deck_top_or_bottom" {
+                    // Q252: more matching cards than count, player chooses which one.
+                    // Directly create a SelectCard choice restricted to the
+                    // trigger_moved_cards' positions in the waitroom.
+                    let player = if use_p2 {
+                        &mut gs.player2
+                    } else {
+                        &mut gs.player1
+                    };
+                    let filtered_indices: Vec<usize> = {
+                        let mut indices = Vec::new();
+                        for &cid in &all_matching {
+                            for (i, &wc) in player.waitroom.cards.iter().enumerate() {
+                                if wc == cid && !indices.contains(&i) {
+                                    indices.push(i);
+                                }
+                            }
+                        }
+                        indices
+                    };
+                    let description = card_type_filter
+                        .and_then(|_| group_name)
+                        .map(|g| format!("Select 1 {g} card to place on deck"))
+                        .unwrap_or_else(|| "Select 1 card to place on deck".to_string().into());
+                    let description_ja = card_type_filter
+                        .and_then(|_| group_name)
+                        .map(|g| format!("{g}カードを山札に置く1枚を選択"))
+                        .unwrap_or_else(|| "山札に置く1枚を選択".to_string().into());
+                    self.pending_choice = Some(
+                        Choice::select_cards(Zone::Discard.to_str(), 1, description, false)
+                            .description_ja(Some(description_ja))
+                            .card_type(card_type_filter.map(|s| s.to_string()))
+                            .group(group_name.map(|s| s.to_string()))
+                            .filtered_indices(Some(filtered_indices))
+                            .target_player_id(Some("self".to_string()))
+                            .build(),
+                    );
+                    return Ok(Some(vec![]));
+                } else {
+                    // More matching than count — player must choose which cards.
+                    // Show a SelectCard choice restricted to the trigger_moved_cards'
+                    // positions in the waitroom, regardless of destination.
+                    let player = if use_p2 {
+                        &mut gs.player2
+                    } else {
+                        &mut gs.player1
+                    };
+                    let filtered_indices: Vec<usize> = {
+                        let mut indices = Vec::new();
+                        for &cid in &all_matching {
+                            for (i, &wc) in player.waitroom.cards.iter().enumerate() {
+                                if wc == cid && !indices.contains(&i) {
+                                    indices.push(i);
+                                }
+                            }
+                        }
+                        indices
+                    };
+                    let description = card_type_filter
+                        .and_then(|_| group_name)
+                        .map(|g| format!("Select {count} {g} card(s)"))
+                        .unwrap_or_else(|| "Select card(s)".to_string().into());
+                    let description_ja = card_type_filter
+                        .and_then(|_| group_name)
+                        .map(|g| format!("{g}カードを{count}枚選択"))
+                        .unwrap_or_else(|| "カードを選択".to_string().into());
+                    self.pending_choice = Some(
+                        Choice::select_cards(
+                            Zone::Discard.to_str(),
+                            count,
+                            description,
+                            effect.optional.unwrap_or(false),
+                        )
+                        .description_ja(Some(description_ja))
+                        .card_type(card_type_filter.map(|s| s.to_string()))
+                        .group(group_name.map(|s| s.to_string()))
+                        .filtered_indices(Some(filtered_indices))
+                        .target_player_id(Some("self".to_string()))
+                        .build(),
+                    );
+                    return Ok(Some(vec![]));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn resolve_from_zone(
+        &mut self,
+        gs: &mut GameState,
+        effective_source: &str,
+        source_str: &str,
+        count: usize,
+        effect: &AbilityEffect,
+        card_type_filter: Option<&str>,
+        group_name: Option<&str>,
+        cost_limit: Option<u32>,
+        cost_total: Option<u32>,
+        cost_total_operator: Option<&str>,
+        character_filter: Option<&Vec<String>>,
+        name_fragments: Option<&Vec<String>>,
+        is_self_cost: bool,
+        is_max: bool,
+        is_all: bool,
+        exclude_self: bool,
+        activating_card_id: Option<i16>,
+        use_p2: bool,
+        destination: &str,
+        card_db: &crate::card::CardDatabase,
+    ) -> Result<Vec<i16>, String> {
+        let player = if use_p2 {
+            &mut gs.player2
+        } else {
+            &mut gs.player1
+        };
+        let cheer_buf = if use_p2 {
+            &mut gs.player2_cheer_revealed_cards
+        } else {
+            &mut gs.player1_cheer_revealed_cards
         };
 
         match Zone::from_str(effective_source) {
@@ -1255,7 +1398,7 @@ impl AbilityResolver {
                 );
                 Ok(vec![])
             }
-            _ => Err(format!("Unknown source zone: {}", source)),
+            _ => Err(format!("Unknown source zone: {}", source_str)),
         }
     }
 
