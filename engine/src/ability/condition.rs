@@ -13,7 +13,7 @@ use alloc::{
 };
 use serde_json::json;
 
-pub(crate) fn comparison_default_count(condition: &Condition) -> u32 {
+pub(crate) fn comparison_default_count(condition: &Condition) -> u8 {
     if condition.get_location().is_some() || condition.get_card_type().is_some() {
         1
     } else {

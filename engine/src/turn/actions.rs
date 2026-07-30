@@ -290,7 +290,7 @@ impl super::TurnEngine {
                             .get(&key)
                             .copied()
                             .unwrap_or(0);
-                        if u32::from(used) >= use_limit {
+                        if u8::from(used) >= use_limit {
                             continue;
                         }
                     }
@@ -825,7 +825,7 @@ impl super::TurnEngine {
                 .current_entry()
                 .is_some_and(|e| e.effect_started);
             // Capture key and player_id BEFORE complete_current() removes the entry.
-            // Numeric key: (card_id as u32) << 16 | ability_index as u32
+            // Numeric key: (card_id as u8) << 16 | ability_index as u8
             let just_completed_key: Option<u32> =
                 game_state.ability_queue.current_entry().and_then(|e| {
                     let cid = e.card_id? as u32;

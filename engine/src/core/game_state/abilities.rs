@@ -298,7 +298,7 @@ impl GameState {
                             .as_ref()
                             .is_some_and(|t| &**t == crate::triggers::AUTO)
                         {
-                            let mut trigger_multiplicity: u32 = 1;
+                            let mut trigger_multiplicity: u8 = 1;
                             // Guard: skip discard-location abilities when the card
                             // is on stage (prevents premature triggering).
                             if let Some(ref effect) = ability.effect {
@@ -619,7 +619,7 @@ impl GameState {
         moved_cards: &[i16],
         effect: &crate::card::AbilityEffect,
         card_db: &crate::card::CardDatabase,
-    ) -> u32 {
+    ) -> u8 {
         let condition = match &effect.condition {
             Some(c) => c,
             None => return 1,
@@ -650,7 +650,7 @@ impl GameState {
                 true
             })
             .collect();
-        let match_count = matching.len() as u32;
+        let match_count = matching.len() as u8;
         if match_count <= 1 {
             return match_count;
         }
@@ -973,9 +973,9 @@ impl GameState {
     /// runaway re-triggering would otherwise recurse without bound and overflow
     /// the stack. `max_auto_recursion` caps the depth as a last-resort safety
     /// net; well-formed games resolve in a handful of levels.
-    const MAX_AUTO_RECURSION: u32 = 64;
+    const MAX_AUTO_RECURSION: u8 = 64;
 
-    fn process_player_abilities_depth(&mut self, raw_player_id: &str, depth: u32) {
+    fn process_player_abilities_depth(&mut self, raw_player_id: &str, depth: u8) {
         let player_id = match raw_player_id {
             "player1" => "p1",
             "player2" => "p2",
@@ -988,7 +988,7 @@ impl GameState {
                 self.ability_queue.len()
             );
         }
-        let mut reprocess_counts: HashMap<(i16, usize), u32> = HashMap::default();
+        let mut reprocess_counts: HashMap<(i16, usize), u8> = HashMap::default();
         loop {
             if !self.ability_queue.is_idle() {
                 break;
@@ -2230,7 +2230,7 @@ impl GameState {
                             if let Some(color_mods) = self.mods.need_heart_modifiers.get(card_id) {
                                 for (color, me) in color_mods {
                                     if me.set != 0 {
-                                        hearts.insert(*color, me.set as u32);
+                                        hearts.insert(*color, me.set as u8);
                                     }
                                 }
                             }
@@ -2242,7 +2242,7 @@ impl GameState {
                                     *hearts.entry_or_default(*color) =
                                         (hearts.get(color).copied().unwrap_or(0) as i32
                                             + me.additive)
-                                            .max(0) as u32;
+                                            .max(0) as u8;
                                 }
                             }
                             crate::card::BaseHeart { hearts }
@@ -2478,9 +2478,9 @@ impl GameState {
                         if let Some(old) = data.old_value() {
                             let is_p1 = data.is_p1().unwrap_or(true);
                             if is_p1 {
-                                self.self_live_surplus_count = old as u32;
+                                self.self_live_surplus_count = old as u8;
                             } else {
-                                self.opponent_live_surplus_count = old as u32;
+                                self.opponent_live_surplus_count = old as u8;
                             }
                             log::debug!("Restored surplus count (is_p1={}) to {}", is_p1, old);
                         }

@@ -768,11 +768,11 @@ impl GameState {
                                 })
                                 .count();
                             log::debug!("[COST_MOD_PER_UNIT_DEBUG] group_matches={}", matches);
-                            matches as u32
+                            matches as u8
                         } else {
                             let cards: Vec<i16> =
                                 crate::ability::util::zone_cards(player, count_zone).to_vec();
-                            cards.len() as u32
+                            cards.len() as u8
                         };
                         log::debug!(
                             "[COST_MOD_PER_UNIT] cid={} count_zone={} count={}",
@@ -787,7 +787,7 @@ impl GameState {
                         } else {
                             count
                         };
-                        value = ((effective / per_unit_count) * (value as u32)) as i32;
+                        value = ((effective / per_unit_count) * (value as u8)) as i32;
                         log::debug!("[COST_MOD] cid={} zone={} count={} eff={} per_unit_cnt={} val={} exclude={}",
                             cid, count_zone, count, effective, per_unit_count, value, exclude_self);
                     }
@@ -826,7 +826,7 @@ impl GameState {
         &mut self,
         card_id: i16,
         color: crate::card::HeartColor,
-        count: u32,
+        count: u8,
         duration: &str,
     ) {
         self.mods.set_heart_override(card_id, color, count);
@@ -925,7 +925,7 @@ impl GameState {
         }
     }
 
-    pub fn get_auto_ability_trigger_count(&self, card_id: &str) -> u32 {
+    pub fn get_auto_ability_trigger_count(&self, card_id: &str) -> u8 {
         self.auto_ability_trigger_counts
             .iter()
             .find(|(k, _)| *k == card_id)
@@ -937,7 +937,7 @@ impl GameState {
         self.auto_ability_trigger_counts.clear();
     }
 
-    pub fn record_turn_limit_usage(&mut self, player_id: &str, card_instance_id: u32) {
+    pub fn record_turn_limit_usage(&mut self, player_id: &str, card_instance_id: u8) {
         let key = format!("{}:{}", player_id, card_instance_id);
         if let Some((_, count)) = self.turn_limit_usage.iter_mut().find(|(k, _)| *k == key) {
             *count += 1;
@@ -946,7 +946,7 @@ impl GameState {
         }
     }
 
-    pub fn get_turn_limit_usage(&self, player_id: &str, card_instance_id: u32) -> u32 {
+    pub fn get_turn_limit_usage(&self, player_id: &str, card_instance_id: u8) -> u8 {
         let key = format!("{}:{}", player_id, card_instance_id);
         self.turn_limit_usage
             .iter()
@@ -959,14 +959,14 @@ impl GameState {
         self.turn_limit_usage.clear();
     }
 
-    pub fn assign_card_instance_id(&mut self, card_id: i16) -> u32 {
+    pub fn assign_card_instance_id(&mut self, card_id: i16) -> u8 {
         self.card_instance_counter += 1;
         let instance_id = self.card_instance_counter;
         self.card_instance_mapping.insert(card_id, instance_id);
         instance_id
     }
 
-    pub fn get_card_instance_id(&self, card_id: i16) -> Option<u32> {
+    pub fn get_card_instance_id(&self, card_id: i16) -> Option<u8> {
         self.card_instance_mapping.get(&card_id).copied()
     }
 
@@ -990,7 +990,7 @@ impl GameState {
         }
     }
 
-    pub fn get_baton_touch_count(&self, player_id: &str) -> u32 {
+    pub fn get_baton_touch_count(&self, player_id: &str) -> u8 {
         if player_id == "p1" {
             self.baton_touch_count_p1
         } else {

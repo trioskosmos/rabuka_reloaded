@@ -53,8 +53,8 @@ pub struct GameState {
     pub rule_log: Vec<String>,
     pub structured_log: Vec<LogEntry>,
     pub turn1_abilities_played: SmallVec<[String; 8]>,
-    pub turn2_abilities_played: SmallVec<[(String, u32); 8]>,
-    pub live_owned_hearts: SmallVec<[(String, Vec<(String, u32)>); 4]>,
+    pub turn2_abilities_played: SmallVec<[(String, u8); 8]>,
+    pub live_owned_hearts: SmallVec<[(String, Vec<(String, u8)>); 4]>,
     pub temporary_effects: SmallVec<[TemporaryEffect; 4]>,
     pub prohibition_effects: SmallVec<[String; 4]>,
     pub delayed_prohibition_effects: SmallVec<[String; 4]>,
@@ -62,12 +62,12 @@ pub struct GameState {
     pub cannot_activate_members: SmallVec<[String; 2]>,
     pub constant_cannot_activate_members: SmallVec<[String; 4]>,
     pub cannot_live_players: SmallVec<[String; 2]>,
-    pub turn_limited_abilities_used: HashMap<(i16, usize, u32), u8>,
+    pub turn_limited_abilities_used: HashMap<(i16, usize, u8), u8>,
     pub mulligan_selected_indices: SmallVec<[usize; 2]>,
     pub live_card_selected_indices: SmallVec<[usize; 3]>,
-    pub auto_ability_trigger_counts: SmallVec<[(String, u32); 8]>,
-    pub turn_limit_usage: SmallVec<[(String, u32); 8]>,
-    pub card_instance_mapping: HashMap<i16, u32>,
+    pub auto_ability_trigger_counts: SmallVec<[(String, u8); 8]>,
+    pub turn_limit_usage: SmallVec<[(String, u8); 8]>,
+    pub card_instance_mapping: HashMap<i16, u8>,
     pub areas_placed_this_turn: SmallVec<[String; 8]>,
     pub cards_appeared_this_turn: SmallVec<[i16; 8]>,
     pub card_appearance_source: SmallVec<[(i16, String); 4]>,
@@ -128,7 +128,7 @@ pub struct GameState {
     /// (e.g. "member card went from live_card_zone to discard this turn").
     pub turn_movements: SmallVec<[MovementEvent; 8]>,
     /// Counter for assigning unique timestamps to MovementEvents within a turn.
-    pub movement_event_counter: u32,
+    pub movement_event_counter: u8,
     /// Snapshot of target cards' orientations taken before a change_state
     /// effect executes. Compared after the effect to detect actual transitions.
     /// None = no snapshot active.
@@ -138,22 +138,22 @@ pub struct GameState {
     pub recently_state_changed: SmallVec<[(i16, String, String); 2]>,
     pub debut_ability_triggers: SmallVec<[(String, i16); 4]>,
     pub last_vacated_stage_area: Option<usize>,
-    // --- 4-byte aligned (u32, Option<i32>) ---
-    pub turn_number: u32,
-    pub live_cheer_count: u32,
-    pub player1_cheer_blade_heart_count: u32,
-    pub player2_cheer_blade_heart_count: u32,
-    pub cheer_checks_required: u32,
-    pub cheer_checks_done: u32,
-    pub card_instance_counter: u32,
-    pub baton_touch_count_p1: u32,
-    pub baton_touch_count_p2: u32,
+    // --- 4-byte aligned (u8, Option<i32>) ---
+    pub turn_number: u8,
+    pub live_cheer_count: u8,
+    pub player1_cheer_blade_heart_count: u8,
+    pub player2_cheer_blade_heart_count: u8,
+    pub cheer_checks_required: u8,
+    pub cheer_checks_done: u8,
+    pub card_instance_counter: u8,
+    pub baton_touch_count_p1: u8,
+    pub baton_touch_count_p2: u8,
     pub baton_touch_arriving_card_ids: SmallVec<[i16; 2]>,
-    pub effect_creation_counter: u32,
-    pub last_state_change_wait_to_active_count: u32,
+    pub effect_creation_counter: u8,
+    pub last_state_change_wait_to_active_count: u8,
     pub player1_rps_choice: Option<i32>,
     pub player2_rps_choice: Option<i32>,
-    pub baton_touch_replaced_member_cost: Option<u32>,
+    pub baton_touch_replaced_member_cost: Option<u8>,
     pub baton_touch_replaced_member_id: Option<i16>,
     pub baton_touch_arriving_card_id: Option<i16>,
     /// Set during the performance phase after a yell actually occurs
@@ -169,7 +169,7 @@ pub struct GameState {
     /// Key of the most recently completed auto ability, used by the re-scan
     /// to prevent re-enqueueing the exact same ability while still allowing
     /// other abilities on the same card (e.g. each_time) to fire.
-    /// Encoded as `(card_id as u32) << 16 | ability_index as u32`.
+    /// Encoded as `(card_id as u8) << 16 | ability_index as u8`.
     pub just_completed_ability_key: Option<u32>,
     /// Batch-scoped set of ability IDs already enqueued during the current movement batch.
     /// Prevents each_time/movement abilities from being re-enqueued across multiple
@@ -195,8 +195,8 @@ pub struct GameState {
     pub opponent_live_success_this_turn: bool,
     pub opponent_live_no_excess_heart_this_turn: bool,
     pub self_no_excess_heart_this_turn: bool,
-    pub opponent_live_surplus_count: u32,
-    pub self_live_surplus_count: u32,
+    pub opponent_live_surplus_count: u8,
+    pub self_live_surplus_count: u8,
     pub formation_change_occurred_this_turn: bool,
     pub opponent_choice_declined: bool,
     pub live_being_performed: bool,
@@ -205,8 +205,8 @@ pub struct GameState {
     pub loop_detected: bool,
     pub live_success_triggered_this_turn: bool,
     pub live_success_p2_fired: bool,
-    pub live_success_p1_extra: u32,
-    pub live_success_p2_extra: u32,
+    pub live_success_p1_extra: u8,
+    pub live_success_p2_extra: u8,
     pub live_surplus_ready_this_turn: bool,
     pub performance_snapshots: Vec<PerformanceSnapshot>,
     /// Trace from the last ability resolution (for debugging).
@@ -637,7 +637,7 @@ impl GameState {
     }
 
     /// Cheer blade heart count, keyed by first/second attacker.
-    pub fn cheer_blade_heart_count_mut(&mut self, is_first: bool) -> &mut u32 {
+    pub fn cheer_blade_heart_count_mut(&mut self, is_first: bool) -> &mut u8 {
         if is_first {
             &mut self.player1_cheer_blade_heart_count
         } else {

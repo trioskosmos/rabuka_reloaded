@@ -22,10 +22,10 @@ impl AbilityResolver {
         effect: &AbilityEffect,
         state_change: &str,
         target: &str,
-        count: u32,
+        count: u8,
         max: bool,
         card_type: Option<&str>,
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         optional: bool,
         group_name: Option<&str>,
         self_cost: bool,
@@ -33,7 +33,7 @@ impl AbilityResolver {
         destination: Option<&str>,
         cost_limit_operator: Option<String>,
         characters: Option<&Vec<String>>,
-        blade_limit: Option<u32>,
+        blade_limit: Option<u8>,
         blade_limit_operator: Option<&str>,
     ) -> Result<(), String> {
         let state_change = state_change.to_string();
@@ -395,7 +395,7 @@ impl AbilityResolver {
             let change_count = if is_change_all {
                 candidates.len()
             } else {
-                count.min(candidates.len() as u32) as usize
+                count.min(candidates.len() as u8) as usize
             };
 
             let actual_targets: Vec<_> = if is_self_target {
@@ -486,7 +486,7 @@ impl AbilityResolver {
                 let actual_count = if is_cannot_activate_by_effect {
                     0
                 } else {
-                    wait_before_count as u32
+                    wait_before_count as u8
                 };
                 gs.last_state_change_wait_to_active_count = actual_count;
             }
@@ -577,7 +577,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         state_change: &str,
         target: &str,
-        count: u32,
+        count: u8,
     ) {
         let cause_cid = gs.activating_card;
         let mut placed_energy: Vec<i16> = Vec::new();
@@ -606,7 +606,7 @@ impl AbilityResolver {
         effect: &AbilityEffect,
         state_change: &str,
         target: &str,
-        count: u32,
+        count: u8,
         max: bool,
         card_type_filter: Option<&str>,
         group_filter: Option<&str>,
@@ -643,7 +643,7 @@ impl AbilityResolver {
                         .saturating_sub(player.energy_zone.active_count()),
                     _ => player.energy_zone.active_count(),
                 };
-                let capped = (count as usize).min(available) as u32;
+                let capped = (count as usize).min(available) as u8;
                 log::debug!(
                     "[ENERGY] max=true: count={} available={} effective={}",
                     count,
@@ -661,7 +661,7 @@ impl AbilityResolver {
                     _ => player.energy_zone.active_count(),
                 };
                 log::debug!("[ENERGY] count=0 (all): effective={}", val);
-                val as u32
+                val as u8
             } else {
                 log::debug!("[ENERGY] max=false: count={} effectve={}", count, count);
                 count
@@ -721,7 +721,7 @@ impl AbilityResolver {
         {
             let player = gs.resolve_target_player(target);
             let mut result = Vec::new();
-            let mut active_count = 0u32;
+            let mut active_count = 0u8;
             let group_filter_for_active = if card_type_filter == Some("energy_card") {
                 None
             } else {
@@ -773,7 +773,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-        value: u32,
+        value: u8,
     ) {
         let target = effect.target_name();
         let ct_binding = effect.card_type_any();
@@ -971,7 +971,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         operation: &str,
-        value: u32,
+        value: u8,
         target: &str,
         duration: Option<&str>,
     ) {
@@ -1015,7 +1015,7 @@ impl AbilityResolver {
         }
     }
 
-    pub(crate) fn execute_reduce_live_card_set_limit(&mut self, gs: &mut GameState, count: u32) {
+    pub(crate) fn execute_reduce_live_card_set_limit(&mut self, gs: &mut GameState, count: u8) {
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -1033,7 +1033,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-        value: u32,
+        value: u8,
     ) {
         let target = effect.target_name();
         let pp = self.player_prefix(gs);
@@ -1158,7 +1158,7 @@ impl AbilityResolver {
     pub(crate) fn execute_set_cost_to_use(
         &mut self,
         gs: &mut GameState,
-        value: u32,
+        value: u8,
     ) -> Result<(), String> {
         let card_id = self.activating_card_id.or(gs.activating_card);
         if let Some(card_id) = card_id {
@@ -1200,7 +1200,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-        value: u32,
+        value: u8,
     ) {
         let op_binding = effect.operation_any();
         let operation = op_binding.unwrap_or("add");

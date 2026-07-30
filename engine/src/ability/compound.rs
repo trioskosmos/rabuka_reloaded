@@ -759,7 +759,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-        repeat_limit: u32,
+        repeat_limit: u8,
     ) -> Result<(), String> {
         let repeat_limit = repeat_limit as usize;
         if let Some(ref actions) = effect.compound.actions {

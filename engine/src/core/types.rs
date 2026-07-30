@@ -181,7 +181,7 @@ pub enum EffectData {
     HeartOverride {
         card_id: i16,
         color: String,
-        count: u32,
+        count: u8,
     },
     SingleCard {
         card_id: i16,
@@ -253,7 +253,7 @@ impl EffectData {
         }
     }
 
-    pub fn count(&self) -> Option<u32> {
+    pub fn count(&self) -> Option<u8> {
         match self {
             EffectData::HeartOverride { count, .. } => Some(*count),
             _ => None,
@@ -288,11 +288,11 @@ pub struct CardEffectItemRef<'a> {
 pub struct TemporaryEffect {
     pub effect_type: String,
     pub duration: Duration,
-    pub created_turn: u32,
+    pub created_turn: u8,
     pub created_phase: Phase,
     pub target_player_id: String,
     pub description: String,
-    pub creation_order: u32,
+    pub creation_order: u8,
     pub effect_data: Option<EffectData>,
 }
 
@@ -310,12 +310,12 @@ pub struct ReplacementEffect {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LivePerformanceData {
-    pub yell_count: u32,
-    pub note_icons: u32,
+    pub yell_count: u8,
+    pub note_icons: u8,
     pub revealed_ids: Vec<i16>,
     pub member_contributions: Vec<MemberContribution>,
     pub yell_cards: Vec<YellCardResult>,
-    pub total_hearts: [u32; 8],
+    pub total_hearts: [u8; 8],
     pub allocations: Vec<Allocation>,
     pub heart_sources: Vec<HeartSource>,
     pub blade_sources: Vec<BladeSource>,
@@ -331,16 +331,16 @@ pub struct LivePerformanceData {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PerformanceSnapshot {
-    pub turn: u32,
+    pub turn: u8,
     pub player_id: String,
     pub lives: Vec<LiveCardResult>,
     pub member_contributions: Vec<MemberContribution>,
     pub yell_cards: Vec<YellCardResult>,
-    pub total_hearts: [u32; 8],
-    pub total_score: u32,
+    pub total_hearts: [u8; 8],
+    pub total_score: u8,
     pub success: bool,
-    pub note_icons: u32,
-    pub yell_count: u32,
+    pub note_icons: u8,
+    pub yell_count: u8,
     pub breakdown: Breakdown,
     pub triggered_abilities: Vec<TriggeredAbility>,
     pub p0_wins: bool,
@@ -353,23 +353,23 @@ pub struct PerformanceSnapshot {
     pub performance_need_heart_modifiers: Vec<(i16, HeartColor, ModifierEntry)>,
     /// Per-color surplus hearts remaining after filling all live card requirements.
     /// Computed as total_hearts[color] - sum(live.filled[color]) across all lives.
-    pub surplus_hearts: [u32; 8],
+    pub surplus_hearts: [u8; 8],
     /// Card IDs revealed during yell/cheer (from resolution zone).
     pub revealed_ids: Vec<i16>,
     /// Sum of individual live card scores (l.score) for passed lives only.
-    pub base_score_total: u32,
+    pub base_score_total: u8,
     /// Sum of triggered score bonuses (l.score - l.base_score) for passed lives.
-    pub card_bonus_total: u32,
+    pub card_bonus_total: u8,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LiveCardResult {
     pub passed: bool,
-    pub score: u32,
-    pub base_score: u32,
-    pub spare: [u32; 8],
-    pub required: [u32; 8],
-    pub filled: [u32; 8],
+    pub score: u8,
+    pub base_score: u8,
+    pub spare: [u8; 8],
+    pub required: [u8; 8],
+    pub filled: [u8; 8],
     pub adjustments: Vec<Adjustment>,
     pub card_id: i16,
     pub card_no: ArcStr,
@@ -379,27 +379,27 @@ pub struct LiveCardResult {
 pub struct MemberContribution {
     pub source_id: i16,
     pub slot: usize,
-    pub base_hearts: [u32; 8],
-    pub bonus_hearts: [u32; 8],
-    pub base_blades: u32,
-    pub bonus_blades: u32,
-    pub base_notes: u32,
-    pub bonus_notes: u32,
-    pub draw_icons: u32,
+    pub base_hearts: [u8; 8],
+    pub bonus_hearts: [u8; 8],
+    pub base_blades: u8,
+    pub bonus_blades: u8,
+    pub base_notes: u8,
+    pub bonus_notes: u8,
+    pub draw_icons: u8,
     pub ability_heart_bonuses: Vec<AbilityBonus>,
     pub ability_blade_bonuses: Vec<AbilityBonus>,
     pub card_no: ArcStr,
     pub is_wait: bool,
     /// Per-color heart delta from color transforms (bonus_hearts minus ability bonuses).
-    pub transform_delta: [u32; 8],
+    pub transform_delta: [u8; 8],
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct YellCardResult {
     pub card_id: i16,
-    pub blade_hearts: [u32; 8],
-    pub note_icons: u32,
-    pub draw_icons: u32,
+    pub blade_hearts: [u8; 8],
+    pub note_icons: u8,
+    pub draw_icons: u8,
     pub card_no: ArcStr,
 }
 
@@ -417,14 +417,14 @@ pub struct Breakdown {
 pub struct HeartSource {
     pub source_type: SourceType,
     pub source: ArcStr,
-    pub value: [u32; 8],
+    pub value: [u8; 8],
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BladeSource {
     pub source_type: SourceType,
     pub source: ArcStr,
-    pub value: u32,
+    pub value: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -480,7 +480,7 @@ pub struct Allocation {
     pub source_slot: Option<usize>,
     pub wildcard: bool,
     pub color: usize,
-    pub amount: u32,
+    pub amount: u8,
     pub is_bonus: bool,
     pub phase: AllocPhase,
 }
@@ -495,7 +495,7 @@ pub struct EffectEntry {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ScoreLine {
     pub source: String,
-    pub value: u32,
+    pub value: u8,
 }
 
 /// Compact zone identifier — replaces String fields in MovementEvent to avoid
@@ -635,7 +635,7 @@ pub struct MovementEvent {
     /// Whether the move was caused by a card effect (true) vs cost/rules (false).
     pub effect_only: bool,
     /// Monotonically increasing counter for ordering events.
-    pub timestamp: u32,
+    pub timestamp: u8,
 }
 
 /// A structured record of a stage-area-to-stage-area position change.
@@ -720,7 +720,7 @@ pub struct Adjustment {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AbilityBonus {
     pub source: ArcStr,
-    pub amount: u32,
+    pub amount: u8,
     pub color: Option<usize>,
     pub ability_text: ArcStr,
 }
@@ -736,13 +736,13 @@ pub enum LogMetadata {
         ability_text: String,
     },
     TurnStart {
-        turn: u32,
+        turn: u8,
     },
     RpsResult {
         p1_choice: String,
         p2_choice: String,
-        p1_value: u32,
-        p2_value: u32,
+        p1_value: u8,
+        p2_value: u8,
         winner: String,
     },
     AbilityResolution {
@@ -774,7 +774,7 @@ impl Default for LogMetadata {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LogEntry {
     pub text: String,
-    pub turn: u32,
+    pub turn: u8,
     pub player_label: String,
     pub source_card_id: Option<i16>,
     pub source_card_name: Option<String>,

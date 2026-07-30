@@ -72,7 +72,7 @@ fn main() {
         game_setup::setup_game(&mut gs);
 
         let mut pending: Option<Example> = None;
-        let mut last_turn = 0u32;
+        let mut last_turn = 0u8;
         let mut stuck = 0u32;
         let mut rng_state: u64 =
             program_seed ^ ((game_idx as u64).wrapping_mul(0x9E3779B97F4A7C15));
@@ -208,7 +208,7 @@ struct Example {
     state: State,
     action_card_id: i16,
     action_type_idx: u8,
-    success_before: u32,
+    success_before: u8,
 }
 
 impl Example {
@@ -249,7 +249,7 @@ impl Example {
             state: State::capture(gs),
             action_card_id,
             action_type_idx: at,
-            success_before: gs.player1.success_live_card_zone.cards.len() as u32,
+            success_before: gs.player1.success_live_card_zone.cards.len() as u8,
         }
     }
 }

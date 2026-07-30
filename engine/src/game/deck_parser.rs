@@ -16,7 +16,7 @@ use std::vec::Vec;
 #[derive(Debug, Clone)]
 pub struct DeckEntry {
     pub card_no: String,
-    pub quantity: u32,
+    pub quantity: u8,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -92,12 +92,12 @@ impl DeckParser {
             let parts: Vec<&str> = line.split(" x ").collect();
             if parts.len() == 2 {
                 // Try to parse first part as quantity (for "quantity x card_no" format)
-                let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u32>() {
+                let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u8>() {
                     (Self::clean_card_no(parts[1].trim()), q)
                 } else {
                     let q = parts[1]
                         .trim()
-                        .parse::<u32>()
+                        .parse::<u8>()
                         .map_err(|e| format!("Invalid quantity: {}", e))?;
                     (Self::clean_card_no(parts[0].trim()), q)
                 };
@@ -194,13 +194,13 @@ impl DeckParser {
 
     /// Parses a single line and returns (card_no, quantity).
     /// Supports "card_no x quantity", "quantity x card_no", or bare card_no (qty=1).
-    fn parse_line(line: &str) -> Option<(String, u32)> {
+    fn parse_line(line: &str) -> Option<(String, u8)> {
         let line = line.trim();
         let parts: Vec<&str> = line.split(" x ").collect();
         if parts.len() == 2 {
-            let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u32>() {
+            let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u8>() {
                 (parts[1].trim(), q)
-            } else if let Ok(q) = parts[1].trim().parse::<u32>() {
+            } else if let Ok(q) = parts[1].trim().parse::<u8>() {
                 (parts[0].trim(), q)
             } else {
                 return None;

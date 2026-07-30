@@ -9,7 +9,7 @@ pub struct PublicObservation {
     pub me: PlayerView,
     pub opp: PlayerView,
     pub current_phase: Phase,
-    pub turn_number: u32,
+    pub turn_number: u8,
     pub game_result: GameResult,
     pub resolution_zone: Vec<i16>,
 }

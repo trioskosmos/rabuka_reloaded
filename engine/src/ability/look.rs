@@ -177,7 +177,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         source: &str,
-        count: u32,
+        count: u8,
         target: &str,
         card_type: Option<&str>,
         heart_colors: &[String],
@@ -223,7 +223,7 @@ impl AbilityResolver {
             log::debug!("DEBUG: is_max: {}, is_optional: {}", is_max, is_optional);
 
             // Create choice if max=true (up to X cards) or optional, or if count < available
-            if is_max || is_optional || count == 0 || count < available as u32 {
+            if is_max || is_optional || count == 0 || count < available as u8 {
                 let choices_count = if any_number {
                     available
                 } else {
@@ -287,7 +287,7 @@ impl AbilityResolver {
             match Zone::from_str(source) {
                 Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
                 Some(Zone::Deck) | Some(Zone::DeckTop) => {
-                    let take_count = count.min(player.main_deck.cards.len() as u32) as usize;
+                    let take_count = count.min(player.main_deck.cards.len() as u8) as usize;
                     // Peek only — don't drain from deck here. The card stays
                     // in the deck until the conditional move_cards consumes it.
                     // If the condition fails, the card remains on top of the
@@ -527,7 +527,7 @@ impl AbilityResolver {
         if effect.distinct_any().is_some() && gs.looked_at_cards.len() < count as usize {
             return Ok(());
         }
-        let count = count.min(gs.looked_at_cards.len() as u32);
+        let count = count.min(gs.looked_at_cards.len() as u8);
 
         let filtered_indices: Option<Vec<usize>> = if Zone::from_str(source) == Some(Zone::Stage) {
             let looked = gs.looked_at_cards.clone();
@@ -872,7 +872,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-        count: u32,
+        count: u8,
         target: &str,
         source: &str,
     ) -> Result<(), String> {
@@ -896,7 +896,7 @@ impl AbilityResolver {
             || Zone::from_str(source) == Some(Zone::DeckTop);
         if look_from_deck {
             let deck_count = gs.resolve_target_player(target).main_deck.cards.len();
-            if (deck_count as u32) < count {
+            if (deck_count as u8) < count {
                 return self.look_at_with_refresh(gs, effect, count, target, source);
             }
         }
@@ -943,7 +943,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         _effect: &AbilityEffect,
-        count: u32,
+        count: u8,
         target: &str,
         _source: &str,
     ) -> Result<(), String> {
@@ -980,7 +980,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         source: &str,
-        count: u32,
+        count: u8,
         target: &str,
     ) -> Result<(), String> {
         let card_db = gs.card_database.clone();
@@ -1130,7 +1130,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         target: &str,
         card_type: Option<&str>,
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         cost_limit_operator: Option<&str>,
     ) -> Result<(), String> {
         let card_type_owned = card_type.map(|s| s.to_string());

@@ -181,8 +181,8 @@ pub struct ActionParameters {
     pub ability_index: Option<usize>, // Which ability on the card (for use_ability actions)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_ability: Option<String>, // Full ability text block (for display)
-    pub base_cost: Option<u32>,
-    pub final_cost: Option<u32>,
+    pub base_cost: Option<u8>,
+    pub final_cost: Option<u8>,
     pub available_areas: Option<Vec<AreaInfo>>,
     pub double_baton_pairs: Option<Vec<DoubleBatonPair>>, // Available double baton pair+placement options
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -193,7 +193,7 @@ pub struct ActionParameters {
 pub struct AreaInfo {
     pub area: String,
     pub available: bool,
-    pub cost: u32,
+    pub cost: u8,
     pub is_baton_touch: bool,
     pub existing_member_name: Option<String>,
 }
@@ -202,7 +202,7 @@ pub struct AreaInfo {
 pub struct DoubleBatonPair {
     pub areas: Vec<String>, // The 2 members to replace (e.g., ["left", "center"])
     pub placement: String,  // Where the card ends up (e.g., "left")
-    pub cost: u32,          // Effective cost after both cost reductions
+    pub cost: u8,           // Effective cost after both cost reductions
 }
 
 pub fn setup_game(game_state: &mut GameState) {
@@ -309,7 +309,7 @@ pub fn test_ai_vs_ai(
     cards: &[crate::card::Card],
     d1: &crate::deck_parser::DeckList,
     d2: &crate::deck_parser::DeckList,
-    max_turns: u32,
+    max_turns: u8,
 ) -> Result<usize, String> {
     use crate::card::CardDatabase;
     use crate::deck_parser::DeckParser;
@@ -339,7 +339,7 @@ pub fn test_ai_vs_ai(
     let mut gs = GameState::new(p1, p2, db);
     setup_game(&mut gs);
     let mut count = 0usize;
-    let mut turns = 0u32;
+    let mut turns = 0u8;
     let max_iter = (max_turns * 40) as usize;
     while gs.game_result == GameResult::Ongoing && turns < max_turns * 2 && count < max_iter {
         let acts = generate_possible_actions(&gs);
@@ -1315,7 +1315,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         let member_cost = existing_member_card.cost.unwrap_or(0);
                                         let cost_to_pay =
                                             effective_cost.saturating_sub(member_cost);
-                                        if (active_energy_count as u32) >= cost_to_pay {
+                                        if (active_energy_count as u8) >= cost_to_pay {
                                             area_info.available = true;
                                             area_info.cost = cost_to_pay;
                                             area_info.is_baton_touch = true;
@@ -1326,7 +1326,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     }
                                 }
                             }
-                        } else if (active_energy_count as u32) >= effective_cost {
+                        } else if (active_energy_count as u8) >= effective_cost {
                             area_info.available = true;
                             area_info.cost = effective_cost;
                             has_any_available = true;
@@ -1379,7 +1379,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 let pair_cost = effective_cost.saturating_sub(combined);
                                 let area_names = [name1.to_string(), name2.to_string()];
                                 for placement in [name1.to_string(), name2.to_string()] {
-                                    if (active_energy_count as u32) >= pair_cost {
+                                    if (active_energy_count as u8) >= pair_cost {
                                         pairs.push(DoubleBatonPair {
                                             areas: area_names.to_vec(),
                                             placement,
@@ -1613,7 +1613,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         .get(&ability_key)
                         .copied()
                         .unwrap_or(0);
-                    if u32::from(used) >= use_limit {
+                    if u8::from(used) >= use_limit {
                         continue;
                     }
                 }
@@ -1707,7 +1707,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         .get(&ability_key)
                         .copied()
                         .unwrap_or(0);
-                    if u32::from(used) >= use_limit {
+                    if u8::from(used) >= use_limit {
                         continue;
                     }
                 }

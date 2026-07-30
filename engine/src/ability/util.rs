@@ -82,7 +82,7 @@ fn per_unit_cost_reduction(
     stage: &crate::core::zones::Stage,
     hand_count: usize,
     card_db: &CardDatabase,
-) -> u32 {
+) -> u8 {
     let pul_binding = effect.per_unit_location_any();
     let loc_binding = effect.location_any();
     let count_zone = pul_binding.or(loc_binding).unwrap_or("hand");
@@ -106,8 +106,8 @@ fn per_unit_cost_reduction(
     } else {
         raw_count
     };
-    let value = effect.value_any().unwrap_or(1) as u32;
-    ((effective / per_unit_count) as u32) * value
+    let value = effect.value_any().unwrap_or(1) as u8;
+    ((effective / per_unit_count) as u8) * value
 }
 
 pub fn calculate_play_cost_reduction(
@@ -116,14 +116,14 @@ pub fn calculate_play_cost_reduction(
     hand_count: usize,
     card_id: i16,
     card_db: &CardDatabase,
-) -> u32 {
+) -> u8 {
     let card = match card_db.get_card(card_id) {
         Some(c) => c,
         None => return 0,
     };
 
     // ── 1. Scan the played card's own abilities for a self-reduction ──────────
-    let mut cost_reduction: u32 = 0;
+    let mut cost_reduction: u8 = 0;
     for ar in &card.abilities {
         let ability = ar.resolve();
         if let Some(ref effect) = ability.effect {
@@ -135,7 +135,7 @@ pub fn calculate_play_cost_reduction(
                     cost_reduction = per_unit_cost_reduction(mod_cost, stage, hand_count, card_db);
                 } else {
                     let reduction = mod_cost.value_any().unwrap_or(1);
-                    cost_reduction = cost_reduction.max(reduction);
+                    cost_reduction = cost_reduction.max(reduction as u8);
                 }
                 break;
             }
@@ -204,7 +204,7 @@ fn scan_abilities_for_cost_reduction(
     stage: &crate::core::zones::Stage,
     hand_count: usize,
     hand_condition_guard: bool,
-) -> Option<u32> {
+) -> Option<u8> {
     for ar in abilities {
         let ability = ar.resolve();
         if let Some(ref effect) = ability.effect {
@@ -258,7 +258,7 @@ fn scan_abilities_for_cost_reduction(
             let reduction = if effect.per_unit_any().unwrap_or(false) {
                 per_unit_cost_reduction(effect, stage, hand_count, card_db)
             } else {
-                effect.value_any().unwrap_or(1)
+                effect.value_any().unwrap_or(1) as u8
             };
             return Some(reduction);
         }
@@ -543,7 +543,7 @@ pub fn card_matches_characters(
 pub fn card_matches_cost_limit(
     card_db: &CardDatabase,
     card_id: i16,
-    cost_limit: Option<u32>,
+    cost_limit: Option<u8>,
 ) -> bool {
     card_matches_cost_limit_op(card_db, card_id, cost_limit, None)
 }
@@ -551,7 +551,7 @@ pub fn card_matches_cost_limit(
 pub fn card_matches_cost_limit_op(
     card_db: &CardDatabase,
     card_id: i16,
-    cost_limit: Option<u32>,
+    cost_limit: Option<u8>,
     comparison: Option<&str>,
 ) -> bool {
     match cost_limit {
@@ -722,12 +722,12 @@ pub struct CardFilter<'a> {
     pub card_type: Option<&'a str>,
     pub group: Option<&'a str>,
     pub groups: Option<&'a Vec<String>>,
-    pub cost_limit: Option<u32>,
+    pub cost_limit: Option<u8>,
     pub cost_operator: Option<&'a str>,
     /// Minimum cost bound for range filters (e.g. cost >= 4)
-    pub cost_limit_min: Option<u32>,
+    pub cost_limit_min: Option<u8>,
     /// Sum-total cost constraint — checked post-selection, not in per-card matches()
-    pub cost_total: Option<u32>,
+    pub cost_total: Option<u8>,
     pub cost_total_operator: Option<&'a str>,
     pub characters: Option<&'a Vec<String>>,
     pub exclude_characters: Option<&'a Vec<String>>,
@@ -736,8 +736,8 @@ pub struct CardFilter<'a> {
     /// When false, card matches ANY heart_colors (OR, default).
     pub require_all_heart_colors: bool,
     /// Minimum count per heart color (e.g. 2 for "heart05を2個以上").
-    pub heart_color_count: Option<u32>,
-    pub need_heart_total: Option<u32>,
+    pub heart_color_count: Option<u8>,
+    pub need_heart_total: Option<u8>,
     pub need_heart_operator: Option<&'a str>,
     pub need_heart_color: Option<&'a str>,
     pub name_fragments: Option<&'a Vec<String>>,
@@ -745,7 +745,7 @@ pub struct CardFilter<'a> {
     pub exclude_self: Option<i16>,
     /// Group names to exclude from matching (e.g. 「スリーズブーケ」以外)
     pub exclude_group_names: Option<&'a [String]>,
-    pub original_blade_limit: Option<u32>,
+    pub original_blade_limit: Option<u8>,
     pub original_blade_operator: Option<&'a str>,
     /// Card IDs to exclude from matching (e.g. previously selected by a prior sequential action)
     pub exclude_cards: Option<&'a [i16]>,
@@ -801,7 +801,7 @@ impl<'a> CardFilter<'a> {
         self.exclude_names = names;
         self
     }
-    pub fn original_blade_limit(mut self, obl: Option<u32>, obo: Option<&'a str>) -> Self {
+    pub fn original_blade_limit(mut self, obl: Option<u8>, obo: Option<&'a str>) -> Self {
         self.original_blade_limit = obl;
         self.original_blade_operator = obo;
         self
@@ -829,8 +829,8 @@ impl<'a> CardFilter<'a> {
     /// Eliminates the dual-field assignment in range-filter handlers.
     pub fn with_cost_range(
         mut self,
-        min: Option<u32>,
-        max: Option<u32>,
+        min: Option<u8>,
+        max: Option<u8>,
         op: Option<&'a str>,
     ) -> Self {
         self.cost_limit = max;
@@ -958,7 +958,7 @@ impl<'a> CardFilter<'a> {
                         .and_then(|c| c.need_heart.as_ref())
                         .map(|nh| *nh.hearts.get(&hc).unwrap_or(&0))
                         .unwrap_or(0);
-                    base_amount.max(need_amount) >= min_count
+                    base_amount.max(need_amount) >= min_count as u8
                 })
             } else {
                 self.heart_colors.iter().any(|color| {
@@ -973,7 +973,7 @@ impl<'a> CardFilter<'a> {
                         .and_then(|c| c.need_heart.as_ref())
                         .map(|nh| *nh.hearts.get(&hc).unwrap_or(&0))
                         .unwrap_or(0);
-                    base_amount.max(need_amount) >= min_count
+                    base_amount.max(need_amount) >= min_count as u8
                 })
             };
             if !passes {
@@ -1001,7 +1001,7 @@ impl<'a> CardFilter<'a> {
                     .map(|nh| *nh.hearts.get(&color).unwrap_or(&0))
                     .unwrap_or(0);
                 let op = self.need_heart_operator.unwrap_or(">=");
-                if !compare_counts(Some(op), card_amount, need_total) {
+                if !compare_counts(Some(op), card_amount.into(), need_total.into()) {
                     return false;
                 }
             } else {
@@ -1012,7 +1012,7 @@ impl<'a> CardFilter<'a> {
                 // total_hearts() instead. Per Q149 + Q172.
                 let card_total = db.get_card(id).map(|c| c.total_hearts()).unwrap_or(0);
                 let op = self.need_heart_operator.unwrap_or(">=");
-                if !compare_counts(Some(op), card_total, need_total) {
+                if !compare_counts(Some(op), card_total, need_total.into()) {
                     return false;
                 }
             }
@@ -1206,7 +1206,7 @@ impl<'a> CardFilter<'a> {
         // modified values.
         if let Some(bl) = self.original_blade_limit {
             let card_blade = db.get_card(id).map(|c| c.blade).unwrap_or(0);
-            if !compare_counts(self.original_blade_operator, card_blade, bl) {
+            if !compare_counts(self.original_blade_operator, card_blade.into(), bl.into()) {
                 return false;
             }
         }
@@ -1215,7 +1215,7 @@ impl<'a> CardFilter<'a> {
         if let Some(ct) = self.cost_total {
             if let Some(op) = self.cost_total_operator {
                 let card_cost = db.get_card(id).and_then(|c| c.cost).unwrap_or(99);
-                if !compare_counts(Some(op), card_cost, ct) {
+                if !compare_counts(Some(op), card_cost.into(), ct.into()) {
                     return false;
                 }
             }
@@ -1241,11 +1241,11 @@ impl<'a> CardFilter<'a> {
             .collect()
     }
 
-    pub fn count(&self, cards: &[i16], db: &CardDatabase) -> u32 {
+    pub fn count(&self, cards: &[i16], db: &CardDatabase) -> u8 {
         cards
             .iter()
             .filter(|&&id| self.matches(db, id, false))
-            .count() as u32
+            .count() as u8
     }
 
     /// Build a full CardFilter from all AbilityEffect fields.
@@ -1328,7 +1328,7 @@ impl<'a> CardFilter<'a> {
                 card_type: card_type.as_deref(),
                 group: group.as_deref(),
                 groups: None,
-                cost_limit: *cost_limit,
+                cost_limit: cost_limit.map(|c| c as u8),
                 cost_operator: cost_limit_operator.as_deref(),
                 cost_limit_min: None,
                 cost_total: None,
@@ -1375,7 +1375,7 @@ fn card_matches_name_fragments(db: &CardDatabase, id: i16, fragments: &[String])
 pub fn filter_from_parts<'a>(
     card_type: Option<&'a str>,
     group: Option<&'a str>,
-    cost_limit: Option<u32>,
+    cost_limit: Option<u8>,
     cost_operator: Option<&'a str>,
     characters: Option<&'a Vec<String>>,
     exclude_characters: Option<&'a Vec<String>>,
@@ -1396,13 +1396,13 @@ pub fn filter_from_parts<'a>(
 pub fn filter_from_parts_full<'a>(
     card_type: Option<&'a str>,
     group: Option<&'a str>,
-    cost_limit: Option<u32>,
+    cost_limit: Option<u8>,
     cost_operator: Option<&'a str>,
     characters: Option<&'a Vec<String>>,
     name_fragments: Option<&'a Vec<String>>,
     distinct: Option<DistinctType>,
     exclude_self: Option<i16>,
-    cost_total: Option<u32>,
+    cost_total: Option<u8>,
     cost_total_operator: Option<&'a str>,
 ) -> CardFilter<'a> {
     CardFilter {
@@ -1456,7 +1456,7 @@ pub fn matching_ids_filtered(
     db: &CardDatabase,
     filter: &CardFilter,
     skip_empty: bool,
-    target_count: Option<u32>,
+    target_count: Option<u8>,
     distinct: Option<DistinctType>,
     exclude_ids: Option<&[i16]>,
 ) -> Vec<i16> {
@@ -1496,11 +1496,11 @@ pub fn count_matching(
     db: &CardDatabase,
     filter: &CardFilter,
     skip_empty: bool,
-) -> u32 {
+) -> u8 {
     cards
         .iter()
         .filter(|&&id| filter.matches(db, id, skip_empty))
-        .count() as u32
+        .count() as u8
 }
 
 /// Map a stage position string to its array index (0=left, 1=center, 2=right).
@@ -1590,7 +1590,7 @@ pub fn count_in_zone(
     zone: &str,
     filter: &CardFilter,
     card_db: &CardDatabase,
-) -> u32 {
+) -> u8 {
     if Zone::from_str(zone) == Some(Zone::UnderMember) {
         let cards: Vec<i16> = player
             .stage
@@ -1611,7 +1611,7 @@ pub fn count_in_zone(
 
 // ============== UTILITY ==============
 
-pub fn compare_counts(operator: Option<&str>, actual: u32, expected: u32) -> bool {
+pub fn compare_counts(operator: Option<&str>, actual: u8, expected: u8) -> bool {
     let op = operator.unwrap_or(">=");
     match op {
         ">=" => actual >= expected,
@@ -1628,12 +1628,12 @@ pub fn sum_score_in_zone(
     cards: &[i16],
     card_db: &CardDatabase,
     get_modifier: impl Fn(i16) -> i32,
-) -> u32 {
+) -> u8 {
     cards
         .iter()
         .map(|&id| {
             let base = card_db.get_card(id).map(|c| c.get_score()).unwrap_or(0);
-            (base as i32 + get_modifier(id)) as u32
+            (base as i32 + get_modifier(id)) as u8
         })
         .sum()
 }
@@ -1910,10 +1910,10 @@ pub fn area_to_index(area: &crate::zones::MemberArea) -> Option<usize> {
 /// count only cards moved by the current cost/effect batch, not the full waitroom.
 pub fn resolve_discard_per_unit_count(
     recently_moved: Option<&SmallVec<[i16; 4]>>,
-    last_discard_count: u32,
+    last_discard_count: u8,
     card_db: &CardDatabase,
     filter: &CardFilter,
-) -> u32 {
+) -> u8 {
     if let Some(moved) = recently_moved {
         count_matching(moved, card_db, filter, false)
     } else {
@@ -1929,11 +1929,11 @@ pub fn calculate_per_unit_multiplier(
     player: &crate::player::Player,
     orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
     state_filter: Option<&str>,
-) -> u32 {
+) -> u8 {
     if !per_unit {
         return 1;
     }
-    let stage_count = |state: Option<&str>| -> u32 {
+    let stage_count = |state: Option<&str>| -> u8 {
         player
             .stage
             .stage
@@ -1945,20 +1945,20 @@ pub fn calculate_per_unit_multiplier(
                     .map_or(s == "active", |o| o.as_str() == s),
                 None => true,
             })
-            .count() as u32
+            .count() as u8
     };
     match per_unit_type {
         Some("member") | Some("人") | Some("members") => stage_count(state_filter),
-        Some("hand") | Some("card") | Some("枚") => player.hand.cards.len() as u32,
-        Some("energy") => player.energy_zone.cards.len() as u32,
-        Some("live_card_zone") => player.live_card_zone.cards.len() as u32,
-        Some("discard") => player.waitroom.cards.len() as u32,
+        Some("hand") | Some("card") | Some("枚") => player.hand.cards.len() as u8,
+        Some("energy") => player.energy_zone.cards.len() as u8,
+        Some("live_card_zone") => player.live_card_zone.cards.len() as u8,
+        Some("discard") => player.waitroom.cards.len() as u8,
         Some("under_member") | Some("下") => player
             .stage
             .under_cards
             .iter()
             .map(|sv| sv.len())
-            .sum::<usize>() as u32,
+            .sum::<usize>() as u8,
         _ => 1,
     }
 }
@@ -1974,7 +1974,7 @@ pub fn resolve_per_unit_count(
     heart_colors: &[String],
     state_filter: Option<&str>,
     orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
-) -> u32 {
+) -> u8 {
     if !per_unit {
         return 1;
     }
@@ -2002,7 +2002,7 @@ pub fn resolve_per_unit_count(
                 }
             }
         }
-        return colors_found.len() as u32;
+        return colors_found.len() as u8;
     }
 
     let zone = match per_unit_type {
@@ -2041,7 +2041,7 @@ pub fn resolve_per_unit_count(
                     filter.matches(card_db, id, false)
                         && card_matches_heart_colors(card_db, id, heart_colors)
                 })
-                .count() as u32
+                .count() as u8
         }
     } else {
         let mut cards: Vec<i16> = zone_cards(player, zone).to_vec();
@@ -2065,7 +2065,7 @@ pub fn resolve_per_unit_count(
                     filter.matches(card_db, id, is_stage)
                         && card_matches_heart_colors(card_db, id, heart_colors)
                 })
-                .count() as u32
+                .count() as u8
         }
     }
 }
@@ -2159,7 +2159,7 @@ pub fn extract_heart_colors_from_text(text: &str) -> Vec<String> {
                 .take_while(|c| c.is_ascii_digit())
                 .count();
         if end > nums_start {
-            if let Ok(n) = text[nums_start..end].parse::<u32>() {
+            if let Ok(n) = text[nums_start..end].parse::<u8>() {
                 let color = format!("heart{:02}", n);
                 if !colors.contains(&color) {
                     colors.push(color);

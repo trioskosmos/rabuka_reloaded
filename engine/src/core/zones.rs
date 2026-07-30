@@ -348,7 +348,7 @@ impl Stage {
         blade_entries: &HashMap<i16, ModifierEntry>,
         orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
         include_waited: bool,
-    ) -> u32 {
+    ) -> u8 {
         let mut total = 0;
         for &card_id in &self.stage {
             if card_id != -1 {
@@ -364,9 +364,9 @@ impl Stage {
                 if let Some(card) = card_db.get_card(card_id) {
                     let entry = blade_entries.get(&card_id).copied().unwrap_or_default();
                     if entry.set != 0 {
-                        total += entry.total().max(0) as u32;
+                        total += entry.total().max(0) as u8;
                     } else {
-                        total += (card.blade as i32 + entry.total()).max(0) as u32;
+                        total += (card.blade as i32 + entry.total()).max(0) as u8;
                     }
                 }
             }
@@ -406,7 +406,7 @@ impl Stage {
     pub fn get_available_hearts(
         &self,
         card_db: &CardDatabase,
-        heart_override: &HashMap<i16, (HeartColor, u32)>,
+        heart_override: &HashMap<i16, (HeartColor, u8)>,
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
         heart_color_multiplier: &HashMap<i16, HeartColor>,
     ) -> BaseHeart {
@@ -432,7 +432,7 @@ impl Stage {
             }
 
             if let Some(override_color) = heart_color_multiplier.get(&card_id) {
-                let total: u32 = card_hearts.values_sum();
+                let total: u8 = card_hearts.values_sum();
                 card_hearts.clear();
                 card_hearts.insert(*override_color, total);
             }
@@ -444,7 +444,7 @@ impl Stage {
             if let Some(mods) = heart_modifiers.get(&card_id) {
                 for (color, delta) in mods {
                     let new_val =
-                        (hearts.get(color).copied().unwrap_or(0) as i32 + *delta).max(0) as u32;
+                        (hearts.get(color).copied().unwrap_or(0) as i32 + *delta).max(0) as u8;
                     if new_val > 0 {
                         hearts.insert(*color, new_val);
                     } else {
@@ -522,14 +522,14 @@ impl LiveCardZone {
     pub fn calculate_live_score(
         &self,
         card_db: &CardDatabase,
-        cheer_blade_heart_count: u32,
+        cheer_blade_heart_count: u8,
         stage_hearts: Option<&crate::card::BaseHeart>,
         need_heart_modifiers: Option<
             &HashMap<i16, HashMap<crate::card::HeartColor, ModifierEntry>>,
         >,
         score_modifiers: Option<&HashMap<i16, i32>>,
         constant_total_score_bonus: i32,
-    ) -> u32 {
+    ) -> u8 {
         let mut total_score = 0;
 
         for card_id in &self.cards {
@@ -539,7 +539,7 @@ impl LiveCardZone {
                     .and_then(|sm| sm.get(card_id))
                     .copied()
                     .unwrap_or(0);
-                let card_score = (base_score + modifier).max(0) as u32;
+                let card_score = (base_score + modifier).max(0) as u8;
 
                 let heart_needs_satisfied = if let Some(ref need_heart) = card.need_heart {
                     if !need_heart.hearts.is_empty() {
@@ -555,7 +555,7 @@ impl LiveCardZone {
                                 };
                                 for (color, me) in card_mods {
                                     if me.set != 0 {
-                                        adjusted.hearts.insert(*color, me.set as u32);
+                                        adjusted.hearts.insert(*color, me.set as u8);
                                     }
                                     if me.additive != 0 {
                                         *adjusted.hearts.entry_or_default(*color) =
@@ -563,7 +563,7 @@ impl LiveCardZone {
                                                 as i32
                                                 + me.additive)
                                                 .max(0)
-                                                as u32;
+                                                as u8;
                                     }
                                 }
                                 Some(adjusted)
@@ -589,7 +589,7 @@ impl LiveCardZone {
             }
         }
 
-        total_score + cheer_blade_heart_count + constant_total_score_bonus.max(0) as u32
+        total_score + cheer_blade_heart_count + constant_total_score_bonus.max(0) as u8
     }
 
     pub fn get_top_card(&self) -> Option<i16> {

@@ -19,7 +19,7 @@ impl AbDebug {
         AbDebug
     }
     pub fn flush_to_rule_log(_rule_log: &mut Vec<String>) {}
-    pub fn flush_to_structured_log(_structured_log: &mut Vec<crate::types::LogEntry>, _turn: u32) {}
+    pub fn flush_to_structured_log(_structured_log: &mut Vec<crate::types::LogEntry>, _turn: u8) {}
     pub fn p(&mut self, _tag: &str, _msg: impl core::fmt::Display) {}
     pub fn ability(
         &mut self,
@@ -32,8 +32,8 @@ impl AbDebug {
     pub fn condition(
         &mut self,
         _cond: &crate::card::Condition,
-        _actual: u32,
-        _threshold: u32,
+        _actual: u8,
+        _threshold: u8,
         _passed: bool,
     ) {
     }
@@ -68,7 +68,7 @@ mod inner {
 
         pub fn flush_to_structured_log(
             structured_log: &mut Vec<crate::types::LogEntry>,
-            turn: u32,
+            turn: u8,
         ) {
             if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
                 for line in buffer.drain(..) {
@@ -121,7 +121,7 @@ mod inner {
             }
         }
 
-        pub fn condition(&mut self, cond: &Condition, actual: u32, threshold: u32, passed: bool) {
+        pub fn condition(&mut self, cond: &Condition, actual: u8, threshold: u8, passed: bool) {
             if !super::ABILITY_DEBUG.load(Ordering::Relaxed) {
                 return;
             }

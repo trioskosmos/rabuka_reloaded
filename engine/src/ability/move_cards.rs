@@ -50,7 +50,7 @@ impl AbilityResolver {
         &self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-    ) -> Result<Option<u32>, String> {
+    ) -> Result<Option<u8>, String> {
         let ref_binding = effect.cost_reference_any();
         let reference = match ref_binding.as_deref() {
             Some(r) => r,
@@ -91,7 +91,7 @@ impl AbilityResolver {
                 )
             })?;
 
-        let resolved = (base_cost as i32).saturating_add(offset).max(0) as u32;
+        let resolved = (base_cost as i32).saturating_add(offset as i32).max(0) as u8;
         log::debug!(
             "[COST_REF] referenced='{}' name='{}' base_cost={} offset={} resolved={}",
             reference,
@@ -378,8 +378,8 @@ impl AbilityResolver {
         count: usize,
         card_type_filter: Option<&str>,
         group_name: Option<&str>,
-        cost_limit: Option<u32>,
-        cost_total: Option<u32>,
+        cost_limit: Option<u8>,
+        cost_total: Option<u8>,
         cost_total_operator: Option<&str>,
         character_filter: Option<&Vec<String>>,
         name_fragments: Option<&Vec<String>>,
@@ -556,8 +556,8 @@ impl AbilityResolver {
         effect: &AbilityEffect,
         card_type_filter: Option<&str>,
         group_name: Option<&str>,
-        cost_limit: Option<u32>,
-        cost_total: Option<u32>,
+        cost_limit: Option<u8>,
+        cost_total: Option<u8>,
         cost_total_operator: Option<&str>,
         character_filter: Option<&Vec<String>>,
         name_fragments: Option<&Vec<String>>,
@@ -813,8 +813,8 @@ impl AbilityResolver {
         effect: &AbilityEffect,
         card_type_filter: Option<&str>,
         group_name: Option<&str>,
-        cost_limit: Option<u32>,
-        cost_total: Option<u32>,
+        cost_limit: Option<u8>,
+        cost_total: Option<u8>,
         cost_total_operator: Option<&str>,
         character_filter: Option<&Vec<String>>,
         name_fragments: Option<&Vec<String>>,
@@ -871,10 +871,10 @@ impl AbilityResolver {
                     }
                 }
                 let mut drawn = Vec::new();
-                let mut attempts = 0u32;
+                let mut attempts = 0u8;
                 let mut remaining = count;
                 while remaining > 0
-                    && attempts < (count as u32 + player.main_deck.cards.len() as u32 + 10)
+                    && attempts < (count as u8 + player.main_deck.cards.len() as u8 + 10)
                 {
                     // Q104 / Rule 10.2.1: deck empty mid-draw → refresh from waitroom
                     // and continue. This handles deck-to-discard costs/effects when the
@@ -1390,7 +1390,7 @@ impl AbilityResolver {
                 // Delegate to place_energy_under_member for choice creation.
                 self.execute_place_energy_under_member(
                     gs,
-                    count as u32,
+                    count as u8,
                     effect.target_name(),
                     effect.position_any(),
                     effect.optional.unwrap_or(false),
@@ -2247,9 +2247,9 @@ impl AbilityResolver {
         zone: &str,
         indices: &[usize],
         card_type_filter: Option<&str>,
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         cost_limit_operator: Option<&str>,
-        cost_total: Option<u32>,
+        cost_total: Option<u8>,
         cost_total_operator: Option<&str>,
         group: Option<&str>,
         characters: Option<&Vec<String>>,
@@ -2352,7 +2352,7 @@ impl AbilityResolver {
                     let limit = sum_limit.unwrap();
                     let op = sum_operator.unwrap_or("<=");
                     let card_ids = util::resolve_indices_to_ids(player, zone, &filtered_indices);
-                    let total_cost: u32 = card_ids
+                    let total_cost: u8 = card_ids
                         .iter()
                         .filter_map(|&cid| card_db.get_card(cid).and_then(|c| c.cost))
                         .sum();
@@ -2507,7 +2507,7 @@ impl AbilityResolver {
                     && (Zone::from_str(dest) == Some(Zone::Discard)
                         || Zone::from_str(dest) == Some(Zone::Waitroom))
                 {
-                    gs.mods.last_cost_discard_count = moved.len() as u32;
+                    gs.mods.last_cost_discard_count = moved.len() as u8;
                     gs.mods.last_cost_moved_card_ids = moved.clone().into();
                 }
             }
@@ -2667,7 +2667,7 @@ impl AbilityResolver {
         // Validate per-group constraint before removing cards
         if let Some(mpg) = max_per_group {
             let card_db = &gs.card_database;
-            let mut group_counts: HashMap<String, u32> = HashMap::default();
+            let mut group_counts: HashMap<String, u8> = HashMap::default();
             for &idx in indices {
                 if idx < looked_at.len() {
                     let cid = looked_at[idx];

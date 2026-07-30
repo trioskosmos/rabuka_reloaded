@@ -58,7 +58,7 @@ impl<'a> ConditionContext<'a> {
                 if let Some(created_turn) = condition
                     .get_temporal_scope()
                     .as_ref()
-                    .and_then(|s| s.parse::<u32>().ok())
+                    .and_then(|s| s.parse::<u8>().ok())
                 {
                     created_turn == self.game_state.turn_number
                 } else {
@@ -200,7 +200,7 @@ impl<'a> ConditionContext<'a> {
                                 if let Some(hc_list) = condition.get_heart_colors() {
                                     if let Some(ref nh) = card.need_heart {
                                         // Check if ALL specified heart colors meet the count threshold
-                                        let threshold = condition.get_count().unwrap_or(1) as u32;
+                                        let threshold = condition.get_count().unwrap_or(1) as u8;
                                         let all_hearts_present = hc_list.iter().all(|color_str| {
                                             let color = crate::card::parse_heart_color(color_str);
                                             nh.hearts.get(&color).copied().unwrap_or(0) >= threshold
@@ -1068,7 +1068,7 @@ impl<'a> ConditionContext<'a> {
                                     }
                                 })
                         })
-                        .count() as u32;
+                        .count() as u8;
                     // Negation: passes only when NO matching cards exist
                     if count > 0 {
                         return false;

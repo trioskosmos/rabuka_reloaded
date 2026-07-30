@@ -14,7 +14,7 @@ use smallvec::SmallVec;
 
 pub(crate) fn draw_cards_for_player(
     player: &mut crate::player::Player,
-    count: u32,
+    count: u8,
     _source: &str,
     destination: &str,
     card_type_filter: Option<&str>,
@@ -73,11 +73,11 @@ impl AbilityResolver {
         &self,
         gs: &mut GameState,
         dc: &crate::card::DynamicCount,
-    ) -> u32 {
+    ) -> u8 {
         let get_revealed_count = |gs: &crate::game_state::GameState| {
             let cheer = gs.cheer_revealed_cards();
             if !cheer.is_empty() {
-                cheer.len() as u32
+                cheer.len() as u8
             } else {
                 let player = gs.resolve_target_player("self");
                 gs.revealed_cards
@@ -94,7 +94,7 @@ impl AbilityResolver {
                             || player.success_live_card_zone.cards.contains(&cid)
                             || gs.resolution_zone.cards.contains(&cid)
                     })
-                    .count() as u32
+                    .count() as u8
             }
         };
 
@@ -114,9 +114,9 @@ impl AbilityResolver {
             }
             Some("previous_moved_cards") | Some("previous_move") => {
                 if !self.moved_cards.is_empty() {
-                    self.moved_cards.len() as u32
+                    self.moved_cards.len() as u8
                 } else if let Some(ref moved_cards) = gs.recently_moved_cards {
-                    moved_cards.len() as u32
+                    moved_cards.len() as u8
                 } else {
                     gs.mods.last_cost_discard_count
                 }
@@ -126,7 +126,7 @@ impl AbilityResolver {
                 if last_draw > 0 {
                     last_draw
                 } else if let Some(ref moved_cards) = gs.recently_moved_cards {
-                    moved_cards.len() as u32
+                    moved_cards.len() as u8
                 } else {
                     0
                 }
@@ -134,17 +134,17 @@ impl AbilityResolver {
             Some("revealed_cards") | Some("previous_reveal") => get_revealed_count(gs),
             Some("unit_count") => {
                 let player = gs.resolve_target_player("self");
-                player.stage.stage.iter().filter(|&&c| c != -1).count() as u32
+                player.stage.stage.iter().filter(|&&c| c != -1).count() as u8
             }
             Some("its_difference") | Some("その差") => {
-                let self_score: u32 = gs
+                let self_score: u8 = gs
                     .player1
                     .success_live_card_zone
                     .cards
                     .iter()
                     .filter_map(|&id| gs.card_database.get_card(id).and_then(|c| c.score))
                     .sum();
-                let opp_score: u32 = gs
+                let opp_score: u8 = gs
                     .player2
                     .success_live_card_zone
                     .cards
@@ -155,9 +155,9 @@ impl AbilityResolver {
             }
             Some(reference) if reference.contains("これにより控え室に置いた数") => {
                 if let Some(ref moved) = gs.recently_moved_cards {
-                    moved.len() as u32
+                    moved.len() as u8
                 } else {
-                    self.moved_cards.len() as u32
+                    self.moved_cards.len() as u8
                 }
             }
             Some(reference)
@@ -169,7 +169,7 @@ impl AbilityResolver {
                     .cards
                     .iter()
                     .filter_map(|&id| gs.card_database.get_card(id).and_then(|c| c.score))
-                    .sum::<u32>()
+                    .sum::<u8>()
             }
             Some(reference) if reference.contains("ステージ") && reference.contains("メンバー") =>
             {
@@ -179,7 +179,7 @@ impl AbilityResolver {
                     "self"
                 };
                 let player = gs.resolve_target_player(target);
-                player.stage.stage.iter().filter(|&&c| c != -1).count() as u32
+                player.stage.stage.iter().filter(|&&c| c != -1).count() as u8
             }
             Some("energy_cards_under_this_member") => {
                 let player = gs.resolve_target_player("self");
@@ -192,7 +192,7 @@ impl AbilityResolver {
                     1 => crate::zones::MemberArea::Center,
                     _ => crate::zones::MemberArea::RightSide,
                 };
-                player.stage.get_under_cards(area).len() as u32
+                player.stage.get_under_cards(area).len() as u8
             }
             _ => match dc.count_type.as_str() {
                 "revealed_cards" => get_revealed_count(gs),
@@ -239,9 +239,9 @@ impl AbilityResolver {
                 gs.mods.last_cost_discard_count
             );
             if !self.moved_cards.is_empty() {
-                self.moved_cards.len() as u32
+                self.moved_cards.len() as u8
             } else if let Some(ref moved_cards) = gs.recently_moved_cards {
-                moved_cards.len() as u32
+                moved_cards.len() as u8
             } else {
                 gs.mods.last_cost_discard_count
             }
@@ -326,13 +326,13 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-        count: u32,
+        count: u8,
         target: &str,
         source: &str,
         destination: &str,
         card_type: Option<&str>,
         per_unit: bool,
-        per_unit_count: u32,
+        per_unit_count: u8,
         per_unit_type: Option<&str>,
     ) -> Result<(), String> {
         let pp = self.player_prefix(gs);
@@ -512,7 +512,7 @@ impl AbilityResolver {
     pub fn execute_draw_until_count(
         &mut self,
         gs: &mut GameState,
-        target_count: u32,
+        target_count: u8,
         target: &str,
         destination: &str,
     ) {
@@ -527,7 +527,7 @@ impl AbilityResolver {
         let _ = self.execute_draw(
             gs,
             &AbilityEffect::default(),
-            to_draw as u32,
+            to_draw as u8,
             target,
             Zone::Deck.to_str(),
             destination,
@@ -541,7 +541,7 @@ impl AbilityResolver {
     pub(crate) fn execute_select_heart_color(
         &mut self,
         gs: &mut GameState,
-        count: u32,
+        count: u8,
         heart_colors: &[String],
         _target: &str,
     ) {
@@ -664,7 +664,7 @@ impl AbilityResolver {
         _gs: &mut GameState,
         effect: &AbilityEffect,
         resource: &str,
-        count: u32,
+        count: u8,
         heart_colors: &[String],
         heart_selection: bool,
     ) -> Result<Option<String>, String> {

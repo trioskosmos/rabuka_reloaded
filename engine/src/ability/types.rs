@@ -65,9 +65,9 @@ pub enum Choice {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         description_ja: Option<String>,
         allow_skip: bool,
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         cost_limit_operator: Option<String>,
-        cost_total: Option<u32>,
+        cost_total: Option<u8>,
         cost_total_operator: Option<String>,
         group: Option<String>,
         characters: Option<Vec<String>>,
@@ -220,7 +220,7 @@ pub enum LookAndSelectStep {
     },
     Select {
         count: usize,
-        max_per_group: Option<u32>,
+        max_per_group: Option<u8>,
     },
     Finalize {
         destination: String,
@@ -236,9 +236,9 @@ pub struct ChoiceBuilder {
     description_en: Option<String>,
     description_ja: Option<String>,
     allow_skip: bool,
-    cost_limit: Option<u32>,
+    cost_limit: Option<u8>,
     cost_limit_operator: Option<String>,
-    cost_total: Option<u32>,
+    cost_total: Option<u8>,
     cost_total_operator: Option<String>,
     group: Option<String>,
     characters: Option<Vec<String>>,
@@ -289,12 +289,12 @@ impl ChoiceBuilder {
         self.card_type = v;
         self
     }
-    pub fn cost_limit(mut self, v: Option<u32>, op: Option<String>) -> Self {
+    pub fn cost_limit(mut self, v: Option<u8>, op: Option<String>) -> Self {
         self.cost_limit = v;
         self.cost_limit_operator = op;
         self
     }
-    pub fn cost_total(mut self, v: Option<u32>, op: Option<String>) -> Self {
+    pub fn cost_total(mut self, v: Option<u8>, op: Option<String>) -> Self {
         self.cost_total = v;
         self.cost_total_operator = op;
         self
@@ -939,7 +939,7 @@ pub struct StepState {
     pub step_results: HashMap<String, StepOutput>,
     /// Number of cards drawn by the most recent draw step. Read by the
     /// sequential handler to populate `StepOutput::value` for the step.
-    pub last_draw_count: u32,
+    pub last_draw_count: u8,
     /// Total count of cards looked at by the most recent look step. Read
     /// by the sequential handler for `StepOutput::value` on look steps.
     pub looked_at_total_count: usize,

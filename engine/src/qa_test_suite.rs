@@ -151,7 +151,7 @@ fn test_q23_member_card_to_stage_procedure() {
     let final_energy_active = game_state.player1.energy_zone.active_count();
     let energy_paid = initial_energy_active - final_energy_active;
     assert_eq!(
-        energy_paid as u32, card_cost,
+        energy_paid as u8, card_cost,
         "Energy paid should equal card cost"
     );
 

@@ -25,7 +25,7 @@ impl super::TurnEngine {
         game_state: &mut GameState,
         player_id: &str,
         card_no: &str,
-        _cost_paid: u32,
+        _cost_paid: u8,
         baton_touch_used: bool,
     ) {
         let player_id_clone = player_id.to_string();
@@ -187,13 +187,13 @@ impl super::TurnEngine {
         game_state: &GameState,
         player_id: &str,
         trigger_substring: &str,
-    ) -> u32 {
+    ) -> u8 {
         let player = if player_id == game_state.player1.id {
             &game_state.player1
         } else {
             &game_state.player2
         };
-        let mut count = 0u32;
+        let mut count = 0u8;
         for &cid in &player.stage.stage {
             if cid == -1 {
                 continue;

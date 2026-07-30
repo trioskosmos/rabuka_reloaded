@@ -15,12 +15,12 @@ use alloc::{
 };
 use core::sync::atomic::Ordering;
 
-const EMPTY_H8: [u32; 8] = [0u32; 8];
+const EMPTY_H8: [u8; 8] = [0u8; 8];
 
 /// Effective heart need for a live card during allocation.
 struct CardNeed {
     name: crate::types::ArcStr,
-    need: [u32; 8],
+    need: [u8; 8],
 }
 
 impl super::TurnEngine {
@@ -114,8 +114,8 @@ impl super::TurnEngine {
             .collect();
         // Q48: A live can be won even with total score 0 or less
         // (score comparison determines the winner regardless of absolute value).
-        let p1_extra: u32;
-        let p2_extra: u32;
+        let p1_extra: u8;
+        let p2_extra: u8;
         if game_state.live_success_triggered_this_turn && game_state.live_success_p2_fired {
             // Re-entry after BOTH players' triggers already resolved.
             // Restore saved extras (e.g. if a later auto-ability creates a choice).
@@ -128,13 +128,13 @@ impl super::TurnEngine {
                 game_state.live_success_p2_fired = false;
 
                 for snap in &mut game_state.performance_snapshots {
-                    let total_hearts: u32 = snap.total_hearts.iter().sum();
+                    let total_hearts: u8 = snap.total_hearts.iter().sum();
                     let player = if snap.player_id == player1_id {
                         &game_state.player1
                     } else {
                         &game_state.player2
                     };
-                    let required: u32 = player
+                    let required: u8 = player
                         .live_card_zone
                         .cards
                         .iter()
@@ -152,10 +152,10 @@ impl super::TurnEngine {
                     // Allocation is already finalised (performance phase completed).
                     // snap.surplus_hearts is read by color-filtered surplus conditions
                     // (e.g. La Bella Patria heart04 >= 1, Q174).
-                    let mut per_color = [0u32; 8];
+                    let mut per_color = [0u8; 8];
                     for color in 0..8 {
                         let total_color = snap.total_hearts[color];
-                        let filled_color: u32 = snap.lives.iter().map(|l| l.filled[color]).sum();
+                        let filled_color: u8 = snap.lives.iter().map(|l| l.filled[color]).sum();
                         per_color[color] = total_color.saturating_sub(filled_color);
                     }
                     snap.surplus_hearts = per_color;
@@ -181,7 +181,7 @@ impl super::TurnEngine {
                     &pre_score_flat,
                     &game_state.player1.live_card_zone.cards,
                 )
-                .max(0) as u32;
+                .max(0) as u8;
                 game_state.live_success_p1_extra = p1_extra;
                 game_state.live_success_p2_fired = true;
             } else {
@@ -212,7 +212,7 @@ impl super::TurnEngine {
                 &pre_score_flat,
                 &game_state.player2.live_card_zone.cards,
             )
-            .max(0) as u32;
+            .max(0) as u8;
             game_state.live_success_p2_extra = p2_extra;
         }
 
@@ -315,12 +315,12 @@ impl super::TurnEngine {
                                 .flatten()
                             {
                                 if me.set != 0 {
-                                    required_arr[color.index()] = me.set as u32;
+                                    required_arr[color.index()] = me.set as u8;
                                 }
                                 if me.additive != 0 {
                                     let idx = color.index();
                                     let current = required_arr[idx] as i32;
-                                    required_arr[idx] = (current + me.additive).max(0) as u32;
+                                    required_arr[idx] = (current + me.additive).max(0) as u8;
                                 }
                             }
                         } else {
@@ -334,7 +334,7 @@ impl super::TurnEngine {
                                         val = (val + me.additive).max(0);
                                     }
                                 }
-                                required_arr[idx] = val as u32;
+                                required_arr[idx] = val as u8;
                             }
                         }
                         // Determine passed by comparing filled vs required (not vs total pool).
@@ -347,13 +347,13 @@ impl super::TurnEngine {
                             let mut wildcard = filled[0] + filled[7];
                             let mut ok = true;
                             // Rule 2.11.3 bullet 2: total provided >= total required
-                            let total_filled: u32 = filled.iter().sum();
-                            let total_required: u32 = required_arr.iter().sum();
+                            let total_filled: u8 = filled.iter().sum();
+                            let total_required: u8 = required_arr.iter().sum();
                             if total_filled < total_required {
                                 ok = false;
                             }
                             if ok && required_arr[0] > 0 {
-                                let h00_satisfied: u32 = filled[1..7].iter().sum();
+                                let h00_satisfied: u8 = filled[1..7].iter().sum();
                                 if h00_satisfied + wildcard < required_arr[0] {
                                     ok = false;
                                 } else {
@@ -449,7 +449,7 @@ impl super::TurnEngine {
                     } else {
                         base_score
                     };
-                    snap.lives[i].score = (effective_base + additive).max(0) as u32;
+                    snap.lives[i].score = (effective_base + additive).max(0) as u8;
                 }
             }
 
@@ -521,7 +521,7 @@ impl super::TurnEngine {
             // Pre-computed per-color transform delta for each member contribution.
             // transform_delta = bonus_hearts - sum(ability_heart_bonuses per color).
             for mc in &mut snap.member_contributions {
-                let mut ability_per_color = [0u32; 8];
+                let mut ability_per_color = [0u8; 8];
                 for ab in &mc.ability_heart_bonuses {
                     if let Some(color_idx) = ab.color {
                         if color_idx < 8 {
@@ -625,7 +625,7 @@ impl super::TurnEngine {
                     {
                         snap.breakdown.scores.push(crate::types::ScoreLine {
                             source: app.ability_text.to_string(),
-                            value: app.amount.unsigned_abs(),
+                            value: app.amount.unsigned_abs() as u8,
                         });
                     }
                 }
@@ -636,17 +636,17 @@ impl super::TurnEngine {
         // Surplus = remaining hearts after filling all live card requirements.
         // Uses actual filled allocations (not just required) to handle cases where
         // available hearts are less than required.
-        let mut p2_surplus = 0u32;
-        let mut p1_surplus = 0u32;
+        let mut p2_surplus = 0u8;
+        let mut p1_surplus = 0u8;
         for snap in &mut game_state.performance_snapshots {
-            let total_available: u32 = snap.total_hearts.iter().sum();
-            let total_filled: u32 = snap.lives.iter().flat_map(|l| l.filled.iter()).sum();
+            let total_available: u8 = snap.total_hearts.iter().sum();
+            let total_filled: u8 = snap.lives.iter().flat_map(|l| l.filled.iter()).sum();
             let surplus = total_available.saturating_sub(total_filled);
             // Compute per-color surplus
-            let mut per_color_surplus = [0u32; 8];
+            let mut per_color_surplus = [0u8; 8];
             for color in 0..8 {
                 let total_color = snap.total_hearts[color];
-                let filled_color: u32 = snap.lives.iter().map(|l| l.filled[color]).sum();
+                let filled_color: u8 = snap.lives.iter().map(|l| l.filled[color]).sum();
                 per_color_surplus[color] = total_color.saturating_sub(filled_color);
             }
             snap.surplus_hearts = per_color_surplus;
@@ -1101,7 +1101,7 @@ impl super::TurnEngine {
         _player_id: &str,
         card_db: &CardDatabase,
         blade_modifiers: &HashMap<i16, ModifierEntry>,
-        heart_override: &HashMap<i16, (HeartColor, u32)>,
+        heart_override: &HashMap<i16, (HeartColor, u8)>,
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
         blade_type_modifiers: &HashMap<i16, BladeColor>,
         orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
@@ -1144,8 +1144,8 @@ impl super::TurnEngine {
             }
             let mut base_h = EMPTY_H8;
             let mut bonus_h = EMPTY_H8;
-            let mut base_blades = 0u32;
-            let mut draw_icons = 0u32;
+            let mut base_blades = 0u8;
+            let mut draw_icons = 0u8;
             let ability_heart_bonuses = Vec::new();
             let ability_blade_bonuses = Vec::new();
 
@@ -1171,9 +1171,9 @@ impl super::TurnEngine {
             let entry = blade_modifiers.get(&cid).copied().unwrap_or_default();
             let (effective_base_blades, bonus_blades) = if entry.set != 0 {
                 // set replaces the base blade — additive stacks on top
-                (entry.total().max(0) as u32, 0u32)
+                (entry.total().max(0) as u8, 0u8)
             } else {
-                (base_blades, entry.total().max(0) as u32)
+                (base_blades, entry.total().max(0) as u8)
             };
             base_blades = effective_base_blades;
 
@@ -1181,14 +1181,14 @@ impl super::TurnEngine {
                 for (color, delta) in mods {
                     let idx = color.index();
                     if idx < 8 && *delta > 0 {
-                        bonus_h[idx] += *delta as u32;
+                        bonus_h[idx] += *delta as u8;
                     }
                 }
             }
 
             // Apply heart_color_multiplier (set_heart_type): transform all hearts to one color
             if let Some(override_color) = heart_color_multiplier.get(&cid) {
-                let total: u32 = base_h.iter().sum();
+                let total: u8 = base_h.iter().sum();
                 base_h = EMPTY_H8;
                 base_h[override_color.index()] = total;
             }
@@ -1224,7 +1224,7 @@ impl super::TurnEngine {
                     .map(|c| crate::types::ArcStr::from(c.card_no.as_ref()))
                     .unwrap_or_default(),
                 is_wait,
-                transform_delta: [0u32; 8],
+                transform_delta: [0u8; 8],
             });
         }
 
@@ -1237,7 +1237,7 @@ impl super::TurnEngine {
                     total_hearts_arr[c] += mc.base_hearts[c] + mc.bonus_hearts[c];
                 }
             }
-            let total_blade: u32 = member_contributions
+            let total_blade: u8 = member_contributions
                 .iter()
                 .filter(|m| !m.is_wait)
                 .map(|m| m.base_blades + m.bonus_blades)
@@ -1307,7 +1307,7 @@ impl super::TurnEngine {
             .next();
 
         // Process yell cards and build YellCardResult + track heart allocations
-        let mut cheer_icon_count = 0u32;
+        let mut cheer_icon_count = 0u8;
         let mut heart_sources: Vec<HeartSource> = Vec::new();
         let mut blade_sources: Vec<BladeSource> = Vec::new();
         let mut total_hearts_arr = EMPTY_H8;
@@ -1342,13 +1342,13 @@ impl super::TurnEngine {
 
         // Q42: Defer draw effects until after all yell cards have been revealed.
         // Count draw icons during the loop, then process all draws at once after.
-        let mut total_draw_icons = 0u32;
+        let mut total_draw_icons = 0u8;
 
         for card_id in &resolution_zone.cards {
             if let Some(card) = card_db.get_card(*card_id) {
                 let mut bh_arr = EMPTY_H8;
-                let mut note_icons = 0u32;
-                let mut draw_icons = 0u32;
+                let mut note_icons = 0u8;
+                let mut draw_icons = 0u8;
 
                 if let Some(ref bh) = card.blade_heart {
                     for (color, count) in &bh.hearts {
@@ -1445,7 +1445,7 @@ impl super::TurnEngine {
 
         // Live card special hearts
         // Collect draw counts first (immutable), then draw with refresh (mutable).
-        let mut special_draw_count = 0u32;
+        let mut special_draw_count = 0u8;
         for &lc_id in &player.live_card_zone.cards {
             if let Some(card) = card_db.get_card(lc_id) {
                 if let Some(ref sh) = card.special_heart {
@@ -1521,7 +1521,7 @@ impl super::TurnEngine {
         let future_demand = Self::compute_future_demand(&card_needs);
 
         // Initialize pool as array for deterministic access
-        let mut pool = [0u32; 8];
+        let mut pool = [0u8; 8];
         for (color, count) in &owned_hearts.hearts {
             pool[color.index()] += count;
         }
@@ -1551,7 +1551,7 @@ impl super::TurnEngine {
         let mut needs = Vec::new();
         for &lc_id in live_card_ids {
             if let Some(card) = card_db.get_card(lc_id) {
-                let mut need = [0u32; 8];
+                let mut need = [0u8; 8];
                 let has_set = need_heart_modifiers
                     .get(&lc_id)
                     .is_some_and(|m| m.values().any(|e| e.set != 0));
@@ -1560,12 +1560,12 @@ impl super::TurnEngine {
                         // Q115/Q127: Set-to-X applies first, then additive stacks.
                         for (color, me) in need_heart_modifiers.get(&lc_id).into_iter().flatten() {
                             if me.set != 0 {
-                                need[color.index()] = me.set as u32;
+                                need[color.index()] = me.set as u8;
                             }
                             if me.additive != 0 {
                                 let idx = color.index();
                                 let current = need[idx] as i32;
-                                need[idx] = (current + me.additive).max(0) as u32;
+                                need[idx] = (current + me.additive).max(0) as u8;
                             }
                         }
                     } else {
@@ -1577,7 +1577,7 @@ impl super::TurnEngine {
                                     val = (val + me.additive).max(0);
                                 }
                             }
-                            need[idx] = val as u32;
+                            need[idx] = val as u8;
                         }
                     }
                 }
@@ -1591,10 +1591,10 @@ impl super::TurnEngine {
     }
 
     /// Compute future demand per card: for cards i+1..N, sum of non-heart00 needs.
-    fn compute_future_demand(card_needs: &[CardNeed]) -> Vec<[u32; 8]> {
+    fn compute_future_demand(card_needs: &[CardNeed]) -> Vec<[u8; 8]> {
         let n = card_needs.len();
-        let mut demand = vec![[0u32; 8]; n];
-        let mut running = [0u32; 8];
+        let mut demand = vec![[0u8; 8]; n];
+        let mut running = [0u8; 8];
         for i in (0..n).rev() {
             if i + 1 < n {
                 for c in 1..7 {
@@ -1610,15 +1610,15 @@ impl super::TurnEngine {
 
     /// Smart greedy allocation: demand-aware Phase 3a + icon_all-last Phase 4.
     fn greedy_allocate(
-        pool: &mut [u32; 8],
+        pool: &mut [u8; 8],
         card_needs: &[CardNeed],
-        future_demand: &[[u32; 8]],
+        future_demand: &[[u8; 8]],
     ) -> Vec<Allocation> {
         let mut allocs = Vec::new();
         for (live_idx, cn) in card_needs.iter().enumerate() {
             let need = cn.need;
             // Track per-color totals for this card (direct + wildcard already assigned)
-            let mut filled = [0u32; 8];
+            let mut filled = [0u8; 8];
             let card_name = &cn.name;
 
             // Phase 1a: matching colored hearts → specific color req
@@ -1688,8 +1688,8 @@ impl super::TurnEngine {
 
             // Phase 3a: total remaining deficit = total_required - total_filled_so_far.
             // Need[0] is the "any" portion, but the total must also be met.
-            let total_filled_so_far: u32 = filled.iter().sum();
-            let total_required: u32 = need.iter().sum();
+            let total_filled_so_far: u8 = filled.iter().sum();
+            let total_required: u8 = need.iter().sum();
             let h00_deficit = total_required.saturating_sub(total_filled_so_far);
             if h00_deficit > 0 {
                 // Demand-aware: sort colors by (pool - future_demand) descending
@@ -1700,7 +1700,7 @@ impl super::TurnEngine {
                     let score_b = pool[b] as i32 - future_demand[live_idx][b] as i32;
                     score_b.cmp(&score_a)
                 });
-                let mut filled_h00 = 0u32;
+                let mut filled_h00 = 0u8;
                 for &c in &surplus_colors {
                     if filled_h00 >= h00_deficit {
                         break;
@@ -1770,7 +1770,7 @@ impl super::TurnEngine {
                     }
                 }
                 // Remaining icon_all → heart00 deficit
-                let total_colored: u32 = filled[1..7].iter().sum();
+                let total_colored: u8 = filled[1..7].iter().sum();
                 let h00_remaining = need[0].saturating_sub(total_colored);
                 if h00_remaining > 0 && pool[7] > 0 {
                     // Also include any previous filled[0] from Phase 3b
@@ -1808,7 +1808,7 @@ impl super::TurnEngine {
         }
         // Build per-card filled arrays
         let num_cards = card_needs.len();
-        let mut per_card_filled = vec![[0u32; 8]; num_cards];
+        let mut per_card_filled = vec![[0u8; 8]; num_cards];
         for a in allocs {
             if a.target_idx < num_cards {
                 per_card_filled[a.target_idx][a.color] += a.amount;
@@ -1820,13 +1820,13 @@ impl super::TurnEngine {
             let req = cn.need;
             let mut wildcard = filled[0] + filled[7];
             let mut ok = true;
-            let total_filled: u32 = filled.iter().sum();
-            let total_required: u32 = req.iter().sum();
+            let total_filled: u8 = filled.iter().sum();
+            let total_required: u8 = req.iter().sum();
             if total_filled < total_required {
                 ok = false;
             }
             if ok && req[0] > 0 {
-                let h00_satisfied: u32 = filled[1..7].iter().sum();
+                let h00_satisfied: u8 = filled[1..7].iter().sum();
                 if h00_satisfied + wildcard < req[0] {
                     ok = false;
                 } else {
@@ -1855,7 +1855,7 @@ impl super::TurnEngine {
 
     /// Exhaustive backtracking search over Phase 3a + Phase 4 choices.
     /// Tries all valid ways to extract hearts from the pool per card.
-    fn backtrack_allocate(pool: &[u32; 8], card_needs: &[CardNeed]) -> Option<Vec<Allocation>> {
+    fn backtrack_allocate(pool: &[u8; 8], card_needs: &[CardNeed]) -> Option<Vec<Allocation>> {
         let mut allocs = Vec::new();
         let mut current_pool = *pool;
         if Self::bt_search(&mut current_pool, card_needs, 0, &mut allocs) {
@@ -1867,7 +1867,7 @@ impl super::TurnEngine {
 
     /// Recursive backtracking: try all valid allocations for card `idx` then recurse.
     fn bt_search(
-        pool: &mut [u32; 8],
+        pool: &mut [u8; 8],
         card_needs: &[CardNeed],
         idx: usize,
         allocs: &mut Vec<Allocation>,
@@ -1884,7 +1884,7 @@ impl super::TurnEngine {
         // ----- Forced phases (no choice) -----
 
         // Phase 1a: matching colored hearts → color req (no choice)
-        let mut filled = [0u32; 8];
+        let mut filled = [0u8; 8];
         for c in 1..7 {
             if need[c] > 0 && pool[c] > 0 {
                 let take = pool[c].min(need[c]);
@@ -1950,14 +1950,14 @@ impl super::TurnEngine {
         }
 
         // ----- Choice phases: Phase 3a (which surplus colors → heart00) -----
-        let total_filled_so_far: u32 = filled.iter().sum();
-        let total_required: u32 = need.iter().sum();
+        let total_filled_so_far: u8 = filled.iter().sum();
+        let total_required: u8 = need.iter().sum();
         let h00_deficit = total_required.saturating_sub(total_filled_so_far);
 
         // Collect available surplus colors
         let mut surplus_colors: Vec<usize> = (1..7).filter(|&c| pool[c] > 0).collect();
         surplus_colors.sort();
-        let total_surplus: u32 = surplus_colors.iter().map(|&c| pool[c]).sum();
+        let total_surplus: u8 = surplus_colors.iter().map(|&c| pool[c]).sum();
         let h00_from_surplus = h00_deficit.min(total_surplus);
 
         let found = Self::try_surplus_compositions(
@@ -1982,14 +1982,14 @@ impl super::TurnEngine {
 
     /// Recursively enumerate all compositions of `remaining` hearts from `colors[color_idx..]`.
     fn try_surplus_compositions(
-        pool: &mut [u32; 8],
+        pool: &mut [u8; 8],
         card_needs: &[CardNeed],
         idx: usize,
         colors: &[usize],
-        remaining: u32,
+        remaining: u8,
         color_idx: usize,
         allocs: &mut Vec<Allocation>,
-        filled: [u32; 8],
+        filled: [u8; 8],
     ) -> bool {
         let cn = &card_needs[idx];
         let card_name = &cn.name;
@@ -2048,11 +2048,11 @@ impl super::TurnEngine {
     /// After Phase 3a choices are made, try Phase 3b (heart00 → heart00 deficit)
     /// and Phase 4 (icon_all → remaining deficits).
     fn try_phase4(
-        pool: &mut [u32; 8],
+        pool: &mut [u8; 8],
         card_needs: &[CardNeed],
         idx: usize,
         allocs: &mut Vec<Allocation>,
-        mut filled: [u32; 8],
+        mut filled: [u8; 8],
     ) -> bool {
         let saved_pool = *pool;
         let saved_len = allocs.len();
@@ -2061,8 +2061,8 @@ impl super::TurnEngine {
         let need = cn.need;
 
         // Count all hearts allocated so far (1a + 3a)
-        let total_filled_so_far: u32 = filled.iter().sum();
-        let total_required: u32 = need.iter().sum();
+        let total_filled_so_far: u8 = filled.iter().sum();
+        let total_required: u8 = need.iter().sum();
         let h00_deficit = total_required.saturating_sub(total_filled_so_far);
 
         // Phase 3b: Heart00 → remaining deficit (no choice, forced)
@@ -2085,11 +2085,11 @@ impl super::TurnEngine {
         }
 
         // Now compute all remaining deficits
-        let total_filled_now: u32 = filled.iter().sum();
-        let total_required: u32 = need.iter().sum();
+        let total_filled_now: u8 = filled.iter().sum();
+        let total_required: u8 = need.iter().sum();
         let h00_still_needed = total_required.saturating_sub(total_filled_now);
 
-        let mut color_deficits: Vec<(usize, u32)> = Vec::new();
+        let mut color_deficits: Vec<(usize, u8)> = Vec::new();
         for c in 1..7 {
             if filled[c] < need[c] {
                 color_deficits.push((c, need[c] - filled[c]));
@@ -2139,14 +2139,14 @@ impl super::TurnEngine {
 
     /// Try all distributions of `remaining` icon_all hearts to deficit types starting at `di`.
     fn try_all_distribution(
-        pool: &mut [u32; 8],
+        pool: &mut [u8; 8],
         card_needs: &[CardNeed],
         idx: usize,
         allocs: &mut Vec<Allocation>,
-        filled: [u32; 8],
+        filled: [u8; 8],
         deficit_indices: &[usize],
-        deficits: &[(usize, u32)],
-        remaining: u32,
+        deficits: &[(usize, u8)],
+        remaining: u8,
         di: usize,
     ) -> bool {
         let saved_pool = *pool;
@@ -2223,15 +2223,15 @@ impl super::TurnEngine {
     }
 
     /// Check if a single card's requirements are satisfied with its filled array.
-    fn card_ok_with_wildcard(filled: [u32; 8], need: [u32; 8]) -> bool {
+    fn card_ok_with_wildcard(filled: [u8; 8], need: [u8; 8]) -> bool {
         let mut wildcard = filled[0] + filled[7];
-        let total_filled: u32 = filled.iter().sum();
-        let total_required: u32 = need.iter().sum();
+        let total_filled: u8 = filled.iter().sum();
+        let total_required: u8 = need.iter().sum();
         if total_filled < total_required {
             return false;
         }
         if need[0] > 0 {
-            let h00_satisfied: u32 = filled[1..7].iter().sum();
+            let h00_satisfied: u8 = filled[1..7].iter().sum();
             if h00_satisfied + wildcard < need[0] {
                 return false;
             }
@@ -2260,16 +2260,16 @@ impl super::TurnEngine {
         resolution_zone: &mut crate::zones::ResolutionZone,
         card_db: &CardDatabase,
         need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
-        heart_override: &HashMap<i16, (HeartColor, u32)>,
+        heart_override: &HashMap<i16, (HeartColor, u8)>,
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
         heart_color_multiplier: &HashMap<i16, HeartColor>,
         live_card_ids: &[i16],
         _allocations: &[Allocation],
         yell_cards: &[YellCardResult],
-        total_blade: u32,
-        cheer_icon_count: u32,
+        total_blade: u8,
+        cheer_icon_count: u8,
         member_contributions: &[MemberContribution],
-        total_hearts_arr: &[u32; 8],
+        total_hearts_arr: &[u8; 8],
         heart_sources: &[HeartSource],
         blade_sources: &[BladeSource],
     ) -> LivePerformanceData {
@@ -2294,7 +2294,7 @@ impl super::TurnEngine {
         let allocations =
             Self::compute_allocations(&owned_hearts, live_card_ids, card_db, need_heart_modifiers);
 
-        let mut per_card_filled: Vec<[u32; 8]> = vec![EMPTY_H8; live_card_ids.len()];
+        let mut per_card_filled: Vec<[u8; 8]> = vec![EMPTY_H8; live_card_ids.len()];
         for alloc in &allocations {
             if alloc.target_idx < per_card_filled.len() {
                 per_card_filled[alloc.target_idx][alloc.color] += alloc.amount;
@@ -2321,13 +2321,13 @@ impl super::TurnEngine {
                             for (color, me) in card_mods {
                                 // Q115: Set-to-X applies first, then add/subtract modifiers stack.
                                 if me.set != 0 {
-                                    adjusted.hearts.insert(*color, me.set as u32);
+                                    adjusted.hearts.insert(*color, me.set as u8);
                                 }
                                 if me.additive != 0 {
                                     *adjusted.hearts.entry_or_default(*color) =
                                         (adjusted.hearts.get(color).copied().unwrap_or(0) as i32
                                             + me.additive)
-                                            .max(0) as u32;
+                                            .max(0) as u8;
                                 }
                             }
                         }
@@ -2345,13 +2345,13 @@ impl super::TurnEngine {
                 let filled = per_card_filled[live_idx];
                 let mut wildcard = filled[0] + filled[7];
                 let mut ok = true;
-                let total_filled: u32 = filled.iter().sum();
-                let total_required: u32 = required_arr.iter().sum();
+                let total_filled: u8 = filled.iter().sum();
+                let total_required: u8 = required_arr.iter().sum();
                 if total_filled < total_required {
                     ok = false;
                 }
                 if ok && required_arr[0] > 0 {
-                    let h00_satisfied: u32 = filled[1..7].iter().sum();
+                    let h00_satisfied: u8 = filled[1..7].iter().sum();
                     if h00_satisfied + wildcard < required_arr[0] {
                         ok = false;
                     } else {
@@ -2442,7 +2442,7 @@ pub fn enrich_from_applications(
                         } else {
                             crate::types::ArcStr::default()
                         },
-                        amount: app.amount.unsigned_abs(),
+                        amount: app.amount.unsigned_abs() as u8,
                         color: app.heart_color,
                         ability_text: app.ability_text.clone().into(),
                     });
@@ -2458,7 +2458,7 @@ pub fn enrich_from_applications(
                         } else {
                             crate::types::ArcStr::default()
                         },
-                        amount: app.amount.unsigned_abs(),
+                        amount: app.amount.unsigned_abs() as u8,
                         color: app.heart_color,
                         ability_text: app.ability_text.clone().into(),
                     });
@@ -2474,7 +2474,7 @@ pub fn enrich_from_applications(
                     } else {
                         String::new()
                     },
-                    value: app.amount.unsigned_abs(),
+                    value: app.amount.unsigned_abs() as u8,
                 });
             }
             crate::types::EffectType::Transform => {
@@ -2519,11 +2519,11 @@ pub fn enrich_from_applications(
 }
 
 pub fn build_snapshot(
-    turn: u32,
+    turn: u8,
     player_id: &str,
     perf: &LivePerformanceData,
     card_db: &CardDatabase,
-    note_icons: u32,
+    note_icons: u8,
     performance_need_heart_modifiers: &[(i16, HeartColor, ModifierEntry)],
 ) -> crate::types::PerformanceSnapshot {
     let mut lives = Vec::new();
@@ -2637,7 +2637,7 @@ fn fmt_player_id(id: &str) -> String {
     }
 }
 
-fn fmt_hearts(arr: &[u32; 8]) -> String {
+fn fmt_hearts(arr: &[u8; 8]) -> String {
     arr.iter()
         .enumerate()
         .filter(|(_, &v)| v > 0)
@@ -2652,7 +2652,7 @@ fn fmt_hearts(arr: &[u32; 8]) -> String {
         .join(" ")
 }
 
-fn fmt_heart_vec(arr: &[u32; 8]) -> String {
+fn fmt_heart_vec(arr: &[u8; 8]) -> String {
     arr.iter()
         .enumerate()
         .map(|(i, v)| {
@@ -2677,8 +2677,8 @@ pub fn snapshot_to_rule_log(
     lines.push(format!("[Turn {}] ── {} Performance ──", snap.turn, player));
 
     // ── Stage members ──
-    let mut _stage_total_blades = 0u32;
-    let mut stage_total_hearts = [0u32; 8];
+    let mut _stage_total_blades = 0u8;
+    let mut stage_total_hearts = [0u8; 8];
     for mc in &snap.member_contributions {
         let name = card_name_by_no(card_db, &mc.card_no);
         let total_blade = mc.base_blades + mc.bonus_blades;
@@ -2717,7 +2717,7 @@ pub fn snapshot_to_rule_log(
     }
 
     // ── Yell cards ──
-    let mut yell_total_hearts = [0u32; 8];
+    let mut yell_total_hearts = [0u8; 8];
     if snap.yell_count > 0 {
         lines.push(format!("  Yell ({} cards):", snap.yell_count));
         for yc in &snap.yell_cards {

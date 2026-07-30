@@ -25,7 +25,7 @@ fn heart_color_index(color: &HeartColor) -> Option<usize> {
 pub struct TempEffectDisplay {
     pub effect_type: String,
     pub duration: String,
-    pub created_turn: u32,
+    pub created_turn: u8,
     pub target_player_id: String,
     pub description: String,
     #[serde(default)]
@@ -75,9 +75,9 @@ pub struct CardDisplay {
     #[serde(rename = "type")]
     pub card_type: String,
     pub orientation: Option<String>,
-    pub base_heart: Option<HashMap<String, u32>>,
-    pub blade: u32,
-    pub total_blade: u32,
+    pub base_heart: Option<HashMap<String, u8>>,
+    pub blade: u8,
+    pub total_blade: u8,
     pub id: i16,
     pub ability_text: Option<String>,
     #[serde(default)]
@@ -165,7 +165,7 @@ pub struct CardDisplay {
     pub heart_transform: Option<String>,
 
     #[serde(default)]
-    pub cost: Option<u32>,
+    pub cost: Option<u8>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Default)]
@@ -189,15 +189,15 @@ pub struct PlayerDisplay {
     #[serde(default)]
     pub score_modifiers: HashMap<i16, i32>,
     #[serde(default)]
-    pub total_hearts: Vec<u32>,
+    pub total_hearts: Vec<u8>,
     #[serde(default)]
-    pub live_need_hearts: Vec<u32>,
+    pub live_need_hearts: Vec<u8>,
     #[serde(default)]
-    pub selected_need_hearts: Vec<u32>,
+    pub selected_need_hearts: Vec<u8>,
     #[serde(default)]
-    pub current_score: u32,
+    pub current_score: u8,
     #[serde(default)]
-    pub live_card_scores: HashMap<String, u32>,
+    pub live_card_scores: HashMap<String, u8>,
     #[serde(default)]
     pub gained_abilities: Vec<String>,
     #[serde(default)]
@@ -221,7 +221,7 @@ pub struct PlayerDisplay {
     #[serde(default)]
     pub deployed_this_turn: Vec<i16>,
     #[serde(default)]
-    pub debut_count_this_turn: u32,
+    pub debut_count_this_turn: u8,
     #[serde(default)]
     pub id: String,
     #[serde(default)]
@@ -233,7 +233,7 @@ pub struct PlayerDisplay {
     #[serde(default)]
     pub energy_active_count: usize,
     #[serde(default)]
-    pub stage_hearts: Option<HashMap<String, u32>>,
+    pub stage_hearts: Option<HashMap<String, u8>>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -282,7 +282,7 @@ impl RevealedCardDisplay {
 
 #[derive(Serialize, Deserialize)]
 pub struct GameStateDisplay {
-    pub turn: u32,
+    pub turn: u8,
     pub phase: String,
     #[serde(default)]
     pub active_player: String,
@@ -317,11 +317,11 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub turn_order_changed: bool,
     #[serde(default)]
-    pub baton_touch_count: u32,
+    pub baton_touch_count: u8,
     #[serde(default)]
     pub baton_touch_zero_cost: bool,
     #[serde(default)]
-    pub baton_touch_replaced_member_cost: Option<u32>,
+    pub baton_touch_replaced_member_cost: Option<u8>,
     #[serde(default)]
     pub baton_touch_replaced_member_id: Option<i16>,
     #[serde(default)]
@@ -384,23 +384,23 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub self_no_excess_heart_this_turn: bool,
     #[serde(default)]
-    pub opponent_live_surplus_count: u32,
+    pub opponent_live_surplus_count: u8,
     #[serde(default)]
-    pub self_live_surplus_count: u32,
+    pub self_live_surplus_count: u8,
     #[serde(default)]
     pub live_success_triggered_this_turn: bool,
     #[serde(default)]
     pub live_surplus_ready_this_turn: bool,
     #[serde(default)]
-    pub cheer_checks_required: u32,
+    pub cheer_checks_required: u8,
     #[serde(default)]
-    pub cheer_checks_done: u32,
+    pub cheer_checks_done: u8,
     #[serde(default)]
     pub turn_limited_abilities_used: Vec<String>,
     #[serde(default)]
-    pub auto_ability_trigger_counts: HashMap<String, u32>,
+    pub auto_ability_trigger_counts: HashMap<String, u8>,
     #[serde(default)]
-    pub turn_limit_usage: HashMap<String, u32>,
+    pub turn_limit_usage: HashMap<String, u8>,
     #[serde(default)]
     pub non_stackable_effects: Vec<String>,
     #[serde(default)]
@@ -453,11 +453,11 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub turn1_abilities_played: Vec<String>,
     #[serde(default)]
-    pub turn2_abilities_played: HashMap<String, u32>,
+    pub turn2_abilities_played: HashMap<String, u8>,
     #[serde(default)]
-    pub card_instance_mapping: HashMap<String, u32>,
+    pub card_instance_mapping: HashMap<String, u8>,
     #[serde(default)]
-    pub card_instance_counter: u32,
+    pub card_instance_counter: u8,
 
     // Move Tracking
     #[serde(default)]
@@ -471,13 +471,13 @@ pub struct GameStateDisplay {
 
     // Live/Cheer
     #[serde(default)]
-    pub live_cheer_count: u32,
+    pub live_cheer_count: u8,
     #[serde(default)]
     pub cheer_check_completed: bool,
     #[serde(default)]
-    pub player1_cheer_blade_heart_count: u32,
+    pub player1_cheer_blade_heart_count: u8,
     #[serde(default)]
-    pub player2_cheer_blade_heart_count: u32,
+    pub player2_cheer_blade_heart_count: u8,
     #[serde(default)]
     pub player1_cheer_revealed_cards: Vec<i16>,
     #[serde(default)]
@@ -511,9 +511,9 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub ability_applications: Vec<AbilityApplicationDisplay>,
     #[serde(default)]
-    pub effect_creation_counter: u32,
+    pub effect_creation_counter: u8,
     #[serde(default)]
-    pub last_state_change_wait_to_active_count: u32,
+    pub last_state_change_wait_to_active_count: u8,
 
     // GameModifiers constant* breakdown
     #[serde(default)]
@@ -533,17 +533,17 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub heart_override: HashMap<i16, [String; 2]>,
     #[serde(default)]
-    pub delayed_cannot_active: HashMap<i16, u32>,
+    pub delayed_cannot_active: HashMap<i16, u8>,
     #[serde(default)]
-    pub last_cost_discard_count: u32,
+    pub last_cost_discard_count: u8,
     #[serde(default)]
-    pub last_cost_energy_count: u32,
+    pub last_cost_energy_count: u8,
 
     // Cheer/Blade heart tracking
     #[serde(default)]
     pub mulligan_selected_indices: Vec<usize>,
     #[serde(default)]
-    pub live_success_total_score: Option<u32>,
+    pub live_success_total_score: Option<u8>,
 }
 
 pub fn card_to_display(
@@ -569,7 +569,7 @@ pub fn card_to_display(
             total_blade: if orientation == Some(Orientation::Wait) {
                 0
             } else {
-                ((card.blade as i32) + blade_modifier).max(0) as u32
+                ((card.blade as i32) + blade_modifier).max(0) as u8
             },
             id: card_id,
             ability_text: Some(card.ability_text().to_string()),
@@ -662,9 +662,9 @@ pub fn card_to_display_full(
             }
         }
         let total_blade = if blade_set != 0 {
-            (blade_set + blade_additive).max(0) as u32
+            (blade_set + blade_additive).max(0) as u8
         } else {
-            ((card.blade as i32) + blade_additive).max(0) as u32
+            ((card.blade as i32) + blade_additive).max(0) as u8
         };
         let transform_str = heart_transform.map(|hc| hc.as_str().to_string());
         CardDisplay {
@@ -928,7 +928,7 @@ pub fn player_to_display(
     let waitroom_display = zone_to_display(&player.waitroom.cards, card_db);
 
     // Calculate total hearts including modifiers (7 elements: heart00-heart06)
-    let mut total_hearts = vec![0u32; 8];
+    let mut total_hearts = vec![0u8; 8];
 
     // Add base hearts from stage cards (accounting for heart_color_multiplier transforms)
     for &card_id in &player.stage.stage {
@@ -940,7 +940,7 @@ pub fn player_to_display(
                 if let Some(&override_color) = heart_color_multiplier.get(&card_id) {
                     // Heart transform: sum all base hearts into the override color
                     if let Some(idx) = heart_color_index(&override_color) {
-                        let total: u32 = base_heart.hearts.values_sum();
+                        let total: u8 = base_heart.hearts.values_sum();
                         total_hearts[idx] += total;
                     }
                 } else {
@@ -960,7 +960,7 @@ pub fn player_to_display(
             if let Some(card_heart_modifiers) = heart_modifiers.get(&card_id) {
                 for (color, modifier) in card_heart_modifiers {
                     if let Some(index) = heart_color_index(color) {
-                        total_hearts[index] = (total_hearts[index] as i32 + modifier).max(0) as u32;
+                        total_hearts[index] = (total_hearts[index] as i32 + modifier).max(0) as u8;
                     }
                 }
             }
@@ -968,7 +968,7 @@ pub fn player_to_display(
     }
 
     // Compute live_need_hearts: sum of need_heart from cards in live_card_zone
-    let mut live_need_hearts = vec![0u32; 8];
+    let mut live_need_hearts = vec![0u8; 8];
     for &cid in &player.live_card_zone.cards {
         if let Some(card) = card_db.get_card(cid) {
             if let Some(ref need) = card.need_heart {
@@ -986,14 +986,14 @@ pub fn player_to_display(
         if player.live_card_zone.cards.contains(&cid) {
             for (color, &val) in colors {
                 if let Some(idx) = heart_color_index(color) {
-                    live_need_hearts[idx] = (live_need_hearts[idx] as i32 + val).max(0) as u32;
+                    live_need_hearts[idx] = (live_need_hearts[idx] as i32 + val).max(0) as u8;
                 }
             }
         }
     }
 
     // Compute selected_need_hearts: sum of need_heart from selected hand cards (preview)
-    let mut selected_need_hearts = vec![0u32; 8];
+    let mut selected_need_hearts = vec![0u8; 8];
     if let Some(selected) = live_card_selection {
         for &idx in selected {
             if idx < player.hand.cards.len() {
@@ -1012,7 +1012,7 @@ pub fn player_to_display(
                     for (color, &val) in colors {
                         if let Some(ci) = heart_color_index(color) {
                             selected_need_hearts[ci] =
-                                (selected_need_hearts[ci] as i32 + val).max(0) as u32;
+                                (selected_need_hearts[ci] as i32 + val).max(0) as u8;
                         }
                     }
                 }
@@ -1026,32 +1026,26 @@ pub fn player_to_display(
         if let Some(card) = card_db.get_card(cid) {
             let base = card.score.unwrap_or(0);
             let bonus = score_modifiers.get(&cid).copied().unwrap_or(0);
-            live_card_scores.insert(
-                card.card_no.to_string(),
-                (base as i32 + bonus).max(0) as u32,
-            );
+            live_card_scores.insert(card.card_no.to_string(), (base as i32 + bonus).max(0) as u8);
         }
     }
     for &cid in &player.success_live_card_zone.cards {
         if let Some(card) = card_db.get_card(cid) {
             let base = card.score.unwrap_or(0);
             let bonus = score_modifiers.get(&cid).copied().unwrap_or(0);
-            live_card_scores.insert(
-                card.card_no.to_string(),
-                (base as i32 + bonus).max(0) as u32,
-            );
+            live_card_scores.insert(card.card_no.to_string(), (base as i32 + bonus).max(0) as u8);
         }
     }
 
     // Compute current_score: sum of stage member base scores + all score modifiers
-    let mut current_score = 0u32;
+    let mut current_score = 0u8;
     for &cid in &player.stage.stage {
         if let Some(card) = card_db.get_card(cid) {
-            current_score += card.score.unwrap_or(0) as u32;
+            current_score += card.score.unwrap_or(0) as u8;
         }
     }
     for (_, &val) in score_modifiers {
-        current_score = (current_score as i32 + val).max(0) as u32;
+        current_score = (current_score as i32 + val).max(0) as u8;
     }
 
     // Collect gained abilities for this player's cards
@@ -1552,7 +1546,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         })
         .collect();
 
-    // Live owned hearts: HashMap<String, Vec<(String, u32)>> -> HashMap<String, Vec<[String; 2]>>
+    // Live owned hearts: HashMap<String, Vec<(String, u8)>> -> HashMap<String, Vec<[String; 2]>>
     let live_owned: HashMap<String, Vec<[String; 2]>> = game_state
         .live_owned_hearts
         .iter()
@@ -1573,8 +1567,8 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .map(|(cid, map)| (*cid, map.clone()))
         .collect();
 
-    // Delayed cannot active: HashMap<i16, u32>
-    let delayed_cannot: HashMap<i16, u32> = game_state.mods.delayed_cannot_active.clone();
+    // Delayed cannot active: HashMap<i16, u8>
+    let delayed_cannot: HashMap<i16, u8> = game_state.mods.delayed_cannot_active.clone();
 
     // Last vacated stage area
     let last_vacated = game_state.last_vacated_stage_area.map(|idx| match idx {

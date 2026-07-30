@@ -23,9 +23,9 @@ pub(crate) struct SelectionContext {
     pub count: usize,
     pub allow_skip: bool,
     pub indices: Vec<usize>,
-    pub cost_limit: Option<u32>,
+    pub cost_limit: Option<u8>,
     pub cost_limit_operator: Option<String>,
-    pub cost_total: Option<u32>,
+    pub cost_total: Option<u8>,
     pub cost_total_operator: Option<String>,
     pub group: Option<String>,
     pub characters: Option<Vec<String>>,
@@ -378,7 +378,7 @@ impl super::resolver::AbilityResolver {
             | (
                 Some(Choice::SelectHeartType { count, .. }),
                 ChoiceResult::HeartTypeSelected { types: colors },
-            ) => self.handle_heart_selection(gs, *count as u32, &colors),
+            ) => self.handle_heart_selection(gs, *count as u8, &colors),
             _ => Err("Choice result does not match pending choice".to_string()),
         }
     }
@@ -393,9 +393,9 @@ impl super::resolver::AbilityResolver {
         allow_skip: bool,
         indices: &[usize],
         context: ExecutionContext,
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         cost_limit_operator: Option<String>,
-        cost_total: Option<u32>,
+        cost_total: Option<u8>,
         cost_total_operator: Option<String>,
         group: Option<String>,
         characters: Option<Vec<String>>,
@@ -473,7 +473,7 @@ impl super::resolver::AbilityResolver {
                          skip: bool,
                          fi: Option<Vec<usize>>,
                          tpid: Option<String>,
-                         ct: Option<u32>,
+                         ct: Option<u8>,
                          cto: Option<String>|
          -> ChoiceBuilder {
             Choice::select_cards(zone, count, desc, skip)
@@ -535,7 +535,7 @@ impl super::resolver::AbilityResolver {
                     None,
                     &card_db,
                 );
-                gs.mods.last_cost_discard_count += new_card_ids.len() as u32;
+                gs.mods.last_cost_discard_count += new_card_ids.len() as u8;
                 gs.mods
                     .last_cost_moved_card_ids
                     .extend(new_card_ids.iter().copied());
@@ -554,7 +554,7 @@ impl super::resolver::AbilityResolver {
             if new_card_ids.is_empty() {
                 if !self.moved_cards.is_empty() {
                     log::debug!("[KANAN_DEBUG] cost finalize: moved_cards={:?}, setting optional_cost_result=true", self.moved_cards);
-                    gs.mods.last_cost_discard_count = self.moved_cards.len() as u32;
+                    gs.mods.last_cost_discard_count = self.moved_cards.len() as u8;
                     gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
                     gs.recently_moved_cards = Some(self.moved_cards.clone());
                     gs.recently_moved_from_zone = Some("hand".to_string());
@@ -736,7 +736,7 @@ impl super::resolver::AbilityResolver {
                 self.moved_cards.len()
             );
             self.pay_deferred_costs(gs)?;
-            let final_count = self.moved_cards.len() as u32;
+            let final_count = self.moved_cards.len() as u8;
             gs.mods.last_cost_discard_count = final_count;
             gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
             gs.recently_moved_cards = Some(self.moved_cards.clone());
@@ -754,7 +754,7 @@ impl super::resolver::AbilityResolver {
                 let player =
                     gs.resolve_target_player_mut(target_player_id.as_deref().unwrap_or("self"));
                 player.energy_zone.pay_energy(count_paid)?;
-                gs.mods.last_cost_energy_count += count_paid as u32;
+                gs.mods.last_cost_energy_count += count_paid as u8;
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.cost_paid = true;
                     entry.optional_cost_result = Some(true);
@@ -1013,7 +1013,7 @@ impl super::resolver::AbilityResolver {
         skip: bool,
         fi: Option<Vec<usize>>,
         tpid: Option<String>,
-        ct: Option<u32>,
+        ct: Option<u8>,
         cto: Option<String>,
     ) -> ChoiceBuilder {
         Choice::select_cards(zone, count, desc, skip)
@@ -1784,8 +1784,8 @@ impl super::resolver::AbilityResolver {
         gs: &GameState,
         ctx: &SelectionContext,
         waitroom_cards: &[i16],
-    ) -> (Option<u32>, Vec<usize>) {
-        let spent: u32 = self
+    ) -> (Option<u8>, Vec<usize>) {
+        let spent: u8 = self
             .selected_cards
             .iter()
             .filter_map(|&cid| gs.card_database.get_card(cid).and_then(|c| c.cost))
@@ -2303,7 +2303,7 @@ impl super::resolver::AbilityResolver {
             if count > 0 {
                 crate::ability::effects::draw_cards_for_player(
                     player,
-                    count as u32,
+                    count as u8,
                     source,
                     destination,
                     card_type,
@@ -2747,7 +2747,7 @@ impl super::resolver::AbilityResolver {
             } => {
                 // Consume use_limit for optional effects BEFORE the mutable
                 // player borrow, to avoid borrow conflicts with gs.
-                let mut use_limit_key: Option<(i16, usize, u32)> = None;
+                let mut use_limit_key: Option<(i16, usize, u8)> = None;
                 if selected != "skip" {
                     if let Some(entry) = gs.ability_queue.current_entry() {
                         let is_optional = entry
@@ -3061,7 +3061,7 @@ impl super::resolver::AbilityResolver {
     fn handle_heart_selection(
         &mut self,
         gs: &mut GameState,
-        count: u32,
+        count: u8,
         colors: &[String],
     ) -> Result<(), String> {
         if let Some(chosen) = colors.first() {

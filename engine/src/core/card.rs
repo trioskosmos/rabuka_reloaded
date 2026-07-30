@@ -165,13 +165,13 @@ pub enum Keyword {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeartIcon {
     pub color: HeartColor,
-    pub count: u32,
+    pub count: u8,
 }
 
 /// Efficient map of HeartColor→u32, backed by SmallVec (1-4 entries typical).
 /// Serializes/deserializes as a flat JSON object (e.g. `{"heart01": 1, "heart03": 1}`).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HeartMap(SmallVec<[(HeartColor, u32); 4]>);
+pub struct HeartMap(SmallVec<[(HeartColor, u8); 4]>);
 
 impl HeartMap {
     pub fn new() -> Self {
@@ -183,19 +183,19 @@ impl HeartMap {
     pub fn len(&self) -> usize {
         self.0.len()
     }
-    pub fn values_sum(&self) -> u32 {
+    pub fn values_sum(&self) -> u8 {
         self.0.iter().map(|(_, v)| v).sum()
     }
-    pub fn get(&self, color: &HeartColor) -> Option<&u32> {
+    pub fn get(&self, color: &HeartColor) -> Option<&u8> {
         self.0.iter().find(|(c, _)| c == color).map(|(_, v)| v)
     }
-    pub fn get_mut(&mut self, color: &HeartColor) -> Option<&mut u32> {
+    pub fn get_mut(&mut self, color: &HeartColor) -> Option<&mut u8> {
         self.0.iter_mut().find(|(c, _)| c == color).map(|(_, v)| v)
     }
     pub fn contains_key(&self, color: &HeartColor) -> bool {
         self.0.iter().any(|(c, _)| c == color)
     }
-    pub fn insert(&mut self, color: HeartColor, val: u32) {
+    pub fn insert(&mut self, color: HeartColor, val: u8) {
         if let Some((_, v)) = self.0.iter_mut().find(|(c, _)| *c == color) {
             *v = val;
         } else {
@@ -208,7 +208,7 @@ impl HeartMap {
     pub fn clear(&mut self) {
         self.0.clear();
     }
-    pub fn entry_or_default(&mut self, color: HeartColor) -> &mut u32 {
+    pub fn entry_or_default(&mut self, color: HeartColor) -> &mut u8 {
         let idx = self.0.iter().position(|(c, _)| c == &color);
         if let Some(i) = idx {
             &mut self.0[i].1
@@ -217,40 +217,40 @@ impl HeartMap {
             &mut self.0.last_mut().unwrap().1
         }
     }
-    pub fn iter(&self) -> impl Iterator<Item = &(HeartColor, u32)> {
+    pub fn iter(&self) -> impl Iterator<Item = &(HeartColor, u8)> {
         self.0.iter()
     }
     pub fn keys(&self) -> impl Iterator<Item = &HeartColor> {
         self.0.iter().map(|(c, _)| c)
     }
-    pub fn values(&self) -> impl Iterator<Item = &u32> {
+    pub fn values(&self) -> impl Iterator<Item = &u8> {
         self.0.iter().map(|(_, v)| v)
     }
 }
 
 impl core::ops::Index<&HeartColor> for HeartMap {
-    type Output = u32;
-    fn index(&self, color: &HeartColor) -> &u32 {
+    type Output = u8;
+    fn index(&self, color: &HeartColor) -> &u8 {
         self.get(color).unwrap_or(&0)
     }
 }
 
 impl core::ops::IndexMut<&HeartColor> for HeartMap {
-    fn index_mut(&mut self, color: &HeartColor) -> &mut u32 {
+    fn index_mut(&mut self, color: &HeartColor) -> &mut u8 {
         self.entry_or_default(*color)
     }
 }
 
 impl<'a> IntoIterator for &'a HeartMap {
-    type Item = &'a (HeartColor, u32);
-    type IntoIter = core::slice::Iter<'a, (HeartColor, u32)>;
+    type Item = &'a (HeartColor, u8);
+    type IntoIter = core::slice::Iter<'a, (HeartColor, u8)>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
     }
 }
 
-impl From<HashMap<HeartColor, u32>> for HeartMap {
-    fn from(map: HashMap<HeartColor, u32>) -> Self {
+impl From<HashMap<HeartColor, u8>> for HeartMap {
+    fn from(map: HashMap<HeartColor, u8>) -> Self {
         HeartMap(map.into_iter().collect())
     }
 }
@@ -283,7 +283,7 @@ impl<'de> Deserialize<'de> for HeartMap {
         let hearts = raw
             .hearts
             .into_iter()
-            .map(|(k, v)| (parse_heart_color(&k), v))
+            .map(|(k, v)| (parse_heart_color(&k), v as u8))
             .collect();
         Ok(HeartMap(hearts))
     }
@@ -317,11 +317,11 @@ pub struct Card {
     #[serde(default = "default_group_from_series")]
     pub group: Box<str>,
     pub unit: Option<ArcStr>,
-    pub cost: Option<u32>,
+    pub cost: Option<u8>,
     pub base_heart: Option<BaseHeart>,
     pub blade_heart: Option<BladeHeart>,
     #[serde(default = "default_blade")]
-    pub blade: u32,
+    pub blade: u8,
     #[cfg(not(feature = "compact_cards"))]
     #[serde(default)]
     pub rare: Box<str>,
@@ -332,7 +332,7 @@ pub struct Card {
     #[serde(default)]
     pub faq: Vec<FAQEntry>,
     // Live card fields
-    pub score: Option<u32>,
+    pub score: Option<u8>,
     pub need_heart: Option<BaseHeart>,
     pub special_heart: Option<SpecialHeart>,
     // Parsed abilities from abilities.json
@@ -518,11 +518,11 @@ impl<'de> Deserialize<'de> for Card {
             #[serde(default)]
             pub series: String,
             pub unit: Option<ArcStr>,
-            pub cost: Option<u32>,
+            pub cost: Option<u8>,
             pub base_heart: Option<BaseHeart>,
             pub blade_heart: Option<BladeHeart>,
             #[serde(default = "default_blade")]
-            pub blade: u32,
+            pub blade: u8,
             #[cfg(not(feature = "compact_cards"))]
             #[serde(default)]
             pub rare: String,
@@ -532,7 +532,7 @@ impl<'de> Deserialize<'de> for Card {
             #[cfg(not(feature = "compact_cards"))]
             #[serde(default)]
             pub faq: Vec<FAQEntry>,
-            pub score: Option<u32>,
+            pub score: Option<u8>,
             pub need_heart: Option<BaseHeart>,
             pub special_heart: Option<SpecialHeart>,
         }
@@ -580,7 +580,7 @@ fn map_series_to_group(series: &str) -> Box<str> {
     }
 }
 
-fn default_blade() -> u32 {
+fn default_blade() -> u8 {
     0
 }
 
@@ -601,7 +601,7 @@ pub struct Ability {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub triggerless_text: Option<String>,
     pub triggers: Option<ArcStr>,
-    pub use_limit: Option<u32>,
+    pub use_limit: Option<u8>,
     #[serde(default)]
     pub is_null: bool,
     pub cost: Option<Box<AbilityCost>>,
@@ -756,11 +756,11 @@ pub enum EffectKind {
         #[serde(default)]
         destination: Option<ArcStr>,
         #[serde(default)]
-        count: Option<u32>,
+        count: Option<u8>,
         #[serde(default, with = "opt_card_type")]
         card_type: Option<CardType>,
         #[serde(default)]
-        target_count: Option<u32>,
+        target_count: Option<u8>,
         #[serde(default)]
         characters: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -770,13 +770,13 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         #[serde(default)]
         cost_limit_operator: Option<Operator>,
         #[serde(default)]
-        cost_limit_min: Option<u32>,
+        cost_limit_min: Option<u8>,
         #[serde(default)]
-        cost_limit_max: Option<u32>,
+        cost_limit_max: Option<u8>,
         #[serde(default)]
         card_names: Box<Vec<String>>,
         #[serde(default)]
@@ -826,7 +826,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_group: Option<bool>,
         #[serde(default)]
-        per_group_count: Option<u32>,
+        per_group_count: Option<u8>,
         #[serde(default)]
         state: Option<Box<EffectState>>,
         #[serde(default)]
@@ -840,11 +840,11 @@ pub enum EffectKind {
         #[serde(default)]
         filter_targets_by_heart_colors: Option<bool>,
         #[serde(default)]
-        cost_total: Option<u32>,
+        cost_total: Option<u8>,
         #[serde(default)]
         cost_total_operator: Option<Operator>,
         #[serde(default)]
-        need_heart_total: Option<u32>,
+        need_heart_total: Option<u8>,
         #[serde(default)]
         need_heart_operator: Option<Operator>,
         #[serde(default)]
@@ -864,11 +864,11 @@ pub enum EffectKind {
         #[serde(default)]
         cost_reference: Option<ArcStr>,
         #[serde(default)]
-        cost_offset: Option<i32>,
+        cost_offset: Option<i8>,
         #[serde(default)]
         all: Option<bool>,
         #[serde(default)]
-        energy_count: Option<u32>,
+        energy_count: Option<u8>,
         #[serde(default)]
         heart_colors: Box<Vec<String>>,
         #[serde(default)]
@@ -895,9 +895,9 @@ pub enum EffectKind {
         #[serde(default)]
         destination: Option<ArcStr>,
         #[serde(default)]
-        target_count: Option<u32>,
+        target_count: Option<u8>,
         #[serde(default)]
-        count: Option<u32>,
+        count: Option<u8>,
         #[serde(default, with = "opt_card_type")]
         card_type: Option<CardType>,
         #[serde(default)]
@@ -911,7 +911,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit: Option<bool>,
         #[serde(default)]
-        per_unit_count: Option<u32>,
+        per_unit_count: Option<u8>,
         #[serde(default)]
         per_unit_type: Option<ArcStr>,
         #[serde(default)]
@@ -944,7 +944,7 @@ pub enum EffectKind {
         #[serde(default)]
         destination: Option<ArcStr>,
         #[serde(default)]
-        target_count: Option<u32>,
+        target_count: Option<u8>,
         #[serde(default, with = "opt_card_type")]
         card_type: Option<CardType>,
         #[serde(default)]
@@ -956,13 +956,13 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         #[serde(default)]
         cost_limit_operator: Option<Operator>,
         #[serde(default)]
-        cost_limit_min: Option<u32>,
+        cost_limit_min: Option<u8>,
         #[serde(default)]
-        cost_limit_max: Option<u32>,
+        cost_limit_max: Option<u8>,
         #[serde(default)]
         card_names: Box<Vec<String>>,
         #[serde(default)]
@@ -994,7 +994,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit: Option<bool>,
         #[serde(default)]
-        per_unit_count: Option<u32>,
+        per_unit_count: Option<u8>,
         #[serde(default)]
         per_unit_type: Option<ArcStr>,
         #[serde(default)]
@@ -1028,7 +1028,7 @@ pub enum EffectKind {
         #[serde(default)]
         heart_colors: Box<Vec<String>>,
         #[serde(default)]
-        cost_total: Option<u32>,
+        cost_total: Option<u8>,
         #[serde(default)]
         cost_total_operator: Option<Operator>,
         #[serde(default)]
@@ -1038,13 +1038,13 @@ pub enum EffectKind {
         #[serde(default)]
         require_all_heart_colors: Option<bool>,
         #[serde(default)]
-        heart_color_count: Option<u32>,
+        heart_color_count: Option<u8>,
         #[serde(default)]
         options: Option<Box<Vec<Box<AbilityEffect>>>>,
         #[serde(default)]
         per_group: Option<bool>,
         #[serde(default)]
-        per_group_count: Option<u32>,
+        per_group_count: Option<u8>,
         #[serde(default)]
         reveal: Option<bool>,
         #[serde(default)]
@@ -1075,13 +1075,13 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         #[serde(default)]
         cost_limit_operator: Option<Operator>,
         #[serde(default)]
-        cost_limit_min: Option<u32>,
+        cost_limit_min: Option<u8>,
         #[serde(default)]
-        cost_limit_max: Option<u32>,
+        cost_limit_max: Option<u8>,
         #[serde(default)]
         card_names: Box<Vec<String>>,
         #[serde(default)]
@@ -1109,7 +1109,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit: Option<bool>,
         #[serde(default)]
-        per_unit_count: Option<u32>,
+        per_unit_count: Option<u8>,
         #[serde(default)]
         per_unit_type: Option<ArcStr>,
         #[serde(default)]
@@ -1149,7 +1149,7 @@ pub enum EffectKind {
         #[serde(default)]
         require_all_heart_colors: Option<bool>,
         #[serde(default)]
-        heart_color_count: Option<u32>,
+        heart_color_count: Option<u8>,
         #[serde(default)]
         same_name: Option<bool>,
         #[serde(default)]
@@ -1166,7 +1166,7 @@ pub enum EffectKind {
         #[serde(default)]
         operation: Option<ArcStr>,
         #[serde(default)]
-        value: Option<u32>,
+        value: Option<u8>,
         #[serde(default)]
         duration: Option<ArcStr>,
         #[serde(default, with = "opt_card_type")]
@@ -1176,7 +1176,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit: Option<bool>,
         #[serde(default)]
-        per_unit_count: Option<u32>,
+        per_unit_count: Option<u8>,
         #[serde(default)]
         per_unit_type: Option<ArcStr>,
         #[serde(default)]
@@ -1194,13 +1194,13 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_self: Option<bool>,
         #[serde(default)]
-        target_count: Option<u32>,
+        target_count: Option<u8>,
         #[serde(default)]
-        repeat_limit: Option<u32>,
+        repeat_limit: Option<u8>,
         #[serde(default)]
         filter_targets_by_heart_colors: Option<bool>,
         #[serde(default)]
-        cost_total: Option<u32>,
+        cost_total: Option<u8>,
         #[serde(default)]
         cost_total_operator: Option<Operator>,
         #[serde(default)]
@@ -1218,11 +1218,11 @@ pub enum EffectKind {
         #[serde(default)]
         negation: Option<bool>,
         #[serde(default)]
-        max_repeats: Option<u32>,
+        max_repeats: Option<u8>,
         #[serde(default)]
         need_heart_operator: Option<Operator>,
         #[serde(default)]
-        need_heart_total: Option<u32>,
+        need_heart_total: Option<u8>,
         #[serde(default)]
         same_name: Option<bool>,
         #[serde(default)]
@@ -1233,7 +1233,7 @@ pub enum EffectKind {
         #[serde(default)]
         operation: Option<ArcStr>,
         #[serde(default)]
-        value: Option<u32>,
+        value: Option<u8>,
         #[serde(default)]
         duration: Option<ArcStr>,
         #[serde(default)]
@@ -1243,7 +1243,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit: Option<bool>,
         #[serde(default)]
-        per_unit_count: Option<u32>,
+        per_unit_count: Option<u8>,
         #[serde(default)]
         per_unit_heart_colors: Box<Vec<String>>,
         #[serde(default)]
@@ -1253,7 +1253,7 @@ pub enum EffectKind {
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
-        original_count: Option<u32>,
+        original_count: Option<u8>,
         #[serde(default)]
         original_operator: Option<Operator>,
         #[serde(default)]
@@ -1263,15 +1263,15 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_heart_colors: Option<Box<Vec<String>>>,
         #[serde(default)]
-        repeat_limit: Option<u32>,
+        repeat_limit: Option<u8>,
         #[serde(default, with = "opt_card_type")]
         card_type: Option<CardType>,
         #[serde(default)]
-        target_count: Option<u32>,
+        target_count: Option<u8>,
         #[serde(default)]
         filter_targets_by_heart_colors: Option<bool>,
         #[serde(default)]
-        cost_total: Option<u32>,
+        cost_total: Option<u8>,
         #[serde(default)]
         cost_total_operator: Option<Operator>,
         #[serde(default)]
@@ -1306,9 +1306,9 @@ pub enum EffectKind {
         #[serde(default)]
         operation: Option<ArcStr>,
         #[serde(default)]
-        value: Option<u32>,
+        value: Option<u8>,
         #[serde(default, alias = "energy")]
-        energy_count: Option<u32>,
+        energy_count: Option<u8>,
         #[serde(default)]
         dynamic_count: Option<Box<DynamicCount>>,
         #[serde(default)]
@@ -1322,7 +1322,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit: Option<bool>,
         #[serde(default)]
-        per_unit_count: Option<u32>,
+        per_unit_count: Option<u8>,
         #[serde(default)]
         per_unit_type: Option<ArcStr>,
         #[serde(default)]
@@ -1336,7 +1336,7 @@ pub enum EffectKind {
         #[serde(default, with = "opt_card_type")]
         card_type: Option<CardType>,
         #[serde(default)]
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         #[serde(default)]
         cost_limit_operator: Option<Operator>,
         #[serde(default)]
@@ -1364,7 +1364,7 @@ pub enum EffectKind {
         #[serde(default)]
         heart_type: Option<ArcStr>,
         #[serde(default)]
-        target_count: Option<u32>,
+        target_count: Option<u8>,
         #[serde(default)]
         all: Option<bool>,
         #[serde(default)]
@@ -1386,13 +1386,13 @@ pub enum EffectKind {
         #[serde(default)]
         multiple_targets: Option<bool>,
         #[serde(default, alias = "max_repeats")]
-        repeat_limit: Option<u32>,
+        repeat_limit: Option<u8>,
         #[serde(default)]
         timing_condition: Option<ArcStr>,
         #[serde(default)]
         require_all_heart_colors: Option<bool>,
         #[serde(default)]
-        heart_color_count: Option<u32>,
+        heart_color_count: Option<u8>,
         #[serde(default)]
         same_unit_name: Option<bool>,
     },
@@ -1409,7 +1409,7 @@ pub enum EffectKind {
         #[serde(default, with = "opt_card_type")]
         card_type: Option<CardType>,
         #[serde(default)]
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         #[serde(default)]
         cost_limit_operator: Option<Operator>,
         #[serde(default)]
@@ -1427,13 +1427,13 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
-        blade_limit: Option<u32>,
+        blade_limit: Option<u8>,
         #[serde(default)]
         blade_limit_operator: Option<Operator>,
         #[serde(default)]
         per_unit: Option<bool>,
         #[serde(default)]
-        per_unit_count: Option<u32>,
+        per_unit_count: Option<u8>,
         #[serde(default)]
         per_unit_type: Option<ArcStr>,
         #[serde(default)]
@@ -1457,7 +1457,7 @@ pub enum EffectKind {
         #[serde(default)]
         negation: Option<bool>,
         #[serde(default)]
-        cost_total: Option<u32>,
+        cost_total: Option<u8>,
         #[serde(default)]
         cost_total_operator: Option<Operator>,
         #[serde(default)]
@@ -1532,7 +1532,7 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_characters: Option<Box<Vec<String>>>,
         #[serde(default)]
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         #[serde(default)]
         cost_limit_operator: Option<Operator>,
         #[serde(default)]
@@ -1550,7 +1550,7 @@ pub enum EffectKind {
         #[serde(default)]
         effect_type: Option<ArcStr>,
         #[serde(default)]
-        use_limit: Option<u32>,
+        use_limit: Option<u8>,
         #[serde(default)]
         triggers: Option<ArcStr>,
         #[serde(default)]
@@ -1579,7 +1579,7 @@ pub enum EffectKind {
         #[serde(default)]
         destination: Option<ArcStr>,
         #[serde(default, alias = "max_repeats")]
-        repeat_limit: Option<u32>,
+        repeat_limit: Option<u8>,
         #[serde(default)]
         options: Option<Box<Vec<Box<AbilityEffect>>>>,
         #[serde(default)]
@@ -1597,7 +1597,7 @@ pub enum EffectKind {
         #[serde(default)]
         optional: Option<bool>,
         #[serde(default)]
-        target_count: Option<u32>,
+        target_count: Option<u8>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1629,7 +1629,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit: Option<bool>,
         #[serde(default)]
-        per_unit_count: Option<u32>,
+        per_unit_count: Option<u8>,
         #[serde(default)]
         per_unit_type: Option<ArcStr>,
         #[serde(default)]
@@ -1727,11 +1727,11 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_characters: Option<Box<Vec<String>>>,
         #[serde(default)]
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         #[serde(default)]
         cost_limit_operator: Option<Operator>,
         #[serde(default)]
-        energy_count: Option<u32>,
+        energy_count: Option<u8>,
         #[serde(default)]
         dynamic_count: Option<Box<DynamicCount>>,
         #[serde(default)]
@@ -1766,7 +1766,7 @@ pub enum EffectKind {
         #[serde(default)]
         operation: Option<Box<ArcStr>>,
         #[serde(default)]
-        value: Option<u32>,
+        value: Option<u8>,
         #[serde(default, with = "opt_card_type")]
         card_type: Option<CardType>,
         #[serde(default)]
@@ -1778,7 +1778,7 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_characters: Option<Box<Vec<String>>>,
         #[serde(default)]
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         #[serde(default)]
         cost_limit_operator: Option<Operator>,
         #[serde(default)]
@@ -1806,7 +1806,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit: Option<bool>,
         #[serde(default)]
-        per_unit_count: Option<u32>,
+        per_unit_count: Option<u8>,
         #[serde(default)]
         per_unit_type: Option<Box<ArcStr>>,
         #[serde(default)]
@@ -1814,7 +1814,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_location: Option<Box<ArcStr>>,
         #[serde(default)]
-        repeat_limit: Option<u32>,
+        repeat_limit: Option<u8>,
         #[serde(default)]
         identities: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1828,13 +1828,13 @@ pub enum EffectKind {
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
-        original_count: Option<u32>,
+        original_count: Option<u8>,
         #[serde(default)]
         original_operator: Option<Operator>,
         #[serde(default)]
-        original_cost: Option<u32>,
+        original_cost: Option<u8>,
         #[serde(default)]
-        blade_limit: Option<u32>,
+        blade_limit: Option<u8>,
         #[serde(default)]
         blade_limit_operator: Option<Operator>,
         #[serde(default)]
@@ -1842,7 +1842,7 @@ pub enum EffectKind {
         #[serde(default)]
         activation_position: Option<Box<ArcStr>>,
         #[serde(default)]
-        target_count: Option<u32>,
+        target_count: Option<u8>,
         #[serde(default)]
         group_reference: Option<Box<ArcStr>>,
         #[serde(default)]
@@ -1856,17 +1856,17 @@ pub enum EffectKind {
         #[serde(default)]
         per_group: Option<bool>,
         #[serde(default)]
-        per_group_count: Option<u32>,
+        per_group_count: Option<u8>,
         #[serde(default)]
-        resource_icon_count: Option<u32>,
+        resource_icon_count: Option<u8>,
         #[serde(default)]
-        cost_total: Option<u32>,
+        cost_total: Option<u8>,
         #[serde(default)]
         cost_total_operator: Option<Operator>,
         #[serde(default)]
         cost_reference: Option<Box<ArcStr>>,
         #[serde(default)]
-        cost_offset: Option<i32>,
+        cost_offset: Option<i8>,
         #[serde(default)]
         blind: Option<bool>,
         #[serde(default)]
@@ -1876,17 +1876,17 @@ pub enum EffectKind {
         #[serde(default)]
         sign: Option<Box<ArcStr>>,
         #[serde(default)]
-        heart_color_count: Option<u32>,
+        heart_color_count: Option<u8>,
         #[serde(default)]
         require_all_heart_colors: Option<bool>,
         #[serde(default)]
-        energy_count: Option<u32>,
+        energy_count: Option<u8>,
         #[serde(default)]
         placement_order: Option<PlacementOrder>,
         #[serde(default)]
         ref_value: Option<Box<ArcStr>>,
         #[serde(default)]
-        ref_offset: Option<i32>,
+        ref_offset: Option<i8>,
         #[serde(default)]
         id: Option<Box<ArcStr>>,
         #[serde(default)]
@@ -1959,7 +1959,7 @@ pub enum EffectKind {
         #[serde(default)]
         activation_condition_parsed: Option<Box<Condition>>,
         #[serde(default)]
-        use_limit: Option<u32>,
+        use_limit: Option<u8>,
         #[serde(default)]
         triggers: Option<ArcStr>,
         #[serde(default)]
@@ -1982,7 +1982,7 @@ pub struct AbilityEffect {
     #[serde(default)]
     pub destination: Option<ArcStr>,
     #[serde(default)]
-    pub count: Option<u32>,
+    pub count: Option<u8>,
     #[serde(default)]
     pub target: Option<ArcStr>,
     #[serde(default)]
@@ -2087,7 +2087,7 @@ macro_rules! str_getter {
 
 macro_rules! u32_getter {
     ($name:ident, [$($variant:ident => $field:ident),+]) => {
-        pub fn $name(&self) -> Option<u32> {
+        pub fn $name(&self) -> Option<u8> {
             match self.kind.as_deref() {
                 $(Some(EffectKind::$variant { $field, .. }) => *$field,)+
                 _ => None,
@@ -2316,7 +2316,7 @@ impl AbilityEffect {
 
     copy_getter!(cost_limit_operator_any, Operator, [MoveCards => cost_limit_operator, SelectTarget => cost_limit_operator, LookReveal => cost_limit_operator, GainResource => cost_limit_operator, ChangeState => cost_limit_operator, AbilityOp => cost_limit_operator, PositionOp => cost_limit_operator, MiscOp => cost_limit_operator]);
 
-    pub fn cost_offset_any(&self) -> Option<i32> {
+    pub fn cost_offset_any(&self) -> Option<i8> {
         match self.kind.as_deref() {
             Some(EffectKind::MoveCards { cost_offset, .. }) => *cost_offset,
             Some(EffectKind::MiscOp { cost_offset, .. }) => *cost_offset,
@@ -2617,7 +2617,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn repeat_limit_any(&self) -> Option<u32> {
+    pub fn repeat_limit_any(&self) -> Option<u8> {
         match self.kind.as_deref() {
             Some(EffectKind::ModifyScore {
                 repeat_limit,
@@ -2674,7 +2674,7 @@ impl AbilityEffect {
 
     str_getter!(destination_any, [MoveCards => destination, DrawCards => destination, SelectTarget => destination, LookReveal => destination, ChangeState => destination, PositionOp => destination, ModifyScore => destination, CompoundEffect => destination, AbilityOp => destination, MiscOp => destination]);
 
-    pub fn count_any(&self) -> Option<u32> {
+    pub fn count_any(&self) -> Option<u8> {
         let variant_count = match self.kind.as_deref() {
             Some(EffectKind::MoveCards { count, .. }) => *count,
             Some(EffectKind::DrawCards { count, .. }) => *count,
@@ -2776,12 +2776,12 @@ impl AbilityEffect {
     pub fn set_optional(&mut self, val: Option<bool>) {
         self.optional = val;
     }
-    setter!(set_energy_count, energy_count: u32 => [GainResource, PositionOp, MiscOp]);
+    setter!(set_energy_count, energy_count: u8 => [GainResource, PositionOp, MiscOp]);
     setter!(set_per_unit, per_unit: bool => [SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, MiscOp]);
-    setter!(set_per_unit_count, per_unit_count: u32 => [SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, MiscOp]);
+    setter!(set_per_unit_count, per_unit_count: u8 => [SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, MiscOp]);
     setter!(set_per_unit_type, per_unit_type: ArcStr => [SelectTarget, LookReveal, ModifyScore, GainResource, ChangeState], boxed [MiscOp]);
     setter!(set_self_target, self_target: bool => [MoveCards, SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, AbilityOp, RestrictionOp, PositionOp, MiscOp, CustomOp]);
-    setter!(set_target_count, target_count: u32 => [MoveCards, DrawCards, SelectTarget, ModifyScore, ModifyHearts, CompoundEffect, MiscOp]);
+    setter!(set_target_count, target_count: u8 => [MoveCards, DrawCards, SelectTarget, ModifyScore, ModifyHearts, CompoundEffect, MiscOp]);
     setter!(set_target_member, target_member: ArcStr => [PositionOp]);
 }
 
@@ -2830,24 +2830,18 @@ impl AbilityEffect {
     }
 
     /// Returns the count with a caller-provided default.
-    pub fn count_or(&self, n: u32) -> u32 {
+    pub fn count_or(&self, n: u8) -> u8 {
         self.count.unwrap_or(n)
+    }
+
+    pub fn value_or_count(&self, default: u8) -> u8 {
+        self.value_any().or(self.count).unwrap_or(default)
     }
 
     /// Returns the first group name, if any.
     pub fn group_name(&self) -> Option<&str> {
         self.group_names_any()
             .and_then(|gn| gn.first().map(|s| s.as_str()))
-    }
-
-    /// Returns the group_names slice, or `&[]` if absent.
-    pub fn group_names_slice(&self) -> &[String] {
-        self.group_names_any().map_or(&[], |v| v.as_slice())
-    }
-
-    /// Returns the numeric value from `value` or `count`, in that priority.
-    pub fn value_or_count(&self, default: u32) -> u32 {
-        self.value_any().or(self.count).unwrap_or(default)
     }
 
     /// Normalized sub-effect steps
@@ -2984,7 +2978,7 @@ pub struct DynamicCount {
     pub mode: Option<ArcStr>,
     pub base_reference: Option<ArcStr>,
     pub calculation: Option<ArcStr>,
-    pub calculation_value: Option<u32>,
+    pub calculation_value: Option<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -3324,7 +3318,7 @@ pub enum Condition {
         #[serde(default)]
         locations: Option<Box<Vec<String>>>,
         target: Option<ArcStr>,
-        count: Option<u32>,
+        count: Option<u8>,
         operator: Option<ArcStr>,
         card_type: Option<ConditionCardType>,
         #[serde(default)]
@@ -3345,7 +3339,7 @@ pub enum Condition {
         characters: Option<Box<Vec<String>>>,
         #[serde(default)]
         exclude_characters: Option<Box<Vec<String>>>,
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         cost_limit_operator: Option<Operator>,
         #[serde(default)]
         heart_colors: Option<Box<Vec<String>>>,
@@ -3376,7 +3370,7 @@ pub enum Condition {
         #[serde(default)]
         baton_touch_trigger: Option<bool>,
         #[serde(default)]
-        min_baton_touch_count: Option<u32>,
+        min_baton_touch_count: Option<u8>,
     },
     #[serde(
         rename = "comparison_condition",
@@ -3399,9 +3393,9 @@ pub enum Condition {
         target: Option<ArcStr>,
         location: Option<ArcStr>,
         operator: Option<ArcStr>,
-        count: Option<u32>,
+        count: Option<u8>,
         #[serde(default)]
-        values: Option<Box<Vec<u32>>>,
+        values: Option<Box<Vec<u8>>>,
         card_type: Option<ConditionCardType>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
@@ -3413,12 +3407,12 @@ pub enum Condition {
         heart_colors: Option<Box<Vec<String>>>,
         #[serde(default)]
         scope: Option<ArcStr>,
-        cost_total: Option<u32>,
+        cost_total: Option<u8>,
         cost_total_operator: Option<Operator>,
         resource_type: Option<ArcStr>,
         #[serde(default)]
         delta: Option<bool>,
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         source: Option<ArcStr>,
         #[serde(default)]
         comparison_source: Option<ArcStr>,
@@ -3463,7 +3457,7 @@ pub enum Condition {
         #[serde(default)]
         baton_touch_trigger: Option<bool>,
         #[serde(default)]
-        min_baton_touch_count: Option<u32>,
+        min_baton_touch_count: Option<u8>,
         #[serde(default)]
         from_state: Option<ArcStr>,
         #[serde(default)]
@@ -3487,10 +3481,10 @@ pub enum Condition {
         movement: Option<ArcStr>,
         location: Option<ArcStr>,
         target: Option<ArcStr>,
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         cost_limit_operator: Option<Operator>,
         baton_touch_trigger: Option<bool>,
-        min_baton_touch_count: Option<u32>,
+        min_baton_touch_count: Option<u8>,
         exclude_self: Option<bool>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
@@ -3532,7 +3526,7 @@ pub enum Condition {
         heart_colors: Option<Box<Vec<String>>>,
         card_type: Option<ConditionCardType>,
         operator: Option<ArcStr>,
-        count: Option<u32>,
+        count: Option<u8>,
         aggregate: Option<ArcStr>,
         #[serde(default)]
         exclude_characters: Option<Box<Vec<String>>>,
@@ -3562,13 +3556,13 @@ pub enum Condition {
         target: Option<ArcStr>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         card_type: Option<ConditionCardType>,
         #[serde(default)]
         characters: Option<Box<Vec<String>>>,
         #[serde(default)]
         positions_characters: Option<Box<Vec<PositionCharacter>>>,
-        min_baton_touch_count: Option<u32>,
+        min_baton_touch_count: Option<u8>,
         activation_position: Option<ArcStr>,
         exclude_self: Option<bool>,
         position_compare: Option<ArcStr>,
@@ -3593,8 +3587,8 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
         temporal: Option<ArcStr>,
-        turn_number: Option<u32>,
-        count: Option<u32>,
+        turn_number: Option<u8>,
+        count: Option<u8>,
         location: Option<ArcStr>,
         card_type: Option<ConditionCardType>,
         target: Option<ArcStr>,
@@ -3635,11 +3629,11 @@ pub enum Condition {
         card_type: Option<ConditionCardType>,
         #[serde(default)]
         characters: Option<Box<Vec<String>>>,
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         cost_limit_operator: Option<Operator>,
         from_state: Option<ArcStr>,
         to_state: Option<ArcStr>,
-        count: Option<u32>,
+        count: Option<u8>,
         operator: Option<ArcStr>,
     },
     #[serde(rename = "resource_condition", alias = "card_blade_condition")]
@@ -3657,7 +3651,7 @@ pub enum Condition {
         target: Option<ArcStr>,
         location: Option<ArcStr>,
         operator: Option<ArcStr>,
-        count: Option<u32>,
+        count: Option<u8>,
         delta: Option<bool>,
         #[serde(default)]
         heart_colors: Option<Box<Vec<String>>>,
@@ -3681,7 +3675,7 @@ pub enum Condition {
         target: Option<ArcStr>,
         location: Option<ArcStr>,
         operator: Option<ArcStr>,
-        count: Option<u32>,
+        count: Option<u8>,
     },
     #[serde(rename = "score_threshold_condition")]
     ScoreThreshold {
@@ -3694,7 +3688,7 @@ pub enum Condition {
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
-        count: Option<u32>,
+        count: Option<u8>,
         operator: Option<ArcStr>,
         target: Option<ArcStr>,
     },
@@ -3821,7 +3815,7 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
         #[serde(default)]
-        count: Option<u32>,
+        count: Option<u8>,
         #[serde(default)]
         operator: Option<ArcStr>,
     },
@@ -3835,7 +3829,7 @@ pub struct LocationSubChecks {
     pub card_property: Option<CardProperty>,
     pub baton_touch_trigger: Option<bool>,
     pub baton_touch_source: Option<ArcStr>,
-    pub min_baton_touch_count: Option<u32>,
+    pub min_baton_touch_count: Option<u8>,
     pub ability_filter: Option<AbilityFilter>,
     #[serde(default)]
     pub ability_filter_triggers: Option<Vec<String>>,
@@ -3845,7 +3839,7 @@ pub struct LocationSubChecks {
     pub activation_position: Option<ArcStr>,
     pub unit: Option<ArcStr>,
     #[serde(default)]
-    pub values: Option<Vec<u32>>,
+    pub values: Option<Vec<u8>>,
     pub group_reference: Option<ArcStr>,
     pub reference_card: Option<ArcStr>,
 }
@@ -4021,7 +4015,7 @@ impl Condition {
         }
     }
 
-    pub fn get_count(&self) -> Option<u32> {
+    pub fn get_count(&self) -> Option<u8> {
         match self {
             Condition::Location { count, .. } => *count,
             Condition::Comparison { count, .. } => *count,
@@ -4234,7 +4228,7 @@ impl Condition {
         }
     }
 
-    pub fn get_cost_limit(&self) -> Option<u32> {
+    pub fn get_cost_limit(&self) -> Option<u8> {
         match self {
             Condition::Location { cost_limit, .. } => *cost_limit,
             Condition::Comparison { cost_limit, .. } => *cost_limit,
@@ -4402,7 +4396,7 @@ pub struct TriggerEvent {
     pub source_character: Option<ArcStr>,
     pub source_group: Option<ArcStr>,
     pub cost_comparison: Option<CostComparison>,
-    pub min_count: Option<u32>,
+    pub min_count: Option<u8>,
     pub exclude_characters: Option<Box<Vec<String>>>,
     pub ability_filter: Option<AbilityFilter>,
     pub self_effect_only: Option<bool>,
@@ -4423,7 +4417,7 @@ pub struct TriggerEvent {
 pub struct CostComparison {
     pub operator: Option<Operator>,
     pub relative_to: Option<ArcStr>,
-    pub cost_limit: Option<u32>,
+    pub cost_limit: Option<u8>,
     pub cost_limit_operator: Option<Operator>,
 }
 
@@ -4723,7 +4717,7 @@ impl Condition {
         }
     }
 
-    pub fn get_min_baton_touch_count(&self) -> Option<u32> {
+    pub fn get_min_baton_touch_count(&self) -> Option<u8> {
         match self {
             Condition::Movement {
                 min_baton_touch_count,
@@ -4760,7 +4754,7 @@ impl Condition {
         }
     }
 
-    pub fn get_turn_number(&self) -> Option<u32> {
+    pub fn get_turn_number(&self) -> Option<u8> {
         match self {
             Condition::Temporal { turn_number, .. } => *turn_number,
             _ => None,
@@ -4852,7 +4846,7 @@ impl Condition {
         }
     }
 
-    pub fn get_cost_total(&self) -> Option<u32> {
+    pub fn get_cost_total(&self) -> Option<u8> {
         match self {
             Condition::Comparison { cost_total, .. } => *cost_total,
             _ => None,
@@ -4919,7 +4913,7 @@ impl Condition {
         }
     }
 
-    pub fn get_values(&self) -> Option<&[u32]> {
+    pub fn get_values(&self) -> Option<&[u8]> {
         match self {
             Condition::Comparison { values, .. } => values.as_deref().map(|v| v.as_slice()),
             Condition::Location { sub_checks, .. } => {
@@ -5010,7 +5004,7 @@ impl Card {
     /// does NOT include runtime heart_modifiers from GameModifiers.
     /// Rules 9.9.1.4→9.9.1.5 (rules.txt:1196-1212) defines the application order:
     /// printed base → set-to-value → add/subtract.
-    pub fn total_hearts(&self) -> u32 {
+    pub fn total_hearts(&self) -> u8 {
         if let Some(ref base_heart) = self.base_heart {
             base_heart.hearts.values_sum()
         } else if let Some(ref need_heart) = self.need_heart {
@@ -5049,8 +5043,8 @@ pub fn check_heart_requirement(need: &BaseHeart, provided: &BaseHeart) -> bool {
     if need.hearts.is_empty() {
         return true;
     }
-    let total_provided: u32 = provided.hearts.values_sum();
-    let total_required: u32 = need.hearts.values_sum();
+    let total_provided: u8 = provided.hearts.values_sum().into();
+    let total_required: u8 = need.hearts.values_sum().into();
     if total_provided < total_required {
         return false;
     }
@@ -5196,7 +5190,7 @@ pub fn parse_heart_color(s: &str) -> HeartColor {
 }
 
 impl Card {
-    pub fn get_score(&self) -> u32 {
+    pub fn get_score(&self) -> u8 {
         self.score.unwrap_or(0)
     }
 }

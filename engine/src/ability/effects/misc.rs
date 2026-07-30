@@ -281,7 +281,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         card_id: i16,
-        heart_distribution: &[(crate::card::HeartColor, u32)],
+        heart_distribution: &[(crate::card::HeartColor, u8)],
         is_negative: bool,
         is_temporary: bool,
         effect_data: &mut Option<crate::core::types::EffectData>,
@@ -449,8 +449,8 @@ impl AbilityResolver {
                 .iter()
                 .find(|s| &s.player_id == pid)
                 .map(|s| {
-                    s.total_hearts.iter().sum::<u32>()
-                        - s.lives.iter().flat_map(|l| l.required.iter()).sum::<u32>()
+                    s.total_hearts.iter().sum::<u8>()
+                        - s.lives.iter().flat_map(|l| l.required.iter()).sum::<u8>()
                 })
                 .unwrap_or(if is_p1 {
                     gs.self_live_surplus_count
@@ -499,16 +499,16 @@ impl AbilityResolver {
         gs: &GameState,
         effect: &AbilityEffect,
         per_unit: bool,
-        base_count: u32,
+        base_count: u8,
         per_unit_type_str: Option<&str>,
         target: &str,
         recently_moved: &Option<SmallVec<[i16; 4]>>,
         entry_snapshot: &Option<SmallVec<[i16; 4]>>,
-        last_energy: u32,
-        last_discard_count: u32,
+        last_energy: u8,
+        last_discard_count: u8,
         orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
         filter: &crate::ability::util::CardFilter,
-    ) -> u32 {
+    ) -> u8 {
         if !per_unit {
             return base_count;
         }
@@ -568,7 +568,7 @@ impl AbilityResolver {
             // Only count recently_moved (from the current effect),
             // NOT entry_snapshot (which may contain trigger-setup cards).
             if let Some(moved) = recently_moved.as_ref() {
-                matching_count = moved.len() as u32;
+                matching_count = moved.len() as u8;
             } else {
                 matching_count = 0;
             }
@@ -1416,12 +1416,12 @@ impl AbilityResolver {
 
         // Build heart distribution: for fixed multi-color grants, distribute count
         // across all specified colors instead of using a single color.
-        let heart_distribution: Vec<(crate::card::HeartColor, u32)> = if resource == "heart"
+        let heart_distribution: Vec<(crate::card::HeartColor, u8)> = if resource == "heart"
             && !heart_selection
             && effect.heart_colors_any().len() > 1
-            && final_count >= effect.heart_colors_any().len() as u32
+            && final_count >= effect.heart_colors_any().len() as u8
         {
-            let per_color = final_count / effect.heart_colors_any().len() as u32;
+            let per_color = final_count / effect.heart_colors_any().len() as u8;
             effect
                 .heart_colors_any()
                 .iter()
@@ -1844,7 +1844,7 @@ impl AbilityResolver {
     pub(crate) fn execute_play_baton_touch(
         &mut self,
         gs: &mut GameState,
-        count: u32,
+        count: u8,
         target: &str,
     ) -> Result<(), String> {
         log::debug!("play_baton_touch: count={}, target={}", count, target);
@@ -1907,7 +1907,7 @@ impl AbilityResolver {
     pub fn execute_place_energy_under_member(
         &mut self,
         gs: &mut GameState,
-        count: u32,
+        count: u8,
         target: &str,
         position: Option<&PositionInfo>,
         optional: bool,
@@ -3433,7 +3433,7 @@ impl AbilityResolver {
     pub(crate) fn execute_pay_energy(
         &mut self,
         gs: &mut GameState,
-        count: u32,
+        count: u8,
         target: &str,
     ) -> Result<(), String> {
         if count > 0 {
@@ -3453,7 +3453,7 @@ impl AbilityResolver {
     pub(crate) fn execute_discard_until_count(
         &mut self,
         gs: &mut GameState,
-        target_count: u32,
+        target_count: u8,
         target: &str,
     ) -> Result<(), String> {
         let player = gs.resolve_target_player_mut(target);
@@ -3688,7 +3688,7 @@ impl AbilityResolver {
     /// and add them to revealed_cards. The yell count is the number of times
     /// to repeat this draw-and-reveal process (calculated from per_unit for
     /// MIRAI TICKET's "for every 5 cost, perform 1 additional yell").
-    pub(crate) fn execute_perform_yell(&mut self, gs: &mut GameState, count: u32, target: &str) {
+    pub(crate) fn execute_perform_yell(&mut self, gs: &mut GameState, count: u8, target: &str) {
         let card_db = gs.card_database.clone();
         let bm = gs.mods.blade_modifiers.clone();
         let om = gs.mods.orientation_modifiers.clone();

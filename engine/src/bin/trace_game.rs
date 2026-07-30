@@ -52,7 +52,7 @@ fn main() {
     let mut gs = GameState::new(p1, p2, Arc::clone(&card_database));
     game_setup::setup_game(&mut gs);
 
-    let mut printed_turns = std::collections::HashSet::<u32>::new();
+    let mut printed_turns = std::collections::HashSet::<u8>::new();
     for _t in 0..500 {
         TurnEngine::check_victory_condition(&mut gs);
         if gs.game_result != GameResult::Ongoing {
@@ -67,7 +67,7 @@ fn main() {
             let p2z = gs.player2.success_live_card_zone.cards.len();
             let e = gs.player1.energy_zone.active_count();
             let h = gs.player1.hand.cards.len();
-            let b: u32 = gs
+            let b: u8 = gs
                 .player1
                 .stage
                 .stage

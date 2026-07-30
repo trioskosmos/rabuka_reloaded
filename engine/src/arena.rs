@@ -8,7 +8,7 @@ static mut ARENA_BUF: [u8; ARENA_SIZE] = [0u8; ARENA_SIZE];
 static ARENA_POS: AtomicUsize = AtomicUsize::new(0);
 
 thread_local! {
-    static DEPTH: Cell<u32> = const { Cell::new(0) };
+    static DEPTH: Cell<u8> = const { Cell::new(0) };
 }
 
 #[inline]

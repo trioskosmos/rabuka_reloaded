@@ -33,7 +33,7 @@ pub use crate::display::{CardDisplay, GameStateDisplay, PlayerDisplay, StageDisp
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FrameSnapshot {
     pub frame: u64,
-    pub turn: u32,
+    pub turn: u8,
     pub phase: String,
     pub active_player: String,
     pub label: String,
@@ -1131,7 +1131,7 @@ async fn exec_code(
         };
     }
 
-    let amount: u32 = parse_param(code, "amount")
+    let amount: u8 = parse_param(code, "amount")
         .and_then(|v| v.parse().ok())
         .unwrap_or(1);
 
@@ -1539,9 +1539,9 @@ fn parse_deck_text(content: &str) -> Vec<String> {
         .flat_map(|l| {
             let parts: Vec<&str> = l.split(" x ").collect();
             if parts.len() == 2 {
-                let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u32>() {
+                let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u8>() {
                     (parts[1].trim().to_string(), q)
-                } else if let Ok(q) = parts[1].trim().parse::<u32>() {
+                } else if let Ok(q) = parts[1].trim().parse::<u8>() {
                     (parts[0].trim().to_string(), q)
                 } else {
                     return Vec::new();
@@ -1576,8 +1576,8 @@ async fn get_decks(_data: web::Data<AppState>) -> impl Responder {
                 .lines()
                 .filter(|l| !l.trim().is_empty())
                 .filter_map(|l| l.split(" x ").nth(1))
-                .filter_map(|q| q.trim().parse::<u32>().ok())
-                .sum::<u32>();
+                .filter_map(|q| q.trim().parse::<u8>().ok())
+                .sum::<u8>();
             let main = parse_deck_text(&content);
             serde_json::json!({
                 "id": id,

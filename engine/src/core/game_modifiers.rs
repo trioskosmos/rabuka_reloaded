@@ -55,7 +55,7 @@ pub struct GameModifiers {
     pub blade_modifiers: HashMap<i16, ModifierEntry>,
     pub blade_type_modifiers: HashMap<i16, BladeColor>,
     pub heart_modifiers: HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
-    pub heart_override: HashMap<i16, (HeartColor, u32)>,
+    pub heart_override: HashMap<i16, (HeartColor, u8)>,
     pub orientation_modifiers: HashMap<i16, CardOrientation>,
     pub cost_modifiers: HashMap<i16, ModifierEntry>,
     pub score_modifiers: HashMap<i16, ModifierEntry>,
@@ -76,17 +76,17 @@ pub struct GameModifiers {
     pub constant_score_sources: Vec<(i16, String, i32)>,
     pub heart_color_multiplier: HashMap<i16, HeartColor>,
     /// Number of cards moved from hand to discard by the most recent cost payment.
-    pub last_cost_discard_count: u32,
+    pub last_cost_discard_count: u8,
     /// Card IDs moved from hand to discard by the most recent cost payment.
     pub last_cost_moved_card_ids: SmallVec<[i16; 4]>,
     /// Number of energy cards paid by the most recent cost payment.
-    pub last_cost_energy_count: u32,
+    pub last_cost_energy_count: u8,
     /// Per-card delayed "cannot activate" flags. Card_id → remaining turns of
     /// activation block. Decremented each Active phase; member stays wait while >0.
-    pub delayed_cannot_active: HashMap<i16, u32>,
+    pub delayed_cannot_active: HashMap<i16, u8>,
     /// The surplus heart count just before it was zeroed by gain_resource(surplus_heart).
     /// Used by `delta: true` conditions on subsequent steps.
-    pub last_surplus_loss_count: u32,
+    pub last_surplus_loss_count: u8,
     /// Blade bonuses contributed by constant abilities on success zone cards.
     /// Key: target member card_id, value: total blade amount from success zone.
     pub success_zone_blade_bonuses: HashMap<i16, i32>,
@@ -288,11 +288,11 @@ impl GameModifiers {
         specific + wildcard
     }
 
-    pub fn set_heart_override(&mut self, card_id: i16, color: HeartColor, count: u32) {
+    pub fn set_heart_override(&mut self, card_id: i16, color: HeartColor, count: u8) {
         self.heart_override.insert(card_id, (color, count));
     }
 
-    pub fn get_heart_override(&self, card_id: i16) -> Option<&(HeartColor, u32)> {
+    pub fn get_heart_override(&self, card_id: i16) -> Option<&(HeartColor, u8)> {
         self.heart_override.get(&card_id)
     }
 
@@ -405,7 +405,7 @@ impl GameModifiers {
     // ============== DELAYED CANNOT ACTIVATE ==============
 
     /// Add a per-card "cannot activate" flag for N turns.
-    pub fn add_delayed_cannot_active(&mut self, card_id: i16, turns: u32) {
+    pub fn add_delayed_cannot_active(&mut self, card_id: i16, turns: u8) {
         // If already set, keep the larger remaining duration
         let current = self
             .delayed_cannot_active

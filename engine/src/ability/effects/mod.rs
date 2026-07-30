@@ -268,7 +268,7 @@ impl AbilityResolver {
             ActionType::DrawUntilCount => {
                 self.execute_draw_until_count(
                     gs,
-                    effect.target_count_any().unwrap_or(0),
+                    effect.target_count_any().unwrap_or(0) as u8,
                     effect.target_name(),
                     effect.destination.as_deref().unwrap_or(Zone::Hand.to_str()),
                 );
@@ -310,7 +310,7 @@ impl AbilityResolver {
                 } else {
                     effect.cost_limit_any()
                 };
-                let mut change_count = effect.count_or(0);
+                let mut change_count: u8 = effect.count_or(0) as u8;
                 let mut change_group = effect.group_name();
                 if effect.per_unit_any().unwrap_or(false) {
                     let player = gs.resolve_target_player(effect.target_name());
@@ -330,8 +330,8 @@ impl AbilityResolver {
                         effect.distinct_any(),
                         &gs.card_database,
                     )
-                    .len() as u32;
-                    let per_unit_cnt = effect.per_unit_count_any().unwrap_or(1);
+                    .len() as u8;
+                    let per_unit_cnt = effect.per_unit_count_any().unwrap_or(1) as u8;
                     change_count = (count / per_unit_cnt) * change_count.max(1);
                     change_group = None;
                 }
@@ -343,7 +343,7 @@ impl AbilityResolver {
                     change_count,
                     effect.max.unwrap_or(false),
                     effect.card_type_any().map(|ct| ct.as_card_str()),
-                    change_cost_limit,
+                    change_cost_limit.map(|v| v as u8),
                     effect.optional.unwrap_or(false),
                     change_group,
                     effect.self_cost_any().unwrap_or(false),
@@ -351,7 +351,7 @@ impl AbilityResolver {
                     effect.destination.as_deref(),
                     effect.cost_limit_operator_any().map(|s| s.to_string()),
                     effect.characters_any(),
-                    effect.blade_limit_any(),
+                    effect.blade_limit_any().map(|v| v as u8),
                     effect.blade_limit_operator_any().as_deref(),
                 )
             }
@@ -359,13 +359,13 @@ impl AbilityResolver {
                 gs,
                 effect,
                 effect.operation_any().as_deref().unwrap_or("add"),
-                effect.value_any().unwrap_or(0),
+                effect.value_any().unwrap_or(0) as u8,
                 effect.target_name(),
                 effect.duration_any().as_deref(),
                 effect.card_type_any().map(|ct| ct.as_card_str()),
                 effect.group_name(),
                 effect.per_unit_any().unwrap_or(false),
-                effect.per_unit_count_any().unwrap_or(1),
+                effect.per_unit_count_any().unwrap_or(1) as u8,
                 effect.per_unit_type_any().as_deref(),
                 effect.location_any().as_deref(),
                 effect.effect_constraint_any().as_deref(),
@@ -375,26 +375,26 @@ impl AbilityResolver {
             ActionType::ModifyRequiredHearts => self.execute_modify_required_hearts(
                 gs,
                 effect.operation_any().as_deref().unwrap_or("decrease"),
-                effect.value_or_count(0),
+                effect.value_or_count(0) as u8,
                 effect.heart_colors_any(),
                 effect.target_name(),
                 effect.per_unit_any().unwrap_or(false),
-                effect.per_unit_count_any().unwrap_or(1),
+                effect.per_unit_count_any().unwrap_or(1) as u8,
                 effect.group_name(),
                 effect.timing_condition_any().as_deref(),
                 effect.location_any().as_deref(),
                 effect.original_value_any(),
-                effect.original_count_any(),
+                effect.original_count_any().map(|v| v as u8),
                 effect.original_operator_any().as_deref(),
                 effect.exclude_self_any().unwrap_or(false),
                 effect.self_target_any().unwrap_or(false),
                 effect.exclude_heart_colors_any(),
                 effect.max.unwrap_or(false),
-                effect.repeat_limit_any(),
+                effect.repeat_limit_any().map(|v| v as u8),
                 &effect.per_unit_heart_colors_any(),
             ),
             ActionType::SetCost => {
-                self.execute_set_cost(gs, effect, effect.value_any().unwrap_or(0));
+                self.execute_set_cost(gs, effect, effect.value_any().unwrap_or(0) as u8);
                 Ok(())
             }
             ActionType::SetBladeType => {
@@ -510,7 +510,7 @@ impl AbilityResolver {
                     gs,
                     effect.ability_text_any().as_deref().unwrap_or(""),
                     effect.target_trigger_any().as_deref(),
-                    effect.count_any(),
+                    effect.count_any().map(|v| v as u8),
                     effect.source_card_any().as_deref(),
                 );
                 Ok(())
@@ -520,7 +520,7 @@ impl AbilityResolver {
             ActionType::GainAbility => self.execute_gain_ability_effect(gs, effect),
             ActionType::GainAbilityFromSource => self.execute_gain_ability_from_source(gs, effect),
             ActionType::PlayBatonTouch => {
-                self.execute_play_baton_touch(gs, effect.count_or(1), effect.target_name())
+                self.execute_play_baton_touch(gs, effect.count_or(1) as u8, effect.target_name())
             }
             ActionType::Reveal => self.execute_reveal_effect(gs, effect),
             ActionType::Select => {
@@ -535,10 +535,10 @@ impl AbilityResolver {
             }
             ActionType::SelectNumber => self.execute_select_number(gs, effect),
             ActionType::LookAt => {
-                let base_count = if let Some(ref dc) = effect.dynamic_count_any() {
+                let base_count: u8 = if let Some(ref dc) = effect.dynamic_count_any() {
                     self.resolve_dynamic_count(gs, dc)
                 } else {
-                    effect.count_or(1)
+                    effect.count_or(1) as u8
                 };
                 let final_count = if effect.per_unit_any().unwrap_or(false) {
                     use crate::ability::util;
@@ -570,7 +570,7 @@ impl AbilityResolver {
             ActionType::ModifyRequiredHeartsGlobal => self.execute_modify_required_hearts_standard(
                 gs,
                 effect.operation_any().as_deref().unwrap_or("increase"),
-                effect.value_or_count(1),
+                effect.value_or_count(1) as u8,
                 effect.heart_colors_any(),
                 effect.target_name(),
             ),
@@ -578,16 +578,16 @@ impl AbilityResolver {
                 self.execute_modify_yell_count(
                     gs,
                     effect.operation_any().as_deref().unwrap_or("subtract"),
-                    effect.count_or(0),
+                    effect.count_or(0) as u8,
                 );
                 Ok(())
             }
             ActionType::PlaceEnergyUnderMember => {
                 // Resolve dynamic_count if present
-                let actual_count = if let Some(ref dc) = effect.dynamic_count_any() {
+                let actual_count: u8 = if let Some(ref dc) = effect.dynamic_count_any() {
                     self.resolve_dynamic_count(gs, dc)
                 } else {
-                    effect.energy_count_any().unwrap_or(1)
+                    effect.energy_count_any().unwrap_or(1) as u8
                 };
                 // Special case: source="under_member" + destination="energy_zone" means
                 // count from under member, but move from energy_deck → energy_zone (wait).
@@ -644,7 +644,7 @@ impl AbilityResolver {
                         }
                     }
                     b = b.cost_limit(
-                        effect.cost_limit_any(),
+                        effect.cost_limit_any().map(|v| v as u8),
                         effect.cost_limit_operator_any().map(|s| s.to_string()),
                     );
                     self.pending_choice = Some(b.build());
@@ -680,7 +680,7 @@ impl AbilityResolver {
                 self.execute_activation_cost(
                     gs,
                     effect.operation_any().as_deref().unwrap_or("increase"),
-                    effect.value_any().unwrap_or(0),
+                    effect.value_any().unwrap_or(0) as u8,
                     effect.target_name(),
                     effect.duration_any().as_deref(),
                 );
@@ -700,12 +700,12 @@ impl AbilityResolver {
 
             ActionType::Choice => self.execute_choice(gs, effect),
             ActionType::PayEnergy => {
-                let count = if let Some(ref dc) = effect.dynamic_count_any() {
+                let count: u8 = if let Some(ref dc) = effect.dynamic_count_any() {
                     self.resolve_dynamic_count(gs, dc)
                 } else {
                     effect
                         .energy_count_any()
-                        .unwrap_or_else(|| effect.count_or(0))
+                        .unwrap_or_else(|| effect.count_or(0)) as u8
                 };
                 if effect.optional.unwrap_or(false) {
                     let player = gs.resolve_target_player(effect.target_name());
@@ -731,12 +731,14 @@ impl AbilityResolver {
                 self.execute_pay_energy(gs, count, effect.target_name())
             }
             ActionType::SetCardIdentity => self.execute_set_card_identity_effect(gs, effect),
-            ActionType::RepeatProcedure => {
-                self.execute_repeat_procedure(gs, effect, effect.repeat_limit_any().unwrap_or(1))
-            }
+            ActionType::RepeatProcedure => self.execute_repeat_procedure(
+                gs,
+                effect,
+                effect.repeat_limit_any().unwrap_or(1) as u8,
+            ),
             ActionType::DiscardUntilCount => self.execute_discard_until_count(
                 gs,
-                effect.target_count_any().unwrap_or(0),
+                effect.target_count_any().unwrap_or(0) as u8,
                 effect.target_name(),
             ),
             // Q57: A "cannot do X" effect takes priority over an effect that would do X.
@@ -769,17 +771,17 @@ impl AbilityResolver {
             ActionType::ModifyLimit => self.execute_modify_limit(
                 gs,
                 effect.operation_any().as_deref().unwrap_or("decrease"),
-                effect.count_or(0),
+                effect.count_or(0) as u8,
             ),
             ActionType::ReduceLiveCardSetLimit => {
-                self.execute_reduce_live_card_set_limit(gs, effect.count_or(1));
+                self.execute_reduce_live_card_set_limit(gs, effect.count_or(1) as u8);
                 Ok(())
             }
             ActionType::SetBladeCount => {
                 self.execute_set_blade_count(
                     gs,
                     effect,
-                    effect.value_any().unwrap_or(effect.count_or(0)),
+                    effect.value_any().unwrap_or(effect.count_or(0)) as u8,
                 );
                 Ok(())
             }
@@ -798,7 +800,7 @@ impl AbilityResolver {
                 self.execute_modify_required_hearts_success(
                     gs,
                     effect.operation_any().as_deref().unwrap_or("increase"),
-                    effect.value_any().unwrap_or(0),
+                    effect.value_any().unwrap_or(0) as u8,
                     effect.target_name(),
                     effect.card_type_any().map(|ct| ct.as_card_str()),
                     effect.heart_colors_any(),
@@ -806,7 +808,7 @@ impl AbilityResolver {
                 Ok(())
             }
             ActionType::SetCostToUse => {
-                self.execute_set_cost_to_use(gs, effect.value_any().unwrap_or(0))
+                self.execute_set_cost_to_use(gs, effect.value_any().unwrap_or(0) as u8)
             }
             ActionType::AllBladeTiming => {
                 self.execute_all_blade_timing(
@@ -841,14 +843,14 @@ impl AbilityResolver {
             ActionType::RevealPerGroup => self.execute_reveal_per_group(
                 gs,
                 effect.source_or(Zone::Hand.to_str()),
-                effect.count_or(1),
+                effect.count_or(1) as u8,
                 effect.target_name(),
             ),
             ActionType::ConditionalOnResult => self.execute_conditional_on_result(gs, effect),
             ActionType::ConditionalOnOptional => self.execute_conditional_on_optional(gs, effect),
             ActionType::ModifyCost => {
                 let card_db = &gs.card_database;
-                let mut value = effect.value_any().unwrap_or(0);
+                let mut value: u8 = effect.value_any().unwrap_or(0) as u8;
                 if effect.per_unit_any().unwrap_or(false) {
                     let put_binding = effect.per_unit_type_any();
                     let loc_binding2 = effect.location_any();
@@ -868,13 +870,13 @@ impl AbilityResolver {
                         effect.state_any().as_deref(),
                         &gs.mods.orientation_modifiers,
                     );
-                    let per_unit_count = effect.per_unit_count_any().unwrap_or(1);
+                    let per_unit_count = effect.per_unit_count_any().unwrap_or(1) as u8;
                     let mut units = matching_count / per_unit_count;
                     // Apply max_repeats cap (aliased as repeat_limit).
                     // The text side-constraint "N枚までしか数えない" is parsed as
                     // max_repeats on the effect.
                     if let Some(cap) = effect.repeat_limit_any() {
-                        units = units.min(cap);
+                        units = units.min(cap as u8);
                     }
                     value *= units;
                 }
@@ -887,25 +889,26 @@ impl AbilityResolver {
             ActionType::RevealUntilChosenCard => self.execute_reveal_until_chosen_card(gs, effect),
             ActionType::ChooseTargetPlayer => self.execute_choose_target_player(gs, effect),
             ActionType::PerformYell => {
-                let count = if effect.per_unit_any().unwrap_or(false) {
+                let count: u8 = if effect.per_unit_any().unwrap_or(false) {
                     // per_unit with per_unit_source = "previous_moved_cards":
                     // sum costs of cards moved by the preceding action,
                     // divide by per_unit_count, cap at repeat_limit.
-                    let total_cost: u32 = self
+                    let total_cost: u8 = self
                         .moved_cards
                         .iter()
                         .filter_map(|&cid| gs.card_database.get_card(cid).and_then(|c| c.cost))
+                        .map(|v| v as u8)
                         .sum();
-                    let divisor = effect.per_unit_count_any().unwrap_or(1) as u32;
+                    let divisor = effect.per_unit_count_any().unwrap_or(1) as u8;
                     let mut c = total_cost / divisor;
                     if let Some(cap) = effect.repeat_limit_any() {
-                        c = c.min(cap);
+                        c = c.min(cap as u8);
                     }
                     c
                 } else if let Some(ref dc) = effect.dynamic_count_any() {
                     self.resolve_dynamic_count(gs, dc)
                 } else {
-                    effect.count_or(1)
+                    effect.count_or(1) as u8
                 };
                 self.execute_perform_yell(gs, count, effect.target_name());
                 Ok(())

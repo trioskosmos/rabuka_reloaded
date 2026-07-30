@@ -63,7 +63,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         ability_text: &str,
         target_trigger: Option<&str>,
-        count: Option<u32>,
+        count: Option<u8>,
         source_card: Option<&str>,
     ) {
         let card_id = source_card.and_then(|sc| match sc {

@@ -56,7 +56,7 @@ impl PolicyNet {
         };
 
         // Version header
-        let _version = read_f32(&buf, &mut pos) as u32;
+        let _version = read_f32(&buf, &mut pos) as u8;
 
         // card_embed [2400, 128]
         for i in 0..CARD_EMBED_TABLE_SIZE * CARD_EMBED_DIM {

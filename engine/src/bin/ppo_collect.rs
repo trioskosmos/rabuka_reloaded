@@ -38,7 +38,7 @@ fn main() {
     let deck = DeckParser::parse_deck_file(deck_path).unwrap();
     let card_numbers = DeckParser::deck_list_to_card_numbers(&deck);
 
-    let num_games: u32 = std::env::args()
+    let num_games: u8 = std::env::args()
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(200);
@@ -76,7 +76,7 @@ fn main() {
 
     let mut out = File::create(&out_path).expect("create output");
     let state_dim = EncodedState::state_dim();
-    let state_dim_u32 = state_dim as u32;
+    let state_dim_u32 = state_dim as u8;
 
     let mut total_steps: u64 = 0;
     let mut p1_wins = 0u32;
@@ -85,7 +85,7 @@ fn main() {
     for game_idx in 0..num_games {
         let mut gs = setup_game(&db, &mut t1, &mut t2);
         let mut trajectory: Vec<Step> = Vec::with_capacity(200);
-        let mut last_turn = 0u32;
+        let mut last_turn = 0u8;
         let mut stuck = 0u32;
 
         if game_idx == 0 {
@@ -228,8 +228,8 @@ fn main() {
             last.done = true;
         }
 
-        // Write trajectory: [n_steps:u32] [step_1] [step_2] ...
-        let n_steps = trajectory.len() as u32;
+        // Write trajectory: [n_steps:u8] [step_1] [step_2] ...
+        let n_steps = trajectory.len() as u8;
         let _ = out.write_all(&n_steps.to_le_bytes());
         for step in &trajectory {
             let n_actions = step.actions.len() as u16;

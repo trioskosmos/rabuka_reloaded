@@ -175,7 +175,7 @@ impl<'a> BcReader<'a> {
         BcReader { cursor: data }
     }
 
-    fn u8(&mut self) -> Option<u8> {
+    fn read_u8(&mut self) -> Option<u8> {
         read_u8(&mut self.cursor)
     }
 
@@ -183,7 +183,7 @@ impl<'a> BcReader<'a> {
         read_u16(&mut self.cursor)
     }
 
-    fn u32(&mut self) -> Option<u32> {
+    fn read_u32(&mut self) -> Option<u32> {
         read_u32(&mut self.cursor)
     }
 
@@ -200,12 +200,12 @@ impl<'a> BcReader<'a> {
     }
 
     fn skip_value(&mut self) -> Option<()> {
-        let tag = self.u8()?;
+        let tag = self.read_u8()?;
         skip_value_with_tag(self, tag)
     }
 
     fn read_string_value(&mut self) -> Option<String> {
-        let tag = self.u8()?;
+        let tag = self.read_u8()?;
         match tag {
             TAG_NULL => None,
             TAG_STR => {
@@ -220,7 +220,7 @@ impl<'a> BcReader<'a> {
     }
 
     fn read_arc_str_value(&mut self) -> Option<ArcStr> {
-        let tag = self.u8()?;
+        let tag = self.read_u8()?;
         match tag {
             TAG_NULL => None,
             TAG_STR => {
@@ -235,7 +235,7 @@ impl<'a> BcReader<'a> {
     }
 
     fn read_bool_value(&mut self) -> Option<bool> {
-        let tag = self.u8()?;
+        let tag = self.read_u8()?;
         match tag {
             TAG_NULL => None,
             TAG_TRUE => Some(true),
@@ -244,11 +244,11 @@ impl<'a> BcReader<'a> {
         }
     }
 
-    fn read_u32_value(&mut self) -> Option<u32> {
-        let tag = self.u8()?;
+    fn read_u32_value(&mut self) -> Option<u8> {
+        let tag = self.read_u8()?;
         match tag {
             TAG_NULL => None,
-            TAG_I64 => Some(self.i64()? as u32),
+            TAG_I64 => Some(self.i64()? as u8),
             _ => None,
         }
     }
@@ -273,14 +273,14 @@ fn skip_value_with_tag(bc: &mut BcReader, tag: u8) -> Option<()> {
             Some(())
         }
         TAG_ARRAY => {
-            let len = bc.u32()? as usize;
+            let len = bc.read_u32()? as usize;
             for _ in 0..len {
                 bc.skip_value()?;
             }
             Some(())
         }
         TAG_OBJECT => {
-            let len = bc.u32()? as usize;
+            let len = bc.read_u32()? as usize;
             for _ in 0..len {
                 bc.u16()?; // key index
                 bc.skip_value()?;
@@ -293,7 +293,7 @@ fn skip_value_with_tag(bc: &mut BcReader, tag: u8) -> Option<()> {
 
 /// Read a tagged value from a BcReader into a serde_json::Value.
 fn read_value_from_bc(bc: &mut BcReader) -> Option<serde_json::Value> {
-    let tag = bc.u8()?;
+    let tag = bc.read_u8()?;
     match tag {
         TAG_NULL => Some(serde_json::Value::Null),
         TAG_FALSE => Some(serde_json::Value::Bool(false)),
@@ -318,7 +318,7 @@ fn read_value_from_bc(bc: &mut BcReader) -> Option<serde_json::Value> {
             Some(serde_json::Value::String(STRINGS[idx].to_string()))
         }
         TAG_ARRAY => {
-            let len = bc.u32()? as usize;
+            let len = bc.read_u32()? as usize;
             let mut arr = Vec::with_capacity(len);
             for _ in 0..len {
                 arr.push(read_value_from_bc(bc)?);
@@ -326,7 +326,7 @@ fn read_value_from_bc(bc: &mut BcReader) -> Option<serde_json::Value> {
             Some(serde_json::Value::Array(arr))
         }
         TAG_OBJECT => {
-            let len = bc.u32()? as usize;
+            let len = bc.read_u32()? as usize;
             let mut obj = serde_json::Map::with_capacity(len);
             for _ in 0..len {
                 let kidx = bc.u16()? as usize;
@@ -346,18 +346,18 @@ fn read_value_from_bc(bc: &mut BcReader) -> Option<serde_json::Value> {
 // ── Direct Ability decoder ──
 
 fn decode_ability(bc: &mut BcReader) -> Option<Ability> {
-    let tag = bc.u8()?;
+    let tag = bc.read_u8()?;
     if tag != TAG_OBJECT {
         return None;
     }
-    let count = bc.u32()? as usize;
+    let count = bc.read_u32()? as usize;
     #[cfg(feature = "ds_debug")]
     ds_print(&alloc::format!("DA:c={}", count));
 
     let mut full_text = String::new();
     let mut triggerless_text: Option<String> = None;
     let mut triggers: Option<ArcStr> = None;
-    let mut use_limit: Option<u32> = None;
+    let mut use_limit: Option<u8> = None;
     let mut is_null = false;
     let mut cost: Option<Box<AbilityCost>> = None;
     let mut effect: Option<Box<AbilityEffect>> = None;
@@ -425,11 +425,11 @@ fn decode_ability(bc: &mut BcReader) -> Option<Ability> {
 // ── AbilityEffect decoder ──
 
 fn decode_ability_cost(bc: &mut BcReader) -> Option<Option<Box<AbilityCost>>> {
-    let tag = bc.u8()?;
+    let tag = bc.read_u8()?;
     match tag {
         TAG_NULL => Some(None),
         TAG_OBJECT => {
-            let count = bc.u32()? as usize;
+            let count = bc.read_u32()? as usize;
             // Collect into map, then apply AbilityCost-specific normalizations.
             let mut map = collect_json_map(bc, count)?;
             normalize_cost_keys(&mut map);
@@ -444,7 +444,7 @@ fn decode_ability_cost(bc: &mut BcReader) -> Option<Option<Box<AbilityCost>>> {
 }
 
 fn decode_ability_effect(bc: &mut BcReader) -> Option<Option<AbilityEffect>> {
-    let tag = bc.u8()?;
+    let tag = bc.read_u8()?;
     match tag {
         TAG_NULL => Some(None),
         TAG_OBJECT => {
@@ -521,7 +521,7 @@ fn recursive_normalize_cost_value(val: &mut serde_json::Value) {
 ///      including `#[serde(flatten)]` CompoundBranch)
 ///   3. Call `populate_from_json` to build EffectKind and recurse into sub-effects
 fn decode_ability_effect_from_object(bc: &mut BcReader) -> Option<AbilityEffect> {
-    let count = bc.u32()? as usize;
+    let count = bc.read_u32()? as usize;
 
     // Phase 1: collect all key-value pairs into a JSON map.
     let mut map = collect_json_map(bc, count)?;
@@ -774,11 +774,11 @@ fn condition_populate_from_json(cond: &mut Condition, cond_json: &serde_json::Va
 // ── Keyword decoder ──
 
 fn decode_keywords(bc: &mut BcReader) -> Option<Option<Vec<crate::card::Keyword>>> {
-    let tag = bc.u8()?;
+    let tag = bc.read_u8()?;
     match tag {
         TAG_NULL => Some(None),
         TAG_ARRAY => {
-            let len = bc.u32()? as usize;
+            let len = bc.read_u32()? as usize;
             let mut v = Vec::with_capacity(len);
             for _ in 0..len {
                 let s = bc.read_string_value()?;

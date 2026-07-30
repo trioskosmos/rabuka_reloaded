@@ -20,7 +20,7 @@ fn parse_stage_area(s: &str) -> Option<MemberArea> {
 
 fn run_game_to_completion(gs: &mut GameState, _trace: bool) -> u64 {
     let mut actions = 0u64;
-    let mut last_turn = 0u32;
+    let mut last_turn = 0u8;
     let mut stuck = 0u32;
     let mut iterations = 0u32;
 
@@ -143,7 +143,7 @@ fn main() {
     );
 
     let mut total_actions = 0u64;
-    let mut outcomes: std::collections::HashMap<String, u32> = std::collections::HashMap::default();
+    let mut outcomes: std::collections::HashMap<String, u8> = std::collections::HashMap::default();
     let mut p1_first_count = 0u32;
     let num_games = 5000;
     for _ in 0..num_games {

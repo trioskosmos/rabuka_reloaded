@@ -82,7 +82,7 @@ fn main() {
 
         let mut examples: Vec<Example> = Vec::with_capacity(200);
         let mut step_count = 0u32;
-        let mut last_turn = 0u32;
+        let mut last_turn = 0u8;
         let mut stuck = 0u32;
 
         for _t in 0..500 {

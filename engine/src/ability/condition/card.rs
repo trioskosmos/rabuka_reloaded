@@ -20,7 +20,7 @@ use smallvec::SmallVec;
 enum HeartTotal {
     None,
     All,
-    Value(u32),
+    Value(u8),
 }
 
 impl<'a> ConditionContext<'a> {
@@ -188,87 +188,86 @@ impl<'a> ConditionContext<'a> {
             return values.contains(&{ count });
         }
 
-        let target_count = if let Some(ref comparison_target) = condition.get_comparison_target() {
-            if *comparison_target == ComparisonTarget::Opponent {
-                self.get_count_for_target(condition, "opponent")
-            } else if *comparison_target == ComparisonTarget::Self_
-                && (condition.get_comparison_type() == Some("cost")
-                    || condition.get_comparison_type() == Some("score"))
-            {
-                let target = condition.get_target().unwrap_or("self");
-                let player = self.game_state.resolve_target_player(target);
-                if let Some(act_id) = self.activating_card_id {
-                    let ctype = condition.get_comparison_type().unwrap_or("cost");
-                    player
-                        .stage
-                        .stage
-                        .iter()
-                        .find(|&&id| id == act_id)
-                        .map(|_| {
-                            let base = self
-                                .game_state
-                                .card_database
-                                .get_card(act_id)
-                                .and_then(|c| c.cost)
-                                .or_else(|| {
-                                    self.game_state
-                                        .card_database
-                                        .get_card(act_id)
-                                        .and_then(|c| c.score)
-                                })
-                                .unwrap_or(0);
-                            // Per Q129 (qa_data.json:2199-2200): cost conditions use
-                            // the CURRENT/MODIFIED cost (NOT base/printed).  Hand-based
-                            // cost reductions ("手札にあるこのメンバーカードのコストは
-                            // ...少なくなる") lower the cost used for condition checks.
-                            // This is distinct from "元々のコスト" which checks the
-                            // printed cost directly via cost_threshold_met().
-                            if ctype == "cost" {
-                                base.saturating_sub(
-                                    self.game_state.mods.get_cost_modifier(act_id).max(0) as u32,
-                                )
-                            } else {
-                                base
-                            }
-                        })
-                        .unwrap_or_else(|| self.get_count_for_target(condition, target))
+        let target_count =
+            if let Some(ref comparison_target) = condition.get_comparison_target() {
+                if *comparison_target == ComparisonTarget::Opponent {
+                    self.get_count_for_target(condition, "opponent")
+                } else if *comparison_target == ComparisonTarget::Self_
+                    && (condition.get_comparison_type() == Some("cost")
+                        || condition.get_comparison_type() == Some("score"))
+                {
+                    let target = condition.get_target().unwrap_or("self");
+                    let player = self.game_state.resolve_target_player(target);
+                    if let Some(act_id) = self.activating_card_id {
+                        let ctype = condition.get_comparison_type().unwrap_or("cost");
+                        player
+                            .stage
+                            .stage
+                            .iter()
+                            .find(|&&id| id == act_id)
+                            .map(|_| {
+                                let base = self
+                                    .game_state
+                                    .card_database
+                                    .get_card(act_id)
+                                    .and_then(|c| c.cost)
+                                    .or_else(|| {
+                                        self.game_state
+                                            .card_database
+                                            .get_card(act_id)
+                                            .and_then(|c| c.score)
+                                    })
+                                    .unwrap_or(0);
+                                // Per Q129 (qa_data.json:2199-2200): cost conditions use
+                                // the CURRENT/MODIFIED cost (NOT base/printed).  Hand-based
+                                // cost reductions ("手札にあるこのメンバーカードのコストは
+                                // ...少なくなる") lower the cost used for condition checks.
+                                // This is distinct from "元々のコスト" which checks the
+                                // printed cost directly via cost_threshold_met().
+                                if ctype == "cost" {
+                                    base.saturating_sub(
+                                        self.game_state.mods.get_cost_modifier(act_id).max(0) as u8,
+                                    )
+                                } else {
+                                    base
+                                }
+                            })
+                            .unwrap_or_else(|| self.get_count_for_target(condition, target))
+                    } else {
+                        self.get_count_for_target(condition, target)
+                    }
+                } else if condition.get_resource_type().is_some() {
+                    self.get_count_for_target(condition, comparison_target.as_str())
                 } else {
-                    self.get_count_for_target(condition, target)
+                    condition
+                        .get_count()
+                        .unwrap_or(comparison_default_count(condition))
                 }
-            } else if condition.get_resource_type().is_some() {
-                self.get_count_for_target(condition, comparison_target.as_str())
-            } else {
+            } else if condition.get_comparison_type() == Some("cost") {
+                let entry_choice = self.game_state.ability_queue.current_entry().and_then(|e| {
+                    match &e.conditional_choice {
+                        Some(ConditionalChoice::Str(s)) => s.parse::<u8>().ok(),
+                        _ => None,
+                    }
+                });
                 condition
-                    .get_count()
+                    .get_cost_limit()
+                    .or(condition.get_count())
+                    .or(entry_choice)
+                    .unwrap_or(0)
+            } else if condition.get_comparison_type() == Some("score") {
+                condition.get_count().unwrap_or(0)
+            } else {
+                let entry_choice = self.game_state.ability_queue.current_entry().and_then(|e| {
+                    match &e.conditional_choice {
+                        Some(ConditionalChoice::Str(s)) => s.parse::<u8>().ok(),
+                        _ => None,
+                    }
+                });
+                entry_choice
+                    .or(condition.get_count())
                     .unwrap_or(comparison_default_count(condition))
-            }
-        } else if condition.get_comparison_type() == Some("cost") {
-            let entry_choice =
-                self.game_state.ability_queue.current_entry().and_then(|e| {
-                    match &e.conditional_choice {
-                        Some(ConditionalChoice::Str(s)) => s.parse::<u32>().ok(),
-                        _ => None,
-                    }
-                });
-            condition
-                .get_cost_limit()
-                .or(condition.get_count())
-                .or(entry_choice)
-                .unwrap_or(0)
-        } else if condition.get_comparison_type() == Some("score") {
-            condition.get_count().unwrap_or(0)
-        } else {
-            let entry_choice =
-                self.game_state.ability_queue.current_entry().and_then(|e| {
-                    match &e.conditional_choice {
-                        Some(ConditionalChoice::Str(s)) => s.parse::<u32>().ok(),
-                        _ => None,
-                    }
-                });
-            entry_choice
-                .or(condition.get_count())
-                .unwrap_or(comparison_default_count(condition))
-        };
+            };
 
         if condition.get_cost_total().is_some() {
             let total = condition.get_cost_total().unwrap_or(0);
@@ -351,7 +350,7 @@ impl<'a> ConditionContext<'a> {
                     })
                     .sum()
             };
-            return compare_counts(Some(operator), sum_cost.max(0) as u32, total);
+            return compare_counts(Some(operator), sum_cost.max(0) as u8, total);
         }
 
         let result = compare_counts(condition.get_operator(), count, target_count);
@@ -439,7 +438,7 @@ impl<'a> ConditionContext<'a> {
         let opp_player = gs.resolve_target_player("opponent");
         let card_db = &gs.card_database;
 
-        let get_stage_costs = |player: &crate::player::Player| -> Vec<u32> {
+        let get_stage_costs = |player: &crate::player::Player| -> Vec<u8> {
             player
                 .stage
                 .stage
@@ -447,7 +446,7 @@ impl<'a> ConditionContext<'a> {
                 .filter(|&&id| id != -1)
                 .map(|&id| {
                     let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
-                    (base + gs.mods.get_cost_modifier(id)).max(0) as u32
+                    (base + gs.mods.get_cost_modifier(id)).max(0) as u8
                 })
                 .collect()
         };
@@ -487,7 +486,7 @@ impl<'a> ConditionContext<'a> {
                 .get_card(card_at_pos)
                 .and_then(|c| c.cost)
                 .unwrap_or(0) as i32;
-            (base + self.game_state.mods.get_cost_modifier(card_at_pos)).max(0) as u32
+            (base + self.game_state.mods.get_cost_modifier(card_at_pos)).max(0) as u8
         };
 
         let operator = condition.get_operator().unwrap_or(">");
@@ -498,7 +497,7 @@ impl<'a> ConditionContext<'a> {
             }
             let other_cost = {
                 let base = card_db.get_card(other_id).and_then(|c| c.cost).unwrap_or(0) as i32;
-                (base + self.game_state.mods.get_cost_modifier(other_id)).max(0) as u32
+                (base + self.game_state.mods.get_cost_modifier(other_id)).max(0) as u8
             };
             if !compare_counts(Some(operator), pos_cost, other_cost) {
                 return false;
@@ -855,7 +854,7 @@ impl<'a> ConditionContext<'a> {
                 .and_then(|gn| gn.first().map(|s| s.as_str()));
             match Zone::from_str(location) {
                 Some(Zone::Stage) => {
-                    let total_heart: u32 = player
+                    let total_heart: u8 = player
                         .stage
                         .stage
                         .iter()
@@ -871,16 +870,16 @@ impl<'a> ConditionContext<'a> {
                         .map(|&cid| (cid, card_db.get_card(cid)))
                         .filter_map(|(cid, card)| card.map(|c| (cid, c)))
                         .map(|(cid, card)| {
-                            let base: u32 = card
+                            let base: u8 = card
                                 .base_heart
                                 .as_ref()
                                 .map(|bh| {
                                     hc.iter()
                                         .map(|color_str| {
                                             let color = crate::card::parse_heart_color(color_str);
-                                            bh.hearts.get(&color).copied().unwrap_or(0) as u32
+                                            bh.hearts.get(&color).copied().unwrap_or(0) as u8
                                         })
-                                        .sum::<u32>()
+                                        .sum::<u8>()
                                 })
                                 .unwrap_or(0);
                             let modifier: i32 = hc
@@ -896,7 +895,7 @@ impl<'a> ConditionContext<'a> {
                                         .unwrap_or(0)
                                 })
                                 .sum();
-                            (base as i32 + modifier).max(0) as u32
+                            (base as i32 + modifier).max(0) as u8
                         })
                         .sum();
                     Some(compare_counts(
@@ -910,7 +909,7 @@ impl<'a> ConditionContext<'a> {
                     cards.extend(player.success_live_card_zone.cards.iter().copied());
                     // If an operator is set (e.g. >=), sum all heart colors and compare
                     if let Some(op) = condition.get_operator() {
-                        let total_need: u32 = cards
+                        let total_need: u8 = cards
                             .iter()
                             .filter(|&&cid| {
                                 card_type.is_empty()
@@ -929,9 +928,9 @@ impl<'a> ConditionContext<'a> {
                                             .map(|color_str| {
                                                 let color =
                                                     crate::card::parse_heart_color(color_str);
-                                                nh.hearts.get(&color).copied().unwrap_or(0) as u32
+                                                nh.hearts.get(&color).copied().unwrap_or(0) as u8
                                             })
-                                            .sum::<u32>()
+                                            .sum::<u8>()
                                     })
                                     .unwrap_or(0)
                             })
@@ -943,10 +942,10 @@ impl<'a> ConditionContext<'a> {
                         ))
                     } else {
                         // No operator: check each color individually across all cards
-                        let threshold = condition.get_count().unwrap_or(1) as u32;
+                        let threshold = condition.get_count().unwrap_or(1) as u8;
                         let all_ok = hc.iter().all(|color_str| {
                             let color = crate::card::parse_heart_color(color_str);
-                            let total: u32 = cards
+                            let total: u8 = cards
                                 .iter()
                                 .filter(|&&cid| {
                                     card_type.is_empty()
@@ -960,9 +959,7 @@ impl<'a> ConditionContext<'a> {
                                 .map(|card| {
                                     card.need_heart
                                         .as_ref()
-                                        .map(|nh| {
-                                            nh.hearts.get(&color).copied().unwrap_or(0) as u32
-                                        })
+                                        .map(|nh| nh.hearts.get(&color).copied().unwrap_or(0) as u8)
                                         .unwrap_or(0)
                                 })
                                 .sum();
@@ -1033,13 +1030,13 @@ impl<'a> ConditionContext<'a> {
 
         let pass = match distinct_type {
             "cost" => {
-                let mut seen_costs: HashSet<u32> = HashSet::default();
+                let mut seen_costs: HashSet<u8> = HashSet::default();
                 for &cid in cards.iter() {
                     if let Some(card) = card_db.get_card(cid) {
                         let cost = card.cost.unwrap_or(0);
                         let modified_cost = (cost as i32
                             + self.game_state.mods.get_cost_modifier(cid))
-                        .max(0) as u32;
+                        .max(0) as u8;
                         seen_costs.insert(modified_cost);
                     }
                 }
@@ -1097,7 +1094,7 @@ impl<'a> ConditionContext<'a> {
             return true;
         }
         let card_db = &self.game_state.card_database;
-        let h: u32 = player
+        let h: u8 = player
             .stage
             .stage
             .iter()
@@ -1119,7 +1116,7 @@ impl<'a> ConditionContext<'a> {
                     .unwrap_or(0)
             })
             .sum();
-        let need: u32 = player
+        let need: u8 = player
             .live_card_zone
             .cards
             .iter()
@@ -1270,7 +1267,7 @@ impl<'a> ConditionContext<'a> {
                                         == selected_name
                                 })
                             })
-                            .count() as u32;
+                            .count() as u8;
                         let required = condition.get_count().unwrap_or(1);
                         return matching >= required;
                     }
@@ -1331,7 +1328,7 @@ impl<'a> ConditionContext<'a> {
                         && self.check_original_heart_filter(condition, id)
                         && self.check_heart_type_all_per_card(condition, card_db, id)
                 })
-                .count() as u32
+                .count() as u8
         };
         // For revealed_cards: check that filtered cards collectively have all required
         // heart colors in their base_heart (printed hearts).
@@ -1411,7 +1408,7 @@ impl<'a> ConditionContext<'a> {
             return HeartTotal::All;
         }
 
-        let base_sum: u32 = base.hearts.values_sum();
+        let base_sum: u8 = base.hearts.values_sum();
 
         let modifier_total: i32 = self
             .game_state
@@ -1421,7 +1418,7 @@ impl<'a> ConditionContext<'a> {
             .map(|hm| hm.values().map(|e| e.set + e.additive).sum::<i32>())
             .unwrap_or(0);
 
-        HeartTotal::Value((base_sum as i32 + modifier_total).max(0) as u32)
+        HeartTotal::Value((base_sum as i32 + modifier_total).max(0) as u8)
     }
 
     fn evaluate_heart_greater_than_all(&self, condition: &Condition, is_both: bool) -> bool {
@@ -1576,7 +1573,7 @@ impl<'a> ConditionContext<'a> {
         ] {
             let modifier = self.game_state.mods.get_heart_modifier(card_id, color);
             if modifier > 0 {
-                current_hearts += modifier as u32;
+                current_hearts += modifier as u8;
             }
         }
         compare_counts(Some(op), current_hearts, base_hearts)
@@ -1624,7 +1621,7 @@ impl<'a> ConditionContext<'a> {
             };
             match distinct_type {
                 "cost" => {
-                    let mut distinct_costs: HashSet<u32> = HashSet::default();
+                    let mut distinct_costs: HashSet<u8> = HashSet::default();
                     for &cid in &combined {
                         if cid == -1 {
                             continue;
@@ -1643,11 +1640,11 @@ impl<'a> ConditionContext<'a> {
                             let cost = card.cost.unwrap_or(0);
                             let modified_cost = (cost as i32
                                 + self.game_state.mods.get_cost_modifier(cid))
-                            .max(0) as u32;
+                            .max(0) as u8;
                             distinct_costs.insert(modified_cost);
                         }
                     }
-                    let count = distinct_costs.len() as u32;
+                    let count = distinct_costs.len() as u8;
                     compare_counts(operator, count, count_threshold)
                 }
                 "group_name" => {
@@ -1672,7 +1669,7 @@ impl<'a> ConditionContext<'a> {
                             }
                         }
                     }
-                    let count = distinct_groups.len() as u32;
+                    let count = distinct_groups.len() as u8;
                     compare_counts(operator, count, count_threshold)
                 }
                 _ => {
@@ -1694,7 +1691,7 @@ impl<'a> ConditionContext<'a> {
                         name_sets.push(card_db.get_card_names(cid));
                     }
                     let best = util::max_distinct_names(&name_sets);
-                    compare_counts(operator, best.distinct as u32, count_threshold)
+                    compare_counts(operator, best.distinct as u8, count_threshold)
                 }
             }
         } else {
@@ -1907,7 +1904,7 @@ impl<'a> ConditionContext<'a> {
         is_new_movement: bool,
         card_type: &str,
         hc: &[String],
-        count: u32,
+        count: u8,
     ) -> bool {
         let card_db = &self.game_state.card_database;
         let negate = condition.get_negation().unwrap_or(false);
@@ -2165,7 +2162,7 @@ impl<'a> ConditionContext<'a> {
 
                 true
             })
-            .count() as u32;
+            .count() as u8;
         // negation for the count comparison only applies when card_property is not
         // driving the per-card filter (handled above). For pure count negation
         // ("ない場合" style), flip the compare result.
@@ -2203,7 +2200,7 @@ impl<'a> ConditionContext<'a> {
         player: &crate::player::Player,
         card_type: &str,
         group_names: Option<&[String]>,
-    ) -> u32 {
+    ) -> u8 {
         let target = self.resolve_target_for_scope(condition);
         let exclude_self = condition.get_exclude_self().unwrap_or(false);
         let activating_id = self.activating_card_id;
@@ -2336,7 +2333,7 @@ impl<'a> ConditionContext<'a> {
                     |d| matches!(d, crate::core::card::DistinctInfo::String(s) if s == "cost"),
                 );
                 if is_distinct_cost {
-                    let mut distinct_costs: HashSet<u32> = HashSet::default();
+                    let mut distinct_costs: HashSet<u8> = HashSet::default();
                     for &cid in &stage_cards {
                         if cid == -1 {
                             continue;
@@ -2348,7 +2345,7 @@ impl<'a> ConditionContext<'a> {
                         }
                         let base = card_db.get_card(cid).and_then(|c| c.cost).unwrap_or(0);
                         let modified = (base as i32 + self.game_state.mods.get_cost_modifier(cid))
-                            .max(0) as u32;
+                            .max(0) as u8;
                         distinct_costs.insert(modified);
                     }
                     distinct_costs.len()
@@ -2540,7 +2537,7 @@ impl<'a> ConditionContext<'a> {
                 }
                 _ => 0,
             },
-        } as u32;
+        } as u8;
         actual
     }
 
@@ -2632,7 +2629,7 @@ impl<'a> ConditionContext<'a> {
             } else {
                 stage_cards
             };
-            let mut name_counts: HashMap<String, u32> = HashMap::default();
+            let mut name_counts: HashMap<String, u8> = HashMap::default();
             for &cid in &stage_cards {
                 if cid == -1 {
                     continue;
@@ -2693,13 +2690,13 @@ impl<'a> ConditionContext<'a> {
             total_blades,
             op_display,
             count,
-            if util::compare_counts(operator, total_blades.max(0) as u32, count) {
+            if util::compare_counts(operator, total_blades.max(0) as u8, count) {
                 "PASS"
             } else {
                 "FAIL"
             }
         );
-        util::compare_counts(operator, total_blades.max(0) as u32, count)
+        util::compare_counts(operator, total_blades.max(0) as u8, count)
     }
 
     pub(crate) fn evaluate_appearance_condition(&self, condition: &Condition) -> bool {
@@ -3403,7 +3400,7 @@ impl<'a> ConditionContext<'a> {
                     })
                     .unwrap_or(false)
             })
-            .count() as u32;
+            .count() as u8;
 
         match operator {
             "=" => match_count == count_needed,
@@ -3415,7 +3412,7 @@ impl<'a> ConditionContext<'a> {
         }
     }
 
-    pub(crate) fn zone_len(&self, player: &crate::player::Player, location: &str) -> u32 {
+    pub(crate) fn zone_len(&self, player: &crate::player::Player, location: &str) -> u8 {
         match Zone::from_str(location) {
             Some(Zone::Stage) => player.stage.total_blades(
                 &self.game_state.card_database,
@@ -3423,13 +3420,13 @@ impl<'a> ConditionContext<'a> {
                 &self.game_state.mods.orientation_modifiers,
                 true,
             ),
-            Some(Zone::Hand) => player.hand.len() as u32,
-            Some(Zone::Deck) => player.main_deck.len() as u32,
-            Some(Zone::Discard) => player.waitroom.len() as u32,
-            Some(Zone::Energy) => player.energy_zone.cards.len() as u32,
-            Some(Zone::LiveCardZone) => player.live_card_zone.len() as u32,
-            Some(Zone::SuccessLiveZone) => player.success_live_card_zone.len() as u32,
-            Some(Zone::RevealedCards) => self.game_state.revealed_cards.len() as u32,
+            Some(Zone::Hand) => player.hand.len() as u8,
+            Some(Zone::Deck) => player.main_deck.len() as u8,
+            Some(Zone::Discard) => player.waitroom.len() as u8,
+            Some(Zone::Energy) => player.energy_zone.cards.len() as u8,
+            Some(Zone::LiveCardZone) => player.live_card_zone.len() as u8,
+            Some(Zone::SuccessLiveZone) => player.success_live_card_zone.len() as u8,
+            Some(Zone::RevealedCards) => self.game_state.revealed_cards.len() as u8,
             _ => 0,
         }
     }
@@ -3440,7 +3437,7 @@ impl<'a> ConditionContext<'a> {
         card_type_filter: Option<&str>,
         group_names: Option<&[String]>,
         heart_colors: &[String],
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         cost_limit_operator: Option<&str>,
         respect_original_value: bool,
         condition: &Condition,
@@ -3479,12 +3476,12 @@ impl<'a> ConditionContext<'a> {
         card_type_filter: Option<&str>,
         group_names: Option<&[String]>,
         heart_colors: &[String],
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         cost_limit_operator: Option<&str>,
         exclude_self: Option<i16>,
         respect_original_value: bool,
         condition: &Condition,
-    ) -> u32 {
+    ) -> u8 {
         // Build a single CardFilter and use its .count() — avoids re-parsing
         // the filter fields for every card in the slice.
         let mut filter = crate::ability::util::CardFilter::default();
@@ -3501,7 +3498,7 @@ impl<'a> ConditionContext<'a> {
             filter.negation = condition.get_negation().unwrap_or(false);
         }
         let card_db = &self.game_state.card_database;
-        let mut count = 0u32;
+        let mut count = 0u8;
         for &card_id in cards {
             if !filter.matches(card_db, card_id, true) {
                 continue;
@@ -3530,7 +3527,7 @@ impl<'a> ConditionContext<'a> {
         condition: &Condition,
         card_type: Option<&str>,
         group_names: Option<&[String]>,
-    ) -> u32 {
+    ) -> u8 {
         let card_db = &self.game_state.card_database;
         // Collect matching cards first
         let matching: Vec<i16> = cards
@@ -3552,16 +3549,16 @@ impl<'a> ConditionContext<'a> {
         };
         match distinct_type {
             "cost" => {
-                let mut seen: HashSet<u32> = HashSet::default();
+                let mut seen: HashSet<u8> = HashSet::default();
                 for &cid in &matching {
                     if let Some(card) = card_db.get_card(cid) {
                         let cost = card.cost.unwrap_or(0);
                         let modified = (cost as i32 + self.game_state.mods.get_cost_modifier(cid))
-                            .max(0) as u32;
+                            .max(0) as u8;
                         seen.insert(modified);
                     }
                 }
-                seen.len() as u32
+                seen.len() as u8
             }
             "group_name" => {
                 let mut seen: HashSet<String> = HashSet::default();
@@ -3570,14 +3567,14 @@ impl<'a> ConditionContext<'a> {
                         seen.insert(card.group.to_string());
                     }
                 }
-                seen.len() as u32
+                seen.len() as u8
             }
             _ => {
                 let name_sets: Vec<Vec<String>> = matching
                     .iter()
                     .map(|&cid| card_db.get_card_names(cid))
                     .collect();
-                util::max_distinct_names(&name_sets).distinct as u32
+                util::max_distinct_names(&name_sets).distinct as u8
             }
         }
     }
@@ -3586,7 +3583,7 @@ impl<'a> ConditionContext<'a> {
         &self,
         player: &crate::player::Player,
         group_name: Option<&str>,
-    ) -> u32 {
+    ) -> u8 {
         let card_db = &self.game_state.card_database;
         player
             .stage
@@ -3611,7 +3608,7 @@ impl<'a> ConditionContext<'a> {
         group_names: Option<&[String]>,
         card_type: Option<&str>,
         exclude_characters: Option<&[String]>,
-    ) -> u32 {
+    ) -> u8 {
         let card_db = &self.game_state.card_database;
         let group_name = group_names.and_then(|g| g.first().map(|s| s.as_str()));
         let count = cards
@@ -3646,7 +3643,7 @@ impl<'a> ConditionContext<'a> {
                 }
                 true
             })
-            .count() as u32;
+            .count() as u8;
         log::debug!(
             "[COUNT_GROUP] zone_count={} group={:?} ct={:?} exc={:?} total={}",
             cards.len(),
@@ -3663,7 +3660,7 @@ impl<'a> ConditionContext<'a> {
         player: &crate::player::Player,
         location: &str,
         comparison_type: Option<&str>,
-    ) -> u32 {
+    ) -> u8 {
         let zone = Zone::from_str(location);
         match comparison_type {
             Some("score") => {
@@ -3702,12 +3699,12 @@ impl<'a> ConditionContext<'a> {
                     );
 
                     let success_score = {
-                        let mut total = 0u32;
+                        let mut total = 0u8;
                         for &card_id in player.success_live_card_zone.cards.iter() {
                             if let Some(card) = self.game_state.card_database.get_card(card_id) {
                                 let base = card.get_score() as i32;
                                 let modifier = score_flat.get(&card_id).copied().unwrap_or(0);
-                                total += (base + modifier).max(0) as u32;
+                                total += (base + modifier).max(0) as u8;
                             }
                         }
                         total
@@ -3724,7 +3721,7 @@ impl<'a> ConditionContext<'a> {
                         ),
                         Some(Zone::SuccessLiveZone) => success_score,
                         None => {
-                            live_score + success_score + cheer_blade + constant_bonus.max(0) as u32
+                            live_score + success_score + cheer_blade + constant_bonus.max(0) as u8
                         }
                         _ => 0,
                     };
@@ -3760,14 +3757,14 @@ impl<'a> ConditionContext<'a> {
                         }
                     }
                 }
-                total_cost.max(0) as u32
+                total_cost.max(0) as u8
             }
-            Some("energy") => player.energy_zone.cards.len() as u32,
+            Some("energy") => player.energy_zone.cards.len() as u8,
             _ => self.zone_len(player, location),
         }
     }
 
-    pub(crate) fn get_count_for_condition(&self, condition: &Condition) -> u32 {
+    pub(crate) fn get_count_for_condition(&self, condition: &Condition) -> u8 {
         let location = condition.get_location().unwrap_or("");
         let target = condition.get_target().unwrap_or("self");
         let comparison_type = condition.get_comparison_type();
@@ -3788,7 +3785,7 @@ impl<'a> ConditionContext<'a> {
                     .filter(|&&id| ct.is_none() || util::card_matches_type(card_db, id, ct))
                     .map(|&id| {
                         let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
-                        (base + self.game_state.mods.get_cost_modifier(id)).max(0) as u32
+                        (base + self.game_state.mods.get_cost_modifier(id)).max(0) as u8
                     })
                     .sum();
             }
@@ -3824,8 +3821,7 @@ impl<'a> ConditionContext<'a> {
                     .filter_map(|&id| {
                         let base = card_db.get_card(id).and_then(|c| c.cost)?;
                         Some(
-                            (base as i32 + self.game_state.mods.get_cost_modifier(id)).max(0)
-                                as u32,
+                            (base as i32 + self.game_state.mods.get_cost_modifier(id)).max(0) as u8,
                         )
                     })
                     .max()
@@ -3844,7 +3840,7 @@ impl<'a> ConditionContext<'a> {
                     if Zone::from_str(loc) == Some(Zone::Stage) {
                         cards.retain(|&id| id != -1);
                     }
-                    let total: u32 = cards
+                    let total: u8 = cards
                         .iter()
                         .filter(|&&id| {
                             if let Some(ref groups) = condition.get_group_names() {
@@ -3866,7 +3862,7 @@ impl<'a> ConditionContext<'a> {
                         .map(|&id| {
                             let base =
                                 card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
-                            (base + self.game_state.mods.get_cost_modifier(id)).max(0) as u32
+                            (base + self.game_state.mods.get_cost_modifier(id)).max(0) as u8
                         })
                         .sum();
                     return total;
@@ -3875,7 +3871,7 @@ impl<'a> ConditionContext<'a> {
         }
         if resource_type == Some("hand_count") {
             let player = self.resolve_condition_player(target);
-            return player.hand.len() as u32;
+            return player.hand.len() as u8;
         }
         if let Some(rt) = resource_type {
             if rt.starts_with("heart") {
@@ -3883,7 +3879,7 @@ impl<'a> ConditionContext<'a> {
                 let color = crate::card::parse_heart_color(&clean);
                 let player = self.resolve_condition_player(target);
                 let card_db = &self.game_state.card_database;
-                let sum_all = || -> u32 {
+                let sum_all = || -> u8 {
                     player
                         .stage
                         .stage
@@ -3948,7 +3944,7 @@ impl<'a> ConditionContext<'a> {
                     let player_id = &player.id;
                     for snap in &self.game_state.performance_snapshots {
                         if &snap.player_id == player_id {
-                            let mut total = 0u32;
+                            let mut total = 0u8;
                             for hc_str in colors {
                                 let color = crate::card::parse_heart_color(hc_str);
                                 total += snap.surplus_hearts[color.index()];
@@ -3975,10 +3971,10 @@ impl<'a> ConditionContext<'a> {
             let card_db = &self.game_state.card_database;
 
             if let Some(colors) = condition.get_heart_colors() {
-                let mut total = 0u32;
+                let mut total = 0u8;
                 for hc_str in colors {
                     let color = crate::card::parse_heart_color(hc_str);
-                    let member_of_color: u32 = player
+                    let member_of_color: u8 = player
                         .stage
                         .stage
                         .iter()
@@ -3992,7 +3988,7 @@ impl<'a> ConditionContext<'a> {
                                 .unwrap_or(0)
                         })
                         .sum();
-                    let needed_of_color: u32 = player
+                    let needed_of_color: u8 = player
                         .live_card_zone
                         .cards
                         .iter()
@@ -4011,14 +4007,14 @@ impl<'a> ConditionContext<'a> {
                 return total;
             }
 
-            let member_hearts: u32 = player
+            let member_hearts: u8 = player
                 .stage
                 .stage
                 .iter()
                 .filter(|&&id| id != -1)
                 .map(|&id| card_db.get_card(id).map(|c| c.total_hearts()).unwrap_or(0))
                 .sum();
-            let needed: u32 = player
+            let needed: u8 = player
                 .live_card_zone
                 .cards
                 .iter()
@@ -4029,7 +4025,7 @@ impl<'a> ConditionContext<'a> {
         }
         if resource_type == Some("energy") {
             let player = self.resolve_condition_player(target);
-            let count = player.energy_zone.cards.len() as u32;
+            let count = player.energy_zone.cards.len() as u8;
             log::debug!(
                 "[GET_COUNT] resource_type=energy target={} → {}",
                 target,
@@ -4047,7 +4043,7 @@ impl<'a> ConditionContext<'a> {
             let ct = condition.get_card_type().map(|ct| ct.as_str());
             let hc: &[String] = condition.get_heart_colors().unwrap_or(&[]);
             let card_db = &self.game_state.card_database;
-            let count: u32 = self
+            let count: u8 = self
                 .moved_cards
                 .iter()
                 .filter(|&&cid| {
@@ -4067,7 +4063,7 @@ impl<'a> ConditionContext<'a> {
                     }
                     true
                 })
-                .count() as u32;
+                .count() as u8;
             return count;
         }
 
@@ -4080,12 +4076,12 @@ impl<'a> ConditionContext<'a> {
             && !self.moved_cards.is_empty()
         {
             let card_db = &self.game_state.card_database;
-            let total: u32 = self
+            let total: u8 = self
                 .moved_cards
                 .iter()
                 .filter_map(|&id| {
                     let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
-                    Some((base + self.game_state.mods.get_cost_modifier(id)).max(0) as u32)
+                    Some((base + self.game_state.mods.get_cost_modifier(id)).max(0) as u8)
                 })
                 .sum();
             if total > 0 {
@@ -4097,13 +4093,13 @@ impl<'a> ConditionContext<'a> {
         // Use the cost of revealed cards when available.
         if location.is_empty() && !self.game_state.revealed_cards.is_empty() {
             let card_db = &self.game_state.card_database;
-            let total: u32 = self
+            let total: u8 = self
                 .game_state
                 .revealed_cards
                 .iter()
                 .filter_map(|&id| {
                     let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
-                    Some((base + self.game_state.mods.get_cost_modifier(id)).max(0) as u32)
+                    Some((base + self.game_state.mods.get_cost_modifier(id)).max(0) as u8)
                 })
                 .sum();
             return total;
@@ -4112,13 +4108,13 @@ impl<'a> ConditionContext<'a> {
         self.zone_len(player, location)
     }
 
-    pub(crate) fn get_count_for_target(&self, condition: &Condition, target: &str) -> u32 {
+    pub(crate) fn get_count_for_target(&self, condition: &Condition, target: &str) -> u8 {
         let location = condition.get_location().unwrap_or("");
         let resource_type = condition.get_resource_type();
         let comparison_type = condition.get_comparison_type();
         if resource_type == Some("energy") {
             let player = self.resolve_condition_player(target);
-            return player.energy_zone.cards.len() as u32;
+            return player.energy_zone.cards.len() as u8;
         }
         let player = self.resolve_condition_player(target);
         let mut count = self.count_for_player_target(player, location, comparison_type);
@@ -4140,7 +4136,7 @@ impl<'a> ConditionContext<'a> {
         count
     }
 
-    pub(crate) fn get_group_card_count(&self, condition: &Condition) -> u32 {
+    pub(crate) fn get_group_card_count(&self, condition: &Condition) -> u8 {
         let group_filter = condition.get_group_names();
         let target = condition.get_target().unwrap_or("self");
         let player = self.resolve_condition_player(target);
@@ -4187,7 +4183,7 @@ impl<'a> ConditionContext<'a> {
                                 || util::card_matches_group_str(card_db, cid, group_name)
                         })
                         .filter_map(|&cid| card_db.get_card(cid))
-                        .map(|card| card.score.unwrap_or(0) as u32)
+                        .map(|card| card.score.unwrap_or(0) as u8)
                         .sum()
                 }
                 _ => 0,
@@ -4218,7 +4214,7 @@ impl<'a> ConditionContext<'a> {
         // This handles zone-transition conditions (e.g. "card in live_card_zone OR discard").
         if let Some(locs) = condition.get_locations() {
             if locs.len() >= 2 {
-                let mut total = 0u32;
+                let mut total = 0u8;
                 for loc in locs {
                     let cards = crate::ability::util::zone_cards(player, loc.as_str());
                     total += self.count_group_cards_in_cards(cards, group_filter, ct, exc);
@@ -4297,7 +4293,7 @@ impl<'a> ConditionContext<'a> {
                     .map(|&cid| {
                         let base = card_db.get_card(cid).map(|c| c.blade as i32).unwrap_or(0);
                         let modifier = bm_flat.get(&cid).copied().unwrap_or(0);
-                        (base + modifier).max(0) as u32
+                        (base + modifier).max(0) as u8
                     })
                     .sum()
             }
@@ -4313,14 +4309,14 @@ impl<'a> ConditionContext<'a> {
                     );
                 }
                 // Count surplus hearts for the target player
-                let heart_total: u32 = player
+                let heart_total: u8 = player
                     .stage
                     .stage
                     .iter()
                     .filter(|&&id| id != -1)
                     .map(|&id| card_db.get_card(id).map(|c| c.total_hearts()).unwrap_or(0))
                     .sum();
-                let need: u32 = player
+                let need: u8 = player
                     .live_card_zone
                     .cards
                     .iter()

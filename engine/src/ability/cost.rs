@@ -763,7 +763,7 @@ impl AbilityResolver {
 
                 if optional && !is_activation {
                     let player = gs.resolve_target_player(target);
-                    let active = player.energy_zone.active_count() as u32;
+                    let active = player.energy_zone.active_count() as u8;
                     if active < energy {
                         if let Some(entry) = gs.ability_queue.current_entry_mut() {
                             entry.cost_paid = true;

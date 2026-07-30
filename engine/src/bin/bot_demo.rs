@@ -47,7 +47,7 @@ fn main() {
         bot.network.load_weights(&weights_path).unwrap();
     }
 
-    const NUM_GAMES: u32 = 100;
+    const NUM_GAMES: u8 = 100;
     let mut p1_wins = 0u32;
     let mut p2_wins = 0u32;
     let mut draws = 0u32;
@@ -74,7 +74,7 @@ fn main() {
         game_setup::setup_game(&mut gs);
 
         let mut stuck = 0u32;
-        let mut last_turn = 0u32;
+        let mut last_turn = 0u8;
 
         for _ in 0..500 {
             TurnEngine::check_victory_condition(&mut gs);

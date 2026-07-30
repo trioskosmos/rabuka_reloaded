@@ -69,7 +69,7 @@ pub struct AbilityResolver {
     /// Cross-step data flow machinery — see `StepState` for the per-step
     /// output map, last-draw-count, and looked-at-total-count fields.
     pub step_state: StepState,
-    pub pending_energy_payment: Option<u32>,
+    pub pending_energy_payment: Option<u8>,
     /// Binary sub-costs (e.g. change_state self_cost) in a sequential_cost that
     /// were deferred until the choice sub-cost is confirmed by the player.
     /// Paid on confirm, cleared on skip.
@@ -152,7 +152,7 @@ impl AbilityResolver {
         card_db: &crate::card::CardDatabase,
         card_type: Option<&str>,
         group_name: Option<&str>,
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
         zone_name: &str,
         _prompt_desc: &str,
     ) -> Result<Option<Vec<usize>>, String> {
@@ -717,7 +717,7 @@ impl AbilityResolver {
                     .get(key)
                     .copied()
                     .unwrap_or(0);
-                if u32::from(used) >= use_limit {
+                if u8::from(used) >= use_limit {
                     let msg = format!(
                         "Ability already used {} of {} times this turn",
                         used, use_limit
@@ -1087,7 +1087,7 @@ impl AbilityResolver {
         &self,
         gs: &mut GameState,
         card_id: i16,
-        cost_limit: Option<u32>,
+        cost_limit: Option<u8>,
     ) -> bool {
         util::card_matches_cost_limit(&gs.card_database, card_id, cost_limit)
     }
@@ -1123,7 +1123,7 @@ impl AbilityResolver {
                     }
                     let per_unit_count = mod_cost.per_unit_count_any().unwrap_or(1);
                     let reduction =
-                        (groups.len() as u32 / per_unit_count) * mod_cost.count.unwrap_or(1);
+                        (groups.len() as u8 / per_unit_count) * mod_cost.count.unwrap_or(1);
                     if cost.action == crate::ability::enums::ActionType::PayEnergy {
                         let new_energy = cost
                             .energy_count_any()

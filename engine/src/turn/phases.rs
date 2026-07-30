@@ -420,12 +420,12 @@ impl super::TurnEngine {
             game_state.re_yell_revealed_cards = game_state.revealed_cards.clone();
             let card_db = &game_state.card_database;
             let mut new_yell_cards: Vec<crate::core::types::YellCardResult> = Vec::new();
-            let mut new_total_hearts = [0u32; 8];
-            let mut new_cheer_count = 0u32;
+            let mut new_total_hearts = [0u8; 8];
+            let mut new_cheer_count = 0u8;
             for &cid in &game_state.revealed_cards {
                 if let Some(card) = card_db.get_card(cid) {
-                    let mut bh = [0u32; 8];
-                    let mut notes = 0u32;
+                    let mut bh = [0u8; 8];
+                    let mut notes = 0u8;
                     if let Some(ref bheart) = card.blade_heart {
                         for (color, count) in &bheart.hearts {
                             use crate::card::HeartColor;
@@ -600,7 +600,7 @@ impl super::TurnEngine {
                 if stage_cards.contains(cid) {
                     bd.scores.push(crate::types::ScoreLine {
                         source: text.clone(),
-                        value: val.unsigned_abs(),
+                        value: val.unsigned_abs() as u8,
                     });
                 }
             }
@@ -949,7 +949,7 @@ impl super::TurnEngine {
             // Calculate cost before modifying state
             let card_entry = card_db.get_card(card_id);
             let card_cost = card_entry.and_then(|c| c.cost).unwrap_or(0);
-            let replaced_costs: Vec<u32> = {
+            let replaced_costs: Vec<u8> = {
                 let player = game_state.active_player();
                 db_areas
                     .iter()
@@ -962,7 +962,7 @@ impl super::TurnEngine {
                     })
                     .collect()
             };
-            let combined_reduction: u32 = replaced_costs.iter().sum();
+            let combined_reduction: u8 = replaced_costs.iter().sum();
             let hand_count = game_state.active_player().hand.cards.len();
             let stage = &game_state.active_player().stage;
             let success_zone = &game_state.active_player().success_live_card_zone.cards;
@@ -1295,8 +1295,8 @@ impl super::TurnEngine {
             metadata: Some(crate::core::types::LogMetadata::RpsResult {
                 p1_choice: Self::rps_choice_name(p1).to_string(),
                 p2_choice: Self::rps_choice_name(p2).to_string(),
-                p1_value: p1 as u32,
-                p2_value: p2 as u32,
+                p1_value: p1 as u8,
+                p2_value: p2 as u8,
                 winner: winner_str.to_string(),
             }),
         });

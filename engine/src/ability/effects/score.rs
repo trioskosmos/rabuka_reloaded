@@ -16,13 +16,13 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
         operation: &str,
-        value: u32,
+        value: u8,
         target: &str,
         duration: Option<&str>,
         card_type: Option<&str>,
         group_name: Option<&str>,
         per_unit: bool,
-        per_unit_count: u32,
+        per_unit_count: u8,
         per_unit_type: Option<&str>,
         location: Option<&str>,
         effect_constraint: Option<&str>,
@@ -176,7 +176,7 @@ impl AbilityResolver {
             (target_card_ids, final_value)
         };
 
-        let mut count_applied = 0u32;
+        let mut count_applied = 0u8;
         for (card_id, delta) in &live_card_ids {
             if let Some(constraint) = &effect_constraint {
                 let current_mod = gs.mods.get_score_modifier(*card_id);
@@ -249,22 +249,22 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         operation: &str,
-        mut value: u32,
+        mut value: u8,
         heart_colors: &[String],
         target: &str,
         per_unit: bool,
-        per_unit_count: u32,
+        per_unit_count: u8,
         group_name: Option<&str>,
         timing_condition: Option<&str>,
         location: Option<&str>,
         original_value: Option<bool>,
-        original_count: Option<u32>,
+        original_count: Option<u8>,
         original_operator: Option<&str>,
         exclude_self: bool,
         self_target: bool,
         exclude_heart_colors: &[String],
         max: bool,
-        repeat_limit: Option<u32>,
+        repeat_limit: Option<u8>,
         per_unit_heart_colors: &[String],
     ) -> Result<(), String> {
         if per_unit {
@@ -274,7 +274,7 @@ impl AbilityResolver {
             if !per_unit_heart_colors.is_empty() {
                 // Count total heart icon count of specified colors across matching members.
                 // Used for patterns like "そのメンバーが持つheart03 2つにつき" (count heart03 on card).
-                let mut total_hearts = 0u32;
+                let mut total_hearts = 0u8;
                 let stage_ids: Vec<i16> = player
                     .stage
                     .stage
@@ -327,7 +327,7 @@ impl AbilityResolver {
                         .collect(),
                 };
                 let activating_id = gs.activating_card;
-                let mut count = 0u32;
+                let mut count = 0u8;
                 for &card_id in &cards {
                     if exclude_self {
                         if activating_id == Some(card_id) {
@@ -489,7 +489,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         operation: &str,
-        value: u32,
+        value: u8,
         heart_colors: &[String],
         target: &str,
     ) -> Result<(), String> {
@@ -530,7 +530,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         operation: &str,
-        count: u32,
+        count: u8,
     ) {
         let pp = self.player_prefix(gs);
         let act_name = gs
@@ -559,7 +559,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         operation: &str,
-        count: u32,
+        count: u8,
     ) -> Result<(), String> {
         let pp = self.player_prefix(gs);
         let act_name = gs
@@ -588,7 +588,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         operation: &str,
-        value: u32,
+        value: u8,
         target: &str,
         card_type: Option<&str>,
         heart_colors: &[String],

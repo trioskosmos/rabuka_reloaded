@@ -53,11 +53,11 @@ pub struct Player {
 
     pub stage_hearts: Option<crate::card::BaseHeart>,
 
-    pub debut_count_this_turn: u32,
+    pub debut_count_this_turn: u8,
 
     pub deck_refreshed_this_turn: bool,
 
-    pub live_card_set_limit_reduction: u32,
+    pub live_card_set_limit_reduction: u8,
 
     pub last_resolution_cards: SmallVec<[i16; 4]>,
 }
@@ -204,7 +204,7 @@ impl Player {
         use_baton_touch: bool,
         card_db: &CardDatabase,
         replaced_member_cost_mod: i32,
-    ) -> Result<(u32, bool, Option<u32>, Option<i16>), String> {
+    ) -> Result<(u8, bool, Option<u8>, Option<i16>), String> {
         // Rule 8.2: Main Phase - Play member card from hand to stage
 
         if hand_index >= self.hand.cards.len() {
@@ -238,7 +238,7 @@ impl Player {
                 card_db,
             );
             // Rule: Cost increase from 常時 abilities (e.g. success_live_zone cards → +cost)
-            let mut cost_increase: u32 = 0;
+            let mut cost_increase: u8 = 0;
             for ar in &card.abilities {
                 let ability = ar.resolve();
                 if let Some(ref effect) = ability.effect {
@@ -253,7 +253,7 @@ impl Player {
                         let per_unit_count = effect.per_unit_count_any().unwrap_or(1) as usize;
                         let success_count = self.success_live_card_zone.cards.len();
                         let multiplier = effect.count.unwrap_or(1);
-                        cost_increase = ((success_count / per_unit_count) as u32) * multiplier;
+                        cost_increase = ((success_count / per_unit_count) as u8) * multiplier;
                     }
                 }
             }
@@ -266,7 +266,7 @@ impl Player {
             // Note: Baton touch sends member from the TARGET area (where you're playing the new member)
 
             // Track baton touch state and replaced member cost
-            let mut baton_touch_replaced_cost: Option<u32> = None;
+            let mut baton_touch_replaced_cost: Option<u8> = None;
 
             // Determine if baton touch should be used:
             // 1. If use_baton_touch parameter is explicitly set to true, OR
@@ -293,7 +293,7 @@ impl Player {
                         // Resolved by the caller (from &game_state.mods) and passed in
                         // to avoid cloning the entire GameModifiers per action.
                         let cost_mod = replaced_member_cost_mod;
-                        let replaced_member_cost = (base_cost as i32 + cost_mod).max(1) as u32;
+                        let replaced_member_cost = (base_cost as i32 + cost_mod).max(1) as u8;
 
                         // Store the replaced member cost for later use
                         baton_touch_replaced_cost = Some(replaced_member_cost);
@@ -465,7 +465,7 @@ impl Player {
         &self,
         card_db: &CardDatabase,
         heart_color_multiplier: &HashMap<i16, crate::card::HeartColor>,
-        heart_override: &HashMap<i16, (crate::card::HeartColor, u32)>,
+        heart_override: &HashMap<i16, (crate::card::HeartColor, u8)>,
         heart_modifiers: &HashMap<i16, HashMap<crate::card::HeartColor, ModifierEntry>>,
     ) -> crate::card::BaseHeart {
         let mut total_hearts = crate::card::HeartMap::new();
@@ -483,7 +483,7 @@ impl Player {
             if let Some(card) = card_db.get_card(card_id) {
                 if let Some(ref base_heart) = card.base_heart {
                     if let Some(override_color) = heart_color_multiplier.get(&card_id) {
-                        let total: u32 = base_heart.hearts.values_sum();
+                        let total: u8 = base_heart.hearts.values_sum();
                         *total_hearts.entry_or_default(*override_color) += total;
                     } else {
                         for (color, count) in &base_heart.hearts {
@@ -498,7 +498,7 @@ impl Player {
                     let delta = entry.total();
                     if delta != 0 {
                         let new_val = (total_hearts.get(color).copied().unwrap_or(0) as i32 + delta)
-                            .max(0) as u32;
+                            .max(0) as u8;
                         if new_val > 0 {
                             total_hearts.insert(*color, new_val);
                         } else {

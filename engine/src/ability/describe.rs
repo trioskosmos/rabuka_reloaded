@@ -7,7 +7,7 @@ use alloc::{
     vec::Vec,
 };
 
-fn plural(n: u32, word: &str) -> String {
+fn plural(n: u8, word: &str) -> String {
     if n == 1 {
         format!("{} {}", n, word)
     } else {
@@ -15,7 +15,7 @@ fn plural(n: u32, word: &str) -> String {
     }
 }
 
-fn maybe_plural(count: Option<u32>, word: &str) -> String {
+fn maybe_plural(count: Option<u8>, word: &str) -> String {
     match count {
         Some(1) => format!("1 {}", word),
         Some(n) => format!("{} {}s", n, word),

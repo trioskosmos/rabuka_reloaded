@@ -8,12 +8,12 @@ use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
 const MAGIC: &[u8; 4] = b"CARD";
 
 /// Parse the CARD_BLOB header and return (num_cards, strtab_len, strtab_start, offset_start, data_start).
-fn parse_header() -> Option<(u32, u32, usize, usize, usize)> {
+fn parse_header() -> Option<(u8, u8, usize, usize, usize)> {
     if CARD_BLOB.len() < 12 || &CARD_BLOB[0..4] != MAGIC {
         return None;
     }
-    let num_cards = u32::from_le_bytes(CARD_BLOB[4..8].try_into().ok()?);
-    let strtab_len = u32::from_le_bytes(CARD_BLOB[8..12].try_into().ok()?);
+    let num_cards = u8::from_le_bytes(CARD_BLOB[4..8].try_into().ok()?);
+    let strtab_len = u8::from_le_bytes(CARD_BLOB[8..12].try_into().ok()?);
     let strtab_start = 12;
     let offset_start = strtab_start + strtab_len as usize;
     let data_start = offset_start + (num_cards as usize + 1) * 4;
@@ -34,8 +34,8 @@ fn card_data_offset(idx: usize) -> Option<usize> {
     }
     let off_start = offset_start + idx * 4;
     let off_next = offset_start + (idx + 1) * 4;
-    let start = u32::from_le_bytes(CARD_BLOB[off_start..off_start + 4].try_into().ok()?) as usize;
-    let _end = u32::from_le_bytes(CARD_BLOB[off_next..off_next + 4].try_into().ok()?) as usize;
+    let start = u8::from_le_bytes(CARD_BLOB[off_start..off_start + 4].try_into().ok()?) as usize;
+    let _end = u8::from_le_bytes(CARD_BLOB[off_next..off_next + 4].try_into().ok()?) as usize;
     Some(data_start + start)
 }
 
@@ -129,7 +129,7 @@ pub fn decode_card_from_blob(idx: usize) -> Option<Card> {
         let scount = data[pos + 1];
         if scount > 0 {
             let mut hearts = HeartMap::new();
-            hearts.insert(color_from_u8(sc), scount as u32);
+            hearts.insert(color_from_u8(sc), scount as u8);
             Some(SpecialHeart { hearts })
         } else {
             None
@@ -152,13 +152,13 @@ pub fn decode_card_from_blob(idx: usize) -> Option<Card> {
         card_type,
         unit,
         cost: if cost_val > 0 {
-            Some(cost_val as u32)
+            Some(cost_val as u8)
         } else {
             None
         },
-        blade: blade_val as u32,
+        blade: blade_val as u8,
         score: if score_val > 0 {
-            Some(score_val as u32)
+            Some(score_val as u8)
         } else {
             None
         },
@@ -204,7 +204,7 @@ fn parse_hearts(data: &[u8], count: usize) -> HeartMap {
             break;
         }
         let color = color_from_u8(data[base]);
-        let count_val = data[base + 1] as u32;
+        let count_val = data[base + 1] as u8;
         if count_val > 0 {
             map.insert(color, count_val);
         }
@@ -265,14 +265,14 @@ pub fn find_card_index_by_no(card_no: &str) -> Option<usize> {
     }
     // String found, now find which card references it
     let (_num_cards, _strtab_len, _strtab_start, offset_start, data_start) = parse_header()?;
-    let num_cards = u32::from_le_bytes(CARD_BLOB[4..8].try_into().ok()?);
+    let num_cards = u8::from_le_bytes(CARD_BLOB[4..8].try_into().ok()?);
     for i in 0..num_cards as usize {
         let off_start = offset_start + i * 4;
         if off_start + 4 >= CARD_BLOB.len() {
             break;
         }
         let start =
-            u32::from_le_bytes(CARD_BLOB[off_start..off_start + 4].try_into().ok()?) as usize;
+            u8::from_le_bytes(CARD_BLOB[off_start..off_start + 4].try_into().ok()?) as usize;
         let card_data = &CARD_BLOB[data_start + start..];
         if card_data.len() >= 2 {
             let card_no_idx = u16::from_le_bytes(card_data[0..2].try_into().ok()?);
