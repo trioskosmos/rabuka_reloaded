@@ -3224,14 +3224,17 @@ fn main() {
                 let my_id: i32 = my_player_idx as i32;
                 // General check: do the current choice actions have card images?
                 // ChoiceOption actions with card_id → image grid. Otherwise → text fallback.
-                // Image mode only for SelectCard (picking actual cards from zones)
-                // answer_based / SelectTarget / etc use text mode
+                // Image mode: SelectCard only. Text mode: ChoiceOption/answer_based.
                 let has_image_choice = choice_image_mode
                     && gs.has_pending_choice()
                     && matches!(
                         gs.get_pending_choice(),
                         Some(rabuka_engine::ability::types::Choice::SelectCard { .. })
                     );
+                let has_text_choice = gs.has_pending_choice()
+                    && acts_cache
+                        .iter()
+                        .any(|a| a.action_type == game_setup::ActionType::ChoiceOption);
                 #[inline(always)]
                 fn pref<'a>(gs: &'a GameState, idx: usize) -> &'a Player {
                     if idx == 0 {
@@ -5982,7 +5985,7 @@ fn main() {
                                     },
                                 );
                             if zone_viewer.is_none() {
-                                if has_image_choice
+                                if (has_image_choice || has_text_choice)
                                     && !(detail_mode && viewing_card.is_some())
                                     && !is_ai_turn
                                     && !is_opponent_turn_mp
@@ -6362,7 +6365,7 @@ fn main() {
                                         }
                                     }
                                     let mut di = start;
-                                    while di < end {
+                                    while di < end && ty < 230.0 {
                                         let fi = display_order[di];
                                         let act = &acts_cache[fi];
                                         let is_sel = di == display_pos;
