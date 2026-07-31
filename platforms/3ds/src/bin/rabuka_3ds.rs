@@ -2856,7 +2856,7 @@ fn main() {
                                     _3ds_text_add_top(format!("{}\n\0", hdr).as_ptr());
                                 }
                                 for (i, _) in hosts.iter().enumerate() {
-                                    let prefix = if i == new_cursor { "> " } else { "  " };
+                                    let prefix = "";
                                     let label =
                                         format!("{}{}\0", prefix, format!("Host {}", i + 1));
                                     unsafe {
@@ -2883,7 +2883,7 @@ fn main() {
                                 for i in 0..n {
                                     let y = 50.0 + i as f32 * 32.0;
                                     let col = if i == new_cursor { COL_SEL } else { COL_LIGHT };
-                                    let prefix = if i == new_cursor { "> " } else { "  " };
+                                    let prefix = "";
                                     unsafe {
                                         _3ds_top_queue_text(
                                             40.0,
@@ -5685,7 +5685,7 @@ fn main() {
                                     let rect_h = panel_end - 52.0;
 
                                     unsafe {
-                                        _3ds_top_queue_rect(0.0, 52.0, 400.0, rect_h, COL_CARD);
+                                        _3ds_top_queue_rect(0.0, 52.0, 400.0, 188.0, COL_CARD);
                                         let display_name =
                                             i18n::card_display_name(&card.name, current_lang());
                                         _3ds_top_queue_text(
@@ -5716,7 +5716,7 @@ fn main() {
                                             COL_LIGHT,
                                             0.65f32,
                                         );
-                                        let mut ty = 86.0;
+                                        let mut ty = 86.0 - detail_scroll_y;
                                         for ab in card.resolved_abilities() {
                                             let ab_text = i18n::translate_ability(
                                                 &ab.full_text,
@@ -5724,9 +5724,11 @@ fn main() {
                                             );
                                             let w = wrap_ability_text(&ab_text, 392.0, 0.65);
                                             for line in w.lines() {
-                                                render_text_with_icons(
-                                                    4.0, ty, line, COL_LIGHT, 0.65,
-                                                );
+                                                if ty > -20.0 && ty < 240.0 {
+                                                    render_text_with_icons(
+                                                        4.0, ty, line, COL_LIGHT, 0.65,
+                                                    );
+                                                }
                                                 ty += 18.0;
                                             }
                                             ty += 3.0;
@@ -6062,7 +6064,7 @@ fn main() {
                                         let desc =
                                             act.display_desc(current_lang() == Lang::Japanese);
                                         let color = if is_disabled { COL_MED } else { COL_GOLD };
-                                        let pfx = "> ";
+                                        let pfx = "";
                                         let scale = 0.70f32;
                                         let full_txt = format!("{}{}", pfx, desc);
                                         let total_h = unsafe {
@@ -6406,7 +6408,7 @@ fn main() {
                                                 };
                                                 areas.push_str(&area_str);
                                             }
-                                            let hdr_prefix = if is_sel { "> " } else { "  " };
+                                            let hdr_prefix = "";
                                             for (li, l) in wrap_text(&hdr, 370.0, line_scale)
                                                 .lines()
                                                 .enumerate()
@@ -6432,7 +6434,7 @@ fn main() {
                                                 }
                                                 ty += 20.0;
                                             }
-                                            let areas_prefix = if group_sel { "> " } else { "  " };
+                                            let areas_prefix = "";
                                             for (li, l) in wrap_text(&areas, 370.0, line_scale)
                                                 .lines()
                                                 .enumerate()
@@ -6461,7 +6463,7 @@ fn main() {
                                             di = ge;
                                         } else {
                                             let prefix = if is_sel {
-                                                "> "
+                                                ""
                                             } else if is_disabled {
                                                 "· "
                                             } else {
@@ -6921,7 +6923,7 @@ fn main() {
                                     let iy = 85.0 + i as f32 * 30.0;
                                     let bg = if i == sel { 0xFF557755 } else { 0xFF555555 };
                                     _3ds_top_queue_rect(60.0, iy, 280.0, 26.0, bg);
-                                    let prefix = if i == sel { "> " } else { "  " };
+                                    let prefix = "";
                                     _3ds_top_queue_text(
                                         70.0,
                                         iy + 4.0,
@@ -6968,7 +6970,7 @@ fn main() {
                                     };
                                     let is_cursor = idx == cursor;
                                     let col = if is_cursor { COL_GOLD } else { 0xFFCCCCCC };
-                                    let prefix = if is_cursor { "> " } else { "  " };
+                                    let prefix = "";
                                     unsafe {
                                         _3ds_top_queue_text(
                                             4.0,
@@ -7108,7 +7110,7 @@ fn main() {
                                         let base_col =
                                             if s.success { 0xFF88FF88 } else { 0xFFFF8888 };
                                         let col = if is_cur { COL_GOLD } else { base_col };
-                                        let prefix = if is_cur { "> " } else { "  " };
+                                        let prefix = "";
                                         let truncated = if label.chars().count() > 55 {
                                             let cutoff = label
                                                 .char_indices()
