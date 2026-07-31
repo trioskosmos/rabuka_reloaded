@@ -545,18 +545,17 @@ impl LiveCardZone {
                     if !need_heart.hearts.is_empty() {
                         let effective_need = if let Some(modifiers) = need_heart_modifiers {
                             if let Some(card_mods) = modifiers.get(card_id) {
-                                let has_set = card_mods.values().any(|e| e.set != 0);
-                                let mut adjusted = if has_set {
-                                    BaseHeart {
-                                        hearts: HeartMap::new(),
-                                    }
-                                } else {
-                                    need_heart.clone()
-                                };
+                                // Q115/Q127: Start from base requirements for every color.
+                                // A set modifier on one color does NOT erase other colors.
+                                let mut adjusted = need_heart.clone();
+                                // Apply set overrides per-color first.
                                 for (color, me) in card_mods {
                                     if me.set != 0 {
                                         adjusted.hearts.insert(*color, me.set as u8);
                                     }
+                                }
+                                // Then apply additive modifiers.
+                                for (color, me) in card_mods {
                                     if me.additive != 0 {
                                         *adjusted.hearts.entry_or_default(*color) =
                                             (adjusted.hearts.get(color).copied().unwrap_or(0)

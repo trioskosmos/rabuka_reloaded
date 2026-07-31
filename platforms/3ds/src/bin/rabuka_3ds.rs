@@ -470,6 +470,10 @@ fn compute_card_stats(
 /// Check if a choice action is text-only (no card image to render).
 /// Used to separate card choices from text choices in the choice grid.
 fn is_text_only(act: &game_setup::Action) -> bool {
+    // ChoiceOption uses card_id as option index (0,1,2...), not a real card
+    if matches!(act.action_type, game_setup::ActionType::ChoiceOption) {
+        return true;
+    }
     if let Some(cn) = act.parameters.as_ref().and_then(|p| p.card_no.as_deref()) {
         if matches!(
             cn,
@@ -814,10 +818,10 @@ enum SetupPhase {
     MultiplayerDeck(usize), // cursor, selecting deck for multiplayer
     MultiplayerPickRole(usize, usize), // deck_idx, role_cursor (0=Host, 1=Client)
     MultiplayerHostWait(usize), // p1_idx: host waiting for client to connect
-    MultiplayerClientScan(usize), // p1_idx: client scanning for host network
+    MultiplayerClientScan(usize, u32), // p1_idx, frames_until_rescan
     MultiplayerClientHostSelect(usize, Vec<u16>, usize), // p1_idx, host_node_ids, cursor
     MultiplayerSyncDeck(usize, usize, bool), // p1_idx, p2_idx, is_host
-    MultiplayerLoading(usize, usize, bool, Option<Vec<u8>>), // p1_idx, p2_idx, is_host, deck_sync_bytes
+    MultiplayerLoading(usize, usize, bool, Option<Vec<u8>>, u64), // p1_idx, p2_idx, is_host, deck_sync_bytes, seed
     QrScan(usize),          // QR code scanning (usize = context pointer, 0=not started)
     QrResult(Vec<String>),  // QR scan result, user can confirm
     QrNotDeck(String, u32), // QR scanned but not a valid deck, shows decoded text, countdown frames
@@ -2623,7 +2627,7 @@ fn main() {
                                 Step::Setup(
                                     cards.clone(),
                                     decks.clone(),
-                                    SetupPhase::MultiplayerClientScan(deck_idx),
+                                    SetupPhase::MultiplayerClientScan(deck_idx, 0),
                                     true,
                                 )
                             }
@@ -2760,7 +2764,7 @@ fn main() {
                         }
                     }
                     // Multiplayer: Client scanning for host
-                    SetupPhase::MultiplayerClientScan(p1_idx) => {
+                    SetupPhase::MultiplayerClientScan(p1_idx, frames) => {
                         // B = back to role selection
                         if keys & 0x00000002 != 0 {
                             uds::uds_exit();
@@ -2771,56 +2775,67 @@ fn main() {
                                 true,
                             )
                         } else {
-                            // Initialize UDS on first entry, rescan on every frame
-                            if was_dirty {
-                                let _ = uds::uds_init(false);
-                            }
-                            let hosts = uds::uds_scan_networks();
-                            if hosts.is_empty() {
-                                // No hosts found — show message and rescan next frame
-                                if unsafe { _3ds_is_cli_mode() } {
-                                    unsafe {
-                                        _3ds_clear_top();
-                                        _3ds_text_add_top(
-                                            format!("{}\n\0", tl("No hosts found")).as_ptr(),
-                                        );
-                                        _3ds_text_add_top(
-                                            format!("{}\n\0", tl("B = back")).as_ptr(),
-                                        );
-                                    }
-                                } else {
-                                    unsafe {
-                                        _3ds_top_clear();
-                                        _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                                        _3ds_top_queue_text(
-                                            80.0,
-                                            100.0,
-                                            COL_MED,
-                                            0.75f32,
-                                            format!("{}\0", tl("Scanning...")).as_ptr(),
-                                        );
-                                        _3ds_top_queue_text(
-                                            80.0,
-                                            230.0,
-                                            COL_MED,
-                                            0.60f32,
-                                            format!("{}\0", tl("B=back")).as_ptr(),
-                                        );
-                                    }
+                            // A = force rescan now, or auto-rescan every ~3s (180 frames)
+                            let do_scan = was_dirty || keys & 0x00000001 != 0 || frames == 0;
+                            if do_scan {
+                                if was_dirty || keys & 0x00000001 != 0 {
+                                    let _ = uds::uds_init(false);
                                 }
-                                Step::Setup(
-                                    cards.clone(),
-                                    decks.clone(),
-                                    SetupPhase::MultiplayerClientScan(p1_idx),
-                                    false,
-                                )
+                                let hosts = uds::uds_scan_networks();
+                                if hosts.is_empty() {
+                                    // No hosts found — rescan after delay
+                                    if unsafe { _3ds_is_cli_mode() } {
+                                        unsafe {
+                                            _3ds_clear_top();
+                                            _3ds_text_add_top(
+                                                format!("{}\n\0", tl("Scanning...")).as_ptr(),
+                                            );
+                                            _3ds_text_add_top(
+                                                format!("{}\n\0", tl("A=refresh B=back")).as_ptr(),
+                                            );
+                                        }
+                                    } else {
+                                        unsafe {
+                                            _3ds_top_clear();
+                                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                            _3ds_top_queue_text(
+                                                80.0,
+                                                100.0,
+                                                COL_MED,
+                                                0.75f32,
+                                                format!("{}\0", tl("Scanning...")).as_ptr(),
+                                            );
+                                            _3ds_top_queue_text(
+                                                80.0,
+                                                230.0,
+                                                COL_MED,
+                                                0.60f32,
+                                                format!("{}\0", tl("A=refresh B=back")).as_ptr(),
+                                            );
+                                        }
+                                    }
+                                    Step::Setup(
+                                        cards.clone(),
+                                        decks.clone(),
+                                        SetupPhase::MultiplayerClientScan(p1_idx, 180),
+                                        false,
+                                    )
+                                } else {
+                                    // Hosts found — go to selection
+                                    Step::Setup(
+                                        cards.clone(),
+                                        decks.clone(),
+                                        SetupPhase::MultiplayerClientHostSelect(p1_idx, hosts, 0),
+                                        true,
+                                    )
+                                }
                             } else {
-                                // Hosts found — go to selection
+                                // Waiting for rescan timer — decrement and keep scanning text
                                 Step::Setup(
                                     cards.clone(),
                                     decks.clone(),
-                                    SetupPhase::MultiplayerClientHostSelect(p1_idx, hosts, 0),
-                                    true,
+                                    SetupPhase::MultiplayerClientScan(p1_idx, frames - 1),
+                                    false,
                                 )
                             }
                         }
@@ -2832,7 +2847,7 @@ fn main() {
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
-                                SetupPhase::MultiplayerClientScan(p1_idx),
+                                SetupPhase::MultiplayerClientScan(p1_idx, 0),
                                 true,
                             )
                         } else if keys & 0x00000002 != 0 {
@@ -2840,7 +2855,7 @@ fn main() {
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
-                                SetupPhase::MultiplayerClientScan(p1_idx),
+                                SetupPhase::MultiplayerClientScan(p1_idx, 0),
                                 true,
                             )
                         } else if keys & 0x00000001 != 0 {
@@ -2951,22 +2966,31 @@ fn main() {
                     // Multiplayer: Syncing deck data
                     SetupPhase::MultiplayerSyncDeck(p1_idx, p2_idx, is_host) => {
                         if is_host {
-                            // Host: send card_no strings so client calls
-                            // build_deck_from_database in the same order → same create_copy IDs.
+                            // Host: send template IDs so client calls create_copy in the same order → matching instance IDs.
+                            let seed = unsafe { _3ds_system_tick() } as u64;
                             let r = (|| -> Result<(), String> {
+                                use rabuka_engine::card::CardDatabase;
+                                let mut cards_vec = (**cards).clone();
+                                CardLoader::attach_abilities(&mut cards_vec);
+                                let db = CardDatabase::load_or_create(cards_vec);
                                 let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
                                 let nums2 = if p1_idx == p2_idx {
                                     nums1.clone()
                                 } else {
                                     DeckParser::deck_list_to_card_numbers(&decks[p2_idx])
                                 };
-                                let seed = unsafe { _3ds_system_tick() } as u64;
+                                // Convert card_no strings to template IDs (same on both machines)
+                                let to_ids = |nos: &Vec<String>| -> Vec<u16> {
+                                    nos.iter()
+                                        .filter_map(|no| db.get_card_id(no).map(|id| id as u16))
+                                        .collect()
+                                };
                                 let sync = uds::DeckSync {
                                     seed,
-                                    p1_main_nos: nums1,
-                                    p1_energy_nos: Vec::new(),
-                                    p2_main_nos: nums2,
-                                    p2_energy_nos: Vec::new(),
+                                    p1_main_templates: to_ids(&nums1),
+                                    p1_energy_templates: Vec::new(),
+                                    p2_main_templates: to_ids(&nums2),
+                                    p2_energy_templates: Vec::new(),
                                 };
                                 let data = sync.to_bytes();
                                 uds::uds_send(&data).map_err(|e| format!("Send: {}", e))?;
@@ -2976,7 +3000,9 @@ fn main() {
                                 Ok(()) => Step::Setup(
                                     cards.clone(),
                                     decks.clone(),
-                                    SetupPhase::MultiplayerLoading(p1_idx, p2_idx, true, None),
+                                    SetupPhase::MultiplayerLoading(
+                                        p1_idx, p2_idx, true, None, seed,
+                                    ),
                                     true,
                                 ),
                                 Err(e) => {
@@ -3013,8 +3039,7 @@ fn main() {
                             let mut recv_buf = [0u8; 4096];
                             match uds::uds_recv(&mut recv_buf) {
                                 Ok(n) if n > 0 => {
-                                    if uds::DeckSync::from_bytes(&recv_buf[..n]).is_some() {
-                                        // Store the raw sync bytes for the loading phase
+                                    if let Some(sync) = uds::DeckSync::from_bytes(&recv_buf[..n]) {
                                         let sync_bytes = recv_buf[..n].to_vec();
                                         Step::Setup(
                                             cards.clone(),
@@ -3024,6 +3049,7 @@ fn main() {
                                                 p2_idx,
                                                 false,
                                                 Some(sync_bytes),
+                                                sync.seed,
                                             ),
                                             true,
                                         )
@@ -3049,7 +3075,13 @@ fn main() {
                         }
                     }
                     // Multiplayer: Loading game with multiplayer flag
-                    SetupPhase::MultiplayerLoading(p1_idx, p2_idx, is_host, deck_sync_bytes) => {
+                    SetupPhase::MultiplayerLoading(
+                        p1_idx,
+                        p2_idx,
+                        is_host,
+                        deck_sync_bytes,
+                        seed,
+                    ) => {
                         let r = (|| -> Result<(GameState, CardAtlas), String> {
                             let mut cards_vec = (**cards).clone();
                             CardLoader::attach_abilities(&mut cards_vec);
@@ -3058,35 +3090,36 @@ fn main() {
                             if let Some(ref sync_bytes) = deck_sync_bytes {
                                 let sync = uds::DeckSync::from_bytes(sync_bytes)
                                     .ok_or("Invalid deck sync data")?;
-                                // Build decks from card_no strings using build_deck_from_database.
-                                // This calls create_copy in the same order as the host would have,
-                                // producing matching instance IDs in both databases.
-                                let mut pd1 = DeckBuilder::build_deck_from_database(
-                                    &mut db,
-                                    sync.p1_main_nos.clone(),
-                                )
-                                .map_err(|e| format!("Deck1: {}", e))?;
-                                if !sync.p1_energy_nos.is_empty() {
-                                    let mut ed1 = DeckBuilder::build_deck_from_database(
-                                        &mut db,
-                                        sync.p1_energy_nos.clone(),
-                                    )
-                                    .map_err(|e| format!("Energy1: {}", e))?;
-                                    pd1.energy_deck.append(&mut ed1.energy_deck);
-                                }
-                                let mut pd2 = DeckBuilder::build_deck_from_database(
-                                    &mut db,
-                                    sync.p2_main_nos.clone(),
-                                )
-                                .map_err(|e| format!("Deck2: {}", e))?;
-                                if !sync.p2_energy_nos.is_empty() {
-                                    let mut ed2 = DeckBuilder::build_deck_from_database(
-                                        &mut db,
-                                        sync.p2_energy_nos.clone(),
-                                    )
-                                    .map_err(|e| format!("Energy2: {}", e))?;
-                                    pd2.energy_deck.append(&mut ed2.energy_deck);
-                                }
+                                // Build decks from template IDs using create_copy in same order → matching instance IDs
+                                let build_from_templates = |db: &mut Arc<CardDatabase>,
+                                                            templates: &Vec<u16>|
+                                 -> Result<
+                                    rabuka_engine::deck_builder::Deck,
+                                    String,
+                                > {
+                                    let mut deck = rabuka_engine::deck_builder::Deck {
+                                        main_deck: std::collections::VecDeque::new(),
+                                        energy_deck: std::collections::VecDeque::new(),
+                                    };
+                                    for &tid in templates {
+                                        let cid = Arc::make_mut(db).create_copy(tid as i16);
+                                        if let Some(card) = db.get_card(cid) {
+                                            match card.card_type {
+                                                rabuka_engine::card::CardType::Energy => {
+                                                    deck.energy_deck.push_back(cid)
+                                                }
+                                                _ => deck.main_deck.push_back(cid),
+                                            }
+                                        }
+                                    }
+                                    Ok(deck)
+                                };
+                                let mut pd1 =
+                                    build_from_templates(&mut db, &sync.p1_main_templates)
+                                        .map_err(|e| format!("Deck1: {}", e))?;
+                                let mut pd2 =
+                                    build_from_templates(&mut db, &sync.p2_main_templates)
+                                        .map_err(|e| format!("Deck2: {}", e))?;
                                 DeckBuilder::add_default_energy_cards_from_database(
                                     &mut pd1, &mut db,
                                 )
@@ -3095,6 +3128,12 @@ fn main() {
                                     &mut pd2, &mut db,
                                 )
                                 .ok();
+                                // Shuffle with same seed as host for identical deck order
+                                rabuka_engine::rng::seed(sync.seed as u32);
+                                pd1.shuffle_main_deck();
+                                pd1.shuffle_energy_deck();
+                                pd2.shuffle_main_deck();
+                                pd2.shuffle_energy_deck();
                                 let mut p1 = Player::new("p1".into(), "P1".into(), true);
                                 p1.set_main_deck(pd1.main_deck);
                                 p1.set_energy_deck(pd1.energy_deck);
@@ -3116,6 +3155,7 @@ fn main() {
                                 .map_err(|e| format!("Deck: {}", e))?;
                             let mut pd2 = DeckBuilder::build_deck_from_database(&mut db, nums2)
                                 .map_err(|e| format!("Deck: {}", e))?;
+                            rabuka_engine::rng::seed(seed as u32);
                             pd1.shuffle_main_deck();
                             pd1.shuffle_energy_deck();
                             pd2.shuffle_main_deck();
@@ -3212,6 +3252,18 @@ fn main() {
                 mut waiting_for_opponent,
                 mut overlay,
             ) => {
+                // Web server pattern: use player_idx (0 or 1) for perspective.
+                // No long-lived borrows on gs — look up inline.
+                let my_player_idx: usize = if is_host { 0 } else { 1 };
+                let my_id: i32 = my_player_idx as i32;
+                #[inline(always)]
+                fn pref<'a>(gs: &'a GameState, idx: usize) -> &'a Player {
+                    if idx == 0 {
+                        &gs.player1
+                    } else {
+                        &gs.player2
+                    }
+                }
                 // Build display order from current acts_cache for navigation.
                 // This will be rebuilt after acts_cache regeneration if dirty/redraw.
                 let mut display_order: Vec<usize> = {
@@ -3541,12 +3593,29 @@ fn main() {
                                     display_pos += 1;
                                 }
                             } else {
-                                // Card item: grid navigation by row
+                                // Card item: DOWN from last card jumps to first text item
+                                let has_text = display_order
+                                    .iter()
+                                    .any(|&fi| is_text_only(&acts_cache[fi]));
+                                if keys & 0x00000080 != 0 {
+                                    let next = (display_pos + cols_c).min(n - 1);
+                                    let next_is_text = display_order
+                                        .get(next)
+                                        .map_or(false, |&fi| is_text_only(&acts_cache[fi]));
+                                    if has_text && next_is_text {
+                                        display_pos = next;
+                                    } else if has_text {
+                                        let last_card = display_order
+                                            .iter()
+                                            .rposition(|&fi| !is_text_only(&acts_cache[fi]))
+                                            .unwrap_or(0);
+                                        display_pos = (display_pos + cols_c).min(last_card);
+                                    } else {
+                                        display_pos = next;
+                                    }
+                                }
                                 if keys & 0x00000040 != 0 {
                                     display_pos = display_pos.saturating_sub(cols_c);
-                                }
-                                if keys & 0x00000080 != 0 {
-                                    display_pos = (display_pos + cols_c).min(n - 1);
                                 }
                             }
                             // LEFT/RIGHT always by 1
@@ -3590,17 +3659,28 @@ fn main() {
                 // DPAD LEFT/RIGHT: scroll hand view (0x10 = RIGHT, 0x20 = LEFT)
                 if overlay == Overlay::None && !detail_mode {
                     let vis = visible_hand_slots();
-                    let is_p1 = gs.active_player().id == gs.player1.id;
-                    let (off, max) = if is_p1 {
-                        (hand_offset, gs.player1.hand.cards.len().saturating_sub(vis))
+                    let is_my_turn = gs.active_player().id == pref(&gs, my_player_idx).id;
+                    let (off, max) = if is_my_turn {
+                        (
+                            hand_offset,
+                            pref(&gs, my_player_idx)
+                                .hand
+                                .cards
+                                .len()
+                                .saturating_sub(vis),
+                        )
                     } else {
                         (
                             hand_offset_p2,
-                            gs.player2.hand.cards.len().saturating_sub(vis),
+                            pref(&gs, 1 - my_player_idx)
+                                .hand
+                                .cards
+                                .len()
+                                .saturating_sub(vis),
                         )
                     };
                     if keys & 0x00000020 != 0 && off > 0 {
-                        if is_p1 {
+                        if is_my_turn {
                             hand_offset -= 1;
                         } else {
                             hand_offset_p2 -= 1;
@@ -3608,7 +3688,7 @@ fn main() {
                         redraw = true;
                     }
                     if keys & 0x00000010 != 0 && off + vis < max + vis {
-                        if is_p1 {
+                        if is_my_turn {
                             hand_offset += 1;
                         } else {
                             hand_offset_p2 += 1;
@@ -4032,10 +4112,14 @@ fn main() {
                         let mut tapped_hand_idx: Option<usize> = None;
                         let mut tap_active_side: bool = false;
                         if h > 0 {
-                            let pb = if y0 == p1y0 { &gs.player1 } else { &gs.player2 };
+                            let pb = if y0 == p1y0 {
+                                pref(&gs, my_player_idx)
+                            } else {
+                                pref(&gs, 1 - my_player_idx)
+                            };
                             let ap_id = &gs.active_player().id;
-                            let is_ap_p1 = ap_id == &gs.player1.id;
-                            tap_active_side = if is_ap_p1 { y0 == p1y0 } else { y0 != p1y0 };
+                            let is_ap_me = *ap_id == pref(&gs, my_player_idx).id;
+                            tap_active_side = if is_ap_me { y0 == p1y0 } else { y0 != p1y0 };
                             if detail_mode && viewing_card.is_some() && tap_active_side {
                                 let raw = ((tx as f32 - 2.0) / (st_slot_w + 2.0)) as usize;
                                 if (ty as i32) >= stage_y && (ty as i32) < (stage_y + stage_h) {
@@ -4363,7 +4447,11 @@ fn main() {
                             };
                             // Detail mode: PlayMemberToStage (empty slot) or UseAbility (filled slot)
                             if detail_mode && viewing_card.is_some() && tap_active_side {
-                                let player = if y0 == p1y0 { &gs.player1 } else { &gs.player2 };
+                                let player = if y0 == p1y0 {
+                                    pref(&gs, my_player_idx)
+                                } else {
+                                    pref(&gs, 1 - my_player_idx)
+                                };
                                 let card_at_slot = if slot_idx < 3 {
                                     let cid = player.stage.stage[slot_idx];
                                     if cid != -1 {
@@ -4619,8 +4707,6 @@ fn main() {
                     }
                     display_pos = display_order.iter().position(|&fi| fi == cur).unwrap_or(0);
 
-                    let p1 = &gs.player1;
-                    let p2 = &gs.player2;
                     let ap = gs.active_player();
 
                     // Helper closures (shared by both modes)
@@ -4742,7 +4828,7 @@ fn main() {
                         }};
                     }
                     fill_player_board!(
-                        p1,
+                        pref(&gs, my_player_idx),
                         _3ds_board_set_stage,
                         _3ds_board_set_live,
                         _3ds_board_set_energy,
@@ -4769,7 +4855,7 @@ fn main() {
                         }
                         // Show opponent stage/live/energy normally
                         fill_player_board!(
-                            p2,
+                            pref(&gs, 1 - my_player_idx),
                             _3ds_board_set_opp_stage,
                             _3ds_board_set_opp_live,
                             _3ds_board_set_opp_energy,
@@ -4785,7 +4871,7 @@ fn main() {
                         }
                     } else {
                         fill_player_board!(
-                            p2,
+                            pref(&gs, 1 - my_player_idx),
                             _3ds_board_set_opp_stage,
                             _3ds_board_set_opp_live,
                             _3ds_board_set_opp_energy,
@@ -4840,8 +4926,8 @@ fn main() {
                                 }
                             }
                         };
-                        set_live_stats(&gs.player1, &gs, false);
-                        set_live_stats(&gs.player2, &gs, true);
+                        set_live_stats(pref(&gs, my_player_idx), &gs, false);
+                        set_live_stats(pref(&gs, 1 - my_player_idx), &gs, true);
                     }
 
                     // Compute and set need hearts text for bottom screen live zone
@@ -5001,7 +5087,11 @@ fn main() {
                                 _3ds_text_add_top("[X]=back Y=game\0".as_ptr());
                             }
                         } else {
-                            let ap_label = if ap.id == p1.id { "P1" } else { "P2" };
+                            let ap_label = if ap.id == pref(&gs, my_player_idx).id {
+                                "P1"
+                            } else {
+                                "P2"
+                            };
                             let touch_indicator =
                                 if viewing_card.is_some() { "[T]" } else { "   " };
                             unsafe {
@@ -5025,11 +5115,11 @@ fn main() {
                                     }
                                     .as_ptr(),
                                 );
-                                _3ds_text_add_top(format!("P1 H:{} E:{}/{} D:{} W:{} L:{}  P2 H:{} E:{}/{} D:{} W:{} L:{}\n\0",
-                                    p1.hand.cards.len(), p1.energy_zone.active_count(), p1.energy_zone.cards.len(),
-                                    p1.main_deck.cards.len(), p1.waitroom.cards.len(), p1.success_live_card_zone.cards.len(),
-                                    p2.hand.cards.len(), p2.energy_zone.active_count(), p2.energy_zone.cards.len(),
-                                    p2.main_deck.cards.len(), p2.waitroom.cards.len(), p2.success_live_card_zone.cards.len(),
+                                _3ds_text_add_top(format!("Me H:{} E:{}/{} D:{} W:{} L:{}  Opp H:{} E:{}/{} D:{} W:{} L:{}\n\0",
+                                    pref(&gs, my_player_idx).hand.cards.len(), pref(&gs, my_player_idx).energy_zone.active_count(), pref(&gs, my_player_idx).energy_zone.cards.len(),
+                                    pref(&gs, my_player_idx).main_deck.cards.len(), pref(&gs, my_player_idx).waitroom.cards.len(), pref(&gs, my_player_idx).success_live_card_zone.cards.len(),
+                                    pref(&gs, 1 - my_player_idx).hand.cards.len(), pref(&gs, 1 - my_player_idx).energy_zone.active_count(), pref(&gs, 1 - my_player_idx).energy_zone.cards.len(),
+                                    pref(&gs, 1 - my_player_idx).main_deck.cards.len(), pref(&gs, 1 - my_player_idx).waitroom.cards.len(), pref(&gs, 1 - my_player_idx).success_live_card_zone.cards.len(),
                                 ).as_ptr());
                             }
                             if let Some(vcid) = viewing_card {
@@ -5154,17 +5244,17 @@ fn main() {
                                                     })
                                                     .collect();
                                                 format!(
-                                                    "[{}] {} c:{} {}→{}",
+                                                    "[{}] E{} {} {}→{}",
                                                     cn,
-                                                    name,
                                                     cost,
+                                                    name,
                                                     src_labels.join("+"),
                                                     area_label
                                                 )
                                             } else {
                                                 format!(
-                                                    "[{}] {} c:{}   {}",
-                                                    cn, name, cost, area_label
+                                                    "[{}] E{} {} {}",
+                                                    cn, cost, name, area_label
                                                 )
                                             }
                                         }
@@ -5308,18 +5398,22 @@ fn main() {
                                 COL_GOLD,
                                 0.65f32,
                                 format!(
-                                    "T{} {} [{}]  P1 H:{} E:{}/{} D:{}  P2 H:{} E:{}/{} D:{}\0",
+                                    "T{} {} [{}]  Me H:{} E:{}/{} D:{}  Opp H:{} E:{}/{} D:{}\0",
                                     gs.turn_number,
                                     phase_name,
-                                    if ap.id == p1.id { "P1" } else { "P2" },
-                                    p1.hand.cards.len(),
-                                    p1.energy_zone.active_count(),
-                                    p1.energy_zone.cards.len(),
-                                    p1.main_deck.cards.len(),
-                                    p2.hand.cards.len(),
-                                    p2.energy_zone.active_count(),
-                                    p2.energy_zone.cards.len(),
-                                    p2.main_deck.cards.len(),
+                                    if ap.id == pref(&gs, my_player_idx).id {
+                                        "Me"
+                                    } else {
+                                        "Opp"
+                                    },
+                                    pref(&gs, my_player_idx).hand.cards.len(),
+                                    pref(&gs, my_player_idx).energy_zone.active_count(),
+                                    pref(&gs, my_player_idx).energy_zone.cards.len(),
+                                    pref(&gs, my_player_idx).main_deck.cards.len(),
+                                    pref(&gs, 1 - my_player_idx).hand.cards.len(),
+                                    pref(&gs, 1 - my_player_idx).energy_zone.active_count(),
+                                    pref(&gs, 1 - my_player_idx).energy_zone.cards.len(),
+                                    pref(&gs, 1 - my_player_idx).main_deck.cards.len(),
                                 )
                                 .as_ptr(),
                             );
@@ -5961,12 +6055,18 @@ fn main() {
                                                                 0xAA000000,
                                                             );
                                                         }
+                                                        let label = if act.action_type == game_setup::ActionType::PlayMemberToStage {
+                                                            let cost = act.parameters.as_ref().and_then(|p| p.base_cost).unwrap_or(0);
+                                                            format!("E{} {}\0", cost, cn)
+                                                        } else {
+                                                            format!("{}\0", cn)
+                                                        };
                                                         _3ds_top_queue_text(
                                                             ix + 1.0,
                                                             iy_card + ch + 1.0,
                                                             COL_LIGHT,
                                                             0.45f32,
-                                                            format!("{}\0", cn).as_ptr(),
+                                                            label.as_ptr(),
                                                         );
                                                     }
                                                 }
@@ -5974,14 +6074,33 @@ fn main() {
                                         }
                                     }
 
-                                    // ---- Render text items as vertical list ----
+                                    // ---- Render text items as scrollable list below card grid ----
                                     let card_rows_used =
                                         ((card_gis.len() + cols - 1) / cols).min(max_rows);
                                     let text_grid_iy =
                                         grid_iy + card_rows_used as f32 * row_h + 4.0;
                                     let text_row_h = 20.0f32;
+                                    let text_area_h = 230.0 - text_grid_iy;
+                                    let max_text_visible =
+                                        (text_area_h / text_row_h).max(1.0) as usize;
+                                    let selected_ti = text_gis
+                                        .iter()
+                                        .position(|&gi| gi == display_pos)
+                                        .unwrap_or(0);
+                                    let text_offset =
+                                        if selected_ti >= choice_grid_offset + max_text_visible {
+                                            selected_ti.saturating_sub(max_text_visible - 1)
+                                        } else if selected_ti < choice_grid_offset {
+                                            selected_ti
+                                        } else {
+                                            choice_grid_offset
+                                        };
                                     for (ti, &gi) in text_gis.iter().enumerate() {
-                                        let di = page + gi;
+                                        let vis_i = ti.wrapping_sub(text_offset);
+                                        if vis_i >= max_text_visible {
+                                            continue;
+                                        }
+                                        let di = gi;
                                         let fi = display_order[di];
                                         let act = &acts_cache[fi];
                                         let is_disabled = act
@@ -5989,10 +6108,7 @@ fn main() {
                                             .as_ref()
                                             .and_then(|p| p.disabled)
                                             .unwrap_or(false);
-                                        let iy = text_grid_iy + ti as f32 * text_row_h;
-                                        if iy + text_row_h > 240.0 && di != display_pos {
-                                            break;
-                                        }
+                                        let iy = text_grid_iy + vis_i as f32 * text_row_h;
 
                                         // Background highlight
                                         let bg = if di == display_pos { COL_SEL } else { COL_DIM };

@@ -1,6 +1,6 @@
 use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability::enums::Zone;
-use crate::card::{BaseHeart, BladeColor, CardDatabase, HeartColor, HeartMap};
+use crate::card::{BaseHeart, BladeColor, CardDatabase, HeartColor};
 use crate::core::game_modifiers::ModifierEntry;
 use crate::game_state::GameState;
 use crate::types::{
@@ -97,6 +97,9 @@ impl super::TurnEngine {
                 }
             }
         }
+        eprintln!("[LIVE-DBG] === STAGE HEARTS AFTER YELL ===");
+        eprintln!("[LIVE-DBG] P1 stage_hearts={:?}", p1_stage.hearts);
+        eprintln!("[LIVE-DBG] P2 stage_hearts={:?}", p2_stage.hearts);
         game_state.player1.stage_hearts = Some(p1_stage);
         game_state.player2.stage_hearts = Some(p2_stage);
 
@@ -152,11 +155,22 @@ impl super::TurnEngine {
                     // Allocation is already finalised (performance phase completed).
                     // snap.surplus_hearts is read by color-filtered surplus conditions
                     // (e.g. La Bella Patria heart04 >= 1, Q174).
+                    // NOTE: snap.lives[i].filled is NOT yet populated at this point —
+                    // that happens later in this function. Derive filled from
+                    // snap.breakdown.allocations, which are already finalised.
                     let mut per_color = [0u8; 8];
-                    for color in 0..8 {
-                        let total_color = snap.total_hearts[color];
-                        let filled_color: u8 = snap.lives.iter().map(|l| l.filled[color]).sum();
-                        per_color[color] = total_color.saturating_sub(filled_color);
+                    {
+                        let mut filled_per_color = [0u8; 8];
+                        for alloc in &snap.breakdown.allocations {
+                            if alloc.color < 8 {
+                                filled_per_color[alloc.color] =
+                                    filled_per_color[alloc.color].saturating_add(alloc.amount);
+                            }
+                        }
+                        for color in 0..8 {
+                            per_color[color] =
+                                snap.total_hearts[color].saturating_sub(filled_per_color[color]);
+                        }
                     }
                     snap.surplus_hearts = per_color;
                 }
@@ -257,34 +271,13 @@ impl super::TurnEngine {
             Some(&pre_score_flat),
             game_state.mods.p2_constant_total_score_bonus,
         ) + p2_extra;
-        let player1_has_cards = !game_state.player1.live_card_zone.cards.is_empty();
-        let player2_has_cards = !game_state.player2.live_card_zone.cards.is_empty();
-
-        let (player1_won, player2_won) = if !player1_has_cards && !player2_has_cards {
-            (false, false)
-        } else if player1_has_cards && !player2_has_cards {
-            (true, false)
-        } else if !player1_has_cards && player2_has_cards {
-            (false, true)
-        } else if player1_score > player2_score {
-            (true, false)
-        } else if player2_score > player1_score {
-            (false, true)
-        } else {
-            (true, true) // Rule 8.4.6.2: equal scores = both win
-        };
-
-        // Finalize snapshots for both players
+        // Pass 1: Compute pass/fail for every live card in every snapshot.
+        // This MUST run before victory determination so that snap.lives[i].passed
+        // is populated and can be used to decide who won.
+        // (Q47/Q48: score is not a reliable proxy — score can be 0 and still win.)
         for snap in game_state.performance_snapshots.iter_mut() {
-            let _player = if snap.player_id == player1_id {
-                &game_state.player1
-            } else {
-                &game_state.player2
-            };
-            // Determine pass/fail for each live card.
-            // NOTE: We iterate over snap.lives (built from perf.live_card_ids captured
-            // before the zone was cleared by Rule 8.3.16) rather than
-            // player.live_card_zone.cards which may have been emptied.
+            eprintln!("[LIVE-DBG] === PASS/FAIL CHECK player={} lives={} total_hearts={:?} ===",
+                snap.player_id, snap.lives.len(), snap.total_hearts);
             for i in 0..snap.lives.len() {
                 let lc_id = snap.lives[i].card_id;
                 if let Some(card) = game_state.card_database.get_card(lc_id) {
@@ -292,90 +285,82 @@ impl super::TurnEngine {
                     snap.lives[i].card_no = crate::types::ArcStr::from(card.card_no.as_ref());
                     if let Some(ref nh) = card.need_heart {
                         let mut filled = EMPTY_H8;
-                        // Build filled array from heart allocations targeting this live
                         for alloc in &snap.breakdown.allocations {
                             if alloc.target_idx == i {
                                 filled[alloc.color] += alloc.amount;
                             }
                         }
+                        eprintln!("[LIVE-DBG] live[{}] card={} filled_from_allocs={:?}",
+                            i, card.card_no, filled);
                         let mut required_arr = EMPTY_H8;
-                        // Build effective need_heart with set/additive logic
-                        let has_set = game_state
-                            .mods
-                            .need_heart_modifiers
-                            .get(&lc_id)
-                            .is_some_and(|m| m.values().any(|e| e.set != 0));
-                        if has_set {
-                            // Q115/Q127: Set-to-X applies first, then additive stacks.
-                            for (color, me) in game_state
-                                .mods
-                                .need_heart_modifiers
-                                .get(&lc_id)
-                                .into_iter()
-                                .flatten()
-                            {
+                        for (color, needed) in &nh.hearts {
+                            required_arr[color.index()] = *needed;
+                        }
+                        eprintln!("[LIVE-DBG] live[{}] base_required={:?}", i, required_arr);
+                        if let Some(card_mods) = game_state.mods.need_heart_modifiers.get(&lc_id) {
+                            // Q115/Q127: Set-to-X applies first (per-color), then additive stacks.
+                            // A set modifier on one color does NOT erase other colors' requirements.
+                            eprintln!("[LIVE-DBG] live[{}] applying {} modifiers", i, card_mods.len());
+                            for (color, me) in card_mods {
+                                eprintln!("[LIVE-DBG] live[{}]   modifier color={:?} set={} additive={}",
+                                    i, color, me.set, me.additive);
                                 if me.set != 0 {
                                     required_arr[color.index()] = me.set as u8;
                                 }
+                            }
+                            for (color, me) in card_mods {
                                 if me.additive != 0 {
                                     let idx = color.index();
                                     let current = required_arr[idx] as i32;
                                     required_arr[idx] = (current + me.additive).max(0) as u8;
                                 }
                             }
+                            eprintln!("[LIVE-DBG] live[{}] after_modifiers required={:?}", i, required_arr);
                         } else {
-                            for (color, needed) in &nh.hearts {
-                                let idx = color.index();
-                                let mut val = *needed as i32;
-                                if let Some(color_mods) =
-                                    game_state.mods.need_heart_modifiers.get(&lc_id)
-                                {
-                                    if let Some(me) = color_mods.get(color) {
-                                        val = (val + me.additive).max(0);
-                                    }
-                                }
-                                required_arr[idx] = val as u8;
-                            }
+                            eprintln!("[LIVE-DBG] live[{}] no modifiers", i);
                         }
-                        // Determine passed by comparing filled vs required (not vs total pool).
-                        // heart00 (index 0) is a wildcard that fills deficits in any color.
-                        // The Heart00 requirement (required_arr[0]) must also be met.
-                        // Phase 3 allocates leftover colored hearts and Heart00 wildcards
-                        // to fill required_arr[0]; those show up in filled[1..6] (colored)
-                        // and filled[0] (Heart00 wildcard).
                         let passed = {
                             let mut wildcard = filled[0] + filled[7];
                             let mut ok = true;
-                            // Rule 2.11.3 bullet 2: total provided >= total required
                             let total_filled: u8 = filled.iter().sum();
                             let total_required: u8 = required_arr.iter().sum();
+                            eprintln!("[LIVE-DBG] live[{}] total_filled={} total_required={} wildcard={}",
+                                i, total_filled, total_required, wildcard);
                             if total_filled < total_required {
+                                eprintln!("[LIVE-DBG] live[{}] FAIL: total_filled({}) < total_required({})",
+                                    i, total_filled, total_required);
                                 ok = false;
                             }
                             if ok && required_arr[0] > 0 {
                                 let h00_satisfied: u8 = filled[1..7].iter().sum();
                                 if h00_satisfied + wildcard < required_arr[0] {
+                                    eprintln!("[LIVE-DBG] live[{}] FAIL: h00_req={} h00_satisfied={} wildcard={}",
+                                        i, required_arr[0], h00_satisfied, wildcard);
                                     ok = false;
                                 } else {
-                                    // Fix C: decrement wildcard by amount consumed for Heart00
                                     let used = required_arr[0].saturating_sub(h00_satisfied);
                                     wildcard = wildcard.saturating_sub(used);
                                 }
                             }
-                            // Use remaining wildcard to cover deficits in specific colors
                             if ok {
                                 for idx in 1..7 {
                                     if filled[idx] < required_arr[idx] {
                                         let deficit = required_arr[idx] - filled[idx];
+                                        eprintln!("[LIVE-DBG] live[{}] color[{}] deficit={} wildcard_remaining={}",
+                                            i, idx, deficit, wildcard);
                                         if wildcard >= deficit {
                                             wildcard -= deficit;
                                         } else {
+                                            eprintln!("[LIVE-DBG] live[{}] FAIL: color[{}] deficit={} can't cover with wildcard={}",
+                                                i, idx, deficit, wildcard);
                                             ok = false;
                                             break;
                                         }
                                     }
                                 }
                             }
+                            eprintln!("[LIVE-DBG] live[{}] VERDICT: passed={} filled={:?} required={:?}",
+                                i, ok, filled, required_arr);
                             ok
                         };
                         // Populate adjustments and requirements from need_heart_modifiers
@@ -392,13 +377,7 @@ impl super::TurnEngine {
                                         desc: if verbose {
                                             format!(
                                                 "{} {}",
-                                                if entry.set != 0 {
-                                                    "="
-                                                } else if total > 0 {
-                                                    "+"
-                                                } else {
-                                                    ""
-                                                },
+                                                if entry.set != 0 { "=" } else if total > 0 { "+" } else { "" },
                                                 total,
                                             )
                                         } else {
@@ -444,14 +423,50 @@ impl super::TurnEngine {
                     let base_score = card.get_score() as i32;
                     let set_score = game_state.mods.get_score_set_modifier(lc_id);
                     let additive = game_state.mods.get_score_modifier(lc_id) - set_score;
-                    let effective_base = if set_score != 0 {
-                        set_score
-                    } else {
-                        base_score
-                    };
+                    let effective_base = if set_score != 0 { set_score } else { base_score };
                     snap.lives[i].score = (effective_base + additive).max(0) as u8;
                 }
             }
+        }
+
+        // Victory determination — now uses the already-populated snap.lives[i].passed.
+        let player1_has_cards = !game_state.player1.live_card_zone.cards.is_empty();
+        let player2_has_cards = !game_state.player2.live_card_zone.cards.is_empty();
+        // Use .rev().find() — snapshots accumulate across turns/re-entries, so the
+        // LAST snapshot for each player is the current turn's, not the first.
+        let player1_all_passed = player1_has_cards && game_state.performance_snapshots.iter().rev()
+            .find(|s| s.player_id == player1_id)
+            .map_or(false, |s| !s.lives.is_empty() && s.lives.iter().all(|l| l.passed));
+        let player2_all_passed = player2_has_cards && game_state.performance_snapshots.iter().rev()
+            .find(|s| s.player_id == player2_id)
+            .map_or(false, |s| !s.lives.is_empty() && s.lives.iter().all(|l| l.passed));
+        eprintln!("[LIVE-DBG] === VICTORY DETERMINATION ===");
+        eprintln!("[LIVE-DBG] P1 score={} has_cards={} all_reqs_met={} live_zone={:?}",
+            player1_score, player1_has_cards, player1_all_passed, game_state.player1.live_card_zone.cards);
+        eprintln!("[LIVE-DBG] P2 score={} has_cards={} all_reqs_met={} live_zone={:?}",
+            player2_score, player2_has_cards, player2_all_passed, game_state.player2.live_card_zone.cards);
+        let (player1_won, player2_won) = if !player1_all_passed && !player2_all_passed {
+            eprintln!("[LIVE-DBG] RESULT: neither player passed → neither wins");
+            (false, false)
+        } else if player1_all_passed && !player2_all_passed {
+            eprintln!("[LIVE-DBG] RESULT: only P1 passed → P1 wins");
+            (true, false)
+        } else if !player1_all_passed && player2_all_passed {
+            eprintln!("[LIVE-DBG] RESULT: only P2 passed → P2 wins");
+            (false, true)
+        } else if player1_score > player2_score {
+            eprintln!("[LIVE-DBG] RESULT: P1 score({}) > P2 score({}) → P1 wins", player1_score, player2_score);
+            (true, false)
+        } else if player2_score > player1_score {
+            eprintln!("[LIVE-DBG] RESULT: P2 score({}) > P1 score({}) → P2 wins", player2_score, player1_score);
+            (false, true)
+        } else {
+            eprintln!("[LIVE-DBG] RESULT: equal scores ({}) → both win (Rule 8.4.6.2)", player1_score);
+            (true, true)
+        };
+
+        // Pass 2: Finalize the remaining snapshot fields now that victory is determined.
+        for snap in game_state.performance_snapshots.iter_mut() {
 
             // Compute per-card spare (余剰ハート): remaining hearts from the pool
             // after this card's allocation. For each live card, spare = total available
@@ -498,11 +513,15 @@ impl super::TurnEngine {
                 game_state.player2.live_card_zone.cards.is_empty()
             };
             if zone_empty {
+                eprintln!("[LIVE-DBG] player={} live_card_zone empty → total_score forced to 0", snap.player_id);
                 snap.total_score = 0;
             }
             // Rule 8.3.16: If ANY live card's need_heart could not be satisfied,
             // ALL live cards fail. Success requires ALL cards to pass.
             snap.success = snap.lives.iter().all(|l| l.passed) && snap.total_score > 0;
+            eprintln!("[LIVE-DBG] player={} SUCCESS={} total_score={} all_passed={}",
+                snap.player_id, snap.success, snap.total_score,
+                snap.lives.iter().all(|l| l.passed));
 
             // Pre-computed score breakdown for the UI display layer.
             snap.base_score_total = snap
@@ -1552,32 +1571,26 @@ impl super::TurnEngine {
         for &lc_id in live_card_ids {
             if let Some(card) = card_db.get_card(lc_id) {
                 let mut need = [0u8; 8];
-                let has_set = need_heart_modifiers
-                    .get(&lc_id)
-                    .is_some_and(|m| m.values().any(|e| e.set != 0));
                 if let Some(ref nh) = card.need_heart {
-                    if has_set {
-                        // Q115/Q127: Set-to-X applies first, then additive stacks.
-                        for (color, me) in need_heart_modifiers.get(&lc_id).into_iter().flatten() {
+                    // Start from the card's base requirements for every color.
+                    for (color, count) in &nh.hearts {
+                        need[color.index()] = *count;
+                    }
+                    if let Some(card_mods) = need_heart_modifiers.get(&lc_id) {
+                        // Q115/Q127: Set-to-X applies first (per-color), then additive stacks.
+                        // A set modifier on one color does NOT erase other colors' requirements.
+                        for (color, me) in card_mods {
                             if me.set != 0 {
-                                need[color.index()] = me.set as u8;
+                                let idx = color.index();
+                                need[idx] = me.set as u8;
                             }
+                        }
+                        for (color, me) in card_mods {
                             if me.additive != 0 {
                                 let idx = color.index();
                                 let current = need[idx] as i32;
                                 need[idx] = (current + me.additive).max(0) as u8;
                             }
-                        }
-                    } else {
-                        for (color, count) in &nh.hearts {
-                            let idx = color.index();
-                            let mut val = *count as i32;
-                            if let Some(mods) = need_heart_modifiers.get(&lc_id) {
-                                if let Some(me) = mods.get(color) {
-                                    val = (val + me.additive).max(0);
-                                }
-                            }
-                            need[idx] = val as u8;
                         }
                     }
                 }
@@ -2305,42 +2318,36 @@ impl super::TurnEngine {
         // Subsequent changes do NOT retroactively fail a live.
         let any_requirement_failed = live_card_ids.iter().enumerate().any(|(live_idx, &lc_id)| {
             card_db.get_card(lc_id).is_some_and(|card| {
-                let nh = match card.need_heart.as_ref() {
-                    Some(nh) => {
-                        let has_set = need_heart_modifiers
-                            .get(&lc_id)
-                            .is_some_and(|m| m.values().any(|e| e.set != 0));
-                        let mut adjusted = if has_set {
-                            BaseHeart {
-                                hearts: HeartMap::new(),
-                            }
-                        } else {
-                            nh.clone()
-                        };
-                        if let Some(card_mods) = need_heart_modifiers.get(&lc_id) {
-                            for (color, me) in card_mods {
-                                // Q115: Set-to-X applies first, then add/subtract modifiers stack.
-                                if me.set != 0 {
-                                    adjusted.hearts.insert(*color, me.set as u8);
-                                }
-                                if me.additive != 0 {
-                                    *adjusted.hearts.entry_or_default(*color) =
-                                        (adjusted.hearts.get(color).copied().unwrap_or(0) as i32
-                                            + me.additive)
-                                            .max(0) as u8;
-                                }
-                            }
-                        }
-                        adjusted
-                    }
+                // Build effective need_heart by starting from base requirements,
+                // then applying per-color set/additive modifiers.
+                // Q115/Q127: A set modifier on one color does NOT erase other colors.
+                let base_nh = match card.need_heart.as_ref() {
+                    Some(nh) => nh,
                     None => return false,
                 };
-                if nh.hearts.is_empty() {
+                if base_nh.hearts.is_empty() {
                     return false;
                 }
                 let mut required_arr = EMPTY_H8;
-                for (color, needed) in &nh.hearts {
+                // Populate from base card requirements.
+                for (color, needed) in &base_nh.hearts {
                     required_arr[color.index()] = *needed;
+                }
+                // Apply set modifiers (per-color override).
+                if let Some(card_mods) = need_heart_modifiers.get(&lc_id) {
+                    // Q115: Set-to-X applies first, then additive stacks.
+                    for (color, me) in card_mods {
+                        if me.set != 0 {
+                            required_arr[color.index()] = me.set as u8;
+                        }
+                    }
+                    for (color, me) in card_mods {
+                        if me.additive != 0 {
+                            let idx = color.index();
+                            let current = required_arr[idx] as i32;
+                            required_arr[idx] = (current + me.additive).max(0) as u8;
+                        }
+                    }
                 }
                 let filled = per_card_filled[live_idx];
                 let mut wildcard = filled[0] + filled[7];

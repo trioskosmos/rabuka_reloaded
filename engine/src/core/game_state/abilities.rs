@@ -2220,33 +2220,27 @@ impl GameState {
             if let Some(card) = self.card_database.get_card(*card_id) {
                 if let Some(ref need_heart) = card.need_heart {
                     let effective_need = {
-                        let has_set = self
-                            .mods
-                            .need_heart_modifiers
-                            .get(card_id)
-                            .is_some_and(|m| m.values().any(|e| e.set != 0));
-                        if has_set {
-                            let mut hearts = crate::card::HeartMap::new();
-                            if let Some(color_mods) = self.mods.need_heart_modifiers.get(card_id) {
-                                for (color, me) in color_mods {
-                                    if me.set != 0 {
-                                        hearts.insert(*color, me.set as u8);
-                                    }
+                        // Q115/Q127: Start from base requirements for every color.
+                        // A set modifier on one color does NOT erase other colors.
+                        let mut hearts = need_heart.hearts.clone();
+                        if let Some(color_mods) = self.mods.need_heart_modifiers.get(card_id) {
+                            // Apply set overrides per-color first.
+                            for (color, me) in color_mods {
+                                if me.set != 0 {
+                                    hearts.insert(*color, me.set as u8);
                                 }
                             }
-                            crate::card::BaseHeart { hearts }
-                        } else {
-                            let mut hearts = need_heart.hearts.clone();
-                            if let Some(color_mods) = self.mods.need_heart_modifiers.get(card_id) {
-                                for (color, me) in color_mods {
+                            // Then apply additive modifiers.
+                            for (color, me) in color_mods {
+                                if me.additive != 0 {
                                     *hearts.entry_or_default(*color) =
                                         (hearts.get(color).copied().unwrap_or(0) as i32
                                             + me.additive)
                                             .max(0) as u8;
                                 }
                             }
-                            crate::card::BaseHeart { hearts }
                         }
+                        crate::card::BaseHeart { hearts }
                     };
                     if crate::card::check_heart_requirement(&effective_need, &stage_hearts) {
                         return true;

@@ -86,46 +86,42 @@ pub fn uds_connect_network(node_id: u16) -> Result<(), i32> {
 
 // --- High-level message helpers ---
 
-/// Deck sync payload: seed (u64) + card_no strings for both players' decks.
-/// Sending card_no strings (not instance IDs) ensures both consoles call
-/// build_deck_from_database in the same order, producing matching instance IDs.
+/// Deck sync payload: seed (u64) + template IDs (u16 each) for both players' decks.
+/// Template IDs are deterministic (same on both machines from load_or_create).
+/// Client calls create_copy for each template_id to get matching instance IDs.
 pub struct DeckSync {
     pub seed: u64,
-    pub p1_main_nos: Vec<String>,
-    pub p1_energy_nos: Vec<String>,
-    pub p2_main_nos: Vec<String>,
-    pub p2_energy_nos: Vec<String>,
+    pub p1_main_templates: Vec<u16>,
+    pub p1_energy_templates: Vec<u16>,
+    pub p2_main_templates: Vec<u16>,
+    pub p2_energy_templates: Vec<u16>,
 }
 
 impl DeckSync {
-    /// Serialize to bytes: tag(1) + seed(8) + count(4×u16) + card_no strings (u16 len + bytes each)
+    /// Serialize to bytes: tag(1) + seed(8) + lens(4×u16) + template_ids(×u16)
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut v = Vec::with_capacity(1 + 8 + 8);
+        let total = self.p1_main_templates.len()
+            + self.p1_energy_templates.len()
+            + self.p2_main_templates.len()
+            + self.p2_energy_templates.len();
+        let mut v = Vec::with_capacity(1 + 8 + 8 + total * 2);
         v.push(MSG_SYNC_SETUP);
         v.extend_from_slice(&self.seed.to_le_bytes());
-        v.extend_from_slice(&(self.p1_main_nos.len() as u16).to_le_bytes());
-        v.extend_from_slice(&(self.p1_energy_nos.len() as u16).to_le_bytes());
-        v.extend_from_slice(&(self.p2_main_nos.len() as u16).to_le_bytes());
-        v.extend_from_slice(&(self.p2_energy_nos.len() as u16).to_le_bytes());
-        for s in &self.p1_main_nos {
-            let bytes = s.as_bytes();
-            v.extend_from_slice(&(bytes.len() as u16).to_le_bytes());
-            v.extend_from_slice(bytes);
+        v.extend_from_slice(&(self.p1_main_templates.len() as u16).to_le_bytes());
+        v.extend_from_slice(&(self.p1_energy_templates.len() as u16).to_le_bytes());
+        v.extend_from_slice(&(self.p2_main_templates.len() as u16).to_le_bytes());
+        v.extend_from_slice(&(self.p2_energy_templates.len() as u16).to_le_bytes());
+        for id in &self.p1_main_templates {
+            v.extend_from_slice(&id.to_le_bytes());
         }
-        for s in &self.p1_energy_nos {
-            let bytes = s.as_bytes();
-            v.extend_from_slice(&(bytes.len() as u16).to_le_bytes());
-            v.extend_from_slice(bytes);
+        for id in &self.p1_energy_templates {
+            v.extend_from_slice(&id.to_le_bytes());
         }
-        for s in &self.p2_main_nos {
-            let bytes = s.as_bytes();
-            v.extend_from_slice(&(bytes.len() as u16).to_le_bytes());
-            v.extend_from_slice(bytes);
+        for id in &self.p2_main_templates {
+            v.extend_from_slice(&id.to_le_bytes());
         }
-        for s in &self.p2_energy_nos {
-            let bytes = s.as_bytes();
-            v.extend_from_slice(&(bytes.len() as u16).to_le_bytes());
-            v.extend_from_slice(bytes);
+        for id in &self.p2_energy_templates {
+            v.extend_from_slice(&id.to_le_bytes());
         }
         v
     }
@@ -145,32 +141,28 @@ impl DeckSync {
         off += 2;
         let len2e = u16::from_le_bytes(data[off..off + 2].try_into().ok()?) as usize;
         off += 2;
-
-        let read_strings = |data: &[u8], off: &mut usize, count: usize| -> Option<Vec<String>> {
+        let total = len1m + len1e + len2m + len2e;
+        if data.len() < off + total * 2 {
+            return None;
+        }
+        let read_u16s = |data: &[u8], off: &mut usize, count: usize| -> Option<Vec<u16>> {
             let mut v = Vec::with_capacity(count);
             for _ in 0..count {
-                let slen = u16::from_le_bytes(data[*off..*off + 2].try_into().ok()?) as usize;
+                v.push(u16::from_le_bytes(data[*off..*off + 2].try_into().ok()?));
                 *off += 2;
-                let s = std::str::from_utf8(&data[*off..*off + slen])
-                    .ok()?
-                    .to_string();
-                *off += slen;
-                v.push(s);
             }
             Some(v)
         };
-
-        let p1_main_nos = read_strings(data, &mut off, len1m)?;
-        let p1_energy_nos = read_strings(data, &mut off, len1e)?;
-        let p2_main_nos = read_strings(data, &mut off, len2m)?;
-        let p2_energy_nos = read_strings(data, &mut off, len2e)?;
-
+        let p1_main_templates = read_u16s(data, &mut off, len1m)?;
+        let p1_energy_templates = read_u16s(data, &mut off, len1e)?;
+        let p2_main_templates = read_u16s(data, &mut off, len2m)?;
+        let p2_energy_templates = read_u16s(data, &mut off, len2e)?;
         Some(DeckSync {
             seed,
-            p1_main_nos,
-            p1_energy_nos,
-            p2_main_nos,
-            p2_energy_nos,
+            p1_main_templates,
+            p1_energy_templates,
+            p2_main_templates,
+            p2_energy_templates,
         })
     }
 }
