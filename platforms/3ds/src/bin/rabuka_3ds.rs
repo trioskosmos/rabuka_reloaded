@@ -3254,7 +3254,15 @@ fn main() {
             ) => {
                 // Web server pattern: use player_idx (0 or 1) for perspective.
                 // No long-lived borrows on gs — look up inline.
-                let my_player_idx: usize = if is_host { 0 } else { 1 };
+                let my_player_idx: usize = if is_multiplayer {
+                    if is_host {
+                        0
+                    } else {
+                        1
+                    }
+                } else {
+                    0
+                };
                 let my_id: i32 = my_player_idx as i32;
                 #[inline(always)]
                 fn pref<'a>(gs: &'a GameState, idx: usize) -> &'a Player {
@@ -3823,6 +3831,7 @@ fn main() {
                                         sync.ability_index.map(|x| x as usize),
                                     );
                                 gs.reset_loop_detection();
+                                game_setup::settle_single_player_state(&mut gs);
                                 let my_id = if is_host { 0 } else { 1 };
                                 waiting_for_opponent = !mp_can_act(&gs, my_id);
                                 cur = 0;
@@ -4525,6 +4534,7 @@ fn main() {
                                     detail_mode = false;
                                     viewing_card = None;
                                     cur = 0;
+                                    dirty = true;
                                     redraw = true;
                                     stage_handled = true;
                                     break;
@@ -4706,6 +4716,29 @@ fn main() {
                         }
                     }
                     display_pos = display_order.iter().position(|&fi| fi == cur).unwrap_or(0);
+
+                    // Debug: dump acts_cache when there's a pending choice
+                    if dirty && gs.has_pending_choice() {
+                        dprintln!(
+                            "[CHOICE] acts_cache={} display_order={} choice_img={}",
+                            acts_cache.len(),
+                            display_order.len(),
+                            choice_image_mode
+                        );
+                        for (i, act) in acts_cache.iter().enumerate() {
+                            let cid = act
+                                .parameters
+                                .as_ref()
+                                .and_then(|p| p.card_id)
+                                .unwrap_or(-1);
+                            let cn = act
+                                .parameters
+                                .as_ref()
+                                .and_then(|p| p.card_no.clone())
+                                .unwrap_or_default();
+                            dprintln!("  [{}] {:?} cid={} cn={}", i, act.action_type, cid, cn);
+                        }
+                    }
 
                     let ap = gs.active_player();
 
@@ -6344,17 +6377,48 @@ fn main() {
                                                 .and_then(|p| p.base_cost)
                                                 .unwrap_or(0);
                                             let hdr = if !cn.is_empty() {
-                                                format!(
-                                                    "[{}] {} {{{{icon_energy.png|E}}}}{}",
-                                                    cn, name, base_cost
-                                                )
+                                                if base_cost > 0 {
+                                                    format!(
+                                                        "{{{{icon_energy.png|E}}}}{} [{}] {}",
+                                                        base_cost, cn, name
+                                                    )
+                                                } else {
+                                                    format!("[{}] {}", cn, name)
+                                                }
                                             } else {
-                                                format!(
-                                                    "{} {{{{icon_energy.png|E}}}}{}",
-                                                    name, base_cost
-                                                )
+                                                if base_cost > 0 {
+                                                    format!(
+                                                        "{{{{icon_energy.png|E}}}}{} {}",
+                                                        base_cost, name
+                                                    )
+                                                } else {
+                                                    name.clone()
+                                                }
                                             };
                                             let mut areas = String::new();
+                                            let area_costs: std::collections::HashMap<
+                                                String,
+                                                (u8, bool),
+                                            > = if let Some(ref p) =
+                                                acts_cache[display_order[di]].parameters
+                                            {
+                                                p.available_areas
+                                                    .as_ref()
+                                                    .map(|areas_vec| {
+                                                        areas_vec
+                                                            .iter()
+                                                            .map(|a| {
+                                                                (
+                                                                    a.area.clone(),
+                                                                    (a.cost, a.is_baton_touch),
+                                                                )
+                                                            })
+                                                            .collect()
+                                                    })
+                                                    .unwrap_or_default()
+                                            } else {
+                                                Default::default()
+                                            };
                                             for i in di..ge {
                                                 let gact = &acts_cache[display_order[i]];
                                                 let stage = gact
@@ -6400,33 +6464,39 @@ fn main() {
                                                         }
                                                     }
                                                 }
-                                                // Regular single-area action
-                                                areas.push_str(&format!(
-                                                    "{}{}{} ",
-                                                    prefix,
-                                                    tl_area(&stage),
-                                                    suffix
-                                                ));
+                                                // Regular single-area action with per-area cost
+                                                let area_cost_info = area_costs.get(&stage);
+                                                let area_str = match area_cost_info {
+                                                    Some((cost, true)) if *cost > 0 => format!(
+                                                        "{}{{{{icon_energy.png|E}}}}{}BT{} ",
+                                                        prefix,
+                                                        cost,
+                                                        tl_area(&stage)
+                                                    ),
+                                                    Some((cost, false)) if *cost > 0 => format!(
+                                                        "{}{{{{icon_energy.png|E}}}}{}{} ",
+                                                        prefix,
+                                                        cost,
+                                                        tl_area(&stage)
+                                                    ),
+                                                    _ => format!(
+                                                        "{}{}{} ",
+                                                        prefix,
+                                                        tl_area(&stage),
+                                                        suffix
+                                                    ),
+                                                };
+                                                areas.push_str(&area_str);
                                             }
-                                            for (li, l) in
-                                                wrap_text(&hdr, 392.0, 0.70).lines().enumerate()
+                                            let hdr_prefix = if is_sel { "> " } else { "  " };
+                                            for (li, l) in wrap_text(&hdr, 370.0, line_scale)
+                                                .lines()
+                                                .enumerate()
                                             {
                                                 if ty > 230.0 {
                                                     break;
                                                 }
-                                                let txt = format!(
-                                                    "{}{}",
-                                                    if li == 0 {
-                                                        if is_sel {
-                                                            "> "
-                                                        } else {
-                                                            "  "
-                                                        }
-                                                    } else {
-                                                        ""
-                                                    },
-                                                    l
-                                                );
+                                                let txt = format!("{}{}", hdr_prefix, l);
                                                 if txt.contains("{{") {
                                                     render_text_with_icons(
                                                         4.0, ty, &txt, line_color, line_scale,
@@ -6444,33 +6514,29 @@ fn main() {
                                                 }
                                                 ty += 20.0;
                                             }
-                                            for (li, l) in
-                                                wrap_text(&areas, 392.0, 0.70).lines().enumerate()
+                                            let areas_prefix = if group_sel { "> " } else { "  " };
+                                            for (li, l) in wrap_text(&areas, 370.0, line_scale)
+                                                .lines()
+                                                .enumerate()
                                             {
                                                 if ty > 230.0 {
                                                     break;
                                                 }
-                                                unsafe {
-                                                    _3ds_top_queue_text(
-                                                        4.0,
-                                                        ty,
-                                                        line_color,
-                                                        line_scale,
-                                                        format!(
-                                                            "{}{}\0",
-                                                            if li == 0 {
-                                                                if group_sel {
-                                                                    "> "
-                                                                } else {
-                                                                    "  "
-                                                                }
-                                                            } else {
-                                                                ""
-                                                            },
-                                                            l
-                                                        )
-                                                        .as_ptr(),
+                                                let txt = format!("{}{}", areas_prefix, l);
+                                                if txt.contains("{{") {
+                                                    render_text_with_icons(
+                                                        4.0, ty, &txt, line_color, line_scale,
                                                     );
+                                                } else {
+                                                    unsafe {
+                                                        _3ds_top_queue_text(
+                                                            4.0,
+                                                            ty,
+                                                            line_color,
+                                                            line_scale,
+                                                            format!("{}\0", txt).as_ptr(),
+                                                        );
+                                                    }
                                                 }
                                                 ty += 20.0;
                                             }
@@ -6506,15 +6572,26 @@ fn main() {
                                                         .unwrap_or_default();
                                                     let area_label = tl_area(&area);
                                                     if !cn.is_empty() {
-                                                        format!(
-                                                            "[{}] {} {{{{icon_energy.png|E}}}}{} {}",
-                                                            cn, name, base_cost, area_label
-                                                        )
+                                                        if base_cost > 0 {
+                                                            format!(
+                                                                "{{{{icon_energy.png|E}}}}{} [{}] {} {}",
+                                                                base_cost, cn, name, area_label
+                                                            )
+                                                        } else {
+                                                            format!(
+                                                                "[{}] {} {}",
+                                                                cn, name, area_label
+                                                            )
+                                                        }
                                                     } else {
-                                                        format!(
-                                                            "{} {{{{icon_energy.png|E}}}}{} {}",
-                                                            name, base_cost, area_label
-                                                        )
+                                                        if base_cost > 0 {
+                                                            format!(
+                                                                "{{{{icon_energy.png|E}}}}{} {} {}",
+                                                                base_cost, name, area_label
+                                                            )
+                                                        } else {
+                                                            format!("{} {}", name, area_label)
+                                                        }
                                                     }
                                                 }
                                                 game_setup::ActionType::UseAbility => {
@@ -6547,12 +6624,8 @@ fn main() {
                                                     if !cn.is_empty() {
                                                         if cost > 0 {
                                                             format!(
-                                                                "[{}] {} {} c:{} {}",
-                                                                cn,
-                                                                name,
-                                                                area_label,
-                                                                cost,
-                                                                abil_short
+                                                                "{{{{icon_energy.png|E}}}}{} [{}] {} {} {}",
+                                                                cost, cn, name, area_label, abil_short
                                                             )
                                                         } else {
                                                             format!(
@@ -6563,8 +6636,8 @@ fn main() {
                                                     } else {
                                                         if cost > 0 {
                                                             format!(
-                                                                "{} {} c:{} {}",
-                                                                name, area_label, cost, abil_short
+                                                                "{{{{icon_energy.png|E}}}}{} {} {} {}",
+                                                                cost, name, area_label, abil_short
                                                             )
                                                         } else {
                                                             format!(
@@ -6640,14 +6713,15 @@ fn main() {
                                                 COL_LIGHT
                                             };
                                             let scale: f32 = if is_sel { 0.70 } else { 0.65 };
+                                            let wrap_w =
+                                                if !prefix.is_empty() { 370.0 } else { 392.0 };
                                             for (li, l) in
-                                                wrap_text(&line, 392.0, 0.70).lines().enumerate()
+                                                wrap_text(&line, wrap_w, scale).lines().enumerate()
                                             {
                                                 if ty > 230.0 {
                                                     break;
                                                 }
-                                                let pfx = if li == 0 { prefix } else { "" };
-                                                let txt = format!("{}{}", pfx, l);
+                                                let txt = format!("{}{}", prefix, l);
                                                 if txt.contains("{{") {
                                                     render_text_with_icons(
                                                         4.0, ty, &txt, color, scale,
@@ -6727,7 +6801,7 @@ fn main() {
                                                 // Normal mode: highlight the hand card that can be played
                                                 if let Some(cid) = p.card_id {
                                                     if let Some((zone, slot, opp)) =
-                                                        find_card_zone_slot(&gs, cid)
+                                                        find_card_zone_slot(&gs, cid, my_player_idx)
                                                     {
                                                         if zone == 3 {
                                                             unsafe {
@@ -6744,7 +6818,7 @@ fn main() {
                                         game_setup::ActionType::UseAbility => {
                                             if let Some(cid) = p.card_id {
                                                 if let Some((zone, slot, opp)) =
-                                                    find_card_zone_slot(&gs, cid)
+                                                    find_card_zone_slot(&gs, cid, my_player_idx)
                                                 {
                                                     unsafe {
                                                         _3ds_board_set_action_highlight(
@@ -6816,7 +6890,7 @@ fn main() {
                                             {
                                                 if let Some(cid) = p.card_id {
                                                     if let Some((zone, slot, opp)) =
-                                                        find_card_zone_slot(&gs, cid)
+                                                        find_card_zone_slot(&gs, cid, my_player_idx)
                                                     {
                                                         unsafe {
                                                             _3ds_board_set_action_highlight(
@@ -6843,7 +6917,7 @@ fn main() {
                                     for opt in options {
                                         if let Some(cid) = opt.card_id {
                                             if let Some((zone, slot, opp)) =
-                                                find_card_zone_slot(&gs, cid)
+                                                find_card_zone_slot(&gs, cid, my_player_idx)
                                             {
                                                 unsafe {
                                                     _3ds_board_set_action_highlight(
@@ -7316,9 +7390,9 @@ fn main() {
 }
 
 #[cfg(feature = "3ds")]
-fn find_card_zone_slot(gs: &GameState, cid: i16) -> Option<(i32, i32, bool)> {
+fn find_card_zone_slot(gs: &GameState, cid: i16, my_player_idx: usize) -> Option<(i32, i32, bool)> {
     for (pi, p) in [&gs.player1, &gs.player2].iter().enumerate() {
-        let opp = pi == 1;
+        let opp = pi != my_player_idx;
         if let Some(idx) = p.stage.stage.iter().position(|&id| id == cid) {
             return Some((1, idx as i32, opp));
         }
