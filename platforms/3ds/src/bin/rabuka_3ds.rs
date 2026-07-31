@@ -1881,6 +1881,7 @@ fn main() {
                                     false,  // choice_subview (false=choices grid)
                                     0,      // text_page
                                     0,      // choice_grid_offset
+                                    0,      // list_scroll
                                     0.0f32, // detail_scroll_y
                                     0,      // hand_offset
                                     0,      // hand_offset_p2
@@ -3162,6 +3163,7 @@ fn main() {
                                     false,    // choice_subview (false=choices grid)
                                     0,        // text_page
                                     0,        // choice_grid_offset
+                                    0,        // list_scroll
                                     0.0f32,   // detail_scroll_y
                                     0,        // hand_offset
                                     0,        // hand_offset_p2
@@ -3197,6 +3199,7 @@ fn main() {
                 mut choice_subview,
                 mut text_page,
                 mut choice_grid_offset,
+                mut list_scroll,
                 mut detail_scroll_y,
                 mut hand_offset,
                 mut hand_offset_p2,
@@ -4406,7 +4409,8 @@ fn main() {
                                 }
                                 redraw = true;
                             // Default: toggle card detail view for any tapped card
-                            } else {
+                            // Skip if a stage zone was tapped — stage handler takes priority
+                            } else if stage_tap.is_none() {
                                 if Some(cid) == viewing_card {
                                     viewing_card = None;
                                     detail_mode = false;
@@ -7290,6 +7294,7 @@ fn main() {
                     choice_subview,
                     text_page,
                     choice_grid_offset,
+                    list_scroll,
                     detail_scroll_y,
                     hand_offset,
                     hand_offset_p2,
@@ -7377,6 +7382,7 @@ fn step_name(s: &Step) -> &'static str {
         Step::ParseCards(_) => "ParseCards",
         Step::Setup(_, _, _, _) => "Setup",
         Step::Play(
+            _,
             _,
             _,
             _,
