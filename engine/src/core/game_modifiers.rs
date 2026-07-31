@@ -50,7 +50,7 @@ impl ModifierEntry {
 
 /// Holds all modifier data for GameState.
 /// Extracted to reduce the 99-field GameState struct.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GameModifiers {
     pub blade_modifiers: HashMap<i16, ModifierEntry>,
     pub blade_type_modifiers: HashMap<i16, BladeColor>,

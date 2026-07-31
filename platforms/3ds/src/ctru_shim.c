@@ -770,9 +770,9 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
         }
         lx += live_slot_w + 2;
     }
-    // Draw need hearts grid to the right of live cards
-    {
-        int pi = opponent ? 1 : 0;
+    // Draw own need hearts grid to the right of live cards (own player only)
+    if (!opponent) {
+        int pi = 0;
         int cols = (board_view == 2) ? 8 : 4;
         int rows = (board_view == 2) ? 1 : 2;
         float icon_sz = 10.0f;

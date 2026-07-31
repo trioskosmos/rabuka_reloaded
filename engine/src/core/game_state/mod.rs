@@ -12,19 +12,20 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
 /// Tracking metadata for a single revealed card, kept in lockstep with the
 /// `revealed_cards` / `revealed_cost_cards` id vectors. Consolidates the four
 /// parallel `Vec` columns into one struct for better locality and fewer
 /// allocator headers.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct RevealedCardMeta {
     pub source: Option<i16>,
     pub source_name: Option<String>,
     pub is_private: bool,
     pub owner: Option<u8>,
-    pub reveal_type: &'static str,
+    pub reveal_type: String,
 }
 
 pub use crate::types::{
@@ -34,12 +35,13 @@ pub use crate::types::{
     ScoreLine, TemporaryEffect, TriggeredAbility, TurnPhase, YellCardResult,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
     // --- 8-byte aligned (Player, HashMap, HashSet, String, Vec, Arc, usize, Value) ---
     pub player1: Player,
     pub player2: Player,
     pub ability_queue: AbilityQueue,
+    #[serde(skip)]
     pub card_database: Arc<CardDatabase>,
     pub mods: GameModifiers,
     /// When false, `recalculate_constants` may skip its work. Mutators
@@ -672,7 +674,7 @@ impl GameState {
             source_name,
             is_private,
             owner,
-            reveal_type,
+            reveal_type: reveal_type.to_string(),
         });
     }
 
@@ -694,7 +696,7 @@ impl GameState {
             source_name,
             is_private,
             owner,
-            reveal_type,
+            reveal_type: reveal_type.to_string(),
         });
     }
 
@@ -931,3 +933,39 @@ impl GameState {
 include!("tracking.rs");
 include!("modifiers.rs");
 include!("abilities.rs");
+
+#[cfg(test)]
+mod serde_roundtrip_tests {
+    use super::*;
+    use crate::card::{Card, CardDatabase};
+    use crate::player::Player;
+    use crate::zones::Stage;
+    use crate::Arc;
+
+    fn test_gs() -> GameState {
+        let db = CardDatabase::new();
+        let mut p1 = Player::new("p1".into(), "P1".into(), true);
+        let mut p2 = Player::new("p2".into(), "P2".into(), false);
+        p1.stage = Stage::new();
+        p2.stage = Stage::new();
+        let mut gs = GameState::new(p1, p2, Arc::new(db));
+        gs.current_phase = Phase::Main;
+        gs.turn_number = 3;
+        gs
+    }
+
+    #[test]
+    fn game_state_roundtrips_through_rmp() {
+        let mut gs = test_gs();
+        gs.player1.hand.cards.push(1);
+        gs.player2.stage.stage[1] = 5;
+        let bytes = rmp_serde::to_vec(&gs).unwrap();
+        let mut back: GameState = rmp_serde::from_slice(&bytes).unwrap();
+        // card_database is #[serde(skip)] — caller reattaches its own
+        back.card_database = gs.card_database.clone();
+        assert_eq!(gs.player1.hand.cards, back.player1.hand.cards);
+        assert_eq!(gs.player2.stage.stage, back.player2.stage.stage);
+        assert_eq!(gs.turn_number, back.turn_number);
+        assert_eq!(gs.current_phase, back.current_phase);
+    }
+}

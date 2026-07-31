@@ -120,7 +120,7 @@ use crate::constants::{EMPTY_SLOT, STAGE_SIZE};
 
 // Orientation and other state tracked in GameState modifiers
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Stage {
     // Rule 5.3: Stage - Where member cards are placed during Main Phase
     // Has three areas: Left Side, Center, Right Side
@@ -460,7 +460,7 @@ impl Stage {
 
 // Removed: use crate::card::parse_heart_color directly
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LiveCardZone {
     // Rule 5.2: Live Card Zone - Where member and live cards are placed during Live Card Set Phase
     pub cards: SmallVec<[i16; MAX_LIVE_CARDS]>, // Card IDs - stack-allocated for up to MAX_LIVE_CARDS cards
@@ -613,7 +613,7 @@ use alloc::{
     vec::Vec,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct EnergyZone {
     // Rule 5.1: Energy Zone - Where energy cards are placed and activated
     // Q15: Energy deck cards are face-down; energy zone cards are face-up.
@@ -717,7 +717,7 @@ impl EnergyZone {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MainDeck {
     /// Card IDs. **Index 0 = top of deck.** Drawing/peeking reads from index 0.
     /// Pushing to the end (`cards.push()`) adds to the bottom.
@@ -769,7 +769,7 @@ impl MainDeck {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct EnergyDeck {
     pub cards: SmallVec<[i16; 20]>,
 }
@@ -800,7 +800,7 @@ impl EnergyDeck {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Hand {
     // Rule 5.4: Hand - Where cards drawn from main deck are held
     pub cards: SmallVec<[i16; 7]>, // Card IDs - stack-allocated for up to 7 cards
@@ -840,7 +840,7 @@ impl Hand {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Waitroom {
     // Rule 5.5: Waitroom - Where used cards are placed
     // Used for refresh when main deck is empty
@@ -881,7 +881,7 @@ impl Waitroom {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SuccessLiveCardZone {
     // Rule 5.6: Success Live Card Zone - Where won live cards are placed
     // Victory condition: 3 cards in this zone
@@ -910,7 +910,7 @@ impl SuccessLiveCardZone {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ExclusionZone {
     // Rule 5.7: Exclusion Zone - Where excluded cards are placed
     pub cards: SmallVec<[i16; 10]>, // Card IDs - stack-allocated for up to 10 cards
@@ -935,7 +935,7 @@ impl ExclusionZone {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ResolutionZone {
     // Rule 5.8: Resolution Zone - Temporary holding area for cards being resolved
     pub cards: SmallVec<[i16; 10]>, // Card IDs - stack-allocated for up to 10 cards

@@ -15,7 +15,7 @@ use alloc::{
 };
 use smallvec::SmallVec;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 
 pub struct Player {
     pub id: String,

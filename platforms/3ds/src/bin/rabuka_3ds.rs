@@ -1073,6 +1073,7 @@ enum Step {
         bool,                       // is_host (true = P1/host, false = P2/client)
         bool,                       // waiting_for_opponent
         Overlay,                    // overlay (start menu, game log, perf stats, revealed)
+        uds::StateReceiver,         // in-progress authoritative state reassembly (client)
     ),
     Done(Result<(), String>),
 }
@@ -1894,6 +1895,7 @@ fn main() {
                                     false,  // is_host
                                     false,  // waiting_for_opponent
                                     Overlay::None,
+                                    uds::StateReceiver::new(),
                                 )
                             }
                             Err(e) => Step::Done(Err(e)),
@@ -2691,11 +2693,12 @@ fn main() {
                         let mut hello = [0u8; 4];
                         match uds::uds_recv(&mut hello) {
                             Ok(n) if n > 0 => {
-                                // Client connected! Move to deck sync
+                                // Client connected! Read client's deck index from hello packet
+                                let p2_idx = if n >= 2 { hello[1] as usize } else { 0 };
                                 Step::Setup(
                                     cards.clone(),
                                     decks.clone(),
-                                    SetupPhase::MultiplayerSyncDeck(p1_idx, 0, true),
+                                    SetupPhase::MultiplayerSyncDeck(p1_idx, p2_idx, true),
                                     true,
                                 )
                             }
@@ -2820,7 +2823,7 @@ fn main() {
                             let selected = hosts[cursor];
                             match uds::uds_connect_network(selected) {
                                 Ok(()) => {
-                                    let hello = [0xAAu8];
+                                    let mut hello = [0xAAu8, (p1_idx & 0xFF) as u8];
                                     let _ = uds::uds_send(&hello);
                                     Step::Setup(
                                         cards.clone(),
@@ -3176,6 +3179,7 @@ fn main() {
                                     is_host,  // is_host
                                     !is_host, // waiting_for_opponent will be recalculated after settle
                                     Overlay::None,
+                                    uds::StateReceiver::new(),
                                 )
                             }
                             Err(e) => Step::Done(Err(e)),
@@ -3212,6 +3216,7 @@ fn main() {
                 is_host,
                 mut waiting_for_opponent,
                 mut overlay,
+                mut state_rx,
             ) => {
                 // Web server pattern: use player_idx (0 or 1) for perspective.
                 // No long-lived borrows on gs — look up inline.
@@ -3786,67 +3791,96 @@ fn main() {
 
                 // Multiplayer: always try to receive data from opponent (non-blocking)
                 if is_multiplayer {
-                    let mut recv_buf = [0u8; 256];
+                    let mut recv_buf = [0u8; 512];
                     if let Ok(n) = uds::uds_recv(&mut recv_buf) {
                         if n > 0 {
-                            if let Some(sync) = uds::ActionSync::from_bytes(&recv_buf[..n]) {
-                                let action_type = match sync.action_tag {
-                                    0 => game_setup::ActionType::RockChoice,
-                                    1 => game_setup::ActionType::PaperChoice,
-                                    2 => game_setup::ActionType::ScissorsChoice,
-                                    3 => game_setup::ActionType::ChooseFirstAttacker,
-                                    4 => game_setup::ActionType::SelectMulligan,
-                                    5 => game_setup::ActionType::SkipMulligan,
-                                    6 => game_setup::ActionType::PlayMemberToStage,
-                                    7 => game_setup::ActionType::SetLiveCard,
-                                    8 => game_setup::ActionType::FinishLiveCardSet,
-                                    9 => game_setup::ActionType::EnergyCharge,
-                                    10 => game_setup::ActionType::ChoiceDecision,
-                                    11 => game_setup::ActionType::ChoiceSelect,
-                                    12 => game_setup::ActionType::ChoiceSkip,
-                                    13 => game_setup::ActionType::ChoiceOption,
-                                    14 => game_setup::ActionType::ChoicePosition,
-                                    15 => game_setup::ActionType::UseAbility,
-                                    16 => game_setup::ActionType::ChooseSecondAttacker,
-                                    17 => game_setup::ActionType::ConfirmMulligan,
-                                    18 => game_setup::ActionType::SelectLiveCard,
-                                    19 => game_setup::ActionType::ConfirmLiveCardSet,
-                                    20 => game_setup::ActionType::SkipLiveCardSet,
-                                    21 => game_setup::ActionType::PassRemaining,
-                                    22 => game_setup::ActionType::Pass,
-                                    _ => game_setup::ActionType::Pass,
-                                };
-                                let stage_area = match sync.stage_area {
-                                    1 => Some(rabuka_engine::zones::MemberArea::LeftSide),
-                                    2 => Some(rabuka_engine::zones::MemberArea::Center),
-                                    3 => Some(rabuka_engine::zones::MemberArea::RightSide),
-                                    _ => None,
-                                };
-                                let _ =
-                                    turn::TurnEngine::execute_main_phase_action_with_ability_index(
-                                        &mut gs,
-                                        &action_type,
-                                        sync.card_id,
-                                        if sync.card_indices.is_empty() {
-                                            None
-                                        } else {
-                                            Some(sync.card_indices.clone())
-                                        },
-                                        stage_area,
-                                        if sync.use_baton_touch {
-                                            Some(true)
-                                        } else {
-                                            None
-                                        },
-                                        sync.ability_index.map(|x| x as usize),
-                                    );
-                                gs.reset_loop_detection();
-                                game_setup::settle_single_player_state(&mut gs);
-                                let my_id = if is_host { 0 } else { 1 };
-                                waiting_for_opponent = !mp_can_act(&gs, my_id);
-                                cur = 0;
-                                dirty = true;
-                                redraw = true;
+                            if recv_buf[0] == uds::MSG_SYNC_STATE && !is_host {
+                                // Client: reassemble authoritative GameState from host
+                                if state_rx.feed(&recv_buf[..n]) {
+                                    if let Some(bytes) = state_rx.take() {
+                                        match rmp_serde::from_slice::<GameState>(&bytes) {
+                                            Ok(mut new_gs) => {
+                                                // Keep our own identical card database (skipped on wire)
+                                                new_gs.card_database = gs.card_database.clone();
+                                                gs = new_gs;
+                                                let my_id = if is_host { 0 } else { 1 };
+                                                waiting_for_opponent = !mp_can_act(&gs, my_id);
+                                                cur = 0;
+                                                dirty = true;
+                                                redraw = true;
+                                            }
+                                            Err(e) => unsafe {
+                                                _3ds_debug_print(
+                                                    format!("[STATE] deserialize err: {}\n\0", e)
+                                                        .as_ptr(),
+                                                );
+                                            },
+                                        }
+                                    }
+                                }
+                            } else if is_host {
+                                // Host: execute the client's action authoritatively, then ship state
+                                if let Some(sync) = uds::ActionSync::from_bytes(&recv_buf[..n]) {
+                                    let action_type = match sync.action_tag {
+                                        0 => game_setup::ActionType::RockChoice,
+                                        1 => game_setup::ActionType::PaperChoice,
+                                        2 => game_setup::ActionType::ScissorsChoice,
+                                        3 => game_setup::ActionType::ChooseFirstAttacker,
+                                        4 => game_setup::ActionType::SelectMulligan,
+                                        5 => game_setup::ActionType::SkipMulligan,
+                                        6 => game_setup::ActionType::PlayMemberToStage,
+                                        7 => game_setup::ActionType::SetLiveCard,
+                                        8 => game_setup::ActionType::FinishLiveCardSet,
+                                        9 => game_setup::ActionType::EnergyCharge,
+                                        10 => game_setup::ActionType::ChoiceDecision,
+                                        11 => game_setup::ActionType::ChoiceSelect,
+                                        12 => game_setup::ActionType::ChoiceSkip,
+                                        13 => game_setup::ActionType::ChoiceOption,
+                                        14 => game_setup::ActionType::ChoicePosition,
+                                        15 => game_setup::ActionType::UseAbility,
+                                        16 => game_setup::ActionType::ChooseSecondAttacker,
+                                        17 => game_setup::ActionType::ConfirmMulligan,
+                                        18 => game_setup::ActionType::SelectLiveCard,
+                                        19 => game_setup::ActionType::ConfirmLiveCardSet,
+                                        20 => game_setup::ActionType::SkipLiveCardSet,
+                                        21 => game_setup::ActionType::PassRemaining,
+                                        22 => game_setup::ActionType::Pass,
+                                        _ => game_setup::ActionType::Pass,
+                                    };
+                                    let stage_area = match sync.stage_area {
+                                        1 => Some(rabuka_engine::zones::MemberArea::LeftSide),
+                                        2 => Some(rabuka_engine::zones::MemberArea::Center),
+                                        3 => Some(rabuka_engine::zones::MemberArea::RightSide),
+                                        _ => None,
+                                    };
+                                    let _ =
+                                        turn::TurnEngine::execute_main_phase_action_with_ability_index(
+                                            &mut gs,
+                                            &action_type,
+                                            sync.card_id,
+                                            if sync.card_indices.is_empty() {
+                                                None
+                                            } else {
+                                                Some(sync.card_indices.clone())
+                                            },
+                                            stage_area,
+                                            if sync.use_baton_touch {
+                                                Some(true)
+                                            } else {
+                                                None
+                                            },
+                                            sync.ability_index.map(|x| x as usize),
+                                        );
+                                    gs.reset_loop_detection();
+                                    game_setup::settle_single_player_state(&mut gs);
+                                    let my_id = if is_host { 0 } else { 1 };
+                                    waiting_for_opponent = !mp_can_act(&gs, my_id);
+                                    cur = 0;
+                                    dirty = true;
+                                    redraw = true;
+                                    // Ship authoritative state to client
+                                    let _ = send_authoritative_state(&gs);
+                                }
                             }
                         }
                     }
@@ -3870,25 +3904,17 @@ fn main() {
                         // Do nothing — disabled actions are not selectable
                     } else {
                         let action = acts_cache[cur].clone();
-                        let p = action.parameters.clone();
-                        let result = turn::TurnEngine::execute_main_phase_action_with_ability_index(
+                        // Authoritative model: host/single executes, client sends action.
+                        let executed = route_authoritative_action(
                             &mut gs,
-                            &action.action_type,
-                            p.as_ref().and_then(|x| x.card_id),
-                            p.as_ref().and_then(|x| x.card_indices.clone()),
-                            p.as_ref()
-                                .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
-                            p.as_ref().and_then(|x| x.use_baton_touch),
-                            p.as_ref().and_then(|x| x.ability_index),
+                            &action,
+                            is_multiplayer,
+                            is_host,
+                            &mut waiting_for_opponent,
                         );
-                        if let Err(ref e) = result {
-                            unsafe {
-                                _3ds_debug_print(format!("[ERR] {}\n\0", e).as_ptr());
-                            }
-                        }
-                        gs.reset_loop_detection();
-                        // In VS AI mode, after human picks RPS for P1, AI auto-picks for P2
-                        if *vs_ai
+                        // VS AI RPS: after human picks P1, AI auto-picks P2 (only when authority)
+                        if executed
+                            && *vs_ai
                             && !*ai_vs_ai
                             && gs.current_phase == Phase::RockPaperScissors
                             && gs.player1_rps_choice.is_some()
@@ -3908,74 +3934,6 @@ fn main() {
                             if gs.player1_rps_choice.is_none() && gs.player2_rps_choice.is_none() {
                                 dprintln!("DRAW! Same choice — pick again.\n");
                             }
-                        }
-                        // Multiplayer: Send action to opponent
-                        if is_multiplayer {
-                            let my_player_id = if is_multiplayer {
-                                if is_host {
-                                    0
-                                } else {
-                                    1
-                                }
-                            } else {
-                                0
-                            };
-                            let action_tag = match action.action_type {
-                                game_setup::ActionType::RockChoice => 0u16,
-                                game_setup::ActionType::PaperChoice => 1,
-                                game_setup::ActionType::ScissorsChoice => 2,
-                                game_setup::ActionType::ChooseFirstAttacker => 3,
-                                game_setup::ActionType::ChooseSecondAttacker => 16,
-                                game_setup::ActionType::SelectMulligan => 4,
-                                game_setup::ActionType::SkipMulligan => 5,
-                                game_setup::ActionType::ConfirmMulligan => 17,
-                                game_setup::ActionType::PlayMemberToStage => 6,
-                                game_setup::ActionType::SetLiveCard => 7,
-                                game_setup::ActionType::FinishLiveCardSet => 8,
-                                game_setup::ActionType::EnergyCharge => 9,
-                                game_setup::ActionType::ChoiceDecision => 10,
-                                game_setup::ActionType::ChoiceSelect => 11,
-                                game_setup::ActionType::ChoiceSkip => 12,
-                                game_setup::ActionType::ChoiceOption => 13,
-                                game_setup::ActionType::ChoicePosition => 14,
-                                game_setup::ActionType::UseAbility => 15,
-                                game_setup::ActionType::SelectLiveCard => 18,
-                                game_setup::ActionType::ConfirmLiveCardSet => 19,
-                                game_setup::ActionType::SkipLiveCardSet => 20,
-                                game_setup::ActionType::PassRemaining => 21,
-                                game_setup::ActionType::Pass => 22,
-                                _ => 0,
-                            };
-                            let stage_area = match p
-                                .as_ref()
-                                .and_then(|x| x.stage_area.as_ref())
-                                .map(|s| s.as_str())
-                            {
-                                Some("left") => 1u8,
-                                Some("center") => 2,
-                                Some("right") => 3,
-                                _ => 0,
-                            };
-                            let sync = uds::ActionSync {
-                                action_tag,
-                                card_id: p.as_ref().and_then(|x| x.card_id),
-                                card_indices: p
-                                    .as_ref()
-                                    .and_then(|x| x.card_indices.clone())
-                                    .unwrap_or_default(),
-                                stage_area,
-                                use_baton_touch: p
-                                    .as_ref()
-                                    .and_then(|x| x.use_baton_touch)
-                                    .unwrap_or(false),
-                                ability_index: p
-                                    .as_ref()
-                                    .and_then(|x| x.ability_index)
-                                    .map(|x| x as u16),
-                            };
-                            let data = sync.to_bytes();
-                            let _ = uds::uds_send(&data);
-                            waiting_for_opponent = !mp_can_act(&gs, my_player_id);
                         }
                         cur = 0;
                         dirty = true;
@@ -4020,7 +3978,11 @@ fn main() {
                     redraw = true;
                 }
 
-                let auto = !gs.has_pending_choice()
+                // Authoritative model: only the HOST settles automatic phases.
+                // The client never runs the engine — it adopts the host's shipped state.
+                let is_authority_here = !is_multiplayer || is_host;
+                let auto = is_authority_here
+                    && !gs.has_pending_choice()
                     && gs.game_result == GameResult::Ongoing
                     && game_setup::is_automatic_phase(&gs);
                 if auto {
@@ -4028,6 +3990,9 @@ fn main() {
                     if is_multiplayer {
                         let my_id = if is_host { 0 } else { 1 };
                         waiting_for_opponent = !mp_can_act(&gs, my_id);
+                        if is_host {
+                            let _ = send_authoritative_state(&gs);
+                        }
                     }
                     cur = 0;
                     dirty = true;
@@ -4283,32 +4248,13 @@ fn main() {
                                             continue;
                                         }
                                         let action = acts_cache[ai].clone();
-                                        let pp = action.parameters.clone();
-                                        let _ = turn::TurnEngine::execute_main_phase_action(
+                                        let _ = route_authoritative_action(
                                             &mut gs,
-                                            &action.action_type,
-                                            pp.as_ref().and_then(|x| x.card_id),
-                                            pp.as_ref().and_then(|x| x.card_indices.clone()),
-                                            None,
-                                            None,
+                                            &action,
+                                            is_multiplayer,
+                                            is_host,
+                                            &mut waiting_for_opponent,
                                         );
-                                        gs.reset_loop_detection();
-                                        if is_multiplayer {
-                                            let my_id = if is_host { 0 } else { 1 };
-                                            let sync = uds::ActionSync {
-                                                action_tag: 4,
-                                                card_id: pp.as_ref().and_then(|x| x.card_id),
-                                                card_indices: pp
-                                                    .as_ref()
-                                                    .and_then(|x| x.card_indices.clone())
-                                                    .unwrap_or_default(),
-                                                stage_area: 0,
-                                                use_baton_touch: false,
-                                                ability_index: None,
-                                            };
-                                            let _ = uds::uds_send(&sync.to_bytes());
-                                            waiting_for_opponent = !mp_can_act(&gs, my_id);
-                                        }
                                         cur = 0;
                                         dirty = true;
                                         redraw = true;
@@ -4339,32 +4285,13 @@ fn main() {
                                             continue;
                                         }
                                         let action = acts_cache[ai].clone();
-                                        let pp = action.parameters.clone();
-                                        let _ = turn::TurnEngine::execute_main_phase_action(
+                                        let _ = route_authoritative_action(
                                             &mut gs,
-                                            &action.action_type,
-                                            pp.as_ref().and_then(|x| x.card_id),
-                                            pp.as_ref().and_then(|x| x.card_indices.clone()),
-                                            None,
-                                            None,
+                                            &action,
+                                            is_multiplayer,
+                                            is_host,
+                                            &mut waiting_for_opponent,
                                         );
-                                        gs.reset_loop_detection();
-                                        if is_multiplayer {
-                                            let my_id = if is_host { 0 } else { 1 };
-                                            let sync = uds::ActionSync {
-                                                action_tag: 18,
-                                                card_id: pp.as_ref().and_then(|x| x.card_id),
-                                                card_indices: pp
-                                                    .as_ref()
-                                                    .and_then(|x| x.card_indices.clone())
-                                                    .unwrap_or_default(),
-                                                stage_area: 0,
-                                                use_baton_touch: false,
-                                                ability_index: None,
-                                            };
-                                            let _ = uds::uds_send(&sync.to_bytes());
-                                            waiting_for_opponent = !mp_can_act(&gs, my_id);
-                                        }
                                         cur = 0;
                                         dirty = true;
                                         redraw = true;
@@ -4401,24 +4328,13 @@ fn main() {
                                 }
                                 if let Some(idx) = act_idx {
                                     let action = acts_cache[idx].clone();
-                                    let p = action.parameters.clone();
-                                    let result = turn::TurnEngine::execute_main_phase_action_with_ability_index(
+                                    let _ = route_authoritative_action(
                                         &mut gs,
-                                        &action.action_type,
-                                        p.as_ref().and_then(|x| x.card_id),
-                                        p.as_ref().and_then(|x| x.card_indices.clone()),
-                                        p.as_ref().and_then(|x| {
-                                            x.stage_area.as_ref().and_then(|s| s.parse().ok())
-                                        }),
-                                        p.as_ref().and_then(|x| x.use_baton_touch),
-                                        p.as_ref().and_then(|x| x.ability_index),
+                                        &action,
+                                        is_multiplayer,
+                                        is_host,
+                                        &mut waiting_for_opponent,
                                     );
-                                    if let Err(ref e) = result {
-                                        unsafe {
-                                            _3ds_debug_print(format!("[ERR] {}\n\0", e).as_ptr());
-                                        }
-                                    }
-                                    gs.reset_loop_detection();
                                     cur = 0;
                                     dirty = true;
                                 } else {
@@ -4515,43 +4431,13 @@ fn main() {
                                     }
                                     cur = ai;
                                     let act2 = acts_cache[cur].clone();
-                                    let pp = act2.parameters.clone();
-                                    let _ = turn::TurnEngine::execute_main_phase_action_with_ability_index(
+                                    let _ = route_authoritative_action(
                                         &mut gs,
-                                        &act2.action_type,
-                                        pp.as_ref().and_then(|x| x.card_id),
-                                        pp.as_ref().and_then(|x| x.card_indices.clone()),
-                                        pp.as_ref().and_then(|x| {
-                                            x.stage_area.as_ref().and_then(|s| s.parse().ok())
-                                        }),
-                                        pp.as_ref().and_then(|x| x.use_baton_touch),
-                                        pp.as_ref().and_then(|x| x.ability_index),
+                                        &act2,
+                                        is_multiplayer,
+                                        is_host,
+                                        &mut waiting_for_opponent,
                                     );
-                                    if is_multiplayer {
-                                        let my_id = if is_host { 0 } else { 1 };
-                                        let sc = match sa.as_str() {
-                                            "left" => 1u8,
-                                            "center" => 2,
-                                            "right" => 3,
-                                            _ => 0,
-                                        };
-                                        let sync = uds::ActionSync {
-                                            action_tag: 6,
-                                            card_id: pp.as_ref().and_then(|x| x.card_id),
-                                            card_indices: pp
-                                                .as_ref()
-                                                .and_then(|x| x.card_indices.clone())
-                                                .unwrap_or_default(),
-                                            stage_area: sc,
-                                            use_baton_touch: pp
-                                                .as_ref()
-                                                .and_then(|x| x.use_baton_touch)
-                                                .unwrap_or(false),
-                                            ability_index: None,
-                                        };
-                                        let _ = uds::uds_send(&sync.to_bytes());
-                                        waiting_for_opponent = !mp_can_act(&gs, my_id);
-                                    }
                                     detail_mode = false;
                                     viewing_card = None;
                                     cur = 0;
@@ -4581,45 +4467,13 @@ fn main() {
                                     }
                                     cur = ai;
                                     let act2 = acts_cache[cur].clone();
-                                    let pp = act2.parameters.clone();
-                                    let result = turn::TurnEngine::execute_main_phase_action(
+                                    let _ = route_authoritative_action(
                                         &mut gs,
-                                        &act2.action_type,
-                                        pp.as_ref().and_then(|x| x.card_id),
-                                        pp.as_ref().and_then(|x| x.card_indices.clone()),
-                                        pp.as_ref().and_then(|x| {
-                                            x.stage_area.as_ref().and_then(|s| s.parse().ok())
-                                        }),
-                                        pp.as_ref().and_then(|x| x.use_baton_touch),
+                                        &act2,
+                                        is_multiplayer,
+                                        is_host,
+                                        &mut waiting_for_opponent,
                                     );
-                                    if let Err(ref e) = result {
-                                        unsafe {
-                                            _3ds_debug_print(format!("[ERR] {}\n\0", e).as_ptr());
-                                        }
-                                    }
-                                    if is_multiplayer {
-                                        let my_id = if is_host { 0 } else { 1 };
-                                        let sc = match sa.as_str() {
-                                            "left" => 1u8,
-                                            "center" => 2,
-                                            "right" => 3,
-                                            _ => 0,
-                                        };
-                                        let sync = uds::ActionSync {
-                                            action_tag: 14,
-                                            card_id: pp.as_ref().and_then(|x| x.card_id),
-                                            card_indices: pp
-                                                .as_ref()
-                                                .and_then(|x| x.card_indices.clone())
-                                                .unwrap_or_default(),
-                                            stage_area: sc,
-                                            use_baton_touch: false,
-                                            ability_index: None,
-                                        };
-                                        let _ = uds::uds_send(&sync.to_bytes());
-                                        waiting_for_opponent = !mp_can_act(&gs, my_id);
-                                    }
-                                    gs.reset_loop_detection();
                                     viewing_card = None;
                                     cur = 0;
                                     dirty = true;
@@ -4878,9 +4732,31 @@ fn main() {
                         unsafe {
                             _3ds_board_set_opp_hand_count(0);
                         }
+                        // Hide opponent's live cards until they perform
+                        let opp_is_first = pref(&gs, 1 - my_player_idx).is_first_attacker;
+                        let opp_performed =
+                            matches!(
+                                gs.current_phase,
+                                Phase::SecondAttackerPerformance | Phase::LiveVictoryDetermination
+                            ) || (matches!(gs.current_phase, Phase::FirstAttackerPerformance)
+                                && opp_is_first);
+                        if !opp_performed {
+                            unsafe {
+                                for i in 0..3i32 {
+                                    _3ds_board_set_opp_live(
+                                        i,
+                                        false,
+                                        std::ptr::null(),
+                                        0,
+                                        false,
+                                        false,
+                                    );
+                                }
+                            }
+                        }
                     }
 
-                    // Set per-card live stats (score + need hearts) on the C board
+                    // Set per-card live stats on the C board
                     {
                         let set_live_stats = |player: &Player, gs: &GameState, is_opp: bool| {
                             for (i, &cid) in player.live_card_zone.cards.iter().enumerate().take(3)
@@ -4890,15 +4766,20 @@ fn main() {
                                 }
                                 if let Some(card) = gs.card_database.get_card(cid) {
                                     let stats = compute_card_stats(card, cid, gs);
-                                    let stat_line = card_stat_line(
-                                        stats.total_blade,
-                                        &stats.heart_str,
-                                        stats.score,
-                                        stats.cost.into(),
-                                        stats.is_tapped,
-                                        card.card_type.as_card_str(),
-                                        &stats.need_heart_str,
-                                    );
+                                    // Opponent: hide score and need hearts
+                                    let stat_line = if is_opp {
+                                        String::new()
+                                    } else {
+                                        card_stat_line(
+                                            stats.total_blade,
+                                            &stats.heart_str,
+                                            stats.score,
+                                            stats.cost.into(),
+                                            stats.is_tapped,
+                                            card.card_type.as_card_str(),
+                                            &stats.need_heart_str,
+                                        )
+                                    };
                                     let c_line = std::ffi::CString::new(stat_line.as_bytes())
                                         .unwrap_or_default();
                                     unsafe {
@@ -7455,6 +7336,7 @@ fn main() {
                     is_host,
                     waiting_for_opponent,
                     overlay,
+                    state_rx,
                 )
             }
             Step::Done(ref r) => {
@@ -7557,8 +7439,116 @@ fn step_name(s: &Step) -> &'static str {
             _,
             _,
             _,
+            _,
         ) => "Play",
         Step::Done(_) => "Done",
+    }
+}
+
+/// Serialize the authoritative GameState and send it to the opponent as
+/// chunked MSG_SYNC_STATE messages. Returns Ok(()) on success.
+fn send_authoritative_state(gs: &GameState) -> Result<(), ()> {
+    use rabuka_3ds::uds;
+    let bytes = rmp_serde::to_vec(gs).map_err(|_| ())?;
+    for chunk in uds::state_chunks(&bytes) {
+        let _ = uds::uds_send(&chunk);
+    }
+    Ok(())
+}
+
+/// Convert an ActionType to its wire tag (matches ActionSync::from_bytes).
+fn action_tag_of(at: &game_setup::ActionType) -> u16 {
+    match at {
+        game_setup::ActionType::RockChoice => 0,
+        game_setup::ActionType::PaperChoice => 1,
+        game_setup::ActionType::ScissorsChoice => 2,
+        game_setup::ActionType::ChooseFirstAttacker => 3,
+        game_setup::ActionType::ChooseSecondAttacker => 16,
+        game_setup::ActionType::SelectMulligan => 4,
+        game_setup::ActionType::SkipMulligan => 5,
+        game_setup::ActionType::ConfirmMulligan => 17,
+        game_setup::ActionType::PlayMemberToStage => 6,
+        game_setup::ActionType::SetLiveCard => 7,
+        game_setup::ActionType::FinishLiveCardSet => 8,
+        game_setup::ActionType::EnergyCharge => 9,
+        game_setup::ActionType::ChoiceDecision => 10,
+        game_setup::ActionType::ChoiceSelect => 11,
+        game_setup::ActionType::ChoiceSkip => 12,
+        game_setup::ActionType::ChoiceOption => 13,
+        game_setup::ActionType::ChoicePosition => 14,
+        game_setup::ActionType::UseAbility => 15,
+        game_setup::ActionType::SelectLiveCard => 18,
+        game_setup::ActionType::ConfirmLiveCardSet => 19,
+        game_setup::ActionType::SkipLiveCardSet => 20,
+        game_setup::ActionType::PassRemaining => 21,
+        game_setup::ActionType::Pass => 22,
+        _ => 0,
+    }
+}
+
+/// Route an action through the authoritative model:
+/// - single player: execute locally
+/// - host: execute locally + ship state to client
+/// - client: send action to host (no local execution; host ships state back)
+/// Returns true if the action was executed locally (host/single).
+#[allow(clippy::too_many_arguments)]
+fn route_authoritative_action(
+    gs: &mut GameState,
+    action: &game_setup::Action,
+    is_multiplayer: bool,
+    is_host: bool,
+    waiting_for_opponent: &mut bool,
+) -> bool {
+    use rabuka_3ds::uds;
+    let p = action.parameters.clone();
+    if !is_multiplayer || is_host {
+        let result = turn::TurnEngine::execute_main_phase_action_with_ability_index(
+            gs,
+            &action.action_type,
+            p.as_ref().and_then(|x| x.card_id),
+            p.as_ref().and_then(|x| x.card_indices.clone()),
+            p.as_ref()
+                .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
+            p.as_ref().and_then(|x| x.use_baton_touch),
+            p.as_ref().and_then(|x| x.ability_index),
+        );
+        if let Err(ref e) = result {
+            unsafe {
+                _3ds_debug_print(format!("[ERR] {}\n\0", e).as_ptr());
+            }
+        }
+        gs.reset_loop_detection();
+        if is_multiplayer {
+            *waiting_for_opponent = !mp_can_act(gs, 0);
+            let _ = send_authoritative_state(gs);
+        }
+        true
+    } else {
+        // Client: send action, don't execute. Host will ship the new state.
+        let stage_area = match p
+            .as_ref()
+            .and_then(|x| x.stage_area.as_ref())
+            .map(|s| s.as_str())
+        {
+            Some("left") => 1u8,
+            Some("center") => 2,
+            Some("right") => 3,
+            _ => 0,
+        };
+        let sync = uds::ActionSync {
+            action_tag: action_tag_of(&action.action_type),
+            card_id: p.as_ref().and_then(|x| x.card_id),
+            card_indices: p
+                .as_ref()
+                .and_then(|x| x.card_indices.clone())
+                .unwrap_or_default(),
+            stage_area,
+            use_baton_touch: p.as_ref().and_then(|x| x.use_baton_touch).unwrap_or(false),
+            ability_index: p.as_ref().and_then(|x| x.ability_index).map(|x| x as u16),
+        };
+        let _ = uds::uds_send(&sync.to_bytes());
+        *waiting_for_opponent = true;
+        false
     }
 }
 

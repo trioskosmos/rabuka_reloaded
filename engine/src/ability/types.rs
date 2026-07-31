@@ -27,7 +27,7 @@ pub struct TriggerEvent {
 /// Discriminator for routing choice results to the correct handler.
 /// Statically known routes are enum variants; dynamic routes (e.g. position_change
 /// with card_no) use `Raw`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ChoiceRoute {
     Choice,
     ChoiceString,
@@ -831,7 +831,7 @@ impl ValueRef {
 // ====================================================================
 
 /// Snapshot of key zone counts for debugging ability execution.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZoneSnapshot {
     pub hand_count: usize,
     pub stage_count: usize,
@@ -858,7 +858,7 @@ impl ZoneSnapshot {
 }
 
 /// A node in the ability execution trace tree.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct AbilityTraceNode {
     pub label: String,
     pub card: Option<String>,

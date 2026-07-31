@@ -25,6 +25,93 @@ pub const MSG_SYNC_SETUP: u8 = 0x01;
 pub const MSG_SYNC_ACTION: u8 = 0x02;
 pub const MSG_SYNC_PING: u8 = 0x03;
 pub const MSG_SYNC_QUIT: u8 = 0x04;
+pub const MSG_SYNC_STATE: u8 = 0x05;
+
+/// Max payload per UDS packet (safe for a single data frame).
+pub const UDS_CHUNK_SIZE: usize = 480;
+
+/// Split a large byte payload into MSG_SYNC_STATE chunks.
+/// Header: [0x05, seq:u8, total:u8] + payload.  total = number of chunks.
+/// First chunk (seq==0) is prefixed with a 4-byte little-endian total length.
+pub fn state_chunks(data: &[u8]) -> Vec<Vec<u8>> {
+    let total_chunks = (data.len() + UDS_CHUNK_SIZE - 1) / UDS_CHUNK_SIZE;
+    let mut out = Vec::with_capacity(total_chunks);
+    let mut offset = 0usize;
+    for seq in 0..total_chunks {
+        let end = (offset + UDS_CHUNK_SIZE).min(data.len());
+        let mut chunk = Vec::with_capacity(end - offset + 3 + 4);
+        chunk.push(MSG_SYNC_STATE);
+        chunk.push(seq as u8);
+        chunk.push(total_chunks as u8);
+        if seq == 0 {
+            chunk.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        }
+        chunk.extend_from_slice(&data[offset..end]);
+        out.push(chunk);
+        offset = end;
+    }
+    out
+}
+
+/// A reassembler for an in-progress MSG_SYNC_STATE transfer.
+#[derive(Clone)]
+pub struct StateReceiver {
+    expected_total: usize,
+    received: Vec<u8>,
+    chunks_seen: Vec<bool>,
+}
+
+impl StateReceiver {
+    pub fn new() -> Self {
+        StateReceiver {
+            expected_total: 0,
+            received: Vec::new(),
+            chunks_seen: Vec::new(),
+        }
+    }
+
+    /// Feed one received chunk. Returns Ok(true) when the full state is ready.
+    pub fn feed(&mut self, chunk: &[u8]) -> bool {
+        if chunk.len() < 3 || chunk[0] != MSG_SYNC_STATE {
+            return false;
+        }
+        let seq = chunk[1] as usize;
+        let total = chunk[2] as usize;
+        if self.received.is_empty() && seq == 0 {
+            // First chunk carries the total byte length in the first 4 payload bytes
+            if chunk.len() < 7 {
+                return false;
+            }
+            self.expected_total = u32::from_le_bytes(chunk[3..7].try_into().unwrap()) as usize;
+            self.received = Vec::with_capacity(self.expected_total);
+            self.chunks_seen = vec![false; total];
+        }
+        if self.expected_total == 0 || self.chunks_seen.is_empty() {
+            return false;
+        }
+        let payload_start = if seq == 0 { 7 } else { 3 };
+        if chunk.len() <= payload_start {
+            return false;
+        }
+        if !self.chunks_seen[seq] {
+            self.chunks_seen[seq] = true;
+            self.received.extend_from_slice(&chunk[payload_start..]);
+        }
+        // Done when all chunks are seen
+        self.chunks_seen.iter().all(|&b| b)
+    }
+
+    /// Take the reassembled state bytes.
+    pub fn take(&mut self) -> Option<Vec<u8>> {
+        if self.expected_total == 0 || self.received.len() < self.expected_total {
+            return None;
+        }
+        let out = self.received.split_off(0);
+        self.expected_total = 0;
+        self.chunks_seen.clear();
+        Some(out)
+    }
+}
 
 /// Initialize UDS as host or client. Returns Ok(()) on success.
 pub fn uds_init(is_host: bool) -> Result<(), i32> {

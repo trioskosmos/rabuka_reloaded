@@ -85,7 +85,7 @@ impl ArcStr {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum AbilityTrigger {
     Activation,
     Debut,
@@ -95,7 +95,7 @@ pub enum AbilityTrigger {
     Auto,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum TurnPhase {
     FirstAttackerNormal,
     SecondAttackerNormal,
@@ -112,7 +112,7 @@ impl core::fmt::Display for TurnPhase {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Phase {
     RockPaperScissors,
     ChooseFirstAttacker,
@@ -169,7 +169,7 @@ impl Phase {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum GameResult {
     FirstAttackerWins,
     SecondAttackerWins,
@@ -177,7 +177,7 @@ pub enum GameResult {
     Ongoing,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Duration {
     LiveEnd,
     ThisTurn,
@@ -304,7 +304,7 @@ pub struct CardEffectItemRef<'a> {
     pub color: Option<&'a str>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TemporaryEffect {
     pub effect_type: String,
     pub duration: Duration,
@@ -316,7 +316,7 @@ pub struct TemporaryEffect {
     pub effect_data: Option<EffectData>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ReplacementEffect {
     pub card_id: i16,
     pub player_id: String,
@@ -682,7 +682,7 @@ pub struct PositionChangeEvent {
 /// Populated in effect handlers (execute_gain_resource etc.) and consumed
 /// by build_snapshot to fill ability_heart_bonuses, ability_blade_bonuses,
 /// Breakdown.scores, Breakdown.transforms, and TriggeredAbility.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum EffectType {
     HeartBonus,
     BladeBonus,
@@ -707,7 +707,7 @@ impl EffectType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AbilityApplication {
     pub source_card_id: i16,
     pub ability_text: ArcStr,
