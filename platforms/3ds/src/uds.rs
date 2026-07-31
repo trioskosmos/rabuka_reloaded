@@ -27,6 +27,7 @@ pub const MSG_SYNC_PING: u8 = 0x03;
 pub const MSG_SYNC_QUIT: u8 = 0x04;
 pub const MSG_SYNC_STATE: u8 = 0x05;
 pub const MSG_SYNC_STATE_ACK: u8 = 0x06;
+pub const MSG_SYNC_ACTION_ACK: u8 = 0x07;
 
 /// Max payload per UDS packet (safe for a single data frame).
 /// UDS data frames carry up to 0x3D4 (980) bytes; 900 leaves margin for
@@ -86,6 +87,26 @@ pub fn state_ack(seq: u16, chunks_seen: &[bool]) -> Vec<u8> {
         v.push(bits);
     }
     v
+}
+
+/// Build an MSG_SYNC_ACTION_ACK packet acknowledging a processed client action.
+/// The client stops retransmitting its action once it receives this, instead of
+/// waiting for a full state round-trip. This decoupling breaks the retransmit
+/// storm where a duplicate action made the host re-stage a fresh state seq,
+/// resetting the client's partial reassembly and looping forever.
+pub fn action_ack(action_seq: u32) -> Vec<u8> {
+    let mut v = Vec::with_capacity(5);
+    v.push(MSG_SYNC_ACTION_ACK);
+    v.extend_from_slice(&action_seq.to_le_bytes());
+    v
+}
+
+/// Parse an MSG_SYNC_ACTION_ACK packet, returning the acknowledged action_seq.
+pub fn parse_action_ack(data: &[u8]) -> Option<u32> {
+    if data.len() < 5 || data[0] != MSG_SYNC_ACTION_ACK {
+        return None;
+    }
+    Some(u32::from_le_bytes(data[1..5].try_into().ok()?))
 }
 
 /// A reassembler for an in-progress MSG_SYNC_STATE transfer.

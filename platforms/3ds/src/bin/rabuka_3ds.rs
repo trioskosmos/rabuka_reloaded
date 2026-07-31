@@ -3822,6 +3822,11 @@ fn main() {
                 // host retransmit logic can detect "just staged this frame" and send
                 // immediately instead of waiting for the next throttle tick.
                 let pending_seq_before = pending_state.as_ref().map(|(s, _, _)| *s);
+                // Set when the host must resend its current pending chunks this
+                // frame without staging a new state (e.g. a duplicate client
+                // action). Re-staging on dup would reset the client's in-progress
+                // reassembly and cause the retransmit storm described below.
+                let mut force_resend = false;
                 if is_multiplayer {
                     // udsPullPacket returns one packet per call, so drain up to 48
                     // packets per frame. Without this a multi-chunk state transfer
@@ -3906,6 +3911,21 @@ fn main() {
                                             dbg_tx_bytes += ack.len() as u32;
                                         }
                                     }
+                                } else if recv_buf[0] == uds::MSG_SYNC_ACTION_ACK && !is_host {
+                                    // Host processed our action — stop retransmitting it. This
+                                    // is what breaks the retransmit storm: the client no longer
+                                    // resends the action until a NEW state arrives (which made
+                                    // the host re-stage a fresh seq, reset the client's partial
+                                    // reassembly, and loop forever).
+                                    if let Some(ack_seq) = uds::parse_action_ack(&recv_buf[..n]) {
+                                        if let Some(bytes) = &pending_client_action {
+                                            if let Some(sync) = uds::ActionSync::from_bytes(bytes) {
+                                                if sync.action_seq == ack_seq {
+                                                    pending_client_action = None;
+                                                }
+                                            }
+                                        }
+                                    }
                                 } else if is_host {
                                     // Host: execute the client's action authoritatively, then ship state
                                     if let Some(sync) = uds::ActionSync::from_bytes(&recv_buf[..n])
@@ -3943,17 +3963,15 @@ fn main() {
                                             _ => None,
                                         };
                                         // Dedup retransmitted actions: only execute once per seq.
-                                        // A duplicate still gets a fresh state reply (the client
-                                        // retransmits to recover a dropped state, not a new action).
+                                        // ACK every action so the client stops retransmitting it
+                                        // (decoupled from state delivery). A duplicate must NOT
+                                        // get a fresh state seq — that resets the client's partial
+                                        // reassembly and loops forever (client never finishes, keeps
+                                        // resending, host keeps re-staging → tx storm + desync).
                                         let is_dup = sync.action_seq != 0
                                             && sync.action_seq <= last_client_action_seq;
                                         if is_dup {
-                                            let prev = pending_state
-                                                .as_ref()
-                                                .map(|(s, _, _)| *s)
-                                                .unwrap_or(0);
-                                            let staged = stage_authoritative_state(&gs, prev);
-                                            pending_state = Some(staged);
+                                            force_resend = true;
                                         } else {
                                             if sync.action_seq != 0 {
                                                 last_client_action_seq = sync.action_seq;
@@ -4000,6 +4018,10 @@ fn main() {
                                             let staged = stage_authoritative_state(&gs, prev);
                                             pending_state = Some(staged);
                                         }
+                                        // ACK the action after processing so the client stops
+                                        // retransmitting it (decoupled from state delivery).
+                                        let _ = uds::uds_send(&uds::action_ack(sync.action_seq));
+                                        dbg_tx_bytes += 5;
                                     }
                                 }
                             } else {
@@ -4157,7 +4179,7 @@ fn main() {
                     }
                     let just_staged =
                         pending_state.as_ref().map(|(s, _, _)| *s) != pending_seq_before;
-                    if just_staged || (_frame % 2 == 0) {
+                    if just_staged || force_resend || (_frame % 2 == 0) {
                         if let Some((_, chunks, acked)) = &pending_state {
                             for (i, chunk) in chunks.iter().enumerate() {
                                 if !acked[i] {

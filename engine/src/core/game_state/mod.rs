@@ -47,12 +47,21 @@ pub struct GameState {
     /// When false, `recalculate_constants` may skip its work. Mutators
     /// that change stage/live/energy/hand/orientation/success-zone state call
     /// `mark_constants_dirty` so constants are re-evaluated exactly when needed.
+    #[serde(skip)]
     pub constants_dirty: bool,
     pub resolution_zone: ResolutionZone,
     pub heart_color_decision_phase: String,
+    /// Engine-internal loop-detection history. Skipped on the wire: the 3DS
+    /// client never runs the engine and it only inflates every state transfer
+    /// (up to 1000 × u64 ≈ 8KB) for no reason.
+    #[serde(skip)]
     pub game_state_history: Vec<u64>,
+    #[serde(skip)]
     pub max_state_history_size: usize,
     pub rule_log: Vec<String>,
+    /// Engine-internal structured log. Skipped on the wire: the client's game
+    /// log overlay reads `rule_log`, not this.
+    #[serde(skip)]
     pub structured_log: Vec<LogEntry>,
     pub turn1_abilities_played: SmallVec<[String; 8]>,
     pub turn2_abilities_played: SmallVec<[(String, u8); 8]>,
@@ -86,10 +95,16 @@ pub struct GameState {
     /// Scratch buffers for recalculate_constants — reused across calls to avoid
     /// allocating 7+ HashMaps/Vecs on every state change. Swapped out via
     /// `core::mem::take` at the start of each call and swapped back at the end.
+    /// All skipped on the wire: transient engine-internal buffers.
+    #[serde(skip)]
     pub scratch_exp_blade: HashMap<i16, i32>,
+    #[serde(skip)]
     pub scratch_exp_cost: HashMap<i16, i32>,
+    #[serde(skip)]
     pub scratch_exp_score: HashMap<i16, i32>,
+    #[serde(skip)]
     pub scratch_exp_heart: HashMap<i16, HashMap<String, i32>>,
+    #[serde(skip)]
     pub scratch_entry_positions: HashMap<i16, Option<usize>>,
     pub negated_abilities: SmallVec<[i16; 8]>,
     pub replacement_effects: SmallVec<[ReplacementEffect; 2]>,
