@@ -932,6 +932,17 @@ float _3ds_measure_text_width(const char* text, float scale) {
     return w;
 }
 
+// ---- Icon dimension query ----
+// Returns width/height ratio for an icon atlas, or 1.0 if not found.
+float _3ds_icon_aspect(const char* atlas_name) {
+    if (!atlas_name || !atlas_name[0]) return 1.0f;
+    C2D_Image img = _3ds_get_card_image(atlas_name, 0);
+    if (img.tex && img.subtex && img.subtex->height > 0) {
+        return (float)img.subtex->width / (float)img.subtex->height;
+    }
+    return 1.0f;
+}
+
 // ---- Main render ----
 void _3ds_swap_buffers() {
     // Re-parse top text

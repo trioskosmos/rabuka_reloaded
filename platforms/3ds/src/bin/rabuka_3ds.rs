@@ -237,32 +237,17 @@ fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32) {
     }
 }
 
-/// Look up the display width for an icon at the given height, maintaining aspect ratio.
+/// Calculate icon display width at a given height, using actual texture aspect ratio.
 fn icon_width_for(file: &str, h: f32) -> f32 {
-    // Known icon dimensions (from docs/img/texticon/*.png)
-    // Square icons (160x160): hearts, blades, energy, score, etc.
-    // Rectangular: triggers and position icons
-    // Strip optional "icon_" prefix so both "kidou.png" and "icon_kidou.png" match
-    let clean = file.strip_prefix("icon_").unwrap_or(file);
-    let (w, ih) = match clean {
-        // Triggers: kidou=378x160, jidou=427x160, jyouji=378x160, toujyou=378x160
-        f if f.starts_with("kidou") || f.starts_with("jyouji") || f.starts_with("toujyou") => {
-            (378.0, 160.0)
-        }
-        f if f.starts_with("jidou") => (427.0, 160.0),
-        // Live start/success: 833x160
-        f if f.starts_with("live_start") || f.starts_with("live_success") => (833.0, 160.0),
-        // Position: 667x160 for center, 833x204 for leftside, 833x202 for rightside
-        f if f.starts_with("center") => (667.0, 160.0),
-        f if f.starts_with("leftside") => (833.0, 204.0),
-        f if f.starts_with("rightside") => (833.0, 202.0),
-        // Turn1: 677x160, Turn2: 300x60
-        f if f.starts_with("turn1") => (677.0, 160.0),
-        f if f.starts_with("turn2") => (300.0, 60.0),
-        // Everything else (hearts, resources): 160x160 square
-        _ => (160.0, 160.0),
-    };
-    h * w / ih
+    let icon_name = file.strip_suffix(".png").unwrap_or(file);
+    let atlas_name = format!("icon_{}.png.t3x", icon_name);
+    let c_str = std::ffi::CString::new(atlas_name.as_str()).unwrap_or_default();
+    let aspect = unsafe { _3ds_icon_aspect(c_str.as_ptr() as *const u8) };
+    if aspect > 0.0 {
+        h * aspect
+    } else {
+        h
+    }
 }
 
 /// Convert heart label like "h061+1" to icon + count: "{{heart_06.png|h06}} 1+1"
@@ -977,7 +962,7 @@ fn render_card_grid(
 }
 
 #[cfg(feature = "3ds")]
-fn render_card_detail(card_id: i16, card_db: &rabuka_engine::card::CardDatabase) {
+fn render_card_detail(card_id: i16, card_db: &rabuka_engine::card::CardDatabase, scroll_y: f32) {
     if let Some(card) = card_db.get_card(card_id) {
         let total_blade = card.blade as i32;
         let score = card.score.unwrap_or(0) as i32;
@@ -1012,7 +997,7 @@ fn render_card_detail(card_id: i16, card_db: &rabuka_engine::card::CardDatabase)
         };
         unsafe {
             _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-            _3ds_top_queue_rect(0.0, 0.0, 400.0, 232.0, COL_CARD);
+            _3ds_top_queue_rect(0.0, 0.0, 400.0, 40.0, COL_CARD);
             let display_name = i18n::card_display_name(&card.name, current_lang());
             _3ds_top_queue_text(
                 4.0,
@@ -1036,19 +1021,20 @@ fn render_card_detail(card_id: i16, card_db: &rabuka_engine::card::CardDatabase)
                 COL_LIGHT,
                 0.65f32,
             );
-            let mut ty = 44.0;
+            // Scrollable ability text area (below the 40px header)
+            _3ds_top_queue_rect(0.0, 40.0, 400.0, 200.0, COL_CARD);
+            let mut ty = 44.0 - scroll_y;
             let abs: Vec<_> = card.resolved_abilities().collect();
             if abs.is_empty() {
-                // Fallback: raw ability text (abilities not parsed in DeckViewer's CardDatabase)
                 let raw = card.ability_text();
                 if !raw.is_empty() {
                     let clean = raw.replace('\n', " ");
                     let w = wrap_ability_text(&clean, 392.0, 0.65);
                     for line in w.lines() {
-                        if ty < 220.0 {
+                        if ty > -20.0 && ty < 240.0 {
                             render_text_with_icons(4.0, ty, line, COL_LIGHT, 0.65);
-                            ty += 18.0;
                         }
+                        ty += 18.0;
                     }
                 }
             } else {
@@ -1056,13 +1042,20 @@ fn render_card_detail(card_id: i16, card_db: &rabuka_engine::card::CardDatabase)
                     let ab_text = i18n::translate_ability(&ab.full_text, current_lang());
                     let w = wrap_ability_text(&ab_text, 392.0, 0.65);
                     for line in w.lines() {
-                        if ty < 220.0 {
+                        if ty > -20.0 && ty < 240.0 {
                             render_text_with_icons(4.0, ty, line, COL_LIGHT, 0.65);
-                            ty += 18.0;
                         }
+                        ty += 18.0;
                     }
                     ty += 3.0;
                 }
+            }
+            // Scroll indicator if content extends beyond screen
+            if ty > 220.0 {
+                _3ds_top_queue_text(380.0, 225.0, COL_MED, 0.50f32, format!("v\0").as_ptr());
+            }
+            if scroll_y > 0.0 {
+                _3ds_top_queue_text(380.0, 42.0, COL_MED, 0.50f32, format!("^\0").as_ptr());
             }
         }
     }
@@ -1107,6 +1100,7 @@ enum Step {
         bool,                       // choice_subview (false=choices grid, true=text overlay)
         usize,                      // text_page (current page index in text subview)
         usize,                      // choice_grid_offset (scroll offset for choice image grid)
+        f32,                        // detail_scroll_y (scroll offset for card detail text)
         usize,                      // hand_offset (P1)
         usize,                      // hand_offset_p2
         u32,                        // touch_tap_count
@@ -1919,23 +1913,24 @@ fn main() {
                                     true,
                                     atlas,
                                     vs_ai,
-                                    false, // ai_vs_ai
-                                    false, // cli_mode (start in game mode)
-                                    false, // detail_mode
-                                    true,  // choice_image_mode
-                                    false, // choice_subview (false=choices grid)
-                                    0,     // text_page
-                                    0,     // choice_grid_offset
-                                    0,     // hand_offset
-                                    0,     // hand_offset_p2
-                                    0,     // touch_tap_count
-                                    None,  // viewing_card
-                                    None,  // zone_viewer
-                                    0,     // zone_viewer_offset
-                                    false, // was_touching
-                                    false, // is_multiplayer
-                                    false, // is_host
-                                    false, // waiting_for_opponent
+                                    false,  // ai_vs_ai
+                                    false,  // cli_mode (start in game mode)
+                                    false,  // detail_mode
+                                    true,   // choice_image_mode
+                                    false,  // choice_subview (false=choices grid)
+                                    0,      // text_page
+                                    0,      // choice_grid_offset
+                                    0.0f32, // detail_scroll_y
+                                    0,      // hand_offset
+                                    0,      // hand_offset_p2
+                                    0,      // touch_tap_count
+                                    None,   // viewing_card
+                                    None,   // zone_viewer
+                                    0,      // zone_viewer_offset
+                                    false,  // was_touching
+                                    false,  // is_multiplayer
+                                    false,  // is_host
+                                    false,  // waiting_for_opponent
                                     Overlay::None,
                                 )
                             }
@@ -2340,7 +2335,7 @@ fn main() {
                             if viewing_card.is_none() {
                                 render_card_grid(card_ids, offset, 5, 2, 28.0, card_db, atlas);
                             } else {
-                                render_card_detail(viewing_card.unwrap(), card_db);
+                                render_card_detail(viewing_card.unwrap(), card_db, 0.0);
                             }
                         }
                         let action = card_grid_input(keys, &mut offset, viewing_card, card_ids, 5);
@@ -3206,6 +3201,7 @@ fn main() {
                                     false,    // choice_subview (false=choices grid)
                                     0,        // text_page
                                     0,        // choice_grid_offset
+                                    0.0f32,   // detail_scroll_y
                                     0,        // hand_offset
                                     0,        // hand_offset_p2
                                     0,        // touch_tap_count
@@ -3240,6 +3236,7 @@ fn main() {
                 mut choice_subview,
                 mut text_page,
                 mut choice_grid_offset,
+                mut detail_scroll_y,
                 mut hand_offset,
                 mut hand_offset_p2,
                 mut touch_tap_count,
@@ -3264,6 +3261,14 @@ fn main() {
                     0
                 };
                 let my_id: i32 = my_player_idx as i32;
+                // General check: do the current choice actions have card images?
+                // ChoiceOption actions with card_id → image grid. Otherwise → text fallback.
+                let has_image_choice = choice_image_mode
+                    && gs.has_pending_choice()
+                    && acts_cache.iter().any(|a| {
+                        a.action_type == game_setup::ActionType::ChoiceOption
+                            && a.parameters.as_ref().and_then(|p| p.card_id).is_some()
+                    });
                 #[inline(always)]
                 fn pref<'a>(gs: &'a GameState, idx: usize) -> &'a Player {
                     if idx == 0 {
@@ -3466,7 +3471,18 @@ fn main() {
                         Overlay::None => {}
                     }
                 } else if detail_mode && viewing_card.is_some() {
-                    // Detail+card: DPAD navigates the filtered action list
+                    // Detail+card: UP/DOWN navigates actions, L/R scrolls detail card
+                    if keys & 0x00000200 != 0 {
+                        detail_scroll_y -= 110.0;
+                        if detail_scroll_y < 0.0 {
+                            detail_scroll_y = 0.0;
+                        }
+                        redraw = true;
+                    }
+                    if keys & 0x00000100 != 0 {
+                        detail_scroll_y += 110.0;
+                        redraw = true;
+                    }
                     let n = display_order.len();
                     if keys & 0x00000040 != 0 && n > 0 {
                         display_pos = if display_pos > 0 {
@@ -3487,24 +3503,19 @@ fn main() {
                         redraw = true;
                     }
                 } else if detail_mode {
-                    // Detail alone (no specific card): DPAD scrolls text
-                    if keys & 0x00000040 != 0 {
-                        let sy = unsafe { _3ds_text_get_scroll_y() };
-                        unsafe {
-                            _3ds_text_set_scroll_y((sy - 10).max(0));
+                    // Detail view: L/R scroll the ability text (half screen per press)
+                    if keys & 0x00000200 != 0 {
+                        detail_scroll_y -= 110.0;
+                        if detail_scroll_y < 0.0 {
+                            detail_scroll_y = 0.0;
                         }
+                        redraw = true;
                     }
-                    if keys & 0x00000080 != 0 {
-                        let sy = unsafe { _3ds_text_get_scroll_y() };
-                        unsafe {
-                            _3ds_text_set_scroll_y(sy + 10);
-                        }
+                    if keys & 0x00000100 != 0 {
+                        detail_scroll_y += 110.0;
+                        redraw = true;
                     }
-                } else if !(choice_image_mode
-                    && gs.has_pending_choice()
-                    && zone_viewer.is_none()
-                    && overlay == Overlay::None)
-                {
+                } else if !has_image_choice {
                     // Navigate in display space with wrap-around
                     // Skipped when choice grid handles its own navigation
                     let n = display_order.len();
@@ -3533,11 +3544,7 @@ fn main() {
                 // Image mode: choices are the primary view; L shows ability text overlay
                 // L toggles overlay; UP/DOWN/LEFT/RIGHT navigate choices; A confirms
                 // Overlay shown: L/B dismiss, UP/DOWN scroll text pages
-                if choice_image_mode
-                    && gs.has_pending_choice()
-                    && zone_viewer.is_none()
-                    && overlay == Overlay::None
-                {
+                if has_image_choice && zone_viewer.is_none() && overlay == Overlay::None {
                     if choice_subview {
                         // === Text overlay: L/B dismiss, UP/DOWN page through text ===
                         if keys & 0x00000200 != 0 || keys & 0x00000002 != 0 {
@@ -3646,6 +3653,7 @@ fn main() {
                     if viewing_card.is_some() {
                         viewing_card = None;
                         detail_mode = false;
+                        detail_scroll_y = 0.0;
                         redraw = true;
                     } else if zone_viewer.is_some() {
                         zone_viewer = None;
@@ -3717,6 +3725,7 @@ fn main() {
                         // No card on this action — do nothing
                     } else {
                         detail_mode = !detail_mode;
+                        detail_scroll_y = 0.0;
                         if detail_mode && cur < acts_cache.len() {
                             if let Some(cid) =
                                 acts_cache[cur].parameters.as_ref().and_then(|p| p.card_id)
@@ -4362,7 +4371,7 @@ fn main() {
                                     }
                                 }
                             // Choice image mode: board tap executes the choice directly
-                            } else if choice_image_mode && gs.has_pending_choice() {
+                            } else if has_image_choice {
                                 let mut act_idx: Option<usize> =
                                     acts_cache.iter().position(|act| {
                                         act.parameters.as_ref().and_then(|p| p.card_id) == Some(cid)
@@ -4419,6 +4428,7 @@ fn main() {
                                     } else {
                                         viewing_card = Some(cid);
                                         detail_mode = true;
+                                        detail_scroll_y = 0.0;
                                         if !acts_cache.is_empty() {
                                             if let Some(pos) = acts_cache.iter().position(|act| {
                                                 act.parameters.as_ref().and_then(|p| p.card_id)
@@ -4438,6 +4448,7 @@ fn main() {
                                 } else {
                                     viewing_card = Some(cid);
                                     detail_mode = true;
+                                    detail_scroll_y = 0.0;
                                     if !acts_cache.is_empty() {
                                         if let Some(pos) = acts_cache.iter().position(|act| {
                                             act.parameters.as_ref().and_then(|p| p.card_id)
@@ -4616,7 +4627,7 @@ fn main() {
                                 }
                             }
                             // ChoicePosition: select stage position during choice prompt
-                            if !stage_handled && choice_image_mode && gs.has_pending_choice() {
+                            if !stage_handled && has_image_choice {
                                 for (ai, act) in acts_cache.iter().enumerate() {
                                     if act.action_type != game_setup::ActionType::ChoicePosition {
                                         continue;
@@ -5729,6 +5740,7 @@ fn main() {
                         //   3. ability_queue      — compact ability banner (CLI/text only)
                         //   4. choice_image_mode  — ability banner + card choice grid
                         //   5. action list        — text action list (bottom text area)
+
                         let mut content_y: f32 = 52.0;
 
                         if let Some((ref zlabel, ref zcards)) = zone_viewer {
@@ -5753,7 +5765,11 @@ fn main() {
                                     atlas,
                                 );
                             } else {
-                                render_card_detail(viewing_card.unwrap(), &gs.card_database);
+                                render_card_detail(
+                                    viewing_card.unwrap(),
+                                    &gs.card_database,
+                                    detail_scroll_y,
+                                );
                             }
                         } else if detail_mode {
                             let detail_cid = viewing_card.or_else(|| {
@@ -5899,7 +5915,7 @@ fn main() {
                             } else if let Some(entry) = gs.ability_queue.current_entry() {
                                 // In image mode with choices, the text subview handles this.
                                 // The banner is only for CLI/text mode.
-                                if !(choice_image_mode && gs.has_pending_choice()) {
+                                if !(has_image_choice) {
                                     let ab_text = i18n::translate_ability(
                                         &entry.ability.full_text,
                                         current_lang(),
@@ -5955,8 +5971,7 @@ fn main() {
                                     },
                                 );
                             if zone_viewer.is_none() {
-                                if choice_image_mode
-                                    && gs.has_pending_choice()
+                                if has_image_choice
                                     && !(detail_mode && viewing_card.is_some())
                                     && !is_ai_turn
                                     && !is_opponent_turn_mp
@@ -6500,19 +6515,21 @@ fn main() {
                                                 let area_cost_info = area_costs.get(&stage);
                                                 let area_str = match area_cost_info {
                                                     Some((cost, true)) if *cost > 0 => format!(
-                                                        "{}{{{{icon_energy.png|E}}}}{}BT{} ",
+                                                        "{} {{{{icon_energy.png|E}}}}{}BT{}{}",
                                                         prefix,
                                                         cost,
-                                                        tl_area(&stage)
+                                                        tl_area(&stage),
+                                                        suffix
                                                     ),
                                                     Some((cost, false)) if *cost > 0 => format!(
-                                                        "{}{{{{icon_energy.png|E}}}}{}{} ",
+                                                        "{} {{{{icon_energy.png|E}}}}{}{}{}",
                                                         prefix,
                                                         cost,
-                                                        tl_area(&stage)
+                                                        tl_area(&stage),
+                                                        suffix
                                                     ),
                                                     _ => format!(
-                                                        "{}{}{} ",
+                                                        "{}{}{}",
                                                         prefix,
                                                         tl_area(&stage),
                                                         suffix
@@ -6873,7 +6890,7 @@ fn main() {
                                         }
                                         // Stage slots for ChoicePosition (choice mode)
                                         game_setup::ActionType::ChoicePosition => {
-                                            if choice_image_mode && gs.has_pending_choice() {
+                                            if has_image_choice {
                                                 if let Some(sa) = &p.stage_area {
                                                     let slot = match sa.as_str() {
                                                         "left" => 0i32,
@@ -6923,8 +6940,7 @@ fn main() {
                                         }
                                         // Board cards for choice image mode (ChoiceSelect, ChoiceDecision, ChoiceOption)
                                         _ => {
-                                            if choice_image_mode
-                                                && gs.has_pending_choice()
+                                            if has_image_choice
                                                 && matches!(
                                                     act.action_type,
                                                     game_setup::ActionType::ChoiceSelect
@@ -6963,8 +6979,7 @@ fn main() {
                                         0
                                     },
                                 ))
-                            && choice_image_mode
-                            && gs.has_pending_choice()
+                            && has_image_choice
                         {
                             if let Some(c) = gs.get_pending_choice() {
                                 use rabuka_engine::ability::types::Choice;
@@ -7250,7 +7265,7 @@ fn main() {
                             }
                             Overlay::RevealedCards(show_self, ref cursor, view_card) => {
                                 if let Some(vcid) = view_card {
-                                    render_card_detail(vcid, &gs.card_database);
+                                    render_card_detail(vcid, &gs.card_database, 0.0);
                                 } else {
                                     let who = if show_self { tl("You") } else { tl("Opponent") };
                                     let rev_hdr = tl("Revealed Cards");
@@ -7400,6 +7415,7 @@ fn main() {
                     choice_subview,
                     text_page,
                     choice_grid_offset,
+                    detail_scroll_y,
                     hand_offset,
                     hand_offset_p2,
                     touch_tap_count,
@@ -7485,9 +7501,34 @@ fn step_name(s: &Step) -> &'static str {
         Step::ReadCardsBin => "ReadCards",
         Step::ParseCards(_) => "ParseCards",
         Step::Setup(_, _, _, _) => "Setup",
-        Step::Play(_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => {
-            "Play"
-        }
+        Step::Play(
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+        ) => "Play",
         Step::Done(_) => "Done",
     }
 }
@@ -7610,6 +7651,7 @@ extern "C" {
     fn _3ds_top_queue_text(x: f32, y: f32, color: u32, scale: f32, text: *const u8);
     fn _3ds_top_queue_card(atlas: *const u8, idx: i32, x: f32, y: f32, w: f32, h: f32);
     fn _3ds_measure_text_width(text: *const u8, scale: f32) -> f32;
+    fn _3ds_icon_aspect(atlas_name: *const u8) -> f32;
 
     // Action highlight on board slots
     fn _3ds_board_set_action_highlight(zone: i32, slot: i32, opponent: bool);
