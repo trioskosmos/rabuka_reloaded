@@ -190,8 +190,11 @@ fn cn_or_empty(act: &game_setup::Action) -> String {
 /// Uses _3ds_top_queue_card to render the actual icon T3X files.
 /// Uses _3ds_measure_text_width (citro2d C2D_TextGetDimensions) for exact pixel positioning.
 fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32) {
-    let text_h = scale * 30.0;
-    let icon_h = (scale * 16.0).max(11.0);
+    // C renderer applies FONT_SCALE to all text — use same scale for icon sizing
+    // so width predictions in wrap_text match actual rendering.
+    let eff_scale = scale * FONT_SCALE;
+    let text_h = eff_scale * 30.0;
+    let icon_h = (eff_scale * 16.0).max(11.0);
     let icon_y = y + (text_h - icon_h) / 2.0;
     let mut cx = x;
     let mut rest = text;
@@ -224,7 +227,7 @@ fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32) {
             unsafe {
                 _3ds_top_queue_card(c_str.as_ptr() as *const u8, 0, cx, icon_y, iw, icon_h);
             }
-            cx += iw + scale * 6.0;
+            cx += iw + eff_scale * 6.0;
             rest = &after[end + 2..];
         } else {
             break;
@@ -6157,95 +6160,82 @@ fn main() {
                                     // ---- Render text items as scrollable list below card grid ----
                                     let card_rows_used =
                                         ((card_gis.len() + cols - 1) / cols).min(max_rows);
-                                    let text_grid_iy =
-                                        grid_iy + card_rows_used as f32 * row_h + 4.0;
-                                    let text_row_h = 20.0f32;
-                                    let text_area_h = 230.0 - text_grid_iy;
-                                    let max_text_visible =
-                                        (text_area_h / text_row_h).max(1.0) as usize;
-                                    let selected_ti = text_gis
-                                        .iter()
-                                        .position(|&gi| gi == display_pos)
-                                        .unwrap_or(0);
-                                    let text_offset =
-                                        if selected_ti >= choice_grid_offset + max_text_visible {
-                                            selected_ti.saturating_sub(max_text_visible - 1)
-                                        } else if selected_ti < choice_grid_offset {
-                                            selected_ti
-                                        } else {
-                                            choice_grid_offset
-                                        };
-                                    for (ti, &gi) in text_gis.iter().enumerate() {
-                                        let vis_i = ti.wrapping_sub(text_offset);
-                                        if vis_i >= max_text_visible {
-                                            continue;
-                                        }
-                                        let di = gi;
-                                        let fi = display_order[di];
+                                    // ---- Text options: one per page, centered ----
+                                    if let Some(&sel_gi) =
+                                        text_gis.iter().find(|&&g| g == display_pos)
+                                    {
+                                        let fi = display_order[sel_gi];
                                         let act = &acts_cache[fi];
                                         let is_disabled = act
                                             .parameters
                                             .as_ref()
                                             .and_then(|p| p.disabled)
                                             .unwrap_or(false);
-                                        let iy = text_grid_iy + vis_i as f32 * text_row_h;
+                                        let desc =
+                                            act.display_desc(current_lang() == Lang::Japanese);
+                                        let color = if is_disabled { COL_MED } else { COL_GOLD };
+                                        let pfx = "> ";
+                                        let scale = 0.70f32;
+                                        let wrapped =
+                                            wrap_text(&format!("{}{}", pfx, desc), 370.0, scale);
+                                        let n_lines = wrapped.lines().count().max(1);
+                                        let line_h = scale * 20.0;
+                                        let total_h = line_h * n_lines as f32;
+                                        let iy = grid_iy + ((230.0 - grid_iy) - total_h) / 2.0;
 
-                                        // Background highlight
-                                        let bg = if di == display_pos { COL_SEL } else { COL_DIM };
                                         unsafe {
                                             _3ds_top_queue_rect(
                                                 4.0,
-                                                iy,
+                                                iy - 2.0,
                                                 392.0,
-                                                text_row_h - 2.0,
-                                                bg,
+                                                total_h + 4.0,
+                                                COL_SEL,
+                                            );
+                                            _3ds_top_queue_rect(
+                                                4.0,
+                                                iy - 2.0,
+                                                392.0,
+                                                total_h + 4.0,
+                                                COL_HIGHLIGHT,
                                             );
                                         }
-                                        if di == display_pos {
-                                            unsafe {
-                                                _3ds_top_queue_rect(
-                                                    4.0,
-                                                    iy,
-                                                    392.0,
-                                                    text_row_h - 2.0,
-                                                    COL_HIGHLIGHT,
-                                                );
-                                            }
-                                        }
-
-                                        let desc = act
-                                            .display_desc(current_lang() == Lang::Japanese)
-                                            .lines()
-                                            .next()
-                                            .unwrap_or("")
-                                            .to_string();
-                                        let color = if is_disabled {
-                                            COL_MED
-                                        } else if di == display_pos {
-                                            COL_GOLD
-                                        } else {
-                                            COL_LIGHT
-                                        };
-                                        let pfx = if di == display_pos { "> " } else { "  " };
-                                        let txt = format!("{}{}", pfx, desc);
-                                        let scale =
-                                            if di == display_pos { 0.70f32 } else { 0.65f32 };
-                                        if txt.contains("{{") {
-                                            render_text_with_icons(
-                                                8.0,
-                                                iy + 2.0,
-                                                &txt,
-                                                color,
-                                                scale,
-                                            );
-                                        } else {
-                                            unsafe {
-                                                _3ds_top_queue_text(
+                                        for (li, l) in wrapped.lines().enumerate() {
+                                            let txt = l.to_string();
+                                            if txt.contains("{{") {
+                                                render_text_with_icons(
                                                     8.0,
-                                                    iy + 2.0,
+                                                    iy + li as f32 * line_h + 2.0,
+                                                    &txt,
                                                     color,
                                                     scale,
-                                                    format!("{}\0", txt).as_ptr(),
+                                                );
+                                            } else {
+                                                unsafe {
+                                                    _3ds_top_queue_text(
+                                                        8.0,
+                                                        iy + li as f32 * line_h + 2.0,
+                                                        color,
+                                                        scale,
+                                                        format!("{}\0", txt).as_ptr(),
+                                                    );
+                                                }
+                                            }
+                                        }
+                                        // Page indicator
+                                        let total = text_gis.len();
+                                        if total > 1 {
+                                            let cur = text_gis
+                                                .iter()
+                                                .position(|&g| g == display_pos)
+                                                .unwrap_or(0)
+                                                + 1;
+                                            unsafe {
+                                                _3ds_top_queue_text(
+                                                    4.0,
+                                                    232.0,
+                                                    COL_MED,
+                                                    0.55f32,
+                                                    format!("{}/{}\0", cur, total).as_ptr(),
                                                 );
                                             }
                                         }
