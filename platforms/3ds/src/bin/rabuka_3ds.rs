@@ -413,7 +413,10 @@ fn compute_card_stats(
 /// Check if a choice action is text-only (no card image to render).
 /// Used to separate card choices from text choices in the choice grid.
 fn is_text_only(act: &game_setup::Action) -> bool {
-    if matches!(act.action_type, game_setup::ActionType::ChoiceOption) {
+    if matches!(
+        act.action_type,
+        game_setup::ActionType::ChoiceOption | game_setup::ActionType::ChoiceSkip
+    ) {
         return true;
     }
     if let Some(cn) = act.parameters.as_ref().and_then(|p| p.card_no.as_deref()) {
@@ -3488,6 +3491,30 @@ fn main() {
                 } else if !has_image_choice {
                     // Navigate in display space with wrap-around
                     // Skipped when choice grid handles its own navigation
+                    // L opens full ability text overlay for text choices too
+                    if keys & 0x00000200 != 0 && !choice_subview {
+                        let has_ab = gs.ability_queue.current_entry().is_some();
+                        if has_ab {
+                            choice_subview = true;
+                            text_page = 0;
+                            redraw = true;
+                        }
+                    }
+                    if choice_subview {
+                        if keys & 0x00000200 != 0 || keys & 0x00000002 != 0 {
+                            choice_subview = false;
+                            detail_scroll_y = 0.0;
+                            redraw = true;
+                        }
+                        if keys & 0x00000040 != 0 && text_page > 0 {
+                            text_page -= 1;
+                            redraw = true;
+                        }
+                        if keys & 0x00000080 != 0 {
+                            text_page += 1;
+                            redraw = true;
+                        }
+                    }
                     let n = display_order.len();
                     if n > 0 {
                         if keys & 0x00000040 != 0 {
@@ -6172,10 +6199,7 @@ fn main() {
                                         }
                                     }
 
-                                    // ---- Render text items as scrollable list below card grid ----
-                                    let card_rows_used =
-                                        ((card_gis.len() + cols - 1) / cols).min(max_rows);
-                                    // ---- Text options: one per page, centered ----
+                                    // ---- Render text items as one-per-page ----
                                     if let Some(&sel_gi) =
                                         text_gis.iter().find(|&&g| g == display_pos)
                                     {
@@ -6195,7 +6219,7 @@ fn main() {
                                             })
                                             .trim_start_matches("- ")
                                             .trim();
-                                        let color = if is_disabled { COL_MED } else { COL_GOLD };
+                                        let color = if is_disabled { COL_MED } else { COL_LIGHT };
                                         let scale = 0.70f32;
                                         let full_txt = desc_clean.to_string();
                                         let total_h = unsafe {
@@ -6213,22 +6237,14 @@ fn main() {
                                                 iy - 2.0,
                                                 392.0,
                                                 total_h + 4.0,
-                                                COL_SEL,
+                                                COL_DIM,
                                             );
-                                            _3ds_top_queue_rect(
-                                                4.0,
-                                                iy - 2.0,
-                                                392.0,
-                                                total_h + 4.0,
-                                                COL_HIGHLIGHT,
-                                            );
-                                            // C-side OP_TEXT handles wrapping + {{icon}} natively
-                                            _3ds_top_queue_text(
+                                            render_text_with_icons(
                                                 8.0,
                                                 iy + 2.0,
+                                                &full_txt,
                                                 color,
                                                 scale,
-                                                format!("{}\0", full_txt).as_ptr(),
                                             );
                                         }
                                         // Page indicator
