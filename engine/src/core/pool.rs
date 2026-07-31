@@ -161,12 +161,6 @@ macro_rules! make_pool_box {
                 Deref::deref(self).serialize(s)
             }
         }
-
-        impl<'de> serde::Deserialize<'de> for $name {
-            fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-                <$t>::deserialize(d).map($name::new)
-            }
-        }
     };
 }
 

@@ -43,6 +43,7 @@ fn drain_auto_abilities(game: &mut TestGame) {
 /// Count how many position change choices appear after the initial one.
 /// Returns (first_choice_found, total_position_change_count).
 /// Resolves each position change by selecting the first available destination.
+#[allow(dead_code)]
 fn resolve_and_count_position_changes(game: &mut TestGame) -> (bool, usize) {
     let mut first_found = false;
     let mut count = 0;

@@ -14,6 +14,8 @@ fn main() {
 
     let objs = [
         "ctru_shim.c",
+        "fbi_task.c",
+        "fbi_capturecam.c",
         "quirc.c",
         "decode.c",
         "identify.c",
@@ -70,6 +72,8 @@ fn main() {
 
     // Tell cargo to rerun this build script if the C source changes
     println!("cargo:rerun-if-changed=src/ctru_shim.c");
+    println!("cargo:rerun-if-changed=src/fbi_task.c");
+    println!("cargo:rerun-if-changed=src/fbi_capturecam.c");
     println!("cargo:rerun-if-changed=src/quirc.c");
 
     // Allow-multiple-definition for pthread_atfork:

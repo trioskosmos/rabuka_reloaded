@@ -816,6 +816,7 @@ enum SetupPhase {
     QrScan(usize),          // QR code scanning (usize = context pointer, 0=not started)
     QrResult(Vec<String>),  // QR scan result, user can confirm
     QrNotDeck(String, u32), // QR scanned but not a valid deck, shows decoded text, countdown frames
+    ControlGuide(usize),    // Help/control guide overlay (usize = page index)
 }
 
 #[cfg(feature = "3ds")]
@@ -1272,6 +1273,7 @@ fn main() {
                 let was_dirty = *dirty;
                 let new_step = match phase.clone() {
                     SetupPhase::PickMode(cur) => unsafe {
+                        let cur = cur.min(3);
                         if was_dirty {
                             if _3ds_is_cli_mode() {
                                 _3ds_clear_top();
@@ -1286,7 +1288,7 @@ fn main() {
                                         format!("{} [{}] {}\n\0", arrow, i, tl(m)).as_ptr(),
                                     );
                                 }
-                                _3ds_text_add_top("\nUP/DOWN=select A=confirm B=back\0".as_ptr());
+                                _3ds_text_add_top("\nL=help A=confirm B=back\0".as_ptr());
                             } else {
                                 _3ds_top_clear();
                                 _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
@@ -1294,7 +1296,7 @@ fn main() {
                                     100.0,
                                     8.0,
                                     COL_GOLD,
-                                    0.85f32,
+                                    0.65f32,
                                     format!("{}\0", tl("SELECT MODE")).as_ptr(),
                                 );
                                 for (i, m) in ["VS AI", "Sandbox", "QR Scan", "Local MP"]
@@ -1329,10 +1331,17 @@ fn main() {
                                         );
                                     }
                                 }
-                                render_hint_bar(&tl("UP/DOWN=select  A=confirm  B=back"));
+                                render_hint_bar(&tl("L=help  A=confirm  B=back"));
                             }
                         }
-                        if keys & 0x00000040 != 0 && cur > 0 {
+                        if keys & 0x00000400 != 0 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::ControlGuide(0),
+                                true,
+                            )
+                        } else if keys & 0x00000040 != 0 && cur > 0 {
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
@@ -1427,7 +1436,7 @@ fn main() {
                                         80.0,
                                         8.0,
                                         COL_GOLD,
-                                        0.85f32,
+                                        0.65f32,
                                         format!("SELECT {}\0", label).as_ptr(),
                                     );
                                 }
@@ -1458,7 +1467,7 @@ fn main() {
                                             24.0,
                                             y + 3.0,
                                             color,
-                                            0.70f32,
+                                            0.65f32,
                                             format!("{}\0", decks[i].name).as_ptr(),
                                         );
                                     }
@@ -1547,7 +1556,7 @@ fn main() {
                                         80.0,
                                         8.0,
                                         COL_GOLD,
-                                        0.85f32,
+                                        0.65f32,
                                         format!("{}\0", deck_hdr).as_ptr(),
                                     );
                                 }
@@ -1576,7 +1585,7 @@ fn main() {
                                             24.0,
                                             y + 3.0,
                                             color,
-                                            0.70f32,
+                                            0.65f32,
                                             format!("{}\0", decks[i].name).as_ptr(),
                                         );
                                     }
@@ -1649,7 +1658,7 @@ fn main() {
                                         80.0,
                                         8.0,
                                         COL_GOLD,
-                                        0.85f32,
+                                        0.65f32,
                                         format!("{}\0", deck_hdr).as_ptr(),
                                     );
                                 }
@@ -1678,7 +1687,7 @@ fn main() {
                                             24.0,
                                             y + 3.0,
                                             color,
-                                            0.70f32,
+                                            0.65f32,
                                             format!("{}\0", decks[i].name).as_ptr(),
                                         );
                                     }
@@ -1859,7 +1868,7 @@ fn main() {
                                             120.0,
                                             8.0,
                                             COL_GOLD,
-                                            0.85f32,
+                                            0.65f32,
                                             format!("{}\0", qr_hdr).as_ptr(),
                                         );
                                         let qr_msg = tl("Point camera at deck QR code");
@@ -1867,7 +1876,7 @@ fn main() {
                                             40.0,
                                             60.0,
                                             COL_LIGHT,
-                                            0.70f32,
+                                            0.65f32,
                                             format!("{}\0", qr_msg).as_ptr(),
                                         );
                                         let qr_auto = tl("Auto-detects when QR is visible");
@@ -1894,7 +1903,7 @@ fn main() {
                             unsafe {
                                 _3ds_clear_both();
                             }
-                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(2), true)
                         } else if keys & 0x00000002 != 0 {
                             if qr_ctx != 0 {
                                 unsafe {
@@ -1904,7 +1913,7 @@ fn main() {
                             unsafe {
                                 _3ds_clear_both();
                             }
-                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(2), true)
                         } else {
                             let mut buf = [0u8; 2048];
                             let r = unsafe {
@@ -1996,7 +2005,7 @@ fn main() {
                                 Step::Setup(
                                     cards.clone(),
                                     decks.clone(),
-                                    SetupPhase::PickMode(5),
+                                    SetupPhase::PickMode(2),
                                     true,
                                 )
                             } else {
@@ -2036,14 +2045,14 @@ fn main() {
                                         120.0,
                                         8.0,
                                         COL_GOLD,
-                                        0.85f32,
+                                        0.65f32,
                                         format!("{}\0", tl("QR DECK")).as_ptr(),
                                     );
                                     _3ds_top_queue_text(
                                         200.0,
                                         32.0,
                                         COL_LIGHT,
-                                        0.70f32,
+                                        0.65f32,
                                         format!("{} cards imported\0", cards_read.len()).as_ptr(),
                                     );
                                     // Count unique cards
@@ -2078,7 +2087,7 @@ fn main() {
                             unsafe {
                                 _3ds_clear_both();
                             }
-                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(2), true)
                         } else if keys & 0x00000001 != 0 {
                             // Build a DeckList from the scanned cards and add to decks list
                             let entry_map =
@@ -2138,7 +2147,7 @@ fn main() {
                                         100.0,
                                         8.0,
                                         COL_GOLD,
-                                        0.85f32,
+                                        0.65f32,
                                         format!("{}\0", tl("NOT A DECK QR")).as_ptr(),
                                     );
                                     let preview = if scanned_text.len() > 40 {
@@ -2164,7 +2173,7 @@ fn main() {
                             }
                         }
                         if keys & 0x00000002 != 0 {
-                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(2), true)
                         } else if frames_left > 0 {
                             Step::Setup(
                                 cards.clone(),
@@ -2174,6 +2183,158 @@ fn main() {
                             )
                         } else {
                             Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan(0), true)
+                        }
+                    }
+                    SetupPhase::ControlGuide(page) => {
+                        const GUIDE_PAGES: &[&str] = &[
+                            "=== CONTROLS ===\n\n\
+                             UP/DOWN = Navigate menu\n\
+                             LEFT/RIGHT = Change selection\n\
+                             A = Confirm / Select\n\
+                             B = Back / Cancel\n\
+                             SELECT = Toggle language\n\
+                             START = In-game menu\n\
+                             L = This help screen",
+                            "=== GAMEPLAY ===\n\n\
+                             Touch = Select/interact\n\
+                             L = View card detail\n\
+                             R = End turn / phase\n\
+                             X = Energy actions\n\
+                             Y = Hand actions\n\
+                             START = In-game menu",
+                            "=== MODES ===\n\n\
+                             VS AI = Play against computer\n\
+                             Sandbox = 2-player hotseat\n\
+                             QR Scan = Import deck from QR code\n\
+                             Local MP = Play on local network",
+                            "=== TIPS ===\n\n\
+                             - Energy cards go in energy zone\n\
+                             - Place members on empty stage slots\n\
+                             - Live cards can attack from stage\n\
+                             - Score by moving cards to success zone\n\
+                             - First to 3 successful cards wins",
+                        ];
+                        let total = GUIDE_PAGES.len();
+                        let page = page.min(total - 1);
+                        let guide_text = GUIDE_PAGES[page];
+                        if was_dirty {
+                            if unsafe { _3ds_is_cli_mode() } {
+                                unsafe {
+                                    _3ds_clear_top();
+                                    _3ds_text_add_top(format!("{}\n\0", tl("HELP")).as_ptr());
+                                    for line in guide_text.split('\n') {
+                                        _3ds_text_add_top(format!("{}\n\0", line).as_ptr());
+                                    }
+                                    _3ds_text_add_top(
+                                        format!("\nPage {}/{}  L/R=pages  B=back\0", page + 1, total).as_ptr(),
+                                    );
+                                }
+                            } else {
+                                unsafe {
+                                    _3ds_top_clear();
+                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                    _3ds_top_queue_rect(20.0, 15.0, 360.0, 195.0, 0xE60A0E1Au32);
+                                    _3ds_top_queue_rect(20.0, 15.0, 360.0, 2.0, COL_DIM);
+                                    _3ds_top_queue_rect(20.0, 208.0, 360.0, 2.0, COL_DIM);
+                                    _3ds_top_queue_rect(20.0, 15.0, 2.0, 195.0, COL_DIM);
+                                    _3ds_top_queue_rect(378.0, 15.0, 2.0, 195.0, COL_DIM);
+                                    let mut y = 25.0f32;
+                                    for line in guide_text.split('\n') {
+                                        if line.starts_with("===") {
+                                            _3ds_top_queue_text(40.0, y, COL_GOLD, 0.65f32,
+                                                format!("{}\0", line).as_ptr());
+                                        } else if !line.is_empty() {
+                                            _3ds_top_queue_text(30.0, y, COL_LIGHT, 0.60f32,
+                                                format!("{}\0", line).as_ptr());
+                                        }
+                                        y += 16.0;
+                                    }
+                                    _3ds_top_queue_text(4.0, 215.0, COL_MED, 0.55f32,
+                                        format!("Page {}/{}   L/R=pages  B=back\0", page + 1, total).as_ptr());
+                                }
+                            }
+                        }
+                        if keys & 0x00000002 != 0 {
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(0), true)
+                        } else if keys & 0x00000400 != 0 && page + 1 < total {
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::ControlGuide(page + 1), true)
+                        } else if keys & 0x00000800 != 0 && page > 0 {
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::ControlGuide(page - 1), true)
+                        } else {
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::ControlGuide(page), false)
+                        }
+                    }
+                                    _3ds_text_add_top(
+                                        format!(
+                                            "\nPage {}/{}  L/R=pages  B=back\0",
+                                            page + 1,
+                                            total
+                                        )
+                                        .as_ptr(),
+                                    );
+                                }
+                            } else {
+                                _3ds_top_clear();
+                                _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                _3ds_top_queue_rect(20.0, 15.0, 360.0, 195.0, 0xE60A0E1Au32);
+                                _3ds_top_queue_rect(20.0, 15.0, 360.0, 2.0, COL_DIM);
+                                _3ds_top_queue_rect(20.0, 208.0, 360.0, 2.0, COL_DIM);
+                                _3ds_top_queue_rect(20.0, 15.0, 2.0, 195.0, COL_DIM);
+                                _3ds_top_queue_rect(378.0, 15.0, 2.0, 195.0, COL_DIM);
+                                let mut y = 25.0f32;
+                                for line in guide_text.split('\n') {
+                                    if line.starts_with("===") {
+                                        _3ds_top_queue_text(
+                                            40.0,
+                                            y,
+                                            COL_GOLD,
+                                            0.65f32,
+                                            format!("{}\0", line).as_ptr(),
+                                        );
+                                    } else if !line.is_empty() {
+                                        _3ds_top_queue_text(
+                                            30.0,
+                                            y,
+                                            COL_LIGHT,
+                                            0.60f32,
+                                            format!("{}\0", line).as_ptr(),
+                                        );
+                                    }
+                                    y += 16.0;
+                                }
+                                _3ds_top_queue_text(
+                                    4.0,
+                                    215.0,
+                                    COL_MED,
+                                    0.55f32,
+                                    format!("Page {}/{}   L/R=pages  B=back\0", page + 1, total)
+                                        .as_ptr(),
+                                );
+                            }
+                        }
+                        if keys & 0x00000002 != 0 {
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(0), true)
+                        } else if keys & 0x00000400 != 0 && page + 1 < total {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::ControlGuide(page + 1),
+                                true,
+                            )
+                        } else if keys & 0x00000800 != 0 && page > 0 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::ControlGuide(page - 1),
+                                true,
+                            )
+                        } else {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::ControlGuide(page),
+                                false,
+                            )
                         }
                     }
                     // Multiplayer: Host or Client?
@@ -2211,7 +2372,7 @@ fn main() {
                                         100.0,
                                         8.0,
                                         COL_GOLD,
-                                        0.85f32,
+                                        0.65f32,
                                         format!("{}\0", mp_hdr).as_ptr(),
                                     );
                                 }
@@ -2244,7 +2405,7 @@ fn main() {
                                             50.0,
                                             y + 12.0,
                                             color,
-                                            0.70f32,
+                                            0.65f32,
                                             format!("{}\0", m).as_ptr(),
                                         );
                                     }
@@ -2326,7 +2487,7 @@ fn main() {
                                                 80.0,
                                                 8.0,
                                                 COL_GOLD,
-                                                0.85f32,
+                                                0.65f32,
                                                 format!("{}\0", tl("HOST: Network created!"))
                                                     .as_ptr(),
                                             );
@@ -2335,7 +2496,7 @@ fn main() {
                                                 50.0,
                                                 100.0,
                                                 COL_LIGHT,
-                                                0.70f32,
+                                                0.65f32,
                                                 format!("{}\0", wait_msg).as_ptr(),
                                             );
                                             _3ds_top_queue_text(
@@ -2374,7 +2535,7 @@ fn main() {
                                                 80.0,
                                                 8.0,
                                                 0xFF0000FF,
-                                                0.85f32,
+                                                0.65f32,
                                                 format!(
                                                     "{}\0",
                                                     tl_fmt(
@@ -2509,7 +2670,7 @@ fn main() {
                                                 80.0,
                                                 8.0,
                                                 0xFF0000FF,
-                                                0.85f32,
+                                                0.65f32,
                                                 format!(
                                                     "{}\0",
                                                     tl_fmt(
@@ -2620,7 +2781,7 @@ fn main() {
                                         80.0,
                                         8.0,
                                         COL_GOLD,
-                                        0.85f32,
+                                        0.65f32,
                                         format!("{}\0", tl("SELECT HOST")).as_ptr(),
                                     );
                                 }
@@ -2633,7 +2794,7 @@ fn main() {
                                             40.0,
                                             y,
                                             col,
-                                            0.70f32,
+                                            0.65f32,
                                             format!("{}{}\0", prefix, format!("Host {}", i + 1))
                                                 .as_ptr(),
                                         );
@@ -2729,7 +2890,7 @@ fn main() {
                                             80.0,
                                             8.0,
                                             COL_GOLD,
-                                            0.85f32,
+                                            0.65f32,
                                             format!("{}\0", tl("Receiving deck data...")).as_ptr(),
                                         );
                                     }
@@ -4998,7 +5159,7 @@ fn main() {
                                 4.0,
                                 2.0,
                                 COL_GOLD,
-                                0.70f32,
+                                0.65f32,
                                 format!(
                                     "T{} {:?} [{}]  P1 H:{} E:{}/{} D:{}  P2 H:{} E:{}/{} D:{}\0",
                                     gs.turn_number,
@@ -5283,7 +5444,7 @@ fn main() {
                                         4.0,
                                         4.0,
                                         COL_GOLD,
-                                        0.70f32,
+                                        0.65f32,
                                         format!("{}  (B=close, X=detail)\0", zlabel).as_ptr(),
                                     );
                                 }
@@ -5800,7 +5961,7 @@ fn main() {
                                                     4.0,
                                                     44.0,
                                                     COL_BLUE,
-                                                    0.70f32,
+                                                    0.65f32,
                                                     format!("{}\0", tl("Ability")).as_ptr(),
                                                 );
                                             }
@@ -6750,7 +6911,7 @@ fn main() {
                                             4.0,
                                             4.0,
                                             COL_GOLD,
-                                            0.70f32,
+                                            0.65f32,
                                             format!(
                                                 "{} ({})  {} cards  (B=close, X=detail)\0",
                                                 rev_hdr, who, total_cards

@@ -3,8 +3,8 @@ use super::enums::EffectState;
 use crate::ability::enums::ActionType;
 use crate::card::{
     ek_box_new, Ability, AbilityCost, AbilityEffect, AbilityFilter, AbilityFilterBranch, CardType,
-    Condition, DistinctType, DynamicCount, EffectKind, Operator, PlacementOrder, PositionInfo,
-    QuotedText,
+    Condition, DistinctType, DynamicCount, EffectFilter, EffectKind, Operator, PlacementOrder,
+    PositionInfo, QuotedText,
 };
 use crate::core::types::ArcStr;
 
@@ -432,26 +432,39 @@ impl<'a> BcReader<'a> {
                 if idx >= STRINGS.len() {
                     return None;
                 }
-                let s = STRINGS[idx];
-                let val = serde_json::Value::String(s.to_string());
-                serde_json::from_value(val).ok().map(Box::new)
+                Some(Box::new(crate::card::PositionInfo::String(
+                    STRINGS[idx].to_string(),
+                )))
             }
             TAG_OBJECT | TAG_OBJECT_VARIANT => {
                 if tag == TAG_OBJECT_VARIANT {
                     self.read_u8()?;
                 }
                 let count = self.read_u32()? as usize;
-                let mut map = serde_json::Map::with_capacity(count);
+                let mut position = None;
+                let mut target = None;
                 for _ in 0..count {
                     let kidx = self.read_idx()?;
                     if kidx >= STRINGS.len() {
-                        return None;
+                        self.skip_value()?;
+                        continue;
                     }
-                    map.insert(STRINGS[kidx].to_string(), self.read_json_value()?);
+                    match STRINGS[kidx] {
+                        "position" => {
+                            position = self.read_arc_str_value();
+                        }
+                        "target" => {
+                            target = self.read_arc_str_value();
+                        }
+                        _ => {
+                            self.skip_value()?;
+                        }
+                    }
                 }
-                let pi: crate::card::PositionInfo =
-                    serde_json::from_value(serde_json::Value::Object(map)).ok()?;
-                Some(Box::new(pi))
+                Some(Box::new(crate::card::PositionInfo::Struct {
+                    position,
+                    target,
+                }))
             }
             _ => None,
         }
@@ -466,17 +479,50 @@ impl<'a> BcReader<'a> {
                     self.read_u8()?;
                 }
                 let count = self.read_u32()? as usize;
-                let mut map = serde_json::Map::with_capacity(count);
+                let mut count_type = String::new();
+                let mut reference = None;
+                let mut mode = None;
+                let mut base_reference = None;
+                let mut calculation = None;
+                let mut calculation_value = None;
                 for _ in 0..count {
                     let kidx = self.read_idx()?;
                     if kidx >= STRINGS.len() {
-                        return None;
+                        self.skip_value()?;
+                        continue;
                     }
-                    map.insert(STRINGS[kidx].to_string(), self.read_json_value()?);
+                    match STRINGS[kidx] {
+                        "type" => {
+                            count_type = self.read_string_value().unwrap_or_default();
+                        }
+                        "reference" => {
+                            reference = self.read_arc_str_value();
+                        }
+                        "mode" => {
+                            mode = self.read_arc_str_value();
+                        }
+                        "base_reference" => {
+                            base_reference = self.read_arc_str_value();
+                        }
+                        "calculation" => {
+                            calculation = self.read_arc_str_value();
+                        }
+                        "calculation_value" => {
+                            calculation_value = self.read_u8_value();
+                        }
+                        _ => {
+                            self.skip_value()?;
+                        }
+                    }
                 }
-                let dc: crate::card::DynamicCount =
-                    serde_json::from_value(serde_json::Value::Object(map)).ok()?;
-                Some(Box::new(dc))
+                Some(Box::new(crate::card::DynamicCount {
+                    count_type,
+                    reference,
+                    mode,
+                    base_reference,
+                    calculation,
+                    calculation_value,
+                }))
             }
             _ => None,
         }
@@ -491,28 +537,17 @@ impl<'a> BcReader<'a> {
                 if idx >= STRINGS.len() {
                     return None;
                 }
-                // EffectState can be a plain string like "wait", "active", etc.
-                // Try to deserialize from the string value.
-                let s = STRINGS[idx];
-                let val = serde_json::Value::String(s.to_string());
-                serde_json::from_value(val).ok().map(Box::new)
+                Some(Box::new(super::enums::EffectState::from_str(STRINGS[idx])))
             }
             TAG_OBJECT | TAG_OBJECT_VARIANT => {
                 if tag == TAG_OBJECT_VARIANT {
                     self.read_u8()?;
                 }
                 let count = self.read_u32()? as usize;
-                let mut map = serde_json::Map::with_capacity(count);
                 for _ in 0..count {
-                    let kidx = self.read_idx()?;
-                    if kidx >= STRINGS.len() {
-                        return None;
-                    }
-                    map.insert(STRINGS[kidx].to_string(), self.read_json_value()?);
+                    self.skip_value()?;
                 }
-                let st: super::enums::EffectState =
-                    serde_json::from_value(serde_json::Value::Object(map)).ok()?;
-                Some(Box::new(st))
+                Some(Box::new(super::enums::EffectState::default()))
             }
             _ => None,
         }
@@ -611,21 +646,6 @@ impl<'a> BcReader<'a> {
         }
     }
 
-    fn read_boxed_arcstr_value(&mut self) -> Option<Box<ArcStr>> {
-        let tag = self.read_u8()?;
-        match tag {
-            TAG_NULL => None,
-            TAG_STR => {
-                let idx = self.read_idx()?;
-                if idx >= STRINGS.len() {
-                    return None;
-                }
-                Some(Box::new(ArcStr::from(STRINGS[idx])))
-            }
-            _ => None,
-        }
-    }
-
     fn read_placement_order_value(&mut self) -> Option<crate::card::PlacementOrder> {
         let tag = self.read_u8()?;
         match tag {
@@ -653,17 +673,27 @@ impl<'a> BcReader<'a> {
                     self.read_u8()?;
                 }
                 let count = self.read_u32()? as usize;
-                let mut map = serde_json::Map::with_capacity(count);
+                let mut text = String::new();
+                let mut quoted_type = String::new();
                 for _ in 0..count {
                     let kidx = self.read_idx()?;
                     if kidx >= STRINGS.len() {
-                        return None;
+                        self.skip_value()?;
+                        continue;
                     }
-                    map.insert(STRINGS[kidx].to_string(), self.read_json_value()?);
+                    match STRINGS[kidx] {
+                        "text" => {
+                            text = self.read_string_value().unwrap_or_default();
+                        }
+                        "quoted_type" => {
+                            quoted_type = self.read_string_value().unwrap_or_default();
+                        }
+                        _ => {
+                            self.skip_value()?;
+                        }
+                    }
                 }
-                let qt: crate::card::QuotedText =
-                    serde_json::from_value(serde_json::Value::Object(map)).ok()?;
-                Some(Box::new(qt))
+                Some(Box::new(crate::card::QuotedText { text, quoted_type }))
             }
             _ => None,
         }
@@ -1197,21 +1227,25 @@ impl AbilityEffect {
                 condition_populate_from_json(cond, cond_json);
             }
         }
+        if let Some(opts) = self
+            .kind
+            .as_deref_mut()
+            .and_then(|k| k.filter_mut())
+            .and_then(|f| f.options.as_mut())
+        {
+            if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
+                for (i, opt) in opts.iter_mut().enumerate() {
+                    if i < json_opts.len() {
+                        opt.populate_from_json(&json_opts[i]);
+                    }
+                }
+            }
+        }
         match self.kind.as_deref_mut() {
             Some(EffectKind::LookReveal {
-                ref mut options,
                 ref mut resource_on_select,
                 ..
             }) => {
-                if let Some(ref mut opts) = options {
-                    if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
-                        for (i, opt) in opts.iter_mut().enumerate() {
-                            if i < json_opts.len() {
-                                opt.populate_from_json(&json_opts[i]);
-                            }
-                        }
-                    }
-                }
                 if let Some(ref mut ros) = resource_on_select {
                     if let Some(ros_json) = json_val.get("resource_on_select") {
                         ros.populate_from_json(ros_json);
@@ -1219,19 +1253,9 @@ impl AbilityEffect {
                 }
             }
             Some(EffectKind::CompoundEffect {
-                ref mut options,
                 ref mut alternative_effect,
                 ..
             }) => {
-                if let Some(ref mut opts) = options {
-                    if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
-                        for (i, opt) in opts.iter_mut().enumerate() {
-                            if i < json_opts.len() {
-                                opt.populate_from_json(&json_opts[i]);
-                            }
-                        }
-                    }
-                }
                 if let Some(ref mut ae) = alternative_effect {
                     if let Some(ae_json) = json_val.get("alternative_effect") {
                         ae.populate_from_json(ae_json);
@@ -1255,22 +1279,6 @@ impl AbilityEffect {
                 if let Some(ref mut oa) = opponent_action {
                     if let Some(oa_json) = json_val.get("opponent_action") {
                         oa.populate_from_json(oa_json);
-                    }
-                }
-            }
-            Some(EffectKind::MiscOp {
-                ref mut options, ..
-            })
-            | Some(EffectKind::SelectTarget {
-                ref mut options, ..
-            }) => {
-                if let Some(ref mut opts) = options {
-                    if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
-                        for (i, opt) in opts.iter_mut().enumerate() {
-                            if i < json_opts.len() {
-                                opt.populate_from_json(&json_opts[i]);
-                            }
-                        }
                     }
                 }
             }

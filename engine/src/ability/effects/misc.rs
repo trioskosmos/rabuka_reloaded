@@ -3345,7 +3345,7 @@ impl AbilityResolver {
                     .map(|opt| {
                         let mut p = opt.clone();
                         if p.group_names_any().is_none() {
-                            p.set_group_names(effect.group_names_any().cloned());
+                            p.set_group_names(effect.group_names_any().cloned().map(Box::new));
                         }
                         p
                     })
