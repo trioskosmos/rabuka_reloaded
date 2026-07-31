@@ -95,6 +95,8 @@ pub struct StateReceiver {
     received: Vec<u8>,
     chunks_seen: Vec<bool>,
     current_seq: Option<u16>,
+    /// True once the current_seq transfer has been consumed by take().
+    done: bool,
 }
 
 impl StateReceiver {
@@ -104,6 +106,7 @@ impl StateReceiver {
             received: Vec::new(),
             chunks_seen: Vec::new(),
             current_seq: None,
+            done: false,
         }
     }
 
@@ -113,17 +116,42 @@ impl StateReceiver {
         self.received = Vec::new();
         self.chunks_seen = Vec::new();
         self.current_seq = None;
+        self.done = false;
     }
 
-    /// The seq of the transfer currently being reassembled, if any.
+    /// The seq of the transfer currently being reassembled (None when done).
     pub fn in_progress_seq(&self) -> Option<u16> {
-        self.current_seq
+        if self.done {
+            None
+        } else {
+            self.current_seq
+        }
     }
 
-    /// Build an ACK for the in-progress transfer carrying the current partial
-    /// bitmap. Sent periodically so the host prunes already-received chunks
-    /// from its retransmit set instead of resending everything.
+    /// Build an ACK for the in-progress transfer carrying the current bitmap.
+    /// Sent periodically so the host prunes already-received chunks from its
+    /// retransmit set instead of resending everything. Returns None once the
+    /// transfer is consumed (done), so the client stops spamming ACKs.
     pub fn partial_ack(&self) -> Option<Vec<u8>> {
+        let seq = self.current_seq?;
+        if self.done || self.chunks_seen.is_empty() {
+            return None;
+        }
+        Some(state_ack(seq, &self.chunks_seen))
+    }
+
+    /// True when the given seq is a *completed* transfer being retransmitted —
+    /// the caller should re-send the completed ACK so the host stops. This
+    /// heals a dropped final ACK without re-adopting the stale state.
+    pub fn wants_reack(&self, seq: u16) -> bool {
+        self.done && self.current_seq == Some(seq)
+    }
+
+    /// Full-bitmap ACK for the last completed transfer (for re-ACK retransmits).
+    pub fn completed_ack(&self) -> Option<Vec<u8>> {
+        if !self.done {
+            return None;
+        }
         let seq = self.current_seq?;
         if self.chunks_seen.is_empty() {
             return None;
@@ -131,9 +159,19 @@ impl StateReceiver {
         Some(state_ack(seq, &self.chunks_seen))
     }
 
-    /// Feed one received chunk. Returns Ok(true) when the full state is ready.
-    /// A chunk with a different seq than the in-progress transfer aborts the
-    /// current transfer and starts a new one (fresh transmission wins).
+    /// Feed one received chunk. Returns true when the full state is ready to take().
+    ///
+    /// Two correctness rules prevent the desync + retransmit storm seen in play:
+    ///  1. A repeated chunk 0 of an in-progress transfer is treated as a normal
+    ///     chunk — it must NOT wipe `received`/`chunks_seen`. The host retransmits
+    ///     the whole batch (including chunk 0) on every retry, so re-initializing
+    ///     on each chunk 0 meant the client never finished reassembling, never
+    ///     ACKed, and the host retransmitted forever.
+    ///  2. A chunk from a *stale* (older) seq is ignored instead of aborting the
+    ///     in-progress transfer. Previously any different seq aborted the current
+    ///     transfer, so a late chunk from an older authoritative state could
+    ///     preempt a newer one and revert the board on the client.
+    /// Only a strictly-newer seq starts a fresh transfer.
     pub fn feed(&mut self, chunk: &[u8]) -> bool {
         if chunk.len() < 5 || chunk[0] != MSG_SYNC_STATE {
             return false;
@@ -141,24 +179,43 @@ impl StateReceiver {
         let seq = (chunk[1] as u16) | ((chunk[2] as u16) << 8);
         let total = chunk[3] as usize;
         let idx = chunk[4] as usize;
-        if self.current_seq != Some(seq) {
-            // New transmission: start over
-            self.reset();
-            self.current_seq = Some(seq);
-        }
         if total == 0 || idx >= total {
             return false;
         }
-        if idx == 0 {
+        match self.current_seq {
+            Some(cur) if cur == seq => {
+                // Same transfer. If already consumed, let the caller re-ACK.
+                if self.done {
+                    return false;
+                }
+            }
+            Some(cur) if (seq.wrapping_sub(cur) as i16) > 0 => {
+                // Newer transmission: abandon the old one and start fresh.
+                self.reset();
+                self.current_seq = Some(seq);
+            }
+            Some(_) => {
+                // Stale (older) transmission — ignore to avoid reverting the board.
+                return false;
+            }
+            None => {
+                self.current_seq = Some(seq);
+            }
+        }
+        // Initialize the transfer from chunk 0 exactly once. Starting from a
+        // non-zero chunk is impossible (we don't know the total length yet).
+        if self.chunks_seen.is_empty() {
+            if idx != 0 {
+                self.current_seq = None;
+                return false;
+            }
             if chunk.len() < 9 {
+                self.current_seq = None;
                 return false;
             }
             self.expected_total = u32::from_le_bytes(chunk[5..9].try_into().unwrap()) as usize;
             self.received = Vec::with_capacity(self.expected_total);
             self.chunks_seen = vec![false; total];
-        }
-        if self.expected_total == 0 || self.chunks_seen.is_empty() {
-            return false;
         }
         let payload_start = if idx == 0 { 9 } else { 5 };
         if chunk.len() <= payload_start {
@@ -180,11 +237,10 @@ impl StateReceiver {
         }
         let out = self.received.split_off(0);
         self.expected_total = 0;
-        self.chunks_seen.clear();
-        // Clear the seq too so a late retransmission of the same seq restarts a
-        // fresh (harmless) reassembly that re-ACKs the state — this heals a
-        // dropped final ACK without needing extra state.
-        self.current_seq = None;
+        // Keep chunks_seen + current_seq so a retransmitted completed transfer
+        // can be re-ACKed (wants_reack) instead of re-adopted — re-adopting a
+        // stale state is what caused the board to revert on one side.
+        self.done = true;
         Some(out)
     }
 }

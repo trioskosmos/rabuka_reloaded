@@ -1907,7 +1907,7 @@ fn main() {
                                     false,
                                     None,
                                     0,
-                                    0,
+                                    1,
                                     0,
                                     0,
                                 )
@@ -3198,7 +3198,7 @@ fn main() {
                                     false,
                                     None,
                                     0,
-                                    0,
+                                    1,
                                     0,
                                     0,
                                 )
@@ -3861,9 +3861,10 @@ fn main() {
                                     }
                                 } else if recv_buf[0] == uds::MSG_SYNC_STATE && !is_host {
                                     // Client: reassemble authoritative GameState from host.
-                                    // Capture the completion ACK BEFORE take() clears the bitmap.
-                                    let final_ack = state_rx.partial_ack();
+                                    // Capture the completion ACK AFTER feed() marks the final
+                                    // chunk so the bitmap is complete.
                                     if state_rx.feed(&recv_buf[..n]) {
+                                        let final_ack = state_rx.partial_ack();
                                         if let Some(bytes) = state_rx.take() {
                                             match rmp_serde::from_slice::<GameState>(&bytes) {
                                                 Ok(mut new_gs) => {
@@ -3893,6 +3894,16 @@ fn main() {
                                                     );
                                                 },
                                             }
+                                        }
+                                    } else if state_rx.wants_reack(
+                                        (recv_buf[1] as u16) | ((recv_buf[2] as u16) << 8),
+                                    ) {
+                                        // A retransmitted chunk of an already-completed state:
+                                        // re-send the full ACK so the host stops (heals a dropped
+                                        // final ACK) without re-adopting the stale state.
+                                        if let Some(ack) = state_rx.completed_ack() {
+                                            let _ = uds::uds_send(&ack);
+                                            dbg_tx_bytes += ack.len() as u32;
                                         }
                                     }
                                 } else if is_host {
