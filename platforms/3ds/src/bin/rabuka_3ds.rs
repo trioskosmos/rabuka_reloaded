@@ -5686,11 +5686,31 @@ fn main() {
 
                                     unsafe {
                                         _3ds_top_queue_rect(0.0, 52.0, 400.0, 188.0, COL_CARD);
+                                        let mut ty = 86.0 - detail_scroll_y;
+                                        for ab in card.resolved_abilities() {
+                                            let ab_text = i18n::translate_ability(
+                                                &ab.full_text,
+                                                current_lang(),
+                                            );
+                                            let w = wrap_ability_text(&ab_text, 392.0, 0.65);
+                                            for line in w.lines() {
+                                                if ty > -20.0 && ty < 240.0 {
+                                                    render_text_with_icons(
+                                                        4.0, ty, line, COL_LIGHT, 0.65,
+                                                    );
+                                                }
+                                                ty += 18.0;
+                                            }
+                                            ty += 3.0;
+                                        }
+                                        ability_end = ty;
+                                        // Redraw header on top so scrolling text goes behind it
+                                        _3ds_top_queue_rect(0.0, 0.0, 400.0, 82.0, COL_CARD);
                                         let display_name =
                                             i18n::card_display_name(&card.name, current_lang());
                                         _3ds_top_queue_text(
                                             4.0,
-                                            44.0,
+                                            4.0,
                                             COL_BLUE,
                                             0.80f32,
                                             format!(
@@ -5716,24 +5736,6 @@ fn main() {
                                             COL_LIGHT,
                                             0.65f32,
                                         );
-                                        let mut ty = 86.0 - detail_scroll_y;
-                                        for ab in card.resolved_abilities() {
-                                            let ab_text = i18n::translate_ability(
-                                                &ab.full_text,
-                                                current_lang(),
-                                            );
-                                            let w = wrap_ability_text(&ab_text, 392.0, 0.65);
-                                            for line in w.lines() {
-                                                if ty > -20.0 && ty < 240.0 {
-                                                    render_text_with_icons(
-                                                        4.0, ty, line, COL_LIGHT, 0.65,
-                                                    );
-                                                }
-                                                ty += 18.0;
-                                            }
-                                            ty += 3.0;
-                                        }
-                                        ability_end = ty;
                                     }
                                 }
                             }
@@ -6276,7 +6278,7 @@ fn main() {
                                             COL_LIGHT
                                         };
                                         let line_scale: f32 =
-                                            if group_sel || is_sel { 0.70 } else { 0.65 };
+                                            0.65;
                                         if ty > 230.0 {
                                             break;
                                         }
@@ -6632,7 +6634,7 @@ fn main() {
                                             } else {
                                                 COL_LIGHT
                                             };
-                                            let scale: f32 = if is_sel { 0.70 } else { 0.65 };
+                                            let scale: f32 = 0.65;
                                             let wrap_w =
                                                 if !prefix.is_empty() { 370.0 } else { 392.0 };
                                             for (li, l) in
