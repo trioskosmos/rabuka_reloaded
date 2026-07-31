@@ -3901,7 +3901,15 @@ fn main() {
                         }
                         // Multiplayer: Send action to opponent
                         if is_multiplayer {
-                            let my_player_id = if is_host { 0 } else { 1 };
+                            let my_player_id = if is_multiplayer {
+                                if is_host {
+                                    0
+                                } else {
+                                    1
+                                }
+                            } else {
+                                0
+                            };
                             let action_tag = match action.action_type {
                                 game_setup::ActionType::RockChoice => 0u16,
                                 game_setup::ActionType::PaperChoice => 1,
@@ -4600,6 +4608,7 @@ fn main() {
                                         detail_mode = false;
                                         viewing_card = None;
                                         cur = 0;
+                                        dirty = true;
                                         redraw = true;
                                         stage_handled = true;
                                         break;
@@ -4667,6 +4676,7 @@ fn main() {
                                     gs.reset_loop_detection();
                                     viewing_card = None;
                                     cur = 0;
+                                    dirty = true;
                                     redraw = true;
                                     detail_mode = false;
                                     break;
@@ -5197,8 +5207,19 @@ fn main() {
                                 }
                             }
                             let is_ai_turn = *ai_vs_ai || (*vs_ai && !mp_can_act(&gs, 0));
-                            let is_opponent_turn_mp =
-                                is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
+                            let is_opponent_turn_mp = is_multiplayer
+                                && !mp_can_act(
+                                    &gs,
+                                    if is_multiplayer {
+                                        if is_host {
+                                            0
+                                        } else {
+                                            1
+                                        }
+                                    } else {
+                                        0
+                                    },
+                                );
                             if is_ai_turn {
                                 let msg = tl("AI is thinking...");
                                 unsafe {
@@ -5920,8 +5941,19 @@ fn main() {
                         // replaces the grid so card images don't overlap the detail text.
                         {
                             let is_ai_turn = *ai_vs_ai || (*vs_ai && !mp_can_act(&gs, 0));
-                            let is_opponent_turn_mp =
-                                is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
+                            let is_opponent_turn_mp = is_multiplayer
+                                && !mp_can_act(
+                                    &gs,
+                                    if is_multiplayer {
+                                        if is_host {
+                                            0
+                                        } else {
+                                            1
+                                        }
+                                    } else {
+                                        0
+                                    },
+                                );
                             if zone_viewer.is_none() {
                                 if choice_image_mode
                                     && gs.has_pending_choice()
@@ -6765,8 +6797,19 @@ fn main() {
                         // Highlight interactive zones for all tap-to-deploy action types
                         {
                             let ai_turn = *ai_vs_ai || (*vs_ai && !mp_can_act(&gs, 0));
-                            let opp_turn =
-                                is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
+                            let opp_turn = is_multiplayer
+                                && !mp_can_act(
+                                    &gs,
+                                    if is_multiplayer {
+                                        if is_host {
+                                            0
+                                        } else {
+                                            1
+                                        }
+                                    } else {
+                                        0
+                                    },
+                                );
                             if !ai_turn && !opp_turn {
                                 for act in &acts_cache {
                                     let p = match &act.parameters {
@@ -6907,7 +6950,19 @@ fn main() {
                         }
                         // Also highlight SelectAutoAbility option cards
                         if !(*ai_vs_ai || (*vs_ai && !mp_can_act(&gs, 0)))
-                            && !(is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 }))
+                            && !(is_multiplayer
+                                && !mp_can_act(
+                                    &gs,
+                                    if is_multiplayer {
+                                        if is_host {
+                                            0
+                                        } else {
+                                            1
+                                        }
+                                    } else {
+                                        0
+                                    },
+                                ))
                             && choice_image_mode
                             && gs.has_pending_choice()
                         {
