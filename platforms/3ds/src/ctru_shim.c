@@ -926,8 +926,9 @@ float _3ds_measure_text_width(const char* text, float scale) {
     C2D_Text tmp;
     C2D_TextFontParse(&tmp, f, tmp_text_buf, text);
     C2D_TextOptimize(&tmp);
+    float font_scale = 1.2f;
     float w, h;
-    C2D_TextGetDimensions(&tmp, scale, scale, &w, &h);
+    C2D_TextGetDimensions(&tmp, scale * font_scale, scale * font_scale, &w, &h);
     C2D_TextBufClear(tmp_text_buf);
     return w;
 }
@@ -993,17 +994,69 @@ void _3ds_swap_buffers() {
                     C2D_DrawRectSolid(draw_ops[i].x + x_off, draw_ops[i].y, 0.5f,
                         draw_ops[i].w, draw_ops[i].h, draw_ops[i].color);
                 } else if (draw_op_types[i] == OP_TEXT) {
-                    C2D_TextBufClear(tmp_text_buf);
-                    C2D_TextFontParse(&tmp_text_obj, f, tmp_text_buf, draw_ops[i].text);
-                    C2D_TextOptimize(&tmp_text_obj);
+                    const char* full = draw_ops[i].text;
                     float x = draw_ops[i].x + x_off;
-                    float max_w = fmaxf(390.0f - x, 0.0f);
+                    float y = draw_ops[i].y;
                     float s = draw_ops[i].scale * font_scale;
-                    C2D_DrawText(&tmp_text_obj, C2D_WithColor | C2D_WordWrap,
-                        x, draw_ops[i].y, 0.5f,
-                        s, s,
-                        draw_ops[i].color,
-                        max_w);
+                    float text_h = s * 30.0f;
+                    float icon_h = (s * 16.0f);
+                    if (icon_h < 11.0f) icon_h = 11.0f;
+                    float icon_y = y + (text_h - icon_h) / 2.0f;
+                    const char* p = full;
+                    while (*p) {
+                        const char* open = strstr(p, "{{");
+                        if (!open) {
+                            C2D_TextBufClear(tmp_text_buf);
+                            C2D_TextFontParse(&tmp_text_obj, f, tmp_text_buf, p);
+                            C2D_TextOptimize(&tmp_text_obj);
+                            float max_w = fmaxf(390.0f - x, 0.0f);
+                            C2D_DrawText(&tmp_text_obj, C2D_WithColor | C2D_WordWrap,
+                                x, y, 0.5f, s, s, draw_ops[i].color, max_w);
+                            break;
+                        }
+                        if (open > p) {
+                            char seg[256];
+                            int len = (int)(open - p);
+                            if (len > 255) len = 255;
+                            memcpy(seg, p, len);
+                            seg[len] = '\0';
+                            C2D_TextBufClear(tmp_text_buf);
+                            C2D_TextFontParse(&tmp_text_obj, f, tmp_text_buf, seg);
+                            C2D_TextOptimize(&tmp_text_obj);
+                            float max_w = fmaxf(390.0f - x, 0.0f);
+                            C2D_DrawText(&tmp_text_obj, C2D_WithColor | C2D_WordWrap,
+                                x, y, 0.5f, s, s, draw_ops[i].color, max_w);
+                            float sw = 0;
+                            C2D_TextGetDimensions(&tmp_text_obj, s, s, &sw, NULL);
+                            x += sw;
+                        }
+                        const char* close = strstr(open + 2, "}}");
+                        if (!close) break;
+                        char inner[256];
+                        int ilen = (int)(close - open - 2);
+                        if (ilen > 255) ilen = 255;
+                        memcpy(inner, open + 2, ilen);
+                        inner[ilen] = '\0';
+                        const char* bar = strchr(inner, '|');
+                        char file[256];
+                        if (bar) { int flen = (int)(bar - inner); memcpy(file, inner, flen); file[flen] = '\0'; }
+                        else { strncpy(file, inner, 255); file[255] = '\0'; }
+                        char atlas_base[256];
+                        strncpy(atlas_base, file, 255);
+                        atlas_base[255] = '\0';
+                        char* dotpng = strstr(atlas_base, ".png");
+                        if (dotpng) *dotpng = '\0';
+                        char atlas_name[280];
+                        snprintf(atlas_name, sizeof(atlas_name), "icon_%s.png.t3x", atlas_base);
+                        C2D_Image img = _3ds_get_card_image(atlas_name, 0);
+                        if (img.tex) {
+                            float iw = icon_h * ((float)img.subtex->width / (float)img.subtex->height);
+                            C2D_DrawImageAt(img, x, icon_y, 0.5f, NULL,
+                                iw / (float)img.subtex->width, icon_h / (float)img.subtex->height);
+                            x += iw + s * 6.0f;
+                        }
+                        p = close + 2;
+                    }
                 } else if (draw_op_types[i] == OP_CARD) {
                     C2D_Image img = _3ds_get_card_image(draw_ops[i].atlas, draw_ops[i].atlas_idx);
                     if (img.tex != NULL) {

@@ -187,56 +187,11 @@ fn cn_or_empty(act: &game_setup::Action) -> String {
 }
 
 /// Render text with inline `{{icon.png|label}}` icon images.
-/// Uses _3ds_top_queue_card to render the actual icon T3X files.
-/// Uses _3ds_measure_text_width (citro2d C2D_TextGetDimensions) for exact pixel positioning.
+/// Queue text for top screen rendering. C-side OP_TEXT handler parses {{icon}} markup natively.
 fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32) {
-    // C renderer applies FONT_SCALE to all text — use same scale for icon sizing
-    // so width predictions in wrap_text match actual rendering.
-    let eff_scale = scale * FONT_SCALE;
-    let text_h = eff_scale * 30.0;
-    let icon_h = (eff_scale * 16.0).max(11.0);
-    let icon_y = y + (text_h - icon_h) / 2.0;
-    let mut cx = x;
-    let mut rest = text;
-    while let Some(start) = rest.find("{{") {
-        if start > 0 {
-            unsafe {
-                _3ds_top_queue_text(
-                    cx,
-                    y,
-                    color,
-                    scale,
-                    format!("{}\0", &rest[..start]).as_ptr(),
-                );
-            }
-            let text_seg = std::ffi::CString::new(&rest[..start]).unwrap_or_default();
-            cx += unsafe { _3ds_measure_text_width(text_seg.as_ptr() as *const u8, scale) };
-        }
-        let after = &rest[start + 2..];
-        if let Some(end) = after.find("}}") {
-            let inner = &after[..end];
-            let (file, _label) = if let Some(bar) = inner.find('|') {
-                (&inner[..bar], &inner[bar + 1..])
-            } else {
-                (inner, "")
-            };
-            let icon_name = file.strip_suffix(".png").unwrap_or(file);
-            let iw = icon_width_for(file, icon_h);
-            let atlas_name = format!("icon_{}.png.t3x", icon_name);
-            let c_str = std::ffi::CString::new(atlas_name.as_str()).unwrap_or_default();
-            unsafe {
-                _3ds_top_queue_card(c_str.as_ptr() as *const u8, 0, cx, icon_y, iw, icon_h);
-            }
-            cx += iw + eff_scale * 6.0;
-            rest = &after[end + 2..];
-        } else {
-            break;
-        }
-    }
-    if !rest.is_empty() {
-        unsafe {
-            _3ds_top_queue_text(cx, y, color, scale, format!("{}\0", rest).as_ptr());
-        }
+    let c_str = std::ffi::CString::new(text).unwrap_or_default();
+    unsafe {
+        _3ds_top_queue_text(x, y, color, scale, c_str.as_ptr() as *const u8);
     }
 }
 
