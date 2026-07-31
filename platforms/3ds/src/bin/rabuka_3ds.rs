@@ -413,8 +413,10 @@ fn compute_card_stats(
 /// Check if a choice action is text-only (no card image to render).
 /// Used to separate card choices from text choices in the choice grid.
 fn is_text_only(act: &game_setup::Action) -> bool {
-    // ChoiceOption uses card_id as option index (0,1,2...), not a real card
-    if matches!(act.action_type, game_setup::ActionType::ChoiceOption) {
+    // ChoiceOption with no real card_id uses option index as card_id, not a real card
+    if matches!(act.action_type, game_setup::ActionType::ChoiceOption)
+        && act.parameters.as_ref().and_then(|p| p.card_id).is_none()
+    {
         return true;
     }
     if let Some(cn) = act.parameters.as_ref().and_then(|p| p.card_no.as_deref()) {
