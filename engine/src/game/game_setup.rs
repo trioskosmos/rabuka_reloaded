@@ -1099,8 +1099,8 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
 fn generate_rps_actions() -> Vec<Action> {
     vec![
         make_action(ActionType::RockChoice, "Rock").with_ja("グー"),
-        make_action(ActionType::PaperChoice, "Paper").with_ja("チョキ"),
-        make_action(ActionType::ScissorsChoice, "Scissors").with_ja("パー"),
+        make_action(ActionType::PaperChoice, "Paper").with_ja("パー"),
+        make_action(ActionType::ScissorsChoice, "Scissors").with_ja("チョキ"),
     ]
 }
 
