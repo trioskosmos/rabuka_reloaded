@@ -1052,11 +1052,11 @@ enum Step {
         bool, // dirty
         bool, // redraw
         CardAtlas,
-        bool,                       // vs_ai (human vs AI)
-        bool,                       // ai_vs_ai (spectator: both AI)
-        bool,                       // cli_mode
-        bool,                       // detail_mode
-        bool,                       // choice_image_mode
+        bool,                                   // vs_ai (human vs AI)
+        bool,                                   // ai_vs_ai (spectator: both AI)
+        bool,                                   // cli_mode
+        bool,                                   // detail_mode
+        bool,                                   // choice_image_mode
         bool,                       // choice_subview (false=choices grid, true=text overlay)
         usize,                      // text_page (current page index in text subview)
         usize,                      // choice_grid_offset (scroll offset for choice image grid)
@@ -1074,6 +1074,13 @@ enum Step {
         bool,                       // waiting_for_opponent
         Overlay,                    // overlay (start menu, game log, perf stats, revealed)
         uds::StateReceiver,         // in-progress authoritative state reassembly (client)
+        Option<(u16, Vec<Vec<u8>>, Vec<bool>)>, // host: pending (state_seq, chunks, acked_bitmap) awaiting client ACK
+        bool,                                   // host: initial authoritative state has been staged
+        Option<Vec<u8>>, // client: last action bytes, retransmitted until host state arrives
+        u32,             // host: last client action_seq processed (dedup)
+        u32,             // client: next action_seq to send
+        u32,             // packet debug counter: bytes sent
+        u32,             // packet debug counter: bytes received
     ),
     Done(Result<(), String>),
 }
@@ -1896,6 +1903,13 @@ fn main() {
                                     false,  // waiting_for_opponent
                                     Overlay::None,
                                     uds::StateReceiver::new(),
+                                    None,
+                                    false,
+                                    None,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
                                 )
                             }
                             Err(e) => Step::Done(Err(e)),
@@ -3180,6 +3194,13 @@ fn main() {
                                     !is_host, // waiting_for_opponent will be recalculated after settle
                                     Overlay::None,
                                     uds::StateReceiver::new(),
+                                    None,
+                                    false,
+                                    None,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
                                 )
                             }
                             Err(e) => Step::Done(Err(e)),
@@ -3217,6 +3238,13 @@ fn main() {
                 mut waiting_for_opponent,
                 mut overlay,
                 mut state_rx,
+                mut pending_state,
+                mut state_init,
+                mut pending_client_action,
+                mut last_client_action_seq,
+                mut next_action_seq,
+                mut dbg_tx_bytes,
+                mut dbg_rx_bytes,
             ) => {
                 // Web server pattern: use player_idx (0 or 1) for perspective.
                 // No long-lived borrows on gs — look up inline.
@@ -3790,71 +3818,146 @@ fn main() {
                 }
 
                 // Multiplayer: always try to receive data from opponent (non-blocking)
+                // Track the pending state seq before this frame mutates it, so the
+                // host retransmit logic can detect "just staged this frame" and send
+                // immediately instead of waiting for the next throttle tick.
+                let pending_seq_before = pending_state.as_ref().map(|(s, _, _)| *s);
                 if is_multiplayer {
-                    let mut recv_buf = [0u8; 512];
-                    if let Ok(n) = uds::uds_recv(&mut recv_buf) {
-                        if n > 0 {
-                            if recv_buf[0] == uds::MSG_SYNC_STATE && !is_host {
-                                // Client: reassemble authoritative GameState from host
-                                if state_rx.feed(&recv_buf[..n]) {
-                                    if let Some(bytes) = state_rx.take() {
-                                        match rmp_serde::from_slice::<GameState>(&bytes) {
-                                            Ok(mut new_gs) => {
-                                                // Keep our own identical card database (skipped on wire)
-                                                new_gs.card_database = gs.card_database.clone();
-                                                gs = new_gs;
-                                                let my_id = if is_host { 0 } else { 1 };
-                                                waiting_for_opponent = !mp_can_act(&gs, my_id);
-                                                cur = 0;
-                                                dirty = true;
-                                                redraw = true;
+                    // udsPullPacket returns one packet per call, so drain up to 48
+                    // packets per frame. Without this a multi-chunk state transfer
+                    // would be stretched across N frames (~N/60 s) before reassembly.
+                    let mut recv_buf = [0u8; 1024];
+                    for _drain in 0..48 {
+                        if let Ok(n) = uds::uds_recv(&mut recv_buf) {
+                            if n > 0 {
+                                dbg_rx_bytes += n as u32;
+                                if recv_buf[0] == uds::MSG_SYNC_STATE_ACK && is_host {
+                                    // Client ACKed a state transfer. The bitmap tells us
+                                    // which chunks got through — mark them acked so we only
+                                    // retransmit the ones UDS actually dropped.
+                                    if n >= 4 {
+                                        let ack_seq =
+                                            (recv_buf[1] as u16) | ((recv_buf[2] as u16) << 8);
+                                        let blen = (recv_buf[3] as usize).min(n - 4);
+                                        if let Some((seq, _, acked)) = &mut pending_state {
+                                            if *seq == ack_seq {
+                                                for (bi, byte) in
+                                                    recv_buf[4..4 + blen].iter().enumerate()
+                                                {
+                                                    for bit in 0..8 {
+                                                        if byte & (1 << bit) != 0 {
+                                                            let idx = bi * 8 + bit;
+                                                            if idx < acked.len() {
+                                                                acked[idx] = true;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                if acked.iter().all(|&b| b) {
+                                                    pending_state = None;
+                                                }
                                             }
-                                            Err(e) => unsafe {
-                                                _3ds_debug_print(
-                                                    format!("[STATE] deserialize err: {}\n\0", e)
-                                                        .as_ptr(),
-                                                );
-                                            },
                                         }
                                     }
-                                }
-                            } else if is_host {
-                                // Host: execute the client's action authoritatively, then ship state
-                                if let Some(sync) = uds::ActionSync::from_bytes(&recv_buf[..n]) {
-                                    let action_type = match sync.action_tag {
-                                        0 => game_setup::ActionType::RockChoice,
-                                        1 => game_setup::ActionType::PaperChoice,
-                                        2 => game_setup::ActionType::ScissorsChoice,
-                                        3 => game_setup::ActionType::ChooseFirstAttacker,
-                                        4 => game_setup::ActionType::SelectMulligan,
-                                        5 => game_setup::ActionType::SkipMulligan,
-                                        6 => game_setup::ActionType::PlayMemberToStage,
-                                        7 => game_setup::ActionType::SetLiveCard,
-                                        8 => game_setup::ActionType::FinishLiveCardSet,
-                                        9 => game_setup::ActionType::EnergyCharge,
-                                        10 => game_setup::ActionType::ChoiceDecision,
-                                        11 => game_setup::ActionType::ChoiceSelect,
-                                        12 => game_setup::ActionType::ChoiceSkip,
-                                        13 => game_setup::ActionType::ChoiceOption,
-                                        14 => game_setup::ActionType::ChoicePosition,
-                                        15 => game_setup::ActionType::UseAbility,
-                                        16 => game_setup::ActionType::ChooseSecondAttacker,
-                                        17 => game_setup::ActionType::ConfirmMulligan,
-                                        18 => game_setup::ActionType::SelectLiveCard,
-                                        19 => game_setup::ActionType::ConfirmLiveCardSet,
-                                        20 => game_setup::ActionType::SkipLiveCardSet,
-                                        21 => game_setup::ActionType::PassRemaining,
-                                        22 => game_setup::ActionType::Pass,
-                                        _ => game_setup::ActionType::Pass,
-                                    };
-                                    let stage_area = match sync.stage_area {
-                                        1 => Some(rabuka_engine::zones::MemberArea::LeftSide),
-                                        2 => Some(rabuka_engine::zones::MemberArea::Center),
-                                        3 => Some(rabuka_engine::zones::MemberArea::RightSide),
-                                        _ => None,
-                                    };
-                                    let _ =
-                                        turn::TurnEngine::execute_main_phase_action_with_ability_index(
+                                } else if recv_buf[0] == uds::MSG_SYNC_STATE && !is_host {
+                                    // Client: reassemble authoritative GameState from host.
+                                    // Capture the completion ACK BEFORE take() clears the bitmap.
+                                    let final_ack = state_rx.partial_ack();
+                                    if state_rx.feed(&recv_buf[..n]) {
+                                        if let Some(bytes) = state_rx.take() {
+                                            match rmp_serde::from_slice::<GameState>(&bytes) {
+                                                Ok(mut new_gs) => {
+                                                    // Keep our own identical card database (skipped on wire)
+                                                    new_gs.card_database = gs.card_database.clone();
+                                                    gs = new_gs;
+                                                    let my_id = if is_host { 0 } else { 1 };
+                                                    waiting_for_opponent = !mp_can_act(&gs, my_id);
+                                                    cur = 0;
+                                                    dirty = true;
+                                                    redraw = true;
+                                                    // The host has processed our action — stop retransmitting it.
+                                                    pending_client_action = None;
+                                                    // ACK so the host stops retransmitting
+                                                    if let Some(ack) = final_ack {
+                                                        let _ = uds::uds_send(&ack);
+                                                        dbg_tx_bytes += ack.len() as u32;
+                                                    }
+                                                }
+                                                Err(e) => unsafe {
+                                                    _3ds_debug_print(
+                                                        format!(
+                                                            "[STATE] deserialize err: {}\n\0",
+                                                            e
+                                                        )
+                                                        .as_ptr(),
+                                                    );
+                                                },
+                                            }
+                                        }
+                                    }
+                                } else if is_host {
+                                    // Host: execute the client's action authoritatively, then ship state
+                                    if let Some(sync) = uds::ActionSync::from_bytes(&recv_buf[..n])
+                                    {
+                                        let action_type = match sync.action_tag {
+                                            0 => game_setup::ActionType::RockChoice,
+                                            1 => game_setup::ActionType::PaperChoice,
+                                            2 => game_setup::ActionType::ScissorsChoice,
+                                            3 => game_setup::ActionType::ChooseFirstAttacker,
+                                            4 => game_setup::ActionType::SelectMulligan,
+                                            5 => game_setup::ActionType::SkipMulligan,
+                                            6 => game_setup::ActionType::PlayMemberToStage,
+                                            7 => game_setup::ActionType::SetLiveCard,
+                                            8 => game_setup::ActionType::FinishLiveCardSet,
+                                            9 => game_setup::ActionType::EnergyCharge,
+                                            10 => game_setup::ActionType::ChoiceDecision,
+                                            11 => game_setup::ActionType::ChoiceSelect,
+                                            12 => game_setup::ActionType::ChoiceSkip,
+                                            13 => game_setup::ActionType::ChoiceOption,
+                                            14 => game_setup::ActionType::ChoicePosition,
+                                            15 => game_setup::ActionType::UseAbility,
+                                            16 => game_setup::ActionType::ChooseSecondAttacker,
+                                            17 => game_setup::ActionType::ConfirmMulligan,
+                                            18 => game_setup::ActionType::SelectLiveCard,
+                                            19 => game_setup::ActionType::ConfirmLiveCardSet,
+                                            20 => game_setup::ActionType::SkipLiveCardSet,
+                                            21 => game_setup::ActionType::PassRemaining,
+                                            22 => game_setup::ActionType::Pass,
+                                            _ => game_setup::ActionType::Pass,
+                                        };
+                                        let stage_area = match sync.stage_area {
+                                            1 => Some(rabuka_engine::zones::MemberArea::LeftSide),
+                                            2 => Some(rabuka_engine::zones::MemberArea::Center),
+                                            3 => Some(rabuka_engine::zones::MemberArea::RightSide),
+                                            _ => None,
+                                        };
+                                        // Dedup retransmitted actions: only execute once per seq.
+                                        // A duplicate still gets a fresh state reply (the client
+                                        // retransmits to recover a dropped state, not a new action).
+                                        let is_dup = sync.action_seq != 0
+                                            && sync.action_seq <= last_client_action_seq;
+                                        if is_dup {
+                                            let prev = pending_state
+                                                .as_ref()
+                                                .map(|(s, _, _)| *s)
+                                                .unwrap_or(0);
+                                            let staged = stage_authoritative_state(&gs, prev);
+                                            pending_state = Some(staged);
+                                        } else {
+                                            if sync.action_seq != 0 {
+                                                last_client_action_seq = sync.action_seq;
+                                            }
+                                            // RPS choices from the client are P2's (player 1).
+                                            // Must be cleared by the action execution.
+                                            if matches!(
+                                                action_type,
+                                                game_setup::ActionType::RockChoice
+                                                    | game_setup::ActionType::PaperChoice
+                                                    | game_setup::ActionType::ScissorsChoice
+                                            ) {
+                                                gs.pending_rps_player_id = Some(1);
+                                            }
+                                            let _ = turn::TurnEngine::execute_main_phase_action_with_ability_index(
                                             &mut gs,
                                             &action_type,
                                             sync.card_id,
@@ -3871,18 +3974,44 @@ fn main() {
                                             },
                                             sync.ability_index.map(|x| x as usize),
                                         );
-                                    gs.reset_loop_detection();
-                                    game_setup::settle_single_player_state(&mut gs);
-                                    let my_id = if is_host { 0 } else { 1 };
-                                    waiting_for_opponent = !mp_can_act(&gs, my_id);
-                                    cur = 0;
-                                    dirty = true;
-                                    redraw = true;
-                                    // Ship authoritative state to client
-                                    let _ = send_authoritative_state(&gs);
+                                            gs.reset_loop_detection();
+                                            game_setup::settle_single_player_state(&mut gs);
+                                            let my_id = if is_host { 0 } else { 1 };
+                                            waiting_for_opponent = !mp_can_act(&gs, my_id);
+                                            cur = 0;
+                                            dirty = true;
+                                            redraw = true;
+                                            // Stage authoritative state for reliable delivery
+                                            let prev = pending_state
+                                                .as_ref()
+                                                .map(|(s, _, _)| *s)
+                                                .unwrap_or(0);
+                                            let staged = stage_authoritative_state(&gs, prev);
+                                            pending_state = Some(staged);
+                                        }
+                                    }
                                 }
+                            } else {
+                                break;
                             }
+                        } else {
+                            break;
                         }
+                    }
+                }
+                // Client: report partial progress on the in-progress state transfer so
+                // the host prunes already-received chunks instead of resending them.
+                if is_multiplayer && !is_host {
+                    if let Some(ack) = state_rx.partial_ack() {
+                        let _ = uds::uds_send(&ack);
+                        dbg_tx_bytes += ack.len() as u32;
+                    }
+                }
+                // Client: retransmit its last action until the host's new state arrives.
+                if is_multiplayer && !is_host {
+                    if let Some(bytes) = &pending_client_action {
+                        let _ = uds::uds_send(bytes);
+                        dbg_tx_bytes += bytes.len() as u32;
                     }
                 }
                 // If waiting for opponent or it's the AI's turn, skip local input
@@ -3911,6 +4040,9 @@ fn main() {
                             is_multiplayer,
                             is_host,
                             &mut waiting_for_opponent,
+                            &mut pending_state,
+                            &mut pending_client_action,
+                            &mut next_action_seq,
                         );
                         // VS AI RPS: after human picks P1, AI auto-picks P2 (only when authority)
                         if executed
@@ -3991,11 +4123,39 @@ fn main() {
                         let my_id = if is_host { 0 } else { 1 };
                         waiting_for_opponent = !mp_can_act(&gs, my_id);
                         if is_host {
-                            let _ = send_authoritative_state(&gs);
+                            let prev = pending_state.as_ref().map(|(s, _, _)| *s).unwrap_or(0);
+                            let staged = stage_authoritative_state(&gs, prev);
+                            pending_state = Some(staged);
                         }
                     }
                     cur = 0;
                     dirty = true;
+                }
+
+                // Host: retransmit pending state chunks until the client ACKs.
+                // UDS is unreliable — a dropped chunk would otherwise deadlock the
+                // client forever. Only unacked chunks are sent (the client's bitmap
+                // ACK prunes the ones that got through), immediately when a new state
+                // is staged this frame, otherwise throttled to every other frame.
+                if is_multiplayer && is_host {
+                    // Ensure the client has the host's authoritative state from the start.
+                    if !state_init {
+                        let staged = stage_authoritative_state(&gs, 0);
+                        pending_state = Some(staged);
+                        state_init = true;
+                    }
+                    let just_staged =
+                        pending_state.as_ref().map(|(s, _, _)| *s) != pending_seq_before;
+                    if just_staged || (_frame % 2 == 0) {
+                        if let Some((_, chunks, acked)) = &pending_state {
+                            for (i, chunk) in chunks.iter().enumerate() {
+                                if !acked[i] {
+                                    let _ = uds::uds_send(chunk);
+                                    dbg_tx_bytes += chunk.len() as u32;
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Touch: tap board zones to view card details, or overlay to select action
@@ -4176,9 +4336,21 @@ fn main() {
                                     None
                                 }
                             } else if (ty as i32) >= live_y && (ty as i32) < (live_y + live_h) {
-                                let idx = ((tx as f32 - 5.0) / (live_slot_w + 2.0)) as usize;
-                                if idx < 3 && idx < pb.live_card_zone.cards.len() {
-                                    Some(pb.live_card_zone.cards[idx])
+                                // Live set cards are face-down until the performance phase —
+                                // not clickable until then (you can't see which card is there).
+                                let live_clickable = matches!(
+                                    gs.current_phase,
+                                    Phase::FirstAttackerPerformance
+                                        | Phase::SecondAttackerPerformance
+                                        | Phase::LiveVictoryDetermination
+                                );
+                                if live_clickable {
+                                    let idx = ((tx as f32 - 5.0) / (live_slot_w + 2.0)) as usize;
+                                    if idx < 3 && idx < pb.live_card_zone.cards.len() {
+                                        Some(pb.live_card_zone.cards[idx])
+                                    } else {
+                                        None
+                                    }
                                 } else {
                                     None
                                 }
@@ -4254,6 +4426,9 @@ fn main() {
                                             is_multiplayer,
                                             is_host,
                                             &mut waiting_for_opponent,
+                                            &mut pending_state,
+                                            &mut pending_client_action,
+                                            &mut next_action_seq,
                                         );
                                         cur = 0;
                                         dirty = true;
@@ -4291,6 +4466,9 @@ fn main() {
                                             is_multiplayer,
                                             is_host,
                                             &mut waiting_for_opponent,
+                                            &mut pending_state,
+                                            &mut pending_client_action,
+                                            &mut next_action_seq,
                                         );
                                         cur = 0;
                                         dirty = true;
@@ -4334,6 +4512,9 @@ fn main() {
                                         is_multiplayer,
                                         is_host,
                                         &mut waiting_for_opponent,
+                                        &mut pending_state,
+                                        &mut pending_client_action,
+                                        &mut next_action_seq,
                                     );
                                     cur = 0;
                                     dirty = true;
@@ -4437,6 +4618,9 @@ fn main() {
                                         is_multiplayer,
                                         is_host,
                                         &mut waiting_for_opponent,
+                                        &mut pending_state,
+                                        &mut pending_client_action,
+                                        &mut next_action_seq,
                                     );
                                     detail_mode = false;
                                     viewing_card = None;
@@ -4473,6 +4657,9 @@ fn main() {
                                         is_multiplayer,
                                         is_host,
                                         &mut waiting_for_opponent,
+                                        &mut pending_state,
+                                        &mut pending_client_action,
+                                        &mut next_action_seq,
                                     );
                                     viewing_card = None;
                                     cur = 0;
@@ -4616,10 +4803,49 @@ fn main() {
                                 set_slot($stage_fn, i as i32, cid, false, tapped);
                             }
                             let lc = &pb.live_card_zone.cards;
+                            // Live set cards are face-down (card back) until the live
+                            // performance phase. You can see a card is there, not which.
+                            let live_hidden = !matches!(
+                                gs.current_phase,
+                                Phase::FirstAttackerPerformance
+                                    | Phase::SecondAttackerPerformance
+                                    | Phase::LiveVictoryDetermination
+                            );
                             for i in 0..3.min(lc.len()) {
                                 let cid = lc[i];
-                                let tapped = if cid != -1 { is_tapped(cid) } else { false };
-                                set_slot($live_fn, i as i32, cid, true, tapped);
+                                if cid == -1 {
+                                    unsafe {
+                                        $live_fn(
+                                            i as i32,
+                                            false,
+                                            std::ptr::null(),
+                                            0,
+                                            false,
+                                            false,
+                                        );
+                                    }
+                                    continue;
+                                }
+                                if live_hidden {
+                                    // Show the card back so presence is visible but not identity.
+                                    // Pass tapped=true so the C renderer rotates it 90° to fill
+                                    // the landscape live slot.
+                                    let back = std::ffi::CString::new("icon_lltcg-back.png.t3x")
+                                        .unwrap_or_default();
+                                    unsafe {
+                                        $live_fn(
+                                            i as i32,
+                                            true,
+                                            back.as_ptr() as *const u8,
+                                            0,
+                                            true,
+                                            true,
+                                        );
+                                    }
+                                } else {
+                                    let tapped = if cid != -1 { is_tapped(cid) } else { false };
+                                    set_slot($live_fn, i as i32, cid, true, tapped);
+                                }
                             }
                             for i in lc.len()..3 {
                                 unsafe {
@@ -6921,7 +7147,14 @@ fn main() {
                                 0xFFFFFF00,
                                 0.65f32,
                                 format!(
-                                    "MP|ap={} my={} can={} wait={} phase={} acts={}\0",
+                                    "MP|tx={} rx={} pseq={} ap={} my={} can={} wait={} phase={} acts={}\0",
+                                    dbg_tx_bytes,
+                                    dbg_rx_bytes,
+                                    if is_host {
+                                        pending_state.as_ref().map(|(s, _, _)| *s).unwrap_or(0)
+                                    } else {
+                                        state_rx.in_progress_seq().unwrap_or(0)
+                                    },
                                     gs.active_player().id.as_str(),
                                     if is_host { "HST" } else { "CLT" },
                                     if can_act { "Y" } else { "N" },
@@ -7337,6 +7570,13 @@ fn main() {
                     waiting_for_opponent,
                     overlay,
                     state_rx,
+                    pending_state,
+                    state_init,
+                    pending_client_action,
+                    last_client_action_seq,
+                    next_action_seq,
+                    dbg_tx_bytes,
+                    dbg_rx_bytes,
                 )
             }
             Step::Done(ref r) => {
@@ -7440,20 +7680,32 @@ fn step_name(s: &Step) -> &'static str {
             _,
             _,
             _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
         ) => "Play",
         Step::Done(_) => "Done",
     }
 }
 
-/// Serialize the authoritative GameState and send it to the opponent as
-/// chunked MSG_SYNC_STATE messages. Returns Ok(()) on success.
-fn send_authoritative_state(gs: &GameState) -> Result<(), ()> {
+/// Serialize the authoritative GameState and stage it for delivery to the
+/// client. Returns (state_seq, chunks, acked_bitmap). The per-frame loop
+/// retransmits only the unacked chunks until the client's bitmap ACK clears
+/// them, because UDS is unreliable and can drop frames.
+fn stage_authoritative_state(gs: &GameState, prev_seq: u16) -> (u16, Vec<Vec<u8>>, Vec<bool>) {
     use rabuka_3ds::uds;
-    let bytes = rmp_serde::to_vec(gs).map_err(|_| ())?;
-    for chunk in uds::state_chunks(&bytes) {
-        let _ = uds::uds_send(&chunk);
+    let seq = prev_seq.wrapping_add(1);
+    if let Ok(bytes) = rmp_serde::to_vec(gs) {
+        let chunks = uds::state_chunks(&bytes, seq);
+        let acked = vec![false; chunks.len()];
+        (seq, chunks, acked)
+    } else {
+        (seq, Vec::new(), Vec::new())
     }
-    Ok(())
 }
 
 /// Convert an ActionType to its wire tag (matches ActionSync::from_bytes).
@@ -7491,6 +7743,8 @@ fn action_tag_of(at: &game_setup::ActionType) -> u16 {
 /// - host: execute locally + ship state to client
 /// - client: send action to host (no local execution; host ships state back)
 /// Returns true if the action was executed locally (host/single).
+/// When executed on the host in multiplayer, stages the new state into
+/// `pending_state` for reliable delivery (retransmit-until-ACK).
 #[allow(clippy::too_many_arguments)]
 fn route_authoritative_action(
     gs: &mut GameState,
@@ -7498,10 +7752,26 @@ fn route_authoritative_action(
     is_multiplayer: bool,
     is_host: bool,
     waiting_for_opponent: &mut bool,
+    pending_state: &mut Option<(u16, Vec<Vec<u8>>, Vec<bool>)>,
+    pending_client_action: &mut Option<Vec<u8>>,
+    next_action_seq: &mut u32,
 ) -> bool {
     use rabuka_3ds::uds;
     let p = action.parameters.clone();
     if !is_multiplayer || is_host {
+        // Tag RPS choices with the acting player id so the engine routes them
+        // to the right slot (host=P1). Only in multiplayer — sandbox uses the
+        // sequential P1-then-P2 fallback. Cleared by the action execution.
+        if is_multiplayer
+            && matches!(
+                action.action_type,
+                game_setup::ActionType::RockChoice
+                    | game_setup::ActionType::PaperChoice
+                    | game_setup::ActionType::ScissorsChoice
+            )
+        {
+            gs.pending_rps_player_id = Some(0);
+        }
         let result = turn::TurnEngine::execute_main_phase_action_with_ability_index(
             gs,
             &action.action_type,
@@ -7520,11 +7790,15 @@ fn route_authoritative_action(
         gs.reset_loop_detection();
         if is_multiplayer {
             *waiting_for_opponent = !mp_can_act(gs, 0);
-            let _ = send_authoritative_state(gs);
+            let prev = pending_state.as_ref().map(|(s, _, _)| *s).unwrap_or(0);
+            let staged = stage_authoritative_state(gs, prev);
+            *pending_state = Some(staged);
         }
         true
     } else {
         // Client: send action, don't execute. Host will ship the new state.
+        // Store the bytes so the per-frame loop can retransmit until the host
+        // replies with a new state (implicit ACK) — UDS may drop the packet.
         let stage_area = match p
             .as_ref()
             .and_then(|x| x.stage_area.as_ref())
@@ -7545,8 +7819,12 @@ fn route_authoritative_action(
             stage_area,
             use_baton_touch: p.as_ref().and_then(|x| x.use_baton_touch).unwrap_or(false),
             ability_index: p.as_ref().and_then(|x| x.ability_index).map(|x| x as u16),
+            action_seq: *next_action_seq,
         };
-        let _ = uds::uds_send(&sync.to_bytes());
+        *next_action_seq = next_action_seq.wrapping_add(1);
+        let bytes = sync.to_bytes();
+        *pending_client_action = Some(bytes.clone());
+        let _ = uds::uds_send(&bytes);
         *waiting_for_opponent = true;
         false
     }

@@ -1208,7 +1208,7 @@ ssize_t getrandom(void *buf, size_t buflen, unsigned int flags) {
 #define UDS_DATA_CHANNEL  1
 #define UDS_MAX_NODES     2
 
-static u32 uds_sharedmem_size = 0x3000;
+static u32 uds_sharedmem_size = 0x8000; // 32KB — more packet buffering = fewer burst drops
 static u32 uds_recv_buf_size = UDS_DEFAULT_RECVBUFSIZE;
 static u8 uds_data_channel = UDS_DATA_CHANNEL;
 static udsNetworkStruct uds_netstruct;

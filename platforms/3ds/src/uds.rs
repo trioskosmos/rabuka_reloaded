@@ -26,24 +26,32 @@ pub const MSG_SYNC_ACTION: u8 = 0x02;
 pub const MSG_SYNC_PING: u8 = 0x03;
 pub const MSG_SYNC_QUIT: u8 = 0x04;
 pub const MSG_SYNC_STATE: u8 = 0x05;
+pub const MSG_SYNC_STATE_ACK: u8 = 0x06;
 
 /// Max payload per UDS packet (safe for a single data frame).
-pub const UDS_CHUNK_SIZE: usize = 480;
+/// UDS data frames carry up to 0x3D4 (980) bytes; 900 leaves margin for
+/// frame overhead while nearly doubling the old 480-byte payload, halving
+/// the number of packets (and receive frames) per state transfer.
+pub const UDS_CHUNK_SIZE: usize = 900;
 
-/// Split a large byte payload into MSG_SYNC_STATE chunks.
-/// Header: [0x05, seq:u8, total:u8] + payload.  total = number of chunks.
-/// First chunk (seq==0) is prefixed with a 4-byte little-endian total length.
-pub fn state_chunks(data: &[u8]) -> Vec<Vec<u8>> {
+/// Split a large byte payload into MSG_SYNC_STATE chunks for one transmission.
+/// Header: [0x05, seq_lo, seq_hi, total:u8, idx:u8] + payload.
+/// First chunk (idx==0) is prefixed with a 4-byte little-endian total length.
+/// `seq` distinguishes consecutive transmissions so the receiver can ignore
+/// chunks from an older transmission that arrive late (UDS is unreliable).
+pub fn state_chunks(data: &[u8], seq: u16) -> Vec<Vec<u8>> {
     let total_chunks = (data.len() + UDS_CHUNK_SIZE - 1) / UDS_CHUNK_SIZE;
     let mut out = Vec::with_capacity(total_chunks);
     let mut offset = 0usize;
-    for seq in 0..total_chunks {
+    for idx in 0..total_chunks {
         let end = (offset + UDS_CHUNK_SIZE).min(data.len());
-        let mut chunk = Vec::with_capacity(end - offset + 3 + 4);
+        let mut chunk = Vec::with_capacity(end - offset + 6 + 4);
         chunk.push(MSG_SYNC_STATE);
-        chunk.push(seq as u8);
+        chunk.push((seq & 0xFF) as u8);
+        chunk.push((seq >> 8) as u8);
         chunk.push(total_chunks as u8);
-        if seq == 0 {
+        chunk.push(idx as u8);
+        if idx == 0 {
             chunk.extend_from_slice(&(data.len() as u32).to_le_bytes());
         }
         chunk.extend_from_slice(&data[offset..end]);
@@ -53,12 +61,40 @@ pub fn state_chunks(data: &[u8]) -> Vec<Vec<u8>> {
     out
 }
 
+/// Build an MSG_SYNC_STATE_ACK packet for a received state seq.
+/// Format: [0x06, seq_lo, seq_hi, bitmap_len, bitmap...]
+/// The bitmap is a per-chunk received-flag list (MSB-first within each byte,
+/// chunk 0 = bit 0 of byte 0). This lets the host selectively retransmit only
+/// the chunks that were dropped instead of the whole batch. `chunks_seen` is
+/// the receiver's reassembly bitmap; it may be partial (sent each frame while
+/// a transfer is in progress) or complete (sent on reassembly).
+pub fn state_ack(seq: u16, chunks_seen: &[bool]) -> Vec<u8> {
+    let bitmap_len = (chunks_seen.len().div_ceil(8)).min(255);
+    let mut v = Vec::with_capacity(4 + bitmap_len);
+    v.push(MSG_SYNC_STATE_ACK);
+    v.push((seq & 0xFF) as u8);
+    v.push((seq >> 8) as u8);
+    v.push(bitmap_len as u8);
+    for byte in 0..bitmap_len {
+        let mut bits = 0u8;
+        for bit in 0..8 {
+            let idx = byte * 8 + bit;
+            if idx < chunks_seen.len() && chunks_seen[idx] {
+                bits |= 1 << bit;
+            }
+        }
+        v.push(bits);
+    }
+    v
+}
+
 /// A reassembler for an in-progress MSG_SYNC_STATE transfer.
 #[derive(Clone)]
 pub struct StateReceiver {
     expected_total: usize,
     received: Vec<u8>,
     chunks_seen: Vec<bool>,
+    current_seq: Option<u16>,
 }
 
 impl StateReceiver {
@@ -67,41 +103,77 @@ impl StateReceiver {
             expected_total: 0,
             received: Vec::new(),
             chunks_seen: Vec::new(),
+            current_seq: None,
         }
     }
 
+    /// Reset all reassembly state (e.g. when a transfer should start fresh).
+    pub fn reset(&mut self) {
+        self.expected_total = 0;
+        self.received = Vec::new();
+        self.chunks_seen = Vec::new();
+        self.current_seq = None;
+    }
+
+    /// The seq of the transfer currently being reassembled, if any.
+    pub fn in_progress_seq(&self) -> Option<u16> {
+        self.current_seq
+    }
+
+    /// Build an ACK for the in-progress transfer carrying the current partial
+    /// bitmap. Sent periodically so the host prunes already-received chunks
+    /// from its retransmit set instead of resending everything.
+    pub fn partial_ack(&self) -> Option<Vec<u8>> {
+        let seq = self.current_seq?;
+        if self.chunks_seen.is_empty() {
+            return None;
+        }
+        Some(state_ack(seq, &self.chunks_seen))
+    }
+
     /// Feed one received chunk. Returns Ok(true) when the full state is ready.
+    /// A chunk with a different seq than the in-progress transfer aborts the
+    /// current transfer and starts a new one (fresh transmission wins).
     pub fn feed(&mut self, chunk: &[u8]) -> bool {
-        if chunk.len() < 3 || chunk[0] != MSG_SYNC_STATE {
+        if chunk.len() < 5 || chunk[0] != MSG_SYNC_STATE {
             return false;
         }
-        let seq = chunk[1] as usize;
-        let total = chunk[2] as usize;
-        if self.received.is_empty() && seq == 0 {
-            // First chunk carries the total byte length in the first 4 payload bytes
-            if chunk.len() < 7 {
+        let seq = (chunk[1] as u16) | ((chunk[2] as u16) << 8);
+        let total = chunk[3] as usize;
+        let idx = chunk[4] as usize;
+        if self.current_seq != Some(seq) {
+            // New transmission: start over
+            self.reset();
+            self.current_seq = Some(seq);
+        }
+        if total == 0 || idx >= total {
+            return false;
+        }
+        if idx == 0 {
+            if chunk.len() < 9 {
                 return false;
             }
-            self.expected_total = u32::from_le_bytes(chunk[3..7].try_into().unwrap()) as usize;
+            self.expected_total = u32::from_le_bytes(chunk[5..9].try_into().unwrap()) as usize;
             self.received = Vec::with_capacity(self.expected_total);
             self.chunks_seen = vec![false; total];
         }
         if self.expected_total == 0 || self.chunks_seen.is_empty() {
             return false;
         }
-        let payload_start = if seq == 0 { 7 } else { 3 };
+        let payload_start = if idx == 0 { 9 } else { 5 };
         if chunk.len() <= payload_start {
             return false;
         }
-        if !self.chunks_seen[seq] {
-            self.chunks_seen[seq] = true;
+        if !self.chunks_seen[idx] {
+            self.chunks_seen[idx] = true;
             self.received.extend_from_slice(&chunk[payload_start..]);
         }
         // Done when all chunks are seen
         self.chunks_seen.iter().all(|&b| b)
     }
 
-    /// Take the reassembled state bytes.
+    /// Take the reassembled state bytes. Caller must verify it matches the
+    /// seq of the ACK it sends.
     pub fn take(&mut self) -> Option<Vec<u8>> {
         if self.expected_total == 0 || self.received.len() < self.expected_total {
             return None;
@@ -109,6 +181,10 @@ impl StateReceiver {
         let out = self.received.split_off(0);
         self.expected_total = 0;
         self.chunks_seen.clear();
+        // Clear the seq too so a late retransmission of the same seq restarts a
+        // fresh (harmless) reassembly that re-ACKs the state — this heals a
+        // dropped final ACK without needing extra state.
+        self.current_seq = None;
         Some(out)
     }
 }
@@ -256,6 +332,9 @@ impl DeckSync {
 
 /// Action sync payload: action_type tag + parameters.
 /// We serialize the action as a compact binary message.
+/// `action_seq` is a monotonically increasing client-side counter. The host
+/// uses it to dedup retransmitted packets (UDS is unreliable) so an action is
+/// only ever executed once, while retransmits still get a state reply.
 pub struct ActionSync {
     pub action_tag: u16, // ActionType discriminant
     pub card_id: Option<i16>,
@@ -263,12 +342,13 @@ pub struct ActionSync {
     pub stage_area: u8, // 0=none, 1=Left, 2=Center, 3=Right
     pub use_baton_touch: bool,
     pub ability_index: Option<u16>,
+    pub action_seq: u32,
 }
 
 impl ActionSync {
     pub fn to_bytes(&self) -> Vec<u8> {
         let idx_len = self.card_indices.len();
-        let mut v = Vec::with_capacity(1 + 2 + 2 + 1 + idx_len * 2 + 1 + 1 + 2);
+        let mut v = Vec::with_capacity(1 + 2 + 2 + 1 + idx_len * 2 + 1 + 1 + 2 + 4);
         v.push(MSG_SYNC_ACTION);
         v.extend_from_slice(&self.action_tag.to_le_bytes());
         match self.card_id {
@@ -291,6 +371,7 @@ impl ActionSync {
             }
             None => v.push(0),
         }
+        v.extend_from_slice(&self.action_seq.to_le_bytes());
         v
     }
 
@@ -328,6 +409,11 @@ impl ActionSync {
         } else {
             None
         };
+        let action_seq = if data.len() >= off + 4 {
+            u32::from_le_bytes(data[off..off + 4].try_into().ok()?)
+        } else {
+            0
+        };
         Some(ActionSync {
             action_tag,
             card_id,
@@ -335,6 +421,7 @@ impl ActionSync {
             stage_area,
             use_baton_touch,
             ability_index,
+            action_seq,
         })
     }
 }
