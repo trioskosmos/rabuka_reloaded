@@ -933,6 +933,65 @@ float _3ds_measure_text_width(const char* text, float scale) {
     return w;
 }
 
+// Measure height of text after word-wrapping + icon parsing.
+// Returns total pixel height for the text rendered at (x, scale) with max_w constraint.
+float _3ds_text_wrapped_height(const char* text, float scale, float max_w) {
+    if (!text || !text[0]) return 0.0f;
+    C2D_Font f = custom_font ? custom_font : NULL;
+    float font_scale = 1.2f;
+    float s = scale * font_scale;
+    float line_h = s * 30.0f;
+    float cx = 0.0f;
+    int lines = 1;
+    const char* p = text;
+    while (*p) {
+        const char* open = strstr(p, "{{");
+        if (!open) {
+            // Measure remaining text and count wrapped lines
+            C2D_TextBufClear(tmp_text_buf);
+            C2D_TextFontParse(&tmp_text_obj, f, tmp_text_buf, p);
+            C2D_TextOptimize(&tmp_text_obj);
+            float tw = 0, th = 0;
+            C2D_TextGetDimensions(&tmp_text_obj, s, s, &tw, &th);
+            if (cx + tw > max_w && cx > 0) lines++;
+            break;
+        }
+        if (open > p) {
+            char seg[256];
+            int len = (int)(open - p);
+            if (len > 255) len = 255;
+            memcpy(seg, p, len);
+            seg[len] = '\0';
+            C2D_TextBufClear(tmp_text_buf);
+            C2D_TextFontParse(&tmp_text_obj, f, tmp_text_buf, seg);
+            C2D_TextOptimize(&tmp_text_obj);
+            float tw = 0, th = 0;
+            C2D_TextGetDimensions(&tmp_text_obj, s, s, &tw, &th);
+            if (cx + tw > max_w && cx > 0) { lines++; cx = 0; }
+            cx += tw;
+        }
+        const char* close = strstr(open + 2, "}}");
+        if (!close) break;
+        // Icon width
+        char inner[256];
+        int ilen = (int)(close - open - 2);
+        if (ilen > 255) ilen = 255;
+        memcpy(inner, open + 2, ilen);
+        inner[ilen] = '\0';
+        const char* bar = strchr(inner, '|');
+        char file[256];
+        if (bar) { int flen = (int)(bar - inner); memcpy(file, inner, flen); file[flen] = '\0'; }
+        else { strncpy(file, inner, 255); file[255] = '\0'; }
+        float icon_h = (s * 16.0f);
+        if (icon_h < 11.0f) icon_h = 11.0f;
+        float iw = icon_h + s * 6.0f;
+        if (cx + iw > max_w && cx > 0) { lines++; cx = 0; }
+        cx += iw;
+        p = close + 2;
+    }
+    return lines * line_h;
+}
+
 // ---- Icon dimension query ----
 // Returns width/height ratio for an icon atlas, or 1.0 if not found.
 float _3ds_icon_aspect(const char* atlas_name) {

@@ -6137,11 +6137,14 @@ fn main() {
                                         let color = if is_disabled { COL_MED } else { COL_GOLD };
                                         let pfx = "> ";
                                         let scale = 0.70f32;
-                                        let wrapped =
-                                            wrap_text(&format!("{}{}", pfx, desc), 370.0, scale);
-                                        let n_lines = wrapped.lines().count().max(1);
-                                        let line_h = scale * 20.0;
-                                        let total_h = line_h * n_lines as f32;
+                                        let full_txt = format!("{}{}", pfx, desc);
+                                        let total_h = unsafe {
+                                            _3ds_text_wrapped_height(
+                                                format!("{}\0", full_txt).as_ptr(),
+                                                scale,
+                                                380.0,
+                                            )
+                                        };
                                         let iy = grid_iy + ((230.0 - grid_iy) - total_h) / 2.0;
 
                                         unsafe {
@@ -6159,28 +6162,15 @@ fn main() {
                                                 total_h + 4.0,
                                                 COL_HIGHLIGHT,
                                             );
+                                            // C-side OP_TEXT handles wrapping + {{icon}} natively
+                                            _3ds_top_queue_text(
+                                                8.0,
+                                                iy + 2.0,
+                                                color,
+                                                scale,
+                                                format!("{}\0", full_txt).as_ptr(),
+                                            );
                                         }
-                                        for (li, l) in wrapped.lines().enumerate() {
-                                            let txt = l.to_string();
-                                            if txt.contains("{{") {
-                                                render_text_with_icons(
-                                                    8.0,
-                                                    iy + li as f32 * line_h + 2.0,
-                                                    &txt,
-                                                    color,
-                                                    scale,
-                                                );
-                                            } else {
-                                                unsafe {
-                                                    _3ds_top_queue_text(
-                                                        8.0,
-                                                        iy + li as f32 * line_h + 2.0,
-                                                        color,
-                                                        scale,
-                                                        format!("{}\0", txt).as_ptr(),
-                                                    );
-                                                }
-                                            }
                                         }
                                         // Page indicator
                                         let total = text_gis.len();
@@ -7602,6 +7592,7 @@ extern "C" {
     fn _3ds_top_queue_text(x: f32, y: f32, color: u32, scale: f32, text: *const u8);
     fn _3ds_top_queue_card(atlas: *const u8, idx: i32, x: f32, y: f32, w: f32, h: f32);
     fn _3ds_measure_text_width(text: *const u8, scale: f32) -> f32;
+    fn _3ds_text_wrapped_height(text: *const u8, scale: f32, max_w: f32) -> f32;
     fn _3ds_icon_aspect(atlas_name: *const u8) -> f32;
 
     // Action highlight on board slots
