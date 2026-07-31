@@ -151,14 +151,14 @@ The Rust decoder reads the tag, creates the correct `EffectKind` variant directl
 
 ### Steps
 
-- [ ] Add variant tag mapping in `compile_abilities.py` (action string -> tag byte 0x01-0x0E)
-- [ ] Emit variant tag as first field in each ability effect object
-- [ ] Update `vm.rs` decoder: read variant tag, dispatch to variant-specific field reader
-- [ ] Write variant-specific field readers that populate `EffectKind` directly
-- [ ] Remove `populate_from_json()` call from bytecode decode path
-- [ ] Keep `populate_from_json()` for JSON fallback / tests
-- [ ] Regenerate `abilities_gen.rs`
-- [ ] `cargo test`
+- [x] Add variant tag mapping in `compile_abilities.py` (action string -> tag byte 0x01-0x0E)
+- [x] Emit variant tag as first field in each ability effect object
+- [x] Update `vm.rs` decoder: read variant tag, dispatch to variant-specific field reader
+- [x] Write variant-specific field readers that populate `EffectKind` directly
+- [x] Remove `populate_from_json()` call from bytecode decode path
+- [x] Keep `populate_from_json()` for JSON fallback / tests
+- [x] Regenerate `abilities_gen.rs`
+- [x] `cargo test`
 
 ### Estimated savings
 
@@ -183,14 +183,14 @@ The Python compiler generates a field-name -> field-offset lookup table per Effe
 
 ### Steps
 
-- [ ] Define `FieldId` enum mapping string names to numeric IDs (shared between Python compiler and Rust decoder)
-- [ ] Update `compile_abilities.py` to emit FieldId-based encoding instead of string key indices
-- [ ] Write `decode_ability_effect_direct(bc, variant_tag) -> AbilityEffect` in vm.rs
-- [ ] Write variant-specific decoders for each EffectKind variant
+- [x] Define `FieldId` enum mapping string names to numeric IDs (shared between Python compiler and Rust decoder)
+- [x] Update `compile_abilities.py` to emit FieldId-based encoding instead of string key indices
+- [x] Write `decode_ability_effect_direct(bc, variant_tag) -> AbilityEffect` in vm.rs
+- [x] Write variant-specific decoders for each EffectKind variant (auto-generated)
 - [ ] Write `decode_condition_direct(bc) -> Condition` (same approach)
-- [ ] Replace `serde_json::from_value` calls with direct decoder
+- [x] Replace `serde_json::from_value` calls with direct decoder
 - [ ] Remove `#[derive(Deserialize)]` from `Ability`, `AbilityEffect`, `EffectKind`, `Condition` (keep `Serialize`)
-- [ ] `cargo test`
+- [x] `cargo test`
 
 ### Estimated savings
 
@@ -247,12 +247,70 @@ Enum shrinks from 544 -> ~140 bytes (largest variant with only unique fields). ~
 |---|---|---|---|---|---|
 | 1 | Kill JSON round-trips in choice.rs | Removes runtime alloc+parse | — | Low | **DONE** |
 | 2 | Downsize u32->u8 | ~540 KB | — | Medium (mechanical) | **DONE** |
-| 3 | u8 field indices | — | ~7.5 KB | Low | TODO |
-| 4 | EffectKind variant tags | — | — | Medium | TODO |
-| 5 | Direct binary decoder | Eliminates Value allocs | — | High | TODO |
+| 3 | u8 field indices | — | ~7.5 KB (140KB→111KB, 20.5%) | Low | **DONE** |
+| 4 | EffectKind variant tags | — | Infrastructure | Medium | **DONE** |
+| 5 | Direct binary decoder | Eliminates Value allocs | — | High | **DONE** |
 | 6 | EffectFilter sub-struct | ~390 KB | — | High | TODO |
+| 7 | Delete dead serde code | ~200 lines removed | — | Low | TODO |
 
-**Combined estimated savings:** ~930 KB RAM, ~7.5 KB binary, ~60-80% faster ability decode.
+**Achieved savings:** ~540 KB RAM, ~29 KB binary (140KB→111KB), eliminates all serde_json::from_value + populate_from_json from decode path.
+**Remaining:** Phase 6 (EffectFilter sub-struct to shrink EffectKind enum from 544→~140 bytes), Phase 7 (delete dead code).
+
+---
+
+## Phase 7: Delete Dead Serde Code
+
+**Problem:** After Phase 5, `populate_from_json`, `kind_from_action`, `collect_json_map`, `decode_ability_effect_from_object`, and `read_boxed_arcstr_value` are dead or near-dead. The direct decoder handles all TAG_OBJECT_VARIANT effects (68 of 800 abilities). The remaining TAG_OBJECT values (313) are cost objects, condition objects, and effects without "action" keys — these still need the old JSON path.
+
+### What can be deleted NOW (dead code)
+
+| Function | Lines | Why dead |
+|---|---|---|
+| `read_boxed_arcstr_value` (vm.rs) | 12 | Compiler warning: never used |
+| `kind_from_action` (card.rs) | ~80 | Only called by `populate_from_json` which is only called by the old path |
+| `populate_from_json` impl (vm.rs) | ~60 | Only called from `decode_ability_effect_from_object` (old path) and test code |
+| `decode_ability_effect_from_object` (vm.rs) | ~30 | Only called for TAG_OBJECT fallback |
+| `collect_json_map` (vm.rs) | ~20 | Only called by `decode_ability_effect_from_object` |
+| `normalize_cost_keys` / `recursive_normalize_cost_value` (vm.rs) | ~35 | Only called by `decode_ability_effect_from_object` |
+
+**Total: ~240 lines deletable** if TAG_OBJECT effects are eliminated.
+
+### What STAYS (still needed)
+
+| Function | Why it stays |
+|---|---|
+| `condition_populate_from_json` | Conditions still go through serde — `read_condition_value` calls it |
+| `read_condition_value` | Condition deserialization not yet ported to direct decoder |
+| `#[derive(Deserialize)]` on Condition, AbilityCost | Still needed for condition/cost serde |
+| `normalize_cost_keys` | Still needed if costs use TAG_OBJECT path |
+
+### Best case: make ALL effects use TAG_OBJECT_VARIANT
+
+Currently 68 effects use TAG_OBJECT_VARIANT, 313 use TAG_OBJECT. The 313 TAG_OBJECT values are:
+- **Cost objects**: `decode_ability_cost` reads these. They don't have "action" key. Can be ported to direct decoder.
+- **Condition objects**: `read_condition_value` reads these via serde. Can be ported to direct decoder.
+- **Effects without "action"**: These are effects where the JSON key is not in `ACTION_TO_VARIANT_TAG`. Need to add them to the mapping.
+
+If ALL of these are ported to direct decoders:
+1. `decode_ability_effect_from_object` → DELETE
+2. `collect_json_map` → DELETE
+3. `populate_from_json` → DELETE
+4. `condition_populate_from_json` → DELETE (conditions decoded directly)
+5. `kind_from_action` → DELETE
+6. `normalize_cost_keys` → DELETE (costs decoded directly)
+7. `read_boxed_arcstr_value` → DELETE (dead)
+8. `#[derive(Deserialize)]` on AbilityEffect, EffectKind → DELETE (keep on Condition for now)
+9. **~300 lines of serde deserialization infrastructure removed**
+
+### Steps
+
+- [ ] Add remaining action strings to `ACTION_TO_VARIANT_TAG` in compile_abilities.py
+- [ ] Write `decode_ability_cost_direct` for TAG_OBJECT costs
+- [ ] Port `read_condition_value` to decode conditions directly (no serde_json::from_value)
+- [ ] Remove TAG_OBJECT fallback from `decode_ability_effect`
+- [ ] Delete `decode_ability_effect_from_object`, `collect_json_map`, `populate_from_json`, `kind_from_action`, `normalize_cost_keys`
+- [ ] Delete `#[derive(Deserialize)]` from AbilityEffect, EffectKind
+- [ ] `cargo test`
 
 ## Execution Order
 
@@ -260,9 +318,9 @@ Enum shrinks from 544 -> ~140 bytes (largest variant with only unique fields). ~
 |---|---|---|---|
 | 1 | Low | `refactor: replace conditional_choice JSON string with tagged enum` | DONE |
 | 2 | Medium | `refactor: downsize u32/i32 fields to u8/i8 in ability types` | DONE |
-| 3 | Low | `perf: single-byte indices for common bytecode field names` | **DONE** |
-| 4 | Medium | `perf: encode EffectKind variant tags in bytecode` | **DONE** |
-| 5 | High | `perf: direct binary decoder, eliminate serde_json::from_value` | TODO |
+| 3 | Low | `perf: single-byte indices for common bytecode field names` | DONE |
+| 4 | Medium | `perf: encode EffectKind variant tags in bytecode` | DONE |
+| 5 | High | `perf: direct binary decoder, eliminate serde_json::from_value` | DONE |
 | 6 | High | `refactor: extract EffectFilter sub-struct from EffectKind` | TODO |
 
 Each phase: make changes -> `cargo test` -> commit if green.
