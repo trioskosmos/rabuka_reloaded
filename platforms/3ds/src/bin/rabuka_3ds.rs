@@ -413,10 +413,7 @@ fn compute_card_stats(
 /// Check if a choice action is text-only (no card image to render).
 /// Used to separate card choices from text choices in the choice grid.
 fn is_text_only(act: &game_setup::Action) -> bool {
-    // ChoiceOption with no real card_id uses option index as card_id, not a real card
-    if matches!(act.action_type, game_setup::ActionType::ChoiceOption)
-        && act.parameters.as_ref().and_then(|p| p.card_id).is_none()
-    {
+    if matches!(act.action_type, game_setup::ActionType::ChoiceOption) {
         return true;
     }
     if let Some(cn) = act.parameters.as_ref().and_then(|p| p.card_no.as_deref()) {
@@ -3227,12 +3224,14 @@ fn main() {
                 let my_id: i32 = my_player_idx as i32;
                 // General check: do the current choice actions have card images?
                 // ChoiceOption actions with card_id → image grid. Otherwise → text fallback.
+                // Image mode only for SelectCard (picking actual cards from zones)
+                // answer_based / SelectTarget / etc use text mode
                 let has_image_choice = choice_image_mode
                     && gs.has_pending_choice()
-                    && acts_cache.iter().any(|a| {
-                        a.action_type == game_setup::ActionType::ChoiceOption
-                            && a.parameters.as_ref().and_then(|p| p.card_id).is_some()
-                    });
+                    && matches!(
+                        gs.get_pending_choice(),
+                        Some(rabuka_engine::ability::types::Choice::SelectCard { .. })
+                    );
                 #[inline(always)]
                 fn pref<'a>(gs: &'a GameState, idx: usize) -> &'a Player {
                     if idx == 0 {
@@ -3435,47 +3434,28 @@ fn main() {
                         Overlay::None => {}
                     }
                 } else if detail_mode && viewing_card.is_some() {
-                    // Detail+card: UP/DOWN navigates actions, L/R scrolls detail card
-                    if keys & 0x00000200 != 0 {
+                    // Detail mode: Up/Down scrolls, B/X exits (handled elsewhere)
+                    if keys & 0x00000040 != 0 {
                         detail_scroll_y -= 110.0;
                         if detail_scroll_y < 0.0 {
                             detail_scroll_y = 0.0;
                         }
                         redraw = true;
                     }
-                    if keys & 0x00000100 != 0 {
+                    if keys & 0x00000080 != 0 {
                         detail_scroll_y += 110.0;
                         redraw = true;
                     }
-                    let n = display_order.len();
-                    if keys & 0x00000040 != 0 && n > 0 {
-                        display_pos = if display_pos > 0 {
-                            display_pos - 1
-                        } else {
-                            n - 1
-                        };
-                        cur = display_order[display_pos];
-                        redraw = true;
-                    }
-                    if keys & 0x00000080 != 0 && n > 0 {
-                        display_pos = if display_pos + 1 < n {
-                            display_pos + 1
-                        } else {
-                            0
-                        };
-                        cur = display_order[display_pos];
-                        redraw = true;
-                    }
                 } else if detail_mode {
-                    // Detail view: L/R scroll the ability text (half screen per press)
-                    if keys & 0x00000200 != 0 {
+                    // Detail view without card: Up/Down scrolls
+                    if keys & 0x00000040 != 0 {
                         detail_scroll_y -= 110.0;
                         if detail_scroll_y < 0.0 {
                             detail_scroll_y = 0.0;
                         }
                         redraw = true;
                     }
-                    if keys & 0x00000100 != 0 {
+                    if keys & 0x00000080 != 0 {
                         detail_scroll_y += 110.0;
                         redraw = true;
                     }
@@ -4604,6 +4584,7 @@ fn main() {
                     if dirty {
                         acts_cache = game_setup::generate_possible_actions(&gs);
                         choice_grid_offset = 0;
+                        list_scroll = 0;
                     }
 
                     // Rebuild display order from freshly generated acts_cache.
@@ -4687,7 +4668,10 @@ fn main() {
                                 }
                                 return None;
                             }
-                            let cn = card_no(cid);
+                            let cn = gs
+                                .card_database
+                                .get_card(cid)
+                                .map(|c| c.card_no.to_string());
                             if let Some(ref no) = cn {
                                 if let Some((ref atl, idx)) = atlas.lookup(no) {
                                     let c_str =
@@ -5756,6 +5740,7 @@ fn main() {
                             } else {
                                 158.0
                             };
+                            render_hint_bar(&tl("B/X=close  Up/Down=scroll"));
                         } else {
                             if let Some(vcid) = viewing_card {
                                 // Compact card info overlay with stats
@@ -6001,7 +5986,11 @@ fn main() {
                                                 act.parameters.as_ref().and_then(|p| p.card_id)
                                             });
                                         if let Some(cid) = real_cid {
-                                            if let Some(cn) = card_no(cid) {
+                                            if let Some(cn) = gs
+                                                .card_database
+                                                .get_card(cid)
+                                                .map(|c| c.card_no.to_string())
+                                            {
                                                 if let Some((atl, idx)) = atlas.lookup(cn.as_str())
                                                 {
                                                     let c_str =
@@ -6214,6 +6203,7 @@ fn main() {
                                     && !is_opponent_turn_mp
                                     && !display_order.is_empty()
                                     && content_y < 240.0
+                                    && !detail_mode
                                 {
                                     let mut ty = content_y;
                                     let max_vis = ((230.0 - content_y) / 20.0) as usize + 1;
