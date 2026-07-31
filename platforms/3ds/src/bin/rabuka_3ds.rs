@@ -3434,29 +3434,52 @@ fn main() {
                         Overlay::None => {}
                     }
                 } else if detail_mode && viewing_card.is_some() {
-                    // Detail mode: Up/Down scrolls, B/X exits (handled elsewhere)
-                    if keys & 0x00000040 != 0 {
-                        detail_scroll_y -= 110.0;
-                        if detail_scroll_y < 0.0 {
+                    // Detail mode with ability subview: L/B dismiss, Up/Down scrolls
+                    if choice_subview {
+                        if keys & 0x00000200 != 0 || keys & 0x00000002 != 0 {
+                            choice_subview = false;
                             detail_scroll_y = 0.0;
+                            redraw = true;
                         }
-                        redraw = true;
-                    }
-                    if keys & 0x00000080 != 0 {
-                        detail_scroll_y += 110.0;
-                        redraw = true;
+                        if keys & 0x00000040 != 0 && text_page > 0 {
+                            text_page -= 1;
+                            redraw = true;
+                        }
+                        if keys & 0x00000080 != 0 {
+                            text_page += 1;
+                            redraw = true;
+                        }
+                    } else {
+                        // L opens full ability text overlay
+                        if keys & 0x00000200 != 0 {
+                            choice_subview = true;
+                            text_page = 0;
+                            redraw = true;
+                        }
+                        // Up/Down scrolls card detail
+                        if keys & 0x00000040 != 0 {
+                            detail_scroll_y -= 18.0;
+                            if detail_scroll_y < 0.0 {
+                                detail_scroll_y = 0.0;
+                            }
+                            redraw = true;
+                        }
+                        if keys & 0x00000080 != 0 {
+                            detail_scroll_y += 18.0;
+                            redraw = true;
+                        }
                     }
                 } else if detail_mode {
                     // Detail view without card: Up/Down scrolls
                     if keys & 0x00000040 != 0 {
-                        detail_scroll_y -= 110.0;
+                        detail_scroll_y -= 18.0;
                         if detail_scroll_y < 0.0 {
                             detail_scroll_y = 0.0;
                         }
                         redraw = true;
                     }
                     if keys & 0x00000080 != 0 {
-                        detail_scroll_y += 110.0;
+                        detail_scroll_y += 18.0;
                         redraw = true;
                     }
                 } else if !has_image_choice {
@@ -5658,93 +5681,190 @@ fn main() {
                                 );
                             }
                         } else if detail_mode {
-                            let detail_cid = viewing_card.or_else(|| {
-                                acts_cache
-                                    .get(cur)
-                                    .and_then(|a| a.parameters.as_ref().and_then(|p| p.card_id))
-                            });
-                            let mut ability_end = 0.0;
-                            if let Some(cid) = detail_cid {
-                                if let Some(card) = gs.card_database.get_card(cid) {
-                                    // Pre-count ability text lines so we can size the panel
-                                    let mut line_count = 0usize;
-                                    for ab in card.resolved_abilities() {
-                                        let ab_text =
-                                            i18n::translate_ability(&ab.full_text, current_lang());
-                                        let w = wrap_ability_text(&ab_text, 392.0, 0.65);
-                                        line_count += w.lines().count();
+                            // L pressed: show full ability text overlay
+                            if choice_subview {
+                                if let Some(cid) = viewing_card {
+                                    if let Some(card) = gs.card_database.get_card(cid) {
+                                        unsafe {
+                                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                            _3ds_top_queue_text(
+                                                4.0,
+                                                4.0,
+                                                COL_GOLD,
+                                                0.70f32,
+                                                format!("{}\0", tl("Ability")).as_ptr(),
+                                            );
+                                        }
+                                        let mut all_lines: Vec<String> = Vec::new();
+                                        let abs: Vec<_> = card.resolved_abilities().collect();
+                                        if abs.is_empty() {
+                                            let raw = card.ability_text();
+                                            if !raw.is_empty() {
+                                                let clean = raw.replace('\n', " ");
+                                                let w = wrap_ability_text(&clean, 384.0, 0.65);
+                                                for l in w.lines() {
+                                                    all_lines.push(l.to_string());
+                                                }
+                                            }
+                                        } else {
+                                            for ab in &abs {
+                                                let ab_text = i18n::translate_ability(
+                                                    &ab.full_text,
+                                                    current_lang(),
+                                                );
+                                                let w = wrap_ability_text(&ab_text, 384.0, 0.65);
+                                                for l in w.lines() {
+                                                    all_lines.push(l.to_string());
+                                                }
+                                                all_lines.push(String::new());
+                                            }
+                                        }
+                                        let lpp = 10usize;
+                                        let total_pages =
+                                            ((all_lines.len() + lpp - 1) / lpp).max(1);
+                                        text_page = text_page.min(total_pages - 1);
+                                        let start = text_page * lpp;
+                                        let mut ty = 24.0;
+                                        for line in &all_lines[start..] {
+                                            if ty > 220.0 {
+                                                break;
+                                            }
+                                            render_text_with_icons(4.0, ty, line, COL_LIGHT, 0.65);
+                                            ty += 18.0;
+                                        }
+                                        if total_pages > 1 {
+                                            unsafe {
+                                                _3ds_top_queue_text(
+                                                    370.0,
+                                                    4.0,
+                                                    COL_MED,
+                                                    0.50f32,
+                                                    format!("{}/{}\0", text_page + 1, total_pages)
+                                                        .as_ptr(),
+                                                );
+                                            }
+                                        }
+                                        render_hint_bar(&tl("L/B=close  Up/Down=scroll"));
                                     }
-                                    // If no abilities, use minimal height; otherwise expand panel
-                                    let text_h = 86.0
-                                        + line_count as f32 * 18.0
-                                        + (card.resolved_abilities().count().saturating_sub(1)
-                                            as f32)
-                                            * 3.0;
-                                    let min_h = 86.0 + 18.0; // at least one line
-                                    let panel_end = (text_h.max(min_h) + 8.0).min(232.0);
-                                    let rect_h = panel_end - 52.0;
-
-                                    unsafe {
-                                        _3ds_top_queue_rect(0.0, 52.0, 400.0, 188.0, COL_CARD);
-                                        let mut ty = 86.0 - detail_scroll_y;
+                                }
+                            } else {
+                                let detail_cid = viewing_card.or_else(|| {
+                                    acts_cache
+                                        .get(cur)
+                                        .and_then(|a| a.parameters.as_ref().and_then(|p| p.card_id))
+                                });
+                                let mut ability_end = 0.0;
+                                if let Some(cid) = detail_cid {
+                                    if let Some(card) = gs.card_database.get_card(cid) {
+                                        // Pre-count ability text lines so we can size the panel
+                                        let mut line_count = 0usize;
                                         for ab in card.resolved_abilities() {
                                             let ab_text = i18n::translate_ability(
                                                 &ab.full_text,
                                                 current_lang(),
                                             );
                                             let w = wrap_ability_text(&ab_text, 392.0, 0.65);
-                                            for line in w.lines() {
-                                                if ty > -20.0 && ty < 240.0 {
-                                                    render_text_with_icons(
-                                                        4.0, ty, line, COL_LIGHT, 0.65,
-                                                    );
-                                                }
-                                                ty += 18.0;
-                                            }
-                                            ty += 3.0;
+                                            line_count += w.lines().count();
                                         }
-                                        ability_end = ty;
-                                        // Redraw header on top so scrolling text goes behind it
-                                        _3ds_top_queue_rect(0.0, 0.0, 400.0, 82.0, COL_CARD);
-                                        let display_name =
-                                            i18n::card_display_name(&card.name, current_lang());
-                                        _3ds_top_queue_text(
-                                            4.0,
-                                            4.0,
-                                            COL_BLUE,
-                                            0.80f32,
-                                            format!(
-                                                "[{}] {}\0",
-                                                card.card_no,
-                                                wrap_text(&display_name, 392.0, 0.80)
-                                            )
-                                            .as_ptr(),
-                                        );
-                                        let stats = compute_card_stats(card, cid, &gs);
-                                        render_text_with_icons(
-                                            4.0,
-                                            66.0,
-                                            &card_stat_line(
-                                                stats.total_blade,
-                                                &stats.heart_str,
-                                                stats.score,
-                                                stats.cost.into(),
-                                                stats.is_tapped,
-                                                card.card_type.as_card_str(),
-                                                &stats.need_heart_str,
-                                            ),
-                                            COL_LIGHT,
-                                            0.65f32,
-                                        );
+                                        // If no abilities, use minimal height; otherwise expand panel
+                                        let text_h = 86.0
+                                            + line_count as f32 * 18.0
+                                            + (card.resolved_abilities().count().saturating_sub(1)
+                                                as f32)
+                                                * 3.0;
+                                        let min_h = 86.0 + 18.0; // at least one line
+                                        let panel_end = (text_h.max(min_h) + 8.0).min(232.0);
+                                        let rect_h = panel_end - 52.0;
+
+                                        unsafe {
+                                            // Background for scrollable area
+                                            _3ds_top_queue_rect(0.0, 52.0, 400.0, 188.0, COL_CARD);
+                                            // Scrollable ability text
+                                            let mut ty = 86.0 - detail_scroll_y;
+                                            for ab in card.resolved_abilities() {
+                                                let ab_text = i18n::translate_ability(
+                                                    &ab.full_text,
+                                                    current_lang(),
+                                                );
+                                                let w = wrap_ability_text(&ab_text, 392.0, 0.65);
+                                                for line in w.lines() {
+                                                    if ty > -20.0 && ty < 240.0 {
+                                                        render_text_with_icons(
+                                                            4.0, ty, line, COL_LIGHT, 0.65,
+                                                        );
+                                                    }
+                                                    ty += 18.0;
+                                                }
+                                                ty += 3.0;
+                                            }
+                                            ability_end = ty;
+                                            // Header overlay on top: covers name + stats, clips scrolling text
+                                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 86.0, COL_TOP_BG);
+                                            let display_name =
+                                                i18n::card_display_name(&card.name, current_lang());
+                                            _3ds_top_queue_text(
+                                                4.0,
+                                                44.0,
+                                                COL_BLUE,
+                                                0.80f32,
+                                                format!(
+                                                    "[{}] {}\0",
+                                                    card.card_no,
+                                                    wrap_text(&display_name, 392.0, 0.80)
+                                                )
+                                                .as_ptr(),
+                                            );
+                                            let stats = compute_card_stats(card, cid, &gs);
+                                            render_text_with_icons(
+                                                4.0,
+                                                66.0,
+                                                &card_stat_line(
+                                                    stats.total_blade,
+                                                    &stats.heart_str,
+                                                    stats.score,
+                                                    stats.cost.into(),
+                                                    stats.is_tapped,
+                                                    card.card_type.as_card_str(),
+                                                    &stats.need_heart_str,
+                                                ),
+                                                COL_LIGHT,
+                                                0.65f32,
+                                            );
+                                        }
                                     }
                                 }
-                            }
-                            content_y = if ability_end > 0.0 {
-                                ability_end + 6.0
-                            } else {
-                                158.0
-                            };
-                            render_hint_bar(&tl("B/X=close  Up/Down=scroll"));
+                                content_y = if ability_end > 0.0 {
+                                    ability_end + 6.0
+                                } else {
+                                    158.0
+                                };
+                                render_hint_bar(&tl("B/X=close  Up/Down=scroll"));
+                                // Redraw game header on top of detail content
+                                unsafe {
+                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 50.0, COL_PANEL);
+                                    let ph = if current_lang() == Lang::Japanese {
+                                        gs.current_phase.label_jp().to_string()
+                                    } else {
+                                        format!("{}", gs.current_phase)
+                                    };
+                                    _3ds_top_queue_text(
+                                    4.0, 2.0, COL_GOLD, 0.65f32,
+                                    format!(
+                                        "T{} {} [{}]  Me H:{} E:{}/{} D:{}  Opp H:{} E:{}/{} D:{}\0",
+                                        gs.turn_number, ph,
+                                        if ap.id == pref(&gs, my_player_idx).id { "Me" } else { "Opp" },
+                                        pref(&gs, my_player_idx).hand.cards.len(),
+                                        pref(&gs, my_player_idx).energy_zone.active_count(),
+                                        pref(&gs, my_player_idx).energy_zone.cards.len(),
+                                        pref(&gs, my_player_idx).main_deck.cards.len(),
+                                        pref(&gs, 1 - my_player_idx).hand.cards.len(),
+                                        pref(&gs, 1 - my_player_idx).energy_zone.active_count(),
+                                        pref(&gs, 1 - my_player_idx).energy_zone.cards.len(),
+                                        pref(&gs, 1 - my_player_idx).main_deck.cards.len(),
+                                    ).as_ptr(),
+                                );
+                                }
+                            } // end else (not choice_subview)
                         } else {
                             if let Some(vcid) = viewing_card {
                                 // Compact card info overlay with stats
@@ -6065,10 +6185,16 @@ fn main() {
                                             .unwrap_or(false);
                                         let desc =
                                             act.display_desc(current_lang() == Lang::Japanese);
+                                        let desc_nlb = desc.replace('\n', " ");
+                                        let desc_clean = desc_nlb
+                                            .trim_start_matches(|c: char| {
+                                                c == '・' || c == '\u{2022}'
+                                            })
+                                            .trim_start_matches("- ")
+                                            .trim();
                                         let color = if is_disabled { COL_MED } else { COL_GOLD };
-                                        let pfx = "";
                                         let scale = 0.70f32;
-                                        let full_txt = format!("{}{}", pfx, desc);
+                                        let full_txt = desc_clean.to_string();
                                         let total_h = unsafe {
                                             _3ds_text_wrapped_height(
                                                 format!("{}\0", full_txt).as_ptr(),
@@ -6277,8 +6403,7 @@ fn main() {
                                         } else {
                                             COL_LIGHT
                                         };
-                                        let line_scale: f32 =
-                                            0.65;
+                                        let line_scale: f32 = 0.65;
                                         if ty > 230.0 {
                                             break;
                                         }
@@ -6664,7 +6789,7 @@ fn main() {
                                             di += 1;
                                         }
                                     }
-                                    if end < n {
+                                    if end < n && ty < 230.0 {
                                         unsafe {
                                             _3ds_top_queue_text(
                                                 4.0,
