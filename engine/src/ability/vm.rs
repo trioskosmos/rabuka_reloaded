@@ -1066,6 +1066,7 @@ fn decode_ability_effect_direct(bc: &mut BcReader, variant: u8) -> Option<Abilit
     ek.count = count_val;
     ek.optional = optional;
     ek.non_stackable = non_stackable;
+    ek.alternative_condition = alternative_condition.clone();
 
     let kind = Some(ek_box_new(match variant {
         1 => build_movecards(&ek),

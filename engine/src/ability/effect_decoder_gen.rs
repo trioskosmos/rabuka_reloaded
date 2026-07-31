@@ -123,7 +123,6 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "is_reveal" => { ek.is_reveal = bc.read_bool_value(); return Some(true); }
             "location" => { ek.location = bc.read_arc_str_value(); return Some(true); }
             "lose_blade_hearts" => { ek.lose_blade_hearts = bc.read_bool_value(); return Some(true); }
-            "max_repeats" => { ek.max_repeats = bc.read_u8_value(); ek.repeat_limit = ek.max_repeats.clone(); return Some(true); }
             "multiple_targets" => { ek.multiple_targets = bc.read_bool_value(); return Some(true); }
             "name_constraint" => { ek.name_constraint = bc.read_arc_str_value(); return Some(true); }
             "name_constraint_source" => { ek.name_constraint_source = bc.read_arc_str_value(); return Some(true); }
@@ -196,6 +195,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "value" => { ek.value = bc.read_u8_value(); return Some(true); }
             "energy" => { ek.energy_count = bc.read_u8_value(); return Some(true); }
             "energy" => { ek.energy_count = bc.read_u8_value(); return Some(true); }
+            "max_repeats" => { ek.repeat_limit = bc.read_u8_value(); return Some(true); }
             _ => { bc.skip_value()?; return Some(true); }
         }
     }
@@ -275,7 +275,6 @@ pub(crate) struct EffectKindLocals {
     pub is_reveal: Option<bool>,
     pub location: Option<ArcStr>,
     pub lose_blade_hearts: Option<bool>,
-    pub max_repeats: Option<u8>,
     pub multiple_targets: Option<bool>,
     pub name_constraint: Option<ArcStr>,
     pub name_constraint_source: Option<ArcStr>,
@@ -788,7 +787,6 @@ fn build_modifyscore(ek: &EffectKindLocals) -> EffectKind {
         heart_colors: ek.heart_colors.clone(),
         exclude_self: ek.exclude_self.clone(),
         target_count: ek.target_count.clone(),
-        repeat_limit: ek.repeat_limit.clone(),
         filter_targets_by_heart_colors: ek.filter_targets_by_heart_colors.clone(),
         cost_total: ek.cost_total.clone(),
         cost_total_operator: ek.cost_total_operator.clone(),
@@ -799,7 +797,7 @@ fn build_modifyscore(ek: &EffectKindLocals) -> EffectKind {
         card_property: ek.card_property.clone(),
         state: ek.state.clone(),
         negation: ek.negation.clone(),
-        max_repeats: ek.max_repeats.clone(),
+        repeat_limit: ek.repeat_limit.clone(),
         need_heart_operator: ek.need_heart_operator.clone(),
         need_heart_total: ek.need_heart_total.clone(),
         same_name: ek.same_name.clone(),

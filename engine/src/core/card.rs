@@ -1196,8 +1196,6 @@ pub enum EffectKind {
         #[serde(default)]
         target_count: Option<u8>,
         #[serde(default)]
-        repeat_limit: Option<u8>,
-        #[serde(default)]
         filter_targets_by_heart_colors: Option<bool>,
         #[serde(default)]
         cost_total: Option<u8>,
@@ -1217,8 +1215,8 @@ pub enum EffectKind {
         state: Option<Box<EffectState>>,
         #[serde(default)]
         negation: Option<bool>,
-        #[serde(default)]
-        max_repeats: Option<u8>,
+        #[serde(default, alias = "max_repeats")]
+        repeat_limit: Option<u8>,
         #[serde(default)]
         need_heart_operator: Option<Operator>,
         #[serde(default)]
@@ -1262,7 +1260,7 @@ pub enum EffectKind {
         self_target: Option<bool>,
         #[serde(default)]
         exclude_heart_colors: Option<Box<Vec<String>>>,
-        #[serde(default)]
+        #[serde(default, alias = "max_repeats")]
         repeat_limit: Option<u8>,
         #[serde(default, with = "opt_card_type")]
         card_type: Option<CardType>,
@@ -1813,7 +1811,7 @@ pub enum EffectKind {
         per_unit_heart_colors: Box<Vec<String>>,
         #[serde(default)]
         per_unit_location: Option<Box<ArcStr>>,
-        #[serde(default)]
+        #[serde(default, alias = "max_repeats")]
         repeat_limit: Option<u8>,
         #[serde(default)]
         identities: Option<Box<Vec<String>>>,
@@ -2619,11 +2617,7 @@ impl AbilityEffect {
 
     pub fn repeat_limit_any(&self) -> Option<u8> {
         match self.kind.as_deref() {
-            Some(EffectKind::ModifyScore {
-                repeat_limit,
-                max_repeats,
-                ..
-            }) => repeat_limit.or(*max_repeats),
+            Some(EffectKind::ModifyScore { repeat_limit, .. }) => *repeat_limit,
             Some(EffectKind::ModifyHearts { repeat_limit, .. }) => *repeat_limit,
             Some(EffectKind::CompoundEffect { repeat_limit, .. }) => *repeat_limit,
             Some(EffectKind::MiscOp { repeat_limit, .. }) => *repeat_limit,
