@@ -1,7 +1,14 @@
 use super::abilities_gen::{BYTECODE, NUM_ABILITIES, OFFSETS, STRINGS};
+use super::enums::EffectState;
 use crate::ability::enums::ActionType;
-use crate::card::{ek_box_new, Ability, AbilityCost, AbilityEffect, Condition, EffectKind};
+use crate::card::{
+    ek_box_new, Ability, AbilityCost, AbilityEffect, AbilityFilter, AbilityFilterBranch, CardType,
+    Condition, DistinctType, DynamicCount, EffectKind, Operator, PlacementOrder, PositionInfo,
+    QuotedText,
+};
 use crate::core::types::ArcStr;
+
+include!("effect_decoder_gen.rs");
 
 #[cfg(feature = "no_std")]
 use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
@@ -263,8 +270,403 @@ impl<'a> BcReader<'a> {
         }
     }
 
+    fn read_u8_value(&mut self) -> Option<u8> {
+        self.read_u32_value()
+    }
+
+    fn read_i8_value(&mut self) -> Option<i8> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_I64 => Some(self.i64()? as i8),
+            _ => None,
+        }
+    }
+
+    fn read_card_type_value(&mut self) -> Option<crate::card::CardType> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_STR => {
+                let idx = self.read_idx()?;
+                if idx >= STRINGS.len() {
+                    return None;
+                }
+                crate::card::CardType::from_card_str(STRINGS[idx])
+            }
+            _ => None,
+        }
+    }
+
+    fn read_operator_value(&mut self) -> Option<crate::card::Operator> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_STR => {
+                let idx = self.read_idx()?;
+                if idx >= STRINGS.len() {
+                    return None;
+                }
+                match STRINGS[idx] {
+                    ">=" => Some(crate::card::Operator::Gte),
+                    "<=" => Some(crate::card::Operator::Lte),
+                    ">" => Some(crate::card::Operator::Gt),
+                    "<" => Some(crate::card::Operator::Lt),
+                    "=" | "==" => Some(crate::card::Operator::Eq),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn read_opt_str_vec_value(&mut self) -> Option<Box<Vec<String>>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_ARRAY => {
+                let len = self.read_u32()? as usize;
+                let mut v = Vec::with_capacity(len);
+                for _ in 0..len {
+                    v.push(self.read_string_value()?);
+                }
+                Some(Box::new(v))
+            }
+            _ => None,
+        }
+    }
+
+    fn read_str_vec_value(&mut self) -> Box<Vec<String>> {
+        let tag = self.read_u8().unwrap_or(TAG_NULL);
+        match tag {
+            TAG_ARRAY => {
+                let len = self.read_u32().unwrap_or(0) as usize;
+                let mut v = Vec::with_capacity(len);
+                for _ in 0..len {
+                    if let Some(s) = self.read_string_value() {
+                        v.push(s);
+                    }
+                }
+                Box::new(v)
+            }
+            _ => Box::new(Vec::new()),
+        }
+    }
+
+    fn read_condition_value(&mut self) -> Option<Box<Condition>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_OBJECT | TAG_OBJECT_VARIANT => {
+                if tag == TAG_OBJECT_VARIANT {
+                    self.read_u8()?;
+                }
+                let count = self.read_u32()? as usize;
+                let mut map = serde_json::Map::with_capacity(count);
+                for _ in 0..count {
+                    let kidx = self.read_idx()?;
+                    if kidx >= STRINGS.len() {
+                        return None;
+                    }
+                    map.insert(STRINGS[kidx].to_string(), self.read_json_value()?);
+                }
+                let map_val = serde_json::Value::Object(map);
+                let cond: Condition = serde_json::from_value(map_val.clone()).ok()?;
+                let mut boxed = Box::new(cond);
+                condition_populate_from_json(&mut boxed, &map_val);
+                Some(boxed)
+            }
+            _ => None,
+        }
+    }
+
+    fn read_effect_value(&mut self) -> Option<Box<AbilityEffect>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_OBJECT_VARIANT => {
+                let variant = self.read_u8()?;
+                Some(Box::new(decode_ability_effect_direct(self, variant)?))
+            }
+            TAG_OBJECT => Some(Box::new(decode_ability_effect_from_object(self)?)),
+            _ => None,
+        }
+    }
+
+    fn read_effect_vec_value(&mut self) -> Option<Vec<Box<AbilityEffect>>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_ARRAY => {
+                let len = self.read_u32()? as usize;
+                let mut v = Vec::with_capacity(len);
+                for _ in 0..len {
+                    let sub_tag = self.read_u8()?;
+                    match sub_tag {
+                        TAG_OBJECT_VARIANT => {
+                            let variant = self.read_u8()?;
+                            v.push(Box::new(decode_ability_effect_direct(self, variant)?));
+                        }
+                        TAG_OBJECT => v.push(Box::new(decode_ability_effect_from_object(self)?)),
+                        _ => {
+                            self.skip_value()?;
+                        }
+                    }
+                }
+                Some(v)
+            }
+            _ => None,
+        }
+    }
+
+    fn read_effect_vec_boxed_value(&mut self) -> Option<Box<Vec<Box<AbilityEffect>>>> {
+        self.read_effect_vec_value().map(Box::new)
+    }
+
+    fn read_position_value(&mut self) -> Option<Box<crate::card::PositionInfo>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_STR => {
+                let idx = self.read_idx()?;
+                if idx >= STRINGS.len() {
+                    return None;
+                }
+                let s = STRINGS[idx];
+                let val = serde_json::Value::String(s.to_string());
+                serde_json::from_value(val).ok().map(Box::new)
+            }
+            TAG_OBJECT | TAG_OBJECT_VARIANT => {
+                if tag == TAG_OBJECT_VARIANT {
+                    self.read_u8()?;
+                }
+                let count = self.read_u32()? as usize;
+                let mut map = serde_json::Map::with_capacity(count);
+                for _ in 0..count {
+                    let kidx = self.read_idx()?;
+                    if kidx >= STRINGS.len() {
+                        return None;
+                    }
+                    map.insert(STRINGS[kidx].to_string(), self.read_json_value()?);
+                }
+                let pi: crate::card::PositionInfo =
+                    serde_json::from_value(serde_json::Value::Object(map)).ok()?;
+                Some(Box::new(pi))
+            }
+            _ => None,
+        }
+    }
+
+    fn read_dynamic_count_value(&mut self) -> Option<Box<crate::card::DynamicCount>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_OBJECT | TAG_OBJECT_VARIANT => {
+                if tag == TAG_OBJECT_VARIANT {
+                    self.read_u8()?;
+                }
+                let count = self.read_u32()? as usize;
+                let mut map = serde_json::Map::with_capacity(count);
+                for _ in 0..count {
+                    let kidx = self.read_idx()?;
+                    if kidx >= STRINGS.len() {
+                        return None;
+                    }
+                    map.insert(STRINGS[kidx].to_string(), self.read_json_value()?);
+                }
+                let dc: crate::card::DynamicCount =
+                    serde_json::from_value(serde_json::Value::Object(map)).ok()?;
+                Some(Box::new(dc))
+            }
+            _ => None,
+        }
+    }
+
+    fn read_effect_state_value(&mut self) -> Option<Box<super::enums::EffectState>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_STR => {
+                let idx = self.read_idx()?;
+                if idx >= STRINGS.len() {
+                    return None;
+                }
+                // EffectState can be a plain string like "wait", "active", etc.
+                // Try to deserialize from the string value.
+                let s = STRINGS[idx];
+                let val = serde_json::Value::String(s.to_string());
+                serde_json::from_value(val).ok().map(Box::new)
+            }
+            TAG_OBJECT | TAG_OBJECT_VARIANT => {
+                if tag == TAG_OBJECT_VARIANT {
+                    self.read_u8()?;
+                }
+                let count = self.read_u32()? as usize;
+                let mut map = serde_json::Map::with_capacity(count);
+                for _ in 0..count {
+                    let kidx = self.read_idx()?;
+                    if kidx >= STRINGS.len() {
+                        return None;
+                    }
+                    map.insert(STRINGS[kidx].to_string(), self.read_json_value()?);
+                }
+                let st: super::enums::EffectState =
+                    serde_json::from_value(serde_json::Value::Object(map)).ok()?;
+                Some(Box::new(st))
+            }
+            _ => None,
+        }
+    }
+
+    fn read_distinct_value(&mut self) -> Option<Box<crate::card::DistinctType>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_FALSE => Some(Box::new(crate::card::DistinctType::CardName)),
+            TAG_TRUE => Some(Box::new(crate::card::DistinctType::True)),
+            TAG_STR => {
+                let idx = self.read_idx()?;
+                if idx >= STRINGS.len() {
+                    return None;
+                }
+                Some(Box::new(match STRINGS[idx] {
+                    "card_name" => crate::card::DistinctType::CardName,
+                    "true" | "distinct" => crate::card::DistinctType::True,
+                    _ => crate::card::DistinctType::CardName,
+                }))
+            }
+            _ => None,
+        }
+    }
+
     fn read_json_value(&mut self) -> Option<serde_json::Value> {
         read_value_from_bc(self)
+    }
+
+    fn read_ability_filter_value(&mut self) -> Option<AbilityFilter> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => Some(AbilityFilter::NoAbility),
+            TAG_STR => {
+                let idx = self.read_idx()?;
+                if idx >= STRINGS.len() {
+                    return None;
+                }
+                Some(match STRINGS[idx] {
+                    "has_ability" => AbilityFilter::HasAbility,
+                    "has_ability_type" => AbilityFilter::HasAbilityType,
+                    "no_ability_type" => AbilityFilter::NoAbilityType,
+                    _ => AbilityFilter::NoAbility,
+                })
+            }
+            _ => Some(AbilityFilter::NoAbility),
+        }
+    }
+
+    fn read_or_ability_filters_value(&mut self) -> Option<Box<Vec<AbilityFilterBranch>>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_ARRAY => {
+                let len = self.read_u32()? as usize;
+                let mut v = Vec::with_capacity(len);
+                for _ in 0..len {
+                    let tag2 = self.read_u8()?;
+                    if tag2 == TAG_OBJECT || tag2 == TAG_OBJECT_VARIANT {
+                        if tag2 == TAG_OBJECT_VARIANT {
+                            self.read_u8()?;
+                        }
+                        let count = self.read_u32()? as usize;
+                        let mut af = None;
+                        let mut aft = None;
+                        for _ in 0..count {
+                            let kidx = self.read_idx()?;
+                            if kidx >= STRINGS.len() {
+                                self.skip_value()?;
+                                continue;
+                            }
+                            match STRINGS[kidx] {
+                                "ability_filter" => {
+                                    af = Some(self.read_ability_filter_value()?);
+                                }
+                                "ability_filter_triggers" => {
+                                    aft = self.read_opt_str_vec_value().map(|b| *b);
+                                }
+                                _ => {
+                                    self.skip_value()?;
+                                }
+                            }
+                        }
+                        v.push(AbilityFilterBranch {
+                            ability_filter: af,
+                            ability_filter_triggers: aft,
+                        });
+                    } else {
+                        self.skip_value()?;
+                    }
+                }
+                Some(Box::new(v))
+            }
+            _ => None,
+        }
+    }
+
+    fn read_boxed_arcstr_value(&mut self) -> Option<Box<ArcStr>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_STR => {
+                let idx = self.read_idx()?;
+                if idx >= STRINGS.len() {
+                    return None;
+                }
+                Some(Box::new(ArcStr::from(STRINGS[idx])))
+            }
+            _ => None,
+        }
+    }
+
+    fn read_placement_order_value(&mut self) -> Option<crate::card::PlacementOrder> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_STR => {
+                let idx = self.read_idx()?;
+                if idx >= STRINGS.len() {
+                    return None;
+                }
+                match STRINGS[idx] {
+                    "any_order" => Some(crate::card::PlacementOrder::AnyOrder),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn read_quoted_text_value(&mut self) -> Option<Box<crate::card::QuotedText>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_OBJECT | TAG_OBJECT_VARIANT => {
+                if tag == TAG_OBJECT_VARIANT {
+                    self.read_u8()?;
+                }
+                let count = self.read_u32()? as usize;
+                let mut map = serde_json::Map::with_capacity(count);
+                for _ in 0..count {
+                    let kidx = self.read_idx()?;
+                    if kidx >= STRINGS.len() {
+                        return None;
+                    }
+                    map.insert(STRINGS[kidx].to_string(), self.read_json_value()?);
+                }
+                let qt: crate::card::QuotedText =
+                    serde_json::from_value(serde_json::Value::Object(map)).ok()?;
+                Some(Box::new(qt))
+            }
+            _ => None,
+        }
     }
 }
 
@@ -463,17 +865,12 @@ fn decode_ability_effect(bc: &mut BcReader) -> Option<Option<AbilityEffect>> {
     let tag = bc.read_u8()?;
     match tag {
         TAG_NULL => Some(None),
+        TAG_OBJECT_VARIANT => {
+            let variant = bc.read_u8()?;
+            let inner = decode_ability_effect_direct(bc, variant)?;
+            Some(Some(inner))
+        }
         TAG_OBJECT => {
-            let inner = decode_ability_effect_from_object(bc)?;
-            Some(Some(inner))
-        }
-        TAG_OBJECT_VARIANT => {
-            bc.read_u8()?;
-            let inner = decode_ability_effect_from_object(bc)?;
-            Some(Some(inner))
-        }
-        TAG_OBJECT_VARIANT => {
-            bc.read_u8()?; // skip variant tag byte, fall through to JSON path
             let inner = decode_ability_effect_from_object(bc)?;
             Some(Some(inner))
         }
@@ -599,7 +996,146 @@ fn decode_ability_effect_from_object(bc: &mut BcReader) -> Option<AbilityEffect>
     Some(effect)
 }
 
-// ── populate_from_json (moved from card.rs) ──
+/// Direct decoder for TAG_OBJECT_VARIANT effects using the generated field dispatch.
+fn decode_ability_effect_direct(bc: &mut BcReader, variant: u8) -> Option<AbilityEffect> {
+    let count = bc.read_u32()? as usize;
+    let mut text = ArcStr::from("");
+    let mut action = ActionType::default();
+    let mut source: Option<ArcStr> = None;
+    let mut destination: Option<ArcStr> = None;
+    let mut count_val: Option<u8> = None;
+    let mut target: Option<ArcStr> = None;
+    let mut condition: Option<Box<Condition>> = None;
+    let mut non_stackable: Option<bool> = None;
+    let mut conditional: Option<bool> = None;
+    let mut is_further: Option<bool> = None;
+    let mut optional: Option<bool> = None;
+    let mut max: Option<bool> = None;
+    let mut effect_steps: Option<Vec<Box<AbilityEffect>>> = None;
+    let mut look_action: Option<Box<AbilityEffect>> = None;
+    let mut select_action: Option<Box<AbilityEffect>> = None;
+    let mut actions: Option<Vec<Box<AbilityEffect>>> = None;
+    let mut primary_effect: Option<Box<AbilityEffect>> = None;
+    let mut alternative_condition: Option<Box<Condition>> = None;
+    let mut result_condition: Option<Box<Condition>> = None;
+    let mut followup_action: Option<Box<AbilityEffect>> = None;
+    let mut optional_action: Option<Box<AbilityEffect>> = None;
+    let mut conditional_action: Option<Box<AbilityEffect>> = None;
+    let mut conditional_negation: Option<bool> = None;
+    let mut ek = EffectKindLocals::default();
+
+    for _ in 0..count {
+        let key = bc.key()?;
+        decode_effect_field(
+            bc,
+            key,
+            &mut text,
+            &mut action,
+            &mut source,
+            &mut destination,
+            &mut count_val,
+            &mut target,
+            &mut condition,
+            &mut non_stackable,
+            &mut conditional,
+            &mut is_further,
+            &mut optional,
+            &mut max,
+            &mut effect_steps,
+            &mut look_action,
+            &mut select_action,
+            &mut actions,
+            &mut primary_effect,
+            &mut alternative_condition,
+            &mut result_condition,
+            &mut followup_action,
+            &mut optional_action,
+            &mut conditional_action,
+            &mut conditional_negation,
+            &mut ek,
+        )?;
+    }
+
+    // The old JSON path feeds the same JSON value into both AbilityEffect AND EffectKind.
+    // Fields like source, target, destination, count exist on AbilityEffect (AE) and also on
+    // many EffectKind variants. The AE dispatch consumes them first so ek never sees them.
+    // Copy the overlapping AE fields into ek so build_* functions have them.
+    ek.source = source.clone();
+    ek.target = target.clone();
+    ek.destination = destination.clone();
+    ek.count = count_val;
+    ek.optional = optional;
+    ek.non_stackable = non_stackable;
+
+    let kind = Some(ek_box_new(match variant {
+        1 => build_movecards(&ek),
+        2 => build_drawcards(&ek),
+        3 => build_selecttarget(&ek),
+        4 => build_lookreveal(&ek),
+        5 => build_modifyscore(&ek),
+        6 => build_modifyhearts(&ek),
+        7 => build_gainresource(&ek),
+        8 => build_changestate(&ek),
+        9 => build_abilityop(&ek),
+        10 => build_compoundeffect(&ek),
+        11 => build_restrictionop(&ek),
+        12 => build_positionop(&ek),
+        13 => build_miscop(&ek),
+        14 => build_customop(&ek),
+        _ => return None,
+    }));
+
+    let mut effect = AbilityEffect {
+        text,
+        action,
+        source,
+        destination,
+        count: count_val,
+        target,
+        condition,
+        non_stackable,
+        conditional,
+        is_further,
+        optional,
+        max,
+        effect_steps,
+        compound: Box::new(crate::card::CompoundBranch {
+            look_action,
+            select_action,
+            actions,
+            primary_effect,
+            alternative_condition,
+            result_condition,
+            followup_action,
+            optional_action,
+            conditional_action,
+            conditional_negation,
+        }),
+        kind,
+    };
+
+    // Draw-count fix
+    if let Some(ref actions) = effect.compound.actions {
+        let fixed: Vec<Box<AbilityEffect>> = actions
+            .iter()
+            .map(|a| {
+                let mut f = (**a).clone();
+                if f.action == ActionType::DrawCard
+                    && f.count.is_none()
+                    && f.dynamic_count_any().is_none()
+                {
+                    f.count = Some(1);
+                }
+                Box::new(f)
+            })
+            .collect();
+        effect.compound.actions = Some(fixed);
+    }
+
+    Some(effect)
+}
+
+// ── populate_from_json (kept for JSON fallback / tests) ──
 
 impl AbilityEffect {
     /// Populate `kind` from this effect's JSON value. Recurses into sub-effects.

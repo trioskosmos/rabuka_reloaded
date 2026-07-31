@@ -14,10 +14,7 @@ mod bytecode_deep_compare {
         data["unique_abilities"].as_array().unwrap().clone()
     }
 
-    /// Decode an ability exactly as the default (non-bytecode) JSON loader does:
-    /// serde `from_value::<Ability>` + `populate_from_json` + draw-count fix.
     fn json_path_decode(entry: &serde_json::Value) -> Option<Ability> {
-        // Normalize cost keys before deserializing (legacy "type"→"action", "zone"→"source").
         let mut normalized = entry.clone();
         if let Some(cost_val) = normalized.get_mut("cost") {
             if let Some(obj) = cost_val.as_object_mut() {
@@ -56,17 +53,68 @@ mod bytecode_deep_compare {
         Some(ab)
     }
 
-    /// Deep-equality check that the bytecode path reconstructs the *exact* same
-    /// `Ability` the JSON path produces. This is the automated guard that makes
-    /// the bytecode path safe when new ability types/fields are added: any
-    /// divergence from the JSON loader is caught here.
+    fn collect_diffs(
+        a: &serde_json::Value,
+        b: &serde_json::Value,
+        path: &str,
+        out: &mut Vec<String>,
+    ) {
+        match (a, b) {
+            (serde_json::Value::Object(ao), serde_json::Value::Object(bo)) => {
+                let mut all_keys: Vec<&String> = ao.keys().chain(bo.keys()).collect();
+                all_keys.sort();
+                all_keys.dedup();
+                for k in all_keys {
+                    let p = if path.is_empty() {
+                        k.clone()
+                    } else {
+                        format!("{path}.{k}")
+                    };
+                    match (ao.get(k), bo.get(k)) {
+                        (Some(av), Some(bv)) => collect_diffs(av, bv, &p, out),
+                        (Some(av), None) => out.push(format!("MISSING_IN_JSON {p} = {av}")),
+                        (None, Some(bv)) => out.push(format!("MISSING_IN_BC {p} = {bv}")),
+                        (None, None) => {}
+                    }
+                }
+            }
+            (serde_json::Value::Array(ao), serde_json::Value::Array(bo)) => {
+                for i in 0..ao.len().max(bo.len()) {
+                    let p = format!("{path}[{i}]");
+                    match (ao.get(i), bo.get(i)) {
+                        (Some(av), Some(bv)) => collect_diffs(av, bv, &p, out),
+                        (Some(_), None) => out.push(format!("EXTRA_IN_JSON {p}")),
+                        (None, Some(_)) => out.push(format!("EXTRA_IN_BC {p}")),
+                        (None, None) => {}
+                    }
+                }
+            }
+            _ if a != b => {
+                let a_s = a.to_string();
+                let b_s = b.to_string();
+                let a_trunc = if a_s.len() > 100 {
+                    format!("{}...", &a_s[..100])
+                } else {
+                    a_s
+                };
+                let b_trunc = if b_s.len() > 100 {
+                    format!("{}...", &b_s[..100])
+                } else {
+                    b_s
+                };
+                out.push(format!("{path}: BC={a_trunc} JSON={b_trunc}"));
+            }
+            _ => {}
+        }
+    }
+
     #[test]
     fn bytecode_deep_matches_json_path() {
         let json_abilities = load_json_abilities();
         assert_eq!(ability_count(), json_abilities.len());
 
         let mut mismatches = 0usize;
-        let mut first: Option<(usize, String, String)> = None;
+        let mut all_diffs: Vec<(usize, Vec<String>)> = Vec::new();
         for (idx, entry) in json_abilities.iter().enumerate() {
             let bc = get_ability(idx).ok();
             let jp = json_path_decode(entry);
@@ -76,35 +124,40 @@ mod bytecode_deep_compare {
                     let bv = serde_json::to_value(&b).unwrap_or(serde_json::Value::Null);
                     if av != bv {
                         mismatches += 1;
-                        if first.is_none() {
-                            // Trim to first 4000 chars each for readability.
-                            let pa = av.to_string();
-                            let pb = bv.to_string();
-                            first = Some((
-                                idx,
-                                pa.chars().take(4000).collect(),
-                                pb.chars().take(4000).collect(),
-                            ));
+                        if all_diffs.len() < 5 {
+                            let mut diffs = Vec::new();
+                            collect_diffs(&av, &bv, "", &mut diffs);
+                            all_diffs.push((idx, diffs));
                         }
                     }
                 }
                 (a, b) => {
                     mismatches += 1;
-                    if first.is_none() {
-                        first = Some((
-                            idx,
-                            format!("bytecode present={}", a.is_some()),
-                            format!("json present={}", b.is_some()),
-                        ));
+                    if all_diffs.len() < 5 {
+                        all_diffs
+                            .push((idx, vec![format!("bc={} jp={}", a.is_some(), b.is_some())]));
                     }
                 }
             }
         }
 
-        if let Some((idx, bc_s, jp_s)) = first {
-            eprintln!("FIRST DEEP MISMATCH at ability idx {idx}");
-            eprintln!("--- bytecode ---\n{bc_s}");
-            eprintln!("--- json path ---\n{jp_s}");
+        if !all_diffs.is_empty() {
+            let mut report = String::new();
+            for (idx, diffs) in &all_diffs {
+                report.push_str(&format!("Ability {idx} ({} diffs):\n", diffs.len()));
+                for d in diffs.iter().take(20) {
+                    report.push_str(&format!("  {d}\n"));
+                }
+                report.push('\n');
+            }
+            let _ = std::fs::write(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .parent()
+                    .unwrap()
+                    .join("deep_diffs.txt"),
+                &report,
+            );
+            eprintln!("{report}");
         }
         assert_eq!(
             mismatches, 0,

@@ -1,5 +1,5 @@
 use crate::ability::ability_store::AbilityRef;
-use crate::ability::enums::{ActionType, ConditionType, EffectState};
+pub(crate) use crate::ability::enums::{ActionType, ConditionType, EffectState};
 use crate::core::types::ArcStr;
 use crate::HashMap;
 use serde::{Deserialize, Serialize};
