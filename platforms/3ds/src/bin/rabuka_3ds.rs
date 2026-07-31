@@ -1060,6 +1060,7 @@ enum Step {
         bool,                       // choice_subview (false=choices grid, true=text overlay)
         usize,                      // text_page (current page index in text subview)
         usize,                      // choice_grid_offset (scroll offset for choice image grid)
+        usize,                      // list_scroll (stable scroll offset for action list)
         f32,                        // detail_scroll_y (scroll offset for card detail text)
         usize,                      // hand_offset (P1)
         usize,                      // hand_offset_p2
@@ -4522,73 +4523,6 @@ fn main() {
                                     stage_handled = true;
                                     break;
                                 }
-
-                                // Filled stage slot: activate the selected Kidou ability.
-                                // This was documented as supported here, but the old code
-                                // only searched PlayMemberToStage actions, so tapping a
-                                // staged Kidou card could leave the stale Pass-only view.
-                                if !stage_handled {
-                                    for (ai, act) in acts_cache.iter().enumerate() {
-                                        if act.action_type != game_setup::ActionType::UseAbility {
-                                            continue;
-                                        }
-                                        let p = match &act.parameters {
-                                            Some(x) => x,
-                                            None => continue,
-                                        };
-                                        if p.card_id != viewing_card
-                                            || p.stage_area.as_deref() != Some(sa.as_str())
-                                        {
-                                            continue;
-                                        }
-                                        if p.disabled.unwrap_or(false) {
-                                            continue;
-                                        }
-                                        let action = act.clone();
-                                        let params = action.parameters.clone();
-                                        let _ = turn::TurnEngine::execute_main_phase_action_with_ability_index(
-                                            &mut gs,
-                                            &action.action_type,
-                                            params.as_ref().and_then(|x| x.card_id),
-                                            params.as_ref().and_then(|x| x.card_indices.clone()),
-                                            params.as_ref().and_then(|x| {
-                                                x.stage_area.as_ref().and_then(|s| s.parse().ok())
-                                            }),
-                                            params.as_ref().and_then(|x| x.use_baton_touch),
-                                            params.as_ref().and_then(|x| x.ability_index),
-                                        );
-                                        if is_multiplayer {
-                                            let sync = uds::ActionSync {
-                                                action_tag: 15,
-                                                card_id: params.as_ref().and_then(|x| x.card_id),
-                                                card_indices: params
-                                                    .as_ref()
-                                                    .and_then(|x| x.card_indices.clone())
-                                                    .unwrap_or_default(),
-                                                stage_area: match sa.as_str() {
-                                                    "left" => 1,
-                                                    "center" => 2,
-                                                    "right" => 3,
-                                                    _ => 0,
-                                                },
-                                                use_baton_touch: false,
-                                                ability_index: params
-                                                    .as_ref()
-                                                    .and_then(|x| x.ability_index)
-                                                    .map(|x| x as u16),
-                                            };
-                                            let _ = uds::uds_send(&sync.to_bytes());
-                                        }
-                                        gs.reset_loop_detection();
-                                        detail_mode = false;
-                                        viewing_card = None;
-                                        cur = 0;
-                                        dirty = true;
-                                        redraw = true;
-                                        stage_handled = true;
-                                        break;
-                                    }
-                                }
                             }
                             // ChoicePosition: select stage position during choice prompt
                             if !stage_handled && has_image_choice {
@@ -6171,7 +6105,6 @@ fn main() {
                                                 format!("{}\0", full_txt).as_ptr(),
                                             );
                                         }
-                                        }
                                         // Page indicator
                                         let total = text_gis.len();
                                         if total > 1 {
@@ -6280,16 +6213,17 @@ fn main() {
                                 {
                                     let mut ty = content_y;
                                     let max_vis = ((230.0 - content_y) / 20.0) as usize + 1;
-                                    let half = max_vis / 2;
                                     let n = display_order.len();
-                                    let start = if n > max_vis {
-                                        (display_pos as isize - half as isize)
-                                            .max(0)
-                                            .min((n - max_vis) as isize)
-                                            as usize
-                                    } else {
-                                        0
-                                    };
+                                    // Stable scroll: only adjust when cursor goes out of visible range
+                                    if list_scroll >= n.saturating_sub(max_vis) {
+                                        list_scroll = n.saturating_sub(max_vis);
+                                    }
+                                    if display_pos < list_scroll {
+                                        list_scroll = display_pos;
+                                    } else if display_pos >= list_scroll + max_vis {
+                                        list_scroll = display_pos + 1 - max_vis;
+                                    }
+                                    let start = list_scroll.min(n.saturating_sub(max_vis));
                                     let end = (start + max_vis).min(n);
                                     if start > 0 {
                                         unsafe {
