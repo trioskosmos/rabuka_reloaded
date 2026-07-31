@@ -1206,7 +1206,7 @@ int _3ds_uds_connect_network(unsigned short node_id) {
                                     &uds_bindctx, UDS_BROADCAST_NETWORKNODEID,
                                     UDSCONTYPE_Client, uds_data_channel,
                                     uds_recv_buf_size);
-            if (R_SUCCEEDED(ret)) { result = 0; break; }
+            if (R_SUCCEEDED(ret)) { result = 0; uds_connected = true; break; }
         }
     }
 

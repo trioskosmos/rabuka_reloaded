@@ -47,13 +47,13 @@ fn strawberry_q36_only_fires_in_live_victory_determination() {
     game.pass();
     assert_eq!(
         game.state.current_phase.to_string(),
-        "SecondAttackerPerformance",
+        "Perform (2nd)",
         "Now in P2's performance"
     );
 
     game.pass();
     assert!(
-        game.state.current_phase.to_string().contains("LiveVictory"),
+        game.state.current_phase.to_string().contains("Live Result"),
         "Q36: Now in LiveVictoryDetermination phase"
     );
 

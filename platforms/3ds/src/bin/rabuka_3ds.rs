@@ -2761,118 +2761,68 @@ fn main() {
                     }
                     // Multiplayer: Client scanning for host
                     SetupPhase::MultiplayerClientScan(p1_idx) => {
-                        // Initialize UDS and scan for hosts on first entry
-                        if was_dirty {
-                            let init_result = uds::uds_init(false);
-                            match init_result {
-                                Ok(()) => {
-                                    let hosts = uds::uds_scan_networks();
-                                    if hosts.is_empty() {
-                                        // No hosts found
-                                        if unsafe { _3ds_is_cli_mode() } {
-                                            unsafe {
-                                                _3ds_clear_top();
-                                                _3ds_text_add_top(
-                                                    format!("{}\n\0", tl("No hosts found"))
-                                                        .as_ptr(),
-                                                );
-                                                _3ds_text_add_top(
-                                                    format!("{}\n\0", tl("B = back")).as_ptr(),
-                                                );
-                                            }
-                                        } else {
-                                            unsafe {
-                                                _3ds_top_clear();
-                                                _3ds_top_queue_rect(
-                                                    0.0, 0.0, 400.0, 240.0, COL_TOP_BG,
-                                                );
-                                                _3ds_top_queue_text(
-                                                    80.0,
-                                                    100.0,
-                                                    COL_MED,
-                                                    0.75f32,
-                                                    format!("{}\0", tl("No hosts found")).as_ptr(),
-                                                );
-                                                _3ds_top_queue_text(
-                                                    80.0,
-                                                    230.0,
-                                                    COL_MED,
-                                                    0.60f32,
-                                                    format!("{}\0", tl("B=back")).as_ptr(),
-                                                );
-                                            }
-                                        }
-                                        Step::Setup(
-                                            cards.clone(),
-                                            decks.clone(),
-                                            SetupPhase::MultiplayerClientScan(p1_idx),
-                                            false,
-                                        )
-                                    } else {
-                                        // Hosts found — go to selection
-                                        Step::Setup(
-                                            cards.clone(),
-                                            decks.clone(),
-                                            SetupPhase::MultiplayerClientHostSelect(
-                                                p1_idx, hosts, 0,
-                                            ),
-                                            true,
-                                        )
-                                    }
-                                }
-                                Err(e) => {
-                                    if unsafe { _3ds_is_cli_mode() } {
-                                        unsafe {
-                                            _3ds_clear_top();
-                                            _3ds_text_add_top(
-                                                format!(
-                                                    "{}\n\0",
-                                                    tl_fmt(
-                                                        "UDS INIT FAILED",
-                                                        &[("e", &e.to_string())]
-                                                    )
-                                                )
-                                                .as_ptr(),
-                                            );
-                                            _3ds_text_add_top(
-                                                format!("{}\n\0", tl("B = back")).as_ptr(),
-                                            );
-                                        }
-                                    } else {
-                                        unsafe {
-                                            _3ds_top_clear();
-                                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                                            _3ds_top_queue_text(
-                                                80.0,
-                                                8.0,
-                                                0xFF0000FF,
-                                                0.65f32,
-                                                format!(
-                                                    "{}\0",
-                                                    tl_fmt(
-                                                        "UDS INIT FAILED",
-                                                        &[("e", &e.to_string())]
-                                                    )
-                                                )
-                                                .as_ptr(),
-                                            );
-                                        }
-                                    }
-                                    Step::Setup(
-                                        cards.clone(),
-                                        decks.clone(),
-                                        SetupPhase::MultiplayerPickRole(p1_idx, 0),
-                                        true,
-                                    )
-                                }
-                            }
-                        } else {
+                        // B = back to role selection
+                        if keys & 0x00000002 != 0 {
+                            uds::uds_exit();
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
-                                SetupPhase::MultiplayerClientScan(p1_idx),
-                                false,
+                                SetupPhase::MultiplayerPickRole(p1_idx, 0),
+                                true,
                             )
+                        } else {
+                            // Initialize UDS on first entry, rescan on every frame
+                            if was_dirty {
+                                let _ = uds::uds_init(false);
+                            }
+                            let hosts = uds::uds_scan_networks();
+                            if hosts.is_empty() {
+                                // No hosts found — show message and rescan next frame
+                                if unsafe { _3ds_is_cli_mode() } {
+                                    unsafe {
+                                        _3ds_clear_top();
+                                        _3ds_text_add_top(
+                                            format!("{}\n\0", tl("No hosts found")).as_ptr(),
+                                        );
+                                        _3ds_text_add_top(
+                                            format!("{}\n\0", tl("B = back")).as_ptr(),
+                                        );
+                                    }
+                                } else {
+                                    unsafe {
+                                        _3ds_top_clear();
+                                        _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                        _3ds_top_queue_text(
+                                            80.0,
+                                            100.0,
+                                            COL_MED,
+                                            0.75f32,
+                                            format!("{}\0", tl("Scanning...")).as_ptr(),
+                                        );
+                                        _3ds_top_queue_text(
+                                            80.0,
+                                            230.0,
+                                            COL_MED,
+                                            0.60f32,
+                                            format!("{}\0", tl("B=back")).as_ptr(),
+                                        );
+                                    }
+                                }
+                                Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::MultiplayerClientScan(p1_idx),
+                                    false,
+                                )
+                            } else {
+                                // Hosts found — go to selection
+                                Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::MultiplayerClientHostSelect(p1_idx, hosts, 0),
+                                    true,
+                                )
+                            }
                         }
                     }
                     // Multiplayer: Client selecting which host to connect to
@@ -3001,35 +2951,22 @@ fn main() {
                     // Multiplayer: Syncing deck data
                     SetupPhase::MultiplayerSyncDeck(p1_idx, p2_idx, is_host) => {
                         if is_host {
-                            // Host: Build decks, shuffle, send order to client
+                            // Host: send card_no strings so client calls
+                            // build_deck_from_database in the same order → same create_copy IDs.
                             let r = (|| -> Result<(), String> {
-                                use rabuka_engine::card::CardDatabase;
-                                let mut cards_vec = (**cards).clone();
-                                CardLoader::attach_abilities(&mut cards_vec);
-                                let mut db = Arc::new(CardDatabase::load_or_create(cards_vec));
                                 let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
                                 let nums2 = if p1_idx == p2_idx {
                                     nums1.clone()
                                 } else {
                                     DeckParser::deck_list_to_card_numbers(&decks[p2_idx])
                                 };
-                                let mut pd1 = DeckBuilder::build_deck_from_database(&mut db, nums1)
-                                    .map_err(|e| format!("Deck: {}", e))?;
-                                let mut pd2 = DeckBuilder::build_deck_from_database(&mut db, nums2)
-                                    .map_err(|e| format!("Deck: {}", e))?;
-                                // Use a random seed for deterministic shuffle
                                 let seed = unsafe { _3ds_system_tick() } as u64;
-                                pd1.shuffle_main_deck();
-                                pd1.shuffle_energy_deck();
-                                pd2.shuffle_main_deck();
-                                pd2.shuffle_energy_deck();
-                                // Build deck sync message
                                 let sync = uds::DeckSync {
                                     seed,
-                                    p1_main: pd1.main_deck.clone().into(),
-                                    p1_energy: pd1.energy_deck.clone().into(),
-                                    p2_main: pd2.main_deck.clone().into(),
-                                    p2_energy: pd2.energy_deck.clone().into(),
+                                    p1_main_nos: nums1,
+                                    p1_energy_nos: Vec::new(),
+                                    p2_main_nos: nums2,
+                                    p2_energy_nos: Vec::new(),
                                 };
                                 let data = sync.to_bytes();
                                 uds::uds_send(&data).map_err(|e| format!("Send: {}", e))?;
@@ -3121,29 +3058,49 @@ fn main() {
                             if let Some(ref sync_bytes) = deck_sync_bytes {
                                 let sync = uds::DeckSync::from_bytes(sync_bytes)
                                     .ok_or("Invalid deck sync data")?;
-                                // Build players from received card IDs (already shuffled)
-                                let mut d1 = rabuka_engine::deck_builder::Deck {
-                                    main_deck: std::collections::VecDeque::from(sync.p1_main),
-                                    energy_deck: std::collections::VecDeque::from(sync.p1_energy),
-                                };
-                                let mut d2 = rabuka_engine::deck_builder::Deck {
-                                    main_deck: std::collections::VecDeque::from(sync.p2_main),
-                                    energy_deck: std::collections::VecDeque::from(sync.p2_energy),
-                                };
+                                // Build decks from card_no strings using build_deck_from_database.
+                                // This calls create_copy in the same order as the host would have,
+                                // producing matching instance IDs in both databases.
+                                let mut pd1 = DeckBuilder::build_deck_from_database(
+                                    &mut db,
+                                    sync.p1_main_nos.clone(),
+                                )
+                                .map_err(|e| format!("Deck1: {}", e))?;
+                                if !sync.p1_energy_nos.is_empty() {
+                                    let mut ed1 = DeckBuilder::build_deck_from_database(
+                                        &mut db,
+                                        sync.p1_energy_nos.clone(),
+                                    )
+                                    .map_err(|e| format!("Energy1: {}", e))?;
+                                    pd1.energy_deck.append(&mut ed1.energy_deck);
+                                }
+                                let mut pd2 = DeckBuilder::build_deck_from_database(
+                                    &mut db,
+                                    sync.p2_main_nos.clone(),
+                                )
+                                .map_err(|e| format!("Deck2: {}", e))?;
+                                if !sync.p2_energy_nos.is_empty() {
+                                    let mut ed2 = DeckBuilder::build_deck_from_database(
+                                        &mut db,
+                                        sync.p2_energy_nos.clone(),
+                                    )
+                                    .map_err(|e| format!("Energy2: {}", e))?;
+                                    pd2.energy_deck.append(&mut ed2.energy_deck);
+                                }
                                 DeckBuilder::add_default_energy_cards_from_database(
-                                    &mut d1, &mut db,
+                                    &mut pd1, &mut db,
                                 )
                                 .ok();
                                 DeckBuilder::add_default_energy_cards_from_database(
-                                    &mut d2, &mut db,
+                                    &mut pd2, &mut db,
                                 )
                                 .ok();
                                 let mut p1 = Player::new("p1".into(), "P1".into(), true);
-                                p1.set_main_deck(d1.main_deck);
-                                p1.set_energy_deck(d1.energy_deck);
+                                p1.set_main_deck(pd1.main_deck);
+                                p1.set_energy_deck(pd1.energy_deck);
                                 let mut p2 = Player::new("p2".into(), "P2".into(), false);
-                                p2.set_main_deck(d2.main_deck);
-                                p2.set_energy_deck(d2.energy_deck);
+                                p2.set_main_deck(pd2.main_deck);
+                                p2.set_energy_deck(pd2.energy_deck);
                                 let mut gs = GameState::new(p1, p2, db);
                                 game_setup::setup_game(&mut gs);
                                 return Ok((gs, CardAtlas::load()));

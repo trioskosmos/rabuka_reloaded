@@ -158,6 +158,7 @@ pub mod parser_issues_e2e_test_part3;
 pub mod pb2_under_member_test;
 pub mod per_unit_discard_fix;
 pub mod performance_pipeline_test;
+pub mod performance_snapshot_audit_test;
 pub mod poppin_test;
 pub mod position_ability_test;
 pub mod position_change_condition_test;
