@@ -132,19 +132,39 @@ pub enum Phase {
 impl core::fmt::Display for Phase {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Phase::RockPaperScissors => write!(f, "RockPaperScissors"),
-            Phase::ChooseFirstAttacker => write!(f, "ChooseFirstAttacker"),
-            Phase::MulliganFirstAttacker => write!(f, "MulliganFirstAttacker"),
-            Phase::MulliganSecondAttacker => write!(f, "MulliganSecondAttacker"),
+            Phase::RockPaperScissors => write!(f, "RPS"),
+            Phase::ChooseFirstAttacker => write!(f, "Choose 1st"),
+            Phase::MulliganFirstAttacker => write!(f, "Mulligan (1st)"),
+            Phase::MulliganSecondAttacker => write!(f, "Mulligan (2nd)"),
             Phase::Active => write!(f, "Active"),
             Phase::Energy => write!(f, "Energy"),
             Phase::Draw => write!(f, "Draw"),
             Phase::Main => write!(f, "Main"),
-            Phase::LiveCardSetFirstAttacker => write!(f, "LiveCardSetFirstAttacker"),
-            Phase::LiveCardSetSecondAttacker => write!(f, "LiveCardSetSecondAttacker"),
-            Phase::FirstAttackerPerformance => write!(f, "FirstAttackerPerformance"),
-            Phase::SecondAttackerPerformance => write!(f, "SecondAttackerPerformance"),
-            Phase::LiveVictoryDetermination => write!(f, "LiveVictoryDetermination"),
+            Phase::LiveCardSetFirstAttacker => write!(f, "Live Set (1st)"),
+            Phase::LiveCardSetSecondAttacker => write!(f, "Live Set (2nd)"),
+            Phase::FirstAttackerPerformance => write!(f, "Perform (1st)"),
+            Phase::SecondAttackerPerformance => write!(f, "Perform (2nd)"),
+            Phase::LiveVictoryDetermination => write!(f, "Live Result"),
+        }
+    }
+}
+
+impl Phase {
+    pub fn label_jp(&self) -> &'static str {
+        match self {
+            Phase::RockPaperScissors => "ジャンケン",
+            Phase::ChooseFirstAttacker => "先攻選択",
+            Phase::MulliganFirstAttacker => "マリガン（先攻）",
+            Phase::MulliganSecondAttacker => "マリガン（後攻）",
+            Phase::Active => "アクティブ",
+            Phase::Energy => "エネルギー",
+            Phase::Draw => "ドロー",
+            Phase::Main => "メイン",
+            Phase::LiveCardSetFirstAttacker => "ライブセット（先攻）",
+            Phase::LiveCardSetSecondAttacker => "ライブセット（後攻）",
+            Phase::FirstAttackerPerformance => "パフォーマンス（先攻）",
+            Phase::SecondAttackerPerformance => "パフォーマンス（後攻）",
+            Phase::LiveVictoryDetermination => "ライブ勝敗判定",
         }
     }
 }

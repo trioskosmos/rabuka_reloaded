@@ -8,14 +8,14 @@ Audit findings and plan for reducing serde overhead, shrinking bytecode, and min
 After Phases 1-6, the bytecode decoder still reconstructs `serde_json::Value` objects for 6 complex types, then uses `serde_json::from_value()` to populate them. This is the last serde bottleneck in the hot path.
 
 ### Remaining serde calls in ability decode (vm.rs):
-| Type | from_value() calls | Complexity |
-|------|-------------------|------------|
-| `Condition` | 1 (line 374) | HIGH — ~40 enum variants, internally tagged |
-| `AbilityEffect` | 2 (lines 841, 958) | HIGH — 15 fields + flattened CompoundBranch |
-| `PositionInfo` | 2 (lines 437, 453) | LOW — untagged enum, 2 variants |
-| `DynamicCount` | 1 (line 478) | LOW — struct, 4 fields |
-| `EffectState` | 2 (lines 498, 514) | LOW — enum, few variants |
-| `QuotedText` | 1 (line 650) | LOW — struct, 2 fields |
+| Type | from_value() calls | Complexity | Status |
+|------|-------------------|------------|--------|
+| `Condition` | 1 (line 374) | HIGH — ~40 enum variants, internally tagged | **TODO** |
+| `AbilityEffect` | 2 (lines 841, 958) | HIGH — 15 fields + flattened CompoundBranch | **TODO** |
+| `PositionInfo` | ~~2~~ 0 | LOW — untagged enum, 2 variants | **DONE** |
+| `DynamicCount` | ~~1~~ 0 | LOW — struct, 4 fields | **DONE** |
+| `EffectState` | ~~2~~ 0 | LOW — enum, few variants | **DONE** |
+| `QuotedText` | ~~1~~ 0 | LOW — struct, 2 fields | **DONE** |
 
 ### Goal
 Eliminate ALL `serde_json::from_value()` calls from vm.rs. Remove `#[derive(Deserialize)]` from AbilityEffect, Condition, PositionInfo, DynamicCount, EffectState, QuotedText. Delete `populate_from_json`, `condition_populate_from_json`, `decode_ability_effect_from_object`, `collect_json_map`, `normalize_cost_keys`, `kind_from_action`.
@@ -258,18 +258,17 @@ Enum shrinks from 544 -> ~140 bytes (largest variant with only unique fields). ~
 
 **Problem:** After Phases 4-6, the bytecode decoder still reconstructs `serde_json::Value` trees for complex sub-objects (Condition, AbilityEffect, PositionInfo, DynamicCount, EffectState, QuotedText), then calls `serde_json::from_value()` to populate them. This means every ability decode still heap-allocates JSON trees and runs full serde deserialization for these types.
 
-### Step 1: Write direct decoders for simple types (LOW risk)
+### Step 1: Write direct decoders for simple types — DONE
 
-Port these simple types first — few fields, few variants:
+Ported simple types first — few fields, few variants:
 
-- [ ] `decode_position_info_direct(bc) -> Option<PositionInfo>` — untagged enum, 2 variants (Single/All)
-- [ ] `decode_dynamic_count_direct(bc) -> Option<Box<DynamicCount>>` — struct, 4 fields
-- [ ] `decode_effect_state_direct(bc) -> Option<Box<EffectState>>` — enum, few variants
-- [ ] `decode_quoted_text_direct(bc) -> Option<Box<QuotedText>>` — struct, 2 fields
-- [ ] Replace `serde_json::from_value()` calls with direct decoders in vm.rs
-- [ ] Remove `#[derive(Deserialize)]` from PositionInfo, DynamicCount, EffectState, QuotedText
-- [ ] Add these types to `generate_effect_decoder.py` or write decoder by hand
-- [ ] `cargo test`
+- [x] `read_position_value(bc)` — direct decode: TAG_STR -> PositionInfo::String, TAG_OBJECT -> PositionInfo::Struct
+- [x] `read_dynamic_count_value(bc)` — direct decode: reads type/reference/mode/base_reference/calculation/calculation_value fields
+- [x] `read_effect_state_value(bc)` — direct decode: TAG_STR -> EffectState::from_str()
+- [x] `read_quoted_text_value(bc)` — direct decode: reads text/quoted_type fields
+- [x] Eliminated 6 `serde_json::from_value()` calls from vm.rs
+- [x] Removed `#[derive(Deserialize)]` from QuotedText (kept on PositionInfo, DynamicCount for now — needed transitively by Condition which still derives Deserialize)
+- [x] `cargo test` — 1907 passed, 0 warnings
 
 ### Step 2: Port AbilityEffect to direct decode (MEDIUM risk)
 
@@ -307,11 +306,12 @@ Port these simple types first — few fields, few variants:
 
 | Function/Attribute | Lines | Step |
 |---|---|---|
-| `serde_json::from_value::<PositionInfo>` | — | 1 |
-| `serde_json::from_value::<DynamicCount>` | — | 1 |
-| `serde_json::from_value::<EffectState>` | — | 1 |
-| `serde_json::from_value::<QuotedText>` | — | 1 |
-| `#[derive(Deserialize)]` on PositionInfo, DynamicCount, EffectState, QuotedText | — | 1 |
+| `serde_json::from_value::<PositionInfo>` | — | 1 | DONE |
+| `serde_json::from_value::<DynamicCount>` | — | 1 | DONE |
+| `serde_json::from_value::<EffectState>` | — | 1 | DONE |
+| `serde_json::from_value::<QuotedText>` | — | 1 | DONE |
+| `#[derive(Deserialize)]` on QuotedText | — | 1 | DONE |
+| `#[derive(Deserialize)]` on PositionInfo, DynamicCount, EffectState | — | 1 | Blocked (transitively needed by Condition) |
 | `serde_json::from_value::<AbilityEffect>` (2 calls) | — | 2 |
 | `#[derive(Deserialize)]` on AbilityEffect, CompoundBranch | — | 2 |
 | `populate_from_json()` | ~60 | 2 |
@@ -344,13 +344,13 @@ Port these simple types first — few fields, few variants:
 | 4 | EffectKind variant tags | Infrastructure | **DONE** |
 | 5 | Direct binary decoder for EffectKind | Eliminates Value allocs | **DONE** |
 | 6 | EffectFilter sub-struct | ~390 KB | **DONE** |
-| 7.1 | Direct decoders: PositionInfo, DynamicCount, EffectState, QuotedText | — | **NEXT** |
-| 7.2 | Direct decoder: AbilityEffect | — | TODO |
+| 7.1 | Direct decoders: PositionInfo, DynamicCount, EffectState, QuotedText | — | **DONE** |
+| 7.2 | Direct decoder: AbilityEffect | — | **NEXT** |
 | 7.3 | Direct decoder: Condition (~40 variants) | — | TODO |
 | 7.4 | Cost decode + cleanup (~400 lines deleted) | — | TODO |
 
-**Achieved savings:** ~540 KB RAM, ~29 KB binary, EffectKind 544→~140 bytes.
-**Current priority:** Phase 7 — eliminate ALL serde_json::from_value from the ability decode path.
+**Achieved savings:** ~540 KB RAM, ~29 KB binary, EffectKind 544→~140 bytes, eliminated 6 serde_json::from_value calls.
+**Current priority:** Phase 7.2 — direct decoder for AbilityEffect (removes 2 more from_value calls, deletes populate_from_json/decode_ability_effect_from_object/collect_json_map).
 
 ---
 
@@ -364,8 +364,8 @@ Port these simple types first — few fields, few variants:
 | 4 | Medium | `perf: encode EffectKind variant tags in bytecode` | DONE |
 | 5 | High | `perf: direct binary decoder for EffectKind` | DONE |
 | 6 | High | `refactor: extract EffectFilter sub-struct from EffectKind` | DONE |
-| 7.1 | Low | `perf: direct decoders for PositionInfo, DynamicCount, EffectState, QuotedText` | NEXT |
-| 7.2 | Medium | `perf: direct decoder for AbilityEffect, remove serde from effect path` | TODO |
+| 7.1 | Low | `perf: direct decoders for PositionInfo, DynamicCount, EffectState, QuotedText` | DONE |
+| 7.2 | Medium | `perf: direct decoder for AbilityEffect, remove serde from effect path` | NEXT |
 | 7.3 | High | `perf: direct decoder for Condition, remove serde from condition path` | TODO |
 | 7.4 | Medium | `perf: direct cost decoder, delete all serde infrastructure (~400 lines)` | TODO |
 

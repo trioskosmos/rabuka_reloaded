@@ -817,6 +817,16 @@ enum SetupPhase {
     QrResult(Vec<String>),  // QR scan result, user can confirm
     QrNotDeck(String, u32), // QR scanned but not a valid deck, shows decoded text, countdown frames
     ControlGuide(usize),    // Help/control guide overlay (usize = page index)
+    DeckViewer(
+        Vec<i16>,    // card_ids (resolved to i16, same as zone_viewer)
+        usize,       // cursor
+        usize,       // offset
+        bool,        // vs_ai
+        bool,        // is_multiplayer
+        Option<i16>, // viewing_card (same as zone_viewer)
+        std::sync::Arc<rabuka_engine::card::CardDatabase>, // card_db
+        CardAtlas,   // atlas
+    ),
 }
 
 #[cfg(feature = "3ds")]
@@ -897,7 +907,7 @@ fn render_card_grid(
     cols: usize,
     rows: usize,
     y_start: f32,
-    gs: &GameState,
+    card_db: &rabuka_engine::card::CardDatabase,
     atlas: &CardAtlas,
 ) {
     let gap = 4.0f32;
@@ -917,8 +927,7 @@ fn render_card_grid(
         unsafe {
             _3ds_top_queue_rect(ix, iy, cw, ch + 14.0, border);
         }
-        let cn = gs
-            .card_database
+        let cn = card_db
             .get_card(cid)
             .map(|c| c.card_no.as_ref())
             .unwrap_or("?");
@@ -937,7 +946,7 @@ fn render_card_grid(
                     ix + 1.0,
                     iy + ch + 1.0,
                     COL_LIGHT,
-                    0.45f32,
+                    0.35f32,
                     format!("{}\0", cn).as_ptr(),
                 );
             }
@@ -959,9 +968,39 @@ fn render_card_grid(
 }
 
 #[cfg(feature = "3ds")]
-fn render_card_detail(card_id: i16, gs: &GameState) {
-    if let Some(card) = gs.card_database.get_card(card_id) {
-        let stats = compute_card_stats(card, card_id, gs);
+fn render_card_detail(card_id: i16, card_db: &rabuka_engine::card::CardDatabase) {
+    if let Some(card) = card_db.get_card(card_id) {
+        let total_blade = card.blade as i32;
+        let score = card.score.unwrap_or(0) as i32;
+        let cost = card.cost.unwrap_or(0);
+        let heart_str = build_heart_str(
+            &card
+                .base_heart
+                .as_ref()
+                .map(|bh| bh.hearts.clone())
+                .unwrap_or_default(),
+            card_id,
+            &Default::default(),
+            false,
+        );
+        let need_heart_str = build_heart_str(
+            &card
+                .need_heart
+                .as_ref()
+                .map(|bh| bh.hearts.clone())
+                .unwrap_or_default(),
+            card_id,
+            &Default::default(),
+            true,
+        );
+        let stats = CardDisplayStats {
+            total_blade,
+            heart_str,
+            need_heart_str,
+            score,
+            cost,
+            is_tapped: false,
+        };
         unsafe {
             _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
             _3ds_top_queue_rect(0.0, 0.0, 400.0, 232.0, COL_CARD);
@@ -989,16 +1028,32 @@ fn render_card_detail(card_id: i16, gs: &GameState) {
                 0.65f32,
             );
             let mut ty = 44.0;
-            for ab in card.resolved_abilities() {
-                let ab_text = i18n::translate_ability(&ab.full_text, current_lang());
-                let w = wrap_ability_text(&ab_text, 392.0, 0.65);
-                for line in w.lines() {
-                    if ty < 230.0 {
-                        render_text_with_icons(4.0, ty, line, COL_LIGHT, 0.65);
-                        ty += 18.0;
+            let abs: Vec<_> = card.resolved_abilities().collect();
+            if abs.is_empty() {
+                // Fallback: raw ability text (abilities not parsed in DeckViewer's CardDatabase)
+                let raw = card.ability_text();
+                if !raw.is_empty() {
+                    let clean = raw.replace('\n', " ");
+                    let w = wrap_ability_text(&clean, 392.0, 0.65);
+                    for line in w.lines() {
+                        if ty < 220.0 {
+                            render_text_with_icons(4.0, ty, line, COL_LIGHT, 0.65);
+                            ty += 18.0;
+                        }
                     }
                 }
-                ty += 3.0;
+            } else {
+                for ab in abs {
+                    let ab_text = i18n::translate_ability(&ab.full_text, current_lang());
+                    let w = wrap_ability_text(&ab_text, 392.0, 0.65);
+                    for line in w.lines() {
+                        if ty < 220.0 {
+                            render_text_with_icons(4.0, ty, line, COL_LIGHT, 0.65);
+                            ty += 18.0;
+                        }
+                    }
+                    ty += 3.0;
+                }
             }
         }
     }
@@ -1007,8 +1062,8 @@ fn render_card_detail(card_id: i16, gs: &GameState) {
 /// Render a consistent hint bar at the bottom of the top screen.
 /// Place this in the overlay's rendering code to show button hints.
 /// The y position is always 225 (above the 240px bottom edge).
-const HINT_BAR_Y: f32 = 225.0;
-const HINT_BAR_SCALE: f32 = 0.55;
+const HINT_BAR_Y: f32 = 218.0;
+const HINT_BAR_SCALE: f32 = 0.58;
 #[cfg(feature = "3ds")]
 fn render_hint_bar(text: &str) {
     unsafe {
@@ -1288,7 +1343,18 @@ fn main() {
                                         format!("{} [{}] {}\n\0", arrow, i, tl(m)).as_ptr(),
                                     );
                                 }
-                                _3ds_text_add_top("\nL=help A=confirm B=back\0".as_ptr());
+                                _3ds_text_add_top(
+                                    format!(
+                                        "{}\n\0",
+                                        match current_lang() {
+                                            Lang::English => "English / 英語",
+                                            Lang::Japanese => "日本語 / English",
+                                        }
+                                    )
+                                    .as_ptr(),
+                                );
+                                let tip = tl("L=help R=lang/言語 A=confirm B=back");
+                                _3ds_text_add_top(format!("\n{}\0", tip).as_ptr());
                             } else {
                                 _3ds_top_clear();
                                 _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
@@ -1331,10 +1397,10 @@ fn main() {
                                         );
                                     }
                                 }
-                                render_hint_bar(&tl("L=help  A=confirm  B=back"));
+                                render_hint_bar(&tl("L=help  R=lang/言語  A=confirm  B=back"));
                             }
                         }
-                        if keys & 0x00000400 != 0 {
+                        if keys & 0x00000200 != 0 {
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
@@ -1365,6 +1431,13 @@ fn main() {
                             )
                         } else if keys & 0x00000002 != 0 {
                             Step::Done(Ok(()))
+                        } else if keys & 0x00000008 != 0 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickMode(cur),
+                                false,
+                            )
                         } else if keys & 0x00000001 != 0 {
                             if cur == 2 {
                                 // "QR Scan"
@@ -1472,10 +1545,38 @@ fn main() {
                                         );
                                     }
                                 }
-                                render_hint_bar(&tl("UP/DOWN=select  A=confirm  B=back"));
+                                render_hint_bar(&tl(
+                                    "UP/DOWN=select  A=confirm  X=preview  B=back",
+                                ));
                             }
                         }
-                        if keys & 0x00000040 != 0 && cur > 0 {
+                        // X = preview deck contents
+                        if keys & 0x00000400 != 0 && cur < n {
+                            let card_db = std::sync::Arc::new(CardDatabase::load_or_create(
+                                cards.as_ref().clone(),
+                            ));
+                            let card_ids: Vec<i16> =
+                                DeckParser::deck_list_to_card_numbers(&decks[cur])
+                                    .iter()
+                                    .filter_map(|cn| card_db.get_card_id(cn))
+                                    .collect();
+                            let deck_atlas = CardAtlas::load();
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::DeckViewer(
+                                    card_ids,
+                                    0,
+                                    0,
+                                    vs_ai,
+                                    is_multiplayer,
+                                    None,
+                                    card_db,
+                                    deck_atlas,
+                                ),
+                                true,
+                            )
+                        } else if keys & 0x00000040 != 0 && cur > 0 {
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
@@ -1692,10 +1793,29 @@ fn main() {
                                         );
                                     }
                                 }
-                                render_hint_bar(&tl("A=select  B=use same"));
+                                render_hint_bar(&tl("X=preview  A=select  B=use same"));
                             }
                         }
-                        if keys & 0x00000040 != 0 && cur > 0 {
+                        // X = preview deck contents
+                        if keys & 0x00000400 != 0 && cur < n {
+                            let card_db = std::sync::Arc::new(CardDatabase::load_or_create(
+                                cards.as_ref().clone(),
+                            ));
+                            let card_ids: Vec<i16> =
+                                DeckParser::deck_list_to_card_numbers(&decks[cur])
+                                    .iter()
+                                    .filter_map(|cn| card_db.get_card_id(cn))
+                                    .collect();
+                            let deck_atlas = CardAtlas::load();
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::DeckViewer(
+                                    card_ids, 0, 0, false, false, None, card_db, deck_atlas,
+                                ),
+                                true,
+                            )
+                        } else if keys & 0x00000040 != 0 && cur > 0 {
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
@@ -2185,34 +2305,118 @@ fn main() {
                             Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan(0), true)
                         }
                     }
+                    SetupPhase::DeckViewer(
+                        ref card_ids,
+                        mut offset,
+                        _,
+                        vs_ai,
+                        is_multiplayer,
+                        ref mut viewing_card,
+                        ref card_db,
+                        ref atlas,
+                    ) => {
+                        if was_dirty {
+                            unsafe {
+                                _3ds_top_clear();
+                                _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                _3ds_top_queue_text(
+                                    4.0,
+                                    4.0,
+                                    COL_GOLD,
+                                    0.65f32,
+                                    format!("{}  (B=close, X=detail)\0", tl("DECK PREVIEW"))
+                                        .as_ptr(),
+                                );
+                            }
+                            if viewing_card.is_none() {
+                                render_card_grid(card_ids, offset, 5, 2, 28.0, card_db, atlas);
+                            } else {
+                                render_card_detail(viewing_card.unwrap(), card_db);
+                            }
+                        }
+                        let action = card_grid_input(keys, &mut offset, viewing_card, card_ids, 5);
+                        match action {
+                            GridAction::CloseGrid => Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickDeck(offset / 10, vs_ai, is_multiplayer),
+                                true,
+                            ),
+                            GridAction::CloseDetail => Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::DeckViewer(
+                                    card_ids.clone(),
+                                    offset,
+                                    0,
+                                    vs_ai,
+                                    is_multiplayer,
+                                    *viewing_card,
+                                    card_db.clone(),
+                                    atlas.clone(),
+                                ),
+                                true,
+                            ),
+                            GridAction::None => Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::DeckViewer(
+                                    card_ids.clone(),
+                                    offset,
+                                    0,
+                                    vs_ai,
+                                    is_multiplayer,
+                                    *viewing_card,
+                                    card_db.clone(),
+                                    atlas.clone(),
+                                ),
+                                false,
+                            ),
+                            _ => Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::DeckViewer(
+                                    card_ids.clone(),
+                                    offset,
+                                    0,
+                                    vs_ai,
+                                    is_multiplayer,
+                                    *viewing_card,
+                                    card_db.clone(),
+                                    atlas.clone(),
+                                ),
+                                true,
+                            ),
+                        }
+                    }
                     SetupPhase::ControlGuide(page) => {
                         const GUIDE_PAGES: &[&str] = &[
-                            "=== CONTROLS ===\n\n\
-                             UP/DOWN = Navigate menu\n\
-                             LEFT/RIGHT = Change selection\n\
+                            "=== MENU CONTROLS ===\n\n\
+                             UP/DOWN = Navigate items\n\
                              A = Confirm / Select\n\
                              B = Back / Cancel\n\
-                             SELECT = Toggle language\n\
-                             START = In-game menu\n\
-                             L = This help screen",
-                            "=== GAMEPLAY ===\n\n\
-                             Touch = Select/interact\n\
-                             L = View card detail\n\
-                             R = End turn / phase\n\
-                             X = Energy actions\n\
-                             Y = Hand actions\n\
-                             START = In-game menu",
-                            "=== MODES ===\n\n\
-                             VS AI = Play against computer\n\
-                             Sandbox = 2-player hotseat\n\
-                             QR Scan = Import deck from QR code\n\
-                             Local MP = Play on local network",
-                            "=== TIPS ===\n\n\
-                             - Energy cards go in energy zone\n\
-                             - Place members on empty stage slots\n\
-                             - Live cards can attack from stage\n\
-                             - Score by moving cards to success zone\n\
-                             - First to 3 successful cards wins",
+                             X = Preview deck contents\n\
+                             L = Open this help guide\n\
+                             R = Toggle language",
+                            "=== IN-GAME CONTROLS ===\n\n\
+                             Touch = Select cards on board\n\
+                             L = View card detail overlay\n\
+                             X = Toggle detail mode\n\
+                             R = Toggle action view (debug)\n\
+                             Y = Switch text/graphic mode (debug)\n\
+                             START = In-game pause menu",
+                            "=== GAME MODES ===\n\n\
+                             VS AI: Play against the computer\n\
+                             Sandbox: Local 2-player hotseat\n\
+                             QR Scan: Import deck via QR code\n\
+                             Local MP: Play on local network",
+                            "=== CARD ZONES ===\n\n\
+                             Hand: Cards you can play\n\
+                             Energy: Powers member abilities\n\
+                             Stage: Active battle area\n\
+                             Success: Scored cards (win here)\n\
+                             Wait: Drawn-from-deck pile\n\
+                             Deck: Face-down draw pile",
                         ];
                         let total = GUIDE_PAGES.len();
                         let page = page.min(total - 1);
@@ -2226,7 +2430,12 @@ fn main() {
                                         _3ds_text_add_top(format!("{}\n\0", line).as_ptr());
                                     }
                                     _3ds_text_add_top(
-                                        format!("\nPage {}/{}  L/R=pages  B=back\0", page + 1, total).as_ptr(),
+                                        format!(
+                                            "\nPage {}/{}  L/R=pages  B=back\0",
+                                            page + 1,
+                                            total
+                                        )
+                                        .as_ptr(),
                                     );
                                 }
                             } else {
@@ -2241,87 +2450,49 @@ fn main() {
                                     let mut y = 25.0f32;
                                     for line in guide_text.split('\n') {
                                         if line.starts_with("===") {
-                                            _3ds_top_queue_text(40.0, y, COL_GOLD, 0.65f32,
-                                                format!("{}\0", line).as_ptr());
+                                            _3ds_top_queue_text(
+                                                40.0,
+                                                y,
+                                                COL_GOLD,
+                                                0.65f32,
+                                                format!("{}\0", line).as_ptr(),
+                                            );
                                         } else if !line.is_empty() {
-                                            _3ds_top_queue_text(30.0, y, COL_LIGHT, 0.60f32,
-                                                format!("{}\0", line).as_ptr());
+                                            _3ds_top_queue_text(
+                                                30.0,
+                                                y,
+                                                COL_LIGHT,
+                                                0.60f32,
+                                                format!("{}\0", line).as_ptr(),
+                                            );
                                         }
                                         y += 16.0;
                                     }
-                                    _3ds_top_queue_text(4.0, 215.0, COL_MED, 0.55f32,
-                                        format!("Page {}/{}   L/R=pages  B=back\0", page + 1, total).as_ptr());
-                                }
-                            }
-                        }
-                        if keys & 0x00000002 != 0 {
-                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(0), true)
-                        } else if keys & 0x00000400 != 0 && page + 1 < total {
-                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::ControlGuide(page + 1), true)
-                        } else if keys & 0x00000800 != 0 && page > 0 {
-                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::ControlGuide(page - 1), true)
-                        } else {
-                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::ControlGuide(page), false)
-                        }
-                    }
-                                    _3ds_text_add_top(
+                                    _3ds_top_queue_text(
+                                        4.0,
+                                        215.0,
+                                        COL_MED,
+                                        0.55f32,
                                         format!(
-                                            "\nPage {}/{}  L/R=pages  B=back\0",
+                                            "Page {}/{}   L/R=pages  B=back\0",
                                             page + 1,
                                             total
                                         )
                                         .as_ptr(),
                                     );
                                 }
-                            } else {
-                                _3ds_top_clear();
-                                _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                                _3ds_top_queue_rect(20.0, 15.0, 360.0, 195.0, 0xE60A0E1Au32);
-                                _3ds_top_queue_rect(20.0, 15.0, 360.0, 2.0, COL_DIM);
-                                _3ds_top_queue_rect(20.0, 208.0, 360.0, 2.0, COL_DIM);
-                                _3ds_top_queue_rect(20.0, 15.0, 2.0, 195.0, COL_DIM);
-                                _3ds_top_queue_rect(378.0, 15.0, 2.0, 195.0, COL_DIM);
-                                let mut y = 25.0f32;
-                                for line in guide_text.split('\n') {
-                                    if line.starts_with("===") {
-                                        _3ds_top_queue_text(
-                                            40.0,
-                                            y,
-                                            COL_GOLD,
-                                            0.65f32,
-                                            format!("{}\0", line).as_ptr(),
-                                        );
-                                    } else if !line.is_empty() {
-                                        _3ds_top_queue_text(
-                                            30.0,
-                                            y,
-                                            COL_LIGHT,
-                                            0.60f32,
-                                            format!("{}\0", line).as_ptr(),
-                                        );
-                                    }
-                                    y += 16.0;
-                                }
-                                _3ds_top_queue_text(
-                                    4.0,
-                                    215.0,
-                                    COL_MED,
-                                    0.55f32,
-                                    format!("Page {}/{}   L/R=pages  B=back\0", page + 1, total)
-                                        .as_ptr(),
-                                );
                             }
                         }
                         if keys & 0x00000002 != 0 {
                             Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(0), true)
-                        } else if keys & 0x00000400 != 0 && page + 1 < total {
+                        } else if keys & 0x00000100 != 0 && page + 1 < total {
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
                                 SetupPhase::ControlGuide(page + 1),
                                 true,
                             )
-                        } else if keys & 0x00000800 != 0 && page > 0 {
+                        } else if keys & 0x00000200 != 0 && page > 0 {
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
@@ -3486,17 +3657,27 @@ fn main() {
 
                 // X toggles card detail mode + narrows action list to selected card
                 if overlay == Overlay::None && keys & 0x00000400 != 0 {
-                    detail_mode = !detail_mode;
-                    if detail_mode && cur < acts_cache.len() {
-                        if let Some(cid) =
-                            acts_cache[cur].parameters.as_ref().and_then(|p| p.card_id)
-                        {
-                            viewing_card = Some(cid);
-                        }
-                    } else if !detail_mode {
-                        viewing_card = None;
-                        unsafe {
-                            _3ds_text_set_scroll_y(0);
+                    let has_card = cur < acts_cache.len()
+                        && acts_cache[cur]
+                            .parameters
+                            .as_ref()
+                            .and_then(|p| p.card_id)
+                            .is_some();
+                    if !has_card && !detail_mode {
+                        // No card on this action — do nothing
+                    } else {
+                        detail_mode = !detail_mode;
+                        if detail_mode && cur < acts_cache.len() {
+                            if let Some(cid) =
+                                acts_cache[cur].parameters.as_ref().and_then(|p| p.card_id)
+                            {
+                                viewing_card = Some(cid);
+                            }
+                        } else if !detail_mode {
+                            viewing_card = None;
+                            unsafe {
+                                _3ds_text_set_scroll_y(0);
+                            }
                         }
                     }
                     redraw = true;
@@ -4870,16 +5051,24 @@ fn main() {
                             let touch_indicator =
                                 if viewing_card.is_some() { "[T]" } else { "   " };
                             unsafe {
+                                let phase_name;
                                 _3ds_text_add_top(
-                                    format!(
-                                        "{} {} | {:?} | {}{} | taps:{}\n\0",
-                                        tl("Turn").trim_end_matches(':'),
-                                        gs.turn_number,
-                                        gs.current_phase,
-                                        ap_label,
-                                        touch_indicator,
-                                        touch_tap_count,
-                                    )
+                                    {
+                                        phase_name = if current_lang() == Lang::Japanese {
+                                            gs.current_phase.label_jp().to_string()
+                                        } else {
+                                            format!("{}", gs.current_phase)
+                                        };
+                                        format!(
+                                            "{} {} | {} | {}{} | taps:{}\n\0",
+                                            tl("Turn").trim_end_matches(':'),
+                                            gs.turn_number,
+                                            phase_name,
+                                            ap_label,
+                                            touch_indicator,
+                                            touch_tap_count,
+                                        )
+                                    }
                                     .as_ptr(),
                                 );
                                 _3ds_text_add_top(format!("P1 H:{} E:{}/{} D:{} W:{} L:{}  P2 H:{} E:{}/{} D:{} W:{} L:{}\n\0",
@@ -5155,15 +5344,20 @@ fn main() {
                         }
                         unsafe {
                             _3ds_top_queue_rect(0.0, 0.0, 400.0, 50.0, COL_PANEL);
+                            let phase_name = if current_lang() == Lang::Japanese {
+                                gs.current_phase.label_jp().to_string()
+                            } else {
+                                format!("{}", gs.current_phase)
+                            };
                             _3ds_top_queue_text(
                                 4.0,
                                 2.0,
                                 COL_GOLD,
                                 0.65f32,
                                 format!(
-                                    "T{} {:?} [{}]  P1 H:{} E:{}/{} D:{}  P2 H:{} E:{}/{} D:{}\0",
+                                    "T{} {} [{}]  P1 H:{} E:{}/{} D:{}  P2 H:{} E:{}/{} D:{}\0",
                                     gs.turn_number,
-                                    gs.current_phase,
+                                    phase_name,
                                     if ap.id == p1.id { "P1" } else { "P2" },
                                     p1.hand.cards.len(),
                                     p1.energy_zone.active_count(),
@@ -5454,11 +5648,11 @@ fn main() {
                                     5,
                                     2,
                                     28.0,
-                                    &gs,
+                                    &gs.card_database,
                                     atlas,
                                 );
                             } else {
-                                render_card_detail(viewing_card.unwrap(), &gs);
+                                render_card_detail(viewing_card.unwrap(), &gs.card_database);
                             }
                         } else if detail_mode {
                             let detail_cid = viewing_card.or_else(|| {
@@ -5844,7 +6038,7 @@ fn main() {
                                             .and_then(|p| p.disabled)
                                             .unwrap_or(false);
                                         let iy = text_grid_iy + ti as f32 * text_row_h;
-                                        if iy + text_row_h > 232.0 {
+                                        if iy + text_row_h > 240.0 && di != display_pos {
                                             break;
                                         }
 
@@ -5872,7 +6066,7 @@ fn main() {
                                         }
 
                                         let desc = act
-                                            .description
+                                            .display_desc(current_lang() == Lang::Japanese)
                                             .lines()
                                             .next()
                                             .unwrap_or("")
@@ -6052,7 +6246,7 @@ fn main() {
                                                 }
                                             }
                                         }
-                                        let is_group = ge > di + 1;
+                                        let is_group = is_pmts && this_cid != -1;
                                         let group_sel =
                                             is_group && (di..ge).any(|i| i == display_pos);
                                         let line_color = if group_sel || is_sel {
@@ -6095,32 +6289,46 @@ fn main() {
                                             let mut areas = String::new();
                                             for i in di..ge {
                                                 let gact = &acts_cache[display_order[i]];
-                                                let area = gact
+                                                let stage = gact
                                                     .parameters
                                                     .as_ref()
                                                     .and_then(|p| p.stage_area.clone())
-                                                    .unwrap_or("?".into());
-                                                let cost = gact
-                                                    .parameters
-                                                    .as_ref()
-                                                    .and_then(|p| p.available_areas.as_ref())
-                                                    .and_then(|aa| {
-                                                        aa.iter()
-                                                            .find(|x| x.area == area)
-                                                            .map(|x| x.cost)
-                                                    })
-                                                    .or_else(|| {
-                                                        gact.parameters
-                                                            .as_ref()
-                                                            .and_then(|p| p.base_cost)
-                                                    })
-                                                    .unwrap_or(0);
-                                                if i == display_pos {
-                                                    areas
-                                                        .push_str(&format!("[{}:{}] ", area, cost));
-                                                } else {
-                                                    areas.push_str(&format!("{}:{} ", area, cost));
+                                                    .unwrap_or_default();
+                                                let prefix =
+                                                    if i == display_pos { "[" } else { "" };
+                                                let suffix =
+                                                    if i == display_pos { "]" } else { "" };
+                                                // For double baton pairs, show dest+source(s)
+                                                let desc = gact
+                                                    .display_desc(current_lang() == Lang::Japanese);
+                                                if let Some(start) = desc.find('(') {
+                                                    if let Some(end) = desc.find(')') {
+                                                        let sources: String = desc[start + 1..end]
+                                                            .split('+')
+                                                            .map(|a| a.trim())
+                                                            .filter(|a| {
+                                                                !a.eq_ignore_ascii_case(&stage)
+                                                            })
+                                                            .map(|a| tl_area(a).to_string())
+                                                            .collect::<Vec<_>>()
+                                                            .join("+");
+                                                        areas.push_str(&format!(
+                                                            "{}{}+{}{} ",
+                                                            prefix,
+                                                            tl_area(&stage),
+                                                            sources,
+                                                            suffix
+                                                        ));
+                                                        continue;
+                                                    }
                                                 }
+                                                // Regular single-area action
+                                                areas.push_str(&format!(
+                                                    "{}{}{} ",
+                                                    prefix,
+                                                    tl_area(&stage),
+                                                    suffix
+                                                ));
                                             }
                                             for (li, l) in
                                                 wrap_text(&hdr, 392.0, 0.70).lines().enumerate()
@@ -6584,7 +6792,7 @@ fn main() {
                                 0xFFFFFF00,
                                 0.65f32,
                                 format!(
-                                    "MP|ap={} my={} can={} wait={} phase={:?} acts={}\0",
+                                    "MP|ap={} my={} can={} wait={} phase={} acts={}\0",
                                     gs.active_player().id.as_str(),
                                     if is_host { "HST" } else { "CLT" },
                                     if can_act { "Y" } else { "N" },
@@ -6836,7 +7044,7 @@ fn main() {
                             }
                             Overlay::RevealedCards(show_self, ref cursor, view_card) => {
                                 if let Some(vcid) = view_card {
-                                    render_card_detail(vcid, &gs);
+                                    render_card_detail(vcid, &gs.card_database);
                                 } else {
                                     let who = if show_self { tl("You") } else { tl("Opponent") };
                                     let rev_hdr = tl("Revealed Cards");
@@ -6937,7 +7145,7 @@ fn main() {
                                             5,
                                             2,
                                             28.0,
-                                            &gs,
+                                            &gs.card_database,
                                             atlas,
                                         );
                                         let mut sec_text = String::new();

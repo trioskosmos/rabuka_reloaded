@@ -638,7 +638,7 @@ function populateFilters() {
 async function init() {
   try {
     const [cardsResp, abilitiesResp] = await Promise.all([
-      fetch('/cards/cards.json'), fetch('/cards/abilities.json')
+      fetch('cards/cards.json'), fetch('cards/abilities.json')
     ]);
     if (!cardsResp.ok) throw new Error('Failed to load cards.json: ' + cardsResp.status);
     allCardsArr = Object.values(await cardsResp.json()).filter(c => c && c.card_no);

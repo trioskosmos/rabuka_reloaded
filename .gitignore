@@ -17,7 +17,12 @@ poll_data/
 cloudflared.exe
 
 .git-rewrite/
-.github/
+# .github/ is tracked (contains Actions workflows)
+
+# Images in docs/ are copied from web_ui/img/ at deploy time by GitHub Actions
+docs/img/cards_webp/
+docs/img/texticon/
+docs/img/tutorial/
 
 source_images/
 

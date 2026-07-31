@@ -1,33 +1,33 @@
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
 
 #[cfg(feature = "arena_allocator")]
 use crate::arena;
 
-static ALLOC_COUNT: AtomicU64 = AtomicU64::new(0);
-static DEALLOC_COUNT: AtomicU64 = AtomicU64::new(0);
-static BYTES_ALLOCATED: AtomicI64 = AtomicI64::new(0);
-static PEAK_BYTES: AtomicI64 = AtomicI64::new(0);
-static TOTAL_BYTES_ALLOCATED: AtomicU64 = AtomicU64::new(0);
-static ARENA_BUMPS: AtomicU64 = AtomicU64::new(0);
+static ALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);
+static DEALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);
+static BYTES_ALLOCATED: AtomicIsize = AtomicIsize::new(0);
+static PEAK_BYTES: AtomicIsize = AtomicIsize::new(0);
+static TOTAL_BYTES_ALLOCATED: AtomicUsize = AtomicUsize::new(0);
+static ARENA_BUMPS: AtomicUsize = AtomicUsize::new(0);
 
 // Size-class histogram: count of allocs per power-of-2 bucket
 // 0=1-7B, 1=8-15B, 2=16-31B, ..., 12=4KB+, 13=8KB+
-static SIZE_BUCKETS: [AtomicU64; 14] = [
-    AtomicU64::new(0),
-    AtomicU64::new(0),
-    AtomicU64::new(0),
-    AtomicU64::new(0),
-    AtomicU64::new(0),
-    AtomicU64::new(0),
-    AtomicU64::new(0),
-    AtomicU64::new(0),
-    AtomicU64::new(0),
-    AtomicU64::new(0),
-    AtomicU64::new(0),
-    AtomicU64::new(0),
-    AtomicU64::new(0),
-    AtomicU64::new(0),
+static SIZE_BUCKETS: [AtomicUsize; 14] = [
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
+    AtomicUsize::new(0),
 ];
 
 fn size_bucket(size: usize) -> usize {
@@ -46,9 +46,9 @@ unsafe impl GlobalAlloc for CountingAllocator {
         ALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
         let bucket = size_bucket(layout.size());
         SIZE_BUCKETS[bucket].fetch_add(1, Ordering::Relaxed);
-        let size = layout.size() as i64;
+        let size = layout.size() as isize;
         let prev = BYTES_ALLOCATED.fetch_add(size, Ordering::Relaxed);
-        TOTAL_BYTES_ALLOCATED.fetch_add(size as u64, Ordering::Relaxed);
+        TOTAL_BYTES_ALLOCATED.fetch_add(layout.size(), Ordering::Relaxed);
         let current = prev + size;
         let mut peak = PEAK_BYTES.load(Ordering::Relaxed);
         while current > peak {
@@ -75,7 +75,7 @@ unsafe impl GlobalAlloc for CountingAllocator {
             }
         }
         DEALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
-        BYTES_ALLOCATED.fetch_sub(layout.size() as i64, Ordering::Relaxed);
+        BYTES_ALLOCATED.fetch_sub(layout.size() as isize, Ordering::Relaxed);
         System.dealloc(ptr, layout)
     }
 }
@@ -83,7 +83,7 @@ unsafe impl GlobalAlloc for CountingAllocator {
 fn read_buckets() -> [u64; 14] {
     let mut b = [0u64; 14];
     for (i, bucket) in SIZE_BUCKETS.iter().enumerate() {
-        b[i] = bucket.load(Ordering::Relaxed);
+        b[i] = bucket.load(Ordering::Relaxed) as u64;
     }
     b
 }
@@ -121,12 +121,12 @@ struct Snapshot {
 
 fn snapshot() -> Snapshot {
     Snapshot {
-        alloc_calls: ALLOC_COUNT.load(Ordering::Relaxed),
-        dealloc_calls: DEALLOC_COUNT.load(Ordering::Relaxed),
-        live_bytes: BYTES_ALLOCATED.load(Ordering::Relaxed),
-        peak_bytes: PEAK_BYTES.load(Ordering::Relaxed),
-        total_allocated: TOTAL_BYTES_ALLOCATED.load(Ordering::Relaxed),
-        arena_bumps: ARENA_BUMPS.load(Ordering::Relaxed),
+        alloc_calls: ALLOC_COUNT.load(Ordering::Relaxed) as u64,
+        dealloc_calls: DEALLOC_COUNT.load(Ordering::Relaxed) as u64,
+        live_bytes: BYTES_ALLOCATED.load(Ordering::Relaxed) as i64,
+        peak_bytes: PEAK_BYTES.load(Ordering::Relaxed) as i64,
+        total_allocated: TOTAL_BYTES_ALLOCATED.load(Ordering::Relaxed) as u64,
+        arena_bumps: ARENA_BUMPS.load(Ordering::Relaxed) as u64,
         buckets: read_buckets(),
     }
 }
