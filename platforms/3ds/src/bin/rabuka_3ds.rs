@@ -5956,7 +5956,7 @@ fn main() {
                             } else if let Some(entry) = gs.ability_queue.current_entry() {
                                 // In image mode with choices, the text subview handles this.
                                 // The banner is only for CLI/text mode.
-                                if !(has_image_choice) && !is_ai_turn && !is_opponent_turn_mp {
+                                if !(has_image_choice || has_text_choice) && !is_ai_turn {
                                     let ab_text = i18n::translate_ability(
                                         &entry.ability.full_text,
                                         current_lang(),
@@ -6372,9 +6372,9 @@ fn main() {
                                         list_scroll = n.saturating_sub(max_vis);
                                     }
                                     if display_pos < list_scroll {
-                                        list_scroll = display_pos;
+                                        list_scroll = display_pos.saturating_sub(max_vis / 3);
                                     } else if display_pos >= list_scroll + max_vis {
-                                        list_scroll = display_pos + 1 - max_vis;
+                                        list_scroll = display_pos.saturating_sub(max_vis / 3);
                                     }
                                     let start = list_scroll.min(n.saturating_sub(max_vis));
                                     let end = (start + max_vis).min(n);
