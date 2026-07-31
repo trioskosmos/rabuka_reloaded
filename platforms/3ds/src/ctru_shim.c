@@ -156,13 +156,12 @@ static int hl_zones[MAX_HIGHLIGHTS];
 static int hl_slots[MAX_HIGHLIGHTS];
 static bool hl_opponent[MAX_HIGHLIGHTS];
 
-// ---- Need hearts text per player (drawn next to live zone) ----
-static char need_hearts_text[2][256] = {{0}, {0}};
-void _3ds_set_need_hearts_text(int player, const char* text) {
+// ---- Need hearts counts per player (drawn next to live zone) ----
+static u32 need_hearts_counts[2][8] = {{0}};
+void _3ds_set_need_hearts(int player, u32 h0, u32 h1, u32 h2, u32 h3, u32 h4, u32 h5, u32 h6, u32 h7) {
     if (player < 0 || player > 1) return;
-    if (!text) { need_hearts_text[player][0] = '\0'; return; }
-    strncpy(need_hearts_text[player], text, 255);
-    need_hearts_text[player][255] = '\0';
+    u32 vals[8] = {h0, h1, h2, h3, h4, h5, h6, h7};
+    for (int i = 0; i < 8; i++) need_hearts_counts[player][i] = vals[i];
 }
 
 // ---- Action overlay (Phase 2: show actions on bottom screen) ----
@@ -768,21 +767,31 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
         _3ds_draw_rect(lx, live_y + 1, live_slot_w, live_card_h, 0x33000000);
         if (pb->live[i].active) {
             _3ds_draw_card_at(&pb->live[i], lx, live_y + 1, live_slot_w, live_card_h);
-            // Draw per-card stat text (score + need hearts) overlaid on card
-            if (pb->live[i].stat_text[0]) {
-                float st_y = live_y + 1 + live_card_h - 12.0f;
-                if (st_y < live_y + 1) st_y = live_y + 1;
-                _3ds_draw_label_icons(pb->live[i].stat_text, lx + 1, st_y, COL_GOLD, 0.35f);
-            }
         }
         lx += live_slot_w + 2;
     }
-    // Draw need hearts text to the right of live cards
+    // Draw need hearts grid to the right of live cards
     {
         int pi = opponent ? 1 : 0;
-        if (need_hearts_text[pi][0] && lx < W - M - 4) {
-            float fs = 0.40f;
-            _3ds_draw_label_icons(need_hearts_text[pi], lx + 2, live_y + 2, COL_GOLD, fs);
+        int cols = (board_view == 2) ? 8 : 4;
+        int rows = (board_view == 2) ? 1 : 2;
+        float icon_sz = 10.0f;
+        float gap = 1.0f;
+        for (int i = 0; i < 8; i++) {
+            if (need_hearts_counts[pi][i] == 0) continue;
+            int col = i % cols;
+            int row = i / cols;
+            if (row >= rows) break;
+            float ix = lx + 2 + col * (icon_sz + gap);
+            float iy = live_y + 2 + row * (icon_sz + gap);
+            char atlas_name[64];
+            snprintf(atlas_name, sizeof(atlas_name), "icon_heart_%02d.png.t3x", i);
+            C2D_Image img = _3ds_get_card_image(atlas_name, 0);
+            if (img.tex) {
+                C2D_DrawImageAt(img, ix, iy, 0.5f, NULL,
+                    icon_sz / (float)img.subtex->width,
+                    icon_sz / (float)img.subtex->height);
+            }
         }
     }
 

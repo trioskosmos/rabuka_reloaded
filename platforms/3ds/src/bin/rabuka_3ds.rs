@@ -524,6 +524,9 @@ fn wrap_ability_text(s: &str, max_px: f32, scale: f32) -> String {
     wrap_text(s, max_px, scale)
 }
 
+/// Render-side font scale multiplier (must match ctru_shim.c font_scale)
+const FONT_SCALE: f32 = 1.2;
+
 /// Truncate text at segment boundaries, keeping `{{...}}` icon markers intact.
 /// Only plain text characters count toward the character limit.
 fn truncate_aware_segments(s: &str, max_chars: usize) -> String {
@@ -590,7 +593,9 @@ fn wrap_text(s: &str, max_px: f32, scale: f32) -> String {
     if max_px <= 0.0 {
         return s.to_string();
     }
-    let icon_h = (scale * 16.0).max(11.0);
+    // C renderer applies FONT_SCALE multiplier to all text — match it here
+    let eff_scale = scale * FONT_SCALE;
+    let icon_h = (eff_scale * 16.0).max(11.0);
     let mut out = String::with_capacity(s.len() + 32);
     for line in s.lines() {
         let segs = segment_text(line);
@@ -601,13 +606,13 @@ fn wrap_text(s: &str, max_px: f32, scale: f32) -> String {
                 TextSeg::Text(t) => {
                     let mut remaining: String = t.clone();
                     while !remaining.is_empty() {
-                        let seg_w = measure_text_width(&remaining, scale);
+                        let seg_w = measure_text_width(&remaining, eff_scale);
                         if line_w + seg_w <= max_px {
                             line_out.push_str(&remaining);
                             line_w += seg_w;
                             break;
                         } else if line_w == 0.0 {
-                            let (part, rest) = split_at_px(&remaining, max_px, scale);
+                            let (part, rest) = split_at_px(&remaining, max_px, eff_scale);
                             line_out.push_str(&part);
                             out.push_str(line_out.trim_end());
                             out.push('\n');
@@ -624,9 +629,9 @@ fn wrap_text(s: &str, max_px: f32, scale: f32) -> String {
                 }
                 TextSeg::Icon(icon) => {
                     let iw = if let Some(bar) = icon.find('|') {
-                        icon_width_for(&icon[..bar], icon_h) + scale * 6.0
+                        icon_width_for(&icon[..bar], icon_h) + eff_scale * 6.0
                     } else {
-                        2.0 * scale * 9.0
+                        2.0 * eff_scale * 9.0
                     };
                     if line_w + iw > max_px && line_w > 0.0 {
                         out.push_str(line_out.trim_end());
@@ -3929,7 +3934,7 @@ fn main() {
                         let ai_idx = (unsafe { _3ds_system_tick() } as usize) % acts_cache.len();
                         let action = acts_cache[ai_idx].clone();
                         let p = action.parameters.clone();
-                        let _ = turn::TurnEngine::execute_main_phase_action(
+                        match turn::TurnEngine::execute_main_phase_action(
                             &mut gs,
                             &action.action_type,
                             p.as_ref().and_then(|x| x.card_id),
@@ -3937,8 +3942,12 @@ fn main() {
                             p.as_ref()
                                 .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
                             p.as_ref().and_then(|x| x.use_baton_touch),
-                        );
-                        gs.reset_loop_detection();
+                        ) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                dprintln!("[AI] action failed: {}", e);
+                            }
+                        }
                         gs.reset_loop_detection();
                     }
                     acts_cache.clear();
@@ -4909,17 +4918,11 @@ fn main() {
                         };
                         // P1 (perspective player) need hearts — always show if any
                         let p1_nh = compute_live_need(&gs.player1, &gs);
-                        if p1_nh.iter().any(|&v| v > 0) {
-                            let nh_str = format_need_hearts_icons(&p1_nh);
-                            let c_str =
-                                std::ffi::CString::new(nh_str.as_bytes()).unwrap_or_default();
-                            unsafe {
-                                _3ds_set_need_hearts_text(0, c_str.as_ptr());
-                            }
-                        } else {
-                            unsafe {
-                                _3ds_set_need_hearts_text(0, std::ptr::null());
-                            }
+                        unsafe {
+                            _3ds_set_need_hearts(
+                                0, p1_nh[0], p1_nh[1], p1_nh[2], p1_nh[3], p1_nh[4], p1_nh[5],
+                                p1_nh[6], p1_nh[7],
+                            );
                         }
                         // P2 (opponent) need hearts — hidden until performed
                         let opp_is_first = gs.player2.is_first_attacker;
@@ -4931,21 +4934,15 @@ fn main() {
                                 && opp_is_first);
                         if opp_performed {
                             let p2_nh = compute_live_need(&gs.player2, &gs);
-                            if p2_nh.iter().any(|&v| v > 0) {
-                                let nh_str = format_need_hearts_icons(&p2_nh);
-                                let c_str =
-                                    std::ffi::CString::new(nh_str.as_bytes()).unwrap_or_default();
-                                unsafe {
-                                    _3ds_set_need_hearts_text(1, c_str.as_ptr());
-                                }
-                            } else {
-                                unsafe {
-                                    _3ds_set_need_hearts_text(1, std::ptr::null());
-                                }
+                            unsafe {
+                                _3ds_set_need_hearts(
+                                    1, p2_nh[0], p2_nh[1], p2_nh[2], p2_nh[3], p2_nh[4], p2_nh[5],
+                                    p2_nh[6], p2_nh[7],
+                                );
                             }
                         } else {
                             unsafe {
-                                _3ds_set_need_hearts_text(1, std::ptr::null());
+                                _3ds_set_need_hearts(1, 0, 0, 0, 0, 0, 0, 0, 0);
                             }
                         }
                     }
@@ -5119,8 +5116,7 @@ fn main() {
                                     }
                                 }
                             }
-                            let is_ai_turn =
-                                *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
+                            let is_ai_turn = *ai_vs_ai || (*vs_ai && !mp_can_act(&gs, 0));
                             let is_opponent_turn_mp =
                                 is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
                             if is_ai_turn {
@@ -5839,8 +5835,7 @@ fn main() {
                         // When detail_mode is active, the card detail overlay (above)
                         // replaces the grid so card images don't overlap the detail text.
                         {
-                            let is_ai_turn =
-                                *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
+                            let is_ai_turn = *ai_vs_ai || (*vs_ai && !mp_can_act(&gs, 0));
                             let is_opponent_turn_mp =
                                 is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
                             if zone_viewer.is_none() {
@@ -6298,28 +6293,38 @@ fn main() {
                                                     if i == display_pos { "[" } else { "" };
                                                 let suffix =
                                                     if i == display_pos { "]" } else { "" };
-                                                // For double baton pairs, show dest+source(s)
+                                                // For double baton pairs: dest+source(s)
+                                                // Double baton desc format: "Card (src1+src2)→dst cost:N"
+                                                // Regular desc format: "Card → dst (cost:N)"
+                                                // Only parse if ( comes before →
                                                 let desc = gact
                                                     .display_desc(current_lang() == Lang::Japanese);
-                                                if let Some(start) = desc.find('(') {
-                                                    if let Some(end) = desc.find(')') {
-                                                        let sources: String = desc[start + 1..end]
-                                                            .split('+')
-                                                            .map(|a| a.trim())
-                                                            .filter(|a| {
-                                                                !a.eq_ignore_ascii_case(&stage)
-                                                            })
-                                                            .map(|a| tl_area(a).to_string())
-                                                            .collect::<Vec<_>>()
-                                                            .join("+");
-                                                        areas.push_str(&format!(
-                                                            "{}{}+{}{} ",
-                                                            prefix,
-                                                            tl_area(&stage),
-                                                            sources,
-                                                            suffix
-                                                        ));
-                                                        continue;
+                                                if let Some(paren_pos) = desc.find('(') {
+                                                    let arrow_pos = desc.find('→');
+                                                    if arrow_pos.map_or(true, |a| paren_pos < a) {
+                                                        // Double baton: extract sources from (src1+src2)
+                                                        if let Some(end) =
+                                                            desc[paren_pos..].find(')')
+                                                        {
+                                                            let sources: String = desc
+                                                                [paren_pos + 1..paren_pos + end]
+                                                                .split('+')
+                                                                .map(|a| a.trim())
+                                                                .filter(|a| {
+                                                                    !a.eq_ignore_ascii_case(&stage)
+                                                                })
+                                                                .map(|a| tl_area(a).to_string())
+                                                                .collect::<Vec<_>>()
+                                                                .join("+");
+                                                            areas.push_str(&format!(
+                                                                "{}{}+{}{} ",
+                                                                prefix,
+                                                                tl_area(&stage),
+                                                                sources,
+                                                                suffix
+                                                            ));
+                                                            continue;
+                                                        }
                                                     }
                                                 }
                                                 // Regular single-area action
@@ -6612,8 +6617,7 @@ fn main() {
 
                         // Highlight interactive zones for all tap-to-deploy action types
                         {
-                            let ai_turn =
-                                *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
+                            let ai_turn = *ai_vs_ai || (*vs_ai && !mp_can_act(&gs, 0));
                             let opp_turn =
                                 is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
                             if !ai_turn && !opp_turn {
@@ -6755,7 +6759,7 @@ fn main() {
                             }
                         }
                         // Also highlight SelectAutoAbility option cards
-                        if !(*ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id))
+                        if !(*ai_vs_ai || (*vs_ai && !mp_can_act(&gs, 0)))
                             && !(is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 }))
                             && choice_image_mode
                             && gs.has_pending_choice()
@@ -7416,8 +7420,18 @@ extern "C" {
     fn _3ds_board_get_overlay_action_idx(display_line: i32) -> i32;
     fn _3ds_board_get_overlay_selected() -> i32;
     fn _3ds_board_clear_action_overlay();
-    // Need hearts text displayed next to live zone on bottom screen
-    fn _3ds_set_need_hearts_text(player: i32, text: *const u8);
+    // Need hearts counts displayed next to live zone on bottom screen
+    fn _3ds_set_need_hearts(
+        player: i32,
+        h0: u32,
+        h1: u32,
+        h2: u32,
+        h3: u32,
+        h4: u32,
+        h5: u32,
+        h6: u32,
+        h7: u32,
+    );
     // QR code scanning (camera + quirc, same tech used by FBI installer)
     fn _3ds_qr_start() -> *mut u8;
     fn _3ds_qr_stop(ctx: *mut u8);
