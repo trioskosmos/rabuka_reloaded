@@ -3502,7 +3502,11 @@ fn main() {
                 // Image mode: choices are the primary view; L shows ability text overlay
                 // L toggles overlay; UP/DOWN/LEFT/RIGHT navigate choices; A confirms
                 // Overlay shown: L/B dismiss, UP/DOWN scroll text pages
-                if has_image_choice && zone_viewer.is_none() && overlay == Overlay::None {
+                if has_image_choice
+                    && !detail_mode
+                    && zone_viewer.is_none()
+                    && overlay == Overlay::None
+                {
                     if choice_subview {
                         // === Text overlay: L/B dismiss, UP/DOWN page through text ===
                         if keys & 0x00000200 != 0 || keys & 0x00000002 != 0 {
@@ -4398,8 +4402,8 @@ fn main() {
                                     }
                                 }
                                 redraw = true;
-                            // Default: toggle card detail view (skip if user tapped a stage zone)
-                            } else if stage_tap.is_none() {
+                            // Default: toggle card detail view for any tapped card
+                            } else {
                                 if Some(cid) == viewing_card {
                                     viewing_card = None;
                                     detail_mode = false;
