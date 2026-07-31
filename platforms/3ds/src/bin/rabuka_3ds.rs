@@ -5956,7 +5956,7 @@ fn main() {
                             } else if let Some(entry) = gs.ability_queue.current_entry() {
                                 // In image mode with choices, the text subview handles this.
                                 // The banner is only for CLI/text mode.
-                                if !(has_image_choice) {
+                                if !(has_image_choice) && !is_ai_turn && !is_opponent_turn_mp {
                                     let ab_text = i18n::translate_ability(
                                         &entry.ability.full_text,
                                         current_lang(),
@@ -6347,6 +6347,16 @@ fn main() {
                                                 render_hint_bar(&tl("L/B=close"));
                                             }
                                         }
+                                    }
+                                } else if is_ai_turn && content_y < 230.0 {
+                                    unsafe {
+                                        _3ds_top_queue_text(
+                                            4.0,
+                                            content_y,
+                                            COL_MED,
+                                            0.65f32,
+                                            format!("{}\0", tl("AI is thinking...")).as_ptr(),
+                                        );
                                     }
                                 } else if !is_ai_turn
                                     && !is_opponent_turn_mp
