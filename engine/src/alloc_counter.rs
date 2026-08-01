@@ -10,6 +10,8 @@ static BYTES_ALLOCATED: AtomicIsize = AtomicIsize::new(0);
 static PEAK_BYTES: AtomicIsize = AtomicIsize::new(0);
 static TOTAL_BYTES_ALLOCATED: AtomicUsize = AtomicUsize::new(0);
 static ARENA_BUMPS: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "arena_allocator")]
+static ARENA_LIVE_BYTES: AtomicIsize = AtomicIsize::new(0);
 
 // Size-class histogram: count of allocs per power-of-2 bucket
 // 0=1-7B, 1=8-15B, 2=16-31B, ..., 12=4KB+, 13=8KB+
@@ -61,6 +63,7 @@ unsafe impl GlobalAlloc for CountingAllocator {
         {
             if let Some(ptr) = arena::arena_alloc(layout) {
                 ARENA_BUMPS.fetch_add(1, Ordering::Relaxed);
+                ARENA_LIVE_BYTES.fetch_add(layout.size() as isize, Ordering::Relaxed);
                 return ptr;
             }
         }
@@ -71,6 +74,7 @@ unsafe impl GlobalAlloc for CountingAllocator {
         #[cfg(feature = "arena_allocator")]
         {
             if arena::arena_contains_ptr(ptr) {
+                ARENA_LIVE_BYTES.fetch_sub(layout.size() as isize, Ordering::Relaxed);
                 return;
             }
         }
@@ -171,6 +175,11 @@ impl Drop for AllocGuard {
             eprintln!("  net live allocs:   {}", d.saturating_sub(dd));
             let ab = now.arena_bumps.saturating_sub(self.baseline.arena_bumps);
             eprintln!("  arena bumps:       {} (skipped system alloc)", ab);
+            #[cfg(feature = "arena_allocator")]
+            {
+                let alb = ARENA_LIVE_BYTES.load(Ordering::Relaxed);
+                eprintln!("  arena live bytes:  {} (never-freed arena allocs)", alb);
+            }
             if live >= 0 {
                 eprintln!("  live bytes:        {} B  ({} KB)", live, live / 1024);
             } else {

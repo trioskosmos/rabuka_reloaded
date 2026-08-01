@@ -1166,7 +1166,14 @@ impl AbilityResolver {
                     }
                     if !stage_groups.is_empty() {
                         let groups_vec: Vec<String> = stage_groups.into_iter().collect();
-                        filter.exclude_group_names = Some(Vec::leak(groups_vec));
+                        // This &'static leak persists for the game's lifetime — keep it
+                        // out of the resettable bump arena.
+                        #[cfg(feature = "arena_allocator")]
+                        crate::arena::arena_bypass_enter();
+                        let leaked = Vec::leak(groups_vec);
+                        #[cfg(feature = "arena_allocator")]
+                        crate::arena::arena_bypass_exit();
+                        filter.exclude_group_names = Some(leaked);
                     }
                 }
 

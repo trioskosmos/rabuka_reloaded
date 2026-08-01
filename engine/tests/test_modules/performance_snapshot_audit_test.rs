@@ -37,10 +37,12 @@ fn run_to_end(game: &mut TestGame, live_cards: &[i16]) {
     }
     game.pass(); // LiveCardSetFirstAttacker -> LiveCardSetSecondAttacker
     game.pass(); // LiveCardSetSecondAttacker -> FirstAttackerPerformance
-    
+
     // Loop until we return to Active phase, resolving any choices created by LiveStart/yell/LiveSuccess
     for _ in 0..20 {
-        if game.state.current_phase == rabuka_engine::game_state::Phase::Active && !game.has_pending_choice() {
+        if game.state.current_phase == rabuka_engine::game_state::Phase::Active
+            && !game.has_pending_choice()
+        {
             break;
         }
         if game.has_pending_choice() {
@@ -257,7 +259,13 @@ fn audit_additive_modifier_stacks_on_base() {
             .need_heart_modifiers
             .entry(live)
             .or_default()
-            .insert(HeartColor::Heart03, ModifierEntry { set: 0, additive: 2 });
+            .insert(
+                HeartColor::Heart03,
+                ModifierEntry {
+                    set: 0,
+                    additive: 2,
+                },
+            );
     }
 
     run_to_end(&mut game, &[live]);
@@ -277,11 +285,17 @@ fn audit_additive_modifier_stacks_on_base() {
         "VERIFY: required={:?} filled={:?} passed={}",
         lc.required, lc.filled, lc.passed
     );
-    assert_eq!(lc.required[3], 3, "h03 required should be base(1) + additive(2) = 3");
+    assert_eq!(
+        lc.required[3], 3,
+        "h03 required should be base(1) + additive(2) = 3"
+    );
     assert_eq!(lc.required[1], 1, "h01 required unchanged from base");
     assert_eq!(lc.required[6], 1, "h06 required unchanged from base");
     // h03 provided = 5, so h03_req(3) is satisfied → PASS
-    assert!(lc.passed, "Card should PASS: h03 filled(5) >= h03_req(3) and others met");
+    assert!(
+        lc.passed,
+        "Card should PASS: h03 filled(5) >= h03_req(3) and others met"
+    );
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -311,7 +325,13 @@ fn audit_additive_modifier_can_cause_failure() {
             .need_heart_modifiers
             .entry(live)
             .or_default()
-            .insert(HeartColor::Heart01, ModifierEntry { set: 0, additive: 5 });
+            .insert(
+                HeartColor::Heart01,
+                ModifierEntry {
+                    set: 0,
+                    additive: 5,
+                },
+            );
     }
 
     run_to_end(&mut game, &[live]);
@@ -329,10 +349,16 @@ fn audit_additive_modifier_can_cause_failure() {
         "VERIFY: required={:?} filled={:?} passed={}",
         lc.required, lc.filled, lc.passed
     );
-    assert_eq!(lc.required[1], 6, "h01 required should be base(1) + additive(5) = 6");
+    assert_eq!(
+        lc.required[1], 6,
+        "h01 required should be base(1) + additive(5) = 6"
+    );
     assert_eq!(lc.required[3], 1, "h03 required unchanged");
     assert_eq!(lc.required[6], 1, "h06 required unchanged");
-    assert!(!lc.passed, "Card should FAIL: h01 required=6, only 1 available");
+    assert!(
+        !lc.passed,
+        "Card should FAIL: h01 required=6, only 1 available"
+    );
     assert!(!perf.success, "success=false when card fails");
 }
 
@@ -366,7 +392,13 @@ fn audit_set_zero_removes_requirement() {
             .need_heart_modifiers
             .entry(live)
             .or_default()
-            .insert(HeartColor::Heart06, ModifierEntry { set: 0, additive: -1 });
+            .insert(
+                HeartColor::Heart06,
+                ModifierEntry {
+                    set: 0,
+                    additive: -1,
+                },
+            );
     }
 
     run_to_end(&mut game, &[live]);
@@ -387,7 +419,10 @@ fn audit_set_zero_removes_requirement() {
     // h01 and h03 still required, h06 reduced to 0
     assert_eq!(lc.required[1], 1, "h01 still required");
     assert_eq!(lc.required[3], 1, "h03 still required");
-    assert_eq!(lc.required[6], 0, "h06 requirement should be 0 after additive -1");
+    assert_eq!(
+        lc.required[6], 0,
+        "h06 requirement should be 0 after additive -1"
+    );
     assert!(lc.passed, "Card should PASS with h06 requirement removed");
     assert!(perf.success, "success=true when all requirements met");
 }
@@ -421,12 +456,21 @@ fn audit_no_need_heart_always_passes() {
         .find(|s| s.player_id == "p1")
         .unwrap();
 
-    eprintln!("VERIFY: lives={:?}", perf.lives.iter().map(|l| l.passed).collect::<Vec<_>>());
+    eprintln!(
+        "VERIFY: lives={:?}",
+        perf.lives.iter().map(|l| l.passed).collect::<Vec<_>>()
+    );
     if let Some(lc) = perf.lives.first() {
-        assert!(lc.passed, "Card without need_heart must always pass regardless of stage");
+        assert!(
+            lc.passed,
+            "Card without need_heart must always pass regardless of stage"
+        );
     }
     // Score may be >0 (card score) even without requirements
-    eprintln!("VERIFY: total_score={} success={}", perf.total_score, perf.success);
+    eprintln!(
+        "VERIFY: total_score={} success={}",
+        perf.total_score, perf.success
+    );
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -462,7 +506,9 @@ fn audit_both_players_fail_no_winner() {
     game.state.player2.hand.cards.push(live2);
 
     // Advance to live card set
-    for _ in 0..5 { game.pass(); }
+    for _ in 0..5 {
+        game.pass();
+    }
     game.set_live_card(live);
     game.pass(); // → p2 set
     game.state.player2.hand.cards.push(live2);
@@ -499,8 +545,16 @@ fn audit_both_players_fail_no_winner() {
         "P2 failed live should NOT get a success zone card"
     );
 
-    let p1_snap = game.state.performance_snapshots.iter().find(|s| s.player_id == "p1");
-    let p2_snap = game.state.performance_snapshots.iter().find(|s| s.player_id == "p2");
+    let p1_snap = game
+        .state
+        .performance_snapshots
+        .iter()
+        .find(|s| s.player_id == "p1");
+    let p2_snap = game
+        .state
+        .performance_snapshots
+        .iter()
+        .find(|s| s.player_id == "p2");
     if let Some(s) = p1_snap {
         assert!(!s.success, "P1 success should be false");
     }
@@ -538,7 +592,11 @@ fn audit_zero_stage_live_card_must_fail() {
     eprintln!(
         "VERIFY card locations: waitroom={} success_zone={}",
         game.state.player1.waitroom.cards.contains(&live),
-        game.state.player1.success_live_card_zone.cards.contains(&live),
+        game.state
+            .player1
+            .success_live_card_zone
+            .cards
+            .contains(&live),
     );
     eprintln!(
         "VERIFY live_card_zone after: {:?}",
@@ -547,7 +605,12 @@ fn audit_zero_stage_live_card_must_fail() {
 
     // Card must NOT be in success zone
     assert!(
-        !game.state.player1.success_live_card_zone.cards.contains(&live),
+        !game
+            .state
+            .player1
+            .success_live_card_zone
+            .cards
+            .contains(&live),
         "FAIL: card landed in success zone despite zero stage hearts"
     );
 
@@ -572,8 +635,14 @@ fn audit_zero_stage_live_card_must_fail() {
     );
 
     // Snapshot must reflect failure
-    assert!(!perf.success, "FAIL: snapshot.success=true with zero stage hearts");
-    assert_eq!(perf.total_score, 0, "FAIL: total_score > 0 on a failed live");
+    assert!(
+        !perf.success,
+        "FAIL: snapshot.success=true with zero stage hearts"
+    );
+    assert_eq!(
+        perf.total_score, 0,
+        "FAIL: total_score > 0 on a failed live"
+    );
 
     // If lives is populated, every entry must show passed=false and required > 0
     for (i, lc) in perf.lives.iter().enumerate() {
@@ -584,8 +653,16 @@ fn audit_zero_stage_live_card_must_fail() {
             i, lc.passed, lc.required, req_total, lc.filled, filled_total
         );
         assert!(!lc.passed, "FAIL: live[{}] passed=true with zero hearts", i);
-        assert!(req_total > 0, "FAIL: live[{}] required_total=0 — requirements not loaded from card", i);
-        assert_eq!(filled_total, 0, "FAIL: live[{}] filled_total={} with zero stage hearts", i, filled_total);
+        assert!(
+            req_total > 0,
+            "FAIL: live[{}] required_total=0 — requirements not loaded from card",
+            i
+        );
+        assert_eq!(
+            filled_total, 0,
+            "FAIL: live[{}] filled_total={} with zero stage hearts",
+            i, filled_total
+        );
     }
 }
 
@@ -629,7 +706,9 @@ fn audit_p1_passes_p2_fails_p1_wins() {
     game.state.player2.hand.cards.push(live2);
 
     // Advance to live card set
-    for _ in 0..5 { game.pass(); }
+    for _ in 0..5 {
+        game.pass();
+    }
 
     game.set_live_card(live);
     game.pass(); // → p2 set
@@ -661,27 +740,49 @@ fn audit_p1_passes_p2_fails_p1_wins() {
         game.state.player2.waitroom.cards.contains(&live2)
     );
 
-    let p1 = game.state.performance_snapshots.iter().find(|s| s.player_id == "p1");
-    let p2 = game.state.performance_snapshots.iter().find(|s| s.player_id == "p2");
+    let p1 = game
+        .state
+        .performance_snapshots
+        .iter()
+        .find(|s| s.player_id == "p1");
+    let p2 = game
+        .state
+        .performance_snapshots
+        .iter()
+        .find(|s| s.player_id == "p2");
     if let Some(s) = p1 {
-        eprintln!("VERIFY P1 snap: success={} total_score={}", s.success, s.total_score);
+        eprintln!(
+            "VERIFY P1 snap: success={} total_score={}",
+            s.success, s.total_score
+        );
         for (i, l) in s.lives.iter().enumerate() {
-            eprintln!("  live[{}]: passed={} required={:?} filled={:?}", i, l.passed, l.required, l.filled);
+            eprintln!(
+                "  live[{}]: passed={} required={:?} filled={:?}",
+                i, l.passed, l.required, l.filled
+            );
         }
     }
     if let Some(s) = p2 {
-        eprintln!("VERIFY P2 snap: success={} total_score={}", s.success, s.total_score);
+        eprintln!(
+            "VERIFY P2 snap: success={} total_score={}",
+            s.success, s.total_score
+        );
         for (i, l) in s.lives.iter().enumerate() {
-            eprintln!("  live[{}]: passed={} required={:?} filled={:?}", i, l.passed, l.required, l.filled);
+            eprintln!(
+                "  live[{}]: passed={} required={:?} filled={:?}",
+                i, l.passed, l.required, l.filled
+            );
         }
     }
 
     assert_eq!(
-        game.state.player1.success_live_card_zone.cards.len(), 1,
+        game.state.player1.success_live_card_zone.cards.len(),
+        1,
         "FAIL: P1 (passed requirements) should have card in success zone"
     );
     assert_eq!(
-        game.state.player2.success_live_card_zone.cards.len(), 0,
+        game.state.player2.success_live_card_zone.cards.len(),
+        0,
         "FAIL: P2 (failed requirements) should NOT have card in success zone"
     );
     assert!(

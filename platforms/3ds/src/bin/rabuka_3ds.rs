@@ -5949,7 +5949,157 @@ fn main() {
                                     },
                                 );
                             if zone_viewer.is_none() {
-                                if (has_image_choice || has_text_choice)
+                                let is_auto_ability_choice = matches!(
+                                    gs.get_pending_choice(),
+                                    Some(
+                                        rabuka_engine::ability::types::Choice::SelectAutoAbility { .. }
+                                    )
+                                );
+                                if is_auto_ability_choice
+                                    && !(detail_mode && viewing_card.is_some())
+                                    && !is_ai_turn
+                                    && !is_opponent_turn_mp
+                                {
+                                    // ===== Ability queue (SelectAutoAbility): vertical text
+                                    //      list, styled like the main-phase action list. Each
+                                    //      queued ability is a row: card-name header + full
+                                    //      ability text wrapped to multiple lines. =====
+                                    if let Some(c) = gs.get_pending_choice() {
+                                        use rabuka_engine::ability::types::Choice;
+                                        if let Choice::SelectAutoAbility {
+                                            options,
+                                            description,
+                                            description_en,
+                                            description_ja,
+                                            ..
+                                        } = c
+                                        {
+                                            // Choice prompt header (same slot as the old banner)
+                                            let desc = if current_lang() == Lang::Japanese {
+                                                description_ja
+                                                    .as_deref()
+                                                    .unwrap_or(description)
+                                                    .to_string()
+                                            } else {
+                                                description_en
+                                                    .as_deref()
+                                                    .unwrap_or(description)
+                                                    .to_string()
+                                            };
+                                            let desc_lines: Vec<String> =
+                                                wrap_text(&desc, 392.0, 0.60)
+                                                    .lines()
+                                                    .map(|l| l.to_string())
+                                                    .collect();
+                                            let header_h =
+                                                12.0 + desc_lines.len().min(2) as f32 * 14.0;
+                                            unsafe {
+                                                _3ds_top_queue_rect(
+                                                    0.0,
+                                                    content_y,
+                                                    400.0,
+                                                    header_h,
+                                                    COL_ABILITY,
+                                                );
+                                            }
+                                            let mut oy = content_y + 3.0;
+                                            for line in desc_lines.iter().take(2) {
+                                                render_text_with_icons(
+                                                    4.0, oy, line, COL_GOLD, 0.60,
+                                                );
+                                                oy += 14.0;
+                                            }
+                                            let mut ty = content_y + header_h + 4.0;
+                                            let n = options.len();
+                                            let max_vis = ((230.0 - ty) / 20.0) as usize + 1;
+                                            if list_scroll >= n.saturating_sub(max_vis) {
+                                                list_scroll = n.saturating_sub(max_vis);
+                                            }
+                                            if display_pos < list_scroll {
+                                                list_scroll =
+                                                    display_pos.saturating_sub(max_vis / 3);
+                                            } else if display_pos >= list_scroll + max_vis {
+                                                list_scroll =
+                                                    display_pos.saturating_sub(max_vis / 3);
+                                            }
+                                            let start = list_scroll.min(n.saturating_sub(max_vis));
+                                            let end = (start + max_vis).min(n);
+                                            if start > 0 {
+                                                unsafe {
+                                                    _3ds_top_queue_text(
+                                                        4.0,
+                                                        ty,
+                                                        COL_MED,
+                                                        0.60f32,
+                                                        format!("\u{25b2} +{}\0", start).as_ptr(),
+                                                    );
+                                                    ty += 18.0;
+                                                }
+                                            }
+                                            let mut di = start;
+                                            while di < end && ty < 230.0 {
+                                                let opt = &options[di];
+                                                let is_sel = di == display_pos;
+                                                let line_color =
+                                                    if is_sel { COL_GOLD } else { COL_LIGHT };
+                                                let prefix = if is_sel { ">" } else { " " };
+                                                let cn = opt
+                                                    .card_id
+                                                    .and_then(|cid| gs.card_database.get_card(cid))
+                                                    .map(|card| card.card_no.to_string())
+                                                    .unwrap_or_default();
+                                                let header = if cn.is_empty() {
+                                                    format!("{}{}", prefix, opt.card_name)
+                                                } else {
+                                                    format!("{}[{}] {}", prefix, cn, opt.card_name)
+                                                };
+                                                for l in wrap_text(&header, 392.0, 0.65).lines() {
+                                                    if ty > 230.0 {
+                                                        break;
+                                                    }
+                                                    render_text_with_icons(
+                                                        4.0, ty, l, line_color, 0.65,
+                                                    );
+                                                    ty += 20.0;
+                                                }
+                                                let ab_text = i18n::translate_ability(
+                                                    &opt.ability_text,
+                                                    current_lang(),
+                                                );
+                                                let ab_wrapped =
+                                                    wrap_ability_text(&ab_text, 392.0, 0.65);
+                                                for (li, l) in ab_wrapped.lines().enumerate() {
+                                                    if ty > 230.0 {
+                                                        break;
+                                                    }
+                                                    let txt = if li == 0 {
+                                                        format!("  {}", l)
+                                                    } else {
+                                                        l.to_string()
+                                                    };
+                                                    render_text_with_icons(
+                                                        4.0, ty, &txt, line_color, 0.65,
+                                                    );
+                                                    ty += 20.0;
+                                                }
+                                                ty += 4.0;
+                                                di += 1;
+                                            }
+                                            if end < n && ty < 230.0 {
+                                                unsafe {
+                                                    _3ds_top_queue_text(
+                                                        4.0,
+                                                        ty,
+                                                        COL_MED,
+                                                        0.60f32,
+                                                        format!("\u{25bc} +{}\0", n - end).as_ptr(),
+                                                    );
+                                                }
+                                            }
+                                            render_hint_bar(&tl("UP/DOWN=select  A=confirm"));
+                                        }
+                                    }
+                                } else if (has_image_choice || has_text_choice)
                                     && !(detail_mode && viewing_card.is_some())
                                     && !is_ai_turn
                                     && !is_opponent_turn_mp

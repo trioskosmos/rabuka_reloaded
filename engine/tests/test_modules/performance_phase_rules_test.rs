@@ -4,7 +4,6 @@
 /// 3. Multi-live allocation: card 1 passes, card 2 fails -> ALL fail (Rule 8.3.16)
 /// 4. Requirement modifiers (set/additive) apply per-color without wiping base requirements
 /// 5. Failed live cards are discarded and do NOT win victory determination
-
 use crate::helpers::*;
 use rabuka_engine::game_state::Phase;
 
@@ -122,7 +121,10 @@ fn test_sufficient_hearts_passes_live() {
 
     assert!(snap.success, "Performance snapshot success should be true");
     assert!(snap.total_score > 0, "Passed live score should be > 0");
-    assert!(snap.lives[0].passed, "Live card passed field should be true");
+    assert!(
+        snap.lives[0].passed,
+        "Live card passed field should be true"
+    );
 }
 
 #[test]
@@ -138,7 +140,10 @@ fn test_per_color_modifier_does_not_erase_base_requirements() {
     game.state.player1.hand.cards.push(live);
 
     // Apply a modifier setting heart01 requirement to 2 (modifying only heart01)
-    let entry = rabuka_engine::core::game_modifiers::ModifierEntry { set: 2, additive: 0 };
+    let entry = rabuka_engine::core::game_modifiers::ModifierEntry {
+        set: 2,
+        additive: 0,
+    };
     game.state
         .mods
         .need_heart_modifiers
@@ -167,7 +172,16 @@ fn test_per_color_modifier_does_not_erase_base_requirements() {
 
     // Base requirements for h03 and h06 should still be present in required array:
     // h01=2, h03=1, h06=1
-    assert_eq!(snap.lives[0].required[1], 2, "h01 required should be modified to 2");
-    assert_eq!(snap.lives[0].required[3], 1, "h03 required should remain base 1");
-    assert_eq!(snap.lives[0].required[6], 1, "h06 required should remain base 1");
+    assert_eq!(
+        snap.lives[0].required[1], 2,
+        "h01 required should be modified to 2"
+    );
+    assert_eq!(
+        snap.lives[0].required[3], 1,
+        "h03 required should remain base 1"
+    );
+    assert_eq!(
+        snap.lives[0].required[6], 1,
+        "h06 required should remain base 1"
+    );
 }
