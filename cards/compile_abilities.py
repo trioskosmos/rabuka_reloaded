@@ -705,6 +705,55 @@ def compile_all(abilities):
     # schema (see read_effect_vec_value / read_effect_vec_boxed_value).
     EFFECT_LIST_KEYS = ("actions", "options", "effect_steps")
 
+    # Keys whose dict value is a Condition object (read_condition_value), plus
+    # the array key whose elements are Conditions ("conditions").
+    CONDITION_KEYS = (
+        "condition",
+        "alternative_condition",
+        "result_condition",
+        "choice_condition",
+        "activation_condition_parsed",
+        "cause",
+    )
+
+    # Condition "type" string -> variant tag. Mirrors the `#[serde(tag = "type")]`
+    # Condition enum in engine/src/core/card.rs, including every alias.
+    COND_TO_VARIANT_TAG = {
+        "compound": 0,
+        "or_condition": 0,
+        "card_count_condition": 1,
+        "location_condition": 1,
+        "comparison_condition": 2,
+        "both_condition": 2,
+        "all_cost_comparison_condition": 2,
+        "highest_cost_on_stage_condition": 2,
+        "movement_condition": 3,
+        "not_moved": 3,
+        "has_moved": 3,
+        "group_condition": 4,
+        "appearance_condition": 5,
+        "temporal_condition": 6,
+        "state_condition": 7,
+        "energy_state_condition": 7,
+        "state_change_condition": 7,
+        "resource_condition": 8,
+        "card_blade_condition": 8,
+        "ability_filter_condition": 9,
+        "score_threshold_condition": 10,
+        "choice_condition": 11,
+        "position_change_condition": 11,
+        "complex_condition": 12,
+        "position_condition": 13,
+        "opponent_choice_condition": 14,
+        "opponent_live_success": 15,
+        "no_excess_heart": 16,
+        "otherwise_condition": 17,
+        "action_success_condition": 17,
+        "custom": 17,
+        "any_of_condition": 18,
+        "all_revealed_match_heart_color": 19,
+    }
+
     ACTION_TO_VARIANT_TAG = {
         # Empty action: no-action/no-type dicts that sit directly inside an
         # effect vector (filter options) decode as variant 3 (SelectTarget),
@@ -797,7 +846,9 @@ def compile_all(abilities):
         "choice_condition": "choice_condition",
     }
 
-    def enc_val(v, out: bytearray, in_effect_vec: bool = False):
+    def enc_val(
+        v, out: bytearray, in_effect_vec: bool = False, is_condition: bool = False
+    ):
         if v is None:
             out.append(0x00)
         elif isinstance(v, bool):
@@ -815,14 +866,43 @@ def compile_all(abilities):
             out.append(0x07)
             out.extend(struct.pack("<I", len(v)))
             for item in v:
-                enc_val(item, out, in_effect_vec)
+                enc_val(item, out, in_effect_vec, is_condition)
         elif isinstance(v, dict):
-            # Cost objects (AbilityCost) use `type`/`zone` instead of
-            # `action`/`source`, and compound costs use `costs`/`options` instead
-            # of `actions`. Alias them here so costs flow through the same
-            # TAG_OBJECT_VARIANT effect decoder as normal effects, eliminating the
-            # runtime normalize_cost_keys serde path.
-            if "action" not in v:
+            if is_condition:
+                # Condition object: encode as TAG_OBJECT_VARIANT with the
+                # Condition variant tag. The "type" key is the tag itself, so it
+                # is dropped before counting the remaining fields (the decoder
+                # dispatches by tag byte). Unknown types fall back to TAG_OBJECT.
+                t = v.get("type") or ""
+                # None if the type string is unknown; 0 is a valid tag (Compound).
+                vtag = COND_TO_VARIANT_TAG.get(t)
+                # `or_condition` is the Compound variant with OR semantics: the
+                # JSON oracle (condition_populate_from_json) forces operator="or"
+                # when the type alias is used. Replicate that at compile time so
+                # the decoded bytecode matches the oracle.
+                if t == "or_condition" and "operator" not in v:
+                    v["operator"] = "or"
+                if vtag is not None:
+                    v.pop("type", None)
+                    out.append(0x09)  # TAG_OBJECT_VARIANT
+                    out.append(vtag)
+                else:
+                    out.append(0x08)  # TAG_OBJECT (serde fallback; keeps "type")
+                out.extend(struct.pack("<I", len(v)))
+                for k, val in v.items():
+                    out.extend(struct.pack("<H", intern(str(k))))
+                    enc_val(
+                        val,
+                        out,
+                        k in EFFECT_LIST_KEYS,
+                        k in CONDITION_KEYS or k == "conditions",
+                    )
+            elif "action" not in v:
+                # Cost objects (AbilityCost) use `type`/`zone` instead of
+                # `action`/`source`, and compound costs use `costs`/`options`
+                # instead of `actions`. Alias them here so costs flow through the
+                # same TAG_OBJECT_VARIANT effect decoder as normal effects,
+                # eliminating the runtime normalize_cost_keys serde path.
                 t = v.get("type")
                 if t in COST_TYPE_TO_ACTION:
                     v["action"] = COST_TYPE_TO_ACTION[t]
@@ -841,17 +921,23 @@ def compile_all(abilities):
                     # carries the option's filter fields (group_names, card_type,
                     # card_property, ...).
                     v["action"] = ""
-            action = v.get("action", "")
-            vtag = ACTION_TO_VARIANT_TAG.get(action, 0)
-            if vtag:
-                out.append(0x09)  # TAG_OBJECT_VARIANT
-                out.append(vtag)
-            else:
-                out.append(0x08)  # TAG_OBJECT
-            out.extend(struct.pack("<I", len(v)))
-            for k, val in v.items():
-                out.extend(struct.pack("<H", intern(str(k))))
-                enc_val(val, out, k in EFFECT_LIST_KEYS)
+            if not is_condition:
+                action = v.get("action", "")
+                vtag = ACTION_TO_VARIANT_TAG.get(action, 0)
+                if vtag:
+                    out.append(0x09)  # TAG_OBJECT_VARIANT
+                    out.append(vtag)
+                else:
+                    out.append(0x08)  # TAG_OBJECT
+                out.extend(struct.pack("<I", len(v)))
+                for k, val in v.items():
+                    out.extend(struct.pack("<H", intern(str(k))))
+                    enc_val(
+                        val,
+                        out,
+                        k in EFFECT_LIST_KEYS,
+                        k in CONDITION_KEYS or k == "conditions",
+                    )
         else:
             out.append(0x00)
 
@@ -863,7 +949,12 @@ def compile_all(abilities):
             if k in SKIP_KEYS:
                 continue
             out.extend(struct.pack("<H", intern(str(k))))
-            enc_val(val, out, k in EFFECT_LIST_KEYS)
+            enc_val(
+                val,
+                out,
+                k in EFFECT_LIST_KEYS,
+                k in CONDITION_KEYS or k == "conditions",
+            )
 
     offsets, bytecode = [], bytearray()
 

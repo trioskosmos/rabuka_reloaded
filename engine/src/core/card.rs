@@ -2160,6 +2160,13 @@ impl CardState {
             CardState::Wait => "wait",
         }
     }
+
+    pub fn from_str(s: &str) -> CardState {
+        match s {
+            "active" => CardState::Active,
+            _ => CardState::Wait,
+        }
+    }
 }
 
 impl_deref_str!(CardState);
@@ -2177,6 +2184,13 @@ impl ComparisonTarget {
         match self {
             ComparisonTarget::Self_ => "self",
             ComparisonTarget::Opponent => "opponent",
+        }
+    }
+
+    pub fn from_str(s: &str) -> ComparisonTarget {
+        match s {
+            "opponent" => ComparisonTarget::Opponent,
+            _ => ComparisonTarget::Self_,
         }
     }
 }
@@ -2199,6 +2213,14 @@ impl CardProperty {
             CardProperty::HasBladeHeart => "has_blade_heart",
             CardProperty::HasScoreIcon => "has_score_icon",
             CardProperty::HasAllBlade => "has_all_blade",
+        }
+    }
+
+    pub fn from_str(s: &str) -> CardProperty {
+        match s {
+            "has_score_icon" => CardProperty::HasScoreIcon,
+            "has_all_blade" => CardProperty::HasAllBlade,
+            _ => CardProperty::HasBladeHeart,
         }
     }
 }
@@ -2292,6 +2314,15 @@ impl ComparisonType {
             ComparisonType::Equality => "equality",
         }
     }
+
+    pub fn from_str(s: &str) -> ComparisonType {
+        match s {
+            "cost" => ComparisonType::Cost,
+            "count" => ComparisonType::Count,
+            "equality" => ComparisonType::Equality,
+            _ => ComparisonType::Score,
+        }
+    }
 }
 
 impl_deref_str!(ComparisonType);
@@ -2315,6 +2346,15 @@ impl AbilityFilter {
             AbilityFilter::HasAbility => "has_ability",
             AbilityFilter::HasAbilityType => "has_ability_type",
             AbilityFilter::NoAbilityType => "no_ability_type",
+        }
+    }
+
+    pub fn from_str(s: &str) -> AbilityFilter {
+        match s {
+            "has_ability" => AbilityFilter::HasAbility,
+            "has_ability_type" => AbilityFilter::HasAbilityType,
+            "no_ability_type" => AbilityFilter::NoAbilityType,
+            _ => AbilityFilter::NoAbility,
         }
     }
 }
@@ -2362,6 +2402,14 @@ impl ConditionCardType {
             ConditionCardType::MemberCard => "member_card",
             ConditionCardType::LiveCard => "live_card",
             ConditionCardType::EnergyCard => "energy_card",
+        }
+    }
+
+    pub fn from_str(s: &str) -> ConditionCardType {
+        match s {
+            "live_card" => ConditionCardType::LiveCard,
+            "energy_card" => ConditionCardType::EnergyCard,
+            _ => ConditionCardType::MemberCard,
         }
     }
 }

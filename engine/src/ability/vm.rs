@@ -2,13 +2,16 @@ use super::abilities_gen::{BYTECODE, NUM_ABILITIES, OFFSETS, STRINGS};
 use super::enums::EffectState;
 use crate::ability::enums::ActionType;
 use crate::card::{
-    ek_box_new, Ability, AbilityCost, AbilityEffect, AbilityFilter, AbilityFilterBranch, CardType,
-    Condition, DistinctType, DynamicCount, EffectFilter, EffectKind, Operator, PlacementOrder,
-    PositionInfo, QuotedText,
+    ek_box_new, Ability, AbilityCost, AbilityEffect, AbilityFilter, AbilityFilterBranch,
+    CardProperty, CardState, CardType, ComparisonTarget, ComparisonType, Condition,
+    ConditionCardType, DistinctInfo, DistinctType, DynamicCount, EffectFilter, EffectKind,
+    LocationSubChecks, Operator, PlacementOrder, PositionCharacter, PositionInfo, QuotedText,
+    TriggerEvent,
 };
 use crate::core::types::ArcStr;
 
 include!("effect_decoder_gen.rs");
+include!("condition_decoder_gen.rs");
 
 #[cfg(feature = "no_std")]
 use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
@@ -357,24 +360,328 @@ impl<'a> BcReader<'a> {
         let tag = self.read_u8()?;
         match tag {
             TAG_NULL => None,
+            TAG_OBJECT_VARIANT => {
+                let variant = self.read_u8()?;
+                Some(Box::new(decode_condition_direct(self, variant)?))
+            }
+            _ => None,
+        }
+    }
+
+    fn read_condition_vec_value(&mut self) -> Option<Vec<Box<Condition>>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_ARRAY => {
+                let len = self.read_u32()? as usize;
+                let mut v = Vec::with_capacity(len);
+                for _ in 0..len {
+                    v.push(self.read_condition_value()?);
+                }
+                Some(v)
+            }
+            _ => None,
+        }
+    }
+
+    fn read_opt_u8_vec_value(&mut self) -> Option<Box<Vec<u8>>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_ARRAY => {
+                let len = self.read_u32()? as usize;
+                let mut v = Vec::with_capacity(len);
+                for _ in 0..len {
+                    v.push(self.read_u8_value()?);
+                }
+                Some(Box::new(v))
+            }
+            _ => None,
+        }
+    }
+
+    fn read_distinct_info_value(&mut self) -> Option<Box<crate::card::DistinctInfo>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_FALSE => Some(Box::new(crate::card::DistinctInfo::Boolean(false))),
+            TAG_TRUE => Some(Box::new(crate::card::DistinctInfo::Boolean(true))),
+            TAG_STR => {
+                let idx = self.read_idx()?;
+                if idx >= STRINGS.len() {
+                    return None;
+                }
+                Some(Box::new(crate::card::DistinctInfo::String(
+                    STRINGS[idx].to_string(),
+                )))
+            }
+            _ => None,
+        }
+    }
+
+    fn read_positions_characters_value(
+        &mut self,
+    ) -> Option<Box<Vec<crate::card::PositionCharacter>>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_ARRAY => {
+                let len = self.read_u32()? as usize;
+                let mut v = Vec::with_capacity(len);
+                for _ in 0..len {
+                    let otag = self.read_u8()?;
+                    if otag != TAG_OBJECT && otag != TAG_OBJECT_VARIANT {
+                        skip_value_with_tag(self, otag)?;
+                        continue;
+                    }
+                    if otag == TAG_OBJECT_VARIANT {
+                        self.read_u8()?;
+                    }
+                    let count = self.read_u32()? as usize;
+                    let mut position = String::new();
+                    let mut character = String::new();
+                    for _ in 0..count {
+                        let kidx = self.read_idx()?;
+                        if kidx >= STRINGS.len() {
+                            self.skip_value()?;
+                            continue;
+                        }
+                        match STRINGS[kidx] {
+                            "position" => {
+                                position = self.read_string_value().unwrap_or_default();
+                            }
+                            "character" => {
+                                character = self.read_string_value().unwrap_or_default();
+                            }
+                            _ => {
+                                self.skip_value()?;
+                            }
+                        }
+                    }
+                    v.push(crate::card::PositionCharacter {
+                        position,
+                        character,
+                    });
+                }
+                Some(Box::new(v))
+            }
+            _ => None,
+        }
+    }
+
+    fn read_cost_comparison_value(&mut self) -> Option<crate::card::CostComparison> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
             TAG_OBJECT | TAG_OBJECT_VARIANT => {
                 if tag == TAG_OBJECT_VARIANT {
                     self.read_u8()?;
                 }
                 let count = self.read_u32()? as usize;
-                let mut map = serde_json::Map::with_capacity(count);
+                let mut operator = None;
+                let mut relative_to = None;
+                let mut cost_limit = None;
+                let mut cost_limit_operator = None;
                 for _ in 0..count {
                     let kidx = self.read_idx()?;
                     if kidx >= STRINGS.len() {
-                        return None;
+                        self.skip_value()?;
+                        continue;
                     }
-                    map.insert(STRINGS[kidx].to_string(), self.read_json_value()?);
+                    match STRINGS[kidx] {
+                        "operator" => {
+                            operator = self.read_operator_value();
+                        }
+                        "relative_to" => {
+                            relative_to = self.read_arc_str_value();
+                        }
+                        "cost_limit" => {
+                            cost_limit = self.read_u8_value();
+                        }
+                        "cost_limit_operator" => {
+                            cost_limit_operator = self.read_operator_value();
+                        }
+                        _ => {
+                            self.skip_value()?;
+                        }
+                    }
                 }
-                let map_val = serde_json::Value::Object(map);
-                let cond: Condition = serde_json::from_value(map_val.clone()).ok()?;
-                let mut boxed = Box::new(cond);
-                condition_populate_from_json(&mut boxed, &map_val);
-                Some(boxed)
+                Some(crate::card::CostComparison {
+                    operator,
+                    relative_to,
+                    cost_limit,
+                    cost_limit_operator,
+                })
+            }
+            _ => None,
+        }
+    }
+
+    fn read_trigger_event_value(&mut self) -> Option<Box<crate::card::TriggerEvent>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_OBJECT | TAG_OBJECT_VARIANT => {
+                if tag == TAG_OBJECT_VARIANT {
+                    self.read_u8()?;
+                }
+                let count = self.read_u32()? as usize;
+                let mut te = crate::card::TriggerEvent::default();
+                for _ in 0..count {
+                    let kidx = self.read_idx()?;
+                    if kidx >= STRINGS.len() {
+                        self.skip_value()?;
+                        continue;
+                    }
+                    match STRINGS[kidx] {
+                        "type" => {
+                            te.event_type = self.read_arc_str_value();
+                        }
+                        "tense" => {
+                            te.tense = self.read_arc_str_value();
+                        }
+                        "location" => {
+                            te.location = self.read_arc_str_value();
+                        }
+                        "source_character" => {
+                            te.source_character = self.read_arc_str_value();
+                        }
+                        "source_group" => {
+                            te.source_group = self.read_arc_str_value();
+                        }
+                        "cost_comparison" => {
+                            te.cost_comparison = self.read_cost_comparison_value();
+                        }
+                        "min_count" => {
+                            te.min_count = self.read_u8_value();
+                        }
+                        "exclude_characters" => {
+                            te.exclude_characters = self.read_opt_str_vec_value();
+                        }
+                        "ability_filter" => {
+                            te.ability_filter = self.read_ability_filter_value();
+                        }
+                        "self_effect_only" => {
+                            te.self_effect_only = self.read_bool_value();
+                        }
+                        "energy_placed" => {
+                            te.energy_placed = self.read_bool_value();
+                        }
+                        "phase" => {
+                            te.phase = self.read_arc_str_value();
+                        }
+                        "phase_target" => {
+                            te.phase_target = self.read_arc_str_value();
+                        }
+                        "recurrence" => {
+                            te.recurrence = self.read_arc_str_value();
+                        }
+                        "events" => {
+                            let etag = self.read_u8()?;
+                            if etag == TAG_ARRAY {
+                                let elen = self.read_u32()? as usize;
+                                let mut events = Vec::with_capacity(elen);
+                                for _ in 0..elen {
+                                    events.push(*self.read_trigger_event_value()?);
+                                }
+                                te.events = Some(events);
+                            } else {
+                                skip_value_with_tag(self, etag)?;
+                            }
+                        }
+                        "source" => {
+                            te.source = self.read_arc_str_value();
+                        }
+                        "destination" => {
+                            te.destination = self.read_arc_str_value();
+                        }
+                        "from_state" => {
+                            te.from_state = self.read_arc_str_value();
+                        }
+                        "to_state" => {
+                            te.to_state = self.read_arc_str_value();
+                        }
+                        _ => {
+                            self.skip_value()?;
+                        }
+                    }
+                }
+                Some(Box::new(te))
+            }
+            _ => None,
+        }
+    }
+
+    fn read_location_sub_checks_value(&mut self) -> Option<Box<crate::card::LocationSubChecks>> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_OBJECT | TAG_OBJECT_VARIANT => {
+                if tag == TAG_OBJECT_VARIANT {
+                    self.read_u8()?;
+                }
+                let count = self.read_u32()? as usize;
+                let mut lsc = crate::card::LocationSubChecks::default();
+                for _ in 0..count {
+                    let kidx = self.read_idx()?;
+                    if kidx >= STRINGS.len() {
+                        self.skip_value()?;
+                        continue;
+                    }
+                    match STRINGS[kidx] {
+                        "card_property" => {
+                            let s = self.read_arc_str_value();
+                            lsc.card_property = s.map(|s| crate::card::CardProperty::from_str(&s));
+                        }
+                        "baton_touch_trigger" => {
+                            lsc.baton_touch_trigger = self.read_bool_value();
+                        }
+                        "baton_touch_source" => {
+                            lsc.baton_touch_source = self.read_arc_str_value();
+                        }
+                        "min_baton_touch_count" => {
+                            lsc.min_baton_touch_count = self.read_u8_value();
+                        }
+                        "ability_filter" => {
+                            let s = self.read_arc_str_value();
+                            lsc.ability_filter =
+                                s.map(|s| crate::card::AbilityFilter::from_str(&s));
+                        }
+                        "ability_filter_triggers" => {
+                            lsc.ability_filter_triggers = self
+                                .read_opt_str_vec_value()
+                                .map(|b| (*b).into_iter().collect());
+                        }
+                        "aggregate" => {
+                            lsc.aggregate = self.read_arc_str_value();
+                        }
+                        "no_excess_heart" => {
+                            lsc.no_excess_heart = self.read_bool_value();
+                        }
+                        "original_value" => {
+                            lsc.original_value = self.read_bool_value();
+                        }
+                        "activation_position" => {
+                            lsc.activation_position = self.read_arc_str_value();
+                        }
+                        "unit" => {
+                            lsc.unit = self.read_arc_str_value();
+                        }
+                        "values" => {
+                            lsc.values = self.read_opt_u8_vec_value().map(|b| *b);
+                        }
+                        "group_reference" => {
+                            lsc.group_reference = self.read_arc_str_value();
+                        }
+                        "reference_card" => {
+                            lsc.reference_card = self.read_arc_str_value();
+                        }
+                        _ => {
+                            self.skip_value()?;
+                        }
+                    }
+                }
+                Some(Box::new(lsc))
             }
             _ => None,
         }
@@ -574,10 +881,6 @@ impl<'a> BcReader<'a> {
         }
     }
 
-    fn read_json_value(&mut self) -> Option<serde_json::Value> {
-        read_value_from_bc(self)
-    }
-
     fn read_ability_filter_value(&mut self) -> Option<AbilityFilter> {
         let tag = self.read_u8()?;
         match tag {
@@ -737,60 +1040,6 @@ fn skip_value_with_tag(bc: &mut BcReader, tag: u8) -> Option<()> {
 }
 
 /// Read a tagged value from a BcReader into a serde_json::Value.
-fn read_value_from_bc(bc: &mut BcReader) -> Option<serde_json::Value> {
-    let tag = bc.read_u8()?;
-    match tag {
-        TAG_NULL => Some(serde_json::Value::Null),
-        TAG_FALSE => Some(serde_json::Value::Bool(false)),
-        TAG_TRUE => Some(serde_json::Value::Bool(true)),
-        TAG_I64 => {
-            let v = bc.i64()?;
-            Some(serde_json::Value::from(v))
-        }
-        TAG_F64 => {
-            if bc.cursor.len() < 8 {
-                return None;
-            }
-            let v = f64::from_le_bytes(bc.cursor[..8].try_into().ok()?);
-            bc.cursor = &bc.cursor[8..];
-            Some(serde_json::Value::from(v))
-        }
-        TAG_STR => {
-            let idx = bc.read_idx()?;
-            if idx >= STRINGS.len() {
-                return None;
-            }
-            Some(serde_json::Value::String(STRINGS[idx].to_string()))
-        }
-        TAG_ARRAY => {
-            let len = bc.read_u32()? as usize;
-            let mut arr = Vec::with_capacity(len);
-            for _ in 0..len {
-                arr.push(read_value_from_bc(bc)?);
-            }
-            Some(serde_json::Value::Array(arr))
-        }
-        TAG_OBJECT | TAG_OBJECT_VARIANT => {
-            if tag == TAG_OBJECT_VARIANT {
-                bc.read_u8()?; // skip variant tag byte
-            }
-            let len = bc.read_u32()? as usize;
-            let mut obj = serde_json::Map::with_capacity(len);
-            for _ in 0..len {
-                let kidx = bc.read_idx()?;
-                if kidx >= STRINGS.len() {
-                    return None;
-                }
-                let key = STRINGS[kidx].to_string();
-                let val = read_value_from_bc(bc)?;
-                obj.insert(key, val);
-            }
-            Some(serde_json::Value::Object(obj))
-        }
-        _ => None,
-    }
-}
-
 // ── Direct Ability decoder ──
 
 fn decode_ability(bc: &mut BcReader) -> Option<Ability> {
