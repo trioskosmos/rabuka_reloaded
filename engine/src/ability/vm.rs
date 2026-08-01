@@ -388,7 +388,6 @@ impl<'a> BcReader<'a> {
                 let variant = self.read_u8()?;
                 Some(Box::new(decode_ability_effect_direct(self, variant)?))
             }
-            TAG_OBJECT => Some(Box::new(decode_ability_effect_from_object(self)?)),
             _ => None,
         }
     }
@@ -407,9 +406,10 @@ impl<'a> BcReader<'a> {
                             let variant = self.read_u8()?;
                             v.push(Box::new(decode_ability_effect_direct(self, variant)?));
                         }
-                        TAG_OBJECT => v.push(Box::new(decode_ability_effect_from_object(self)?)),
                         _ => {
-                            self.skip_value()?;
+                            // sub_tag was already consumed; skip the body without
+                            // re-reading the tag byte.
+                            skip_value_with_tag(self, sub_tag)?;
                         }
                     }
                 }
@@ -876,15 +876,11 @@ fn decode_ability_cost(bc: &mut BcReader) -> Option<Option<Box<AbilityCost>>> {
     let tag = bc.read_u8()?;
     match tag {
         TAG_NULL => Some(None),
-        TAG_OBJECT => {
-            let count = bc.read_u32()? as usize;
-            // Collect into map, then apply AbilityCost-specific normalizations.
-            let mut map = collect_json_map(bc, count)?;
-            normalize_cost_keys(&mut map);
-            let map_val = serde_json::Value::Object(map);
-            let map_clone = map_val.clone();
-            let mut inner: AbilityEffect = serde_json::from_value(map_val).ok()?;
-            inner.populate_from_json(&map_clone);
+        TAG_OBJECT_VARIANT => {
+            // The compiler aliases cost `type`→`action` and `zone`→`source`, so
+            // costs decode through the same direct effect decoder as effects.
+            let variant = bc.read_u8()?;
+            let inner = decode_ability_effect_direct(bc, variant)?;
             Some(Some(Box::new(AbilityCost(inner))))
         }
         _ => None,
@@ -900,30 +896,8 @@ fn decode_ability_effect(bc: &mut BcReader) -> Option<Option<AbilityEffect>> {
             let inner = decode_ability_effect_direct(bc, variant)?;
             Some(Some(inner))
         }
-        TAG_OBJECT => {
-            let inner = decode_ability_effect_from_object(bc)?;
-            Some(Some(inner))
-        }
         _ => None,
     }
-}
-
-/// Collect `count` key-value pairs from a BcReader into a serde_json::Map.
-fn collect_json_map(
-    bc: &mut BcReader,
-    count: usize,
-) -> Option<serde_json::Map<String, serde_json::Value>> {
-    let mut map = serde_json::Map::with_capacity(count);
-    for _ in 0..count {
-        let key_idx = bc.read_idx()?;
-        if key_idx >= STRINGS.len() {
-            return None;
-        }
-        let key = STRINGS[key_idx].to_string();
-        let val = bc.read_json_value()?;
-        map.insert(key, val);
-    }
-    Some(map)
 }
 
 /// Apply AbilityCost-specific key normalizations recursively.
@@ -965,65 +939,6 @@ fn recursive_normalize_cost_value(val: &mut serde_json::Value) {
         }
         _ => {}
     }
-}
-
-/// Decode an AbilityEffect from an object whose TAG_OBJECT + count have been
-/// consumed. Strategy:
-///   1. Collect every key→value pair into a serde_json::Map
-///   2. Deserialize AbilityEffect from the Map via serde (handles all fields
-///      including `#[serde(flatten)]` CompoundBranch)
-///   3. Call `populate_from_json` to build EffectKind and recurse into sub-effects
-fn decode_ability_effect_from_object(bc: &mut BcReader) -> Option<AbilityEffect> {
-    let count = bc.read_u32()? as usize;
-
-    // Phase 1: collect all key-value pairs into a JSON map.
-    let mut map = collect_json_map(bc, count)?;
-
-    // Normalize legacy / alias keys so AbilityEffect::Deserialize picks them up:
-    //   "type" / "cost_type" → "action"   (AbilityCost uses "type")
-    //   "zone"               → "source"   (AbilityCost uses "zone")
-    if !map.contains_key("action") {
-        if let Some(v) = map.remove("type").or_else(|| map.remove("cost_type")) {
-            map.insert("action".into(), v);
-        }
-    }
-    if !map.contains_key("source") {
-        if let Some(v) = map.remove("zone") {
-            map.insert("source".into(), v);
-        }
-    }
-
-    let map_val = serde_json::Value::Object(map);
-    let map_clone = map_val.clone();
-
-    // Phase 2: deserialize AbilityEffect via serde.
-    // This handles text, action, source, destination, count, target, condition,
-    // compound (look_action, select_action, actions, etc.), and all other fields
-    // including #[serde(flatten)] CompoundBranch.
-    let mut effect: AbilityEffect = serde_json::from_value(map_val).ok()?;
-
-    // Phase 3: populate EffectKind and recurse into sub-effects.
-    effect.populate_from_json(&map_clone);
-
-    // Phase 4: draw-count fix (mirror decode_like_json)
-    if let Some(ref actions) = effect.compound.actions {
-        let fixed: Vec<Box<AbilityEffect>> = actions
-            .iter()
-            .map(|a| {
-                let mut f = (**a).clone();
-                if (f.action == ActionType::DrawCard)
-                    && f.count.is_none()
-                    && f.dynamic_count_any().is_none()
-                {
-                    f.count = Some(1);
-                }
-                Box::new(f)
-            })
-            .collect();
-        effect.compound.actions = Some(fixed);
-    }
-
-    Some(effect)
 }
 
 /// Direct decoder for TAG_OBJECT_VARIANT effects using the generated field dispatch.

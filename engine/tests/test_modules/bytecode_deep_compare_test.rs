@@ -92,16 +92,15 @@ mod bytecode_deep_compare {
             _ if a != b => {
                 let a_s = a.to_string();
                 let b_s = b.to_string();
-                let a_trunc = if a_s.len() > 100 {
-                    format!("{}...", &a_s[..100])
-                } else {
-                    a_s
-                };
-                let b_trunc = if b_s.len() > 100 {
-                    format!("{}...", &b_s[..100])
-                } else {
-                    b_s
-                };
+                fn truncate(s: &str, max: usize) -> String {
+                    let mut end = s.len().min(max);
+                    while end > 0 && !s.is_char_boundary(end) {
+                        end -= 1;
+                    }
+                    format!("{}...", &s[..end])
+                }
+                let a_trunc = truncate(&a_s, 100);
+                let b_trunc = truncate(&b_s, 100);
                 out.push(format!("{path}: BC={a_trunc} JSON={b_trunc}"));
             }
             _ => {}

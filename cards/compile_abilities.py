@@ -701,7 +701,15 @@ def compile_all(abilities):
             strings.append(s)
         return string_idx[s]
 
+    # Keys whose array values are vectors of effect objects in the bytecode
+    # schema (see read_effect_vec_value / read_effect_vec_boxed_value).
+    EFFECT_LIST_KEYS = ("actions", "options", "effect_steps")
+
     ACTION_TO_VARIANT_TAG = {
+        # Empty action: no-action/no-type dicts that sit directly inside an
+        # effect vector (filter options) decode as variant 3 (SelectTarget),
+        # whose EffectFilter carries the option's fields.
+        "": 3,
         "move_cards": 1,
         "discard_card": 1,
         "discard_until_count": 1,
@@ -740,7 +748,9 @@ def compile_all(abilities):
         "suppress_ability_trigger": 9,
         "activate_ability": 9,
         "sequential": 10,
+        "sequential_cost": 10,
         "choice": 10,
+        "choice_condition": 10,
         "repeat_procedure": 10,
         "conditional_alternative": 10,
         "conditional_on_optional": 10,
@@ -769,7 +779,25 @@ def compile_all(abilities):
         "opponent_action": 14,
     }
 
-    def enc_val(v, out: bytearray):
+    # Cost objects (AbilityCost) carry `type` instead of `action`. The values are
+    # valid action names (ActionType::from_str covers every one), so the alias is
+    # identity — sequential_cost/choice_condition stay distinct ActionType variants
+    # (SequentialCost/ChoiceCondition), they are NOT folded into sequential/choice.
+    # Their sub-effects live in `costs`/`options`, which the decoder reads as
+    # `actions` (the compound list). NOTE: `choice_condition` is also a Condition
+    # variant name, but in the current abilities.json it only appears as a cost type
+    # — verified by scan, and the bytecode deep-compare test guards this corpus.
+    COST_TYPE_TO_ACTION = {
+        "move_cards": "move_cards",
+        "pay_energy": "pay_energy",
+        "reveal": "reveal",
+        "change_state": "change_state",
+        "place_energy_under_member": "place_energy_under_member",
+        "sequential_cost": "sequential_cost",
+        "choice_condition": "choice_condition",
+    }
+
+    def enc_val(v, out: bytearray, in_effect_vec: bool = False):
         if v is None:
             out.append(0x00)
         elif isinstance(v, bool):
@@ -787,8 +815,32 @@ def compile_all(abilities):
             out.append(0x07)
             out.extend(struct.pack("<I", len(v)))
             for item in v:
-                enc_val(item, out)
+                enc_val(item, out, in_effect_vec)
         elif isinstance(v, dict):
+            # Cost objects (AbilityCost) use `type`/`zone` instead of
+            # `action`/`source`, and compound costs use `costs`/`options` instead
+            # of `actions`. Alias them here so costs flow through the same
+            # TAG_OBJECT_VARIANT effect decoder as normal effects, eliminating the
+            # runtime normalize_cost_keys serde path.
+            if "action" not in v:
+                t = v.get("type")
+                if t in COST_TYPE_TO_ACTION:
+                    v["action"] = COST_TYPE_TO_ACTION[t]
+                    v.pop("type", None)
+                    if "source" not in v and "zone" in v:
+                        v["source"] = v.pop("zone")
+                    if "actions" not in v:
+                        for k in ("costs", "options"):
+                            if k in v:
+                                v["actions"] = v.pop(k)
+                                break
+                elif in_effect_vec:
+                    # Filter option with neither action nor type (direct element
+                    # of an effect vector): fabricate an empty action so it
+                    # decodes as variant 3 (SelectTarget), whose EffectFilter
+                    # carries the option's filter fields (group_names, card_type,
+                    # card_property, ...).
+                    v["action"] = ""
             action = v.get("action", "")
             vtag = ACTION_TO_VARIANT_TAG.get(action, 0)
             if vtag:
@@ -799,7 +851,7 @@ def compile_all(abilities):
             out.extend(struct.pack("<I", len(v)))
             for k, val in v.items():
                 out.extend(struct.pack("<H", intern(str(k))))
-                enc_val(val, out)
+                enc_val(val, out, k in EFFECT_LIST_KEYS)
         else:
             out.append(0x00)
 
@@ -811,7 +863,7 @@ def compile_all(abilities):
             if k in SKIP_KEYS:
                 continue
             out.extend(struct.pack("<H", intern(str(k))))
-            enc_val(val, out)
+            enc_val(val, out, k in EFFECT_LIST_KEYS)
 
     offsets, bytecode = [], bytearray()
 
@@ -1062,774 +1114,11 @@ pub const STRINGS: &[&str] = &[{str_lits}];
 pub const CARD_ABILITY_PAIRS: &[u16] = &[{pair_strs}];
 """
     (build_dir / "abilities_gen.rs").write_text(src, encoding="utf-8")
-<<<<<<< Updated upstream
     # The crate compiles `src/ability/abilities_gen.rs`, so mirror the artifact
     # there as well. (Kept in sync so a regen is a single command.)
     engine_dir = Path(__file__).parent.parent / "engine" / "src" / "ability"
     if engine_dir.exists():
         (engine_dir / "abilities_gen.rs").write_text(src, encoding="utf-8")
-=======
-
-
-def generate_vm_gen(build_dir, field_map):
-    import re
-
-    card_rs = Path(__file__).parent.parent / "engine/src/core/card.rs"
-    with open(card_rs, encoding="utf-8") as f:
-        content = f.read()
-
-    # Parse Condition enum fields
-    ci = content.find("pub enum Condition")
-    ce = content.find("};", ci) + 2
-    cf = {}
-    cv = None
-    for line in content[ci:ce].split("\n"):
-        m = re.match(r"    (\w+) \{", line)
-        if m:
-            cv = m.group(1)
-            cf[cv] = {}
-        m2 = re.match(r"        (\w+): (.+),", line)
-        if m2 and cv:
-            cf[cv][m2.group(1)] = m2.group(2).strip()
-        if line.strip() == "}," and cv:
-            cv = None
-
-    # Parse EffectKind enum fields
-    ei = content.find("pub enum EffectKind")
-    ee = content.find("};", ei) + 2
-    ekf = {}
-    ev = None
-    for line in content[ei:ee].split("\n"):
-        m = re.match(r"    (\w+) \{", line)
-        if m:
-            ev = m.group(1)
-            ekf[ev] = {}
-        m2 = re.match(r"        (\w+): (.+),", line)
-        if m2 and ev:
-            ekf[ev][m2.group(1)] = m2.group(2).strip()
-        if line.strip() == "}," and ev:
-            ev = None
-
-    FIELD_ALIAS = {
-        "DrawCards": {
-            "count": "target_count",
-            "baton_touch_trigger": "_skip",
-            "parenthetical": "_skip",
-            "activation_position": "_skip",
-            "answers": "_skip",
-            "duration": "_skip",
-            "group_names": "_skip",
-            "multiple_targets": "_skip",
-            "optional": "_skip",
-            "per_unit_heart_colors": "_skip",
-            "per_unit_location": "_skip",
-            "position_compare": "_skip",
-            "trigger_type": "_skip",
-        },
-        "DrawUntilCount": {
-            "count": "target_count",
-            "activation_position": "_skip",
-            "answers": "_skip",
-            "duration": "_skip",
-            "group_names": "_skip",
-            "multiple_targets": "_skip",
-            "optional": "_skip",
-            "per_unit_heart_colors": "_skip",
-            "per_unit_location": "_skip",
-            "position_compare": "_skip",
-            "trigger_type": "_skip",
-        },
-        "SelectTarget": {
-            "count": "target_count",
-            "activation_position": "_skip",
-            "answers": "_skip",
-            "characters": "_skip",
-            "choice_options": "_skip",
-            "cost_limit": "_skip",
-            "cost_limit_operator": "_skip",
-            "duration": "_skip",
-            "effect_steps": "_skip",
-            "exclude_characters": "_skip",
-            "exclude_group_names": "_skip",
-            "filter_targets_by_heart_colors": "_skip",
-            "group_reference": "_skip",
-            "heart_color_count": "_skip",
-            "heart_colors": "_skip",
-            "multiple_targets": "_skip",
-            "or_card_types": "_skip",
-            "per_unit_heart_colors": "_skip",
-            "per_unit_location": "_skip",
-            "position": "_skip",
-            "question": "_skip",
-            "require_all_heart_colors": "_skip",
-        },
-        "GainResource": {
-            "count": "value",
-            "baton_touch_trigger": "_skip",
-            "conditional": "_skip",
-            "max": "_skip",
-            "max_repeats": "repeat_limit",
-            "parenthetical": "_skip",
-            "per_unit_source": "_skip",
-            "target": "_skip",
-            "activation_position": "_skip",
-            "answers": "_skip",
-            "characters": "_skip",
-            "exclude_characters": "_skip",
-            "exclude_group_names": "_skip",
-            "filter_targets_by_heart_colors": "_skip",
-            "group_reference": "_skip",
-            "heart_color_count": "_skip",
-            "heart_colors_from_selected_card": "_skip",
-            "heart_type": "_skip",
-            "multiple_targets": "_skip",
-            "or_card_types": "_skip",
-            "per_unit_heart_colors": "_skip",
-            "per_unit_location": "_skip",
-            "require_all_heart_colors": "_skip",
-            "same_name": "_skip",
-            "state": "_skip",
-            "target_count": "_skip",
-            "target_from_selection": "_skip",
-            "timing_condition": "_skip",
-            "trigger_type": "_skip",
-        },
-        "ModifyHearts": {
-            "count": "value",
-            "baton_touch_trigger": "_skip",
-            "conditional": "_skip",
-            "max": "_skip",
-            "max_repeats": "repeat_limit",
-            "non_stackable": "_skip",
-            "parenthetical": "_skip",
-            "target": "_skip",
-            "activation_position": "_skip",
-            "exclude_heart_colors": "_skip",
-            "group_reference": "_skip",
-            "original_count": "_skip",
-            "original_operator": "_skip",
-            "per_unit_heart_colors": "_skip",
-            "per_unit_type": "_skip",
-            "position": "_skip",
-            "replace_all": "_skip",
-            "timing_condition": "_skip",
-        },
-        "ModifyScore": {
-            "count": "value",
-            "conditional": "_skip",
-            "parenthetical": "_skip",
-            "max_repeats": "repeat_limit",
-            "activation_position": "_skip",
-            "card_names": "_skip",
-            "card_property": "_skip",
-            "cost_total": "_skip",
-            "cost_total_operator": "_skip",
-            "distinct": "_skip",
-            "effect_constraint": "_skip",
-            "filter_targets_by_heart_colors": "_skip",
-            "heart_colors": "_skip",
-            "need_heart_operator": "_skip",
-            "need_heart_total": "_skip",
-            "negation": "_skip",
-            "per_unit_heart_colors": "_skip",
-            "per_unit_location": "_skip",
-            "position": "_skip",
-            "repeat_limit": "_skip",
-            "state": "_skip",
-            "target_count": "_skip",
-        },
-        "CustomOp": {
-            "count": "value",
-            "ability_filter": "_skip",
-            "blade_type": "_skip",
-            "conditional": "_skip",
-            "cost_limit": "_skip",
-            "cost_limit_operator": "_skip",
-            "destination": "_skip",
-            "non_stackable": "_skip",
-            "operation": "_skip",
-            "original_count": "_skip",
-            "original_operator": "_skip",
-            "per_unit": "_skip",
-            "per_unit_count": "_skip",
-            "per_unit_location": "_skip",
-            "per_unit_type": "_skip",
-            "source": "_skip",
-            "target": "_skip",
-            "value": "_skip",
-            "duration": "_skip",
-            "original_value": "_skip",
-            "exclude_self": "_skip",
-            "group_names": "_skip",
-            "location": "_skip",
-            "card_type": "_skip",
-            "self_target": "_skip",
-        },
-        "MiscOp": {
-            "count": "value",
-            "activation_position": "_skip",
-            "blade_limit": "_skip",
-            "blade_limit_operator": "_skip",
-            "blade_type": "_skip",
-            "card_names": "_skip",
-            "characters": "_skip",
-            "choice": "_skip",
-            "cost_total": "_skip",
-            "cost_total_operator": "_skip",
-            "cost_reference": "_skip",
-            "cost_offset": "_skip",
-            "distinct": "_skip",
-            "effect_constraint": "_skip",
-            "energy_count": "_skip",
-            "exclude_characters": "_skip",
-            "exclude_group_names": "_skip",
-            "group_names": "_skip",
-            "group_reference": "_skip",
-            "heart_color_count": "_skip",
-            "heart_colors": "_skip",
-            "heart_selection": "_skip",
-            "heart_type": "_skip",
-            "identities": "_skip",
-            "id": "_skip",
-            "lose_blade_hearts": "_skip",
-            "location": "_skip",
-            "negation": "_skip",
-            "operation": "_skip",
-            "options": "_skip",
-            "or_card_types": "_skip",
-            "original_cost": "_skip",
-            "original_count": "_skip",
-            "original_operator": "_skip",
-            "original_value": "_skip",
-            "parenthetical": "_skip",
-            "per_group": "_skip",
-            "per_group_count": "_skip",
-            "per_unit": "_skip",
-            "per_unit_count": "_skip",
-            "per_unit_heart_colors": "_skip",
-            "per_unit_location": "_skip",
-            "per_unit_type": "_skip",
-            "picker": "_skip",
-            "placement_order": "_skip",
-            "position": "_skip",
-            "ref_offset": "_skip",
-            "ref_value": "_skip",
-            "repeat_limit": "_skip",
-            "require_all_heart_colors": "_skip",
-            "resource_icon_count": "_skip",
-            "same_unit_name": "_skip",
-            "sign": "_skip",
-            "target_count": "_skip",
-            "timing": "_skip",
-            "treat_as": "_skip",
-        },
-        "ChangeState": {
-            "count": "_skip",
-            "max": "_skip",
-            "parenthetical": "_skip",
-            "position_compare": "_skip",
-            "ability_filter": "_skip",
-            "ability_filter_triggers": "_skip",
-            "activation_position": "_skip",
-            "card_names": "_skip",
-            "characters": "_skip",
-            "exclude_characters": "_skip",
-            "exclude_group_names": "_skip",
-            "exclude_heart_colors": "_skip",
-            "filter_targets_by_heart_colors": "_skip",
-            "group_reference": "_skip",
-            "heart_colors": "_skip",
-            "identities": "_skip",
-            "name_constraint": "_skip",
-            "name_constraint_source": "_skip",
-            "negation": "_skip",
-            "or_ability_filters": "_skip",
-            "or_card_types": "_skip",
-            "original_value": "_skip",
-        },
-        "AbilityOp": {
-            "count": "_skip",
-            "max": "_skip",
-            "parenthetical": "_skip",
-            "source_location": "location",
-            "activation_position": "_skip",
-            "activation_condition_parsed": "_skip",
-            "all": "_skip",
-            "cost_limit": "_skip",
-            "cost_limit_operator": "_skip",
-            "dynamic_count": "_skip",
-            "effect_type": "_skip",
-            "heart_colors": "_skip",
-            "option": "_skip",
-            "trigger_filter": "_skip",
-            "trigger_type": "_skip",
-            "triggers": "_skip",
-            "use_limit": "_skip",
-        },
-        "RestrictionOp": {
-            "count": "_skip",
-            "destination": "_skip",
-            "target": "_skip",
-            "characters": "_skip",
-            "choice_based": "_skip",
-            "effect_type": "_skip",
-            "exclude_characters": "_skip",
-            "exclude_group_names": "_skip",
-            "group_names": "_skip",
-            "non_stackable": "_skip",
-            "operation": "_skip",
-            "replaces_event": "_skip",
-            "restricted_destination": "_skip",
-            "timing": "_skip",
-            "timing_condition": "_skip",
-            "trigger_filter": "_skip",
-            "trigger_type": "_skip",
-        },
-        "PositionOp": {
-            "count": "_skip",
-            "parenthetical": "_skip",
-            "position_compare": "_skip",
-            "any_number": "_skip",
-            "cost_from_revealed": "_skip",
-            "cost_limit": "_skip",
-            "cost_limit_operator": "_skip",
-            "dynamic_count": "_skip",
-            "energy_count": "_skip",
-            "exclude_characters": "_skip",
-            "exclude_group_names": "_skip",
-            "group_names": "_skip",
-            "group_reference": "_skip",
-            "multiple_targets": "_skip",
-            "state": "_skip",
-        },
-        "LookReveal": {
-            "count": "_skip",
-            "activation_position": "_skip",
-            "blind": "_skip",
-            "card_names": "_skip",
-            "characters": "_skip",
-            "cost_limit": "_skip",
-            "cost_limit_operator": "_skip",
-            "distinct": "_skip",
-            "dynamic_count": "_skip",
-            "exclude_characters": "_skip",
-            "exclude_group_names": "_skip",
-            "filter_targets_by_heart_colors": "_skip",
-            "group_names": "_skip",
-            "group_reference": "_skip",
-            "heart_color_count": "_skip",
-            "heart_colors": "_skip",
-            "is_reveal": "_skip",
-            "multiple_targets": "_skip",
-            "name_constraint": "_skip",
-            "name_constraint_source": "_skip",
-            "negation": "_skip",
-            "optional": "_skip",
-            "options": "_skip",
-            "or_ability_filters": "_skip",
-            "or_card_types": "_skip",
-            "original_value": "_skip",
-            "per_unit_heart_colors": "_skip",
-            "per_unit_location": "_skip",
-            "picker": "_skip",
-            "require_all_heart_colors": "_skip",
-            "resource_on_select": "_skip",
-            "reveal": "_skip",
-            "self_target": "_skip",
-            "state": "_skip",
-        },
-        "CompoundEffect": {
-            "count": "_skip",
-            "activation_position": "_skip",
-            "activation_condition_parsed": "_skip",
-            "alternative_count_type": "_skip",
-            "card_type": "_skip",
-            "distinct": "_skip",
-            "group_reference": "_skip",
-            "heart_colors": "_skip",
-            "original_value": "_skip",
-            "parenthetical": "_skip",
-            "per_unit": "_skip",
-            "per_unit_count": "_skip",
-            "per_unit_type": "_skip",
-            "position": "_skip",
-            "shuffle": "_skip",
-            "trigger_type": "_skip",
-        },
-    }
-
-    lines = ["// Auto-generated"]
-
-    # Default condition constructors
-    for v in sorted(cf.keys()):
-        fn = f"default_condition_{v[0].lower()}{v[1:]}"
-        lines.append(f"fn {fn}() -> Condition {{")
-        lines.append(f"    Condition::{v} {{")
-        for fname in sorted(cf[v].keys()):
-            lines.append(f"        {fname}: Default::default(),")
-        lines.append("    }")
-        lines.append("}")
-        lines.append("")
-
-    # Default EffectKind constructors
-    action_to_variant = {
-        "draw_card": "DrawCards",
-        "draw_until_count": "DrawCards",
-        "move_cards": "MoveCards",
-        "gain_resource": "GainResource",
-        "modify_score": "ModifyScore",
-        "change_state": "ChangeState",
-        "position_change": "PositionOp",
-        "modify_required_hearts": "ModifyHearts",
-        "modify_required_hearts_global": "ModifyHearts",
-        "modify_cost": "CustomOp",
-        "set_blade_type": "CustomOp",
-        "set_blade_count": "MiscOp",
-        "set_heart_type": "MiscOp",
-        "gain_ability": "AbilityOp",
-        "gain_ability_from_source": "AbilityOp",
-        "restriction": "RestrictionOp",
-        "choose_target_player": "SelectTarget",
-        "place_energy_under_member": "MoveCards",
-        "modify_yell_count": "ModifyScore",
-        "invalidate_ability": "AbilityOp",
-        "suppress_ability_trigger": "AbilityOp",
-        "activate_ability": "AbilityOp",
-        "play_baton_touch": "MoveCards",
-        "set_card_identity": "ChangeState",
-        "pay_energy": "GainResource",
-        "look_at": "LookReveal",
-        "select": "SelectTarget",
-        "select_cards": "SelectTarget",
-        "select_number": "SelectTarget",
-        "reveal": "LookReveal",
-        "reveal_until_live_card": "LookReveal",
-        "do_nothing": "CustomOp",
-        "perform_yell": "MiscOp",
-        "specify_heart_color": "MiscOp",
-        "re_yell": "MiscOp",
-        "reduce_live_card_set_limit": "RestrictionOp",
-        "discard_until_count": "MoveCards",
-        "repeat_procedure": "CompoundEffect",
-        "conditional_alternative": "CompoundEffect",
-    }
-    used_ek = set()
-    for a in EFFECT_OPCODES:
-        v = action_to_variant.get(a)
-        if v:
-            used_ek.add(v)
-    used_ek.add("CompoundEffect")
-    used_ek.add("MoveCards")
-    used_ek.add("ChangeState")
-
-    for v in sorted(used_ek):
-        fn = f"default_{v[0].lower()}{v[1:]}"
-        lines.append(f"fn {fn}() -> EffectKind {{")
-        lines.append(f"    EffectKind::{v} {{")
-        for fname in sorted(ekf.get(v, {}).keys()):
-            ft = ekf[v][fname]
-            if ft.startswith("Option<Box<"):
-                lines.append(f"        {fname}: None,")
-            elif ft.startswith("Box<"):
-                lines.append(f"        {fname}: Box::default(),")
-            else:
-                lines.append(f"        {fname}: Default::default(),")
-        lines.append("    }")
-        lines.append("}")
-        lines.append("")
-
-    # decode_ability_effect — builds AbilityEffect directly from bytecode,
-    # setting both EffectKind type tag AND convenience fields
-    lines.append(
-        "fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>> {"
-    )
-    lines.append("    match op {")
-    for action in sorted(EFFECT_OPCODES.keys()):
-        opname = rust_name(action)
-        variant = action_to_variant.get(action)
-        if variant is None:
-            continue
-        fn = f"default_{variant[0].lower()}{variant[1:]}"
-        fields = field_map.get(action, [])
-        lines.append(f"        Opcode::{opname} => {{")
-        vars_read = []
-        for ftype, fname in fields:
-            vname = fname.replace("-", "_")
-            lines.append("            " + _read_expr(ftype, vname) + ";")
-            vars_read.append((ftype, vname, fname))
-        lines.append(f"            let mut ek = {fn}();")
-        used = set()
-        ek_assigns = []
-        for ftype, vname, fname in vars_read:
-            sfname = FIELD_ALIAS.get(variant, {}).get(fname, fname)
-            if sfname == "_skip":
-                continue
-            if sfname in used:
-                continue
-            used.add(sfname)
-            ft = ekf.get(variant, {}).get(sfname)
-            if ft:
-                expr = _assign(ft, vname, ftype)
-                if expr:
-                    ek_assigns.append((sfname, expr))
-        if ek_assigns:
-            fl = ", ".join(f"{f}: ref mut _bc_{f}" for f, _ in ek_assigns)
-            lines.append(
-                f"            if let EffectKind::{variant} {{ {fl}, .. }} = &mut ek {{"
-            )
-            for f, e in ek_assigns:
-                lines.append(f"                *_bc_{f} = {e};")
-            lines.append("            }")
-        lines.append("            Some(Box::new(ek))")
-        lines.append("        }")
-    lines.append("        _ => None,")
-    lines.append("    }")
-    lines.append("}")
-    lines.append("")
-
-    # action_for_op
-    lines.append("fn action_for_op(op: Opcode) -> &'static str {")
-    lines.append("    match op {")
-    for action in sorted(EFFECT_OPCODES.keys()):
-        lines.append(f'        Opcode::{rust_name(action)} => "{action}",')
-    lines.append('        _ => "",')
-    lines.append("    }")
-    lines.append("}")
-    lines.append("")
-
-    # decode_operator_from_str
-    lines.append("fn decode_operator_from_str(s: &str) -> Operator {")
-    lines.append(
-        '    match s { ">=" => Operator::Gte, "<=" => Operator::Lte, ">" => Operator::Gt, "<" => Operator::Lt, "=" => Operator::Eq, _ => Operator::Eq }'
-    )
-    lines.append("}")
-    lines.append("")
-
-    # decode_cond_card_type
-    lines.append("fn decode_cond_card_type(v: u8) -> ConditionCardType {")
-    lines.append(
-        "    match v { 1 => ConditionCardType::MemberCard, 2 => ConditionCardType::LiveCard, 3 => ConditionCardType::EnergyCard, _ => ConditionCardType::MemberCard }"
-    )
-    lines.append("}")
-    lines.append("")
-
-    # decode_condition
-    cond_variant = {
-        "card_count_condition": "Location",
-        "location_condition": "Location",
-        "comparison_condition": "Comparison",
-        "group_condition": "Group",
-        "movement_condition": "Movement",
-        "temporal_condition": "Temporal",
-        "appearance_condition": "Appearance",
-        "state_condition": "State",
-        "energy_state_condition": "State",
-        "position_condition": "PositionCond",
-        "highest_cost_on_stage_condition": "ScoreThreshold",
-        "state_change_condition": "State",
-        "card_blade_condition": "Resource",
-        "all_cost_comparison_condition": "Comparison",
-        "ability_filter_condition": "AbilityFilter",
-        "has_moved": "Movement",
-        "not_moved": "Movement",
-        "opponent_live_success": "OpponentLiveSuccess",
-        "no_excess_heart": "NoExcessHeart",
-    }
-
-    lines.append("pub fn decode_condition(cursor: &mut &[u8]) -> Condition {")
-    lines.append("    if cursor.is_empty() { return default_condition_alwaysTrue(); }")
-    lines.append("    let op_val = cursor[0];")
-    lines.append("    match op_val {")
-    for ctype in sorted(COND_FIELDS.keys()):
-        code = COND_OPCODES[ctype]
-        v = cond_variant[ctype]
-        fn = f"default_condition_{v[0].lower()}{v[1:]}"
-        fields = COND_FIELDS[ctype]
-        lines.append(f"        {code} => {{")
-        lines.append("            let _ = read_u8(cursor);")
-        vr = []
-        for ftype, fname in fields:
-            vname = fname.replace("-", "_")
-            lines.append("            " + _read_expr(ftype, vname) + ";")
-            vr.append((ftype, vname, fname))
-        lines.append(f"            let mut c = {fn}();")
-        assigns = []
-        for ftype, vname, fname in vr:
-            ft = cf.get(v, {}).get(fname)
-            if ft:
-                expr = _cond_assign(ft, vname, ftype, fname)
-                if expr:
-                    assigns.append((fname, expr))
-        if assigns:
-            fl = ", ".join(f"{f}: ref mut _bc_{f}" for f, _ in assigns)
-            lines.append(
-                f"            if let Condition::{v} {{ {fl}, .. }} = &mut c {{"
-            )
-            for f, e in assigns:
-                lines.append(f"                *_bc_{f} = {e};")
-            lines.append("            }")
-        lines.append("            c")
-        lines.append("        }")
-    lines.append("        0x4A | 0x4B => {")
-    lines.append("            let _ = read_u8(cursor);")
-    lines.append('            let op_str = if op_val == 0x4A { "or" } else { "and" };')
-    lines.append("            let mut conditions = Vec::new();")
-    lines.append("            loop {")
-    lines.append("                if cursor.is_empty() || cursor[0] == 0x4C {")
-    lines.append(
-        "                    if !cursor.is_empty() { let _ = read_u8(cursor); }"
-    )
-    lines.append("                    break;")
-    lines.append("                }")
-    lines.append("                conditions.push(Box::new(decode_condition(cursor)));")
-    lines.append("            }")
-    lines.append(
-        "            if conditions.is_empty() { default_condition_alwaysTrue() }"
-    )
-    lines.append(
-        "            else if conditions.len() == 1 { *conditions.into_iter().next().unwrap() }"
-    )
-    lines.append("            else { let mut c = default_condition_compound();")
-    lines.append(
-        "                if let Condition::Compound { operator: ref mut _bc_o, conditions: ref mut _bc_cond, .. } = &mut c {"
-    )
-    lines.append(
-        "                    *_bc_o = Some(op_str.into()); *_bc_cond = Some(conditions);"
-    )
-    lines.append("                } c")
-    lines.append("            }")
-    lines.append("        }")
-    lines.append("        _ => default_condition_alwaysTrue(),")
-    lines.append("    }")
-    lines.append("}")
-    lines.append("")
-
-    (build_dir / "vm_gen.rs").write_text("\n".join(lines), encoding="utf-8")
-
-
-def _read_expr(ftype, vname):
-    m = {
-        "u8": f"let {vname} = read_u8(cursor)",
-        "u16": f"let {vname} = read_u16(cursor)",
-        "i8": f"let {vname} = read_i8(cursor)",
-        "bool": f"let {vname} = read_u8(cursor) != 0",
-        "zone": f"let {vname} = decode_zone(read_u8(cursor))",
-        "player": f"let {vname} = decode_player(read_u8(cursor))",
-        "card_type": f"let {vname} = decode_card_type(read_u8(cursor))",
-        "resource": f"let {vname} = decode_resource(read_u8(cursor))",
-        "heart": f"let {vname} = decode_heart(read_u8(cursor))",
-        "state": f"let {vname} = decode_state(read_u8(cursor))",
-        "duration": f"let {vname} = decode_duration(read_u8(cursor))",
-        "operator": f"let {vname} = decode_operator(read_u8(cursor))",
-        "str_idx": f"let {vname} = read_str(cursor)",
-    }
-    return m.get(ftype, f"let {vname} = read_u8(cursor)")
-
-
-def _assign(ft, src_var, optype):
-    """Generate assignment expression. Returns None if not possible."""
-    if ft is None:
-        return None
-    is_opt = ft.startswith("Option<")
-    inner = ft[7:-1] if is_opt else ft
-    opt_ret = optype == "str_idx"
-
-    def wr(expr):
-        return f"Some({expr})" if is_opt else expr
-
-    if inner == "ArcStr":
-        if opt_ret:
-            return (
-                f"{src_var}.map(|s| s.into())"
-                if is_opt
-                else f"{src_var}.map_or(Default::default(), |s| s.into())"
-            )
-        return wr(f"{src_var}.into()")
-    if inner == "u32":
-        if opt_ret:
-            return (
-                f"{src_var}.map(|s| s.parse().ok().unwrap_or(0))"
-                if is_opt
-                else f"{src_var}.map_or(0, |s| s.parse().ok().unwrap_or(0))"
-            )
-        return wr(f"{src_var} as u32")
-    if inner == "bool":
-        return wr(f"{src_var}")
-    if inner == "String":
-        if opt_ret:
-            return (
-                f"{src_var}.map(|s| s.to_string())"
-                if is_opt
-                else f"{src_var}.map_or(String::new(), |s| s.to_string())"
-            )
-        return wr(f"{src_var}.to_string()")
-    if "Box<Vec<" in inner or "Vec<" in inner:
-        bwrap = "Box::new(" if "Box<" in inner else ""
-        bclose = ")" if "Box<" in inner else ""
-        if opt_ret:
-            if is_opt:
-                return f"{src_var}.map(|s| {bwrap}vec![s.to_string()]{bclose})"
-            return f"{src_var}.map_or(Default::default(), |s| {bwrap}vec![s.to_string()]{bclose})"
-        return wr(f"{bwrap}vec![{src_var}.to_string()]{bclose}")
-    if inner == "Operator":
-        return wr(f"decode_operator_from_str({src_var})")
-    if inner == "ConditionCardType":
-        return wr(f"decode_cond_card_type({src_var})") if not opt_ret else None
-    return None
-
-
-def _cond_assign(ft, src_var, optype, fname):
-    if ft is None:
-        return None
-    is_opt = ft.startswith("Option<")
-    inner = ft[7:-1] if is_opt else ft
-    opt_ret = optype == "str_idx"
-
-    def wr(expr):
-        return f"Some({expr})" if is_opt else expr
-
-    if inner == "ArcStr":
-        if opt_ret:
-            return (
-                f"{src_var}.map(|s| s.into())"
-                if is_opt
-                else f"{src_var}.map_or(Default::default(), |s| s.into())"
-            )
-        return wr(f"{src_var}.into()")
-    if inner == "u32":
-        if opt_ret:
-            return (
-                f"{src_var}.map(|s| s.parse().ok().unwrap_or(0))"
-                if is_opt
-                else f"{src_var}.map_or(0, |s| s.parse().ok().unwrap_or(0))"
-            )
-        return wr(f"{src_var} as u32")
-    if inner == "bool":
-        return wr(f"{src_var}")
-    if inner == "String":
-        if opt_ret:
-            return (
-                f"{src_var}.map(|s| s.to_string())"
-                if is_opt
-                else f"{src_var}.map_or(String::new(), |s| s.to_string())"
-            )
-        return wr(f"{src_var}.to_string()")
-    if "Box<Vec<" in inner or "Vec<" in inner:
-        bwrap = "Box::new(" if "Box<" in inner else ""
-        bclose = ")" if "Box<" in inner else ""
-        if opt_ret:
-            if is_opt:
-                return f"{src_var}.map(|s| {bwrap}vec![s.to_string()]{bclose})"
-            return f"{src_var}.map_or(Default::default(), |s| {bwrap}vec![s.to_string()]{bclose})"
-        return wr(f"{bwrap}vec![{src_var}.to_string()]{bclose}")
-    if inner == "Operator":
-        return wr(f"decode_operator_from_str({src_var})")
-    if inner == "ConditionCardType":
-        return wr(f"decode_cond_card_type({src_var})") if not opt_ret else None
-    if inner in ("PositionInfo", "DistinctType", "PlacementOrder"):
-        return None
-    return None
->>>>>>> Stashed changes
 
 
 # ── Main ──
