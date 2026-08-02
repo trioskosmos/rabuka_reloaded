@@ -1402,7 +1402,10 @@ impl GameState {
             r.pending_choice = None;
             r
         } else {
-            crate::ability::resolver::AbilityResolver::new(self.card_database.clone(), card_id)
+            crate::Box::new(crate::ability::resolver::AbilityResolver::new(
+                self.card_database.clone(),
+                card_id,
+            ))
         };
 
         resolver.debug_trace =

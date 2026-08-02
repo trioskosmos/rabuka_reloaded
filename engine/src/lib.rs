@@ -19,7 +19,7 @@ macro_rules! eprintln {
 
 // Platform compat: maps std types to no_std equivalents for PSP
 pub(crate) mod compat;
-pub(crate) use compat::{Arc, HashMap, HashSet, VecDeque};
+pub(crate) use compat::{Arc, Box, HashMap, HashSet, VecDeque};
 
 #[cfg(feature = "alloc_tracker")]
 pub mod alloc_counter;

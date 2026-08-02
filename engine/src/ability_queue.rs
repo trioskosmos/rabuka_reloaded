@@ -95,8 +95,10 @@ pub struct AbilityQueueEntry {
     pub pending_actions: Vec<AbilityEffect>,
     /// Persistent ability resolver — stays alive across choice round-trips
     /// instead of being destroyed and recreated. Eliminates manual save/restore.
+    /// Boxed: the resolver carries ~1.9 KB of execution state that is only ever
+    /// used by the CURRENT entry, so idle entries must not pay that inline.
     #[serde(skip)]
-    pub resolver: Option<AbilityResolver>,
+    pub resolver: Option<Box<AbilityResolver>>,
     /// For each_time triggers: the stage member card ID whose resolution
     /// caused this each_time ability to fire. Used by effects like
     /// "gain all-heart" to target the correct member.
@@ -504,12 +506,12 @@ impl AbilityQueue {
     }
 
     /// Take the resolver out of the current entry (for use with game_state).
-    pub fn take_resolver(&mut self) -> Option<AbilityResolver> {
+    pub fn take_resolver(&mut self) -> Option<Box<AbilityResolver>> {
         self.current_entry_mut().and_then(|e| e.resolver.take())
     }
 
     /// Put the resolver back into the current entry.
-    pub fn set_resolver(&mut self, resolver: AbilityResolver) {
+    pub fn set_resolver(&mut self, resolver: Box<AbilityResolver>) {
         if let Some(entry) = self.current_entry_mut() {
             entry.resolver = Some(resolver);
         }

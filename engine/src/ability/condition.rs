@@ -124,6 +124,7 @@ impl<'a> ConditionContext<'a> {
 }
 
 /// Produce a user-friendly human-readable expectation string for a condition.
+#[cfg(not(feature = "no_std"))]
 fn describe_condition_expectation(condition: &Condition) -> String {
     let op = condition.get_operator().unwrap_or(">=");
     let threshold = condition
@@ -236,6 +237,7 @@ fn describe_condition_expectation(condition: &Condition) -> String {
     }
 }
 
+#[cfg(not(feature = "no_std"))]
 fn describe_zone_label(zone: &str) -> String {
     match zone {
         "hand" => "[[zone_hand]]".into(),
@@ -255,6 +257,7 @@ fn describe_zone_label(zone: &str) -> String {
     }
 }
 
+#[cfg(not(feature = "no_std"))]
 fn describe_card_type_label(ct: &str) -> String {
     match ct {
         "member_card" => "[[card_type_member]]".into(),

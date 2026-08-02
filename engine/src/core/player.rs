@@ -9,10 +9,7 @@ use crate::core::game_modifiers::ModifierEntry;
 
 use crate::{HashMap, VecDeque};
 #[cfg(feature = "no_std")]
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

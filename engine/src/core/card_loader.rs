@@ -1,6 +1,6 @@
-#[cfg(not(feature = "no_std"))]
+#[cfg(all(not(feature = "no_std"), not(feature = "compact_card_data")))]
 use std::fs::File;
-#[cfg(not(feature = "no_std"))]
+#[cfg(all(not(feature = "no_std"), not(feature = "compact_card_data")))]
 use std::io::Read;
 #[cfg(not(feature = "no_std"))]
 use std::path::Path;

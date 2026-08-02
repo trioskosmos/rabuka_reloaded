@@ -42,6 +42,11 @@ pub(crate) use alloc::sync::Arc;
 pub(crate) use std::sync::Arc;
 
 #[cfg(feature = "no_std")]
+pub(crate) use alloc::boxed::Box;
+#[cfg(not(feature = "no_std"))]
+pub(crate) use std::boxed::Box;
+
+#[cfg(feature = "no_std")]
 pub(crate) use alloc::collections::VecDeque;
 #[cfg(not(feature = "no_std"))]
 pub(crate) use std::collections::VecDeque;

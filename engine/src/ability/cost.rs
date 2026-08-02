@@ -195,8 +195,7 @@ impl AbilityResolver {
                 // with each other (any group, not necessarily the activating card's).
                 // Build a group→count map, then only allow cards from groups with
                 // at least `count` members.
-                use std::collections::HashMap;
-                let mut group_counts: HashMap<String, Vec<usize>> = HashMap::new();
+                let mut group_counts: HashMap<String, Vec<usize>> = HashMap::default();
                 for (i, &cid) in pl.hand.cards.iter().enumerate() {
                     if let Some(card) = card_db.get_card(cid) {
                         if !card.group.is_empty() {
