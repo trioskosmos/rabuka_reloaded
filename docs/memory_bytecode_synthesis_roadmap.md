@@ -276,6 +276,11 @@ biggest shipped-code cuts, then feature-gating, then the sweep.
 
 ### Phase R1 — Delete the dead opcode encoder (`compile_one`/`compile_condition`/`compile_cost`)
 
+> **Status: DONE (2026-08-02, `af05a47e`).** Deleted the opcode encoder cluster
+> (`compile_one`/`compile_condition`/`compile_cost` + `COND_OPCODES`/`COND_FIELDS`/
+> `COST_OPCODES`/`EFFECT_OPCODES` tables, ~377 lines) and the obsolete opcode-vs-schema
+> checks in `validate_schema.py`. Byte-identical regen (112121 B) + 1934/1934 green.
+
 **Goal.** Remove the superseded opcode-based encoder in `cards/compile_abilities.py`
 (verified: `compile_one`/`compile_condition`/`compile_cost` have **no non-recursive
 caller** — `enc_val` is the only encoder). Also delete the opcode tables they alone use
@@ -297,6 +302,11 @@ re-running the parser). **Effort/risk:** 1–2 h, Low.
 ---
 
 ### Phase R2 — Remove the `arena_allocator` subsystem
+
+> **Status: DONE (2026-08-02, `70eabeb7`).** Deleted `arena.rs` (81 lines), the
+> `arena_allocator` feature, the arena hooks in `ability_store.rs`/`move_cards.rs`/
+> `game_state/abilities.rs`/`game_state/mod.rs`, the `ARENA_LIVE_BYTES` metric, and the
+> README feature-table rows. 1934/1934 green.
 
 **Goal.** Delete the arena feature entirely: `engine/src/arena.rs`, the `arena_allocator`
 feature, the arena hooks in `alloc_counter.rs`, and the arena bypass calls added in
@@ -320,6 +330,10 @@ own bump allocator in `platforms/ds`) — the engine arena is independent of it.
 ---
 
 ### Phase R3 — Strip debug/alloc instrumentation from production builds
+
+> **Status: DONE (2026-08-02, `f46d1908`).** `alloc_tracker` out of default (counting
+> allocator no longer wraps every alloc/free); `debug_conditions` kept — its fields are
+> load-bearing. 1934/1934 green.
 
 **Goal.** Remove resource-holding instrumentation from shipped targets. **Done (2026-08-02):
 `alloc_tracker` removed from default** — the `CountingAllocator` `#[global_allocator]`
@@ -352,6 +366,12 @@ removal, it's a redesign (a cache key must exist regardless).
 ---
 
 ### Phase R4 — Gate the ability-path JSON decode (drop serde from the ability system)
+
+> **Status: DONE (2026-08-02, `420eae75`).** `json_path_test` feature added (in default;
+> off for `ds`/`no_std` which use `--no-default-features`). `normalize_cost_keys`,
+> `recursive_normalize_cost_value`, `populate_from_json`, `condition_populate_from_json`,
+> and `kind_from_action` are `#[cfg(feature = "json_path_test")]`; the deep-compare oracle
+> runs only under both `bytecode_abilities` + `json_path_test`. 1934/1934 green.
 
 **Goal.** Feature-gate the ability-path JSON decode (`populate_from_json`,
 `condition_populate_from_json`, `normalize_cost_keys` + `recursive_normalize_cost_value`,
@@ -389,6 +409,10 @@ as a follow-up, not part of R4.
 
 ### Phase R5 — Remove the `RESOLVED_ABILITIES` ability cache
 
+> **Status: DONE (2026-08-02, `928ec7a3`).** Removed the `OnceLock<Mutex<HashMap>>` cache,
+> its imports, the cache hit/insert, and the duplicate `no_std` decode branch — `resolve()`
+> now always decodes on demand (single path). 1934/1934 green.
+
 **Goal.** Restore the documented no-cache design: `AbilityRef::resolve()` decodes fresh and
 the caller drops the `Arc` — reclaiming the ~120 KB cache and its arena bypass wiring.
 
@@ -407,6 +431,11 @@ was added for.
 ---
 
 ### Phase R6 — Pools and dependency sweep: keep only what pays
+
+> **Status: DONE (2026-08-02, `13ce4337`).** Deleted the unwired `CondBox` pool (64 slots,
+> zero users) and the dead `once_cell` dependency (zero references in engine + platforms;
+> removed from `psp`/`ds`/`wii` features and `platforms/ds/Cargo.toml`). `EkBox` kept
+> (wired into `AbilityEffect.kind`). 1934/1934 green.
 
 **Goal.** Decide `EkBox`/`CondBox` pools on measured benefit; remove what doesn't pay.
 `CondBox` is defined but not wired — either wire it (only if it moves RAM materially) or
@@ -557,7 +586,7 @@ the deferred optimization track:
 | Old item | Now |
 |----------|-----|
 | C1. P3 enum conversions (`operation` etc.) | **O4** — deferred, lowest value. |
- | C2. `debug_conditions` for `no_std` (strip `text`/`trigger_event`) | **R3** — NOT removable: `text`/`trigger_event` are load-bearing (cache key + source/state fallbacks). Only `alloc_tracker` was stripped. |
+ | C2. `debug_conditions` for `no_std` (strip `text`/`trigger_event`) | **R3** — DONE: `alloc_tracker` stripped from default. The `text`/`trigger_event` fields stay (load-bearing: cache key + source/state fallbacks). |
 | C3. Dead `compile_one`/`compile_condition`/`compile_cost` encoder | **R1** — delete the dead opcode encoder. |
 | C4. `kind_from_action` + `Deserialize` feature-gating (ability-path serde) | **R4** — gate the ability-path JSON decode. |
 
@@ -565,14 +594,14 @@ the deferred optimization track:
 
 ## 6. Suggested execution order
 
-| Order | Phase | Type | Commit message | Est. |
-|-------|-------|------|----------------|------|
-| 1 | R1 Delete dead opcode encoder | removal | `refactor: delete dead compile_one/compile_condition/compile_cost encoder` | 1–2 h |
-| 2 | R2 Remove `arena_allocator` subsystem | removal | `refactor: remove blocked arena_allocator subsystem` | 2–3 h |
- | 3 | R3 Strip debug/alloc instrumentation (DONE: `alloc_tracker` out of default) | removal | `refactor: drop counting allocator from default builds` | done |
-| 4 | R4 Gate ability-path JSON decode (`json_path_test`) | removal | `refactor: gate ability-path json decode behind json_path_test` | ~0.5 d |
-| 5 | R5 Remove `RESOLVED_ABILITIES` cache (verify 3DS MP) | removal | `perf: drop ability cache, reclaim ~120KB, decode on demand` | 1–2 h |
-| 6 | R6 Pools + dep sweep (CondBox, `once_cell`; keep `rmp-serde`) | removal | `refactor: remove unwired CondBox and dead once_cell dep` | 0.5 d |
+| Order | Phase | Type | Commit message | Status |
+|-------|-------|------|----------------|--------|
+| 1 | R1 Delete dead opcode encoder | removal | `refactor: delete dead compile_one/compile_condition/compile_cost encoder` | DONE `af05a47e` |
+| 2 | R2 Remove `arena_allocator` subsystem | removal | `refactor: remove blocked arena_allocator subsystem` | DONE `70eabeb7` |
+| 3 | R3 Strip debug/alloc instrumentation | removal | `refactor: drop counting allocator from default builds` | DONE `f46d1908` |
+| 4 | R4 Gate ability-path JSON decode (`json_path_test`) | removal | `refactor: gate ability-path json decode behind json_path_test` | DONE `420eae75` |
+| 5 | R5 Remove `RESOLVED_ABILITIES` cache | removal | `refactor: remove RESOLVED_ABILITIES cache, decode on demand` | DONE `928ec7a3` |
+| 6 | R6 Pools + dep sweep (CondBox, `once_cell`) | removal | `refactor: remove unwired CondBox pool and dead once_cell dep` | DONE `13ce4337` |
 | 7+ | O1–O4 squeezing (was B1/B2/B3/C1) | deferred | — | only if measured |
 
 Each phase: **run the parser (`bash cards/regenerate.sh`) → `cargo test` from `engine/` →
@@ -589,13 +618,13 @@ intermediate `serde_json::Value` trees during decode, ~600 lines of serde/JSON
 infrastructure removed from the hot path, 2,310 lines of dead generated code gone, and the
 ability-path serde one feature-gate away from being dropped. **Achieved.**
 
-After Track R: the engine ships **fewer systems, not smarter ones**:
+After Track R: the engine ships **fewer systems, not smarter ones** — **all achieved**:
 - Dead opcode encoder gone (R1); blocked `arena_allocator` subsystem gone (R2).
 - Counting allocator gone from default builds (R3); `debug_conditions` kept — its fields are load-bearing.
-- Ability-path JSON decode gone from `ds`/`no_std` builds (R4).
-- Ability cache gone or capped (R5); unwired CondBox + dead `once_cell` deleted (R6).
+- Ability-path JSON decode gated behind `json_path_test`, off for `ds`/`no_std` (R4).
+- Ability cache removed — decode on demand (R5); unwired CondBox + dead `once_cell` deleted (R6).
 - Net: smaller binaries, less resident RAM, fewer code paths to maintain — achieved by
-  deletion, not by micro-optimization.
+  deletion, not by micro-optimization. All green via the parser → `cargo test` loop.
 
 Track O (squeezing) is **deferred**: arena per-turn reset stays blocked (game-state grows
 into the bump — measured 2–22 KB live), and the resolver/CondBox/P3 trims are only worth
