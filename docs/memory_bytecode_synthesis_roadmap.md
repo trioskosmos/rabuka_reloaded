@@ -633,9 +633,7 @@ doing if profiling after Track R shows they move a real number.
 
 ## 8. Verified bytecode state + remaining serde (2026-08-02)
 
-### The ability decode path is properly bytecode now — no fallbacks
-
-Verified in the current tree:
+### The ability decode path is properly bytecode now — no fallbacksVerified in the current tree:
 
 - `get_ability(idx)` (`vm.rs:102`) slices the embedded `BYTECODE` blob by `OFFSETS` and
   decodes **only** via `decode_ability` → `decode_ability_effect_direct` /
@@ -652,29 +650,35 @@ Verified in the current tree:
 **Verdict: yes — the ability system is properly bytecode, with zero production
 fallbacks or bad conversions in the decode path.**
 
-### Remaining serde in production (NOT ability decode) — what has to be done
+### Remaining serde in production (NOT ability decode)
 
-serde/`serde_json` still ships for **card and deck loading**, not for abilities:
+serde/`serde_json` now ships only for **deck parsing** and the web server, not card loading:
 
-| Site | What it deserializes | Who uses it |
-|------|----------------------|-------------|
-| `card_loader.rs:39,42` | `Vec<Card>` / `HashMap<String, Card>` from JSON | desktop bins (`play_game`, bots, tests) |
-| `deck_parser.rs:37,40` | `Vec<Card>` from deck JSON | DS + desktop deck loading |
-| `web_server.rs` | API request/response structs | `server` feature only |
-| `qa_test_suite.rs:2159,2467` | `Choice` structs (test-only) | `qa_test_suite` |
-| `card_binary.rs` blob | compact `cards.bin` | **3DS only** (not desktop/DS) |
+| Site | What it deserializes | Who uses it | Status |
+|------|----------------------|-------------|--------|
+| `card_loader.rs:39,42` | `Vec<Card>` / `HashMap<String, Card>` from JSON | desktop bins, tests | **GONE** — routed to embedded blob (R8) |
+| `card_loader.rs` | all cards from `cards_gen.rs` `CARD_BLOB` | desktop + DS, zero serde | **DONE (R8)** |
+| `deck_parser.rs:37,40` | `Vec<Card>` from baked deck JSON | DS deck loading | **remains** |
+| `web_server.rs` | API request/response structs | `server` feature only | keeps serde (API contract) |
+| `qa_test_suite.rs:2159,2467` | `Choice` structs (test-only) | `qa_test_suite` | fine (test-only) |
+| `card_binary.rs` blob | compact `cards.bin` | desktop (R8) + 3DS | **DONE (R8)** |
 
-**To drop serde from the remaining targets** (the natural next removal):
-1. **Wire the compact card blob on desktop/DS** — `card_binary::load_cards_from_blob`
-   exists and is blob-verified (`test_blob_matches_json`), but only `rabuka_3ds.rs` uses it.
-   Route desktop/DS card loading through the blob (with a fallback to JSON only in
-   non-compact builds) — removes `card_loader.rs:39` + `deck_parser.rs:37,40` serde.
-2. **Gate `deck_parser` serde** behind a non-`no_std`/non-blob feature once cards come from
-   the blob.
-3. **`web_server.rs`** keeps serde (it IS the API contract) — out of scope; it's
-   `server`-only, already optional.
-4. **`qa_test_suite.rs`** `Choice` from_value is test-only — fine.
+**R8 — card loading is bytecode/blob now (DONE, `a5848110`).** `compact_card_data` is in
+default; `load_cards_from_file`/`load_cards_from_strs` decode all cards from the embedded
+`CARD_BLOB` (zero serde), verified by `test_blob_matches_json` over **all 2280 cards**
+(field-for-field, including `group` derivation and `Some(0)` score/cost via presence bits
+0x08/0x10). Fixes that shipped with it:
+- `parse_header`/offset-table reads were `u8` but the format is `u32` (broken blob decoder).
+- Blob `group` now mirrors `map_series_to_group` (multi-line series → empty group), matching
+  the JSON deserializer exactly (this was the bring_love multiname regression).
+- `score`/`cost` presence flags so `Some(0)` is preserved.
 
-**Not done; future work.** This is tracked as a follow-up to R4 (R4 gated only the
-ability-path symbols; the loaders were explicitly out of scope). Effort estimate:
-~half a day, Medium risk (blob is already produced by `compile_cards.py` and verified).
+**Remaining (smaller):**
+1. **`deck_parser.rs:37,40`** still `serde_json::from_str::<Vec<Card>>` on the baked DS deck
+   JSON. Could route through the blob's `resolve_deck_indices`/`find_card_index_by_no`.
+2. **`web_server.rs`** keeps serde (it IS the API contract) — out of scope; `server`-only.
+3. **`qa_test_suite.rs`** `Choice` from_value is test-only — fine.
+
+**Note on build size:** enabling `compact_card_data` in default embeds the ~539 KB blob
+(`cards_gen.rs`, 3.8 MB source) in every build — the cost of dropping card serde. Tests:
+**1934/1934 green**.
