@@ -1232,8 +1232,6 @@ impl GameState {
     }
 
     pub(crate) fn process_current_ability(&mut self) {
-        #[cfg(feature = "arena_allocator")]
-        crate::arena::arena_enter();
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!(
                 "[PCA_ENTER] has_resolver={}",

@@ -50,10 +50,6 @@ wii = ["no_std", "once_cell", "bytecode_abilities"]
 # Bytecode abilities: use pre-compiled bytecode instead of JSON serde
 # for ability loading. Dramatically reduces memory footprint (~7KB vs 1.4MB).
 bytecode_abilities = []
-# Arena allocator: bump arena for temporary allocations during ability triggers.
-# Reduces per-trigger heap allocs from ~15K to ~150. Requires alloc_tracker.
-# NOT in default — enable explicitly for production/profiling builds.
-arena_allocator = ["alloc_tracker"]
 # Compact cards: strips display-only fields (img, product, rare, ability text, faq)
 # from the Card struct to reduce RAM on embedded/console targets.
 compact_cards = []

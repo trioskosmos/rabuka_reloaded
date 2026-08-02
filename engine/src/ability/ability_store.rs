@@ -60,10 +60,6 @@ impl AbilityRef {
                 return ability;
             }
 
-            // Decoded abilities persist (global cache + queue entries), so they
-            // must not live in the resettable bump arena.
-            #[cfg(feature = "arena_allocator")]
-            crate::arena::arena_bypass_enter();
             let ability = match crate::ability::vm::get_ability(self.0 as usize) {
                 Ok(ability) => Arc::new(ability),
                 Err(e) => {
@@ -71,8 +67,6 @@ impl AbilityRef {
                     Arc::new(crate::card::Ability::default())
                 }
             };
-            #[cfg(feature = "arena_allocator")]
-            crate::arena::arena_bypass_exit();
             if let Ok(mut cache) = cache.lock() {
                 cache.insert(self.0, ability.clone());
             }

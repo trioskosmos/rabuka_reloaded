@@ -626,8 +626,6 @@ impl GameState {
         self.mods.last_cost_discard_count = 0;
         self.mods.last_cost_moved_card_ids.clear();
         self.mods.last_cost_energy_count = 0;
-        #[cfg(feature = "arena_allocator")]
-        crate::arena::arena_exit();
     }
 
     /// Backward-compat: the card that last moved areas (from turn_area_movements).

@@ -104,7 +104,6 @@ The engine uses Cargo feature flags to toggle platform support and optimizations
 | `psp` | PSP target (no_std + alloc) |
 | `ds` | DS target (no_std + compact everything) |
 | `dc` | Dreamcast target (no_std) |
-| `arena_allocator` | Bump arena for temp allocs (~15K → ~150 per trigger) |
 | `bytecode_abilities` | Use bytecode VM instead of JSON serde |
 | `compact_cards` | Strip display-only fields from Card struct |
 | `compact_state` | Bounded log/application Vecs |
@@ -155,7 +154,6 @@ To test if the DS crash is resolved, build with `build_ds.bat` and activate an a
 | `text` fields (AbilityEffect, Choice, etc.) | String (24 B + heap) | ArcStr (16 B, shared) | ~48 KB |
 | JSON-based ability loading | ~1.4 MB | ~136 KB (bytecode) | 90% |
 | GameState HashMap/HashSet → SmallVec (7 fields) | ~40-80 B overhead per empty map | 0-24 B inline | ~20-40 KB |
-| Bump arena allocator | ~15,000 per-trigger allocs | ~150 | 99% |
 | recalculate_constants scratch buffers | 7 HashMap allocs per call | 0 (reused across calls) | ~10-20 KB per activation |
 | MovementEvent source/dest zones | String (24 B + heap) × 2 | ZoneId enum (1 B) | ~46 B per event × ~10-20 events/turn |
 | TriggerEvent moved_cards/appeared_cards | Vec (24 B + heap) × 2 | SmallVec (inline, 0 allocs) | ~48 B per event × ~10-20 events/turn |
@@ -179,7 +177,6 @@ To test if the DS crash is resolved, build with `build_ds.bat` and activate an a
 | Store gained abilities as AbilityRef (2 B) instead of Ability (~600 B) | ~50-100 KB | Medium | `game_state/mod.rs:77` | Medium |
 | DynamicCount/QuotedText String fields → enums | ~12 KB | Low | `card.rs:3645-3659` | Low |
 | PositionInfo/DistinctInfo String variants → enums | ~12 KB | Low | `card.rs:3625-3666` | Low |
-| Arena v1 (cursor reset) — eliminates remaining per-trigger allocs | ~3 KB per trigger | Medium | `arena.rs` | Low |
 | Unblock CondBox (Condition pool, 64 slots) | ~33 KB | Medium | `pool.rs:174` | Low |
 
 ## Testing
