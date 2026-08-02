@@ -320,7 +320,6 @@ pub fn truncate_aware_segments(s: &str, max_chars: usize) -> String {
                 } else {
                     let truncated: String = chars.into_iter().take(remaining).collect();
                     result.push_str(&truncated);
-                    text_count += remaining;
                     break;
                 }
             }

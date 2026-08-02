@@ -1,12 +1,13 @@
 use super::abilities_gen::{BYTECODE, NUM_ABILITIES, OFFSETS, STRINGS};
 use super::enums::EffectState;
 use crate::ability::enums::ActionType;
+#[cfg_attr(not(feature = "debug_conditions"), allow(unused_imports))]
+use crate::card::TriggerEvent;
 use crate::card::{
     ek_box_new, Ability, AbilityCost, AbilityEffect, AbilityFilter, AbilityFilterBranch,
     CardProperty, CardState, CardType, ComparisonTarget, ComparisonType, Condition,
     ConditionCardType, DistinctInfo, DistinctType, DynamicCount, EffectFilter, EffectKind,
     LocationSubChecks, Operator, PlacementOrder, PositionCharacter, PositionInfo, QuotedText,
-    TriggerEvent,
 };
 use crate::core::types::ArcStr;
 
@@ -469,6 +470,7 @@ impl<'a> BcReader<'a> {
         }
     }
 
+    #[allow(dead_code)] // deserialization mirror kept for symmetry with the serializer
     fn read_cost_comparison_value(&mut self) -> Option<crate::card::CostComparison> {
         let tag = self.read_u8()?;
         match tag {
@@ -517,6 +519,7 @@ impl<'a> BcReader<'a> {
         }
     }
 
+    #[allow(dead_code)] // deserialization mirror kept for symmetry with the serializer
     fn read_trigger_event_value(&mut self) -> Option<Box<crate::card::TriggerEvent>> {
         let tag = self.read_u8()?;
         match tag {
