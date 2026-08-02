@@ -47,6 +47,11 @@ pub(crate) use alloc::boxed::Box;
 pub(crate) use std::boxed::Box;
 
 #[cfg(feature = "no_std")]
+pub(crate) use alloc::collections::BTreeMap;
+#[cfg(not(feature = "no_std"))]
+pub(crate) use std::collections::BTreeMap;
+
+#[cfg(feature = "no_std")]
 pub(crate) use alloc::collections::VecDeque;
 #[cfg(not(feature = "no_std"))]
 pub(crate) use std::collections::VecDeque;

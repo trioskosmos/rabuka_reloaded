@@ -19,7 +19,7 @@ macro_rules! eprintln {
 
 // Platform compat: maps std types to no_std equivalents for PSP
 pub(crate) mod compat;
-pub(crate) use compat::{Arc, Box, HashMap, HashSet, VecDeque};
+pub(crate) use compat::{Arc, Box, BTreeMap, HashMap, HashSet, VecDeque};
 
 #[cfg(feature = "alloc_tracker")]
 pub mod alloc_counter;
@@ -44,7 +44,6 @@ pub mod bot;
 // Game logic modules
 pub mod game;
 pub use game::deck_builder;
-#[cfg(not(feature = "no_std"))]
 pub use game::deck_parser;
 pub use game::display;
 pub use game::game_setup;

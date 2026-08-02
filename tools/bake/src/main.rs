@@ -146,7 +146,7 @@ fn build_normalized_map(
 // ---------------------------------------------------------------------------
 
 fn bake_psp(repo_root: &Path) {
-    println!("--- PSP: per-deck JSON + cards_all ---");
+    println!("--- PSP: per-deck JSON ---");
 
     let out = repo_root.join("platforms/psp/baked");
     fs::create_dir_all(&out).expect("create psp/baked dir");
@@ -160,11 +160,6 @@ fn bake_psp(repo_root: &Path) {
         write_psp_deck_json(&out, &normalized_map, &norm_to_orig, &abilities, &decks);
 
     write_decks_json(&out, &deck_entries);
-    write_deck_cards_all(&out, &deck_entries);
-
-    // Write ALL cards as a single Vec<Card> JSON — the PSP loads this like
-    // the 3DS loads cards.bin: full database, then builds decks from it.
-    write_psp_cards_all(&out, &cards_obj, &abilities);
 
     println!();
 }
@@ -485,10 +480,13 @@ fn write_psp_deck_json(
     let mut deck_entries: Vec<serde_json::Value> = Vec::new();
 
     for (deck_index, (deck_name, card_nos)) in decks.iter().enumerate() {
-        // Collect unique card values for this deck
-        let unique_set: HashSet<&str> = card_nos.iter().map(|s| s.as_str()).collect();
+        // Collect unique card values for this deck (sorted for deterministic
+        // output — HashSet iteration order is nondeterministic).
+        let mut unique_nos: Vec<&str> = card_nos.iter().map(|s| s.as_str()).collect();
+        unique_nos.sort_unstable();
+        unique_nos.dedup();
         let mut deck_cards: Vec<serde_json::Value> = Vec::new();
-        for no in &unique_set {
+        for no in &unique_nos {
             if let Some(card_val) = normalized_map.get(*no) {
                 deck_cards.push(card_val.clone());
             } else {
@@ -561,67 +559,6 @@ fn write_decks_json(out: &Path, deck_entries: &[serde_json::Value]) {
     println!(
         "  decks.json: {} decks, {} bytes",
         deck_entries.len(),
-        json.len()
-    );
-}
-
-fn write_deck_cards_all(out: &Path, deck_entries: &[serde_json::Value]) {
-    let mut all: Vec<Vec<serde_json::Value>> = Vec::new();
-    for i in 0..deck_entries.len() {
-        let filename = format!("deck_{i}_cards.json");
-        let path = out.join(&filename);
-        let cards = fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str::<Vec<serde_json::Value>>(&s).ok())
-            .unwrap_or_default();
-        all.push(cards);
-    }
-    let json = serde_json::to_string(&all).unwrap_or_else(|e| {
-        panic!("[BAKE] deck_cards_all.json serialize: {e}");
-    });
-    let path = out.join("deck_cards_all.json");
-    fs::write(&path, &json).unwrap_or_else(|e| {
-        panic!("[BAKE] Failed to write {}: {}", path.display(), e);
-    });
-    println!(
-        "  deck_cards_all.json: {} decks, {} bytes",
-        all.len(),
-        json.len()
-    );
-}
-
-/// Write ALL cards as a single Vec<Card> JSON for PSP.
-/// The PSP loads this like the 3DS loads cards.bin: full database,
-/// then builds decks from it at runtime.
-fn write_psp_cards_all(
-    out: &Path,
-    cards_obj: &serde_json::Map<String, serde_json::Value>,
-    abilities: &Option<serde_json::Value>,
-) {
-    let mut cards: Vec<Card> = cards_obj
-        .values()
-        .map(|v| {
-            serde_json::from_value(v.clone()).expect("[BAKE] Card deserialize from cards.json")
-        })
-        .collect();
-
-    // Note: abilities Vec<AbilityRef> is #[serde(skip)] so it won't serialize.
-    // The PSP runtime calls CardLoader::attach_abilities() after deserializing.
-    // We still attach here to count how many cards have them for the status line.
-    if abilities.is_some() {
-        CardLoader::attach_abilities(&mut cards);
-    }
-
-    let json = serde_json::to_string(&cards).expect("[BAKE] cards_all serialize");
-    let path = out.join("cards_all.json");
-    fs::write(&path, &json).unwrap_or_else(|e| {
-        panic!("[BAKE] Failed to write {}: {}", path.display(), e);
-    });
-    let with_abilities = cards.iter().filter(|c| !c.abilities.is_empty()).count();
-    println!(
-        "  cards_all.json: {} cards ({} with abilities), {} bytes",
-        cards.len(),
-        with_abilities,
         json.len()
     );
 }

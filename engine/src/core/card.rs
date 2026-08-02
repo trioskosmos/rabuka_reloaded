@@ -1,7 +1,7 @@
 use crate::ability::ability_store::AbilityRef;
 pub(crate) use crate::ability::enums::{ActionType, ConditionType, EffectState};
 use crate::core::types::ArcStr;
-use crate::HashMap;
+use crate::{BTreeMap, HashMap};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
@@ -252,8 +252,10 @@ impl<'de> Deserialize<'de> for HeartMap {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(Deserialize)]
         struct Raw {
+            // BTreeMap: deterministic iteration order (std HashMap uses a
+            // random per-process seed, making baked output nondeterministic).
             #[serde(flatten)]
-            hearts: HashMap<String, u32>,
+            hearts: BTreeMap<String, u32>,
         }
         let raw = Raw::deserialize(deserializer)?;
         let hearts = raw
