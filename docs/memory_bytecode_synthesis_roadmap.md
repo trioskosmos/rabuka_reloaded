@@ -37,9 +37,9 @@ confirmed against the source; every number was re-measured from the current tree
 
 The ability decode path is fully direct. The only remaining `serde_json::from_value` calls
 are in the JSON oracle/test path (`kind_from_action`'s `dynamic_count` fallback in
-`card.rs`, and `qa_test_suite.rs`) — the target of R1.
+`card.rs`, and `qa_test_suite.rs`) — the target of R4.
 
-### Serde/JSON infrastructure still compiled (oracle-only; gated by R1)
+### Serde/JSON infrastructure still compiled (ability-path; gated by R4)
 
 | Symbol | Location | ~Lines |
 |--------|----------|--------|
@@ -49,10 +49,12 @@ are in the JSON oracle/test path (`kind_from_action`'s `dynamic_count` fallback 
 | `kind_from_action` (JSON twin of `build_*`) | `card.rs` | ~345 |
 | `Deserialize` derives | `card.rs` etc. | — |
 
-> These remain **only** for the deep-compare oracle
+> These **ability-path** symbols remain only for the deep-compare oracle
 > (`tests/test_modules/bytecode_deep_compare_test.rs`), the bytecode↔JSON equality guard.
-> The hot path no longer touches them. **R1** gates them behind a dev-only feature so
-> `ds`/`no_std` builds drop serde entirely.
+> The hot path no longer touches them. **R4** gates them behind a dev-only feature.
+> Note: serde/serde_json are *also* used elsewhere in production (`card_loader.rs`,
+> `deck_parser.rs`, `web_server.rs`, DS `DECKS_JSON`) — R4 only gates the ability decode
+> path; those loaders are handled separately.
 
 ### Memory refactor state
 
@@ -62,8 +64,8 @@ are in the JSON oracle/test path (`kind_from_action`'s `dynamic_count` fallback 
 | Compact cards (`compact_cards` + `compact_card_data` blob) | DONE |
 | Compact GameState (`compact_state`) | DONE |
 | HeartMap → `SmallVec<[(HeartColor, u8); 4]>` | DONE (already u8) |
-| Arena v0 (monotonic 64 KB bump, `arena_allocator`) | LIVE but off-by-default & blocked → **R3: remove** |
-| Arena v1 (cursor reset) — the **99% alloc win** | **BLOCKED** (game-state grows into the arena; per-turn reset unsafe). Superseded by R3 (removal). |
+| Arena v0 (monotonic 64 KB bump, `arena_allocator`) | LIVE but off-by-default & blocked → **R2: remove** |
+| Arena v1 (cursor reset) — the **99% alloc win** | **BLOCKED** (game-state grows into the arena; per-turn reset unsafe). Superseded by R2 (removal). |
 | `EkBox` pool (128 slots) | LIVE, wired into `AbilityEffect.kind` — **R6: keep only if it pays** |
 | `CondBox` pool (64 slots) | defined in `pool.rs` but **NOT wired** — **R6: wire or delete** |
 | P3 enums (`card_type`, `orientation`, `zone`) | DONE |
@@ -85,8 +87,8 @@ Both documents converge on one principle:
 
 Track A (zero-serde decode) is complete. The next phase of work is **removal-first**
 (Track R): delete or gate the systems that no longer pay for themselves before optimizing
-what remains. `Condition` and `AbilityCost` no longer decode through serde, so the JSON
-oracle is now the only reason the serde decode *system* still ships.
+what remains. `Condition` and `AbilityCost` no longer decode through serde, so the
+ability-path JSON decode system is now only kept for the oracle.
 
 ### Guiding principle (2026-08-02): remove before optimize
 
@@ -245,47 +247,20 @@ and the 2,300-line dead `vm_gen.rs`.
 ## 4. Track R — Remove systems and resources (new priority)
 
 Under the "remove before optimize" principle. Each phase deletes or gates a whole system,
-not a micro-tweak.
+not a micro-tweak. Ordered by **value ÷ risk**: pure zero-risk deletions first, then the
+biggest shipped-code cuts, then feature-gating, then the sweep.
 
-### Phase R1 — Gate the JSON oracle; drop serde/serde_json from `ds`/`no_std`
-
-**Goal.** Delete ~600 lines of JSON decode (`populate_from_json`, `condition_populate_from_json`,
-`normalize_cost_keys` + `recursive_normalize_cost_value`, `kind_from_action`, the
-`Deserialize` derives) and the `serde_json`/`serde` dependencies from production builds —
-not by editing the code, but by feature-gating them behind a dev-only `json_path_test`
-feature (the bytecode↔JSON deep-compare oracle).
-
-**Why.** These are now used **only** by `bytecode_deep_compare_test.rs` (the oracle). The
-hot path is 100% direct. Keeping them compiled costs binary size and RAM on every target
-that never needs them. Gating removes the whole serde decode *system* from `ds`/`no_std`.
-
-**How.**
-1. Add `json_path_test` (dev-only) feature to `engine/Cargo.toml`; put `serde`/`serde_json`
-   behind it for `ds`/`no_std` targets (keep them on default/dev for the oracle).
-2. `#[cfg(feature = "json_path_test")]` on `populate_from_json`, `kind_from_action`,
-   `normalize_cost_keys`, `condition_populate_from_json`, and the `Deserialize` derives
-   that only the oracle touches. Prefer `cfg_attr` on derives.
-3. Verify: `cargo test --features json_path_test` still runs the deep-compare oracle;
-   `--no-default-features --features ds` (or `no_std`) compiles with zero serde in the
-   ability path.
-4. Optional follow-up: move the oracle test itself behind the feature.
-
-**Files:** `engine/Cargo.toml`, `engine/src/ability/vm.rs`, `engine/src/core/card.rs`,
-`engine/tests/test_modules/bytecode_deep_compare_test.rs`.
-
-**Gate:** deep-compare green on default; `ds`/`no_std` builds compile without serde.
-**Effort/risk:** ~half a day, Low–Medium (feature plumbing, not logic).
-
----
-
-### Phase R2 — Delete the dead opcode encoder (`compile_one`/`compile_condition`/`compile_cost`)
+### Phase R1 — Delete the dead opcode encoder (`compile_one`/`compile_condition`/`compile_cost`)
 
 **Goal.** Remove the superseded opcode-based encoder in `cards/compile_abilities.py`
-(verified present). `enc_val` is the only encoder; this is pure deletion.
+(verified: `compile_one`/`compile_condition`/`compile_cost` have **no non-recursive
+caller** — `enc_val` is the only encoder). Also delete the opcode tables they alone use
+(`COND_OPCODES`, `COND_FIELDS`, `COST_OPCODES`, `EFFECT_OPCODES`). ~300 lines of pure
+deletion.
 
 **How.**
-1. Delete `compile_one`, `compile_condition`, `compile_cost` and any callers/constants
-   only they use.
+1. Delete `compile_one`, `compile_condition`, `compile_cost` and the opcode tables that
+   have no other reader.
 2. Sweep `vm.rs` for opcode-era readers that no encoder emits (anything beyond the
    `TAG_OBJECT_VARIANT` + direct readers). Delete unreachable arms.
 3. Confirm `compile_abilities.py` re-runs to byte-identical output (`cards/build/*.bin`,
@@ -296,7 +271,7 @@ that never needs them. Gating removes the whole serde decode *system* from `ds`/
 
 ---
 
-### Phase R3 — Remove the `arena_allocator` subsystem
+### Phase R2 — Remove the `arena_allocator` subsystem
 
 **Goal.** Delete the arena feature entirely: `engine/src/arena.rs`, the `arena_allocator`
 feature, the arena hooks in `alloc_counter.rs`, and the arena bypass calls added in
@@ -319,20 +294,64 @@ own bump allocator in `platforms/ds`) — the engine arena is independent of it.
 
 ---
 
-### Phase R4 — Strip debug instrumentation from production builds
+### Phase R3 — Strip debug instrumentation from production builds
 
 **Goal.** Remove resource-holding debug systems from shipped targets: `debug_conditions`
 `text`/`trigger_event` fields on `Condition`, `ABILITY_DEBUG` logging, `ds_print`/`nds_println`
 under `ds_debug`, and `alloc_counter` in non-dev builds.
 
+**Why.** `debug_conditions` is in **default features** (Cargo.toml:29) and gates 92 cfg
+blocks + `debug.rs` (158 lines) + the `text`/`trigger_event` fields inflating `Condition`
+(400 B). Flipping it out of default is the **largest shipped-code/RAM cut in Track R** —
+bigger than the serde gate, and it touches every build, not just `ds`/`no_std`.
+
 **How.** Audit each `#[cfg(feature = "debug_*")]` and gate them out of default (keep only
 for `test`/dev builds). This shrinks `Condition` (400 B → smaller) and removes the string
-payloads the compiler still emits for `text`.
+payloads the compiler still emits for `text`. Note the bytecode decoder
+(`condition_decoder_gen.rs`) already `#[cfg]`s the `text`/`trigger_event` read, so both
+decode paths stay in parity.
 
 **Files:** `engine/Cargo.toml` (feature defaults), `engine/src/core/card.rs`,
 `engine/src/ability/debug.rs`, `engine/src/alloc_counter.rs`.
 **Gate:** default suite still passes with gating; `Condition` size re-measured.
 **Effort/risk:** 2–4 h, Low.
+
+---
+
+### Phase R4 — Gate the ability-path JSON decode (drop serde from the ability system)
+
+**Goal.** Feature-gate the ability-path JSON decode (`populate_from_json`,
+`condition_populate_from_json`, `normalize_cost_keys` + `recursive_normalize_cost_value`,
+`kind_from_action`, the ability `Deserialize` derives) behind a dev-only `json_path_test`
+feature so `ds`/`no_std` builds compile without that decode *system*.
+
+**Why.** The hot path is 100% direct; these symbols are now used only by
+`bytecode_deep_compare_test.rs` (the oracle). Keeping them compiled costs binary size and
+RAM on every target that never needs them.
+
+**Scope note (corrected).** serde/serde_json are **not** ability-only: `card_loader.rs`
+(`load_cards_from_strs`), `deck_parser.rs`, `web_server.rs`, and the DS `DECKS_JSON` parse
+all call `serde_json` in production. R4 gates **only** the ability-path symbols. Dropping
+serde from `ds`/`no_std` *entirely* requires reworking card/deck loading too — track that
+as a follow-up, not part of R4.
+
+**How.**
+1. Add `json_path_test` (dev-only) feature to `engine/Cargo.toml`; put `serde`/`serde_json`
+   behind it for `ds`/`no_std` targets (keep them on default/dev for the oracle).
+2. `#[cfg(feature = "json_path_test")]` on `populate_from_json`, `kind_from_action`,
+   `normalize_cost_keys`, `condition_populate_from_json`, and the ability `Deserialize`
+   derives. Prefer `cfg_attr` on derives.
+3. Verify: `cargo test --features json_path_test` still runs the deep-compare oracle;
+   `--no-default-features --features ds` (or `no_std`) compiles with zero serde in the
+   ability path.
+4. Optional follow-up: move the oracle test itself behind the feature.
+
+**Files:** `engine/Cargo.toml`, `engine/src/ability/vm.rs`, `engine/src/core/card.rs`,
+`engine/tests/test_modules/bytecode_deep_compare_test.rs`.
+
+**Gate:** deep-compare green on default; `ds`/`no_std` builds compile without serde in the
+ability path.
+**Effort/risk:** ~half a day, Low–Medium (feature plumbing, not logic; loader serde stays).
 
 ---
 
@@ -354,12 +373,16 @@ verify the 3DS MP flow it was added for.
 
 ---
 
-### Phase R6 — Pools and remaining subsystems: keep only if they pay
+### Phase R6 — Pools and dependency sweep: keep only what pays
 
-**Goal.** Decide `EkBox`/`CondBox` pools and the `compact_*` systems on measured benefit;
-remove what doesn't pay. `CondBox` is defined but not wired — either wire it (only if it
-moves RAM materially) or delete it. Same for the arena (R3) and any `once_cell`/`uuid`/
-`actix`/`tokio`/`rmp-serde` deps that resolve to zero for a given target.
+**Goal.** Decide `EkBox`/`CondBox` pools on measured benefit; remove what doesn't pay.
+`CondBox` is defined but not wired — either wire it (only if it moves RAM materially) or
+delete it.
+
+**Deps (corrected).** `once_cell` is **dead everywhere** (zero references in engine and
+platforms) → delete it and the `ds`/`psp`/`wii` feature links. `rmp-serde` **is** used
+(`game_state` save/load, 3DS `cards.bin`, `card_loader` msgpack) → **keep**, don't drop.
+`uuid`/`actix`/`tokio`/`bytes` are `server`-only, already optional → leave.
 
 **How.** One profiling pass over `RABUKA_ALLOC_TRACK` + `size_check`-style probes, then
 delete unused pools/deps. This is the "remove resources" sweep after the system removals.
@@ -376,7 +399,7 @@ measured win. Kept for reference; B1 stays blocked per the note below.
 
 | Phase | Old goal | Status / why deferred |
 |-------|----------|------------------------|
-| O1 (was B1) | Arena per-turn reset | **BLOCKED** — game-state grows into the bump (measured 2–22 KB live); unsafe to reset. Removal (R3) supersedes it. |
+| O1 (was B1) | Arena per-turn reset | **BLOCKED** — game-state grows into the bump (measured 2–22 KB live); unsafe to reset. Removal (R2) supersedes it. |
 | O2 (was B3) | Box `AbilityResolver` → shrink `AbilityQueueEntry` 2.5 KB → ~100 B | Deferred — micro-opt; only if profiles show queue residency is meaningful. |
 | O3 (was B2) | Wire `CondBox` pool into `Condition` | Deferred — see R6 (pool decision). |
 | O4 (was C1) | P3 enum conversions (`operation` etc.) | Deferred — byte-level squeeze, lowest value. |
@@ -499,9 +522,9 @@ the deferred optimization track:
 | Old item | Now |
 |----------|-----|
 | C1. P3 enum conversions (`operation` etc.) | **O4** — deferred, lowest value. |
-| C2. `debug_conditions` for `no_std` (strip `text`/`trigger_event`) | **R4** — remove debug resources from production. |
-| C3. Dead `compile_one`/`compile_condition`/`compile_cost` encoder | **R2** — delete the dead opcode encoder. |
-| C4. `kind_from_action` + `Deserialize` feature-gating (drop serde from `ds`/`no_std`) | **R1** — gate the JSON oracle, drop serde. |
+| C2. `debug_conditions` for `no_std` (strip `text`/`trigger_event`) | **R3** — strip debug resources from production (default features). |
+| C3. Dead `compile_one`/`compile_condition`/`compile_cost` encoder | **R1** — delete the dead opcode encoder. |
+| C4. `kind_from_action` + `Deserialize` feature-gating (ability-path serde) | **R4** — gate the ability-path JSON decode. |
 
 ---
 
@@ -509,12 +532,12 @@ the deferred optimization track:
 
 | Order | Phase | Type | Commit message | Est. |
 |-------|-------|------|----------------|------|
-| 1 | R1 Gate JSON oracle, drop serde from `ds`/`no_std` | removal | `refactor: gate json oracle behind json_path_test, drop serde from ds/no_std` | ~0.5 d |
-| 2 | R2 Delete dead opcode encoder | removal | `refactor: delete dead compile_one/compile_condition/compile_cost encoder` | 1–2 h |
-| 3 | R3 Remove `arena_allocator` subsystem | removal | `refactor: remove blocked arena_allocator subsystem` | 2–3 h |
-| 4 | R4 Strip debug instrumentation from production | removal | `refactor: gate debug_conditions/logging out of production builds` | 2–4 h |
+| 1 | R1 Delete dead opcode encoder | removal | `refactor: delete dead compile_one/compile_condition/compile_cost encoder` | 1–2 h |
+| 2 | R2 Remove `arena_allocator` subsystem | removal | `refactor: remove blocked arena_allocator subsystem` | 2–3 h |
+| 3 | R3 Strip debug instrumentation from production | removal | `refactor: gate debug_conditions/logging out of production builds` | 2–4 h |
+| 4 | R4 Gate ability-path JSON decode (`json_path_test`) | removal | `refactor: gate ability-path json decode behind json_path_test` | ~0.5 d |
 | 5 | R5 Remove `RESOLVED_ABILITIES` cache (verify 3DS MP) | removal | `perf: drop ability cache, reclaim ~120KB, decode on demand` | 1–2 h |
-| 6 | R6 Pool + dependency sweep (keep only what pays) | removal | `refactor: remove unused pools/deps` | 0.5 d |
+| 6 | R6 Pools + dep sweep (CondBox, `once_cell`; keep `rmp-serde`) | removal | `refactor: remove unwired CondBox and dead once_cell dep` | 0.5 d |
 | 7+ | O1–O4 squeezing (was B1/B2/B3/C1) | deferred | — | only if measured |
 
 Each phase: implement → `cargo test` → `cargo test --features bytecode_abilities` (deep-compare
@@ -528,13 +551,13 @@ guard) → commit if green. Measure with `RABUKA_ALLOC_TRACK=1 cargo test -- --n
 After Track A: **zero `serde_json::from_value` in the ability decode path**, zero
 intermediate `serde_json::Value` trees during decode, ~600 lines of serde/JSON
 infrastructure removed from the hot path, 2,310 lines of dead generated code gone, and the
-`ds`/`no_std` build one feature-gate away from dropping serde entirely. **Achieved.**
+ability-path serde one feature-gate away from being dropped. **Achieved.**
 
 After Track R: the engine ships **fewer systems, not smarter ones**:
-- `serde`/`serde_json` gone from `ds`/`no_std` ability paths (R1).
-- Dead opcode encoder gone (R2); blocked `arena_allocator` subsystem gone (R3).
-- Debug payloads (`text`/`trigger_event`, logging) stripped from production (R4).
-- Ability cache gone or capped (R5); unused pools/deps deleted (R6).
+- Dead opcode encoder gone (R1); blocked `arena_allocator` subsystem gone (R2).
+- Debug payloads (`text`/`trigger_event`, logging) stripped from production (R3).
+- Ability-path JSON decode gone from `ds`/`no_std` builds (R4).
+- Ability cache gone or capped (R5); unwired CondBox + dead `once_cell` deleted (R6).
 - Net: smaller binaries, less resident RAM, fewer code paths to maintain — achieved by
   deletion, not by micro-optimization.
 
