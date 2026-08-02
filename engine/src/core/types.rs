@@ -220,7 +220,7 @@ pub enum EffectData {
     },
     SurplusHeart {
         is_p1: bool,
-        old_value: u64,
+        old_value: u8,
     },
 }
 
@@ -266,7 +266,7 @@ impl EffectData {
         }
     }
 
-    pub fn old_value(&self) -> Option<u64> {
+    pub fn old_value(&self) -> Option<u8> {
         match self {
             EffectData::SurplusHeart { old_value, .. } => Some(*old_value),
             _ => None,
@@ -398,7 +398,7 @@ pub struct LiveCardResult {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MemberContribution {
     pub source_id: i16,
-    pub slot: usize,
+    pub slot: u8,
     pub base_hearts: [u8; 8],
     pub bonus_hearts: [u8; 8],
     pub base_blades: u8,
@@ -493,13 +493,13 @@ pub enum AdjustmentType {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Allocation {
-    pub target_idx: usize,
+    pub target_idx: u8,
     pub target_name: ArcStr,
     pub source_type: SourceType,
     pub source_name: SourceName,
-    pub source_slot: Option<usize>,
+    pub source_slot: Option<u8>,
     pub wildcard: bool,
-    pub color: usize,
+    pub color: u8,
     pub amount: u8,
     pub is_bonus: bool,
     pub phase: AllocPhase,
@@ -666,9 +666,9 @@ pub struct PositionChangeEvent {
     /// The card that changed position.
     pub moved_card_id: i16,
     /// The position index before the change (0=left, 1=center, 2=right).
-    pub old_position: usize,
+    pub old_position: u8,
     /// The position index after the change (0=left, 1=center, 2=right).
-    pub new_position: usize,
+    pub new_position: u8,
     /// The card whose ability/action caused the move (None = rule/cost with no source card).
     pub cause_card_id: Option<i16>,
     /// The player whose effect/action caused the move.
@@ -713,7 +713,7 @@ pub struct AbilityApplication {
     pub ability_text: ArcStr,
     pub effect_type: EffectType,
     pub target_card_id: i16,
-    pub heart_color: Option<usize>,
+    pub heart_color: Option<u8>,
     pub amount: i32,
 }
 
@@ -733,7 +733,7 @@ pub struct Adjustment {
     pub adjustment_type: AdjustmentType,
     pub desc: String,
     pub value: i32,
-    pub color: usize,
+    pub color: u8,
     pub source: String,
 }
 
@@ -741,7 +741,7 @@ pub struct Adjustment {
 pub struct AbilityBonus {
     pub source: ArcStr,
     pub amount: u8,
-    pub color: Option<usize>,
+    pub color: Option<u8>,
     pub ability_text: ArcStr,
 }
 

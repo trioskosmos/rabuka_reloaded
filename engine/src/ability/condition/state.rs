@@ -441,7 +441,9 @@ impl<'a> ConditionContext<'a> {
                 } else {
                     event.new_position
                 };
-                if check_pos >= pos_names.len() || pos_names[check_pos] != req_pos {
+                if (check_pos as usize) >= pos_names.len()
+                    || pos_names[check_pos as usize] != req_pos
+                {
                     return false;
                 }
             }

@@ -163,8 +163,9 @@ impl super::TurnEngine {
                         let mut filled_per_color = [0u8; 8];
                         for alloc in &snap.breakdown.allocations {
                             if alloc.color < 8 {
-                                filled_per_color[alloc.color] =
-                                    filled_per_color[alloc.color].saturating_add(alloc.amount);
+                                filled_per_color[alloc.color as usize] = filled_per_color
+                                    [alloc.color as usize]
+                                    .saturating_add(alloc.amount);
                             }
                         }
                         for color in 0..8 {
@@ -276,8 +277,12 @@ impl super::TurnEngine {
         // is populated and can be used to decide who won.
         // (Q47/Q48: score is not a reliable proxy — score can be 0 and still win.)
         for snap in game_state.performance_snapshots.iter_mut() {
-            eprintln!("[LIVE-DBG] === PASS/FAIL CHECK player={} lives={} total_hearts={:?} ===",
-                snap.player_id, snap.lives.len(), snap.total_hearts);
+            eprintln!(
+                "[LIVE-DBG] === PASS/FAIL CHECK player={} lives={} total_hearts={:?} ===",
+                snap.player_id,
+                snap.lives.len(),
+                snap.total_hearts
+            );
             for i in 0..snap.lives.len() {
                 let lc_id = snap.lives[i].card_id;
                 if let Some(card) = game_state.card_database.get_card(lc_id) {
@@ -286,12 +291,14 @@ impl super::TurnEngine {
                     if let Some(ref nh) = card.need_heart {
                         let mut filled = EMPTY_H8;
                         for alloc in &snap.breakdown.allocations {
-                            if alloc.target_idx == i {
-                                filled[alloc.color] += alloc.amount;
+                            if alloc.target_idx == i as u8 {
+                                filled[alloc.color as usize] += alloc.amount;
                             }
                         }
-                        eprintln!("[LIVE-DBG] live[{}] card={} filled_from_allocs={:?}",
-                            i, card.card_no, filled);
+                        eprintln!(
+                            "[LIVE-DBG] live[{}] card={} filled_from_allocs={:?}",
+                            i, card.card_no, filled
+                        );
                         let mut required_arr = EMPTY_H8;
                         for (color, needed) in &nh.hearts {
                             required_arr[color.index()] = *needed;
@@ -300,10 +307,16 @@ impl super::TurnEngine {
                         if let Some(card_mods) = game_state.mods.need_heart_modifiers.get(&lc_id) {
                             // Q115/Q127: Set-to-X applies first (per-color), then additive stacks.
                             // A set modifier on one color does NOT erase other colors' requirements.
-                            eprintln!("[LIVE-DBG] live[{}] applying {} modifiers", i, card_mods.len());
+                            eprintln!(
+                                "[LIVE-DBG] live[{}] applying {} modifiers",
+                                i,
+                                card_mods.len()
+                            );
                             for (color, me) in card_mods {
-                                eprintln!("[LIVE-DBG] live[{}]   modifier color={:?} set={} additive={}",
-                                    i, color, me.set, me.additive);
+                                eprintln!(
+                                    "[LIVE-DBG] live[{}]   modifier color={:?} set={} additive={}",
+                                    i, color, me.set, me.additive
+                                );
                                 if me.set != 0 {
                                     required_arr[color.index()] = me.set as u8;
                                 }
@@ -315,7 +328,10 @@ impl super::TurnEngine {
                                     required_arr[idx] = (current + me.additive).max(0) as u8;
                                 }
                             }
-                            eprintln!("[LIVE-DBG] live[{}] after_modifiers required={:?}", i, required_arr);
+                            eprintln!(
+                                "[LIVE-DBG] live[{}] after_modifiers required={:?}",
+                                i, required_arr
+                            );
                         } else {
                             eprintln!("[LIVE-DBG] live[{}] no modifiers", i);
                         }
@@ -324,8 +340,10 @@ impl super::TurnEngine {
                             let mut ok = true;
                             let total_filled: u8 = filled.iter().sum();
                             let total_required: u8 = required_arr.iter().sum();
-                            eprintln!("[LIVE-DBG] live[{}] total_filled={} total_required={} wildcard={}",
-                                i, total_filled, total_required, wildcard);
+                            eprintln!(
+                                "[LIVE-DBG] live[{}] total_filled={} total_required={} wildcard={}",
+                                i, total_filled, total_required, wildcard
+                            );
                             if total_filled < total_required {
                                 eprintln!("[LIVE-DBG] live[{}] FAIL: total_filled({}) < total_required({})",
                                     i, total_filled, total_required);
@@ -359,8 +377,10 @@ impl super::TurnEngine {
                                     }
                                 }
                             }
-                            eprintln!("[LIVE-DBG] live[{}] VERDICT: passed={} filled={:?} required={:?}",
-                                i, ok, filled, required_arr);
+                            eprintln!(
+                                "[LIVE-DBG] live[{}] VERDICT: passed={} filled={:?} required={:?}",
+                                i, ok, filled, required_arr
+                            );
                             ok
                         };
                         // Populate adjustments and requirements from need_heart_modifiers
@@ -377,14 +397,20 @@ impl super::TurnEngine {
                                         desc: if verbose {
                                             format!(
                                                 "{} {}",
-                                                if entry.set != 0 { "=" } else if total > 0 { "+" } else { "" },
+                                                if entry.set != 0 {
+                                                    "="
+                                                } else if total > 0 {
+                                                    "+"
+                                                } else {
+                                                    ""
+                                                },
                                                 total,
                                             )
                                         } else {
                                             String::new()
                                         },
                                         value: total,
-                                        color: color.index(),
+                                        color: color.index() as u8,
                                         source: if verbose {
                                             format!("{} req modifier ({})", card.name, color_label)
                                         } else {
@@ -423,7 +449,11 @@ impl super::TurnEngine {
                     let base_score = card.get_score() as i32;
                     let set_score = game_state.mods.get_score_set_modifier(lc_id);
                     let additive = game_state.mods.get_score_modifier(lc_id) - set_score;
-                    let effective_base = if set_score != 0 { set_score } else { base_score };
+                    let effective_base = if set_score != 0 {
+                        set_score
+                    } else {
+                        base_score
+                    };
                     snap.lives[i].score = (effective_base + additive).max(0) as u8;
                 }
             }
@@ -434,17 +464,39 @@ impl super::TurnEngine {
         let player2_has_cards = !game_state.player2.live_card_zone.cards.is_empty();
         // Use .rev().find() — snapshots accumulate across turns/re-entries, so the
         // LAST snapshot for each player is the current turn's, not the first.
-        let player1_all_passed = player1_has_cards && game_state.performance_snapshots.iter().rev()
-            .find(|s| s.player_id == player1_id)
-            .map_or(false, |s| !s.lives.is_empty() && s.lives.iter().all(|l| l.passed));
-        let player2_all_passed = player2_has_cards && game_state.performance_snapshots.iter().rev()
-            .find(|s| s.player_id == player2_id)
-            .map_or(false, |s| !s.lives.is_empty() && s.lives.iter().all(|l| l.passed));
+        let player1_all_passed = player1_has_cards
+            && game_state
+                .performance_snapshots
+                .iter()
+                .rev()
+                .find(|s| s.player_id == player1_id)
+                .map_or(false, |s| {
+                    !s.lives.is_empty() && s.lives.iter().all(|l| l.passed)
+                });
+        let player2_all_passed = player2_has_cards
+            && game_state
+                .performance_snapshots
+                .iter()
+                .rev()
+                .find(|s| s.player_id == player2_id)
+                .map_or(false, |s| {
+                    !s.lives.is_empty() && s.lives.iter().all(|l| l.passed)
+                });
         eprintln!("[LIVE-DBG] === VICTORY DETERMINATION ===");
-        eprintln!("[LIVE-DBG] P1 score={} has_cards={} all_reqs_met={} live_zone={:?}",
-            player1_score, player1_has_cards, player1_all_passed, game_state.player1.live_card_zone.cards);
-        eprintln!("[LIVE-DBG] P2 score={} has_cards={} all_reqs_met={} live_zone={:?}",
-            player2_score, player2_has_cards, player2_all_passed, game_state.player2.live_card_zone.cards);
+        eprintln!(
+            "[LIVE-DBG] P1 score={} has_cards={} all_reqs_met={} live_zone={:?}",
+            player1_score,
+            player1_has_cards,
+            player1_all_passed,
+            game_state.player1.live_card_zone.cards
+        );
+        eprintln!(
+            "[LIVE-DBG] P2 score={} has_cards={} all_reqs_met={} live_zone={:?}",
+            player2_score,
+            player2_has_cards,
+            player2_all_passed,
+            game_state.player2.live_card_zone.cards
+        );
         let (player1_won, player2_won) = if !player1_all_passed && !player2_all_passed {
             eprintln!("[LIVE-DBG] RESULT: neither player passed → neither wins");
             (false, false)
@@ -455,19 +507,27 @@ impl super::TurnEngine {
             eprintln!("[LIVE-DBG] RESULT: only P2 passed → P2 wins");
             (false, true)
         } else if player1_score > player2_score {
-            eprintln!("[LIVE-DBG] RESULT: P1 score({}) > P2 score({}) → P1 wins", player1_score, player2_score);
+            eprintln!(
+                "[LIVE-DBG] RESULT: P1 score({}) > P2 score({}) → P1 wins",
+                player1_score, player2_score
+            );
             (true, false)
         } else if player2_score > player1_score {
-            eprintln!("[LIVE-DBG] RESULT: P2 score({}) > P1 score({}) → P2 wins", player2_score, player1_score);
+            eprintln!(
+                "[LIVE-DBG] RESULT: P2 score({}) > P1 score({}) → P2 wins",
+                player2_score, player1_score
+            );
             (false, true)
         } else {
-            eprintln!("[LIVE-DBG] RESULT: equal scores ({}) → both win (Rule 8.4.6.2)", player1_score);
+            eprintln!(
+                "[LIVE-DBG] RESULT: equal scores ({}) → both win (Rule 8.4.6.2)",
+                player1_score
+            );
             (true, true)
         };
 
         // Pass 2: Finalize the remaining snapshot fields now that victory is determined.
         for snap in game_state.performance_snapshots.iter_mut() {
-
             // Compute per-card spare (余剰ハート): remaining hearts from the pool
             // after this card's allocation. For each live card, spare = total available
             // minus all allocations up to and including this card.
@@ -477,14 +537,14 @@ impl super::TurnEngine {
             let mut cumulative_used = EMPTY_H8;
             for i in 0..snap.lives.len() {
                 for alloc in &snap.breakdown.allocations {
-                    if alloc.target_idx == i {
+                    if alloc.target_idx == i as u8 {
                         let source_idx = match alloc.phase {
                             crate::types::AllocPhase::H00Wild
                             | crate::types::AllocPhase::Wildcard => 0,
                             crate::types::AllocPhase::AllWild
                             | crate::types::AllocPhase::CAll
                             | crate::types::AllocPhase::AllCleanup => 7,
-                            _ => alloc.color,
+                            _ => alloc.color as usize,
                         };
                         cumulative_used[source_idx] += alloc.amount;
                     }
@@ -513,15 +573,22 @@ impl super::TurnEngine {
                 game_state.player2.live_card_zone.cards.is_empty()
             };
             if zone_empty {
-                eprintln!("[LIVE-DBG] player={} live_card_zone empty → total_score forced to 0", snap.player_id);
+                eprintln!(
+                    "[LIVE-DBG] player={} live_card_zone empty → total_score forced to 0",
+                    snap.player_id
+                );
                 snap.total_score = 0;
             }
             // Rule 8.3.16: If ANY live card's need_heart could not be satisfied,
             // ALL live cards fail. Success requires ALL cards to pass.
             snap.success = snap.lives.iter().all(|l| l.passed) && snap.total_score > 0;
-            eprintln!("[LIVE-DBG] player={} SUCCESS={} total_score={} all_passed={}",
-                snap.player_id, snap.success, snap.total_score,
-                snap.lives.iter().all(|l| l.passed));
+            eprintln!(
+                "[LIVE-DBG] player={} SUCCESS={} total_score={} all_passed={}",
+                snap.player_id,
+                snap.success,
+                snap.total_score,
+                snap.lives.iter().all(|l| l.passed)
+            );
 
             // Pre-computed score breakdown for the UI display layer.
             snap.base_score_total = snap
@@ -544,7 +611,7 @@ impl super::TurnEngine {
                 for ab in &mc.ability_heart_bonuses {
                     if let Some(color_idx) = ab.color {
                         if color_idx < 8 {
-                            ability_per_color[color_idx] += ab.amount;
+                            ability_per_color[color_idx as usize] += ab.amount;
                         }
                     }
                 }
@@ -1228,7 +1295,7 @@ impl super::TurnEngine {
 
             member_contributions.push(MemberContribution {
                 source_id: cid,
-                slot: i,
+                slot: i as u8,
                 base_hearts: base_h,
                 bonus_hearts: bonus_h,
                 base_blades,
@@ -1639,13 +1706,13 @@ impl super::TurnEngine {
                 if need[c] > 0 && pool[c] > 0 {
                     let take = pool[c].min(need[c]);
                     allocs.push(Allocation {
-                        target_idx: live_idx,
+                        target_idx: live_idx as u8,
                         target_name: card_name.clone(),
                         source_type: SourceType::Stage,
                         source_name: SourceName::StageHearts,
                         source_slot: None,
                         wildcard: false,
-                        color: c,
+                        color: c as u8,
                         amount: take,
                         is_bonus: false,
                         phase: AllocPhase::Colored,
@@ -1661,13 +1728,13 @@ impl super::TurnEngine {
                     let deficit = need[c] - filled[c];
                     let take = pool[0].min(deficit);
                     allocs.push(Allocation {
-                        target_idx: live_idx,
+                        target_idx: live_idx as u8,
                         target_name: card_name.clone(),
                         source_type: SourceType::Stage,
                         source_name: SourceName::WildcardHeart00,
                         source_slot: None,
                         wildcard: true,
-                        color: c,
+                        color: c as u8,
                         amount: take,
                         is_bonus: false,
                         phase: AllocPhase::H00Wild,
@@ -1683,13 +1750,13 @@ impl super::TurnEngine {
                     let deficit = need[c] - filled[c];
                     let take = pool[0].min(deficit);
                     allocs.push(Allocation {
-                        target_idx: live_idx,
+                        target_idx: live_idx as u8,
                         target_name: card_name.clone(),
                         source_type: SourceType::Stage,
                         source_name: SourceName::WildcardHeart00,
                         source_slot: None,
                         wildcard: true,
-                        color: c,
+                        color: c as u8,
                         amount: take,
                         is_bonus: false,
                         phase: AllocPhase::Wildcard,
@@ -1721,13 +1788,13 @@ impl super::TurnEngine {
                     if pool[c] > 0 {
                         let take = pool[c].min(h00_deficit - filled_h00);
                         allocs.push(Allocation {
-                            target_idx: live_idx,
+                            target_idx: live_idx as u8,
                             target_name: card_name.clone(),
                             source_type: SourceType::Stage,
                             source_name: SourceName::StageHearts,
                             source_slot: None,
                             wildcard: false,
-                            color: c,
+                            color: c as u8,
                             amount: take,
                             is_bonus: false,
                             phase: AllocPhase::ColoredSurplus,
@@ -1742,7 +1809,7 @@ impl super::TurnEngine {
                 if filled_h00 < h00_deficit && pool[0] > 0 {
                     let take = pool[0].min(h00_deficit - filled_h00);
                     allocs.push(Allocation {
-                        target_idx: live_idx,
+                        target_idx: live_idx as u8,
                         target_name: card_name.clone(),
                         source_type: SourceType::Stage,
                         source_name: SourceName::StageHearts,
@@ -1767,13 +1834,13 @@ impl super::TurnEngine {
                         let deficit = need[c] - filled[c];
                         let take = pool[7].min(deficit);
                         allocs.push(Allocation {
-                            target_idx: live_idx,
+                            target_idx: live_idx as u8,
                             target_name: card_name.clone(),
                             source_type: SourceType::Stage,
                             source_name: SourceName::AllHeartIconAll,
                             source_slot: None,
                             wildcard: true,
-                            color: c,
+                            color: c as u8,
                             amount: take,
                             is_bonus: false,
                             phase: AllocPhase::AllCleanup,
@@ -1792,7 +1859,7 @@ impl super::TurnEngine {
                     if h00_still_needed > 0 && pool[7] > 0 {
                         let take = pool[7].min(h00_still_needed);
                         allocs.push(Allocation {
-                            target_idx: live_idx,
+                            target_idx: live_idx as u8,
                             target_name: card_name.clone(),
                             source_type: SourceType::Stage,
                             source_name: SourceName::AllHeartIconAll,
@@ -1823,8 +1890,8 @@ impl super::TurnEngine {
         let num_cards = card_needs.len();
         let mut per_card_filled = vec![[0u8; 8]; num_cards];
         for a in allocs {
-            if a.target_idx < num_cards {
-                per_card_filled[a.target_idx][a.color] += a.amount;
+            if (a.target_idx as usize) < num_cards {
+                per_card_filled[a.target_idx as usize][a.color as usize] += a.amount;
             }
         }
         // Check each card
@@ -1902,13 +1969,13 @@ impl super::TurnEngine {
             if need[c] > 0 && pool[c] > 0 {
                 let take = pool[c].min(need[c]);
                 allocs.push(Allocation {
-                    target_idx: idx,
+                    target_idx: idx as u8,
                     target_name: card_name.clone(),
                     source_type: SourceType::Stage,
                     source_name: SourceName::StageHearts,
                     source_slot: None,
                     wildcard: false,
-                    color: c,
+                    color: c as u8,
                     amount: take,
                     is_bonus: false,
                     phase: AllocPhase::Colored,
@@ -1924,13 +1991,13 @@ impl super::TurnEngine {
                 let deficit = need[c] - filled[c];
                 let take = pool[0].min(deficit);
                 allocs.push(Allocation {
-                    target_idx: idx,
+                    target_idx: idx as u8,
                     target_name: card_name.clone(),
                     source_type: SourceType::Stage,
                     source_name: SourceName::WildcardHeart00,
                     source_slot: None,
                     wildcard: true,
-                    color: c,
+                    color: c as u8,
                     amount: take,
                     is_bonus: false,
                     phase: AllocPhase::H00Wild,
@@ -1946,13 +2013,13 @@ impl super::TurnEngine {
                 let deficit = need[c] - filled[c];
                 let take = pool[0].min(deficit);
                 allocs.push(Allocation {
-                    target_idx: idx,
+                    target_idx: idx as u8,
                     target_name: card_name.clone(),
                     source_type: SourceType::Stage,
                     source_name: SourceName::WildcardHeart00,
                     source_slot: None,
                     wildcard: true,
-                    color: c,
+                    color: c as u8,
                     amount: take,
                     is_bonus: false,
                     phase: AllocPhase::Wildcard,
@@ -2022,13 +2089,13 @@ impl super::TurnEngine {
             let mut new_filled = filled;
             if take > 0 {
                 allocs.push(Allocation {
-                    target_idx: idx,
+                    target_idx: idx as u8,
                     target_name: card_name.clone(),
                     source_type: SourceType::Stage,
                     source_name: SourceName::StageHearts,
                     source_slot: None,
                     wildcard: false,
-                    color: c,
+                    color: c as u8,
                     amount: take,
                     is_bonus: false,
                     phase: AllocPhase::ColoredSurplus,
@@ -2082,7 +2149,7 @@ impl super::TurnEngine {
         if h00_deficit > 0 && pool[0] > 0 {
             let take = pool[0].min(h00_deficit);
             allocs.push(Allocation {
-                target_idx: idx,
+                target_idx: idx as u8,
                 target_name: card_name.clone(),
                 source_type: SourceType::Stage,
                 source_name: SourceName::StageHearts,
@@ -2193,9 +2260,13 @@ impl super::TurnEngine {
         for take in 0..=max_take {
             let mut new_filled = filled;
             if take > 0 {
-                let alloc_color = if target_color == 0 { 7 } else { target_color };
+                let alloc_color = if target_color == 0 {
+                    7
+                } else {
+                    target_color as u8
+                };
                 allocs.push(Allocation {
-                    target_idx: idx,
+                    target_idx: idx as u8,
                     target_name: card_name.clone(),
                     source_type: SourceType::Stage,
                     source_name: SourceName::AllHeartIconAll,
@@ -2309,8 +2380,8 @@ impl super::TurnEngine {
 
         let mut per_card_filled: Vec<[u8; 8]> = vec![EMPTY_H8; live_card_ids.len()];
         for alloc in &allocations {
-            if alloc.target_idx < per_card_filled.len() {
-                per_card_filled[alloc.target_idx][alloc.color] += alloc.amount;
+            if (alloc.target_idx as usize) < per_card_filled.len() {
+                per_card_filled[alloc.target_idx as usize][alloc.color as usize] += alloc.amount;
             }
         }
 
@@ -2711,7 +2782,7 @@ pub fn snapshot_to_rule_log(
         for ab in &mc.ability_heart_bonuses {
             let color_str = ab
                 .color
-                .map(|c| heart_labels[c].to_string())
+                .map(|c| heart_labels[c as usize].to_string())
                 .unwrap_or_default();
             lines.push(format!(
                 "    Ability: {}  ♥{}+{}",

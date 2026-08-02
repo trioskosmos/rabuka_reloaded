@@ -168,8 +168,8 @@ pub struct GameState {
     pub baton_touch_arriving_card_ids: SmallVec<[i16; 2]>,
     pub effect_creation_counter: u8,
     pub last_state_change_wait_to_active_count: u8,
-    pub player1_rps_choice: Option<i32>,
-    pub player2_rps_choice: Option<i32>,
+    pub player1_rps_choice: Option<u8>,
+    pub player2_rps_choice: Option<u8>,
     pub baton_touch_replaced_member_cost: Option<u8>,
     pub baton_touch_replaced_member_id: Option<i16>,
     pub baton_touch_arriving_card_id: Option<i16>,
@@ -234,7 +234,7 @@ pub struct GameState {
     pub pending_success_replacement_player_id: Option<String>,
     /// Transient: set by web_server for PVP RPS routing so the action handler
     /// knows which player sent the request (0=P1, 1=P2).
-    pub pending_rps_player_id: Option<i32>,
+    pub pending_rps_player_id: Option<u8>,
 }
 
 impl GameState {
@@ -875,7 +875,7 @@ impl GameState {
         ability_text: String,
         effect_type: &str,
         target_card_id: i16,
-        heart_color: Option<usize>,
+        heart_color: Option<u8>,
         amount: i32,
     ) {
         self.ability_applications

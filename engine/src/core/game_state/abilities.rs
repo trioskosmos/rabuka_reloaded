@@ -2470,9 +2470,9 @@ impl GameState {
                         if let Some(old) = data.old_value() {
                             let is_p1 = data.is_p1().unwrap_or(true);
                             if is_p1 {
-                                self.self_live_surplus_count = old as u8;
+                                self.self_live_surplus_count = old;
                             } else {
-                                self.opponent_live_surplus_count = old as u8;
+                                self.opponent_live_surplus_count = old;
                             }
                             log::debug!("Restored surplus count (is_p1={}) to {}", is_p1, old);
                         }

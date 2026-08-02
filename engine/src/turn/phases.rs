@@ -1258,20 +1258,20 @@ impl super::TurnEngine {
 
     pub(crate) fn handle_rps_choice_p1(
         game_state: &mut GameState,
-        choice: i32,
+        choice: u8,
     ) -> Result<(), String> {
         game_state.player1_rps_choice = Some(choice);
         Self::resolve_rps_if_both_chosen(game_state)
     }
     pub(crate) fn handle_rps_choice_p2(
         game_state: &mut GameState,
-        choice: i32,
+        choice: u8,
     ) -> Result<(), String> {
         game_state.player2_rps_choice = Some(choice);
         Self::resolve_rps_if_both_chosen(game_state)
     }
 
-    fn rps_choice_name(choice: i32) -> &'static str {
+    fn rps_choice_name(choice: u8) -> &'static str {
         match choice {
             0 => "グー",
             1 => "パー",
@@ -1280,7 +1280,7 @@ impl super::TurnEngine {
         }
     }
 
-    fn push_rps_log(game_state: &mut GameState, p1: i32, p2: i32, winner_str: &str) {
+    fn push_rps_log(game_state: &mut GameState, p1: u8, p2: u8, winner_str: &str) {
         let p1_name = Self::rps_choice_name(p1);
         let p2_name = Self::rps_choice_name(p2);
         let text = format!("P1: {} vs P2: {} → {}", p1_name, p2_name, winner_str);
@@ -1295,8 +1295,8 @@ impl super::TurnEngine {
             metadata: Some(crate::core::types::LogMetadata::RpsResult {
                 p1_choice: Self::rps_choice_name(p1).to_string(),
                 p2_choice: Self::rps_choice_name(p2).to_string(),
-                p1_value: p1 as u8,
-                p2_value: p2 as u8,
+                p1_value: p1,
+                p2_value: p2,
                 winner: winner_str.to_string(),
             }),
         });

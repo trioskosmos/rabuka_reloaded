@@ -435,11 +435,11 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub rps_winner: Option<u8>,
     #[serde(default)]
-    pub player1_rps_choice: Option<i32>,
+    pub player1_rps_choice: Option<u8>,
     #[serde(default)]
-    pub player2_rps_choice: Option<i32>,
+    pub player2_rps_choice: Option<u8>,
     #[serde(default)]
-    pub pending_rps_player_id: Option<i32>,
+    pub pending_rps_player_id: Option<u8>,
 
     // Card/Ability Runtime
     #[serde(default)]

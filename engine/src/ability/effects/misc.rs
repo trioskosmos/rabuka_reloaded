@@ -389,7 +389,7 @@ impl AbilityResolver {
                         effect.text.to_string(),
                         "heart_bonus",
                         card_id,
-                        Some(color.index()),
+                        Some(color.index() as u8),
                         1,
                     );
                 }
@@ -478,7 +478,7 @@ impl AbilityResolver {
             );
             let effect_data = old.map(|v| crate::core::types::EffectData::SurplusHeart {
                 is_p1,
-                old_value: v as u64,
+                old_value: v,
             });
             util::push_temporary_effect(
                 gs,
@@ -2550,8 +2550,8 @@ impl AbilityResolver {
                 // Push events BEFORE push_movement_event so the
                 // PositionChangeEvent list captures the change before the
                 // self-trigger fires from within push_movement_event.
-                let source_old = current_idx;
-                let source_new = target_index;
+                let source_old = current_idx as u8;
+                let source_new = target_index as u8;
                 if source_id != -1 {
                     gs.position_change_events
                         .push(crate::types::PositionChangeEvent {
@@ -2709,7 +2709,7 @@ impl AbilityResolver {
             smallvec::SmallVec::new(),
             smallvec::SmallVec::new(),
         ];
-        let mut events: Vec<(i16, usize, usize)> = Vec::new();
+        let mut events: Vec<(i16, u8, u8)> = Vec::new();
 
         // Phase 1: place every planned card at its destination.
         // Track which card got evicted from each destination.
@@ -2740,7 +2740,7 @@ impl AbilityResolver {
             new_stage[dest_idx] = member_id;
             new_under[dest_idx] = old_under[from_idx].clone();
             occupant[dest_idx] = member_id;
-            events.push((member_id, from_idx, dest_idx));
+            events.push((member_id, from_idx as u8, dest_idx as u8));
         }
 
         // Phase 2: place evicted cards / stay-in-place.
@@ -2772,7 +2772,7 @@ impl AbilityResolver {
                 if evicted_id != -1 && evicted_id != member_id && new_stage[from_idx] == -1 {
                     new_stage[from_idx] = evicted_id;
                     new_under[from_idx] = old_under[dest_idx].clone();
-                    events.push((evicted_id, dest_idx, from_idx));
+                    events.push((evicted_id, dest_idx as u8, from_idx as u8));
                 }
             }
         }
@@ -2948,8 +2948,8 @@ impl AbilityResolver {
                 gs.position_change_events
                     .push(crate::types::PositionChangeEvent {
                         moved_card_id: source_id2,
-                        old_position: source_idx,
-                        new_position: target_index,
+                        old_position: source_idx as u8,
+                        new_position: target_index as u8,
                         cause_card_id: gs.activating_card,
                         cause_player_id: mover_pid.clone(),
                         effect_only: true,
@@ -2959,8 +2959,8 @@ impl AbilityResolver {
                 gs.position_change_events
                     .push(crate::types::PositionChangeEvent {
                         moved_card_id: target_id2,
-                        old_position: target_index,
-                        new_position: source_idx,
+                        old_position: target_index as u8,
+                        new_position: source_idx as u8,
                         cause_card_id: gs.activating_card,
                         cause_player_id: mover_pid.clone(),
                         effect_only: true,
@@ -3046,8 +3046,8 @@ impl AbilityResolver {
                         gs.position_change_events
                             .push(crate::types::PositionChangeEvent {
                                 moved_card_id: source_id,
-                                old_position: current_idx,
-                                new_position: target_index,
+                                old_position: current_idx as u8,
+                                new_position: target_index as u8,
                                 cause_card_id: gs.activating_card,
                                 cause_player_id: mover_pid.clone(),
                                 effect_only: true,
@@ -3057,8 +3057,8 @@ impl AbilityResolver {
                         gs.position_change_events
                             .push(crate::types::PositionChangeEvent {
                                 moved_card_id: target_id,
-                                old_position: target_index,
-                                new_position: current_idx,
+                                old_position: target_index as u8,
+                                new_position: current_idx as u8,
                                 cause_card_id: gs.activating_card,
                                 cause_player_id: mover_pid.clone(),
                                 effect_only: true,
@@ -3146,8 +3146,8 @@ impl AbilityResolver {
                     gs.position_change_events
                         .push(crate::types::PositionChangeEvent {
                             moved_card_id: activating_card_id,
-                            old_position: current_idx,
-                            new_position: target_index,
+                            old_position: current_idx as u8,
+                            new_position: target_index as u8,
                             cause_card_id: gs.activating_card,
                             cause_player_id: mover_pid.clone(),
                             effect_only: true,
@@ -3156,8 +3156,8 @@ impl AbilityResolver {
                         gs.position_change_events
                             .push(crate::types::PositionChangeEvent {
                                 moved_card_id: target_id3,
-                                old_position: target_index,
-                                new_position: current_idx,
+                                old_position: target_index as u8,
+                                new_position: current_idx as u8,
                                 cause_card_id: gs.activating_card,
                                 cause_player_id: mover_pid.clone(),
                                 effect_only: true,
@@ -3217,7 +3217,7 @@ impl AbilityResolver {
         target: &str,
     ) -> Result<(), String> {
         let tgt = if target == "both" { "self" } else { target };
-        let (moved_card_ids, original_positions): (Vec<i16>, Vec<(usize, usize)>) = {
+        let (moved_card_ids, original_positions): (Vec<i16>, Vec<(u8, u8)>) = {
             let player = gs.resolve_target_player_mut(tgt);
 
             // Snapshot current stage
@@ -3245,7 +3245,7 @@ impl AbilityResolver {
                 player.stage.stage[dest_idx] = card_id;
                 player.stage.under_cards[dest_idx] = snapshot_under[src_idx].clone();
                 moved.push(card_id);
-                positions.push((src_idx, dest_idx));
+                positions.push((src_idx as u8, dest_idx as u8));
             }
             (moved, positions)
         };

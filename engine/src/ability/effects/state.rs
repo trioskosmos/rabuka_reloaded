@@ -953,7 +953,7 @@ impl AbilityResolver {
             format!("Transform hearts to {}", ht),
             "transform",
             card_id,
-            Some(color.index()),
+            Some(color.index() as u8),
             0,
         );
         let ed = crate::core::types::EffectData::SetBladeCount { card_id };

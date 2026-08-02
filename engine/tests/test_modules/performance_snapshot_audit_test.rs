@@ -211,7 +211,7 @@ fn audit_allocations_match_filled() {
     let mut alloc_filled = [0u8; 8];
     for a in &perf.breakdown.allocations {
         if a.target_idx == 0 {
-            alloc_filled[a.color] += a.amount;
+            alloc_filled[a.color as usize] += a.amount;
         }
     }
     let lc = &perf.lives[0];

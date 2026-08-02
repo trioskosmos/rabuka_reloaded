@@ -234,7 +234,7 @@ impl GameModifiers {
             ability_text: ability_text.into(),
             effect_type: crate::types::EffectType::HeartBonus,
             target_card_id: card_id,
-            heart_color: Some(color.index()),
+            heart_color: Some(color.index() as u8),
             amount: delta,
         });
     }

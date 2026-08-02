@@ -691,7 +691,7 @@ pub async fn execute_action(
         action_type,
         ActionType::RockChoice | ActionType::PaperChoice | ActionType::ScissorsChoice
     ) {
-        game_state.pending_rps_player_id = pvp_player_pid;
+        game_state.pending_rps_player_id = pvp_player_pid.map(|p| p as u8);
     }
 
     let result = crate::turn::TurnEngine::execute_main_phase_action(

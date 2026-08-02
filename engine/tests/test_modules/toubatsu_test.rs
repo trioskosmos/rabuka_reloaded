@@ -204,8 +204,8 @@ fn toubatsu_q263_center_to_area_move_triggers_auto() {
     game.state.player1.stage.stage[1] = toubatsu;
 
     // Simulate area move: center → left (index 0)
-    let old_pos = 1usize;
-    let new_pos = 0usize;
+    let old_pos = 1u8;
+    let new_pos = 0u8;
     game.state.player1.stage.stage[1] = -1;
     game.state.player1.stage.stage[0] = toubatsu;
     game.state
