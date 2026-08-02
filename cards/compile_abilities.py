@@ -183,6 +183,27 @@ DURATION_ENCODE = {
 OPERATOR_ENCODE = {"=": 0, "==": 0, "!=": 1, ">": 2, ">=": 3, "<": 4, "<=": 5}
 
 
+def write_len(out, n):
+    """Write a container length as u8 with 0xFE escape for large values."""
+    if n < 0xFE:
+        out.append(n)
+    else:
+        out.append(0xFE)
+        out.extend(struct.pack("<H", n))
+
+
+def read_len(bc, pos):
+    """Read a container length written by write_len. Returns (n, new_pos)."""
+    if pos >= len(bc):
+        return 0, pos
+    b = bc[pos]
+    if b < 0xFE:
+        return b, pos + 1
+    if pos + 3 > len(bc):
+        return 0, len(bc)
+    return (bc[pos + 1] | (bc[pos + 2] << 8)), pos + 3
+
+
 def norm(v):
     if v is None:
         return ""
@@ -495,7 +516,7 @@ def compile_all(abilities):
             out.extend(struct.pack("<H", intern(v)))
         elif isinstance(v, list):
             out.append(0x07)
-            out.extend(struct.pack("<I", len(v)))
+            write_len(out, len(v))
             for item in v:
                 enc_val(item, out, in_effect_vec, is_condition)
         elif isinstance(v, dict):
@@ -519,7 +540,7 @@ def compile_all(abilities):
                     out.append(vtag)
                 else:
                     out.append(0x08)  # TAG_OBJECT (serde fallback; keeps "type")
-                out.extend(struct.pack("<I", len(v)))
+                write_len(out, len(v))
                 for k, val in v.items():
                     out.extend(struct.pack("<H", intern(str(k))))
                     enc_val(
@@ -560,7 +581,7 @@ def compile_all(abilities):
                     out.append(vtag)
                 else:
                     out.append(0x08)  # TAG_OBJECT
-                out.extend(struct.pack("<I", len(v)))
+                write_len(out, len(v))
                 for k, val in v.items():
                     out.extend(struct.pack("<H", intern(str(k))))
                     enc_val(
@@ -575,7 +596,7 @@ def compile_all(abilities):
     def enc_entry(entry, out: bytearray):
         # Object with `cards` (loader-only mapping) stripped.
         out.append(0x08)
-        out.extend(struct.pack("<I", sum(1 for k in entry if k not in SKIP_KEYS)))
+        write_len(out, sum(1 for k in entry if k not in SKIP_KEYS))
         for k, val in entry.items():
             if k in SKIP_KEYS:
                 continue
@@ -646,18 +667,12 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
                 freq[idx] += 1
             return pos
         elif tag == 0x07:
-            if pos + 4 > len(bc):
-                return len(bc)
-            n = bc[pos] | (bc[pos + 1] << 8) | (bc[pos + 2] << 16) | (bc[pos + 3] << 24)
-            pos += 4
+            n, pos = read_len(bc, pos)
             for _ in range(n):
                 pos = count_one(bc, pos)
             return pos
         elif tag == 0x08:
-            if pos + 4 > len(bc):
-                return len(bc)
-            n = bc[pos] | (bc[pos + 1] << 8) | (bc[pos + 2] << 16) | (bc[pos + 3] << 24)
-            pos += 4
+            n, pos = read_len(bc, pos)
             for _ in range(n):
                 if pos + 2 > len(bc):
                     return len(bc)
@@ -669,10 +684,7 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
             return pos
         elif tag == 0x09:
             pos += 1  # skip variant tag byte
-            if pos + 4 > len(bc):
-                return len(bc)
-            n = bc[pos] | (bc[pos + 1] << 8) | (bc[pos + 2] << 16) | (bc[pos + 3] << 24)
-            pos += 4
+            n, pos = read_len(bc, pos)
             for _ in range(n):
                 if pos + 2 > len(bc):
                     return len(bc)
@@ -753,20 +765,14 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
             write_idx(out, new_idx[old_idx])
             return pos
         elif tag == 0x07:
-            if pos + 4 > len(bc):
-                return len(bc)
-            n = bc[pos] | (bc[pos + 1] << 8) | (bc[pos + 2] << 16) | (bc[pos + 3] << 24)
-            pos += 4
-            out.extend(struct.pack("<I", n))
+            n, pos = read_len(bc, pos)
+            write_len(out, n)
             for _ in range(n):
                 pos = rewrite_one(bc, pos, out)
             return pos
         elif tag == 0x08:
-            if pos + 4 > len(bc):
-                return len(bc)
-            n = bc[pos] | (bc[pos + 1] << 8) | (bc[pos + 2] << 16) | (bc[pos + 3] << 24)
-            pos += 4
-            out.extend(struct.pack("<I", n))
+            n, pos = read_len(bc, pos)
+            write_len(out, n)
             for _ in range(n):
                 if pos + 2 > len(bc):
                     return len(bc)
@@ -780,11 +786,8 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
             vtag = bc[pos]
             pos += 1
             out.append(vtag)
-            if pos + 4 > len(bc):
-                return len(bc)
-            n = bc[pos] | (bc[pos + 1] << 8) | (bc[pos + 2] << 16) | (bc[pos + 3] << 24)
-            pos += 4
-            out.extend(struct.pack("<I", n))
+            n, pos = read_len(bc, pos)
+            write_len(out, n)
             for _ in range(n):
                 if pos + 2 > len(bc):
                     return len(bc)

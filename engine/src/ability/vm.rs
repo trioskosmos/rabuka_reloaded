@@ -199,6 +199,16 @@ impl<'a> BcReader<'a> {
         read_u32(&mut self.cursor)
     }
 
+    /// Read a container length (u8 with 0xFE escape).
+    fn read_len(&mut self) -> Option<usize> {
+        let b = self.read_u8()?;
+        if b < 0xFE {
+            Some(b as usize)
+        } else {
+            self.u16().map(|v| v as usize)
+        }
+    }
+
     fn i64(&mut self) -> Option<i64> {
         read_i64(&mut self.cursor)
     }
@@ -344,7 +354,7 @@ impl<'a> BcReader<'a> {
         match tag {
             TAG_NULL => None,
             TAG_ARRAY => {
-                let len = self.read_u32()? as usize;
+                let len = self.read_len()?;
                 let mut v = Vec::with_capacity(len);
                 for _ in 0..len {
                     v.push(self.read_string_value()?);
@@ -359,7 +369,7 @@ impl<'a> BcReader<'a> {
         let tag = self.read_u8().unwrap_or(TAG_NULL);
         match tag {
             TAG_ARRAY => {
-                let len = self.read_u32().unwrap_or(0) as usize;
+                let len = self.read_len().unwrap_or(0);
                 let mut v = Vec::with_capacity(len);
                 for _ in 0..len {
                     if let Some(s) = self.read_string_value() {
@@ -389,7 +399,7 @@ impl<'a> BcReader<'a> {
         match tag {
             TAG_NULL => None,
             TAG_ARRAY => {
-                let len = self.read_u32()? as usize;
+                let len = self.read_len()?;
                 let mut v = Vec::with_capacity(len);
                 for _ in 0..len {
                     v.push(self.read_condition_value()?);
@@ -405,7 +415,7 @@ impl<'a> BcReader<'a> {
         match tag {
             TAG_NULL => None,
             TAG_ARRAY => {
-                let len = self.read_u32()? as usize;
+                let len = self.read_len()?;
                 let mut v = Vec::with_capacity(len);
                 for _ in 0..len {
                     v.push(self.read_u8_value()?);
@@ -442,7 +452,7 @@ impl<'a> BcReader<'a> {
         match tag {
             TAG_NULL => None,
             TAG_ARRAY => {
-                let len = self.read_u32()? as usize;
+                let len = self.read_len()?;
                 let mut v = Vec::with_capacity(len);
                 for _ in 0..len {
                     let otag = self.read_u8()?;
@@ -453,7 +463,7 @@ impl<'a> BcReader<'a> {
                     if otag == TAG_OBJECT_VARIANT {
                         self.read_u8()?;
                     }
-                    let count = self.read_u32()? as usize;
+                    let count = self.read_len()?;
                     let mut position = String::new();
                     let mut character = String::new();
                     for _ in 0..count {
@@ -494,7 +504,7 @@ impl<'a> BcReader<'a> {
                 if tag == TAG_OBJECT_VARIANT {
                     self.read_u8()?;
                 }
-                let count = self.read_u32()? as usize;
+                let count = self.read_len()?;
                 let mut operator = None;
                 let mut relative_to = None;
                 let mut cost_limit = None;
@@ -543,7 +553,7 @@ impl<'a> BcReader<'a> {
                 if tag == TAG_OBJECT_VARIANT {
                     self.read_u8()?;
                 }
-                let count = self.read_u32()? as usize;
+                let count = self.read_len()?;
                 let mut te = crate::card::TriggerEvent::default();
                 for _ in 0..count {
                     let kidx = self.read_idx()?;
@@ -597,7 +607,7 @@ impl<'a> BcReader<'a> {
                         "events" => {
                             let etag = self.read_u8()?;
                             if etag == TAG_ARRAY {
-                                let elen = self.read_u32()? as usize;
+                                let elen = self.read_len()?;
                                 let mut events = Vec::with_capacity(elen);
                                 for _ in 0..elen {
                                     events.push(*self.read_trigger_event_value()?);
@@ -638,7 +648,7 @@ impl<'a> BcReader<'a> {
                 if tag == TAG_OBJECT_VARIANT {
                     self.read_u8()?;
                 }
-                let count = self.read_u32()? as usize;
+                let count = self.read_len()?;
                 let mut lsc = crate::card::LocationSubChecks::default();
                 for _ in 0..count {
                     let kidx = self.read_idx()?;
@@ -722,7 +732,7 @@ impl<'a> BcReader<'a> {
         match tag {
             TAG_NULL => None,
             TAG_ARRAY => {
-                let len = self.read_u32()? as usize;
+                let len = self.read_len()?;
                 let mut v = Vec::with_capacity(len);
                 for _ in 0..len {
                     let sub_tag = self.read_u8()?;
@@ -765,7 +775,7 @@ impl<'a> BcReader<'a> {
                 if tag == TAG_OBJECT_VARIANT {
                     self.read_u8()?;
                 }
-                let count = self.read_u32()? as usize;
+                let count = self.read_len()?;
                 let mut position = None;
                 let mut target = None;
                 for _ in 0..count {
@@ -803,7 +813,7 @@ impl<'a> BcReader<'a> {
                 if tag == TAG_OBJECT_VARIANT {
                     self.read_u8()?;
                 }
-                let count = self.read_u32()? as usize;
+                let count = self.read_len()?;
                 let mut count_type = String::new();
                 let mut reference = None;
                 let mut mode = None;
@@ -868,7 +878,7 @@ impl<'a> BcReader<'a> {
                 if tag == TAG_OBJECT_VARIANT {
                     self.read_u8()?;
                 }
-                let count = self.read_u32()? as usize;
+                let count = self.read_len()?;
                 for _ in 0..count {
                     self.skip_value()?;
                 }
@@ -924,7 +934,7 @@ impl<'a> BcReader<'a> {
         match tag {
             TAG_NULL => None,
             TAG_ARRAY => {
-                let len = self.read_u32()? as usize;
+                let len = self.read_len()?;
                 let mut v = Vec::with_capacity(len);
                 for _ in 0..len {
                     let tag2 = self.read_u8()?;
@@ -932,7 +942,7 @@ impl<'a> BcReader<'a> {
                         if tag2 == TAG_OBJECT_VARIANT {
                             self.read_u8()?;
                         }
-                        let count = self.read_u32()? as usize;
+                        let count = self.read_len()?;
                         let mut af = None;
                         let mut aft = None;
                         for _ in 0..count {
@@ -993,7 +1003,7 @@ impl<'a> BcReader<'a> {
                 if tag == TAG_OBJECT_VARIANT {
                     self.read_u8()?;
                 }
-                let count = self.read_u32()? as usize;
+                let count = self.read_len()?;
                 let mut text = String::new();
                 let mut quoted_type = String::new();
                 for _ in 0..count {
@@ -1054,7 +1064,7 @@ fn skip_value_with_tag(bc: &mut BcReader, tag: u8) -> Option<()> {
             Some(())
         }
         TAG_ARRAY => {
-            let len = bc.read_u32()? as usize;
+            let len = bc.read_len()?;
             for _ in 0..len {
                 bc.skip_value()?;
             }
@@ -1064,7 +1074,7 @@ fn skip_value_with_tag(bc: &mut BcReader, tag: u8) -> Option<()> {
             if tag == TAG_OBJECT_VARIANT {
                 bc.read_u8()?;
             }
-            let len = bc.read_u32()? as usize;
+            let len = bc.read_len()?;
             for _ in 0..len {
                 bc.read_idx()?;
                 bc.skip_value()?;
@@ -1083,7 +1093,7 @@ fn decode_ability(bc: &mut BcReader) -> Option<Ability> {
     if tag != TAG_OBJECT {
         return None;
     }
-    let count = bc.read_u32()? as usize;
+    let count = bc.read_len()?;
     #[cfg(feature = "ds_debug")]
     ds_print(&alloc::format!("DA:c={}", count));
 
@@ -1230,7 +1240,7 @@ fn recursive_normalize_cost_value(val: &mut serde_json::Value) {
 
 /// Direct decoder for TAG_OBJECT_VARIANT effects using the generated field dispatch.
 fn decode_ability_effect_direct(bc: &mut BcReader, variant: u8) -> Option<AbilityEffect> {
-    let count = bc.read_u32()? as usize;
+    let count = bc.read_len()?;
     let mut text = ArcStr::from("");
     let mut action = ActionType::default();
     let mut source: Option<ArcStr> = None;
@@ -1553,7 +1563,7 @@ fn decode_keywords(bc: &mut BcReader) -> Option<Option<Vec<crate::card::Keyword>
     match tag {
         TAG_NULL => Some(None),
         TAG_ARRAY => {
-            let len = bc.read_u32()? as usize;
+            let len = bc.read_len()?;
             let mut v = Vec::with_capacity(len);
             for _ in 0..len {
                 let s = bc.read_string_value()?;

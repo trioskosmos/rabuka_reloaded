@@ -247,7 +247,7 @@ def main():
     lines.append("    bc: &mut BcReader,")
     lines.append("    variant: u8,")
     lines.append(") -> Option<Condition> {")
-    lines.append("    let count = bc.read_u32()? as usize;")
+    lines.append("    let count = bc.read_len()?;")
     lines.append("    let mut l = ConditionLocals::default();")
     lines.append("    for _ in 0..count {")
     lines.append("        let key = bc.key()?;")

@@ -612,7 +612,7 @@ fn decode_condition_direct(
     bc: &mut BcReader,
     variant: u8,
 ) -> Option<Condition> {
-    let count = bc.read_u32()? as usize;
+    let count = bc.read_len()?;
     let mut l = ConditionLocals::default();
     for _ in 0..count {
         let key = bc.key()?;
