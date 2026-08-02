@@ -1,14 +1,6 @@
 use crate::card::Ability;
 use crate::Arc;
 
-#[cfg(not(feature = "no_std"))]
-use std::collections::HashMap;
-#[cfg(not(feature = "no_std"))]
-use std::sync::{Mutex, OnceLock};
-
-#[cfg(not(feature = "no_std"))]
-static RESOLVED_ABILITIES: OnceLock<Mutex<HashMap<u16, Arc<Ability>>>> = OnceLock::new();
-
 /// A lightweight handle to an ability stored in the bytecode blob.
 ///
 /// `AbilityRef` stores a `u16` bytecode index (2 bytes). Call `resolve()`
@@ -49,31 +41,6 @@ impl AbilityRef {
                 nds_println(msg.as_ptr());
             }
         }
-        #[cfg(not(feature = "no_std"))]
-        {
-            let cache = RESOLVED_ABILITIES.get_or_init(|| Mutex::new(HashMap::new()));
-            if let Some(ability) = cache
-                .lock()
-                .ok()
-                .and_then(|cache| cache.get(&self.0).cloned())
-            {
-                return ability;
-            }
-
-            let ability = match crate::ability::vm::get_ability(self.0 as usize) {
-                Ok(ability) => Arc::new(ability),
-                Err(e) => {
-                    log::error!("AbilityRef::resolve() failed for index {}: {e}", self.0);
-                    Arc::new(crate::card::Ability::default())
-                }
-            };
-            if let Ok(mut cache) = cache.lock() {
-                cache.insert(self.0, ability.clone());
-            }
-            return ability;
-        }
-
-        #[cfg(feature = "no_std")]
         match crate::ability::vm::get_ability(self.0 as usize) {
             Ok(ability) => Arc::new(ability),
             Err(e) => {
