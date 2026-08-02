@@ -21,9 +21,7 @@ use crate::ui::hint::render_hint_bar;
 use crate::ui::text::*;
 use crate::util::{cn_or_empty, tl_area};
 
-use super::{
-    compute_live_need, compute_total_hearts, find_card_zone_slot, format_action_line, pref,
-};
+use super::{action_list, compute_live_need, compute_total_hearts, find_card_zone_slot, pref};
 
 /// Render the board (CLI or graphical/image mode). Never returns early; the
 /// only side effects on locals are the text_page/list_scroll clamps, returned
@@ -224,7 +222,8 @@ pub(crate) fn render_board(
                     let fi = display_order[di];
                     let act = &acts_cache[fi];
                     let prefix = if fi == cur { ">" } else { " " };
-                    let line = format_action_line(act, current_lang() == Lang::Japanese);
+                    let line =
+                        action_list::format_action_line(act, current_lang() == Lang::Japanese);
                     let desc_full = wrap_text(&line, 390.0, 0.85);
                     for (li, l) in desc_full.lines().enumerate() {
                         if li == 0 {
@@ -1360,165 +1359,7 @@ pub(crate) fn render_board(
                             } else {
                                 "  "
                             };
-                            let line = match act.action_type {
-                                game_setup::ActionType::Pass => tl("Pass"),
-                                game_setup::ActionType::PlayMemberToStage => {
-                                    let cn = cn_or_empty(act);
-                                    let name = i18n::card_display_name(
-                                        &act.parameters
-                                            .as_ref()
-                                            .and_then(|p| p.card_name.clone())
-                                            .unwrap_or_default(),
-                                        current_lang(),
-                                    );
-                                    let base_cost = act
-                                        .parameters
-                                        .as_ref()
-                                        .and_then(|p| p.base_cost)
-                                        .unwrap_or(0);
-                                    let area = act
-                                        .parameters
-                                        .as_ref()
-                                        .and_then(|p| p.stage_area.clone())
-                                        .unwrap_or_default();
-                                    let area_label = tl_area(&area);
-                                    if !cn.is_empty() {
-                                        if base_cost > 0 {
-                                            format!(
-                                                "{{{{icon_energy.png|E}}}}{} [{}] {} {}",
-                                                base_cost, cn, name, area_label
-                                            )
-                                        } else {
-                                            format!("[{}] {} {}", cn, name, area_label)
-                                        }
-                                    } else {
-                                        if base_cost > 0 {
-                                            format!(
-                                                "{{{{icon_energy.png|E}}}}{} {} {}",
-                                                base_cost, name, area_label
-                                            )
-                                        } else {
-                                            format!("{} {}", name, area_label)
-                                        }
-                                    }
-                                }
-                                game_setup::ActionType::UseAbility => {
-                                    let name = i18n::card_display_name(
-                                        &act.parameters
-                                            .as_ref()
-                                            .and_then(|p| p.card_name.clone())
-                                            .unwrap_or_default(),
-                                        current_lang(),
-                                    );
-                                    let cost = act
-                                        .parameters
-                                        .as_ref()
-                                        .and_then(|p| p.final_cost.or(p.base_cost))
-                                        .unwrap_or(0);
-                                    let area = act
-                                        .parameters
-                                        .as_ref()
-                                        .and_then(|p| p.stage_area.clone())
-                                        .unwrap_or_default();
-                                    let area_label = tl_area(&area);
-                                    let abil = act
-                                        .parameters
-                                        .as_ref()
-                                        .and_then(|p| p.source_ability.clone())
-                                        .unwrap_or_default();
-                                    let abil_short = truncate_aware_segments(&abil, 28);
-                                    let cn = cn_or_empty(act);
-                                    if !cn.is_empty() {
-                                        if cost > 0 {
-                                            format!(
-                                                "{{{{icon_energy.png|E}}}}{} [{}] {} {} {}",
-                                                cost, cn, name, area_label, abil_short
-                                            )
-                                        } else {
-                                            format!(
-                                                "[{}] {} {} {}",
-                                                cn, name, area_label, abil_short
-                                            )
-                                        }
-                                    } else {
-                                        if cost > 0 {
-                                            format!(
-                                                "{{{{icon_energy.png|E}}}}{} {} {} {}",
-                                                cost, name, area_label, abil_short
-                                            )
-                                        } else {
-                                            format!("{} {} {}", name, area_label, abil_short)
-                                        }
-                                    }
-                                }
-                                _ => {
-                                    let cn = cn_or_empty(act);
-                                    let name = i18n::card_display_name(
-                                        &act.parameters
-                                            .as_ref()
-                                            .and_then(|p| p.card_name.clone())
-                                            .unwrap_or_default(),
-                                        current_lang(),
-                                    );
-                                    let line = if let Some(sel) = act.selected {
-                                        let label = if sel {
-                                            tl("selected_label")
-                                        } else {
-                                            tl("unselected_label")
-                                        };
-                                        if !cn.is_empty() && !name.is_empty() {
-                                            format!("[{}] [{}] {}", label, cn, name)
-                                        } else if !cn.is_empty() {
-                                            format!("[{}] [{}]", label, cn)
-                                        } else {
-                                            format!("[{}] {}", label, name)
-                                        }
-                                    } else {
-                                        let desc = act
-                                            .display_desc(current_lang() == Lang::Japanese)
-                                            .to_string();
-                                        let ability_text = if act.action_type
-                                            == game_setup::ActionType::ChoiceOption
-                                        {
-                                            gs.get_pending_choice()
-                                                .and_then(|c| {
-                                                    use rabuka_engine::ability::types::Choice;
-                                                    if let Choice::SelectAutoAbility {
-                                                        options,
-                                                        ..
-                                                    } = c
-                                                    {
-                                                        act.parameters
-                                                            .as_ref()
-                                                            .and_then(|p| p.card_id)
-                                                            .and_then(|idx| {
-                                                                options.get(idx as usize)
-                                                            })
-                                                            .map(|o| o.ability_text.clone())
-                                                    } else {
-                                                        None
-                                                    }
-                                                })
-                                                .unwrap_or_default()
-                                        } else {
-                                            String::new()
-                                        };
-                                        let display = if !ability_text.is_empty() {
-                                            ability_text
-                                        } else {
-                                            desc
-                                        };
-                                        if !cn.is_empty() && !name.is_empty() {
-                                            format!("[{}] {} {}", cn, name, display)
-                                        } else if !cn.is_empty() {
-                                            format!("[{}] {}", cn, display)
-                                        } else {
-                                            display
-                                        }
-                                    };
-                                    line
-                                }
-                            };
+                            let line = super::action_list::format_action_line_image(act, gs);
                             let color = if is_disabled {
                                 COL_MED
                             } else if is_sel {

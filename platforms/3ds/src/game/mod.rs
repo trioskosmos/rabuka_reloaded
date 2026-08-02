@@ -2,6 +2,7 @@
 // Play state machine (Phase C): the Step::Play handler, moved verbatim from the
 // bin (see extract_play.py). PlayState replaces the old 32-field tuple.
 
+mod action_list;
 mod input;
 mod overlays;
 mod render;
@@ -12,14 +13,13 @@ use rabuka_engine::player::Player;
 
 use crate::dprintln;
 use crate::ffi::*;
-use crate::i18n;
-use crate::lang::{current_lang, tl};
+use crate::lang::tl;
 use crate::net::mp_can_act;
 use crate::steps::{Overlay, Step};
 use crate::ui::card_atlas::CardAtlas;
 use crate::ui::colors::*;
 use crate::ui::text::*;
-use crate::util::{cn_or_empty, heart_color_index, tl_area};
+use crate::util::heart_color_index;
 
 /// Full gameplay state carried by `Step::Play`.
 #[derive(Clone)]
@@ -58,120 +58,6 @@ pub struct PlayState {
     pub dbg_rx_bytes: u32,
 }
 
-/// Build the compact single-line action description for the CLI action list.
-/// Single source of truth for the PlayMemberToStage / UseAbility description
-/// building that was previously duplicated inline (the "two sources of truth"
-/// smell flagged in the Phase C plan).
-fn format_action_line(act: &game_setup::Action, is_ja: bool) -> String {
-    match act.action_type {
-        game_setup::ActionType::Pass => tl("Pass"),
-        game_setup::ActionType::PlayMemberToStage => {
-            let name = i18n::card_display_name(
-                &act.parameters
-                    .as_ref()
-                    .and_then(|p| p.card_name.clone())
-                    .unwrap_or_default(),
-                current_lang(),
-            );
-            let cn = act
-                .parameters
-                .as_ref()
-                .and_then(|p| p.card_no.clone())
-                .unwrap_or_default();
-            let cost = act
-                .parameters
-                .as_ref()
-                .and_then(|p| p.base_cost)
-                .unwrap_or(0);
-            let area = act
-                .parameters
-                .as_ref()
-                .and_then(|p| p.stage_area.clone())
-                .unwrap_or_default();
-            let area_label = tl_area(&area);
-            let card_indices = act
-                .parameters
-                .as_ref()
-                .and_then(|p| p.card_indices.clone())
-                .unwrap_or_default();
-            let is_db = card_indices.len() >= 2;
-            if is_db {
-                let src_labels: Vec<&str> = card_indices
-                    .iter()
-                    .map(|&idx| match idx {
-                        0 => tl_area("left"),
-                        1 => tl_area("center"),
-                        2 => tl_area("right"),
-                        _ => "?",
-                    })
-                    .collect();
-                format!(
-                    "[{}] E{} {} {}→{}",
-                    cn,
-                    cost,
-                    name,
-                    src_labels.join("+"),
-                    area_label
-                )
-            } else {
-                format!("[{}] E{} {} {}", cn, cost, name, area_label)
-            }
-        }
-        game_setup::ActionType::UseAbility => {
-            let name = i18n::card_display_name(
-                &act.parameters
-                    .as_ref()
-                    .and_then(|p| p.card_name.clone())
-                    .unwrap_or_default(),
-                current_lang(),
-            );
-            let cost = act
-                .parameters
-                .as_ref()
-                .and_then(|p| p.base_cost)
-                .unwrap_or(0);
-            let area = act
-                .parameters
-                .as_ref()
-                .and_then(|p| p.stage_area.clone())
-                .unwrap_or_default();
-            let area_label = tl_area(&area);
-            let abil = act
-                .parameters
-                .as_ref()
-                .and_then(|p| p.source_ability.clone())
-                .unwrap_or_default();
-            let abil_short: String = abil.chars().take(36).collect();
-            if cost > 0 {
-                format!(
-                    "[{}] {} {} c:{} {}",
-                    cn_or_empty(act),
-                    name,
-                    area_label,
-                    cost,
-                    abil_short
-                )
-            } else {
-                format!(
-                    "[{}] {} {} {}",
-                    cn_or_empty(act),
-                    name,
-                    area_label,
-                    abil_short
-                )
-            }
-        }
-        _ => act
-            .display_desc(is_ja)
-            .lines()
-            .next()
-            .unwrap_or("")
-            .to_string(),
-    }
-}
-
-/// Sum the need-heart counts (8 colors) for a player's live zone, including
-/// need_heart_modifiers. Single source of truth (was duplicated twice inline).
 fn compute_live_need(player: &Player, gs: &GameState) -> Vec<u32> {
     let mut nh = vec![0u32; 8];
     for &cid in &player.live_card_zone.cards {
