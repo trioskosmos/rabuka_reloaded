@@ -7,35 +7,39 @@ use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
 
 const MAGIC: &[u8; 4] = b"CARD";
 
-/// Parse the CARD_BLOB header and return (num_cards, strtab_len, strtab_start, offset_start, data_start).
+/// Parse the CARD_BLOB header and return (num_cards, strtab_len, strtab_start, length_start, data_start).
+/// Header: magic(4) + num_cards(u16) + strtab_len(u32). Then strtab, then a u8
+/// per-card length table, then card data. Card starts are prefix sums of lengths.
 fn parse_header() -> Option<(u32, u32, usize, usize, usize)> {
-    if CARD_BLOB.len() < 12 || &CARD_BLOB[0..4] != MAGIC {
+    if CARD_BLOB.len() < 10 || &CARD_BLOB[0..4] != MAGIC {
         return None;
     }
-    let num_cards = u32::from_le_bytes(CARD_BLOB[4..8].try_into().ok()?);
-    let strtab_len = u32::from_le_bytes(CARD_BLOB[8..12].try_into().ok()?);
-    let strtab_start = 12;
-    let offset_start = strtab_start + strtab_len as usize;
-    let data_start = offset_start + (num_cards as usize + 1) * 4;
+    let num_cards = u16::from_le_bytes(CARD_BLOB[4..6].try_into().ok()?) as u32;
+    let strtab_len = u32::from_le_bytes(CARD_BLOB[6..10].try_into().ok()?);
+    let strtab_start = 10;
+    let length_start = strtab_start + strtab_len as usize;
+    let data_start = length_start + num_cards as usize;
     Some((
         num_cards,
         strtab_len,
         strtab_start,
-        offset_start,
+        length_start,
         data_start,
     ))
 }
 
 /// Get the byte offset of card `idx`'s data within CARD_BLOB.
+/// O(n) prefix-sum over the u8 length table — cheap (cards are 25-41 bytes).
 fn card_data_offset(idx: usize) -> Option<usize> {
-    let (num_cards, _strtab_len, _strtab_start, offset_start, data_start) = parse_header()?;
+    let (num_cards, _strtab_len, _strtab_start, length_start, data_start) = parse_header()?;
     if idx >= num_cards as usize {
         return None;
     }
-    let off_start = offset_start + idx * 4;
-    let off_next = offset_start + (idx + 1) * 4;
-    let start = u32::from_le_bytes(CARD_BLOB[off_start..off_start + 4].try_into().ok()?) as usize;
-    let _end = u32::from_le_bytes(CARD_BLOB[off_next..off_next + 4].try_into().ok()?) as usize;
+    let lengths = &CARD_BLOB[length_start..length_start + num_cards as usize];
+    let mut start = 0usize;
+    for &len in &lengths[..idx] {
+        start += len as usize;
+    }
     Some(data_start + start)
 }
 
@@ -277,22 +281,17 @@ pub fn blob_card_count() -> usize {
 /// Find the blob index of a card by its `card_no`.
 /// Linear scan — use sparingly. For GBA, pre-resolve deck card indices at boot.
 pub fn find_card_index_by_no(card_no: &str) -> Option<usize> {
-    let (_num_cards, _strtab_len, _strtab_start, _offset_start, _data_start) = parse_header()?;
+    let (_num_cards, _strtab_len, _strtab_start, _length_start, _data_start) = parse_header()?;
     let idx = CARD_STRINGS.iter().position(|s| *s == card_no)?;
     // idx 0 is the empty string, skip it
     if idx == 0 {
         return None;
     }
     // String found, now find which card references it
-    let (_num_cards, _strtab_len, _strtab_start, offset_start, data_start) = parse_header()?;
-    let num_cards = u32::from_le_bytes(CARD_BLOB[4..8].try_into().ok()?);
-    for i in 0..num_cards as usize {
-        let off_start = offset_start + i * 4;
-        if off_start + 4 >= CARD_BLOB.len() {
-            break;
-        }
-        let start =
-            u32::from_le_bytes(CARD_BLOB[off_start..off_start + 4].try_into().ok()?) as usize;
+    let (num_cards, _strtab_len, _strtab_start, length_start, data_start) = parse_header()?;
+    let lengths = &CARD_BLOB[length_start..length_start + num_cards as usize];
+    let mut start = 0usize;
+    for (i, &len) in lengths.iter().enumerate() {
         let card_data = &CARD_BLOB[data_start + start..];
         if card_data.len() >= 2 {
             let card_no_idx = u16::from_le_bytes(card_data[0..2].try_into().ok()?);
@@ -300,6 +299,7 @@ pub fn find_card_index_by_no(card_no: &str) -> Option<usize> {
                 return Some(i);
             }
         }
+        start += len as usize;
     }
     None
 }

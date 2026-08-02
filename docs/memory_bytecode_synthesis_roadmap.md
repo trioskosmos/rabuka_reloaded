@@ -669,6 +669,10 @@ default; `load_cards_from_file`/`load_cards_from_strs` decode all cards from the
 (field-for-field, including `group` derivation and `Some(0)` score/cost via presence bits
 0x08/0x10). Fixes that shipped with it:
 - `parse_header`/offset-table reads were `u8` but the format is `u32` (broken blob decoder).
+- Blob header compacted: `num_cards` u32→u16, and the u32 offset table (9,124 B) replaced
+  with a u8 per-card **length table** (2,280 B) + prefix-sum decode — **~6.8 KB smaller**
+  (539 KB → 532 KB). `strtab_len` and string indices stay u16/u32 (string table has 5,675
+  strings, max string 687 B).
 - Blob `group` now mirrors `map_series_to_group` (multi-line series → empty group), matching
   the JSON deserializer exactly (this was the bring_love multiname regression).
 - `score`/`cost` presence flags so `Some(0)` is preserved.
@@ -679,6 +683,6 @@ default; `load_cards_from_file`/`load_cards_from_strs` decode all cards from the
 2. **`web_server.rs`** keeps serde (it IS the API contract) — out of scope; `server`-only.
 3. **`qa_test_suite.rs`** `Choice` from_value is test-only — fine.
 
-**Note on build size:** enabling `compact_card_data` in default embeds the ~539 KB blob
-(`cards_gen.rs`, 3.8 MB source) in every build — the cost of dropping card serde. Tests:
+**Note on build size:** enabling `compact_card_data` in default embeds the ~532 KB blob
+(`cards_gen.rs`, ~3.7 MB source) in every build — the cost of dropping card serde. Tests:
 **1934/1934 green**.

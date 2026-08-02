@@ -186,18 +186,20 @@ def compile_all(cards_dict: dict) -> tuple[bytes, list[int], list[str]]:
     strings, idx = build_string_table(cards)
     strtab = encode_strtab(strings)
 
-    offsets = []
+    # Per-card byte lengths (max card is well under 256 bytes → u8).
+    # Start offsets are derived by prefix-sum on decode, replacing a u32 table.
+    lengths = []
     card_data = bytearray()
     for card in cards:
-        offsets.append(len(card_data))
+        before = len(card_data)
         card_data.extend(encode_card(card, idx))
-    offsets.append(len(card_data))
+        lengths.append(len(card_data) - before)
 
-    header = struct.pack("<4sII", b"CARD", len(cards), len(strtab))
-    offset_table = struct.pack(f"<{len(offsets)}I", *offsets)
+    header = struct.pack("<4sHI", b"CARD", len(cards), len(strtab))
+    length_table = struct.pack(f"<{len(lengths)}B", *lengths)
 
-    blob = header + strtab + offset_table + bytes(card_data)
-    return blob, offsets, strings
+    blob = header + strtab + length_table + bytes(card_data)
+    return blob, lengths, strings
 
 
 def generate_cards_gen(
