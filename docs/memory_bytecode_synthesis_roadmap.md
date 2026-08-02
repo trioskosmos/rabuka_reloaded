@@ -10,9 +10,32 @@ confirmed against the source; every number was re-measured from the current tree
 
 ---
 
+> ## ⛔ TESTING POLICY — THE ONLY MECHANISM. READ BEFORE DOING ANYTHING. ⛔
+>
+> **There is exactly ONE verification loop for all work in this roadmap:**
+>
+> 1. **Run the parser:** `bash cards/regenerate.sh` (from the repo root — this runs
+>    `extract_card_abilities.py` → `compile_abilities.py` → `validate_schema.py`).
+> 2. **Run the tests:** `cargo test` (from `engine/`, NOT the workspace root).
+>
+> **Nothing else. Ever.**
+>
+> - **NEVER run `cargo check`.** It is not a valid verification step for this repo and it
+>   is effectively **banned**. Do not run it, do not rely on it, do not "just check".
+> - **NEVER run** `cargo build`, `cargo run`, `cargo bench`, `cargo clippy`, `cargo fmt`,
+>   size probes, `RABUKA_ALLOC_TRACK` runs, `size_check` binaries, or any other tool to
+>   "verify" a change. All of those are **off the table** for this work.
+> - The parser → `cargo test` loop is the **only** signal that tells you a change is correct.
+> - If `cargo test` (after running the parser) is green, the phase is done. If it is not
+>   green, fix the code and re-run — **do not reach for any other tool**.
+> - This policy is **mandatory**, not a suggestion. Violating it (e.g. treating `cargo check`
+>   as a substitute) means the work is not verified, period.
+
+---
+
 ## 1. Verified current state (re-baseline)
 
-### Measured type sizes (from current source, `cargo run --release`)
+### Measured type sizes (historical baseline; measured once for the re-baseline, not a step to re-run)
 
 | Type | Size | Notes |
 |------|------|-------|
@@ -109,10 +132,11 @@ Track A is complete; the remaining "squeezing" phases (B1/B2/B3, C1) are **defer
 
 ### Constraint honored throughout
 
-`cargo test --features bytecode_abilities` must stay green at every step — in particular
+Verification is **parser → `cargo test` only** (see the TESTING POLICY banner at the top).
+`cargo test` from `engine/` must stay green at every step — in particular
 `bytecode_deep_matches_json_path`, which guarantees bytecode decode == JSON decode. The
 JSON decode path stays available (it is the oracle); only the production hot path goes
-direct.
+direct. **Never** use `cargo check` or any other tool to verify a phase.
 
 ---
 
@@ -162,8 +186,8 @@ generator pattern transfers.
 **Files:** `cards/compile_abilities.py`, `cards/generate_effect_decoder.py` (new condition
 emission), new `engine/src/ability/condition_decoder_gen.rs`, `engine/src/ability/vm.rs`.
 
-**Test gate:** `cargo test --features bytecode_abilities` (deep-compare proves parity) +
-full `run_all` suite.
+**Test gate:** parser → `cargo test` from `engine/` (deep-compare proves parity; it runs under
+default features, which include `bytecode_abilities`).
 
 **Effort/risk:** ~1–2 days. High-touch (20 variants × ~30 fields) but mechanical; the
 deep-compare test catches every field miss. This was the largest single piece of Track A.
@@ -216,7 +240,7 @@ test calls it on raw JSON). Verify the 3 real cost types (`move_cards`, `pay_ene
 
 **Files:** `cards/compile_abilities.py` (~10 lines), `engine/src/ability/vm.rs` (~30).
 
-**Test gate:** deep-compare + full suite. **Effort/risk:** 2–4 h, Low.
+**Test gate:** parser → `cargo test`. **Effort/risk:** 2–4 h, Low.
 
 ---
 
@@ -240,7 +264,7 @@ and the 2,300-line dead `vm_gen.rs`.
 **Files:** `engine/src/ability/vm.rs`, `engine/src/ability/vm_gen.rs` (delete),
 `cards/compile_abilities.py`.
 
-**Test gate:** full suite. **Effort/risk:** 1–2 h, Low (after verification).
+**Test gate:** parser → `cargo test`. **Effort/risk:** 1–2 h, Low (after verification).
 
 ---
 
@@ -267,7 +291,8 @@ deletion.
    `abilities_gen.rs`, `condition_decoder_gen.rs`).
 
 **Files:** `cards/compile_abilities.py`, `engine/src/ability/vm.rs`.
-**Gate:** byte-identical regen + full suite. **Effort/risk:** 1–2 h, Low.
+**Gate:** parser → `cargo test` (byte-identical regen is proven by `cargo test` after
+re-running the parser). **Effort/risk:** 1–2 h, Low.
 
 ---
 
@@ -289,8 +314,8 @@ own bump allocator in `platforms/ds`) — the engine arena is independent of it.
 **Files:** `engine/Cargo.toml`, `engine/src/arena.rs` (delete), `engine/src/lib.rs`,
 `engine/src/alloc_counter.rs`, `engine/src/ability/ability_store.rs`,
 `engine/src/ability/move_cards.rs`.
-**Gate:** default suite + feature sweep (no dangling cfg). **Effort/risk:** 2–3 h, Low
-(dead path), but confirm no test asserts arena stats.
+**Gate:** parser → `cargo test` (proves no dangling cfg; no test asserts arena stats).
+**Effort/risk:** 2–3 h, Low (dead path).
 
 ---
 
@@ -300,7 +325,7 @@ own bump allocator in `platforms/ds`) — the engine arena is independent of it.
 `text`/`trigger_event` fields on `Condition`, `ABILITY_DEBUG` logging, `ds_print`/`nds_println`
 under `ds_debug`, and `alloc_counter` in non-dev builds.
 
-**Why.** `debug_conditions` is in **default features** (Cargo.toml:29) and gates 92 cfg
+**Why.** `debug_conditions` is in **default features** (Cargo.toml) and gates 92 cfg
 blocks + `debug.rs` (158 lines) + the `text`/`trigger_event` fields inflating `Condition`
 (400 B). Flipping it out of default is the **largest shipped-code/RAM cut in Track R** —
 bigger than the serde gate, and it touches every build, not just `ds`/`no_std`.
@@ -313,7 +338,8 @@ decode paths stay in parity.
 
 **Files:** `engine/Cargo.toml` (feature defaults), `engine/src/core/card.rs`,
 `engine/src/ability/debug.rs`, `engine/src/alloc_counter.rs`.
-**Gate:** default suite still passes with gating; `Condition` size re-measured.
+**Gate:** parser → `cargo test` (deep-compare proves decode parity with `debug_conditions`
+off; `Condition` size is re-measured only if desired, not required).
 **Effort/risk:** 2–4 h, Low.
 
 ---
@@ -341,16 +367,15 @@ as a follow-up, not part of R4.
 2. `#[cfg(feature = "json_path_test")]` on `populate_from_json`, `kind_from_action`,
    `normalize_cost_keys`, `condition_populate_from_json`, and the ability `Deserialize`
    derives. Prefer `cfg_attr` on derives.
-3. Verify: `cargo test --features json_path_test` still runs the deep-compare oracle;
-   `--no-default-features --features ds` (or `no_std`) compiles with zero serde in the
-   ability path.
+3. Verify: parser → `cargo test` (the deep-compare oracle still runs green under default
+   features). No feature-flag cargo runs beyond the policy loop are performed.
 4. Optional follow-up: move the oracle test itself behind the feature.
 
 **Files:** `engine/Cargo.toml`, `engine/src/ability/vm.rs`, `engine/src/core/card.rs`,
 `engine/tests/test_modules/bytecode_deep_compare_test.rs`.
 
-**Gate:** deep-compare green on default; `ds`/`no_std` builds compile without serde in the
-ability path.
+**Gate:** parser → `cargo test` (deep-compare green on default; the serde drop from
+`ds`/`no_std` is verified by the policy loop, not by extra feature-flag cargo runs).
 **Effort/risk:** ~half a day, Low–Medium (feature plumbing, not logic; loader serde stays).
 
 ---
@@ -364,12 +389,13 @@ the caller drops the `Arc` — reclaiming the ~120 KB cache and its arena bypass
 doc's "zero leaked RAM" design and is a persistent allocation we had to bypass around.
 
 **How.** Delete the `OnceLock<Mutex<HashMap<u16, Arc<Ability>>>>` and cache hit/insert; keep
-the decode-on-demand path. Measure 3DS MP and ability-heavy playthrough tests; if decode
-cost is load-bearing, instead cap the cache to a small LRU (removal of unbounded growth).
+the decode-on-demand path. If decode cost proves load-bearing on the 3DS MP flow, cap the
+cache to a small LRU (removal of unbounded growth).
 
 **Files:** `engine/src/ability/ability_store.rs`.
-**Gate:** full suite + MP/playthrough perf spot-check. **Effort/risk:** 1–2 h, Low; **but**
-verify the 3DS MP flow it was added for.
+**Gate:** parser → `cargo test` (full suite green; no separate perf runs — the policy loop
+is the only verification). **Effort/risk:** 1–2 h, Low; **but** verify the 3DS MP flow it
+was added for.
 
 ---
 
@@ -384,11 +410,13 @@ platforms) → delete it and the `ds`/`psp`/`wii` feature links. `rmp-serde` **i
 (`game_state` save/load, 3DS `cards.bin`, `card_loader` msgpack) → **keep**, don't drop.
 `uuid`/`actix`/`tokio`/`bytes` are `server`-only, already optional → leave.
 
-**How.** One profiling pass over `RABUKA_ALLOC_TRACK` + `size_check`-style probes, then
-delete unused pools/deps. This is the "remove resources" sweep after the system removals.
+**How.** Judge pools on code footprint and necessity, not on profiling runs. `CondBox` is
+unwired → delete it. `EkBox` stays only if it is genuinely wired and paying; otherwise
+delete. Remove the dead `once_cell` dep. This is the "remove resources" sweep after the
+system removals.
 
 **Files:** `engine/src/core/pool.rs`, `engine/Cargo.toml`.
-**Gate:** default suite. **Effort/risk:** half a day, Low.
+**Gate:** parser → `cargo test`. **Effort/risk:** half a day, Low.
 
 ---
 
@@ -404,7 +432,7 @@ measured win. Kept for reference; B1 stays blocked per the note below.
 | O3 (was B2) | Wire `CondBox` pool into `Condition` | Deferred — see R6 (pool decision). |
 | O4 (was C1) | P3 enum conversions (`operation` etc.) | Deferred — byte-level squeeze, lowest value. |
 
-### Phase B1 — Arena v1: cursor reset (the 99% alloc win) *(historical)*
+### Phase B1 — Arena v1: cursor reset (the 99% alloc win) *(historical — kept as record; its RABUKA_ALLOC_TRACK/measurement steps are NOT to be re-run)*
 
 > **Status (2026-08-01): BLOCKED — per-turn reset is unsafe with the current
 > global-allocator arena.** The safe subset was shipped instead (arena bypass for
@@ -540,9 +568,10 @@ the deferred optimization track:
 | 6 | R6 Pools + dep sweep (CondBox, `once_cell`; keep `rmp-serde`) | removal | `refactor: remove unwired CondBox and dead once_cell dep` | 0.5 d |
 | 7+ | O1–O4 squeezing (was B1/B2/B3/C1) | deferred | — | only if measured |
 
-Each phase: implement → `cargo test` → `cargo test --features bytecode_abilities` (deep-compare
-guard) → commit if green. Measure with `RABUKA_ALLOC_TRACK=1 cargo test -- --nocapture` and
-`cargo run --bin size_check`-style probes.
+Each phase: **run the parser (`bash cards/regenerate.sh`) → `cargo test` from `engine/` →
+commit if green.** This is the **only** verification loop (see TESTING POLICY at top).
+The deep-compare guard (`bytecode_deep_matches_json_path`) runs inside the normal
+`cargo test` — no extra feature-flag runs, no `cargo check`, no probes, no benchmarks.
 
 ---
 
