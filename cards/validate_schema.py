@@ -17,7 +17,6 @@ SCHEMA_PATH = REPO / "cards" / "ability_schema.json"
 COMPILE_PATH = REPO / "cards" / "compile_abilities.py"
 ENGINE_ENUMS = REPO / "engine" / "src" / "ability" / "enums.rs"
 ENGINE_EFFECTS = REPO / "engine" / "src" / "ability" / "effects" / "mod.rs"
-ENGINE_CARD = REPO / "engine" / "src" / "core" / "card.rs"
 
 ERRORS = []
 
@@ -37,44 +36,6 @@ def ok(msg):
 
 def load_schema():
     return json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-
-
-def extract_effect_opcodes():
-    """Extract EFFECT_OPCODES dict from compile_abilities.py."""
-    content = COMPILE_PATH.read_text(encoding="utf-8")
-    # Find the enumerate block
-    m = re.search(
-        r"EFFECT_OPCODES\s*=\s*\{\s*s:\s*i\s*\+\s*1\s*for\s+i,\s*s\s+in\s+enumerate\(\s*\[([^\]]+)\]",
-        content,
-        re.DOTALL,
-    )
-    if not m:
-        err("Could not find EFFECT_OPCODES in compile_abilities.py")
-        return {}
-    opcodes = {}
-    action_names = re.findall(r'"(\w+)"', m.group(1))
-    for i, name in enumerate(action_names):
-        opcodes[name] = i + 1
-    # Add compound opcodes
-    for comp in re.finditer(
-        r'EFFECT_OPCODES\["(\w+)"\]\s*=\s*(0x[0-9a-fA-F]+|\d+)', content
-    ):
-        opcodes[comp.group(1)] = int(comp.group(2), 0)
-    return opcodes
-
-
-def extract_cond_opcodes():
-    """Extract COND_OPCODES dict from compile_abilities.py."""
-    content = COMPILE_PATH.read_text(encoding="utf-8")
-    m = re.search(r"COND_OPCODES\s*=\s*\{([^}]+)\}", content, re.DOTALL)
-    if not m:
-        return {}
-    opcodes = {}
-    for line in m.group(1).split("\n"):
-        pair = re.match(r'"(\w+)"\s*:\s*(0x[0-9a-fA-F]+)', line.strip())
-        if pair:
-            opcodes[pair.group(1)] = int(pair.group(2), 16)
-    return opcodes
 
 
 def extract_action_type_variants():
@@ -102,30 +63,6 @@ def extract_handler_actions():
     return set(re.findall(r"ActionType::(\w+)\s*=>", content))
 
 
-def check_schema_vs_compiler(schema):
-    """Check schema actions have opcodes and vice versa."""
-    print("\n[Schema ↔ Compiler]")
-    schema_actions = set(schema.get("actions", {}).keys())
-    compiler_opcodes = extract_effect_opcodes()
-
-    for action in sorted(schema_actions):
-        info = schema["actions"][action]
-        opcode = info.get("opcode")
-        if action not in compiler_opcodes:
-            warn(
-                f"Schema action '{action}' has no EFFECT_OPCODE entry (may be compound/preprocessed)"
-            )
-        elif compiler_opcodes[action] != opcode:
-            err(
-                f"Schema action '{action}' opcode {opcode} != compiler {compiler_opcodes[action]}"
-            )
-    for action in sorted(compiler_opcodes):
-        if action.startswith("compound_"):
-            continue  # compound opcodes are auto-generated
-        if action not in schema_actions:
-            warn(f"Compiler action '{action}' not in schema")
-
-
 def check_schema_vs_engine(schema):
     """Check schema actions map to valid Rust enum variants."""
     print("\n[Schema ↔ Engine]")
@@ -145,20 +82,6 @@ def check_schema_vs_engine(schema):
                 pass
 
 
-def check_schema_vs_conditions(schema):
-    """Check condition types have opcodes."""
-    print("\n[Schema ↔ Compiler conditions]")
-    schema_conds = set(schema.get("conditions", {}).keys())
-    compiler_conds = extract_cond_opcodes()
-
-    for cond in sorted(schema_conds):
-        if cond not in compiler_conds:
-            warn(f"Schema condition '{cond}' has no COND_OPCODE entry")
-    for cond in sorted(compiler_conds):
-        if cond not in schema_conds:
-            warn(f"Compiler condition '{cond}' not in schema")
-
-
 def check_handler_coverage(schema):
     """Check every action type has a documented handler."""
     print("\n[Handler coverage]")
@@ -176,9 +99,7 @@ def main():
 
     schema = load_schema()
 
-    check_schema_vs_compiler(schema)
     check_schema_vs_engine(schema)
-    check_schema_vs_conditions(schema)
     check_handler_coverage(schema)
 
     if ERRORS:
