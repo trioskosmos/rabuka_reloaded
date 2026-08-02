@@ -1,4 +1,4 @@
-#[cfg(feature = "bytecode_abilities")]
+#[cfg(all(feature = "bytecode_abilities", feature = "json_path_test"))]
 mod bytecode_deep_compare {
     use rabuka_engine::ability::enums::ActionType;
     use rabuka_engine::ability::vm::{ability_count, get_ability};

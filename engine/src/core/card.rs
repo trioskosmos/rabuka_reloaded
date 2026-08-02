@@ -1028,6 +1028,7 @@ pub struct AbilityEffect {
 impl AbilityEffect {
     /// Build EffectKind from an action string and the matching effect JSON.
     /// Constructs EffectKind directly without serde Deserialize.
+    #[cfg(feature = "json_path_test")]
     pub(crate) fn kind_from_action(
         action: &str,
         effect_json: &serde_json::Value,

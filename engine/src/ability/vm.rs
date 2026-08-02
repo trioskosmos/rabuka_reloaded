@@ -1157,6 +1157,7 @@ fn decode_ability_effect(bc: &mut BcReader) -> Option<Option<AbilityEffect>> {
 /// objects use "type" (not "action"), "zone" (not "source"), and
 /// "options"/"costs" (not "actions") — because the legacy AbilityCost
 /// custom Deserialize handles these aliases.
+#[cfg(feature = "json_path_test")]
 pub fn normalize_cost_keys(map: &mut serde_json::Map<String, serde_json::Value>) {
     if !map.contains_key("action") {
         if let Some(v) = map.remove("type").or_else(|| map.remove("cost_type")) {
@@ -1179,6 +1180,7 @@ pub fn normalize_cost_keys(map: &mut serde_json::Map<String, serde_json::Value>)
     }
 }
 
+#[cfg(feature = "json_path_test")]
 fn recursive_normalize_cost_value(val: &mut serde_json::Value) {
     match val {
         serde_json::Value::Object(m) => {
@@ -1333,8 +1335,9 @@ fn decode_ability_effect_direct(bc: &mut BcReader, variant: u8) -> Option<Abilit
     Some(effect)
 }
 
-// ── populate_from_json (kept for JSON fallback / tests) ──
+// ── populate_from_json (JSON-path decode; used only by the deep-compare oracle) ──
 
+#[cfg(feature = "json_path_test")]
 impl AbilityEffect {
     /// Populate `kind` from this effect's JSON value. Recurses into sub-effects.
     pub fn populate_from_json(&mut self, json_val: &serde_json::Value) {
@@ -1454,6 +1457,7 @@ impl AbilityEffect {
     }
 }
 
+#[cfg(feature = "json_path_test")]
 fn condition_populate_from_json(cond: &mut Condition, cond_json: &serde_json::Value) {
     if let Condition::Choice {
         ref mut options, ..
