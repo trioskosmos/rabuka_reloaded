@@ -25,27 +25,43 @@ pub struct CardLoader;
 impl CardLoader {
     #[cfg(not(feature = "no_std"))]
     pub fn load_cards_from_file(path: &Path) -> Result<Vec<Card>, String> {
-        let mut file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
-
-        Self::load_cards_from_strs(&contents)
+        #[cfg(feature = "compact_card_data")]
+        {
+            let _ = path;
+            return Ok(Self::load_all_cards_from_blob());
+        }
+        #[cfg(not(feature = "compact_card_data"))]
+        {
+            let mut file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
+            let mut contents = String::new();
+            file.read_to_string(&mut contents)
+                .map_err(|e| format!("Failed to read file: {}", e))?;
+            Self::load_cards_from_strs(&contents)
+        }
     }
 
     /// Load cards from serde_json str — internally calls attach_abilities().
     /// This is the single entry point that all ports should use.
+    /// Under `compact_card_data`, decodes from the embedded blob instead (zero serde).
     pub fn load_cards_from_strs(cards_json: &str) -> Result<Vec<Card>, String> {
-        let mut cards: Vec<Card> = match serde_json::from_str::<Vec<Card>>(cards_json) {
-            Ok(cards) => cards,
-            Err(e1) => {
-                let card_map: HashMap<String, Card> = serde_json::from_str(cards_json)
-                    .map_err(|e| format!("Vec: {}; Object: {}", e1, e))?;
-                card_map.into_values().collect()
-            }
-        };
-        Self::attach_abilities(&mut cards);
-        Ok(cards)
+        #[cfg(feature = "compact_card_data")]
+        {
+            let _ = cards_json;
+            return Ok(Self::load_all_cards_from_blob());
+        }
+        #[cfg(not(feature = "compact_card_data"))]
+        {
+            let mut cards: Vec<Card> = match serde_json::from_str::<Vec<Card>>(cards_json) {
+                Ok(cards) => cards,
+                Err(e1) => {
+                    let card_map: HashMap<String, Card> = serde_json::from_str(cards_json)
+                        .map_err(|e| format!("Vec: {}; Object: {}", e1, e))?;
+                    card_map.into_values().collect()
+                }
+            };
+            Self::attach_abilities(&mut cards);
+            Ok(cards)
+        }
     }
 
     /// Load cards from MessagePack bytes — internally calls attach_abilities().
@@ -58,6 +74,23 @@ impl CardLoader {
         let mut cards: Vec<Card> = map.into_values().collect();
         Self::attach_abilities(&mut cards);
         Ok(cards)
+    }
+
+    /// Load ALL cards from the embedded compact blob (cards_gen.rs), with zero serde.
+    /// Requires the `compact_card_data` feature. Decodes every card in the blob and
+    /// attaches ability references — a drop-in replacement for the JSON loader, verified
+    /// by `card_binary::tests::test_blob_matches_json` (2280/2280 cards).
+    #[cfg(feature = "compact_card_data")]
+    pub fn load_all_cards_from_blob() -> Vec<Card> {
+        let mut cards: Vec<Card> = Vec::new();
+        let num_cards = crate::core::card_binary::blob_card_count();
+        for i in 0..num_cards {
+            if let Some(c) = crate::core::card_binary::decode_card_from_blob(i) {
+                cards.push(c);
+            }
+        }
+        Self::attach_abilities(&mut cards);
+        cards
     }
 
     /// Attach ability references to all cards using the embedded CARD_ABILITY_PAIRS.

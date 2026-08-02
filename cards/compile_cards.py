@@ -106,7 +106,11 @@ def encode_card(card: dict, idx: dict[str, int]) -> bytes:
     else:
         has_special = 0
         special = None
-    type_flags = ctype | (has_special << 2)
+    # Presence bits: 0x08 = has_cost (cost may legitimately be 0),
+    # 0x10 = has_score (score may legitimately be 0).
+    has_cost = 1 if "cost" in card else 0
+    has_score = 1 if "score" in card else 0
+    type_flags = ctype | (has_special << 2) | (has_cost << 3) | (has_score << 4)
 
     nb = len(base_hearts)
     nbl = len(blade_hearts)
@@ -117,7 +121,7 @@ def encode_card(card: dict, idx: dict[str, int]) -> bytes:
     out.extend(struct.pack("<H", idx.get(card.get("card_no", ""), 0)))
     out.extend(struct.pack("<H", idx.get(card.get("name", ""), 0)))
     out.extend(struct.pack("<H", idx.get(card.get("series", ""), 0)))
-    out.extend(struct.pack("<H", idx.get(card.get("group", card.get("series", "")), 0)))
+    out.extend(struct.pack("<H", idx.get(card.get("group", ""), 0)))
     out.extend(
         struct.pack(
             "<H", idx.get(card.get("unit", ""), 0) if card.get("unit") else 0xFFFF
@@ -132,9 +136,9 @@ def encode_card(card: dict, idx: dict[str, int]) -> bytes:
         )
     )
     out.extend(struct.pack("<B", type_flags))
-    out.extend(struct.pack("<B", min(cost, 255) if cost else 0))
+    out.extend(struct.pack("<B", min(cost, 255)))
     out.extend(struct.pack("<B", min(blade, 255)))
-    out.extend(struct.pack("<B", min(score, 255) if score else 0))
+    out.extend(struct.pack("<B", min(score, 255)))
     out.extend(struct.pack("<B", nb))
     out.extend(struct.pack("<B", nbl))
     out.extend(struct.pack("<B", nn))

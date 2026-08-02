@@ -8,12 +8,12 @@ use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
 const MAGIC: &[u8; 4] = b"CARD";
 
 /// Parse the CARD_BLOB header and return (num_cards, strtab_len, strtab_start, offset_start, data_start).
-fn parse_header() -> Option<(u8, u8, usize, usize, usize)> {
+fn parse_header() -> Option<(u32, u32, usize, usize, usize)> {
     if CARD_BLOB.len() < 12 || &CARD_BLOB[0..4] != MAGIC {
         return None;
     }
-    let num_cards = u8::from_le_bytes(CARD_BLOB[4..8].try_into().ok()?);
-    let strtab_len = u8::from_le_bytes(CARD_BLOB[8..12].try_into().ok()?);
+    let num_cards = u32::from_le_bytes(CARD_BLOB[4..8].try_into().ok()?);
+    let strtab_len = u32::from_le_bytes(CARD_BLOB[8..12].try_into().ok()?);
     let strtab_start = 12;
     let offset_start = strtab_start + strtab_len as usize;
     let data_start = offset_start + (num_cards as usize + 1) * 4;
@@ -34,8 +34,8 @@ fn card_data_offset(idx: usize) -> Option<usize> {
     }
     let off_start = offset_start + idx * 4;
     let off_next = offset_start + (idx + 1) * 4;
-    let start = u8::from_le_bytes(CARD_BLOB[off_start..off_start + 4].try_into().ok()?) as usize;
-    let _end = u8::from_le_bytes(CARD_BLOB[off_next..off_next + 4].try_into().ok()?) as usize;
+    let start = u32::from_le_bytes(CARD_BLOB[off_start..off_start + 4].try_into().ok()?) as usize;
+    let _end = u32::from_le_bytes(CARD_BLOB[off_next..off_next + 4].try_into().ok()?) as usize;
     Some(data_start + start)
 }
 
@@ -86,6 +86,10 @@ pub fn decode_card_from_blob(idx: usize) -> Option<Card> {
     let num_need = data[24] as usize;
     let ctype = type_flags & 0x03;
     let has_special = (type_flags >> 2) & 0x01;
+    // Presence bits: cost and score may legitimately be 0, so a separate flag
+    // distinguishes Some(0) from None.
+    let has_cost = (type_flags >> 3) & 0x01;
+    let has_score = (type_flags >> 4) & 0x01;
 
     let card_type = match ctype {
         0 => CardType::Member,
@@ -101,7 +105,18 @@ pub fn decode_card_from_blob(idx: usize) -> Option<Card> {
     let group: Box<str> = {
         let g = get_str(group_idx);
         if g.is_empty() {
-            series.clone()
+            // Mirrors Card::deserialize's map_series_to_group: a multi-line series
+            // does not map to a single group, so group stays empty.
+            match series.as_ref() {
+                "ラブライブ！" => "μ's".into(),
+                "ラブライブ！サンシャイン!!" => "Aqours".into(),
+                "ラブライブ！虹ヶ咲学園スクールアイドル同好会" => {
+                    "虹ヶ咲".into()
+                }
+                "ラブライブ！スーパースター!!" => "Liella!".into(),
+                "蓮ノ空女学院スクールアイドルクラブ" => "蓮ノ空".into(),
+                _ => Box::from(""),
+            }
         } else {
             g.into()
         }
@@ -151,13 +166,13 @@ pub fn decode_card_from_blob(idx: usize) -> Option<Card> {
         group,
         card_type,
         unit,
-        cost: if cost_val > 0 {
+        cost: if has_cost != 0 {
             Some(cost_val as u8)
         } else {
             None
         },
         blade: blade_val as u8,
-        score: if score_val > 0 {
+        score: if has_score != 0 {
             Some(score_val as u8)
         } else {
             None
@@ -254,6 +269,11 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
     }
 }
 
+/// Number of cards stored in the embedded CARD_BLOB.
+pub fn blob_card_count() -> usize {
+    parse_header().map(|(n, ..)| n as usize).unwrap_or(0)
+}
+
 /// Find the blob index of a card by its `card_no`.
 /// Linear scan — use sparingly. For GBA, pre-resolve deck card indices at boot.
 pub fn find_card_index_by_no(card_no: &str) -> Option<usize> {
@@ -265,14 +285,14 @@ pub fn find_card_index_by_no(card_no: &str) -> Option<usize> {
     }
     // String found, now find which card references it
     let (_num_cards, _strtab_len, _strtab_start, offset_start, data_start) = parse_header()?;
-    let num_cards = u8::from_le_bytes(CARD_BLOB[4..8].try_into().ok()?);
+    let num_cards = u32::from_le_bytes(CARD_BLOB[4..8].try_into().ok()?);
     for i in 0..num_cards as usize {
         let off_start = offset_start + i * 4;
         if off_start + 4 >= CARD_BLOB.len() {
             break;
         }
         let start =
-            u8::from_le_bytes(CARD_BLOB[off_start..off_start + 4].try_into().ok()?) as usize;
+            u32::from_le_bytes(CARD_BLOB[off_start..off_start + 4].try_into().ok()?) as usize;
         let card_data = &CARD_BLOB[data_start + start..];
         if card_data.len() >= 2 {
             let card_no_idx = u16::from_le_bytes(card_data[0..2].try_into().ok()?);
@@ -358,7 +378,7 @@ mod tests {
     fn test_blob_matches_json() {
         // Load ALL cards from blob and JSON, compare by card_no.
         let (num_cards, ..) = parse_header().unwrap();
-        let num = (num_cards as usize).min(100); // first 100 cards
+        let num = num_cards as usize;
         let mut blob_cards: Vec<Card> = Vec::new();
         for i in 0..num {
             if let Some(c) = decode_card_from_blob(i) {
@@ -384,25 +404,20 @@ mod tests {
             assert_eq!(b.name, j.name, "name mismatch for {}", b.card_no);
             assert_eq!(b.card_type, j.card_type, "type mismatch for {}", b.card_no);
             assert_eq!(b.series, j.series, "series mismatch for {}", b.card_no);
+            assert_eq!(b.group, j.group, "group mismatch for {}", b.card_no);
             assert_eq!(b.unit, j.unit, "unit mismatch for {}", b.card_no);
-            assert_eq!(
-                b.cost.unwrap_or(0),
-                j.cost.unwrap_or(0),
-                "cost mismatch for {}",
-                b.card_no
-            );
+            assert_eq!(b.cost, j.cost, "cost mismatch for {}", b.card_no);
             assert_eq!(b.blade, j.blade, "blade mismatch for {}", b.card_no);
-            assert_eq!(
-                b.score.unwrap_or(0),
-                j.score.unwrap_or(0),
-                "score mismatch for {}",
-                b.card_no
-            );
+            assert_eq!(b.score, j.score, "score mismatch for {}", b.card_no);
             // Hearts: compare by value (order-independent)
             assert_hearts_eq(&b.base_heart, &j.base_heart, &b.card_no, "base_heart");
             assert_blade_hearts_eq(&b.blade_heart, &j.blade_heart, &b.card_no, "blade_heart");
             assert_hearts_eq(&b.need_heart, &j.need_heart, &b.card_no, "need_heart");
             assert_special_heart_eq(&b.special_heart, &j.special_heart, &b.card_no);
+            assert_eq!(b.img, j.img, "img mismatch for {}", b.card_no);
+            assert_eq!(b.product, j.product, "product mismatch for {}", b.card_no);
+            assert_eq!(b.rare, j.rare, "rare mismatch for {}", b.card_no);
+            assert_eq!(b.ability, j.ability, "ability mismatch for {}", b.card_no);
         }
         assert!(count > 0, "at least one card matched");
         println!("Verified {} cards match between blob and JSON", count);
