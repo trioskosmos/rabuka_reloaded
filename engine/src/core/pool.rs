@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
-use super::card::{Condition, EffectKind};
+use super::card::EffectKind;
 #[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
@@ -14,7 +14,7 @@ use alloc::{
 // ── Fixed-size object pool ─────────────────────────────────────────────
 // Pre-allocates N slots of size_of::<T>(). alloc() and free_idx() are O(1)
 // with a Mutex-guarded free list. Falls back to Box::new() when the pool
-// is exhausted. Used by EkBox and CondBox.
+// is exhausted. Used by EkBox.
 
 pub struct Pool<T> {
     slots: Box<[UnsafeCell<MaybeUninit<T>>]>,
@@ -165,4 +165,3 @@ macro_rules! make_pool_box {
 }
 
 make_pool_box!(EkBox, EffectKind, __EK_POOL, ek_get_pool, 128);
-make_pool_box!(CondBox, Condition, __COND_POOL, cond_get_pool, 64);
