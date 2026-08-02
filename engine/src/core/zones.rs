@@ -28,6 +28,25 @@ impl MemberArea {
             MemberArea::RightSide => MemberArea::LeftSide,
         }
     }
+
+    /// Wire tag used by the 3DS multiplayer protocol (1=left, 2=center, 3=right).
+    pub fn to_tag(&self) -> u8 {
+        match self {
+            MemberArea::LeftSide => 1,
+            MemberArea::Center => 2,
+            MemberArea::RightSide => 3,
+        }
+    }
+
+    /// Inverse of [`MemberArea::to_tag`]. Returns None for unknown tags.
+    pub fn from_tag(tag: u8) -> Option<MemberArea> {
+        match tag {
+            1 => Some(MemberArea::LeftSide),
+            2 => Some(MemberArea::Center),
+            3 => Some(MemberArea::RightSide),
+            _ => None,
+        }
+    }
 }
 
 impl core::fmt::Display for MemberArea {

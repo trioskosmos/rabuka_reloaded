@@ -97,6 +97,71 @@ impl core::fmt::Display for ActionType {
     }
 }
 
+impl ActionType {
+    /// Wire tag used by the 3DS multiplayer protocol (see `ActionSync::to_bytes`).
+    /// Kept on the engine so the mapping stays in one place and breaks loudly
+    /// (exhaustive match) if a new variant is added.
+    pub fn to_tag(&self) -> u16 {
+        match self {
+            ActionType::RockChoice => 0,
+            ActionType::PaperChoice => 1,
+            ActionType::ScissorsChoice => 2,
+            ActionType::ChooseFirstAttacker => 3,
+            ActionType::SelectMulligan => 4,
+            ActionType::SkipMulligan => 5,
+            ActionType::PlayMemberToStage => 6,
+            ActionType::SetLiveCard => 7,
+            ActionType::FinishLiveCardSet => 8,
+            ActionType::EnergyCharge => 9,
+            ActionType::ChoiceDecision => 10,
+            ActionType::ChoiceSelect => 11,
+            ActionType::ChoiceSkip => 12,
+            ActionType::ChoiceOption => 13,
+            ActionType::ChoicePosition => 14,
+            ActionType::UseAbility => 15,
+            ActionType::ChooseSecondAttacker => 16,
+            ActionType::ConfirmMulligan => 17,
+            ActionType::SelectLiveCard => 18,
+            ActionType::ConfirmLiveCardSet => 19,
+            ActionType::SkipLiveCardSet => 20,
+            ActionType::PassRemaining => 21,
+            ActionType::Pass => 22,
+            // Non-wire variants (menu headers) have no tag.
+            ActionType::MulliganHeader | ActionType::LiveCardHeader => 0,
+        }
+    }
+
+    /// Inverse of [`ActionType::to_tag`]. Unknown tags decode to `Pass`.
+    pub fn from_tag(tag: u16) -> ActionType {
+        match tag {
+            0 => ActionType::RockChoice,
+            1 => ActionType::PaperChoice,
+            2 => ActionType::ScissorsChoice,
+            3 => ActionType::ChooseFirstAttacker,
+            4 => ActionType::SelectMulligan,
+            5 => ActionType::SkipMulligan,
+            6 => ActionType::PlayMemberToStage,
+            7 => ActionType::SetLiveCard,
+            8 => ActionType::FinishLiveCardSet,
+            9 => ActionType::EnergyCharge,
+            10 => ActionType::ChoiceDecision,
+            11 => ActionType::ChoiceSelect,
+            12 => ActionType::ChoiceSkip,
+            13 => ActionType::ChoiceOption,
+            14 => ActionType::ChoicePosition,
+            15 => ActionType::UseAbility,
+            16 => ActionType::ChooseSecondAttacker,
+            17 => ActionType::ConfirmMulligan,
+            18 => ActionType::SelectLiveCard,
+            19 => ActionType::ConfirmLiveCardSet,
+            20 => ActionType::SkipLiveCardSet,
+            21 => ActionType::PassRemaining,
+            22 => ActionType::Pass,
+            _ => ActionType::Pass,
+        }
+    }
+}
+
 impl core::str::FromStr for ActionType {
     type Err = String;
 

@@ -173,6 +173,75 @@ fn format_action_line(act: &game_setup::Action, is_ja: bool) -> String {
     }
 }
 
+/// Sum the need-heart counts (8 colors) for a player's live zone, including
+/// need_heart_modifiers. Single source of truth (was duplicated twice inline).
+fn compute_live_need(player: &Player, gs: &GameState) -> Vec<u32> {
+    let mut nh = vec![0u32; 8];
+    for &cid in &player.live_card_zone.cards {
+        if cid == -1 {
+            continue;
+        }
+        if let Some(card) = gs.card_database.get_card(cid) {
+            if let Some(ref need) = card.need_heart {
+                for (color, count) in &need.hearts {
+                    if let Some(idx) = heart_color_index(color) {
+                        nh[idx] += *count as u32;
+                    }
+                }
+            }
+        }
+    }
+    for (&cid, colors) in &gs.mods.need_heart_modifiers {
+        if player.live_card_zone.cards.contains(&cid) {
+            for (color, &val) in colors {
+                if let Some(idx) = heart_color_index(color) {
+                    nh[idx] = (nh[idx] as i32 + val.total()).max(0) as u32;
+                }
+            }
+        }
+    }
+    nh
+}
+
+/// Sum the stage total-heart counts (8 colors) for a player, including
+/// heart_modifiers and the heart_color_multiplier. Mirrors display.rs
+/// player_to_display total_hearts logic. Single source of truth.
+fn compute_total_hearts(player: &Player, gs: &GameState) -> Vec<u32> {
+    let mut hearts = vec![0u32; 8];
+    for &cid in &player.stage.stage {
+        if cid == -1 {
+            continue;
+        }
+        if let Some(card) = gs.card_database.get_card(cid) {
+            if let Some(ref base_heart) = card.base_heart {
+                let h_mult = gs.mods.heart_color_multiplier.get(&cid).copied();
+                for (color, count) in &base_heart.hearts {
+                    if let Some(idx) = heart_color_index(color) {
+                        if let Some(hc) = h_mult {
+                            if hc == *color {
+                                hearts[idx] += *count as u32;
+                            }
+                        } else {
+                            hearts[idx] += *count as u32;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for (cid, modifier) in &gs.mods.heart_modifiers {
+        if !player.stage.stage.contains(cid) {
+            continue;
+        }
+        for (color, val) in modifier {
+            if let Some(idx) = heart_color_index(color) {
+                hearts[idx] = (hearts[idx] as i32 + val.total()).max(0) as u32;
+            }
+        }
+    }
+    hearts
+}
+
 pub fn play_step(p: PlayState, keys: u32) -> Step {
     let PlayState {
         mut gs,
@@ -1694,13 +1763,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
                 _3ds_board_set_opp_hand_count(0);
             }
             // Hide opponent's live cards until they perform
-            let opp_is_first = pref(&gs, 1 - my_player_idx).is_first_attacker;
-            let opp_performed = matches!(
-                gs.current_phase,
-                Phase::SecondAttackerPerformance | Phase::LiveVictoryDetermination
-            ) || (matches!(gs.current_phase, Phase::FirstAttackerPerformance)
-                && opp_is_first);
-            if !opp_performed {
+            if !gs.opponent_has_performed(my_player_idx) {
                 unsafe {
                     for i in 0..3i32 {
                         _3ds_board_set_opp_live(i, false, std::ptr::null(), 0, false, false);
@@ -1758,33 +1821,6 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
 
         // Compute and set need hearts text for bottom screen live zone
         {
-            let compute_live_need = |player: &Player, gs: &GameState| -> Vec<u32> {
-                let mut nh = vec![0u32; 8];
-                for &cid in &player.live_card_zone.cards {
-                    if cid == -1 {
-                        continue;
-                    }
-                    if let Some(card) = gs.card_database.get_card(cid) {
-                        if let Some(ref need) = card.need_heart {
-                            for (color, count) in &need.hearts {
-                                if let Some(idx) = heart_color_index(color) {
-                                    nh[idx] += *count as u32;
-                                }
-                            }
-                        }
-                    }
-                }
-                for (&cid, colors) in &gs.mods.need_heart_modifiers {
-                    if player.live_card_zone.cards.contains(&cid) {
-                        for (color, &val) in colors {
-                            if let Some(idx) = heart_color_index(color) {
-                                nh[idx] = (nh[idx] as i32 + val.total()).max(0) as u32;
-                            }
-                        }
-                    }
-                }
-                nh
-            };
             // P1 (perspective player) need hearts — always show if any
             let p1_nh = compute_live_need(&gs.player1, &gs);
             unsafe {
@@ -1794,13 +1830,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
                 );
             }
             // P2 (opponent) need hearts — hidden until performed
-            let opp_is_first = gs.player2.is_first_attacker;
-            let opp_performed = matches!(
-                gs.current_phase,
-                Phase::SecondAttackerPerformance | Phase::LiveVictoryDetermination
-            ) || (matches!(gs.current_phase, Phase::FirstAttackerPerformance)
-                && opp_is_first);
-            if opp_performed {
+            if gs.opponent_has_performed(my_player_idx) {
                 let p2_nh = compute_live_need(&gs.player2, &gs);
                 unsafe {
                     _3ds_set_need_hearts(
@@ -2136,136 +2166,22 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
                     )
                     .as_ptr(),
                 );
-                let p1_blade: u32 = gs
-                    .player1
-                    .stage
-                    .stage
-                    .iter()
-                    .filter_map(|&cid| {
-                        if cid == -1 {
-                            return None;
-                        }
-                        let card = gs.card_database.get_card(cid)?;
-                        let is_wait = gs
-                            .mods
-                            .orientation_modifiers
-                            .get(&cid)
-                            .map(|o| o.as_str() == "wait")
-                            .unwrap_or(false);
-                        if is_wait {
-                            return Some(0u32);
-                        }
-                        let m = gs.mods.blade_modifiers.get(&cid);
-                        let total = if let Some(e) = m {
-                            if e.set != 0 {
-                                e.total().max(0) as u32
-                            } else {
-                                (card.blade as i32 + e.total()).max(0) as u32
-                            }
-                        } else {
-                            card.blade as u32
-                        };
-                        Some(total)
-                    })
-                    .sum::<u32>();
-                let p2_blade: u32 = gs
-                    .player2
-                    .stage
-                    .stage
-                    .iter()
-                    .filter_map(|&cid| {
-                        if cid == -1 {
-                            return None;
-                        }
-                        let card = gs.card_database.get_card(cid)?;
-                        let is_wait = gs
-                            .mods
-                            .orientation_modifiers
-                            .get(&cid)
-                            .map(|o| o.as_str() == "wait")
-                            .unwrap_or(false);
-                        if is_wait {
-                            return Some(0u32);
-                        }
-                        let m = gs.mods.blade_modifiers.get(&cid);
-                        let total = if let Some(e) = m {
-                            if e.set != 0 {
-                                e.total().max(0) as u32
-                            } else {
-                                (card.blade as i32 + e.total()).max(0) as u32
-                            }
-                        } else {
-                            card.blade as u32
-                        };
-                        Some(total)
-                    })
-                    .sum::<u32>();
+                let p1_blade: u32 = gs.player1.stage.total_blades(
+                    &gs.card_database,
+                    &gs.mods.blade_modifiers,
+                    &gs.mods.orientation_modifiers,
+                    false,
+                ) as u32;
+                let p2_blade: u32 = gs.player2.stage.total_blades(
+                    &gs.card_database,
+                    &gs.mods.blade_modifiers,
+                    &gs.mods.orientation_modifiers,
+                    false,
+                ) as u32;
                 // Compute total hearts per player from stage members
                 // (mirrors display.rs player_to_display total_hearts logic)
-                let mut p1_hearts = vec![0u32; 8];
-                let mut p2_hearts = vec![0u32; 8];
-                for &cid in &gs.player1.stage.stage {
-                    if cid == -1 {
-                        continue;
-                    }
-                    if let Some(card) = gs.card_database.get_card(cid) {
-                        if let Some(ref base_heart) = card.base_heart {
-                            let h_mult = gs.mods.heart_color_multiplier.get(&cid).copied();
-                            for (color, count) in &base_heart.hearts {
-                                if let Some(idx) = heart_color_index(color) {
-                                    if let Some(hc) = h_mult {
-                                        if hc == *color {
-                                            p1_hearts[idx] += *count as u32;
-                                        }
-                                    } else {
-                                        p1_hearts[idx] += *count as u32;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                for (cid, modifier) in &gs.mods.heart_modifiers {
-                    if !gs.player1.stage.stage.contains(cid) {
-                        continue;
-                    }
-                    for (color, val) in modifier {
-                        if let Some(idx) = heart_color_index(color) {
-                            p1_hearts[idx] = (p1_hearts[idx] as i32 + val.total()).max(0) as u32;
-                        }
-                    }
-                }
-                for &cid in &gs.player2.stage.stage {
-                    if cid == -1 {
-                        continue;
-                    }
-                    if let Some(card) = gs.card_database.get_card(cid) {
-                        if let Some(ref base_heart) = card.base_heart {
-                            let h_mult = gs.mods.heart_color_multiplier.get(&cid).copied();
-                            for (color, count) in &base_heart.hearts {
-                                if let Some(idx) = heart_color_index(color) {
-                                    if let Some(hc) = h_mult {
-                                        if hc == *color {
-                                            p2_hearts[idx] += *count as u32;
-                                        }
-                                    } else {
-                                        p2_hearts[idx] += *count as u32;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                for (cid, modifier) in &gs.mods.heart_modifiers {
-                    if !gs.player2.stage.stage.contains(cid) {
-                        continue;
-                    }
-                    for (color, val) in modifier {
-                        if let Some(idx) = heart_color_index(color) {
-                            p2_hearts[idx] = (p2_hearts[idx] as i32 + val.total()).max(0) as u32;
-                        }
-                    }
-                }
+                let p1_hearts = compute_total_hearts(&gs.player1, &gs);
+                let p2_hearts = compute_total_hearts(&gs.player2, &gs);
                 // Format hearts as texticon string
                 let format_hearts = |hearts: &[u32]| -> String {
                     let mut parts = Vec::new();
@@ -2304,41 +2220,6 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
                     Phase::LiveCardSetFirstAttacker | Phase::LiveCardSetSecondAttacker
                 );
                 if is_live_set {
-                    // Compute live_need_hearts from live zone cards
-                    let compute_live_need = |player: &Player, gs: &GameState| -> Vec<u32> {
-                        let mut nh = vec![0u32; 8];
-                        for &cid in &player.live_card_zone.cards {
-                            if cid == -1 {
-                                continue;
-                            }
-                            if let Some(card) = gs.card_database.get_card(cid) {
-                                if let Some(ref need) = card.need_heart {
-                                    for (color, count) in &need.hearts {
-                                        if let Some(idx) = heart_color_index(color) {
-                                            nh[idx] += *count as u32;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        for (&cid, colors) in &gs.mods.need_heart_modifiers {
-                            if player.live_card_zone.cards.contains(&cid) {
-                                for (color, &val) in colors {
-                                    if let Some(idx) = heart_color_index(color) {
-                                        nh[idx] = (nh[idx] as i32 + val.total()).max(0) as u32;
-                                    }
-                                }
-                            }
-                        }
-                        nh
-                    };
-                    let opp_is_first = gs.player2.is_first_attacker;
-                    let opp_performed =
-                        matches!(
-                            gs.current_phase,
-                            Phase::SecondAttackerPerformance | Phase::LiveVictoryDetermination
-                        ) || (matches!(gs.current_phase, Phase::FirstAttackerPerformance)
-                            && opp_is_first);
                     // P1 (perspective) need hearts
                     let p1_nh = compute_live_need(&gs.player1, &gs);
                     if p1_nh.iter().any(|&v| v > 0) {
@@ -2347,7 +2228,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
                         render_text_with_icons(4.0, 46.0, &need_display, COL_GOLD, 0.50f32);
                     }
                     // P2 (opponent) need hearts — only after performed
-                    if opp_performed {
+                    if gs.opponent_has_performed(my_player_idx) {
                         let p2_nh = compute_live_need(&gs.player2, &gs);
                         if p2_nh.iter().any(|&v| v > 0) {
                             let nh_str = format_hearts(&p2_nh);

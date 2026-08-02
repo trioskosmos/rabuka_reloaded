@@ -238,6 +238,22 @@ pub struct GameState {
 }
 
 impl GameState {
+    /// Whether the opponent (the player at index `1 - my_player_idx`) has
+    /// performed their live this turn. Used to decide when the opponent's live
+    /// zone / need-hearts may be revealed to the local player.
+    pub fn opponent_has_performed(&self, my_player_idx: usize) -> bool {
+        let opp_idx = 1 - my_player_idx;
+        let opp_first = if opp_idx == 0 {
+            self.player1.is_first_attacker
+        } else {
+            self.player2.is_first_attacker
+        };
+        matches!(
+            self.current_phase,
+            Phase::SecondAttackerPerformance | Phase::LiveVictoryDetermination
+        ) || (matches!(self.current_phase, Phase::FirstAttackerPerformance) && opp_first)
+    }
+
     /// Check if the given player (0=P1, 1=P2) can act right now.
     /// Accounts for pending choices (including SelectAutoAbility/SelectLiveSuccess),
     /// phase-specific rules, and active player checks.
