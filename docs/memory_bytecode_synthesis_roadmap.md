@@ -58,39 +58,38 @@ confirmed against the source; every number was re-measured from the current tree
 | `decode_ability_cost` | `AbilityEffect` inside `AbilityCost` | **GONE** (A2) |
 | `decode_ability_effect_from_object` | `AbilityEffect` (TAG_OBJECT fallback) | **GONE** (A3, 06aece4e) |
 
-The ability decode path is fully direct. The only remaining `serde_json::from_value` calls
-are in the JSON oracle/test path (`kind_from_action`'s `dynamic_count` fallback in
-`card.rs`, and `qa_test_suite.rs`) — the target of R4.
+The ability decode path is fully direct and bytecode-only. The remaining
+`serde_json::from_value` calls are all in the JSON oracle/test path (`kind_from_action`'s
+`dynamic_count` fallback in `card.rs`, `qa_test_suite.rs`) — **gated behind `json_path_test`
+(R4, `420eae75`)**, compiled only for the deep-compare oracle, off for `ds`/`no_std`.
 
-### Serde/JSON infrastructure still compiled (ability-path; gated by R4)
+### Serde/JSON infrastructure (ability-path; gated by R4 — compiled only for the oracle)
 
-| Symbol | Location | ~Lines |
-|--------|----------|--------|
-| `populate_from_json` | `vm.rs` | ~115 |
-| `condition_populate_from_json` | `vm.rs` | ~54 |
-| `normalize_cost_keys` + `recursive_normalize_cost_value` | `vm.rs` | ~35 |
-| `kind_from_action` (JSON twin of `build_*`) | `card.rs` | ~345 |
-| `Deserialize` derives | `card.rs` etc. | — |
+| Symbol | Location | ~Lines | Status |
+|--------|----------|--------|--------|
+| `populate_from_json` | `vm.rs` | ~115 | `#[cfg(json_path_test)]` |
+| `condition_populate_from_json` | `vm.rs` | ~54 | `#[cfg(json_path_test)]` |
+| `normalize_cost_keys` + `recursive_normalize_cost_value` | `vm.rs` | ~35 | `#[cfg(json_path_test)]` |
+| `kind_from_action` (JSON twin of `build_*`) | `card.rs` | ~345 | `#[cfg(json_path_test)]` |
+| `Deserialize` derives | `card.rs` etc. | — | needed for card/deck loading + oracle |
 
 > These **ability-path** symbols remain only for the deep-compare oracle
 > (`tests/test_modules/bytecode_deep_compare_test.rs`), the bytecode↔JSON equality guard.
-> The hot path no longer touches them. **R4** gates them behind a dev-only feature.
-> Note: serde/serde_json are *also* used elsewhere in production (`card_loader.rs`,
-> `deck_parser.rs`, `web_server.rs`, DS `DECKS_JSON`) — R4 only gates the ability decode
-> path; those loaders are handled separately.
+> The hot path never touches them; `ds`/`no_std` builds compile without them.
+> Note: serde/serde_json are *also* used in production **outside** the ability path
+> (`card_loader.rs`, `deck_parser.rs`, `web_server.rs`, DS `DECKS_JSON`) — see §8.
 
 ### Memory refactor state
 
 | Item | Status |
 |------|--------|
-| Lazy/decode-on-demand abilities (`AbilityRef` = u16) | DONE (but `RESOLVED_ABILITIES` cache re-added — see R5) |
-| Compact cards (`compact_cards` + `compact_card_data` blob) | DONE |
+| Lazy/decode-on-demand abilities (`AbilityRef` = u16) | DONE (`RESOLVED_ABILITIES` cache removed, R5) |
+| Compact cards (`compact_cards` + `compact_card_data` blob) | DONE (blob wired on 3DS only — see §8) |
 | Compact GameState (`compact_state`) | DONE |
 | HeartMap → `SmallVec<[(HeartColor, u8); 4]>` | DONE (already u8) |
-| Arena v0 (monotonic 64 KB bump, `arena_allocator`) | LIVE but off-by-default & blocked → **R2: remove** |
-| Arena v1 (cursor reset) — the **99% alloc win** | **BLOCKED** (game-state grows into the arena; per-turn reset unsafe). Superseded by R2 (removal). |
-| `EkBox` pool (128 slots) | LIVE, wired into `AbilityEffect.kind` — **R6: keep only if it pays** |
-| `CondBox` pool (64 slots) | defined in `pool.rs` but **NOT wired** — **R6: wire or delete** |
+| `arena_allocator` subsystem | **REMOVED** (R2, `70eabeb7`) |
+| `EkBox` pool (128 slots) | LIVE, wired into `AbilityEffect.kind` (kept, R6) |
+| `CondBox` pool (64 slots) | **REMOVED** (unwired, R6) |
 | P3 enums (`card_type`, `orientation`, `zone`) | DONE |
 | P3 enums (`operation`, etc.) | PARTIAL — **O4: deferred** |
 
@@ -629,3 +628,53 @@ After Track R: the engine ships **fewer systems, not smarter ones** — **all ac
 Track O (squeezing) is **deferred**: arena per-turn reset stays blocked (game-state grows
 into the bump — measured 2–22 KB live), and the resolver/CondBox/P3 trims are only worth
 doing if profiling after Track R shows they move a real number.
+
+---
+
+## 8. Verified bytecode state + remaining serde (2026-08-02)
+
+### The ability decode path is properly bytecode now — no fallbacks
+
+Verified in the current tree:
+
+- `get_ability(idx)` (`vm.rs:102`) slices the embedded `BYTECODE` blob by `OFFSETS` and
+  decodes **only** via `decode_ability` → `decode_ability_effect_direct` /
+  `condition_decoder_gen` — the generated field-dispatch decoders. **No serde, no JSON.**
+- The generic `read_value` (serde_json tree) decoder is **gone** (A3); `TAG_OBJECT` /
+  `TAG_OBJECT_VARIANT` are handled by the direct decoders.
+- No lazy JSON fallback on decode failure: `get_ability` returns `Err(DecodeError)`
+  (no fallback to `from_value`).
+- `AbilityRef::resolve()` decodes on demand, no cache (R5), no arena (R2).
+- The only serde ability decode left (`populate_from_json` / `kind_from_action` /
+  `normalize_cost_keys` / `condition_populate_from_json`) is `#[cfg(json_path_test)]` —
+  compiled solely for the deep-compare oracle, off for `ds`/`no_std` (R4).
+
+**Verdict: yes — the ability system is properly bytecode, with zero production
+fallbacks or bad conversions in the decode path.**
+
+### Remaining serde in production (NOT ability decode) — what has to be done
+
+serde/`serde_json` still ships for **card and deck loading**, not for abilities:
+
+| Site | What it deserializes | Who uses it |
+|------|----------------------|-------------|
+| `card_loader.rs:39,42` | `Vec<Card>` / `HashMap<String, Card>` from JSON | desktop bins (`play_game`, bots, tests) |
+| `deck_parser.rs:37,40` | `Vec<Card>` from deck JSON | DS + desktop deck loading |
+| `web_server.rs` | API request/response structs | `server` feature only |
+| `qa_test_suite.rs:2159,2467` | `Choice` structs (test-only) | `qa_test_suite` |
+| `card_binary.rs` blob | compact `cards.bin` | **3DS only** (not desktop/DS) |
+
+**To drop serde from the remaining targets** (the natural next removal):
+1. **Wire the compact card blob on desktop/DS** — `card_binary::load_cards_from_blob`
+   exists and is blob-verified (`test_blob_matches_json`), but only `rabuka_3ds.rs` uses it.
+   Route desktop/DS card loading through the blob (with a fallback to JSON only in
+   non-compact builds) — removes `card_loader.rs:39` + `deck_parser.rs:37,40` serde.
+2. **Gate `deck_parser` serde** behind a non-`no_std`/non-blob feature once cards come from
+   the blob.
+3. **`web_server.rs`** keeps serde (it IS the API contract) — out of scope; it's
+   `server`-only, already optional.
+4. **`qa_test_suite.rs`** `Choice` from_value is test-only — fine.
+
+**Not done; future work.** This is tracked as a follow-up to R4 (R4 gated only the
+ability-path symbols; the loaders were explicitly out of scope). Effort estimate:
+~half a day, Medium risk (blob is already produced by `compile_cards.py` and verified).
