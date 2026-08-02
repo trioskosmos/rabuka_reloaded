@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-30T23:27:37.802247",
+  "generated_at": "2026-08-02T16:57:14.975459",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "38daacf6",
+  "engine_commit": "70eabeb7",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -2228,6 +2228,7 @@
             "duration": "live_end"
           }
         ],
+        "same_name": true,
         "heart_colors": [
           "heart04"
         ]
