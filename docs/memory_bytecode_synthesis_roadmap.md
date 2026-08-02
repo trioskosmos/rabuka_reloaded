@@ -319,28 +319,35 @@ own bump allocator in `platforms/ds`) — the engine arena is independent of it.
 
 ---
 
-### Phase R3 — Strip debug instrumentation from production builds
+### Phase R3 — Strip debug/alloc instrumentation from production builds
 
-**Goal.** Remove resource-holding debug systems from shipped targets: `debug_conditions`
-`text`/`trigger_event` fields on `Condition`, `ABILITY_DEBUG` logging, `ds_print`/`nds_println`
-under `ds_debug`, and `alloc_counter` in non-dev builds.
+**Goal.** Remove resource-holding instrumentation from shipped targets. **Done (2026-08-02):
+`alloc_tracker` removed from default** — the `CountingAllocator` `#[global_allocator]`
+(lib.rs:28-30) no longer wraps every malloc/free in atomics + a 14-bucket histogram on
+production builds. 1934/1934 green.
 
-**Why.** `debug_conditions` is in **default features** (Cargo.toml) and gates 92 cfg
-blocks + `debug.rs` (158 lines) + the `text`/`trigger_event` fields inflating `Condition`
-(400 B). Flipping it out of default is the **largest shipped-code/RAM cut in Track R** —
-bigger than the serde gate, and it touches every build, not just `ds`/`no_std`.
+**Why `debug_conditions` stays (corrected).** The original plan to flip `debug_conditions`
+out of default is **wrong** — its two fields are **load-bearing gameplay state**, not debug
+payloads:
+- `Condition.text` is the **condition-cache key** and the `same_as_prev` dedup key in
+  `compound.rs:207-249`. Gating it off made every condition collapse to key `""`, corrupting
+  compound-evaluation caching → **46 gameplay test failures** (verified: 1888/1934).
+- `Condition.trigger_event` is the **fallback source** for `source`/`destination`/
+  `from_state`/`to_state`/`self_effect_only` (card.rs:3335-3372) and is read directly by
+  `condition/state.rs:454`, `condition.rs:329`, `game_state/abilities.rs:325`.
 
-**How.** Audit each `#[cfg(feature = "debug_*")]` and gate them out of default (keep only
-for `test`/dev builds). This shrinks `Condition` (400 B → smaller) and removes the string
-payloads the compiler still emits for `text`. Note the bytecode decoder
-(`condition_decoder_gen.rs`) already `#[cfg]`s the `text`/`trigger_event` read, so both
-decode paths stay in parity.
+So `debug_conditions` must stay in default; the field-level strip it was chasing is not a
+removal, it's a redesign (a cache key must exist regardless).
 
-**Files:** `engine/Cargo.toml` (feature defaults), `engine/src/core/card.rs`,
-`engine/src/ability/debug.rs`, `engine/src/alloc_counter.rs`.
-**Gate:** parser → `cargo test` (deep-compare proves decode parity with `debug_conditions`
-off; `Condition` size is re-measured only if desired, not required).
-**Effort/risk:** 2–4 h, Low.
+**Remaining scope (all safe, gated-not-default already or pure deletion):**
+- `ds_debug` (`ds_print`/`nds_println`) — already not in default; leave.
+- `ABILITY_DEBUG`/`debug.rs`/`log.rs` — runtime-gated by an `AtomicBool`, cheap; leave.
+- The `alloc_counter.rs` module (233 lines) stays compiled only under `alloc_tracker`
+  (dev-only now).
+
+**Files (done):** `engine/Cargo.toml` (default features).
+**Gate:** parser → `cargo test` — **1934/1934 green.**
+**Effort/risk:** done, Low.
 
 ---
 
@@ -550,7 +557,7 @@ the deferred optimization track:
 | Old item | Now |
 |----------|-----|
 | C1. P3 enum conversions (`operation` etc.) | **O4** — deferred, lowest value. |
-| C2. `debug_conditions` for `no_std` (strip `text`/`trigger_event`) | **R3** — strip debug resources from production (default features). |
+ | C2. `debug_conditions` for `no_std` (strip `text`/`trigger_event`) | **R3** — NOT removable: `text`/`trigger_event` are load-bearing (cache key + source/state fallbacks). Only `alloc_tracker` was stripped. |
 | C3. Dead `compile_one`/`compile_condition`/`compile_cost` encoder | **R1** — delete the dead opcode encoder. |
 | C4. `kind_from_action` + `Deserialize` feature-gating (ability-path serde) | **R4** — gate the ability-path JSON decode. |
 
@@ -562,7 +569,7 @@ the deferred optimization track:
 |-------|-------|------|----------------|------|
 | 1 | R1 Delete dead opcode encoder | removal | `refactor: delete dead compile_one/compile_condition/compile_cost encoder` | 1–2 h |
 | 2 | R2 Remove `arena_allocator` subsystem | removal | `refactor: remove blocked arena_allocator subsystem` | 2–3 h |
-| 3 | R3 Strip debug instrumentation from production | removal | `refactor: gate debug_conditions/logging out of production builds` | 2–4 h |
+ | 3 | R3 Strip debug/alloc instrumentation (DONE: `alloc_tracker` out of default) | removal | `refactor: drop counting allocator from default builds` | done |
 | 4 | R4 Gate ability-path JSON decode (`json_path_test`) | removal | `refactor: gate ability-path json decode behind json_path_test` | ~0.5 d |
 | 5 | R5 Remove `RESOLVED_ABILITIES` cache (verify 3DS MP) | removal | `perf: drop ability cache, reclaim ~120KB, decode on demand` | 1–2 h |
 | 6 | R6 Pools + dep sweep (CondBox, `once_cell`; keep `rmp-serde`) | removal | `refactor: remove unwired CondBox and dead once_cell dep` | 0.5 d |
@@ -584,7 +591,7 @@ ability-path serde one feature-gate away from being dropped. **Achieved.**
 
 After Track R: the engine ships **fewer systems, not smarter ones**:
 - Dead opcode encoder gone (R1); blocked `arena_allocator` subsystem gone (R2).
-- Debug payloads (`text`/`trigger_event`, logging) stripped from production (R3).
+- Counting allocator gone from default builds (R3); `debug_conditions` kept — its fields are load-bearing.
 - Ability-path JSON decode gone from `ds`/`no_std` builds (R4).
 - Ability cache gone or capped (R5); unwired CondBox + dead `once_cell` deleted (R6).
 - Net: smaller binaries, less resident RAM, fewer code paths to maintain — achieved by
