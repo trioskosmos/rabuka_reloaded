@@ -21,6 +21,7 @@ use rabuka_engine::player::Player;
 
 use crate::dprintln;
 use crate::ffi::*;
+use crate::game::PlayState;
 use crate::i18n::Lang;
 use crate::lang::{current_lang, set_lang, tl, tl_fmt};
 use crate::steps::{Overlay, SetupPhase, Step};
@@ -651,40 +652,40 @@ fn loading(
                 unsafe {
                     _3ds_board_enable(true);
                 }
-                Step::Play(
+                Step::Play(PlayState {
                     gs,
-                    0,
-                    Vec::new(),
-                    true,
-                    true,
+                    cur: 0,
+                    acts_cache: Vec::new(),
+                    dirty: true,
+                    redraw: true,
                     atlas,
                     vs_ai,
-                    false,  // ai_vs_ai
-                    false,  // cli_mode (start in game mode)
-                    false,  // detail_mode
-                    true,   // choice_image_mode
-                    false,  // choice_subview (false=choices grid)
-                    0,      // text_page
-                    0,      // choice_grid_offset
-                    0,      // list_scroll
-                    0.0f32, // detail_scroll_y
-                    0,      // hand_offset
-                    0,      // hand_offset_p2
-                    0,      // touch_tap_count
-                    None,   // viewing_card
-                    None,   // zone_viewer
-                    0,      // zone_viewer_offset
-                    false,  // was_touching
-                    false,  // is_multiplayer
-                    false,  // is_host
-                    false,  // waiting_for_opponent
-                    Overlay::None,
-                    None,
-                    0,
-                    1,
-                    0,
-                    0,
-                )
+                    ai_vs_ai: false,
+                    cli_mode: false,
+                    detail_mode: false,
+                    choice_image_mode: true,
+                    choice_subview: false,
+                    text_page: 0,
+                    choice_grid_offset: 0,
+                    list_scroll: 0,
+                    detail_scroll_y: 0.0f32,
+                    hand_offset: 0,
+                    hand_offset_p2: 0,
+                    touch_tap_count: 0,
+                    viewing_card: None,
+                    zone_viewer: None,
+                    zone_viewer_offset: 0,
+                    was_touching: false,
+                    is_multiplayer: false,
+                    is_host: false,
+                    waiting_for_opponent: false,
+                    overlay: Overlay::None,
+                    pending_client_action: None,
+                    last_client_action_seq: 0,
+                    next_action_seq: 1,
+                    dbg_tx_bytes: 0,
+                    dbg_rx_bytes: 0,
+                })
             }
             Err(e) => Step::Done(Err(e)),
         }
@@ -1936,40 +1937,40 @@ fn multiplayer_loading(
                 unsafe {
                     _3ds_board_enable(true);
                 }
-                Step::Play(
+                Step::Play(PlayState {
                     gs,
-                    0,
-                    Vec::new(),
-                    true,
-                    true,
+                    cur: 0,
+                    acts_cache: Vec::new(),
+                    dirty: true,
+                    redraw: true,
                     atlas,
-                    false,    // vs_ai (this is multiplayer)
-                    false,    // ai_vs_ai
-                    false,    // cli_mode (start in game mode)
-                    false,    // detail_mode
-                    true,     // choice_image_mode
-                    false,    // choice_subview (false=choices grid)
-                    0,        // text_page
-                    0,        // choice_grid_offset
-                    0,        // list_scroll
-                    0.0f32,   // detail_scroll_y
-                    0,        // hand_offset
-                    0,        // hand_offset_p2
-                    0,        // touch_tap_count
-                    None,     // viewing_card
-                    None,     // zone_viewer
-                    0,        // zone_viewer_offset
-                    false,    // was_touching
-                    true,     // is_multiplayer
-                    is_host,  // is_host
-                    !is_host, // waiting_for_opponent will be recalculated after settle
-                    Overlay::None,
-                    None,
-                    0,
-                    1,
-                    0,
-                    0,
-                )
+                    vs_ai: false,
+                    ai_vs_ai: false,
+                    cli_mode: false,
+                    detail_mode: false,
+                    choice_image_mode: true,
+                    choice_subview: false,
+                    text_page: 0,
+                    choice_grid_offset: 0,
+                    list_scroll: 0,
+                    detail_scroll_y: 0.0f32,
+                    hand_offset: 0,
+                    hand_offset_p2: 0,
+                    touch_tap_count: 0,
+                    viewing_card: None,
+                    zone_viewer: None,
+                    zone_viewer_offset: 0,
+                    was_touching: false,
+                    is_multiplayer: true,
+                    is_host,
+                    waiting_for_opponent: !is_host,
+                    overlay: Overlay::None,
+                    pending_client_action: None,
+                    last_client_action_seq: 0,
+                    next_action_seq: 1,
+                    dbg_tx_bytes: 0,
+                    dbg_rx_bytes: 0,
+                })
             }
             Err(e) => Step::Done(Err(e)),
         }

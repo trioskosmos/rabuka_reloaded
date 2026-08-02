@@ -1,3 +1,4 @@
+pub mod game;
 pub mod ffi;
 pub mod i18n;
 pub mod lang;

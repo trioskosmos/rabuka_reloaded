@@ -7,11 +7,10 @@ use std::sync::Arc;
 
 use rabuka_engine::card::{Card, CardDatabase};
 use rabuka_engine::deck_parser::DeckList;
-use rabuka_engine::game_setup;
-use rabuka_engine::game_state::GameState;
 
 #[allow(unused_imports)] // needed for the _3ds_* names in the dprintln!/tprintln! bodies
 use crate::ffi::*;
+use crate::game::PlayState;
 use crate::ui::card_atlas::CardAtlas;
 
 // dprintln! — game output on BOTTOM screen (action list).
@@ -85,40 +84,7 @@ pub enum Step {
     ReadCardsBin,
     ParseCards(Vec<u8>),
     Setup(Arc<Vec<Card>>, Vec<DeckList>, SetupPhase, bool),
-    Play(
-        GameState,
-        usize, // cursor
-        Vec<game_setup::Action>,
-        bool, // dirty
-        bool, // redraw
-        CardAtlas,
-        bool,                       // vs_ai (human vs AI)
-        bool,                       // ai_vs_ai (spectator: both AI)
-        bool,                       // cli_mode
-        bool,                       // detail_mode
-        bool,                       // choice_image_mode
-        bool,                       // choice_subview (false=choices grid, true=text overlay)
-        usize,                      // text_page (current page index in text subview)
-        usize,                      // choice_grid_offset (scroll offset for choice image grid)
-        usize,                      // list_scroll (stable scroll offset for action list)
-        f32,                        // detail_scroll_y (scroll offset for card detail text)
-        usize,                      // hand_offset (P1)
-        usize,                      // hand_offset_p2
-        u32,                        // touch_tap_count
-        Option<i16>,                // viewing_card_id
-        Option<(String, Vec<i16>)>, // zone_viewer (label, card_ids)
-        usize,                      // zone_viewer_offset
-        bool,                       // was_touching (edge detect for touch screen)
-        bool,                       // is_multiplayer
-        bool,                       // is_host (true = P1/host, false = P2/client)
-        bool,                       // waiting_for_opponent
-        Overlay,                    // overlay (start menu, game log, perf stats, revealed)
-        Option<Vec<u8>>, // either side: my last action bytes, retransmitted until the opponent ACKs
-        u32,             // last action_seq received from the opponent (dedup)
-        u32,             // my next action_seq to send
-        u32,             // packet debug counter: bytes sent
-        u32,             // packet debug counter: bytes received
-    ),
+    Play(PlayState),
     Done(Result<(), String>),
 }
 
@@ -127,40 +93,7 @@ pub fn step_name(s: &Step) -> &'static str {
         Step::ReadCardsBin => "ReadCards",
         Step::ParseCards(_) => "ParseCards",
         Step::Setup(_, _, _, _) => "Setup",
-        Step::Play(
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-            _,
-        ) => "Play",
+        Step::Play(_) => "Play",
         Step::Done(_) => "Done",
     }
 }
