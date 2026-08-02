@@ -31,47 +31,43 @@ confirmed against the source; every number was re-measured from the current tree
 
 | Location | Type decoded | Status |
 |----------|--------------|--------|
-| `vm.rs:374` `read_condition_value` | `Condition` (20 variants, internally tagged) | **BLOCKED ITEM** |
-| `vm.rs:886` `decode_ability_cost` | `AbilityEffect` inside `AbilityCost` | **BLOCKED ITEM** |
-| `vm.rs:1003` `decode_ability_effect_from_object` | `AbilityEffect` (TAG_OBJECT fallback) | **dead-or-near-dead** |
+| `read_condition_value` | `Condition` (20 variants, internally tagged) | **GONE** (A1, 694913d4) |
+| `decode_ability_cost` | `AbilityEffect` inside `AbilityCost` | **GONE** (A2) |
+| `decode_ability_effect_from_object` | `AbilityEffect` (TAG_OBJECT fallback) | **GONE** (A3, 06aece4e) |
 
-Only these three calls stand between the engine and a fully direct binary decoder. The
-`kind: EffectKind` path is already direct (`decode_ability_effect_direct` +
-`effect_decoder_gen.rs`). Phases 7.1–7.2 of the bytecode doc are effectively done; the
-doc's remaining 7.3/7.4 map to the three calls above.
+The ability decode path is fully direct. The only remaining `serde_json::from_value` calls
+are in the JSON oracle/test path (`kind_from_action`'s `dynamic_count` fallback in
+`card.rs`, and `qa_test_suite.rs`) — the target of R1.
 
-### Serde/JSON infrastructure that can be deleted from the hot path
+### Serde/JSON infrastructure still compiled (oracle-only; gated by R1)
 
 | Symbol | Location | ~Lines |
 |--------|----------|--------|
-| `populate_from_json` | `vm.rs:1173` | ~115 |
-| `condition_populate_from_json` | `vm.rs:1290` | ~54 |
-| `collect_json_map` | `vm.rs:912` | ~16 |
-| `normalize_cost_keys` + `recursive_normalize_cost_value` | `vm.rs:934-968` | ~35 |
-| `decode_ability_effect_from_object` | `vm.rs:976` | ~52 |
-| `kind_from_action` (JSON twin of `build_*`) | `card.rs:1031-1376` | ~345 |
-| `vm_gen.rs` (dead generated code, **not `include!`d anywhere**) | `src/ability/vm_gen.rs` | **2310** |
+| `populate_from_json` | `vm.rs` | ~115 |
+| `condition_populate_from_json` | `vm.rs` | ~54 |
+| `normalize_cost_keys` + `recursive_normalize_cost_value` | `vm.rs` | ~35 |
+| `kind_from_action` (JSON twin of `build_*`) | `card.rs` | ~345 |
+| `Deserialize` derives | `card.rs` etc. | — |
 
-> Note: `populate_from_json`, `normalize_cost_keys`, `kind_from_action`, and the
-> `Deserialize` derives **must stay compiled** for the deep-compare test
-> (`tests/test_modules/bytecode_deep_compare_test.rs`), which is the documented
-> bytecode↔JSON equality guard. The goal is to remove them from the *hot path*, not from
-> the tree. They can be feature-gated (`ds`/`no_std`) later for the tightest builds.
+> These remain **only** for the deep-compare oracle
+> (`tests/test_modules/bytecode_deep_compare_test.rs`), the bytecode↔JSON equality guard.
+> The hot path no longer touches them. **R1** gates them behind a dev-only feature so
+> `ds`/`no_std` builds drop serde entirely.
 
 ### Memory refactor state
 
 | Item | Status |
 |------|--------|
-| Lazy/decode-on-demand abilities (`AbilityRef` = u16) | DONE |
+| Lazy/decode-on-demand abilities (`AbilityRef` = u16) | DONE (but `RESOLVED_ABILITIES` cache re-added — see R5) |
 | Compact cards (`compact_cards` + `compact_card_data` blob) | DONE |
 | Compact GameState (`compact_state`) | DONE |
 | HeartMap → `SmallVec<[(HeartColor, u8); 4]>` | DONE (already u8) |
-| Arena v0 (monotonic 64 KB bump, `arena_allocator`) | LIVE |
-| Arena v1 (cursor reset) — the **99% alloc win** | **BLOCKED** (game-state grows into the arena; per-turn reset unsafe — see Phase B1). Arena bypass for persistent allocs shipped. |
-| `EkBox` pool (128 slots) | LIVE, wired into `AbilityEffect.kind` |
-| `CondBox` pool (64 slots) | defined in `pool.rs` but **NOT wired** into `Condition` |
+| Arena v0 (monotonic 64 KB bump, `arena_allocator`) | LIVE but off-by-default & blocked → **R3: remove** |
+| Arena v1 (cursor reset) — the **99% alloc win** | **BLOCKED** (game-state grows into the arena; per-turn reset unsafe). Superseded by R3 (removal). |
+| `EkBox` pool (128 slots) | LIVE, wired into `AbilityEffect.kind` — **R6: keep only if it pays** |
+| `CondBox` pool (64 slots) | defined in `pool.rs` but **NOT wired** — **R6: wire or delete** |
 | P3 enums (`card_type`, `orientation`, `zone`) | DONE |
-| P3 enums (`operation`, etc.) | PARTIAL (see Phase 6) |
+| P3 enums (`operation`, etc.) | PARTIAL — **O4: deferred** |
 
 ---
 
@@ -87,10 +83,27 @@ Both documents converge on one principle:
 - The **memory doc** chases the same spirit for RAM (pools, arena, lazy decode), but its
   arena/CondBox work is *blocked by serde*.
 
-The synthesis: **finish zero-serde first (Track A), then finish the arena/pools (Track B).**
-Each phase of Track A removes a reason Track B is blocked. `Condition` and `AbilityCost`
-are the last two types that still decode through serde, and they are exactly the types
-whose pools/arena wiring is blocked.
+Track A (zero-serde decode) is complete. The next phase of work is **removal-first**
+(Track R): delete or gate the systems that no longer pay for themselves before optimizing
+what remains. `Condition` and `AbilityCost` no longer decode through serde, so the JSON
+oracle is now the only reason the serde decode *system* still ships.
+
+### Guiding principle (2026-08-02): remove before optimize
+
+> **Prefer deleting whole systems/resources over squeezing existing ones.** Every
+> optimization (boxing a struct, shrinking a field, resetting the arena) keeps the
+> system alive and adds code. The cheapest byte is the one never shipped, and the
+> cheapest CPU cycle is the one never spent. So the priority order is:
+>
+> 1. **Delete** systems that no longer pay for themselves (dead encoders, blocked
+>    features, debug/test-only paths, caches whose RAM cost outweighs their CPU win).
+> 2. **Gate** resource-heavy systems behind features so `ds`/`no_std` builds ship
+>    without them (serde JSON oracle, debug instrumentation, `debug_conditions`).
+> 3. **Consolidate** duplicate paths (JSON decode vs bytecode decode) down to one.
+> 4. Only then **optimize** what remains — and only with a measured win.
+
+Track A is complete; the remaining "squeezing" phases (B1/B2/B3, C1) are **deferred**
+(§5) in favour of the removal-first Track R (§4).
 
 ### Constraint honored throughout
 
@@ -102,6 +115,10 @@ direct.
 ---
 
 ## 3. Track A — Finish zero-serde decode (continuation of the bytecode doc)
+
+> **Status: DONE.** All three `serde_json::from_value` calls in the ability decode path
+> are gone (A1 `694913d4`, A2 + A3 `06aece4e`). `vm_gen.rs` deleted. Sections A1–A3 below
+> are kept as the historical record of how it was done.
 
 ### Phase A1 — Condition direct decoder (unblocks vm.rs:374)
 
@@ -147,7 +164,7 @@ emission), new `engine/src/ability/condition_decoder_gen.rs`, `engine/src/abilit
 full `run_all` suite.
 
 **Effort/risk:** ~1–2 days. High-touch (20 variants × ~30 fields) but mechanical; the
-deep-compare test catches every field miss. This is the largest single piece remaining.
+deep-compare test catches every field miss. This was the largest single piece of Track A.
 
 ---
 
@@ -225,9 +242,146 @@ and the 2,300-line dead `vm_gen.rs`.
 
 ---
 
-## 4. Track B — Allocation elimination (continuation of the memory doc)
+## 4. Track R — Remove systems and resources (new priority)
 
-### Phase B1 — Arena v1: cursor reset (the 99% alloc win)
+Under the "remove before optimize" principle. Each phase deletes or gates a whole system,
+not a micro-tweak.
+
+### Phase R1 — Gate the JSON oracle; drop serde/serde_json from `ds`/`no_std`
+
+**Goal.** Delete ~600 lines of JSON decode (`populate_from_json`, `condition_populate_from_json`,
+`normalize_cost_keys` + `recursive_normalize_cost_value`, `kind_from_action`, the
+`Deserialize` derives) and the `serde_json`/`serde` dependencies from production builds —
+not by editing the code, but by feature-gating them behind a dev-only `json_path_test`
+feature (the bytecode↔JSON deep-compare oracle).
+
+**Why.** These are now used **only** by `bytecode_deep_compare_test.rs` (the oracle). The
+hot path is 100% direct. Keeping them compiled costs binary size and RAM on every target
+that never needs them. Gating removes the whole serde decode *system* from `ds`/`no_std`.
+
+**How.**
+1. Add `json_path_test` (dev-only) feature to `engine/Cargo.toml`; put `serde`/`serde_json`
+   behind it for `ds`/`no_std` targets (keep them on default/dev for the oracle).
+2. `#[cfg(feature = "json_path_test")]` on `populate_from_json`, `kind_from_action`,
+   `normalize_cost_keys`, `condition_populate_from_json`, and the `Deserialize` derives
+   that only the oracle touches. Prefer `cfg_attr` on derives.
+3. Verify: `cargo test --features json_path_test` still runs the deep-compare oracle;
+   `--no-default-features --features ds` (or `no_std`) compiles with zero serde in the
+   ability path.
+4. Optional follow-up: move the oracle test itself behind the feature.
+
+**Files:** `engine/Cargo.toml`, `engine/src/ability/vm.rs`, `engine/src/core/card.rs`,
+`engine/tests/test_modules/bytecode_deep_compare_test.rs`.
+
+**Gate:** deep-compare green on default; `ds`/`no_std` builds compile without serde.
+**Effort/risk:** ~half a day, Low–Medium (feature plumbing, not logic).
+
+---
+
+### Phase R2 — Delete the dead opcode encoder (`compile_one`/`compile_condition`/`compile_cost`)
+
+**Goal.** Remove the superseded opcode-based encoder in `cards/compile_abilities.py`
+(verified present). `enc_val` is the only encoder; this is pure deletion.
+
+**How.**
+1. Delete `compile_one`, `compile_condition`, `compile_cost` and any callers/constants
+   only they use.
+2. Sweep `vm.rs` for opcode-era readers that no encoder emits (anything beyond the
+   `TAG_OBJECT_VARIANT` + direct readers). Delete unreachable arms.
+3. Confirm `compile_abilities.py` re-runs to byte-identical output (`cards/build/*.bin`,
+   `abilities_gen.rs`, `condition_decoder_gen.rs`).
+
+**Files:** `cards/compile_abilities.py`, `engine/src/ability/vm.rs`.
+**Gate:** byte-identical regen + full suite. **Effort/risk:** 1–2 h, Low.
+
+---
+
+### Phase R3 — Remove the `arena_allocator` subsystem
+
+**Goal.** Delete the arena feature entirely: `engine/src/arena.rs`, the `arena_allocator`
+feature, the arena hooks in `alloc_counter.rs`, and the arena bypass calls added in
+`ability_store.rs` / `move_cards.rs`.
+
+**Why.** The feature is **off by default**, its headline goal (B1 per-turn reset) is
+**blocked** (game-state grows into the bump — unsafe to reset), and the feature build has
+a **pre-existing flaky allocator panic**. It currently adds complexity and a maintenance
+surface for zero shipped benefit. Removing it deletes a whole blocked subsystem.
+
+**How.** Remove the feature + module + hooks; delete the `ARENA_LIVE_BYTES` metric; leave
+`alloc_counter` as pure system-alloc accounting. Re-check the `ds` DS build (which has its
+own bump allocator in `platforms/ds`) — the engine arena is independent of it.
+
+**Files:** `engine/Cargo.toml`, `engine/src/arena.rs` (delete), `engine/src/lib.rs`,
+`engine/src/alloc_counter.rs`, `engine/src/ability/ability_store.rs`,
+`engine/src/ability/move_cards.rs`.
+**Gate:** default suite + feature sweep (no dangling cfg). **Effort/risk:** 2–3 h, Low
+(dead path), but confirm no test asserts arena stats.
+
+---
+
+### Phase R4 — Strip debug instrumentation from production builds
+
+**Goal.** Remove resource-holding debug systems from shipped targets: `debug_conditions`
+`text`/`trigger_event` fields on `Condition`, `ABILITY_DEBUG` logging, `ds_print`/`nds_println`
+under `ds_debug`, and `alloc_counter` in non-dev builds.
+
+**How.** Audit each `#[cfg(feature = "debug_*")]` and gate them out of default (keep only
+for `test`/dev builds). This shrinks `Condition` (400 B → smaller) and removes the string
+payloads the compiler still emits for `text`.
+
+**Files:** `engine/Cargo.toml` (feature defaults), `engine/src/core/card.rs`,
+`engine/src/ability/debug.rs`, `engine/src/alloc_counter.rs`.
+**Gate:** default suite still passes with gating; `Condition` size re-measured.
+**Effort/risk:** 2–4 h, Low.
+
+---
+
+### Phase R5 — Remove the `RESOLVED_ABILITIES` ability cache
+
+**Goal.** Restore the documented no-cache design: `AbilityRef::resolve()` decodes fresh and
+the caller drops the `Arc` — reclaiming the ~120 KB cache and its arena bypass wiring.
+
+**Why.** The cache was re-added (eb9d4ff9) for 3DS MP perf, but contradicts the memory
+doc's "zero leaked RAM" design and is a persistent allocation we had to bypass around.
+
+**How.** Delete the `OnceLock<Mutex<HashMap<u16, Arc<Ability>>>>` and cache hit/insert; keep
+the decode-on-demand path. Measure 3DS MP and ability-heavy playthrough tests; if decode
+cost is load-bearing, instead cap the cache to a small LRU (removal of unbounded growth).
+
+**Files:** `engine/src/ability/ability_store.rs`.
+**Gate:** full suite + MP/playthrough perf spot-check. **Effort/risk:** 1–2 h, Low; **but**
+verify the 3DS MP flow it was added for.
+
+---
+
+### Phase R6 — Pools and remaining subsystems: keep only if they pay
+
+**Goal.** Decide `EkBox`/`CondBox` pools and the `compact_*` systems on measured benefit;
+remove what doesn't pay. `CondBox` is defined but not wired — either wire it (only if it
+moves RAM materially) or delete it. Same for the arena (R3) and any `once_cell`/`uuid`/
+`actix`/`tokio`/`rmp-serde` deps that resolve to zero for a given target.
+
+**How.** One profiling pass over `RABUKA_ALLOC_TRACK` + `size_check`-style probes, then
+delete unused pools/deps. This is the "remove resources" sweep after the system removals.
+
+**Files:** `engine/src/core/pool.rs`, `engine/Cargo.toml`.
+**Gate:** default suite. **Effort/risk:** half a day, Low.
+
+---
+
+## 5. Track O — Optimization (squeezing) — deferred
+
+Deferred under "remove before optimize". Revisit **only** after Track R, and only with a
+measured win. Kept for reference; B1 stays blocked per the note below.
+
+| Phase | Old goal | Status / why deferred |
+|-------|----------|------------------------|
+| O1 (was B1) | Arena per-turn reset | **BLOCKED** — game-state grows into the bump (measured 2–22 KB live); unsafe to reset. Removal (R3) supersedes it. |
+| O2 (was B3) | Box `AbilityResolver` → shrink `AbilityQueueEntry` 2.5 KB → ~100 B | Deferred — micro-opt; only if profiles show queue residency is meaningful. |
+| O3 (was B2) | Wire `CondBox` pool into `Condition` | Deferred — see R6 (pool decision). |
+| O4 (was C1) | P3 enum conversions (`operation` etc.) | Deferred — byte-level squeeze, lowest value. |
+
+### Phase B1 — Arena v1: cursor reset (the 99% alloc win) *(historical)*
 
 > **Status (2026-08-01): BLOCKED — per-turn reset is unsafe with the current
 > global-allocator arena.** The safe subset was shipped instead (arena bypass for
@@ -289,7 +443,7 @@ flaky failures, separate from this phase).
 
 ---
 
-### Phase B2 — Wire `CondBox` into `Condition` (unblocked by A1)
+### Phase B2 — Wire `CondBox` into `Condition` *(historical, deferred — see O3/R6)*
 
 **Why.** `Condition` is 400 B; nested conditions are `Box<Condition>` (heap alloc per
 condition). A 64-slot pool recycles them. The docs abandoned this because serde
@@ -314,7 +468,7 @@ impossible to detect (static). Cap it and prefer the arena for the bulk.
 
 ---
 
-### Phase B3 — Shrink `AbilityQueueEntry` (2536 B → ~96 B + heap)
+### Phase B3 — Shrink `AbilityQueueEntry` (2536 B → ~96 B + heap) *(historical, deferred — see O2)*
 
 **Why.** This is now the single largest per-queue-entry struct and is **missing from both
 docs**. The 2,536 B is dominated by `resolver: Option<AbilityResolver>` inlined (holds
@@ -337,28 +491,31 @@ resolver logic, only the field type + `Box::new` at construction).
 
 ---
 
-## 5. Track C — Remaining trims
+### Track C — Remaining trims (historical; re-mapped into Track R / Track O)
 
-| Item | Detail | Effort |
-|------|--------|--------|
-| C1. P3 enum conversions | `EffectKind`/`Condition` fields still `Option<ArcStr>` on closed sets: `operation`, `ability_filter` (has enum but call sites use strings), `placement_order` (done), `distinct` (done). Convert `operation` → enum. Minor. | 2–4 h |
-| C2. `debug_conditions` for `no_std` | `text`/`trigger_event` already gated. For `ds`/`no_std`, strip `text` at parser time (memory doc idea) or `--no-default-features` excludes it. Verify the `ds` feature build compiles after Track A (no `serde_json` in hot path). | 2 h |
-| C3. Dead `compile_one`/`compile_condition`/`compile_cost` in `compile_abilities.py` | The opcode-based encoder (lines ~401-665) is superseded by `enc_val`. Delete once `decode_condition`-era opcodes are fully gone (after A3 `vm_gen.rs` delete). | 1 h |
-| C4. `kind_from_action` + `Deserialize` feature-gating | After A3, gate the JSON oracle behind a `json_path_test` (dev-only) feature so `ds` builds can drop serde from the crate. Doc'd as the endgame "remove serde from no_std". | 1 day |
+The old C1–C4 trim list no longer stands alone — each item moved into the removal track or
+the deferred optimization track:
+
+| Old item | Now |
+|----------|-----|
+| C1. P3 enum conversions (`operation` etc.) | **O4** — deferred, lowest value. |
+| C2. `debug_conditions` for `no_std` (strip `text`/`trigger_event`) | **R4** — remove debug resources from production. |
+| C3. Dead `compile_one`/`compile_condition`/`compile_cost` encoder | **R2** — delete the dead opcode encoder. |
+| C4. `kind_from_action` + `Deserialize` feature-gating (drop serde from `ds`/`no_std`) | **R1** — gate the JSON oracle, drop serde. |
 
 ---
 
 ## 6. Suggested execution order
 
-| Order | Phase | Risk | Commit message | Est. |
+| Order | Phase | Type | Commit message | Est. |
 |-------|-------|------|----------------|------|
-| 1 | A2 Cost via compiler alias | Low | `perf: encode cost objects with variant tags, kill serde cost decode` | **DONE** |
-| 2 | A3 Delete TAG_OBJECT fallback + dead vm_gen.rs | Low | `refactor: remove TAG_OBJECT effect fallback and dead vm_gen.rs` | **DONE** (06aece4e) |
-| 3 | A1 Condition direct decoder | High | `perf: direct condition decoder, remove serde from condition path` | **DONE** (694913d4) |
-| 4 | B1 Arena v1 (cursor reset) | Medium | `perf: double-buffer bump arena with per-turn reset` | **BLOCKED** (unsafe; safe subset shipped — bypass + metric) |
-| 5 | B3 Box the resolver | Low | `refactor: box AbilityResolver to shrink AbilityQueueEntry 2.5KB→~100B` | 1–2 h — next up |
-| 6 | B2 Wire CondBox | Medium | `perf: pool-backed CondBox for decoded conditions` | 0.5–1 d |
-| 7 | C1–C4 trims | Low | mixed | 1 d |
+| 1 | R1 Gate JSON oracle, drop serde from `ds`/`no_std` | removal | `refactor: gate json oracle behind json_path_test, drop serde from ds/no_std` | ~0.5 d |
+| 2 | R2 Delete dead opcode encoder | removal | `refactor: delete dead compile_one/compile_condition/compile_cost encoder` | 1–2 h |
+| 3 | R3 Remove `arena_allocator` subsystem | removal | `refactor: remove blocked arena_allocator subsystem` | 2–3 h |
+| 4 | R4 Strip debug instrumentation from production | removal | `refactor: gate debug_conditions/logging out of production builds` | 2–4 h |
+| 5 | R5 Remove `RESOLVED_ABILITIES` cache (verify 3DS MP) | removal | `perf: drop ability cache, reclaim ~120KB, decode on demand` | 1–2 h |
+| 6 | R6 Pool + dependency sweep (keep only what pays) | removal | `refactor: remove unused pools/deps` | 0.5 d |
+| 7+ | O1–O4 squeezing (was B1/B2/B3/C1) | deferred | — | only if measured |
 
 Each phase: implement → `cargo test` → `cargo test --features bytecode_abilities` (deep-compare
 guard) → commit if green. Measure with `RABUKA_ALLOC_TRACK=1 cargo test -- --nocapture` and
@@ -373,12 +530,14 @@ intermediate `serde_json::Value` trees during decode, ~600 lines of serde/JSON
 infrastructure removed from the hot path, 2,310 lines of dead generated code gone, and the
 `ds`/`no_std` build one feature-gate away from dropping serde entirely. **Achieved.**
 
-After Track B: per-trigger allocs drop from ~1,700 toward the low hundreds (arena absorbs
-temporaries, pools recycle `Condition`/`EffectKind`), `AbilityQueueEntry` shrinks ~2.4 KB,
-and the arena stops pinning memory between turns. **B1's per-turn reset is blocked** (see
-§4) because game-state containers grow into the arena during resolution; the shipped arena
-bypass keeps persistent allocations on the system allocator as a prerequisite.
+After Track R: the engine ships **fewer systems, not smarter ones**:
+- `serde`/`serde_json` gone from `ds`/`no_std` ability paths (R1).
+- Dead opcode encoder gone (R2); blocked `arena_allocator` subsystem gone (R3).
+- Debug payloads (`text`/`trigger_event`, logging) stripped from production (R4).
+- Ability cache gone or capped (R5); unused pools/deps deleted (R6).
+- Net: smaller binaries, less resident RAM, fewer code paths to maintain — achieved by
+  deletion, not by micro-optimization.
 
-Combined, the two docs' shared goal — a full 800-ability game under the console budget with
-bytecode-as-the-effect-source — is reached by finishing the last serde stragglers (A1/A2)
-and then completing the allocator story (B1/B2) that serde was blocking.
+Track O (squeezing) is **deferred**: arena per-turn reset stays blocked (game-state grows
+into the bump — measured 2–22 KB live), and the resolver/CondBox/P3 trims are only worth
+doing if profiling after Track R shows they move a real number.
