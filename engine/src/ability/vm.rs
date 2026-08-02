@@ -203,6 +203,21 @@ impl<'a> BcReader<'a> {
         read_i64(&mut self.cursor)
     }
 
+    /// Read a TAG_I64 value with variable-width payload:
+    /// value ≤ 0xFD → 1 byte; 0xFE → +u16; 0xFF → +u32; negative → full i64.
+    fn read_int(&mut self) -> Option<i64> {
+        let b = self.read_u8()?;
+        if b <= 0xFD {
+            Some(b as i64)
+        } else if b == 0xFE {
+            self.u16().map(|v| v as i64)
+        } else if b == 0xFF {
+            self.read_u32().map(|v| v as i64)
+        } else {
+            self.i64()
+        }
+    }
+
     fn key(&mut self) -> Option<&'a str> {
         let idx = self.read_idx()?;
         if idx >= STRINGS.len() {
@@ -269,7 +284,7 @@ impl<'a> BcReader<'a> {
         let tag = self.read_u8()?;
         match tag {
             TAG_NULL => None,
-            TAG_I64 => Some(self.i64()? as u8),
+            TAG_I64 => Some(self.read_int()? as u8),
             _ => None,
         }
     }
@@ -282,7 +297,7 @@ impl<'a> BcReader<'a> {
         let tag = self.read_u8()?;
         match tag {
             TAG_NULL => None,
-            TAG_I64 => Some(self.i64()? as i8),
+            TAG_I64 => Some(self.read_int()? as i8),
             _ => None,
         }
     }
@@ -1009,7 +1024,25 @@ impl<'a> BcReader<'a> {
 fn skip_value_with_tag(bc: &mut BcReader, tag: u8) -> Option<()> {
     match tag {
         TAG_NULL | TAG_FALSE | TAG_TRUE => Some(()),
-        TAG_I64 | TAG_F64 => {
+        TAG_I64 => {
+            let b = bc.read_u8()?;
+            if b > 0xFD {
+                // 0xFE → u16, 0xFF → u32
+                let skip = if b == 0xFE {
+                    2
+                } else if b == 0xFF {
+                    4
+                } else {
+                    8
+                };
+                if bc.cursor.len() < skip {
+                    return None;
+                }
+                bc.cursor = &bc.cursor[skip..];
+            }
+            Some(())
+        }
+        TAG_F64 => {
             if bc.cursor.len() < 8 {
                 return None;
             }

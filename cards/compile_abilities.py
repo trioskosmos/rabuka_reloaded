@@ -287,7 +287,6 @@ class StringTable:
         return len(self._strings)
 
 
-
 def compile_all(abilities):
     """Store each `unique_abilities[i]` entry as a compact *binary JSON* slice.
 
@@ -478,7 +477,16 @@ def compile_all(abilities):
             out.append(0x02 if v else 0x01)
         elif isinstance(v, int):
             out.append(0x03)
-            out.extend(struct.pack("<q", v))
+            if v < 0:
+                out.extend(struct.pack("<q", v))
+            elif v <= 0xFD:
+                out.append(v & 0xFF)
+            elif v <= 0xFFFF:
+                out.append(0xFE)
+                out.extend(struct.pack("<H", v))
+            else:
+                out.append(0xFF)
+                out.extend(struct.pack("<I", v))
         elif isinstance(v, float):
             out.append(0x04)
             out.extend(struct.pack("<d", v))
@@ -616,7 +624,17 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
         if tag in (0x00, 0x01, 0x02):
             return pos
         elif tag == 0x03:
-            return pos + 8
+            # variable-width int: 1 byte (≤0xFD), 0xFE+u16, 0xFF+u32, else i64
+            if pos >= len(bc):
+                return len(bc)
+            b = bc[pos]
+            if b <= 0xFD:
+                return pos + 1
+            elif b == 0xFE:
+                return pos + 3
+            elif b == 0xFF:
+                return pos + 5
+            return pos + 9
         elif tag == 0x04:
             return pos + 8
         elif tag == 0x06:
@@ -707,8 +725,23 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
         if tag in (0x00, 0x01, 0x02):
             return pos
         elif tag == 0x03:
-            out.extend(bc[pos : pos + 8])
-            return pos + 8
+            # variable-width int
+            if pos >= len(bc):
+                return pos
+            b = bc[pos]
+            if b <= 0xFD:
+                out.append(b)
+                return pos + 1
+            elif b == 0xFE:
+                out.append(b)
+                out.extend(bc[pos + 1 : pos + 3])
+                return pos + 3
+            elif b == 0xFF:
+                out.append(b)
+                out.extend(bc[pos + 1 : pos + 5])
+                return pos + 5
+            out.extend(bc[pos : pos + 9])
+            return pos + 9
         elif tag == 0x04:
             out.extend(bc[pos : pos + 8])
             return pos + 8
