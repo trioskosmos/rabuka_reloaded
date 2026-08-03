@@ -94,8 +94,7 @@ holds everything else; the heap is an arena that gets reset between scenes.**
 ### 4.1 Kill the 532 KB blob buffer (the decisive change)
 
 The game only ever plays **two decks**, and across all 9 baked decks there are
-only **196 unique card numbers** (~7 KB in the engine's `card_binary` blob
-format; each card is 25–41 bytes). Instead of:
+**196 unique card numbers**. Instead of:
 
 ```rust
 static mut CARD_BUF: [u32; (532_378 + 3) / 4] = [0; ...];  // 532 KB in .bss
@@ -103,7 +102,7 @@ static mut CARD_BUF: [u32; (532_378 + 3) / 4] = [0; ...];  // 532 KB in .bss
 ```
 
 bake the **deck-card subset** directly into the EXE as rodata (a generated
-`decks_card_blob.rs`, ~7 KB) and point `card_binary::EXTERN_CARD_BLOB` at it.
+`decks_card_blob.rs`) and point `card_binary::EXTERN_CARD_BLOB` at it.
 Cards are already pre-resolved from the blob by card number at boot
 (`load_deck_cards_from_blob`), so the logic is unchanged — only the source
 shrink.
@@ -112,6 +111,32 @@ shrink.
 - Removes the CD dependency entirely (no ISO needed; the EXE self-contained —
   DuckStation fastboot just works).
 - This is the same trick the DS port uses (baked blob), just subset to the decks.
+
+#### Blob composition (why 532 KB, and why the subset is still not tiny)
+
+Measured by parsing `engine/src/core/cards_gen.rs` `CARD_BLOB` (532,378 bytes):
+
+| Part | Size | Notes |
+|------|------|-------|
+| Card records | 66 KB | 2280 cards × ~29 B of stats/hearts/string indices |
+| Length table | 2 KB | 1 byte per card |
+| **String table** | **463 KB** | 5675 strings — card_no, name, series, group, **full Japanese ability text**, img URLs, product, rare |
+
+The blob is already **5.7× smaller than `cards.json`** (532 KB vs 2.9 MB). What
+keeps it large is not the game state — it is the string table carrying the
+**complete ability text for every card** (top entries are 600+ byte ability
+descriptions). `compact_cards` strips `ability`/`img`/`product`/`rare` from the
+decoded `Card` on console, so ~400 KB of that text is never read at runtime.
+
+Deck-subset blob, measured with the same normalizer the runtime uses:
+
+- 196 deck cards, **all** present in the blob (no promos missing).
+- Subset **with** ability/img/product/rare text: **~62 KB**.
+- Subset **without** it (only card_no/name/series/group/unit): **~11 KB**.
+
+So two cuts, not one: subset to the 196 deck cards **and** have the generator
+skip the display-only strings on console targets (`compact_cards` proves they
+are never decoded). That lands at ~11 KB in `.rodata`.
 
 ### 4.2 Right-size the heap (arena model)
 
