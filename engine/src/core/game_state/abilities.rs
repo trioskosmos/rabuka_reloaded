@@ -1315,6 +1315,7 @@ impl GameState {
                 category: "ability_resolution".to_string(),
                 metadata: Some(crate::core::types::LogMetadata::AbilityResolution {
                     result: "skipped".to_string(),
+                    #[cfg(feature = "serde_support")]
                     items: Vec::new(),
                     ability_text: ability_text.to_string(),
                     zone: zone.to_string(),
@@ -1360,6 +1361,7 @@ impl GameState {
                     if let Some(ref mut meta) = entry.metadata {
                         *meta = crate::core::types::LogMetadata::AbilityResolution {
                             result: "skipped".to_string(),
+                            #[cfg(feature = "serde_support")]
                             items: Vec::new(),
                             ability_text: ability_text.clone(),
                             zone: String::new(),
@@ -1753,6 +1755,7 @@ impl GameState {
     /// Inject card and ability identity into the pending_choice JSON so the frontend
     /// can display which card+ability is responsible for the current choice prompt.
     /// Get the serialized JSON for the frontend from the ability queue's waiting choice.
+    #[cfg(feature = "serde_support")]
     pub fn get_pending_choice_json(&self) -> Option<serde_json::Value> {
         let choice = self.ability_queue.is_waiting_for_choice()?;
         let mut json = choice.to_frontend_json()?;
@@ -1760,6 +1763,7 @@ impl GameState {
         Some(json)
     }
 
+    #[cfg(feature = "serde_support")]
     pub fn inject_choice_ability_context(&self, json: &mut serde_json::Value) {
         let entry = self.ability_queue.current_entry();
         let entry_ref = entry.as_ref();

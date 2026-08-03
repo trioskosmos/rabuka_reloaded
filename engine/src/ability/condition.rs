@@ -2,15 +2,20 @@ use core::sync::atomic::Ordering;
 
 use super::debug::AbDebug;
 use crate::ability::debug::ABILITY_DEBUG;
-use crate::ability::enums::{ConditionType, Zone};
+#[cfg(feature = "serde_support")]
+use crate::ability::enums::ConditionType;
+use crate::ability::enums::Zone;
 use crate::ability_queue::ConditionalChoice;
-use crate::card::{CardState, Condition};
+#[cfg(feature = "serde_support")]
+use crate::card::CardState;
+use crate::card::Condition;
 use crate::game_state::Phase;
-#[cfg(feature = "no_std")]
+#[cfg(all(feature = "no_std", feature = "serde_support"))]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(feature = "serde_support")]
 use serde_json::json;
 
 pub(crate) fn comparison_default_count(condition: &Condition) -> u8 {
@@ -635,6 +640,7 @@ impl<'a> ConditionContext<'a> {
     /// Same as evaluate_condition but also returns the measured runtime value
     /// (count, score, bool, etc.) that was compared against the condition threshold.
     /// Used by the /api/debug/conditions endpoint — purely read-only.
+    #[cfg(feature = "serde_support")]
     pub fn evaluate_condition_debug(&self, condition: &Condition) -> (bool, serde_json::Value) {
         let passed = self.evaluate_condition(condition);
         let actual_str = self.describe_condition_actual(condition);
@@ -659,6 +665,7 @@ impl<'a> ConditionContext<'a> {
 
     /// Query game state to produce a human-readable "actual" string for this condition.
     /// This runs immediately after evaluation (game state is fresh).
+    #[cfg(feature = "serde_support")]
     fn describe_condition_actual(&self, condition: &Condition) -> String {
         let ct = condition.condition_type();
         match ct {
@@ -857,6 +864,7 @@ impl<'a> ConditionContext<'a> {
         }
     }
 
+    #[cfg(feature = "serde_support")]
     fn describe_appearance_actual(&self, condition: &Condition) -> String {
         let target = condition.get_target().unwrap_or("self");
         let player = self.resolve_condition_player(target);

@@ -156,6 +156,7 @@ macro_rules! make_pool_box {
             }
         }
 
+        #[cfg(feature = "serde_support")]
         impl serde::Serialize for $name {
             fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
                 Deref::deref(self).serialize(s)

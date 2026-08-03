@@ -7,8 +7,11 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(feature = "serde_support")]
 use serde::de::Deserializer;
+#[cfg(feature = "serde_support")]
 use serde::ser::Serializer;
+#[cfg(feature = "serde_support")]
 use serde::{Deserialize, Serialize};
 
 /// Like `Box<str>` but `Arc`-backed for cheap clone (refcount bump, no str copy).
@@ -66,12 +69,14 @@ impl AsRef<str> for ArcStr {
     }
 }
 
+#[cfg(feature = "serde_support")]
 impl Serialize for ArcStr {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.0.as_ref().serialize(serializer)
     }
 }
 
+#[cfg(feature = "serde_support")]
 impl<'de> Deserialize<'de> for ArcStr {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
@@ -85,7 +90,11 @@ impl ArcStr {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum AbilityTrigger {
     Activation,
     Debut,
@@ -95,7 +104,11 @@ pub enum AbilityTrigger {
     Auto,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum TurnPhase {
     FirstAttackerNormal,
     SecondAttackerNormal,
@@ -112,7 +125,11 @@ impl core::fmt::Display for TurnPhase {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum Phase {
     RockPaperScissors,
     ChooseFirstAttacker,
@@ -169,7 +186,11 @@ impl Phase {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum GameResult {
     FirstAttackerWins,
     SecondAttackerWins,
@@ -177,7 +198,11 @@ pub enum GameResult {
     Ongoing,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum Duration {
     LiveEnd,
     ThisTurn,
@@ -187,16 +212,30 @@ pub enum Duration {
     Unless,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct CardEffectItem {
     pub card_id: i16,
     pub amount: i32,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub color: Option<String>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+#[cfg_attr(
+    feature = "serde_support",
+    serde(tag = "type", rename_all = "snake_case")
+)]
 pub enum EffectData {
     HeartOverride {
         card_id: i16,
@@ -206,7 +245,10 @@ pub enum EffectData {
     SingleCard {
         card_id: i16,
         amount: i32,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         color: Option<String>,
     },
     MultiCard {
@@ -298,13 +340,18 @@ impl EffectData {
 }
 
 #[derive(Debug, Clone, Copy)]
+
 pub struct CardEffectItemRef<'a> {
     pub card_id: i16,
     pub amount: i32,
     pub color: Option<&'a str>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct TemporaryEffect {
     pub effect_type: String,
     pub duration: Duration,
@@ -316,7 +363,11 @@ pub struct TemporaryEffect {
     pub effect_data: Option<EffectData>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct ReplacementEffect {
     pub card_id: i16,
     pub player_id: String,
@@ -328,7 +379,11 @@ pub struct ReplacementEffect {
 
 // ============== LIVE PERFORMANCE DATA (intermediate, from player_perform_live) ==============
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct LivePerformanceData {
     pub yell_count: u8,
     pub note_icons: u8,
@@ -349,7 +404,11 @@ pub struct LivePerformanceData {
 
 // ============== PERFORMANCE SNAPSHOT ==============
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct PerformanceSnapshot {
     pub turn: u8,
     pub player_id: String,
@@ -382,7 +441,11 @@ pub struct PerformanceSnapshot {
     pub card_bonus_total: u8,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct LiveCardResult {
     pub passed: bool,
     pub score: u8,
@@ -395,7 +458,11 @@ pub struct LiveCardResult {
     pub card_no: ArcStr,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct MemberContribution {
     pub source_id: i16,
     pub slot: u8,
@@ -414,7 +481,11 @@ pub struct MemberContribution {
     pub transform_delta: [u8; 8],
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct YellCardResult {
     pub card_id: i16,
     pub blade_hearts: [u8; 8],
@@ -423,7 +494,11 @@ pub struct YellCardResult {
     pub card_no: ArcStr,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct Breakdown {
     pub hearts: Vec<HeartSource>,
     pub blades: Vec<BladeSource>,
@@ -433,65 +508,93 @@ pub struct Breakdown {
     pub scores: Vec<ScoreLine>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct HeartSource {
     pub source_type: SourceType,
     pub source: ArcStr,
     pub value: [u8; 8],
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct BladeSource {
     pub source_type: SourceType,
     pub source: ArcStr,
     pub value: u8,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum AllocPhase {
-    #[serde(rename = "1a_colored")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "1a_colored"))]
     Colored,
-    #[serde(rename = "1b_h00_wild")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "1b_h00_wild"))]
     H00Wild,
-    #[serde(rename = "1c_all_wild")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "1c_all_wild"))]
     AllWild,
-    #[serde(rename = "2_wildcard")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "2_wildcard"))]
     Wildcard,
-    #[serde(rename = "3c_all")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "3c_all"))]
     CAll,
-    #[serde(rename = "3a_colored_surplus")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "3a_colored_surplus"))]
     ColoredSurplus,
-    #[serde(rename = "3b_h00")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "3b_h00"))]
     H00,
-    #[serde(rename = "4_all_cleanup")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "4_all_cleanup"))]
     AllCleanup,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum SourceType {
-    #[serde(rename = "stage")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "stage"))]
     Stage,
-    #[serde(rename = "yell")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "yell"))]
     Yell,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum SourceName {
-    #[serde(rename = "Stage hearts")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "Stage hearts"))]
     StageHearts,
-    #[serde(rename = "Wildcard (Heart00)")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "Wildcard (Heart00)"))]
     WildcardHeart00,
-    #[serde(rename = "All heart (icon_all)")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "All heart (icon_all)"))]
     AllHeartIconAll,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum AdjustmentType {
-    #[serde(rename = "requirement")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "requirement"))]
     Requirement,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct Allocation {
     pub target_idx: u8,
     pub target_name: ArcStr,
@@ -505,14 +608,22 @@ pub struct Allocation {
     pub phase: AllocPhase,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct EffectEntry {
     pub source: String,
     pub value: String,
     pub desc: String,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct ScoreLine {
     pub source: String,
     pub value: u8,
@@ -520,8 +631,12 @@ pub struct ScoreLine {
 
 /// Compact zone identifier — replaces String fields in MovementEvent to avoid
 /// heap allocations. Covers all zone names used in the game engine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+#[cfg_attr(feature = "serde_support", serde(rename_all = "snake_case"))]
 pub enum ZoneId {
     Stage,
     Hand,
@@ -640,7 +755,11 @@ impl PartialEq<ZoneId> for String {
 /// but WHAT CAUSED the move (which card's effect/ability). Replaces the old
 /// pattern of separate tracking fields (recently_moved_cards, last_area_move_card_id,
 /// last_area_move_by_player, etc.) with a unified event log.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct MovementEvent {
     /// The card that physically moved.
     pub moved_card_id: i16,
@@ -661,7 +780,11 @@ pub struct MovementEvent {
 /// A structured record of a stage-area-to-stage-area position change.
 /// Captures the old/new positions and what caused the move.
 /// Replaces the fragile snapshot-based detection with direct event tracking.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct PositionChangeEvent {
     /// The card that changed position.
     pub moved_card_id: i16,
@@ -682,7 +805,11 @@ pub struct PositionChangeEvent {
 /// Populated in effect handlers (execute_gain_resource etc.) and consumed
 /// by build_snapshot to fill ability_heart_bonuses, ability_blade_bonuses,
 /// Breakdown.scores, Breakdown.transforms, and TriggeredAbility.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum EffectType {
     HeartBonus,
     BladeBonus,
@@ -707,7 +834,11 @@ impl EffectType {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct AbilityApplication {
     pub source_card_id: i16,
     pub ability_text: ArcStr,
@@ -717,7 +848,11 @@ pub struct AbilityApplication {
     pub amount: i32,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct TriggeredAbility {
     pub source_card_id: i16,
     pub name: String,
@@ -727,9 +862,13 @@ pub struct TriggeredAbility {
     pub is_public: bool,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct Adjustment {
-    #[serde(rename = "type")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "type"))]
     pub adjustment_type: AdjustmentType,
     pub desc: String,
     pub value: i32,
@@ -737,7 +876,11 @@ pub struct Adjustment {
     pub source: String,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct AbilityBonus {
     pub source: ArcStr,
     pub amount: u8,
@@ -745,8 +888,15 @@ pub struct AbilityBonus {
     pub ability_text: ArcStr,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+#[cfg_attr(
+    feature = "serde_support",
+    serde(tag = "type", rename_all = "snake_case")
+)]
 pub enum LogMetadata {
     TriggerEvaluation {
         trigger: String,
@@ -767,13 +917,23 @@ pub enum LogMetadata {
     },
     AbilityResolution {
         result: String,
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        #[cfg(feature = "serde_support")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Vec::is_empty")
+        )]
         items: Vec<serde_json::Value>,
         ability_text: String,
         zone: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         error: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         resolved: Option<bool>,
     },
 }
@@ -782,6 +942,7 @@ impl Default for LogMetadata {
     fn default() -> Self {
         LogMetadata::AbilityResolution {
             result: String::new(),
+            #[cfg(feature = "serde_support")]
             items: Vec::new(),
             ability_text: String::new(),
             zone: String::new(),
@@ -791,7 +952,11 @@ impl Default for LogMetadata {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct LogEntry {
     pub text: String,
     pub turn: u8,
@@ -799,12 +964,19 @@ pub struct LogEntry {
     pub source_card_id: Option<i16>,
     pub source_card_name: Option<String>,
     pub category: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub metadata: Option<LogMetadata>,
 }
 
 /// Condition evaluation result for a single condition on a jyouji ability.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct ConditionResult {
     pub text: String,
     pub passed: bool,
@@ -812,7 +984,11 @@ pub struct ConditionResult {
 
 /// Status of a single constant (常時) ability on the board.
 /// Exposed to the frontend for the jyouji summary bar.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct ConstantAbilityStatus {
     pub card_id: i16,
     pub card_name: String,

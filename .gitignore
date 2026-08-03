@@ -62,3 +62,6 @@ engine/rustc-ice-*.txt
 /network.h
 /room.h
 /file_util.cpp
+
+# scratch
+hf_temp/

@@ -8,6 +8,7 @@ use alloc::{
     vec::Vec,
 };
 use rand::Rng;
+#[cfg(feature = "serde_support")]
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
@@ -30,7 +31,8 @@ pub use crate::display::{CardDisplay, GameStateDisplay, PlayerDisplay, StageDisp
 // (no full CardDisplay objects — the card database has all names/data)
 // ====================================================================
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug,  Clone)]
+#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
 pub struct FrameSnapshot {
     pub frame: u64,
     pub turn: u8,
@@ -41,7 +43,8 @@ pub struct FrameSnapshot {
     pub p2: FramePlayerState,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug,  Clone)]
+#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
 pub struct FramePlayerState {
     pub hand: Vec<i16>,
     pub hand_count: usize,
@@ -88,7 +91,8 @@ impl FrameSnapshot {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive( Clone,  Debug)]
+#[cfg_attr(feature = "serde_support", derive(Serialize,  Deserialize))]
 pub struct ActionIndex {
     pub description: String,
     pub action_type: String,
@@ -96,17 +100,19 @@ pub struct ActionIndex {
     pub index: usize,
 }
 
-#[derive(Serialize)]
+#[derive()]
+#[cfg_attr(feature = "serde_support", derive(Serialize))]
 struct GameStateResponse {
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde_support", serde(flatten))]
     game_state: display::GameStateDisplay,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
     legal_actions: Option<Vec<ActionIndex>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
     ui_config: Option<UiConfig>,
 }
 
-#[derive(Deserialize)]
+#[derive()]
+#[cfg_attr(feature = "serde_support", derive(Deserialize))]
 
 pub struct ExecuteActionRequest {
     pub action_index: usize,
@@ -126,7 +132,8 @@ pub struct ExecuteActionRequest {
     pub use_baton_touch: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive( Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize,  Deserialize))]
 
 pub struct RoomSession {
     pub session_id: String,
@@ -136,7 +143,8 @@ pub struct RoomSession {
     pub username: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive( Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize,  Deserialize))]
 
 pub struct Room {
     pub room_id: String,
@@ -155,34 +163,35 @@ pub struct Room {
 
     pub custom_decks: Option<HashMap<i32, CustomDeck>>,
 
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     #[allow(dead_code)]
     pub game_state: Option<Arc<RwLock<GameState>>>, // Per-room game state
 
     // Per-room state (completely isolated from other rooms)
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub history: Vec<GameState>,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub future: Vec<GameState>,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub frame_counter: u64,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub frame_history: Vec<FrameSnapshot>,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub cached_actions: Vec<ActionIndex>,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub actions_dirty: bool,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub recording: bool,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub recording_data: Vec<u8>,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub recording_before: Vec<u8>, // serialized state before pending action
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub recording_action: Option<(i16, u8)>, // pending action (card_id, type_idx)
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive( Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize,  Deserialize))]
 
 pub struct CustomDeck {
     pub main: Vec<String>,
@@ -190,7 +199,8 @@ pub struct CustomDeck {
     pub energy: Vec<String>,
 }
 
-#[derive(Deserialize)]
+#[derive()]
+#[cfg_attr(feature = "serde_support", derive(Deserialize))]
 
 pub struct CreateRoomRequest {
     pub mode: Option<String>,
@@ -210,7 +220,8 @@ pub struct CreateRoomRequest {
     pub is_ai: Option<bool>,
 }
 
-#[derive(Deserialize)]
+#[derive()]
+#[cfg_attr(feature = "serde_support", derive(Deserialize))]
 
 pub struct JoinRoomRequest {
     pub room_id: String,
@@ -218,7 +229,8 @@ pub struct JoinRoomRequest {
     pub username: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive()]
+#[cfg_attr(feature = "serde_support", derive(Deserialize))]
 pub struct SetUiConfigRequest {
     pub current_lang: Option<String>,
     pub perspective_player: Option<i32>,
@@ -229,19 +241,22 @@ pub struct SetUiConfigRequest {
     pub replay_mode: Option<bool>,
 }
 
-#[derive(Deserialize)]
+#[derive()]
+#[cfg_attr(feature = "serde_support", derive(Deserialize))]
 
 pub struct InitGameRequest {
     pub deck: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive()]
+#[cfg_attr(feature = "serde_support", derive(Deserialize))]
 
 pub struct ExecCodeRequest {
     pub code: String,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive( Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize,  Deserialize))]
 pub struct UiConfig {
     pub current_lang: String,          // "jp" or "en"
     pub perspective_player: i32,       // 0 or 1

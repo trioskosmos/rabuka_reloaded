@@ -2,6 +2,7 @@ use crate::Arc;
 
 use smallvec::SmallVec;
 
+#[cfg(feature = "serde_support")]
 use serde::{Deserialize, Serialize};
 
 use crate::ability::resolver::AbilityResolver;
@@ -17,7 +18,8 @@ use alloc::{
 
 /// Discriminator data for choice routing. Replaces the old `conditional_choice: Option<String>`
 /// which serialized three different types to JSON strings at runtime.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug,  Clone)]
+#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
 pub enum ConditionalChoice {
     /// Plain string value (color name, sentinel like "pay_optional_cost")
     Str(String),
@@ -30,7 +32,8 @@ pub enum ConditionalChoice {
 }
 
 /// Unique identifier for an ability instance in the queue
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug,  Clone,  PartialEq,  Eq)]
+#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
 pub struct AbilityId(pub String);
 
 impl AbilityId {
@@ -40,7 +43,8 @@ impl AbilityId {
 }
 
 /// Current state of ability queue processing
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug,  Clone,  PartialEq,  Eq)]
+#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
 pub enum QueueState {
     /// Queue is idle, ready to process next ability
     Idle,
@@ -57,7 +61,8 @@ pub enum QueueState {
 }
 
 /// Entry in the ability queue
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug,  Clone)]
+#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
 pub struct AbilityQueueEntry {
     pub id: AbilityId,
     pub card_no: String,
@@ -97,7 +102,7 @@ pub struct AbilityQueueEntry {
     /// instead of being destroyed and recreated. Eliminates manual save/restore.
     /// Boxed: the resolver carries ~1.9 KB of execution state that is only ever
     /// used by the CURRENT entry, so idle entries must not pay that inline.
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub resolver: Option<Box<AbilityResolver>>,
     /// For each_time triggers: the stage member card ID whose resolution
     /// caused this each_time ability to fire. Used by effects like
@@ -114,7 +119,8 @@ pub struct AbilityQueueEntry {
 }
 
 /// Unified ability queue with proper state management
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug,  Clone)]
+#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
 pub struct AbilityQueue {
     entries: Vec<AbilityQueueEntry>,
     state: QueueState,

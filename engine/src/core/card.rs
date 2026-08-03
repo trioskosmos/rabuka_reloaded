@@ -1,7 +1,10 @@
 use crate::ability::ability_store::AbilityRef;
 pub(crate) use crate::ability::enums::{ActionType, ConditionType, EffectState};
 use crate::core::types::ArcStr;
-use crate::{BTreeMap, HashMap};
+#[cfg(feature = "serde_support")]
+use crate::BTreeMap;
+use crate::HashMap;
+#[cfg(feature = "serde_support")]
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
@@ -25,6 +28,7 @@ pub(crate) fn ek_box_new(val: EffectKind) -> EkBox {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+
 pub enum CardType {
     // Rule 4.1: Member cards are placed on the stage and used for performance
     Member,
@@ -52,12 +56,14 @@ impl CardType {
     }
 }
 
+#[cfg(feature = "serde_support")]
 impl serde::Serialize for CardType {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_card_str())
     }
 }
 
+#[cfg(feature = "serde_support")]
 impl<'de> serde::Deserialize<'de> for CardType {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = <String as serde::Deserialize>::deserialize(deserializer)?;
@@ -79,52 +85,55 @@ impl core::fmt::Display for CardType {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum HeartColor {
-    #[serde(rename = "heart00", alias = "heart0")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "heart00", alias = "heart0"))]
     Heart00, // Index 0 - wildcard, can be treated as any heart01-heart06
-    #[serde(rename = "heart01")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "heart01"))]
     Heart01,
-    #[serde(rename = "heart02")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "heart02"))]
     Heart02,
-    #[serde(rename = "heart03")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "heart03"))]
     Heart03,
-    #[serde(rename = "heart04")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "heart04"))]
     Heart04,
-    #[serde(rename = "heart05")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "heart05"))]
     Heart05,
-    #[serde(rename = "heart06")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "heart06"))]
     Heart06,
-    #[serde(rename = "b_all")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "b_all"))]
     BAll, // Blade heart wildcard
-    #[serde(rename = "draw")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "draw"))]
     Draw, // Special heart type for drawing cards
-    #[serde(rename = "score")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "score"))]
     Score, // Special heart type for score bonus
-    #[serde(rename = "all")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "all"))]
     All, // All-heart (icon_all.png) — can be treated as any one color during performance check
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum BladeColor {
-    #[serde(rename = "桃")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "桃"))]
     Peach,
-    #[serde(rename = "赤")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "赤"))]
     Red,
-    #[serde(rename = "黄")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "黄"))]
     Yellow,
-    #[serde(rename = "緑")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "緑"))]
     Green,
-    #[serde(rename = "青")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "青"))]
     Blue,
-    #[serde(rename = "紫")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "紫"))]
     Purple,
-    #[serde(rename = "all")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "all"))]
     All, // All blade types
 }
 
 // Rule 11: Keywords
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum Keyword {
     Turn1,           // Rule 11.1: First turn only
     Turn2,           // Rule 11.2: Second turn only
@@ -138,7 +147,8 @@ pub enum Keyword {
     FormationChange, // Rule 11.10: Multiple members move simultaneously
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct HeartIcon {
     pub color: HeartColor,
     pub count: u8,
@@ -237,6 +247,7 @@ impl Default for HeartMap {
     }
 }
 
+#[cfg(feature = "serde_support")]
 impl Serialize for HeartMap {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeMap;
@@ -248,13 +259,14 @@ impl Serialize for HeartMap {
     }
 }
 
+#[cfg(feature = "serde_support")]
 impl<'de> Deserialize<'de> for HeartMap {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
+        #[cfg_attr(feature = "serde_support", derive(Deserialize))]
         struct Raw {
             // BTreeMap: deterministic iteration order (std HashMap uses a
             // random per-process seed, making baked output nondeterministic).
-            #[serde(flatten)]
+            #[cfg_attr(feature = "serde_support", serde(flatten))]
             hearts: BTreeMap<String, u32>,
         }
         let raw = Raw::deserialize(deserializer)?;
@@ -267,58 +279,65 @@ impl<'de> Deserialize<'de> for HeartMap {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct BladeHeart {
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde_support", serde(flatten))]
     pub hearts: HeartMap,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct BaseHeart {
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde_support", serde(flatten))]
     pub hearts: HeartMap,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct Card {
     pub card_no: ArcStr,
     #[cfg(not(feature = "compact_cards"))]
     pub img: Option<ArcStr>,
     pub name: ArcStr,
     #[cfg(not(feature = "compact_cards"))]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub product: Box<str>,
-    #[serde(rename = "type")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "type"))]
     pub card_type: CardType,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub series: Box<str>,
-    #[serde(default = "default_group_from_series")]
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(default = "default_group_from_series")
+    )]
     pub group: Box<str>,
     pub unit: Option<ArcStr>,
     pub cost: Option<u8>,
     pub base_heart: Option<BaseHeart>,
     pub blade_heart: Option<BladeHeart>,
-    #[serde(default = "default_blade")]
+    #[cfg_attr(feature = "serde_support", serde(default = "default_blade"))]
     pub blade: u8,
     #[cfg(not(feature = "compact_cards"))]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub rare: Box<str>,
     #[cfg(not(feature = "compact_cards"))]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub ability: Box<str>,
     #[cfg(not(feature = "compact_cards"))]
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub faq: Vec<FAQEntry>,
     // Live card fields
     pub score: Option<u8>,
     pub need_heart: Option<BaseHeart>,
     pub special_heart: Option<SpecialHeart>,
     // Parsed abilities from abilities.json
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub abilities: Vec<AbilityRef>,
 }
 
 #[derive(Debug, Clone)]
+
 pub struct CardDatabase {
     pub cards: HashMap<i16, Card>,
     pub card_no_to_id: HashMap<String, i16>,
@@ -477,38 +496,40 @@ impl CardDatabase {
     }
 }
 
+#[cfg(feature = "serde_support")]
 impl<'de> Deserialize<'de> for Card {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(Debug, Clone, Deserialize)]
+        #[derive(Debug, Clone)]
+        #[cfg_attr(feature = "serde_support", derive(Deserialize))]
         struct CardHelper {
             pub card_no: String,
             #[cfg(not(feature = "compact_cards"))]
             pub img: Option<ArcStr>,
             pub name: String,
             #[cfg(not(feature = "compact_cards"))]
-            #[serde(default)]
+            #[cfg_attr(feature = "serde_support", serde(default))]
             pub product: String,
-            #[serde(rename = "type")]
+            #[cfg_attr(feature = "serde_support", serde(rename = "type"))]
             pub card_type: CardType,
-            #[serde(default)]
+            #[cfg_attr(feature = "serde_support", serde(default))]
             pub series: String,
             pub unit: Option<ArcStr>,
             pub cost: Option<u8>,
             pub base_heart: Option<BaseHeart>,
             pub blade_heart: Option<BladeHeart>,
-            #[serde(default = "default_blade")]
+            #[cfg_attr(feature = "serde_support", serde(default = "default_blade"))]
             pub blade: u8,
             #[cfg(not(feature = "compact_cards"))]
-            #[serde(default)]
+            #[cfg_attr(feature = "serde_support", serde(default))]
             pub rare: String,
             #[cfg(not(feature = "compact_cards"))]
-            #[serde(default)]
+            #[cfg_attr(feature = "serde_support", serde(default))]
             pub ability: String,
             #[cfg(not(feature = "compact_cards"))]
-            #[serde(default)]
+            #[cfg_attr(feature = "serde_support", serde(default))]
             pub faq: Vec<FAQEntry>,
             pub score: Option<u8>,
             pub need_heart: Option<BaseHeart>,
@@ -547,6 +568,7 @@ impl<'de> Deserialize<'de> for Card {
     }
 }
 
+#[cfg(feature = "serde_support")]
 fn map_series_to_group(series: &str) -> Box<str> {
     match series {
         "ラブライブ！" => "μ's".into(),
@@ -558,35 +580,42 @@ fn map_series_to_group(series: &str) -> Box<str> {
     }
 }
 
+#[cfg(feature = "serde_support")]
 fn default_blade() -> u8 {
     0
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct SpecialHeart {
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde_support", serde(flatten))]
     pub hearts: HeartMap,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct Ability {
-    #[serde(default = "default_empty_string")]
+    #[cfg_attr(feature = "serde_support", serde(default = "default_empty_string"))]
     pub full_text: String,
     /// Trigger prefix stripped from `full_text` (e.g. "【自】"). Usually derived
     /// on demand from `full_text`; only populated directly when the source JSON
     /// carries an explicit, non-derivable value. `None` means "derive from
     /// `full_text`" — see `Ability::triggerless_text`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub triggerless_text: Option<String>,
     pub triggers: Option<ArcStr>,
     pub use_limit: Option<u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub is_null: bool,
     pub cost: Option<Box<AbilityCost>>,
     pub effect: Option<Box<AbilityEffect>>,
     pub keywords: Option<Vec<Keyword>>,
 }
 
+#[cfg(feature = "serde_support")]
 fn default_empty_string() -> String {
     String::new()
 }
@@ -611,8 +640,9 @@ impl Ability {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde_support", serde(transparent))]
 pub struct AbilityCost(pub AbilityEffect);
 
 impl AbilityCost {
@@ -686,33 +716,35 @@ impl AbilityCost {
 /// (look_action/select_action/primary_effect/...) are kept here for backward
 /// compatibility with previously-generated `abilities.json` files; new
 /// parsers should emit only `effect_steps`.
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct CompoundBranch {
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub look_action: Option<Box<AbilityEffect>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub select_action: Option<Box<AbilityEffect>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub actions: Option<Vec<Box<AbilityEffect>>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub primary_effect: Option<Box<AbilityEffect>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub alternative_condition: Option<Box<Condition>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub result_condition: Option<Box<Condition>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub followup_action: Option<Box<AbilityEffect>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub optional_action: Option<Box<AbilityEffect>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub conditional_action: Option<Box<AbilityEffect>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub conditional_negation: Option<bool>,
 }
 
 /// One branch of an OR'd ability filter. At least one branch must match
 /// for the card to pass.
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct AbilityFilterBranch {
     pub ability_filter: Option<AbilityFilter>,
     pub ability_filter_triggers: Option<Vec<String>>,
@@ -720,7 +752,8 @@ pub struct AbilityFilterBranch {
 
 /// Shared filter/targeting fields extracted from EffectKind variants.
 /// Boxed into each variant to reduce enum size from ~544 to ~140 bytes.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct EffectFilter {
     pub card_type: Option<CardType>,
     pub exclude_self: Option<bool>,
@@ -800,7 +833,8 @@ pub struct EffectFilter {
 /// Tagged union of effect-specific fields, indexed by effect action type.
 /// Each variant holds only the fields relevant to its group of actions,
 /// replacing the 142-field flat AbilityEffect struct.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub enum EffectKind {
     #[default]
     None,
@@ -994,36 +1028,37 @@ impl EffectKind {
 
 /// Recursively re-populate EffectKind for a serialization-deserialized
 /// AbilityEffect that lost its `kind` (because kind is #[serde(skip)]).
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct AbilityEffect {
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub text: ArcStr,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub action: ActionType,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub source: Option<ArcStr>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub destination: Option<ArcStr>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub count: Option<u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub target: Option<ArcStr>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub condition: Option<Box<Condition>>,
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde_support", serde(flatten))]
     pub compound: Box<CompoundBranch>,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub kind: Option<EkBox>,
     pub non_stackable: Option<bool>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub conditional: Option<bool>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub is_further: Option<bool>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub optional: Option<bool>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub max: Option<bool>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub effect_steps: Option<Vec<Box<AbilityEffect>>>,
 }
 
@@ -2089,8 +2124,9 @@ macro_rules! impl_deref_str {
     };
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde_support", serde(untagged))]
 pub enum PositionInfo {
     String(String),
     Struct {
@@ -2108,9 +2144,10 @@ impl PositionInfo {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct DynamicCount {
-    #[serde(rename = "type")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "type"))]
     pub count_type: String,
     pub reference: Option<ArcStr>,
     pub mode: Option<ArcStr>,
@@ -2119,14 +2156,16 @@ pub struct DynamicCount {
     pub calculation_value: Option<u8>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct QuotedText {
     pub text: String,
     pub quoted_type: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde_support", serde(untagged))]
 pub enum DistinctInfo {
     Boolean(bool),
     String(String),
@@ -2142,17 +2181,19 @@ impl DistinctInfo {
 }
 
 /// Maps a stage position to the character name required at that position.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct PositionCharacter {
     pub position: String,
     pub character: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum CardState {
-    #[serde(rename = "active")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "active"))]
     Active,
-    #[serde(rename = "wait")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "wait"))]
     Wait,
 }
 
@@ -2174,11 +2215,12 @@ impl CardState {
 
 impl_deref_str!(CardState);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum ComparisonTarget {
-    #[serde(rename = "self")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "self"))]
     Self_,
-    #[serde(rename = "opponent")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "opponent"))]
     Opponent,
 }
 
@@ -2200,13 +2242,14 @@ impl ComparisonTarget {
 
 impl_deref_str!(ComparisonTarget);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum CardProperty {
-    #[serde(rename = "has_blade_heart")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "has_blade_heart"))]
     HasBladeHeart,
-    #[serde(rename = "has_score_icon")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "has_score_icon"))]
     HasScoreIcon,
-    #[serde(rename = "has_all_blade")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "has_all_blade"))]
     HasAllBlade,
 }
 
@@ -2230,9 +2273,10 @@ impl CardProperty {
 
 impl_deref_str!(CardProperty);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum PlacementOrder {
-    #[serde(rename = "any_order")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "any_order"))]
     AnyOrder,
 }
 
@@ -2246,13 +2290,14 @@ impl PlacementOrder {
 
 impl_deref_str!(PlacementOrder);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum DistinctType {
-    #[serde(rename = "card_name")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "card_name"))]
     CardName,
-    #[serde(rename = "true")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "true"))]
     True,
-    #[serde(rename = "distinct")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "distinct"))]
     Distinct,
 }
 
@@ -2268,17 +2313,18 @@ impl DistinctType {
 
 impl_deref_str!(DistinctType);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum Operator {
-    #[serde(rename = ">=")]
+    #[cfg_attr(feature = "serde_support", serde(rename = ">="))]
     Gte,
-    #[serde(rename = "<=")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "<="))]
     Lte,
-    #[serde(rename = ">")]
+    #[cfg_attr(feature = "serde_support", serde(rename = ">"))]
     Gt,
-    #[serde(rename = "<")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "<"))]
     Lt,
-    #[serde(rename = "=", alias = "==")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "=", alias = "=="))]
     Eq,
 }
 
@@ -2296,15 +2342,16 @@ impl Operator {
 
 impl_deref_str!(Operator);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum ComparisonType {
-    #[serde(rename = "score")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "score"))]
     Score,
-    #[serde(rename = "cost")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "cost"))]
     Cost,
-    #[serde(rename = "count")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "count"))]
     Count,
-    #[serde(rename = "equality")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "equality"))]
     Equality,
 }
 
@@ -2330,15 +2377,16 @@ impl ComparisonType {
 
 impl_deref_str!(ComparisonType);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum AbilityFilter {
-    #[serde(rename = "no_ability")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "no_ability"))]
     NoAbility,
-    #[serde(rename = "has_ability")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "has_ability"))]
     HasAbility,
-    #[serde(rename = "has_ability_type")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "has_ability_type"))]
     HasAbilityType,
-    #[serde(rename = "no_ability_type")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "no_ability_type"))]
     NoAbilityType,
 }
 
@@ -2364,15 +2412,16 @@ impl AbilityFilter {
 
 impl_deref_str!(AbilityFilter);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum ConditionTarget {
-    #[serde(rename = "self")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "self"))]
     Self_,
-    #[serde(rename = "opponent")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "opponent"))]
     Opponent,
-    #[serde(rename = "both")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "both"))]
     Both,
-    #[serde(rename = "either")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "either"))]
     Either,
 }
 
@@ -2389,13 +2438,14 @@ impl ConditionTarget {
 
 impl_deref_str!(ConditionTarget);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum ConditionCardType {
-    #[serde(rename = "member_card")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "member_card"))]
     MemberCard,
-    #[serde(rename = "live_card")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "live_card"))]
     LiveCard,
-    #[serde(rename = "energy_card")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "energy_card"))]
     EnergyCard,
 }
 
@@ -2419,27 +2469,31 @@ impl ConditionCardType {
 
 impl_deref_str!(ConditionCardType);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum Location {
-    #[serde(rename = "stage", alias = "ステージ")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "stage", alias = "ステージ"))]
     Stage,
-    #[serde(rename = "hand")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "hand"))]
     Hand,
-    #[serde(rename = "deck")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "deck"))]
     Deck,
-    #[serde(rename = "deck_top")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "deck_top"))]
     DeckTop,
-    #[serde(rename = "discard")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "discard"))]
     Discard,
-    #[serde(rename = "energy_zone")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "energy_zone"))]
     EnergyZone,
-    #[serde(rename = "live_card_zone")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "live_card_zone"))]
     LiveCardZone,
-    #[serde(rename = "success_live_card_zone", alias = "success_live_zone")]
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(rename = "success_live_card_zone", alias = "success_live_zone")
+    )]
     SuccessLiveZone,
-    #[serde(rename = "under_member")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "under_member"))]
     UnderMember,
-    #[serde(rename = "revealed_cards")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "revealed_cards"))]
     RevealedCards,
 }
 
@@ -2469,12 +2523,16 @@ impl_deref_str!(Location);
 /// Each variant holds only the fields relevant to that condition kind.
 /// The common fields (text, negation, phase, cache, trigger_event) appear
 /// on every variant because any condition can carry them.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "type")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde_support", serde(tag = "type"))]
 pub enum Condition {
-    #[serde(rename = "compound", alias = "or_condition")]
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(rename = "compound", alias = "or_condition")
+    )]
     Compound {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2485,12 +2543,15 @@ pub enum Condition {
         trigger_event: Option<Box<TriggerEvent>>,
         operator: Option<ArcStr>,
         target: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         conditions: Option<Vec<Box<Condition>>>,
     },
-    #[serde(rename = "card_count_condition", alias = "location_condition")]
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(rename = "card_count_condition", alias = "location_condition")
+    )]
     Location {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2501,33 +2562,33 @@ pub enum Condition {
         trigger_event: Option<Box<TriggerEvent>>,
         // Core location fields (commonly accessed)
         location: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         locations: Option<Box<Vec<String>>>,
         target: Option<ArcStr>,
         count: Option<u8>,
         operator: Option<ArcStr>,
         card_type: Option<ConditionCardType>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         unit: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         comparison_target: Option<ComparisonTarget>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         comparison_type: Option<ComparisonType>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         aggregate: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         group_names: Option<Box<Vec<String>>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         group_reference: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         exclude_group_names: Option<Box<Vec<String>>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         characters: Option<Box<Vec<String>>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         exclude_characters: Option<Box<Vec<String>>>,
         cost_limit: Option<u8>,
         cost_limit_operator: Option<Operator>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         heart_colors: Option<Box<Vec<String>>>,
         heart_type: Option<ArcStr>,
         heart_source: Option<ArcStr>,
@@ -2535,7 +2596,7 @@ pub enum Condition {
         exclude_self: Option<bool>,
         self_target: Option<bool>,
         source: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         activation_position: Option<ArcStr>,
         destination: Option<ArcStr>,
         state: Option<CardState>,
@@ -2547,25 +2608,28 @@ pub enum Condition {
         temporal: Option<ArcStr>,
         yell_trigger: Option<bool>,
         same_name: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         card_property: Option<CardProperty>,
         scope: Option<ArcStr>,
         // Boxed sub-checks (rarely accessed together)
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         sub_checks: Option<Box<LocationSubChecks>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         baton_touch_trigger: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         min_baton_touch_count: Option<u8>,
     },
-    #[serde(
-        rename = "comparison_condition",
-        alias = "both_condition",
-        alias = "all_cost_comparison_condition",
-        alias = "highest_cost_on_stage_condition"
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(
+            rename = "comparison_condition",
+            alias = "both_condition",
+            alias = "all_cost_comparison_condition",
+            alias = "highest_cost_on_stage_condition"
+        )
     )]
     Comparison {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2580,82 +2644,85 @@ pub enum Condition {
         location: Option<ArcStr>,
         operator: Option<ArcStr>,
         count: Option<u8>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         values: Option<Box<Vec<u8>>>,
         card_type: Option<ConditionCardType>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         group_names: Option<Box<Vec<String>>>,
         position: Option<Box<PositionInfo>>,
         position_compare: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         aggregate: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         heart_colors: Option<Box<Vec<String>>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         scope: Option<ArcStr>,
         cost_total: Option<u8>,
         cost_total_operator: Option<Operator>,
         resource_type: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         delta: Option<bool>,
         cost_limit: Option<u8>,
         source: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         comparison_source: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         locations: Option<Box<Vec<String>>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         exclude_group_names: Option<Box<Vec<String>>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         characters: Option<Box<Vec<String>>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         exclude_characters: Option<Box<Vec<String>>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         same_name: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         distinct: Option<Box<DistinctInfo>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         all: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         all_areas: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         exclude_self: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         self_target: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         destination: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         state: Option<CardState>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         require_position_cards: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         temporal: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         yell_trigger: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         no_excess_heart: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         card_property: Option<CardProperty>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         ability_filter: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         ability_filter_triggers: Option<Box<Vec<String>>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         baton_touch_trigger: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         min_baton_touch_count: Option<u8>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         from_state: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         to_state: Option<ArcStr>,
     },
-    #[serde(
-        rename = "movement_condition",
-        alias = "not_moved",
-        alias = "has_moved"
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(
+            rename = "movement_condition",
+            alias = "not_moved",
+            alias = "has_moved"
+        )
     )]
     Movement {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2672,10 +2739,10 @@ pub enum Condition {
         baton_touch_trigger: Option<bool>,
         min_baton_touch_count: Option<u8>,
         exclude_self: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         group_names: Option<Box<Vec<String>>>,
         card_type: Option<ConditionCardType>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         characters: Option<Box<Vec<String>>>,
         baton_touch_source: Option<ArcStr>,
         card_property: Option<CardProperty>,
@@ -2692,9 +2759,9 @@ pub enum Condition {
         from_state: Option<ArcStr>,
         to_state: Option<ArcStr>,
     },
-    #[serde(rename = "group_condition")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "group_condition"))]
     Group {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2703,31 +2770,31 @@ pub enum Condition {
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         group_names: Option<Box<Vec<String>>>,
         all_members: Option<bool>,
         location: Option<ArcStr>,
         target: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         heart_colors: Option<Box<Vec<String>>>,
         card_type: Option<ConditionCardType>,
         operator: Option<ArcStr>,
         count: Option<u8>,
         aggregate: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         exclude_characters: Option<Box<Vec<String>>>,
         temporal: Option<ArcStr>,
         self_target: Option<bool>,
         exclude_self: Option<bool>,
         heart_source: Option<ArcStr>,
         source: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         locations: Option<Box<Vec<String>>>,
         position: Option<Box<PositionInfo>>,
     },
-    #[serde(rename = "appearance_condition")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "appearance_condition"))]
     Appearance {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2740,13 +2807,13 @@ pub enum Condition {
         baton_touch_trigger: Option<bool>,
         location: Option<ArcStr>,
         target: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         group_names: Option<Box<Vec<String>>>,
         cost_limit: Option<u8>,
         card_type: Option<ConditionCardType>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         characters: Option<Box<Vec<String>>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         positions_characters: Option<Box<Vec<PositionCharacter>>>,
         min_baton_touch_count: Option<u8>,
         activation_position: Option<ArcStr>,
@@ -2754,16 +2821,16 @@ pub enum Condition {
         position_compare: Option<ArcStr>,
         position: Option<Box<PositionInfo>>,
         card_property: Option<CardProperty>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         all_areas: Option<bool>,
         cost_reference_character: Option<ArcStr>,
         cost_reference_operator: Option<Operator>,
         appearance_source: Option<ArcStr>,
         operator: Option<ArcStr>,
     },
-    #[serde(rename = "temporal_condition")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "temporal_condition"))]
     Temporal {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2778,25 +2845,28 @@ pub enum Condition {
         location: Option<ArcStr>,
         card_type: Option<ConditionCardType>,
         target: Option<ArcStr>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         group_names: Option<Box<Vec<String>>>,
         temporal_scope: Option<ArcStr>,
         position: Option<Box<PositionInfo>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         locations: Option<Box<Vec<String>>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         heart_colors: Option<Box<Vec<String>>>,
         aggregate: Option<ArcStr>,
         self_target: Option<bool>,
         condition: Option<Box<Condition>>,
     },
-    #[serde(
-        rename = "state_condition",
-        alias = "energy_state_condition",
-        alias = "state_change_condition"
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(
+            rename = "state_condition",
+            alias = "energy_state_condition",
+            alias = "state_change_condition"
+        )
     )]
     State {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2810,10 +2880,10 @@ pub enum Condition {
         target: Option<ArcStr>,
         resource_type: Option<ArcStr>,
         all: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         group_names: Option<Box<Vec<String>>>,
         card_type: Option<ConditionCardType>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         characters: Option<Box<Vec<String>>>,
         cost_limit: Option<u8>,
         cost_limit_operator: Option<Operator>,
@@ -2822,9 +2892,12 @@ pub enum Condition {
         count: Option<u8>,
         operator: Option<ArcStr>,
     },
-    #[serde(rename = "resource_condition", alias = "card_blade_condition")]
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(rename = "resource_condition", alias = "card_blade_condition")
+    )]
     Resource {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2839,14 +2912,14 @@ pub enum Condition {
         operator: Option<ArcStr>,
         count: Option<u8>,
         delta: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         heart_colors: Option<Box<Vec<String>>>,
         position: Option<Box<PositionInfo>>,
         source: Option<ArcStr>,
     },
-    #[serde(rename = "ability_filter_condition")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "ability_filter_condition"))]
     AbilityFilter {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2856,16 +2929,16 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
         ability_filter: Option<AbilityFilter>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         ability_filter_triggers: Option<Box<Vec<String>>>,
         target: Option<ArcStr>,
         location: Option<ArcStr>,
         operator: Option<ArcStr>,
         count: Option<u8>,
     },
-    #[serde(rename = "score_threshold_condition")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "score_threshold_condition"))]
     ScoreThreshold {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2878,9 +2951,12 @@ pub enum Condition {
         operator: Option<ArcStr>,
         target: Option<ArcStr>,
     },
-    #[serde(rename = "choice_condition", alias = "position_change_condition")]
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(rename = "choice_condition", alias = "position_change_condition")
+    )]
     Choice {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2889,12 +2965,12 @@ pub enum Condition {
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         options: Option<Box<Vec<Box<AbilityEffect>>>>,
     },
-    #[serde(rename = "complex_condition")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "complex_condition"))]
     Complex {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2906,9 +2982,9 @@ pub enum Condition {
         cause: Option<Box<Condition>>,
         effect: Option<Box<AbilityEffect>>,
     },
-    #[serde(rename = "position_condition")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "position_condition"))]
     PositionCond {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2920,9 +2996,9 @@ pub enum Condition {
         target: Option<ArcStr>,
         position: Option<Box<PositionInfo>>,
     },
-    #[serde(rename = "opponent_choice_condition")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "opponent_choice_condition"))]
     OpponentChoice {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2933,9 +3009,9 @@ pub enum Condition {
         trigger_event: Option<Box<TriggerEvent>>,
         target: Option<ArcStr>,
     },
-    #[serde(rename = "opponent_live_success")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "opponent_live_success"))]
     OpponentLiveSuccess {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2946,9 +3022,9 @@ pub enum Condition {
         trigger_event: Option<Box<TriggerEvent>>,
         no_excess_heart: Option<bool>,
     },
-    #[serde(rename = "no_excess_heart")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "no_excess_heart"))]
     NoExcessHeart {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2959,13 +3035,16 @@ pub enum Condition {
         trigger_event: Option<Box<TriggerEvent>>,
         target: Option<ArcStr>,
     },
-    #[serde(
-        rename = "otherwise_condition",
-        alias = "action_success_condition",
-        alias = "custom"
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(
+            rename = "otherwise_condition",
+            alias = "action_success_condition",
+            alias = "custom"
+        )
     )]
     AlwaysTrue {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2975,9 +3054,9 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
     },
-    #[serde(rename = "any_of_condition")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "any_of_condition"))]
     AnyOf {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -2986,12 +3065,15 @@ pub enum Condition {
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         any_of: Option<Vec<String>>,
     },
-    #[serde(rename = "all_revealed_match_heart_color")]
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(rename = "all_revealed_match_heart_color")
+    )]
     AllRevealedMatchHeartColor {
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
@@ -3000,31 +3082,32 @@ pub enum Condition {
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         count: Option<u8>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         operator: Option<ArcStr>,
     },
 }
 
 /// Sub-checks that can appear on Location conditions.
 /// Boxed together because they're rarely all present at once.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde_support", serde(default))]
 pub struct LocationSubChecks {
     pub card_property: Option<CardProperty>,
     pub baton_touch_trigger: Option<bool>,
     pub baton_touch_source: Option<ArcStr>,
     pub min_baton_touch_count: Option<u8>,
     pub ability_filter: Option<AbilityFilter>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub ability_filter_triggers: Option<Vec<String>>,
     pub aggregate: Option<ArcStr>,
     pub no_excess_heart: Option<bool>,
     pub original_value: Option<bool>,
     pub activation_position: Option<ArcStr>,
     pub unit: Option<ArcStr>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub values: Option<Vec<u8>>,
     pub group_reference: Option<ArcStr>,
     pub reference_card: Option<ArcStr>,
@@ -3572,10 +3655,11 @@ impl Condition {
 /// Rich description of what event triggers a condition.
 /// Parser-produced documentary field. The engine reads from this when
 /// the corresponding flat Condition field is absent.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde_support", serde(default))]
 pub struct TriggerEvent {
-    #[serde(rename = "type")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "type"))]
     pub event_type: Option<ArcStr>,
     pub tense: Option<ArcStr>,
     pub location: Option<ArcStr>,
@@ -3598,8 +3682,9 @@ pub struct TriggerEvent {
 }
 
 /// Cost comparison for baton touch: e.g. "このメンバーよりコストが低い" (cost < activating).
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde_support", serde(default))]
 pub struct CostComparison {
     pub operator: Option<Operator>,
     pub relative_to: Option<ArcStr>,
@@ -4130,7 +4215,8 @@ impl Condition {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct FAQEntry {
     pub title: String,
     pub question: String,
@@ -4138,7 +4224,8 @@ pub struct FAQEntry {
     pub relation: Vec<CardRelation>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct CardRelation {
     pub card_no: String,
     pub name: String,

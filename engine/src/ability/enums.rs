@@ -1,4 +1,5 @@
 use crate::core::types::ArcStr;
+#[cfg(feature = "serde_support")]
 use serde::ser::Serializer;
 
 /// Strongly-typed zone identifiers to prevent stringly-typed bugs.
@@ -135,8 +136,12 @@ impl core::fmt::Display for Zone {
 /// Strongly-typed ability effect action types to prevent stringly-typed dispatch bugs.
 /// Action type for ability effects.
 /// ~60 variants cover all effect actions in the game.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+#[cfg_attr(feature = "serde_support", serde(rename_all = "snake_case"))]
 pub enum ActionType {
     // Card movement
     DrawCard,
@@ -468,8 +473,12 @@ impl core::fmt::Display for ActionType {
 
 // ============== CONDITION TYPE ==============
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+#[cfg_attr(feature = "serde_support", serde(rename_all = "snake_case"))]
 pub enum ConditionType {
     Compound,
     ComparisonCondition,
@@ -673,6 +682,7 @@ impl From<ActionType> for String {
 // so existing JSON / bytecode assets keep loading without regeneration.
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+
 pub enum EffectCardType {
     MemberCard,
     LiveCard,
@@ -702,14 +712,14 @@ impl EffectCardType {
     }
 }
 
-#[cfg(not(feature = "no_std"))]
+#[cfg(all(not(feature = "no_std"), feature = "serde_support"))]
 impl serde::Serialize for EffectCardType {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
-#[cfg(not(feature = "no_std"))]
+#[cfg(all(not(feature = "no_std"), feature = "serde_support"))]
 impl<'de> serde::Deserialize<'de> for EffectCardType {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = <ArcStr as serde::Deserialize>::deserialize(deserializer)?;
@@ -717,14 +727,14 @@ impl<'de> serde::Deserialize<'de> for EffectCardType {
     }
 }
 
-#[cfg(feature = "no_std")]
+#[cfg(all(feature = "no_std", feature = "serde_support"))]
 impl serde::Serialize for EffectCardType {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
-#[cfg(feature = "no_std")]
+#[cfg(all(feature = "no_std", feature = "serde_support"))]
 impl<'de> serde::Deserialize<'de> for EffectCardType {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = <String as serde::Deserialize>::deserialize(deserializer)?;
@@ -751,6 +761,7 @@ impl core::fmt::Display for EffectCardType {
 // is preserved verbatim in `Other(ArcStr)` so legacy JSON keeps loading.
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+
 pub enum EffectState {
     Active,
     Wait,
@@ -775,14 +786,14 @@ impl EffectState {
     }
 }
 
-#[cfg(not(feature = "no_std"))]
+#[cfg(all(not(feature = "no_std"), feature = "serde_support"))]
 impl serde::Serialize for EffectState {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
-#[cfg(not(feature = "no_std"))]
+#[cfg(all(not(feature = "no_std"), feature = "serde_support"))]
 impl<'de> serde::Deserialize<'de> for EffectState {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = <ArcStr as serde::Deserialize>::deserialize(deserializer)?;
@@ -790,14 +801,14 @@ impl<'de> serde::Deserialize<'de> for EffectState {
     }
 }
 
-#[cfg(feature = "no_std")]
+#[cfg(all(feature = "no_std", feature = "serde_support"))]
 impl serde::Serialize for EffectState {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
-#[cfg(feature = "no_std")]
+#[cfg(all(feature = "no_std", feature = "serde_support"))]
 impl<'de> serde::Deserialize<'de> for EffectState {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = <String as serde::Deserialize>::deserialize(deserializer)?;

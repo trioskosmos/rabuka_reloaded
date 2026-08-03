@@ -830,16 +830,19 @@ impl GameState {
         duration: &str,
     ) {
         self.mods.set_heart_override(card_id, color, count);
-        let mut data = serde_json::Map::new();
-        data.insert(
-            "card_id".to_string(),
-            serde_json::Value::Number(card_id.into()),
-        );
-        data.insert(
-            "color".to_string(),
-            serde_json::Value::String(format!("{:?}", color)),
-        );
-        data.insert("count".to_string(), serde_json::Value::Number(count.into()));
+        #[cfg(feature = "serde_support")]
+        {
+            let mut data = serde_json::Map::new();
+            data.insert(
+                "card_id".to_string(),
+                serde_json::Value::Number(card_id.into()),
+            );
+            data.insert(
+                "color".to_string(),
+                serde_json::Value::String(format!("{:?}", color)),
+            );
+            data.insert("count".to_string(), serde_json::Value::Number(count.into()));
+        }
         self.temporary_effects.push(TemporaryEffect {
             effect_type: "heart_override".to_string(),
             duration: match duration {

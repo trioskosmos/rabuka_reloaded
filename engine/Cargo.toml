@@ -10,28 +10,31 @@ doctest = false
 [dependencies]
 log = { version = "=0.4.22", default-features = false }
 env_logger = { version = "0.11", optional = true }
-serde = { version = "=1.0.228", default-features = false, features = ["derive", "alloc", "rc"] }
-serde_json = { version = "=1.0.99", default-features = false, features = ["alloc"] }
+serde = { version = "=1.0.228", default-features = false, features = ["derive", "alloc", "rc"], optional = true }
+serde_json = { version = "=1.0.99", default-features = false, features = ["alloc"], optional = true }
 rand = { version = "0.8", optional = true }
 actix-web = { version = "4.4", optional = true }
 actix-cors = { version = "0.6", optional = true }
 actix-files = { version = "0.6", optional = true }
 tokio = { version = "1.35", features = ["full"], optional = true }
-smallvec = { version = "1.11", features = ["serde"] }
-hashbrown = { version = "0.14", default-features = false, features = ["serde"] }
+smallvec = { version = "1.11", default-features = false }
+hashbrown = { version = "0.14", default-features = false }
 uuid = { version = "1.6", features = ["v4", "serde"], optional = true }
 local-ip-address = { version = "0.6", optional = true }
 tokio-stream = { version = "0.1", optional = true }
 bytes = { version = "1", optional = true }
 rmp-serde = { version = "=1.3.1", optional = true }
 [features]
-default = ["env_logger", "debug_conditions", "rand", "rmp-serde", "bytecode_abilities", "json_path_test", "compact_card_data"]
+default = ["env_logger", "debug_conditions", "rand", "rmp-serde", "bytecode_abilities", "json_path_test", "compact_card_data", "serde_support"]
 debug_conditions = []
 # JSON-path ability decode (serde) — used only by the bytecode↔JSON deep-compare
 # oracle. Off for ds/no_std targets so the serde decode system is not compiled.
-json_path_test = []
+json_path_test = ["serde_support"]
+# serde + serde_json + serde-capable smallvec/hashbrown. Disabled for console
+# targets (ds/ps1/psp/wii/dc) where types are serialized via the binary blob.
+serde_support = ["dep:serde", "dep:serde_json", "smallvec/serde", "hashbrown/serde"]
 # Optional server feature: enables the web server and async runtime
-server = ["actix-web", "actix-cors", "actix-files", "tokio", "tokio-stream", "local-ip-address", "uuid", "bytes"]
+server = ["actix-web", "actix-cors", "actix-files", "tokio", "tokio-stream", "local-ip-address", "uuid", "bytes", "serde_support"]
 # 3DS target: disables TLS-based RNG, uses xorshift64 seeded from svcGetSystemTick
 3ds = ["bytecode_abilities"]
 # Profiling: enables Timer-based instrumentation for flamegraph generation
@@ -45,6 +48,8 @@ psp = ["no_std", "debug_conditions", "bytecode_abilities"]
 # DS target: no_std + alloc, minimal features for tight 4MB ROM
 ds = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
 ds_debug = ["ds"]
+# PS1 target: no_std + alloc, compact like DS (2MB RAM; card data streams from CD)
+ps1 = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
 # Dreamcast target: no_std + alloc via KallistiOS + rustc_codegen_gcc
 dc = ["no_std", "debug_conditions"]
 # Wii target: no_std + alloc via devkitPPC + libogc

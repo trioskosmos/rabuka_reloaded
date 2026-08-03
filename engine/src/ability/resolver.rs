@@ -11,7 +11,8 @@ use alloc::{
     vec::Vec,
 };
 #[cfg(feature = "no_std")]
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde_support", derive(serde::Serialize))]
 pub struct AbilityLogItem;
 #[cfg(feature = "no_std")]
 #[allow(dead_code)]
@@ -497,21 +498,24 @@ impl AbilityResolver {
                     }
                 }
             }
-            let mut json = choice.to_frontend_json();
-            if let Some(ref mut j) = json {
-                if let Some(entry) = gs.ability_queue.current_entry() {
-                    if let Some(ref effect) = entry.ability.effect {
-                        if let Some(ref maker) = effect.choice_maker_any() {
-                            if let Some(obj) = j.as_object_mut() {
-                                obj.insert(
-                                    "choice_maker".to_string(),
-                                    serde_json::Value::String(maker.to_string()),
-                                );
+            #[cfg(feature = "serde_support")]
+            {
+                let mut json = choice.to_frontend_json();
+                if let Some(ref mut j) = json {
+                    if let Some(entry) = gs.ability_queue.current_entry() {
+                        if let Some(ref effect) = entry.ability.effect {
+                            if let Some(ref maker) = effect.choice_maker_any() {
+                                if let Some(obj) = j.as_object_mut() {
+                                    obj.insert(
+                                        "choice_maker".to_string(),
+                                        serde_json::Value::String(maker.to_string()),
+                                    );
+                                }
                             }
                         }
                     }
+                    gs.inject_choice_ability_context(j);
                 }
-                gs.inject_choice_ability_context(j);
             }
         }
     }
@@ -548,6 +552,8 @@ impl AbilityResolver {
         items: Vec<AbilityLogItem>,
         error: Option<&str>,
     ) {
+        #[cfg(not(feature = "serde_support"))]
+        let _ = &items;
         let pp = gs.player_prefix();
         let card_id = gs.activating_card;
         let card_name = card_id
@@ -585,12 +591,14 @@ impl AbilityResolver {
         let zone = card_id
             .map(|cid| Self::zone_for_card(gs, cid))
             .unwrap_or_default();
+        #[cfg(feature = "serde_support")]
         let items_json: Vec<serde_json::Value> = items
             .iter()
             .map(|i| serde_json::to_value(i).unwrap_or_default())
             .collect();
         let meta = crate::core::types::LogMetadata::AbilityResolution {
             result: result.to_string(),
+            #[cfg(feature = "serde_support")]
             items: items_json.clone(),
             ability_text: ability_text.clone(),
             zone: zone.clone(),
@@ -659,6 +667,7 @@ impl AbilityResolver {
                 if let Some(ref mut meta) = entry.metadata {
                     *meta = crate::core::types::LogMetadata::AbilityResolution {
                         result: result.to_string(),
+                        #[cfg(feature = "serde_support")]
                         items: items_json.clone(),
                         ability_text: ability_text.clone(),
                         zone: String::new(),

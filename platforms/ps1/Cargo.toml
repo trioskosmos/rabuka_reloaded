@@ -1,0 +1,11 @@
+[package]
+name = "rabuka_ps1"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+rabuka_engine = { path = "../../engine", default-features = false, features = ["ps1"] }
+psx = { git = "https://github.com/ayrtonm/psx-sdk-rs", branch = "main", features = ["NA_region", "heap"] }
+log = { version = "0.4", default-features = false }

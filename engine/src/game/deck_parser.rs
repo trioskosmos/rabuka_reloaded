@@ -19,7 +19,8 @@ pub struct DeckEntry {
     pub quantity: u8,
 }
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(serde::Deserialize))]
 pub struct DeckListEntry {
     pub name: String,
     pub cards: Vec<String>,
@@ -32,19 +33,36 @@ pub struct DeckList {
 }
 
 /// Load and merge two deck JSON files from DECK_CARD_FILES, deduplicating by card_no.
+/// JSON parsing requires the `serde_support` feature; on no-serde targets (DS/PS1/etc)
+/// this returns cards from the embedded compact blob when available, else empty.
 pub fn load_two_decks(deck1_idx: usize, deck2_idx: usize) -> Vec<crate::card::Card> {
-    let json1 = DECK_CARD_FILES[deck1_idx];
-    let mut merged: Vec<crate::card::Card> = serde_json::from_str(json1).unwrap_or_default();
-    if deck1_idx != deck2_idx && deck2_idx < DECK_CARD_FILES.len() {
-        let json2 = DECK_CARD_FILES[deck2_idx];
-        let cards2: Vec<crate::card::Card> = serde_json::from_str(json2).unwrap_or_default();
-        for c in cards2 {
-            if !merged.iter().any(|m| m.card_no == c.card_no) {
-                merged.push(c);
+    #[cfg(feature = "serde_support")]
+    {
+        let json1 = DECK_CARD_FILES[deck1_idx];
+        let mut merged: Vec<crate::card::Card> = serde_json::from_str(json1).unwrap_or_default();
+        if deck1_idx != deck2_idx && deck2_idx < DECK_CARD_FILES.len() {
+            let json2 = DECK_CARD_FILES[deck2_idx];
+            let cards2: Vec<crate::card::Card> = serde_json::from_str(json2).unwrap_or_default();
+            for c in cards2 {
+                if !merged.iter().any(|m| m.card_no == c.card_no) {
+                    merged.push(c);
+                }
             }
         }
+        merged
     }
-    merged
+    #[cfg(not(feature = "serde_support"))]
+    {
+        let _ = (deck1_idx, deck2_idx);
+        #[cfg(feature = "compact_card_data")]
+        {
+            crate::card_loader::CardLoader::load_all_cards_from_blob()
+        }
+        #[cfg(not(feature = "compact_card_data"))]
+        {
+            Vec::new()
+        }
+    }
 }
 
 pub struct DeckParser;

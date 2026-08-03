@@ -5,7 +5,8 @@ use crate::HashMap;
 use alloc::{string::String, vec::Vec};
 use smallvec::SmallVec;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug,  Clone,  Copy,  PartialEq,  Eq,  Hash)]
+#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
 pub enum CardOrientation {
     Active,
     Wait,
@@ -28,7 +29,8 @@ impl core::fmt::Display for CardOrientation {
 
 /// Stores both the additive delta and absolute set value for a modifier.
 /// Replaces the old dual-map pattern (`blade_modifiers` + `set_blade_modifiers`).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(serde::Serialize, serde::Deserialize))]
 pub struct ModifierEntry {
     /// Accumulated via repeated `add_*` / `+=` calls.
     pub additive: i32,
@@ -50,7 +52,8 @@ impl ModifierEntry {
 
 /// Holds all modifier data for GameState.
 /// Extracted to reduce the 99-field GameState struct.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug,  Clone)]
+#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
 pub struct GameModifiers {
     pub blade_modifiers: HashMap<i16, ModifierEntry>,
     pub blade_type_modifiers: HashMap<i16, BladeColor>,

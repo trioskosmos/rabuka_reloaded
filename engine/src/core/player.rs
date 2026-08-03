@@ -12,7 +12,8 @@ use crate::{HashMap, VecDeque};
 use alloc::string::{String, ToString};
 use smallvec::SmallVec;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug,  Clone)]
+#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
 
 pub struct Player {
     pub id: String,

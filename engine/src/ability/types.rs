@@ -1,5 +1,6 @@
 use core::fmt;
 
+#[cfg(feature = "serde_support")]
 use serde_json::Value;
 use smallvec::SmallVec;
 
@@ -27,7 +28,11 @@ pub struct TriggerEvent {
 /// Discriminator for routing choice results to the correct handler.
 /// Statically known routes are enum variants; dynamic routes (e.g. position_change
 /// with card_no) use `Raw`.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum ChoiceRoute {
     Choice,
     ChoiceString,
@@ -53,16 +58,26 @@ impl fmt::Display for ChoiceRoute {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum Choice {
     SelectCard {
         zone: String,
         card_type: Option<String>,
         count: usize,
         description: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         description_en: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         description_ja: Option<String>,
         allow_skip: bool,
         cost_limit: Option<u8>,
@@ -71,46 +86,67 @@ pub enum Choice {
         cost_total_operator: Option<String>,
         group: Option<String>,
         characters: Option<Vec<String>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         filtered_indices: Option<Vec<usize>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         is_select_action: bool,
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Vec::is_empty")
+        )]
         heart_colors: Vec<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         require_all_heart_colors: Option<bool>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         name_fragments: Option<Vec<String>>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         target_player_id: Option<String>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         blind: bool,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         is_reveal: bool,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         picker: Option<String>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         destination: Option<String>,
-        #[serde(default)]
+        #[cfg_attr(feature = "serde_support", serde(default))]
         discard_remaining: Option<bool>,
     },
     SelectTarget {
         target: String,
         description: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         description_en: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         description_ja: Option<String>,
         allow_skip: bool,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         options: Option<Vec<String>>,
     },
     SelectPosition {
         position: String,
         description: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         description_en: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         description_ja: Option<String>,
         allow_skip: bool,
     },
@@ -118,18 +154,30 @@ pub enum Choice {
         count: usize,
         options: Vec<String>,
         description: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         description_en: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         description_ja: Option<String>,
     },
     SelectHeartType {
         count: usize,
         options: Vec<String>,
         description: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         description_en: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         description_ja: Option<String>,
     },
     /// Player chooses which of their standby auto abilities resolves first (Rule 9.5.3).
@@ -137,9 +185,15 @@ pub enum Choice {
         player_id: String,
         options: Vec<AutoAbilityOption>,
         description: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         description_en: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         description_ja: Option<String>,
     },
     /// Player chooses which live card goes to success zone (Rule 8.4.7).
@@ -148,9 +202,15 @@ pub enum Choice {
         count: usize,
         options: Vec<LiveSuccessOption>,
         description: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         description_en: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Option::is_none")
+        )]
         description_ja: Option<String>,
     },
 }
@@ -169,13 +229,21 @@ impl Choice {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct LiveSuccessOption {
     pub card_name: String,
     pub card_index: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct AutoAbilityOption {
     pub card_name: String,
     pub ability_text: String,
@@ -184,6 +252,7 @@ pub struct AutoAbilityOption {
 }
 
 #[derive(Debug, Clone)]
+
 pub enum ChoiceResult {
     CardSelected { indices: Vec<usize> },
     TargetSelected { target: String },
@@ -196,6 +265,7 @@ pub enum ChoiceResult {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+
 pub enum ExecutionContext {
     None,
     SingleEffect {
@@ -213,6 +283,7 @@ pub enum ExecutionContext {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+
 pub enum LookAndSelectStep {
     LookAt {
         count: usize,
@@ -530,6 +601,7 @@ impl Choice {
 
     /// Convert to the JSON format expected by the frontend.
     /// Flattens enum variants and adds frontend-specific fields (choose_count, v_remaining, title).
+    #[cfg(feature = "serde_support")]
     pub fn to_frontend_json(&self) -> Option<Value> {
         let mut json = serde_json::to_value(self).ok()?;
         match self {
@@ -716,6 +788,7 @@ impl Choice {
 // ====================================================================
 
 #[derive(Clone, Debug, Default)]
+
 pub struct EffectSpawnContext {
     pub target: Option<String>,
     pub destination: Option<String>,
@@ -831,7 +904,11 @@ impl ValueRef {
 // ====================================================================
 
 /// Snapshot of key zone counts for debugging ability execution.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct ZoneSnapshot {
     pub hand_count: usize,
     pub stage_count: usize,
@@ -858,7 +935,11 @@ impl ZoneSnapshot {
 }
 
 /// A node in the ability execution trace tree.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct AbilityTraceNode {
     pub label: String,
     pub card: Option<String>,

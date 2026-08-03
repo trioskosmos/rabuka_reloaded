@@ -1,6 +1,22 @@
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::Ordering;
 
+#[cfg(target_has_atomic = "ptr")]
+use core::sync::atomic::AtomicBool;
+#[cfg(target_has_atomic = "ptr")]
 pub static ABILITY_DEBUG: AtomicBool = AtomicBool::new(false);
+
+// No-atomic targets (PS1 R3000/MIPS-I): a compile-time-false debug flag.
+#[cfg(not(target_has_atomic = "ptr"))]
+pub static ABILITY_DEBUG: AbilityDebugFlag = AbilityDebugFlag;
+#[cfg(not(target_has_atomic = "ptr"))]
+pub struct AbilityDebugFlag;
+#[cfg(not(target_has_atomic = "ptr"))]
+impl AbilityDebugFlag {
+    pub fn load(&self, _o: Ordering) -> bool {
+        false
+    }
+    pub fn store(&self, _v: bool, _o: Ordering) {}
+}
 
 pub fn set_debug(enabled: bool) {
     ABILITY_DEBUG.store(enabled, Ordering::SeqCst);
@@ -66,10 +82,7 @@ mod inner {
             }
         }
 
-        pub fn flush_to_structured_log(
-            structured_log: &mut Vec<crate::types::LogEntry>,
-            turn: u8,
-        ) {
+        pub fn flush_to_structured_log(structured_log: &mut Vec<crate::types::LogEntry>, turn: u8) {
             if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
                 for line in buffer.drain(..) {
                     structured_log.push(crate::types::LogEntry {

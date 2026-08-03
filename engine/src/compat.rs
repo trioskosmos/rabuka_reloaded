@@ -36,8 +36,13 @@ pub(crate) use psp_hash::{HashMap, HashSet};
 #[cfg(not(feature = "no_std"))]
 pub(crate) use std::collections::{HashMap, HashSet};
 
-#[cfg(feature = "no_std")]
+#[cfg(all(feature = "no_std", target_has_atomic = "ptr"))]
 pub(crate) use alloc::sync::Arc;
+// No-atomic targets (PS1 R3000/MIPS-I, etc.): use Rc. The game is single-
+// threaded on consoles and only uses new/clone/make_mut/deref, so the shared
+// Rc/Arc API is a drop-in; Rc doesn't require target atomics.
+#[cfg(all(feature = "no_std", not(target_has_atomic = "ptr")))]
+pub(crate) use alloc::rc::Rc as Arc;
 #[cfg(not(feature = "no_std"))]
 pub(crate) use std::sync::Arc;
 
@@ -46,9 +51,9 @@ pub(crate) use alloc::boxed::Box;
 #[cfg(not(feature = "no_std"))]
 pub(crate) use std::boxed::Box;
 
-#[cfg(feature = "no_std")]
+#[cfg(all(feature = "no_std", feature = "serde_support"))]
 pub(crate) use alloc::collections::BTreeMap;
-#[cfg(not(feature = "no_std"))]
+#[cfg(all(not(feature = "no_std"), feature = "serde_support"))]
 pub(crate) use std::collections::BTreeMap;
 
 #[cfg(feature = "no_std")]

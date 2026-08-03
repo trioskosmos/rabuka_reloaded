@@ -49,7 +49,7 @@ impl CardLoader {
             let _ = cards_json;
             return Ok(Self::load_all_cards_from_blob());
         }
-        #[cfg(not(feature = "compact_card_data"))]
+        #[cfg(all(not(feature = "compact_card_data"), feature = "serde_support"))]
         {
             let mut cards: Vec<Card> = match serde_json::from_str::<Vec<Card>>(cards_json) {
                 Ok(cards) => cards,
@@ -61,6 +61,11 @@ impl CardLoader {
             };
             Self::attach_abilities(&mut cards);
             Ok(cards)
+        }
+        #[cfg(all(not(feature = "compact_card_data"), not(feature = "serde_support")))]
+        {
+            let _ = cards_json;
+            Err("loading JSON cards requires the serde_support feature".to_string())
         }
     }
 

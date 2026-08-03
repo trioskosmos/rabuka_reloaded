@@ -12,6 +12,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(feature = "serde_support")]
 use serde::{Deserialize, Serialize};
 
 fn heart_color_index(color: &HeartColor) -> Option<usize> {
@@ -21,18 +22,21 @@ fn heart_color_index(color: &HeartColor) -> Option<usize> {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct TempEffectDisplay {
     pub effect_type: String,
     pub duration: String,
     pub created_turn: u8,
     pub target_player_id: String,
     pub description: String,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    #[cfg(feature = "serde_support")]
     pub effect_data: Option<serde_json::Value>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct ReplacementEffectDisplay {
     pub card_id: i16,
     pub player_id: String,
@@ -40,7 +44,8 @@ pub struct ReplacementEffectDisplay {
     pub is_choice_based: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct AbilityQueueEntryDisplay {
     pub card_no: String,
     pub player_id: String,
@@ -54,13 +59,15 @@ pub struct AbilityQueueEntryDisplay {
     pub ability_index: usize,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct DebutTriggerDisplay {
     pub ability_key: String,
     pub card_id: i16,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct AbilityApplicationDisplay {
     pub source_card_id: i16,
     pub effect_type: String,
@@ -68,11 +75,12 @@ pub struct AbilityApplicationDisplay {
     pub amount: i32,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct CardDisplay {
     pub card_no: String,
     pub name: String,
-    #[serde(rename = "type")]
+    #[cfg_attr(feature = "serde_support", serde(rename = "type"))]
     pub card_type: String,
     pub orientation: Option<String>,
     pub base_heart: Option<HashMap<String, u8>>,
@@ -80,7 +88,7 @@ pub struct CardDisplay {
     pub total_blade: u8,
     pub id: i16,
     pub ability_text: Option<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub hidden: bool,
 
     // ════════════════════════════════════════════════════════════════
@@ -105,12 +113,12 @@ pub struct CardDisplay {
 
     // ── Additive bonuses (ModifyBlade, GainResource blade) ──
     // Shows icon_blade.png with "+N" or "-N"
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub bonus_blade: i32,
 
     // ── Additive heart bonuses (ModifyHeart, GainResource heart) ──
     // Shows per-color heart icons with "+N" or "-N"
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub bonus_hearts: Vec<i32>,
 
     // ── Additive score bonus (ModifyScore, GainAbility score) ──
@@ -118,34 +126,34 @@ pub struct CardDisplay {
     // NOTE: GainAbility(constant trigger) contributes to this via
     // recalculate_constants → score_modifier, but does NOT add a
     // jyouji.png trigger icon. The trigger type is in bonus_triggers.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub bonus_score: i32,
 
     // ── Additive cost modifier (ModifyCost) ──
     // Shows icon_energy.png with "+N" or "-N"
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub bonus_cost: i32,
 
     // ── Set/override blade (SetBladeCount, SetBladeType) ──
     // Shows icon_blade.png with plain "N" (no +/-)
     // Separate from bonus_blade so both can appear simultaneously:
     // e.g. set_blade=5 (base) + bonus_blade=+2 (modifier)
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub set_blade: i32,
 
     // ── Set/override hearts (SetHeartType) ──
     // Shows per-color heart icons with plain "N" (no +/-)
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub set_hearts: Vec<i32>,
 
     // ── Set/override score (SetScore) ──
     // Shows icon_score.png with plain "N" (no +/-)
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub set_score: i32,
 
     // ── Set/override cost (SetCost, SetCostToUse) ──
     // Shows icon_energy.png with plain "N" (no +/-)
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub set_cost: i32,
 
     // ── Gained ability trigger texticons (GainAbility) ──
@@ -155,25 +163,27 @@ pub struct CardDisplay {
     // images.
     // Without this field, gain_ability effects would have NO texticon
     // indicator on the card, even though they grant persistent abilities.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub bonus_triggers: Vec<String>,
 
     // ── Heart color transform (SetHeartType → "transform heart to X") ──
     // Shows a heart texticon overlay indicating all hearts now count as
     // that color.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub heart_transform: Option<String>,
 
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub cost: Option<u8>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Default)]
+#[derive(Clone, Default)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct ZoneDisplay {
     pub cards: Vec<CardDisplay>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct PlayerDisplay {
     pub hand: ZoneDisplay,
     pub energy: ZoneDisplay,
@@ -184,83 +194,85 @@ pub struct PlayerDisplay {
     pub discard: ZoneDisplay,
     pub main_deck_count: usize,
     pub energy_deck_count: usize,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub last_resolution_cards: Vec<CardDisplay>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub score_modifiers: HashMap<i16, i32>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub total_hearts: Vec<u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub live_need_hearts: Vec<u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub selected_need_hearts: Vec<u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub current_score: u8,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub live_card_scores: HashMap<String, u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub gained_abilities: Vec<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub active_restrictions: Vec<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub need_heart_modifiers: HashMap<String, Vec<i32>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub mulligan_selection: Option<Vec<usize>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub live_card_selection: Option<Vec<usize>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub blade_buffs: Vec<i32>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub heart_buffs: Vec<Vec<i32>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub cost_reduction: i32,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub prevent_baton_touch: i32,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub prevent_baton: i32,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub deployed_this_turn: Vec<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub debut_count_this_turn: u8,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub id: String,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub name: String,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub is_first_attacker: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub exclusion_zone: ZoneDisplay,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub energy_active_count: usize,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub stage_hearts: Option<HashMap<String, u8>>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct StageDisplay {
     pub left_side: Option<CardDisplay>,
     pub center: Option<CardDisplay>,
     pub right_side: Option<CardDisplay>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub left_under: Vec<CardDisplay>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub center_under: Vec<CardDisplay>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub right_under: Vec<CardDisplay>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct RevealedCardDisplay {
     pub card_id: i16,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub source_card_id: Option<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub source_card_name: Option<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub owner: i8,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub is_private: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub reveal_type: String,
 }
 
@@ -280,77 +292,79 @@ impl RevealedCardDisplay {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive()]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct GameStateDisplay {
     pub turn: u8,
     pub phase: String,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub active_player: String,
     pub player1: PlayerDisplay,
     pub player2: PlayerDisplay,
+    #[cfg(feature = "serde_support")]
     pub pending_choice: Option<serde_json::Value>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub looked_cards: ZoneDisplay,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub rule_log: Vec<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub structured_log: Vec<crate::types::LogEntry>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub performance_results: Option<HashMap<String, PerformanceSnapshot>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub performance_history: Vec<PerformanceSnapshot>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub game_over: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub winner: Option<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub waiting_for_opponent: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub mode: String,
     // --- Internal tracking fields for game state modal ---
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub current_turn_phase: String,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub game_result: String,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub is_first_turn: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub turn_order_changed: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub baton_touch_count: u8,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub baton_touch_zero_cost: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub baton_touch_replaced_member_cost: Option<u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub baton_touch_replaced_member_id: Option<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub baton_touch_arriving_card_id: Option<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub deck_refresh_pending: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub loop_detected: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub draw_state: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub live_being_performed: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub cards_moved_this_turn: Vec<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub cards_appeared_this_turn: Vec<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub areas_placed_this_turn: Vec<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub last_area_move_card_id: Option<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub last_area_move_by_player: Option<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub last_energy_placed_by_effect: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub batch_movements: Vec<crate::types::MovementEvent>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub last_energy_placed_by_player: Option<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub position_change_occurred_this_turn: bool,
     /// Batch-level stage-area-to-stage-area position changes in execution
     /// order. Each entry records one card's movement between left/center/right
@@ -362,7 +376,7 @@ pub struct GameStateDisplay {
     /// (0=left, 1=center, 2=right). All entries in this list are one batch
     /// and should animate together (e.g. a formation change where all 3 cards
     /// rearrange produces 4-6 entries).
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub position_changes: Vec<crate::types::PositionChangeEvent>,
     /// Same data as position_changes but keyed by card ID for per-card
     /// lookups. Each card's entry is its full position-change history
@@ -373,176 +387,176 @@ pub struct GameStateDisplay {
     /// cards showing where it moved. Check if a card ID appears here to
     /// highlight it as "moved this batch". The Vec length tells you how
     /// many times it moved (usually 1, up to 3 for a full rotation).
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub position_changes_by_card: HashMap<i16, Vec<crate::types::PositionChangeEvent>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub formation_change_occurred_this_turn: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub opponent_live_success_this_turn: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub opponent_live_no_excess_heart_this_turn: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub self_no_excess_heart_this_turn: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub opponent_live_surplus_count: u8,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub self_live_surplus_count: u8,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub live_success_triggered_this_turn: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub live_surplus_ready_this_turn: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub cheer_checks_required: u8,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub cheer_checks_done: u8,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub turn_limited_abilities_used: Vec<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub auto_ability_trigger_counts: HashMap<String, u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub turn_limit_usage: HashMap<String, u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub non_stackable_effects: Vec<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub prohibition_effects: Vec<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub delayed_prohibition_effects: Vec<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub cannot_live_players: Vec<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub cannot_activate_members: Vec<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub constant_cannot_activate_members: Vec<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub constant_ability_statuses: Vec<crate::types::ConstantAbilityStatus>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub negated_abilities: Vec<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub temporary_effects: Vec<TempEffectDisplay>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub replacement_effects: Vec<ReplacementEffectDisplay>,
 
     // === New comprehensive fields ===
     // Ability Queue
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub ability_queue_state: String,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub ability_queue_current_index: usize,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub ability_queue_entries: Vec<AbilityQueueEntryDisplay>,
 
     // RPS
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub rps_winner: Option<u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub player1_rps_choice: Option<u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub player2_rps_choice: Option<u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub pending_rps_player_id: Option<u8>,
 
     // Card/Ability Runtime
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub activating_card: Option<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub activating_ability_index: Option<usize>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub just_completed_ability_key: Option<u32>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub this_batch_triggered_ability_ids: Vec<u32>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub turn1_abilities_played: Vec<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub turn2_abilities_played: HashMap<String, u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub card_instance_mapping: HashMap<String, u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub card_instance_counter: u8,
 
     // Move Tracking
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub recently_moved_cards: Vec<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub recently_moved_from_zone: Option<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub last_vacated_stage_area: Option<String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub debut_ability_triggers: Vec<DebutTriggerDisplay>,
 
     // Live/Cheer
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub live_cheer_count: u8,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub cheer_check_completed: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub player1_cheer_blade_heart_count: u8,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub player2_cheer_blade_heart_count: u8,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub player1_cheer_revealed_cards: Vec<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub player2_cheer_revealed_cards: Vec<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub revealed_cards: Vec<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub initial_yell_revealed_cards: Vec<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub re_yell_revealed_cards: Vec<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub revealed_card_info: Vec<RevealedCardDisplay>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub revealed_cost_card_info: Vec<RevealedCardDisplay>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub heart_color_decision_phase: String,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub live_owned_hearts: HashMap<String, Vec<[String; 2]>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub opponent_choice_declined: bool,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub pending_success_replacement_card_id: Option<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub pending_success_replacement_player_id: Option<String>,
 
     // Resolution/Misc
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub resolution_zone_cards: Vec<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub revealed_cost_cards: Vec<i16>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub ability_applications: Vec<AbilityApplicationDisplay>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub effect_creation_counter: u8,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub last_state_change_wait_to_active_count: u8,
 
     // GameModifiers constant* breakdown
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub constant_blade_bonuses: HashMap<i16, i32>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub constant_cost_bonuses: HashMap<i16, i32>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub constant_score_bonuses: HashMap<i16, i32>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub constant_heart_bonuses: HashMap<i16, HashMap<String, i32>>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub constant_global_need_heart: Vec<[String; 3]>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub constant_score_sources: Vec<[String; 3]>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub blade_type_modifiers: HashMap<i16, String>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub heart_override: HashMap<i16, [String; 2]>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub delayed_cannot_active: HashMap<i16, u8>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub last_cost_discard_count: u8,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub last_cost_energy_count: u8,
 
     // Cheer/Blade heart tracking
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub mulligan_selected_indices: Vec<usize>,
-    #[serde(default)]
+    #[cfg_attr(feature = "serde_support", serde(default))]
     pub live_success_total_score: Option<u8>,
 }
 
@@ -1275,15 +1289,18 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     // Collect publicly visible revealed cards + pending_choice selection cards
     let mut looked_ids: Vec<i16> = game_state.looked_at_cards.to_vec();
     looked_ids.extend(&game_state.revealed_cards);
-    if let Some(ref pc) = game_state.get_pending_choice_json() {
-        if let Some(cards) = pc.get("selection_cards").and_then(|v| v.as_array()) {
-            for val in cards {
-                if let Some(id) = val
-                    .get("id")
-                    .and_then(|v| v.as_i64())
-                    .or_else(|| val.as_i64())
-                {
-                    looked_ids.push(id as i16);
+    #[cfg(feature = "serde_support")]
+    {
+        if let Some(ref pc) = game_state.get_pending_choice_json() {
+            if let Some(cards) = pc.get("selection_cards").and_then(|v| v.as_array()) {
+                for val in cards {
+                    if let Some(id) = val
+                        .get("id")
+                        .and_then(|v| v.as_i64())
+                        .or_else(|| val.as_i64())
+                    {
+                        looked_ids.push(id as i16);
+                    }
                 }
             }
         }
@@ -1473,6 +1490,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             created_turn: te.created_turn,
             target_player_id: te.target_player_id.clone(),
             description: te.description.clone(),
+            #[cfg(feature = "serde_support")]
             effect_data: te
                 .effect_data
                 .as_ref()
@@ -1630,6 +1648,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         active_player: game_state.active_player().id.clone(),
         player1,
         player2,
+        #[cfg(feature = "serde_support")]
         pending_choice: game_state.get_pending_choice_json(),
         looked_cards: zone_to_display(&looked_ids, &game_state.card_database),
         rule_log,

@@ -12,6 +12,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(feature = "serde_support")]
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
@@ -19,7 +20,11 @@ use smallvec::SmallVec;
 /// `revealed_cards` / `revealed_cost_cards` id vectors. Consolidates the four
 /// parallel `Vec` columns into one struct for better locality and fewer
 /// allocator headers.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct RevealedCardMeta {
     pub source: Option<i16>,
     pub source_name: Option<String>,
@@ -35,33 +40,34 @@ pub use crate::types::{
     ScoreLine, TemporaryEffect, TriggeredAbility, TurnPhase, YellCardResult,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct GameState {
     // --- 8-byte aligned (Player, HashMap, HashSet, String, Vec, Arc, usize, Value) ---
     pub player1: Player,
     pub player2: Player,
     pub ability_queue: AbilityQueue,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub card_database: Arc<CardDatabase>,
     pub mods: GameModifiers,
     /// When false, `recalculate_constants` may skip its work. Mutators
     /// that change stage/live/energy/hand/orientation/success-zone state call
     /// `mark_constants_dirty` so constants are re-evaluated exactly when needed.
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub constants_dirty: bool,
     pub resolution_zone: ResolutionZone,
     pub heart_color_decision_phase: String,
     /// Engine-internal loop-detection history. Skipped on the wire: the 3DS
     /// client never runs the engine and it only inflates every state transfer
     /// (up to 1000 × u64 ≈ 8KB) for no reason.
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub game_state_history: Vec<u64>,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub max_state_history_size: usize,
     pub rule_log: Vec<String>,
     /// Engine-internal structured log. Skipped on the wire: the client's game
     /// log overlay reads `rule_log`, not this.
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub structured_log: Vec<LogEntry>,
     pub turn1_abilities_played: SmallVec<[String; 8]>,
     pub turn2_abilities_played: SmallVec<[(String, u8); 8]>,
@@ -96,15 +102,15 @@ pub struct GameState {
     /// allocating 7+ HashMaps/Vecs on every state change. Swapped out via
     /// `core::mem::take` at the start of each call and swapped back at the end.
     /// All skipped on the wire: transient engine-internal buffers.
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub scratch_exp_blade: HashMap<i16, i32>,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub scratch_exp_cost: HashMap<i16, i32>,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub scratch_exp_score: HashMap<i16, i32>,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub scratch_exp_heart: HashMap<i16, HashMap<String, i32>>,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub scratch_entry_positions: HashMap<i16, Option<usize>>,
     pub negated_abilities: SmallVec<[i16; 8]>,
     pub replacement_effects: SmallVec<[ReplacementEffect; 2]>,
