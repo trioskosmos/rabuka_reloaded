@@ -53,37 +53,47 @@ pub fn load_two_decks(deck1_idx: usize, deck2_idx: usize) -> Vec<crate::card::Ca
     }
     #[cfg(not(feature = "serde_support"))]
     {
+        // Compact builds: decode only the two selected decks' cards from the
+        // engine-baked per-deck blobs. No serde, no full-database load.
         let _ = (deck1_idx, deck2_idx);
-        #[cfg(feature = "compact_card_data")]
-        {
-            crate::card_loader::CardLoader::load_all_cards_from_blob()
+        let mut merged: Vec<crate::card::Card> = Vec::new();
+        let mut seen: crate::HashSet<String> = crate::HashSet::default();
+        for idx in [deck1_idx, deck2_idx] {
+            if idx >= crate::decks_cards_gen::DECK_CARD_BLOBS.len() {
+                continue;
+            }
+            for card in crate::core::card_binary::decode_all_cards_from_slice(
+                crate::decks_cards_gen::DECK_CARD_BLOBS[idx],
+            ) {
+                let no = card.card_no.to_string();
+                if seen.insert(no.clone()) {
+                    merged.push(card);
+                }
+            }
         }
-        #[cfg(not(feature = "compact_card_data"))]
-        {
-            Vec::new()
-        }
+        merged
     }
 }
 
 pub struct DeckParser;
 
 pub const DECK_CARD_FILES: &[&str] = &[
-    include_str!("../../../platforms/psp/baked/deck_0_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_1_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_2_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_3_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_4_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_5_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_6_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_7_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_8_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_9_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_10_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_11_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_12_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_13_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_14_cards.json"),
-    include_str!("../../../platforms/psp/baked/deck_15_cards.json"),
+    include_str!("../../baked/deck_0_cards.json"),
+    include_str!("../../baked/deck_1_cards.json"),
+    include_str!("../../baked/deck_2_cards.json"),
+    include_str!("../../baked/deck_3_cards.json"),
+    include_str!("../../baked/deck_4_cards.json"),
+    include_str!("../../baked/deck_5_cards.json"),
+    include_str!("../../baked/deck_6_cards.json"),
+    include_str!("../../baked/deck_7_cards.json"),
+    include_str!("../../baked/deck_8_cards.json"),
+    include_str!("../../baked/deck_9_cards.json"),
+    include_str!("../../baked/deck_10_cards.json"),
+    include_str!("../../baked/deck_11_cards.json"),
+    include_str!("../../baked/deck_12_cards.json"),
+    include_str!("../../baked/deck_13_cards.json"),
+    include_str!("../../baked/deck_14_cards.json"),
+    include_str!("../../baked/deck_15_cards.json"),
 ];
 
 impl DeckParser {

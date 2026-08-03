@@ -39,6 +39,11 @@ pub use core::player;
 pub use core::types;
 pub use core::zones;
 
+// Per-deck compact card data baked from web_ui/decks/*.txt (see
+// tools/bake_deck_cards.py). load_two_decks() decodes only the two selected
+// decks' cards from these blobs.
+pub mod decks_cards_gen;
+
 // Bot AI module (excluded on PSP)
 #[cfg(not(feature = "no_std"))]
 pub mod bot;

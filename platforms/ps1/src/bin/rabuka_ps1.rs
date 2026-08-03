@@ -11,7 +11,6 @@ use alloc::vec::Vec;
 use rabuka_engine::card::Card;
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader::CardLoader;
-use rabuka_engine::core::card_binary;
 use rabuka_engine::game::deck_builder::DeckBuilder;
 use rabuka_engine::game::platform_ui;
 use rabuka_engine::game_setup;
@@ -21,7 +20,6 @@ use rabuka_engine::rng;
 use rabuka_engine::turn::TurnEngine;
 
 use rabuka_ps1::decks_baked::DECKS;
-use rabuka_ps1::decks_card_blob::DECKS_CARD_BLOB;
 use rabuka_ps1::display::Display;
 use rabuka_ps1::input::{Button, Input};
 
@@ -63,71 +61,19 @@ impl<'a> platform_ui::PlatformUi for Ps1Ui<'a> {
     }
 }
 
-/// Normalize a card number to the canonical form used by deck lists
-/// (uppercase ASCII + halfwidth punctuation). cards.json stores some card_nos
-/// with fullwidth chars (＋, ！, －, ａ-ｚ); the blob keeps those raw, so match
-/// must fold them to ASCII too.
-fn normalize_blob_card_no(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for ch in s.chars() {
-        match ch {
-            'a'..='z' => out.push((ch as u8 - b'a' + b'A') as char),
-            'ａ'..='ｚ' => out.push((ch as u32 - 'ａ' as u32 + 'A' as u32) as u8 as char),
-            '０'..='９' => out.push((ch as u32 - '０' as u32 + '0' as u32) as u8 as char),
-            '＋' => out.push('+'),
-            '！' => out.push('!'),
-            '－' => out.push('-'),
-            _ => out.push(ch),
-        }
-    }
-    out
-}
-
-/// Build the union of two decks' cards directly from the engine's compact blob.
-fn load_deck_cards_from_blob(
+// The full card database (532KB) cannot live in RAM next to ~1.8MB of code/data.
+// The engine bakes a compact per-deck blob for each deck (15KB total for all 9);
+// load_two_decks() decodes only the two selected decks' cards, so RAM holds only
+// the cards actually in play. No CD read, no 532KB buffer, no baked subset.
+fn load_deck_cards(
     decks: &[rabuka_ps1::decks_baked::DeckInfo],
     idx1: usize,
     idx2: usize,
 ) -> Vec<Card> {
-    let mut wanted: alloc::collections::BTreeSet<String> = alloc::collections::BTreeSet::new();
-    for &idx in &[idx1, idx2] {
-        if idx < decks.len() {
-            for cn in decks[idx].cards {
-                wanted.insert(normalize_blob_card_no(cn));
-            }
-        }
-    }
-    let mut indices: Vec<usize> = Vec::with_capacity(wanted.len());
-    for i in 0..card_binary::blob_card_count() {
-        if wanted.is_empty() {
-            break;
-        }
-        let Some(card) = card_binary::decode_card_from_blob(i) else {
-            continue;
-        };
-        if wanted.remove(&normalize_blob_card_no(card.card_no.as_ref())) {
-            indices.push(i);
-        }
-    }
-    let mut cards: Vec<Card> = Vec::with_capacity(indices.len());
-    for idx in indices {
-        if let Some(card) = card_binary::decode_card_from_blob(idx) {
-            cards.push(card);
-        }
-    }
+    let mut cards = rabuka_engine::game::deck_parser::load_two_decks(idx1, idx2);
     CardLoader::attach_abilities(&mut cards);
+    let _ = (decks, idx1, idx2);
     cards
-}
-
-// The full card blob (532KB) cannot live in RAM next to ~1.8MB of code/data.
-// Instead the deck-card subset (only the 196 cards the baked decks use, ~12KB,
-// display-only strings omitted) is baked into the EXE's rodata and the engine's
-// card_binary decoder is pointed at it. No CD-ROM read, no 532KB static buffer.
-fn point_card_blob() {
-    unsafe {
-        card_binary::EXTERN_CARD_BLOB = DECKS_CARD_BLOB.as_ptr();
-        card_binary::EXTERN_CARD_BLOB_LEN = DECKS_CARD_BLOB.len();
-    }
 }
 
 #[no_mangle]
@@ -174,8 +120,7 @@ fn main() {
     display.clear();
     display.println("Loading cards...");
     display.swap_buffers();
-    point_card_blob();
-    let all_cards = load_deck_cards_from_blob(decks, deck1_idx, deck2_idx);
+    let all_cards = load_deck_cards(decks, deck1_idx, deck2_idx);
 
     display.println("Building DB...");
     display.swap_buffers();

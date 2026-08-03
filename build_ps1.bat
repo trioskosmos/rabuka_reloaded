@@ -5,19 +5,19 @@ REM Requirements:
 REM   - Rust nightly-2025-05-23 (rustup) with rust-src component
 REM   - cargo-psx  (cargo install --path research/ps1_rust/psx-sdk-rs/cargo-psx)
 REM   - psx-sdk-rs  (fetched as a git dependency of platforms/ps1)
-REM   - Python 3  (for tools\bake_ps1_decks.py)
+REM   - Python 3  (for tools\bake_deck_cards.py)
 REM
 REM Builds to C:\rust_targets\mipsel-sony-psx\release\rabuka_ps1.exe
 setlocal
 cd /d "%~dp0"
 
-REM Bake the deck-card subset blob (12KB) from cards.json + decks_baked.rs.
-REM Keeps platforms\ps1\src\decks_card_blob.rs in sync so the build can never
-REM silently use a stale subset.
-python tools\bake_ps1_decks.py
+REM Bake per-deck card data into the engine (from cards.json + web_ui\decks).
+REM Keeps engine\src\decks_cards_gen.rs in sync so load_two_decks() always has
+REM the right cards for the selected decks.
+python tools\bake_deck_cards.py
 if errorlevel 1 (
     echo.
-    echo FAILED: tools\bake_ps1_decks.py
+    echo FAILED: tools\bake_deck_cards.py
     exit /b 1
 )
 

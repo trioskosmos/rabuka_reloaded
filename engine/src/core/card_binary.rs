@@ -133,9 +133,11 @@ fn find_string_index_by_no(card_no: &str) -> Option<usize> {
     None
 }
 
-pub fn decode_card_from_blob(idx: usize) -> Option<Card> {
-    let offset = card_data_offset(idx)?;
-    let data = &blob()[offset..];
+/// Decode a single card from a raw record using a string resolver.
+/// The record is a CARD-format card record; `get_str` resolves strtab indices.
+fn decode_card_from_record(rec: &[u8], strtab: &[u8]) -> Option<Card> {
+    let data = rec;
+    let get_str = |idx: u16| get_str_from_strtab(strtab, idx);
 
     if data.len() < 20 {
         return None;
@@ -294,6 +296,66 @@ pub fn decode_card_from_blob(idx: usize) -> Option<Card> {
         faq: Vec::new(),
         abilities: Vec::new(),
     })
+}
+
+/// Decode a single card from the active blob (embedded const or runtime buffer).
+pub fn decode_card_from_blob(idx: usize) -> Option<Card> {
+    let offset = card_data_offset(idx)?;
+    let data = &blob()[offset..];
+    let (_num, strtab_len, strtab_start, _, _) = parse_header()?;
+    let strtab_end = strtab_start + strtab_len as usize;
+    decode_card_from_record(data, &blob()[strtab_start..strtab_end])
+}
+
+/// Walk a length-prefixed (u16) strtab slice and return string `idx` (0 = "").
+fn get_str_from_strtab(strtab: &[u8], idx: u16) -> &str {
+    let mut pos = 0usize;
+    for _ in 0..idx {
+        if pos + 2 > strtab.len() {
+            return "";
+        }
+        let len = u16::from_le_bytes([strtab[pos], strtab[pos + 1]]) as usize;
+        pos += 2 + len;
+    }
+    if pos + 2 > strtab.len() {
+        return "";
+    }
+    let len = u16::from_le_bytes([strtab[pos], strtab[pos + 1]]) as usize;
+    pos += 2;
+    if pos + len > strtab.len() {
+        return "";
+    }
+    core::str::from_utf8(&strtab[pos..pos + len]).unwrap_or("")
+}
+
+/// Decode every card from a self-contained CARD-format blob slice. Does not use
+/// the active blob/global, so `load_two_decks` can decode just the two selected
+/// decks' cards from the engine-baked per-deck blobs.
+pub fn decode_all_cards_from_slice(blob_slice: &[u8]) -> Vec<Card> {
+    if blob_slice.len() < 10 || &blob_slice[0..4] != MAGIC {
+        return Vec::new();
+    }
+    let num_cards = u16::from_le_bytes([blob_slice[4], blob_slice[5]]) as usize;
+    let strtab_len =
+        u32::from_le_bytes(blob_slice[6..10].try_into().unwrap_or([0, 0, 0, 0])) as usize;
+    let length_start = 10 + strtab_len;
+    let data_start = length_start + num_cards;
+    if blob_slice.len() < data_start {
+        return Vec::new();
+    }
+    let strtab = &blob_slice[10..length_start];
+
+    let mut out = Vec::with_capacity(num_cards);
+    let mut start = data_start;
+    for idx in 0..num_cards {
+        let len = blob_slice[length_start + idx] as usize;
+        let end = (start + len).min(blob_slice.len());
+        if let Some(card) = decode_card_from_record(&blob_slice[start..end], strtab) {
+            out.push(card);
+        }
+        start = end;
+    }
+    out
 }
 
 fn parse_hearts(data: &[u8], count: usize) -> HeartMap {
