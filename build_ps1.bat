@@ -10,6 +10,10 @@ REM Builds to C:\rust_targets\mipsel-sony-psx\release\rabuka_ps1.exe
 setlocal
 cd /d "%~dp0platforms\ps1"
 
+REM Fat LTO + size opt shrink the MIPS code enough to fit PS1's 2MB RAM
+REM (without it, .text alone overflows the region).
+set RUSTFLAGS=-Copt-level=z -Clto=fat -Cembed-bitcode=yes -Ccodegen-units=1
+
 cargo psx build
 if errorlevel 1 (
     echo.
