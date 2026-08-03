@@ -27,7 +27,7 @@ pub fn execute_received_action(gs: &mut GameState, sync: &uds::ActionSync) {
             | game_setup::ActionType::PaperChoice
             | game_setup::ActionType::ScissorsChoice
     ) {
-        gs.pending_rps_player_id = Some(sync.player_id as i32);
+        gs.pending_rps_player_id = Some(sync.player_id);
     }
     let _ = turn::TurnEngine::execute_main_phase_action_with_ability_index(
         gs,
@@ -123,7 +123,7 @@ pub fn route_authoritative_action(
         let bytes = sync.to_bytes();
         *pending_client_action = Some(bytes.clone());
         let _ = uds::uds_send(&bytes);
-        *waiting_for_opponent = !mp_can_act(gs, my_id);
+        *waiting_for_opponent = !mp_can_act(gs, my_id as i32);
     }
     true
 }
