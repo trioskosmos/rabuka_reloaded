@@ -1823,8 +1823,6 @@ version = "0.1.0"
 dependencies = [
  "log",
  "rabuka_engine",
- "serde",
- "serde_json",
 ]
 
 [[package]]

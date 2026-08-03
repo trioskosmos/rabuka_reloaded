@@ -119,3 +119,13 @@ test = false
 name = "ppo_collect"
 path = "src/bin/ppo_collect.rs"
 test = false
+
+[[bin]]
+name = "test_hang"
+path = "src/bin/test_hang.rs"
+test = false
+
+[[bin]]
+name = "trace_game"
+path = "src/bin/trace_game.rs"
+test = false

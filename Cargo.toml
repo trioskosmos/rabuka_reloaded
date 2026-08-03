@@ -26,7 +26,6 @@ codegen-units = 16
 debug = true
 
 # Default release profile. Platform-specific overrides via env vars:
-#   DS:   CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=true CARGO_PROFILE_RELEASE_STRIP=true CARGO_PROFILE_RELEASE_PANIC=abort CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo build -p rabuka_ds --release
 #   3DS:  CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 cargo build -p rabuka_3ds --release
 #   PSP:  CARGO_PROFILE_RELEASE_LTO=true CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 cargo build -p rabuka_psp --release
 #   Wii:  CARGO_PROFILE_RELEASE_PANIC=abort cargo build -p rabuka_wii --release

@@ -26,6 +26,19 @@ pub trait PlatformUi {
 
 /// AI turn: pick a random action and execute it.
 pub fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
+    use crate::game_setup::ActionType;
+    // Mulligan phases MUST be concluded, otherwise the AI can keep toggling
+    // card selections forever and the game can never reach the main phase.
+    // Prefer a Confirm/Skip over the per-card Select actions.
+    for a in acts {
+        if matches!(
+            a.action_type,
+            ActionType::ConfirmMulligan | ActionType::SkipMulligan
+        ) {
+            let _ = game_setup::execute_action(gs, a);
+            return true;
+        }
+    }
     let _ = game_setup::execute_action(gs, &acts[crate::rng::rand_range(acts.len())]);
     true
 }

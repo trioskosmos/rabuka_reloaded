@@ -52,63 +52,55 @@ mod inner {
 mod inner {
     use super::{AbilityLogItem, ABILITY_DEBUG};
     use core::sync::atomic::Ordering;
-    use std::sync::Mutex;
+    use std::cell::RefCell;
 
-    static VERDICT_BUFFER: Mutex<Vec<AbilityLogItem>> = Mutex::new(Vec::new());
+    thread_local! {
+        static VERDICT_BUFFER: RefCell<Vec<AbilityLogItem>> = RefCell::new(Vec::new());
+    }
+
+    fn with_buffer<R>(f: impl FnOnce(&mut Vec<AbilityLogItem>) -> R) -> R {
+        VERDICT_BUFFER.with(|buf| f(&mut buf.borrow_mut()))
+    }
 
     pub fn push_verdict(item: AbilityLogItem) {
         if !ABILITY_DEBUG.load(Ordering::Relaxed) {
             return;
         }
-        if let Ok(mut buf) = VERDICT_BUFFER.lock() {
-            buf.push(item);
-        }
+        with_buffer(|buf| buf.push(item));
     }
 
     pub fn drain_verdicts() -> Vec<AbilityLogItem> {
         if !ABILITY_DEBUG.load(Ordering::Relaxed) {
             return vec![];
         }
-        if let Ok(mut buf) = VERDICT_BUFFER.lock() {
-            buf.drain(..).collect()
-        } else {
-            vec![]
-        }
+        with_buffer(|buf| buf.drain(..).collect())
     }
 
     pub fn buffer_len() -> usize {
         if !ABILITY_DEBUG.load(Ordering::Relaxed) {
             return 0;
         }
-        if let Ok(buf) = VERDICT_BUFFER.lock() {
-            buf.len()
-        } else {
-            0
-        }
+        with_buffer(|buf| buf.len())
     }
 
     pub fn drain_verdicts_since(start_index: usize) -> Vec<AbilityLogItem> {
         if !ABILITY_DEBUG.load(Ordering::Relaxed) {
             return vec![];
         }
-        if let Ok(mut buf) = VERDICT_BUFFER.lock() {
+        with_buffer(|buf| {
             if start_index < buf.len() {
                 buf.drain(start_index..).collect()
             } else {
                 vec![]
             }
-        } else {
-            vec![]
-        }
+        })
     }
 
     pub fn clear_verdicts() {
         if !ABILITY_DEBUG.load(Ordering::Relaxed) {
             return;
         }
-        if let Ok(mut buf) = VERDICT_BUFFER.lock() {
-            buf.clear();
-        }
+        with_buffer(|buf| buf.clear());
     }
 }
 

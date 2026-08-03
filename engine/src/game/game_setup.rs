@@ -369,7 +369,6 @@ pub fn execute_action(gs: &mut GameState, action: &Action) -> Result<(), String>
 
 /// Run a quick AI-vs-AI test game using the given cards and deck lists.
 /// Returns the number of actions executed, or an error string.
-#[cfg(not(feature = "no_std"))]
 pub fn test_ai_vs_ai(
     cards: &[crate::card::Card],
     d1: &crate::deck_parser::DeckList,
@@ -377,10 +376,10 @@ pub fn test_ai_vs_ai(
     max_turns: u8,
 ) -> Result<usize, String> {
     use crate::card::CardDatabase;
+    use crate::compat::Arc;
     use crate::deck_parser::DeckParser;
     use crate::game::deck_builder::DeckBuilder;
     use crate::player::Player;
-    use std::sync::Arc;
 
     let mut db = Arc::new(CardDatabase::load_or_create(cards.to_vec()));
     let n1 = DeckParser::deck_list_to_card_numbers(d1);
@@ -1277,8 +1276,10 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
             .with_ja("パス - メインフェーズ終了")];
 
     if !game_state.is_action_prohibited("play_member") {
-        // Rule 7.7.2.2: Main Phase - Can play member cards to stage
-        let estimated = active_player.hand.cards.len() * 3 + 1;
+        // Rule 7.7.2.2: Main Phase - Can play member cards to stage.
+        // Bound the reserve so the largest burst right at the Main boundary
+        // can't over-allocate past the 4MB DS heap before settling.
+        let estimated = (active_player.hand.cards.len() * 3 + 1).min(64);
         actions.reserve(estimated);
 
         // Cache stage card data: read once, not once per hand card

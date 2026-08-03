@@ -1,7 +1,10 @@
-[target.armv5te-nintendo-ds]
-linker = "C:\\devkitPro\\devkitARM\\bin\\arm-none-eabi-gcc.exe"
-rustflags = [
-    "-C", "link-arg=-specs=C:/devkitPro/calico/share/ds9-large.specs",
-    "-C", "link-arg=-Wl,--allow-multiple-definition",
-    "-Zunstable-options",
-]
+[build]
+target = ".cargo/armv5te-nintendo-ds-newlibeabi.json"
+
+[unstable]
+build-std = ["core", "compiler_builtins", "alloc"]
+build-std-features = ["compiler-builtins-mem"]
+
+[target.armv5te-nintendo-ds-newlibeabi]
+rustflags = [ "--cfg", "portable_atomic_no_outline_atomics" ]
+linker = "arm-none-eabi-gcc"

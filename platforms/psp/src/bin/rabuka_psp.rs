@@ -298,7 +298,7 @@ fn run_on_device_tests(display: &mut Display, input: &mut Input) {
 }
 
 fn test_ai_vs_ai_psp() -> Result<usize, alloc::string::String> {
-    let decks: Vec<rabuka_engine::deck_parser::DeckEntry> =
+    let decks: Vec<DeckEntry> =
         serde_json::from_str(DECKS_JSON).map_err(|e| alloc::format!("JSON: {}", e))?;
     if decks.len() < 2 {
         return Err("need 2+ decks".into());
@@ -307,21 +307,20 @@ fn test_ai_vs_ai_psp() -> Result<usize, alloc::string::String> {
     let mut all_cards = deck_parser::load_two_decks(0, 1);
     CardLoader::attach_abilities(&mut all_cards);
 
-    // Build DeckList from DeckEntry
-    let to_deck_list =
-        |e: &rabuka_engine::deck_parser::DeckEntry| -> rabuka_engine::deck_parser::DeckList {
-            rabuka_engine::deck_parser::DeckList {
-                name: e.name.clone(),
-                entries: e
-                    .cards
-                    .iter()
-                    .map(|c| rabuka_engine::deck_parser::DeckEntry {
-                        card_no: c.clone(),
-                        quantity: 1,
-                    })
-                    .collect(),
-            }
-        };
+    // Build DeckList from DeckListEntry
+    let to_deck_list = |e: &DeckEntry| -> rabuka_engine::deck_parser::DeckList {
+        rabuka_engine::deck_parser::DeckList {
+            name: e.name.clone(),
+            entries: e
+                .cards
+                .iter()
+                .map(|c| rabuka_engine::deck_parser::DeckEntry {
+                    card_no: c.clone(),
+                    quantity: 1,
+                })
+                .collect(),
+        }
+    };
     let dl1 = to_deck_list(&decks[0]);
     let dl2 = to_deck_list(&decks[1]);
     rabuka_engine::game_setup::test_ai_vs_ai(&all_cards, &dl1, &dl2, 5).map_err(|e| e.into())

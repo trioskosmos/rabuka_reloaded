@@ -11,6 +11,7 @@ use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
+use rabuka_engine::types::GameResult;
 
 #[allow(dead_code)]
 fn build_game(json_str: &str) -> Result<GameState, String> {
@@ -36,7 +37,6 @@ fn build_game(json_str: &str) -> Result<GameState, String> {
 }
 
 #[test]
-#[cfg(not(feature = "bytecode_abilities"))]
 fn load_and_play() {
     let json_str = std::fs::read_to_string("../cards/cards.json").expect("cards.json not found");
     eprintln!("cards: {} KB", json_str.len() / 1024,);

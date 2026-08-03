@@ -25,6 +25,12 @@ pub struct Timer {
 
 impl Timer {
     pub fn start(label: &'static str) -> Self {
+        if !cfg!(feature = "profiling") {
+            return Timer {
+                label,
+                start: Instant::now(),
+            };
+        }
         if let Ok(mut stack) = CALL_STACK.lock() {
             stack.push(label);
         }
@@ -37,6 +43,9 @@ impl Timer {
 
 impl Drop for Timer {
     fn drop(&mut self) {
+        if !cfg!(feature = "profiling") {
+            return;
+        }
         let elapsed = self.start.elapsed().as_nanos();
 
         // Reconstruct the full call path (entire stack at this moment)
