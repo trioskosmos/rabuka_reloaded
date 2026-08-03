@@ -1,5 +1,30 @@
 use super::card::{BaseHeart, BladeHeart, Card, CardType, HeartColor, HeartMap, SpecialHeart};
+#[cfg(not(feature = "external_card_data"))]
 use super::cards_gen::{CARD_BLOB, CARD_STRINGS};
+
+// PS1: the card blob is loaded from the CD at runtime (2MB RAM can't hold it
+// baked). The platform fills these before decoding; the embedded const is not
+// referenced on external-card-data builds so it is dead-stripped.
+#[cfg(feature = "external_card_data")]
+pub static mut EXTERN_CARD_BLOB: *const u8 = core::ptr::null();
+#[cfg(feature = "external_card_data")]
+pub static mut EXTERN_CARD_BLOB_LEN: usize = 0;
+
+/// The active card blob: the embedded const, or the runtime-loaded buffer.
+#[inline]
+fn blob() -> &'static [u8] {
+    #[cfg(feature = "external_card_data")]
+    unsafe {
+        if !EXTERN_CARD_BLOB.is_null() {
+            return core::slice::from_raw_parts(EXTERN_CARD_BLOB, EXTERN_CARD_BLOB_LEN);
+        }
+        return &[];
+    }
+    #[cfg(not(feature = "external_card_data"))]
+    {
+        CARD_BLOB
+    }
+}
 use crate::core::types::ArcStr;
 use crate::{HashMap, HashSet};
 #[cfg(feature = "no_std")]
@@ -11,11 +36,11 @@ const MAGIC: &[u8; 4] = b"CARD";
 /// Header: magic(4) + num_cards(u16) + strtab_len(u32). Then strtab, then a u8
 /// per-card length table, then card data. Card starts are prefix sums of lengths.
 fn parse_header() -> Option<(u32, u32, usize, usize, usize)> {
-    if CARD_BLOB.len() < 10 || &CARD_BLOB[0..4] != MAGIC {
+    if blob().len() < 10 || &blob()[0..4] != MAGIC {
         return None;
     }
-    let num_cards = u16::from_le_bytes(CARD_BLOB[4..6].try_into().ok()?) as u32;
-    let strtab_len = u32::from_le_bytes(CARD_BLOB[6..10].try_into().ok()?);
+    let num_cards = u16::from_le_bytes(blob()[4..6].try_into().ok()?) as u32;
+    let strtab_len = u32::from_le_bytes(blob()[6..10].try_into().ok()?);
     let strtab_start = 10;
     let length_start = strtab_start + strtab_len as usize;
     let data_start = length_start + num_cards as usize;
@@ -35,7 +60,7 @@ fn card_data_offset(idx: usize) -> Option<usize> {
     if idx >= num_cards as usize {
         return None;
     }
-    let lengths = &CARD_BLOB[length_start..length_start + num_cards as usize];
+    let lengths = &blob()[length_start..length_start + num_cards as usize];
     let mut start = 0usize;
     for &len in &lengths[..idx] {
         start += len as usize;
@@ -43,18 +68,74 @@ fn card_data_offset(idx: usize) -> Option<usize> {
     Some(data_start + start)
 }
 
-/// Get string from CARD_STRINGS by index (0 = empty string).
+/// Get string by index from the card string table (0 = empty string).
 fn get_str(idx: u16) -> &'static str {
-    if (idx as usize) < CARD_STRINGS.len() {
-        CARD_STRINGS[idx as usize]
-    } else {
-        ""
+    #[cfg(feature = "external_card_data")]
+    {
+        get_str_from_blob(idx)
     }
+    #[cfg(not(feature = "external_card_data"))]
+    {
+        if (idx as usize) < CARD_STRINGS.len() {
+            CARD_STRINGS[idx as usize]
+        } else {
+            ""
+        }
+    }
+}
+
+/// Parse a length-prefixed (u16) string from the blob's strtab.
+#[cfg(feature = "external_card_data")]
+fn get_str_from_blob(idx: u16) -> &'static str {
+    let b = blob();
+    let (_num, strtab_len, strtab_start, _, _) = match parse_header() {
+        Some(h) => h,
+        None => return "",
+    };
+    let strtab_end = strtab_start + strtab_len as usize;
+    let mut pos = strtab_start;
+    for _ in 0..idx {
+        if pos + 2 > strtab_end {
+            return "";
+        }
+        let len = u16::from_le_bytes([b[pos], b[pos + 1]]) as usize;
+        pos += 2 + len;
+    }
+    if pos + 2 > strtab_end {
+        return "";
+    }
+    let len = u16::from_le_bytes([b[pos], b[pos + 1]]) as usize;
+    pos += 2;
+    if pos + len > strtab_end {
+        return "";
+    }
+    core::str::from_utf8(&b[pos..pos + len]).unwrap_or("")
+}
+
+/// Find a string's index in the blob strtab (external mode).
+#[cfg(feature = "external_card_data")]
+fn find_string_index_by_no(card_no: &str) -> Option<usize> {
+    let b = blob();
+    let (_num, strtab_len, strtab_start, _, _) = parse_header()?;
+    let strtab_end = strtab_start + strtab_len as usize;
+    let mut pos = strtab_start;
+    let mut idx = 0usize;
+    while pos + 2 <= strtab_end {
+        let len = u16::from_le_bytes([b[pos], b[pos + 1]]) as usize;
+        pos += 2;
+        let end = (pos + len).min(strtab_end);
+        if core::str::from_utf8(&b[pos..end]).ok() == Some(card_no) {
+            return Some(idx);
+        }
+        pos = end;
+        idx += 1;
+    }
+    None
 }
 
 pub fn decode_card_from_blob(idx: usize) -> Option<Card> {
     let offset = card_data_offset(idx)?;
-    let data = &CARD_BLOB[offset..];
+    let data = &blob()[offset..];
 
     if data.len() < 20 {
         return None;
@@ -282,6 +363,9 @@ pub fn blob_card_count() -> usize {
 /// Linear scan — use sparingly. For GBA, pre-resolve deck card indices at boot.
 pub fn find_card_index_by_no(card_no: &str) -> Option<usize> {
     let (_num_cards, _strtab_len, _strtab_start, _length_start, _data_start) = parse_header()?;
+    #[cfg(feature = "external_card_data")]
+    let idx = find_string_index_by_no(card_no)?;
+    #[cfg(not(feature = "external_card_data"))]
     let idx = CARD_STRINGS.iter().position(|s| *s == card_no)?;
     // idx 0 is the empty string, skip it
     if idx == 0 {
@@ -289,10 +373,10 @@ pub fn find_card_index_by_no(card_no: &str) -> Option<usize> {
     }
     // String found, now find which card references it
     let (num_cards, _strtab_len, _strtab_start, length_start, data_start) = parse_header()?;
-    let lengths = &CARD_BLOB[length_start..length_start + num_cards as usize];
+    let lengths = &blob()[length_start..length_start + num_cards as usize];
     let mut start = 0usize;
     for (i, &len) in lengths.iter().enumerate() {
-        let card_data = &CARD_BLOB[data_start + start..];
+        let card_data = &blob()[data_start + start..];
         if card_data.len() >= 2 {
             let card_no_idx = u16::from_le_bytes(card_data[0..2].try_into().ok()?);
             if card_no_idx as usize == idx {

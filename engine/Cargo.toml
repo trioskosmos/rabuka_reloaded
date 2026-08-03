@@ -49,7 +49,7 @@ psp = ["no_std", "debug_conditions", "bytecode_abilities"]
 ds = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
 ds_debug = ["ds"]
 # PS1 target: no_std + alloc, compact like DS (2MB RAM; card data streams from CD)
-ps1 = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
+ps1 = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state", "external_card_data"]
 # Dreamcast target: no_std + alloc via KallistiOS + rustc_codegen_gcc
 dc = ["no_std", "debug_conditions"]
 # Wii target: no_std + alloc via devkitPPC + libogc
@@ -63,6 +63,9 @@ compact_cards = []
 # Compact card data: embeds a binary card blob in rodata and loads only deck
 # cards into RAM. Dramatically reduces RAM for embedded/console targets (GBA).
 compact_card_data = []
+# PS1: card blob is loaded from the CD at runtime (2MB RAM can't hold it baked).
+# card_binary reads the blob from platform-provided statics set after loading.
+external_card_data = []
 # Compact GameState: caps log/application Vecs to bounded sizes instead of
 # unbounded accumulation. Reduces GameState RAM by ~80%+ for console targets.
 compact_state = []

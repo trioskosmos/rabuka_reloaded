@@ -109,6 +109,35 @@ fn load_deck_cards_from_blob(
     cards
 }
 
+// The card blob lives on the CD (2MB RAM can't hold it baked). Load it into a
+// static buffer once at boot, then point card_binary at it.
+static mut CARD_BUF: [u32; (CARD_BLOB_SIZE + 3) / 4] = [0; (CARD_BLOB_SIZE + 3) / 4];
+const CARD_BLOB_SIZE: usize = 532_378;
+
+fn load_card_blob_from_cd() -> bool {
+    use psx::sys::fs::{File, CDROM};
+    let file = match File::<CDROM>::open("cdrom:\\CARDDATA.BIN") {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+    let buf: &mut [u8] = unsafe {
+        core::slice::from_raw_parts_mut(CARD_BUF.as_mut_ptr() as *mut u8, CARD_BUF.len() * 4)
+    };
+    let mut read_total = 0usize;
+    while read_total < buf.len() {
+        let want = core::cmp::min(2048, buf.len() - read_total);
+        match file.read(&mut buf[read_total..read_total + want]) {
+            Ok(n) if n > 0 => read_total += n,
+            _ => break,
+        }
+    }
+    unsafe {
+        card_binary::EXTERN_CARD_BLOB = CARD_BUF.as_ptr() as *const u8;
+        card_binary::EXTERN_CARD_BLOB_LEN = read_total;
+    }
+    read_total > 0
+}
+
 #[no_mangle]
 fn main() {
     let mut display = Display::new();
@@ -149,6 +178,18 @@ fn main() {
         };
         platform_ui::select(&mut ui, &deck_names, "P2 Deck")
     };
+
+    display.clear();
+    display.println("Loading card data...");
+    display.swap_buffers();
+    let blob_ok = load_card_blob_from_cd();
+    if !blob_ok {
+        display.println("ERROR: no carddata.bin on disc");
+        display.swap_buffers();
+        loop {
+            display.swap_buffers();
+        }
+    }
 
     display.clear();
     display.println("Loading cards...");

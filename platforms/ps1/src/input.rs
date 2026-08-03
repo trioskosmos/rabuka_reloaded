@@ -33,7 +33,10 @@ impl Input {
     }
 
     pub fn poll(&mut self) {
-        self.prev = core::mem::replace(&mut self.curr, self.gamepad.poll_p1().collect::<Vec<PsxButton>>());
+        self.prev = core::mem::replace(
+            &mut self.curr,
+            self.gamepad.poll_p1().collect::<Vec<PsxButton>>(),
+        );
     }
 
     pub fn just_pressed(&self, btn: Button) -> bool {

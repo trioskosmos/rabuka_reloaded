@@ -65,3 +65,6 @@ engine/rustc-ice-*.txt
 
 # scratch
 hf_temp/
+
+# ps1 iso tool binaries
+/tools/mkpsxiso/
