@@ -21,6 +21,7 @@ use rabuka_engine::rng;
 use rabuka_engine::turn::TurnEngine;
 
 use rabuka_ps1::decks_baked::DECKS;
+use rabuka_ps1::decks_card_blob::DECKS_CARD_BLOB;
 use rabuka_ps1::display::Display;
 use rabuka_ps1::input::{Button, Input};
 
@@ -62,11 +63,20 @@ impl<'a> platform_ui::PlatformUi for Ps1Ui<'a> {
     }
 }
 
+/// Normalize a card number to the canonical form used by deck lists
+/// (uppercase ASCII + halfwidth punctuation). cards.json stores some card_nos
+/// with fullwidth chars (＋, ！, －, ａ-ｚ); the blob keeps those raw, so match
+/// must fold them to ASCII too.
 fn normalize_blob_card_no(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for ch in s.chars() {
         match ch {
             'a'..='z' => out.push((ch as u8 - b'a' + b'A') as char),
+            'ａ'..='ｚ' => out.push((ch as u32 - 'ａ' as u32 + 'A' as u32) as u8 as char),
+            '０'..='９' => out.push((ch as u32 - '０' as u32 + '0' as u32) as u8 as char),
+            '＋' => out.push('+'),
+            '！' => out.push('!'),
+            '－' => out.push('-'),
             _ => out.push(ch),
         }
     }
@@ -89,7 +99,7 @@ fn load_deck_cards_from_blob(
     }
     let mut indices: Vec<usize> = Vec::with_capacity(wanted.len());
     for i in 0..card_binary::blob_card_count() {
-        if indices.len() == wanted.len() {
+        if wanted.is_empty() {
             break;
         }
         let Some(card) = card_binary::decode_card_from_blob(i) else {
@@ -109,33 +119,15 @@ fn load_deck_cards_from_blob(
     cards
 }
 
-// The card blob lives on the CD (2MB RAM can't hold it baked). Load it into a
-// static buffer once at boot, then point card_binary at it.
-static mut CARD_BUF: [u32; (CARD_BLOB_SIZE + 3) / 4] = [0; (CARD_BLOB_SIZE + 3) / 4];
-const CARD_BLOB_SIZE: usize = 532_378;
-
-fn load_card_blob_from_cd() -> bool {
-    use psx::sys::fs::{File, CDROM};
-    let file = match File::<CDROM>::open("cdrom:\\CARDDATA.BIN") {
-        Ok(f) => f,
-        Err(_) => return false,
-    };
-    let buf: &mut [u8] = unsafe {
-        core::slice::from_raw_parts_mut(CARD_BUF.as_mut_ptr() as *mut u8, CARD_BUF.len() * 4)
-    };
-    let mut read_total = 0usize;
-    while read_total < buf.len() {
-        let want = core::cmp::min(2048, buf.len() - read_total);
-        match file.read(&mut buf[read_total..read_total + want]) {
-            Ok(n) if n > 0 => read_total += n,
-            _ => break,
-        }
-    }
+// The full card blob (532KB) cannot live in RAM next to ~1.8MB of code/data.
+// Instead the deck-card subset (only the 196 cards the baked decks use, ~12KB,
+// display-only strings omitted) is baked into the EXE's rodata and the engine's
+// card_binary decoder is pointed at it. No CD-ROM read, no 532KB static buffer.
+fn point_card_blob() {
     unsafe {
-        card_binary::EXTERN_CARD_BLOB = CARD_BUF.as_ptr() as *const u8;
-        card_binary::EXTERN_CARD_BLOB_LEN = read_total;
+        card_binary::EXTERN_CARD_BLOB = DECKS_CARD_BLOB.as_ptr();
+        card_binary::EXTERN_CARD_BLOB_LEN = DECKS_CARD_BLOB.len();
     }
-    read_total > 0
 }
 
 #[no_mangle]
@@ -180,20 +172,9 @@ fn main() {
     };
 
     display.clear();
-    display.println("Loading card data...");
-    display.swap_buffers();
-    let blob_ok = load_card_blob_from_cd();
-    if !blob_ok {
-        display.println("ERROR: no carddata.bin on disc");
-        display.swap_buffers();
-        loop {
-            display.swap_buffers();
-        }
-    }
-
-    display.clear();
     display.println("Loading cards...");
     display.swap_buffers();
+    point_card_blob();
     let all_cards = load_deck_cards_from_blob(decks, deck1_idx, deck2_idx);
 
     display.println("Building DB...");

@@ -1,9 +1,15 @@
 # Rabuka PS1 — RAM Fit Audit & Plan
 
-Status of the PS1 port as of 2026-08-04: **the current build does not link.** This
-document records the measured numbers, why the bytecode work didn't make the port
-"just fit", what the advanced PS1 homebrew actually do, and the concrete plan to
-make `build_ps1.bat` produce a game that runs.
+Status as of 2026-08-04: the port **now links and fits**. This document records
+the measured numbers, why the bytecode work didn't make the port "just fit",
+what the advanced PS1 homebrew actually do, the concrete plan, what was
+implemented, and the remaining next steps.
+
+**TL;DR of the fix:** the 532 KB full card blob was replaced with a baked
+**12 KB deck-card subset** (only the 196 unique cards the 9 decks use, with
+display-only strings stripped). Combined with a right-sized 192 KB heap the
+build went from a 563 KB `.bss` overflow to fitting in 1,961 KB of the
+2,031 KB available. Two real bugs surfaced and were fixed along the way (see §4.2).
 
 ---
 
@@ -138,11 +144,31 @@ So two cuts, not one: subset to the 196 deck cards **and** have the generator
 skip the display-only strings on console targets (`compact_cards` proves they
 are never decoded). That lands at ~11 KB in `.rodata`.
 
+**Implemented:** `tools/bake_ps1_decks.py` emits
+`platforms/ps1/src/decks_card_blob.rs` (+ `.bin`) — 196 cards, 12,011 bytes —
+and `rabuka_ps1.rs` points `card_binary::EXTERN_CARD_BLOB` at it at boot. The
+CD-ROM read and the 532 KB `CARD_BUF` static are gone.
+
+#### Two real bugs found while validating the subset
+
+1. **Half the deck cards silently didn't load.** `load_deck_cards_from_blob`
+   (shared by the PS1 and DS ports) used `if indices.len() == wanted.len()`
+   as the scan-break test while `wanted` was being drained by `.remove()`.
+   Those two lengths are equal at exactly **half** the wanted count, so only
+   ~20 of 40 cards made it into the DB. Fixed to `if wanted.is_empty()`.
+2. **36 of 196 cards never matched.** cards.json stores some card_nos with
+   fullwidth chars (`PL!SP-bp1-003-r＋`); the runtime normalizer only
+   uppercased ASCII `a-z`, so `+`-suffixed deck numbers never matched. The
+   normalizer now folds fullwidth `＋ ！ － ａ-ｚ ０-９` to ASCII in both ports.
+
 ### 4.2 Right-size the heap (arena model)
 
 `sys_heap!(256 KB)` is a static in `.bss`. doukutsupsx runs Cave Story on a 16 KB
-malloc + arena. Measure the real peak allocation of a match and size the heap to
-it (likely 32–64 KB for a card game state machine). Saves **~192–224 KB**.
+malloc + arena. A host-side bounded-heap test of the real load+match path
+(`hf_temp/ps1_heap_test`, capping allocator) measured **187 KB peak** with
+64-bit host pointers; the 32-bit PS1 uses less. `sys_heap!` is now **192 KB** —
+the largest that keeps ~22 KB between heap top and the stack at `0x801fff00`.
+Saves **64 KB** of `.bss` versus the original 256 KB.
 
 ### 4.3 Attack `.data`/`.text` if the first two aren't enough
 
@@ -161,23 +187,60 @@ mandatory, not optional:
   result screens into an overlay loaded from CD over a shared region
   (doukutsupsx's `cpe.ld` pattern). The match loop itself stays resident.
 
-### 4.4 Expected result
+### 4.4 Result (implemented)
+
+What 4.1 + 4.2 + the matching fixes delivered, measured from the final ELF:
 
 ```
-.text   999 KB   (code, maybe less after 4.3)
-.data   759 KB   (maybe ~300 KB after 4.3)
-.bss   ~260 KB   (heap 64 KB + statics; no card blob)
-total  ~2018 KB  →  under 2,031 KB with real slack for the stack
+.text   998 KB   (MIPS code)
+.data   771 KB   (includes the 12 KB baked deck-card blob)
+.bss    192 KB   (right-sized sys_heap!)
+total 1,961 KB  →  70 KB slack, ~22 KB of it between heap and stack
 ```
 
 `build_ps1.bat` stays: `cargo psx build` → copy EXE to `output_ps1/rabuka.ps-exe`
 → DuckStation fastboot. No ISO, no CD-ROM reads, no 532 KB anywhere in RAM.
 
-## 5. Validation
+## 5. Validation (done + remaining)
 
-1. `build_ps1.bat` links (currently fails).
-2. Parse the PS-X EXE header: `load_size + bss < 0x200000 − 0x10000`.
-3. Boot in DuckStation: mode select → deck select → a full AI vs AI match plays
-   to completion without heap exhaustion or fault.
-4. `objdump -h` the ELF (build with `cargo psx build --elf`) to confirm section
-   sizes against the table above.
+Done:
+
+1. `cargo psx build` links cleanly (was: `.bss` overflowed by 563 KB).
+2. `objdump -h` on the ELF: text 998 KB / data 771 KB / bss 192 KB; EXE load
+   image ends at `0x801ca800`, heap ends ~`0x801fa8a0`, stack at `0x801fff00`.
+3. Host-side bounded-heap test of the exact load+match path
+   (`hf_temp/ps1_heap_test`, engine compiled with the PS1 feature set, deck
+   blob `include_bytes!`-ed): all 40 unique cards of decks 0+1 decode, DB +
+   decks + setup + turns run, **peak heap 187 KB** (64-bit host pointers;
+   the 32-bit PS1 uses less). Sized the PS1 heap at 192 KB with margin.
+
+Remaining (next steps):
+
+1. **Wire the blob bake into the build.** `platforms/ps1/src/decks_card_blob.rs`
+   is checked in and built from `cards.json` + `decks_baked.rs` by
+   `tools/bake_ps1_decks.py`. `build_ps1.bat` should run that tool before
+   `cargo psx build` so the subset stays in sync when decks/cards change.
+   (Note: `build_ps1.bat` currently crashes — the failure is in the build
+   itself, see §6.)
+2. **Boot in DuckStation** and play an AI vs AI match to completion on the
+   actual 32-bit heap. The 187 KB host peak is an upper bound; if the real
+   peak is far lower the heap can drop below 192 KB for more stack room.
+3. **Cut `.data`/`.text` further** (the §4.3 items) to buy headroom beyond the
+   current ~22 KB heap↔stack gap: gate the ability `describe` strings, split
+   the `execute_effect`/`evaluate_condition` match arms. This is what makes the
+   margin comfortable rather than tight.
+
+## 6. Known issue: build_ps1.bat crash
+
+`build_ps1.bat` fails at the `cargo psx build` step. The bat file itself is a
+thin wrapper; the crash is reproduced by running the cargo command directly
+with the bat's `RUSTFLAGS` from `platforms/ps1`. Likely causes to check next:
+a stale/missing `Cargo.lock` pin for the `psx-sdk-rs` git dep, the OneDrive
+path in `cd /d "%~dp0..."`, or the `cargo-psx` binary not being on `PATH`
+when the bat runs under a fresh shell. Debug with:
+
+```
+cd platforms\ps1
+set RUSTFLAGS=-Copt-level=z -Clto=fat -Cembed-bitcode=yes -Ccodegen-units=1
+cargo psx build
+```

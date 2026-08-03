@@ -63,11 +63,20 @@ impl<'a> platform_ui::PlatformUi for DsUi<'a> {
     }
 }
 
+/// Normalize a card number to the canonical form used by deck lists
+/// (uppercase ASCII + halfwidth punctuation). cards.json stores some card_nos
+/// with fullwidth chars (＋, ！, －, ａ-ｚ); the blob keeps those raw, so match
+/// must fold them to ASCII too.
 fn normalize_blob_card_no(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for ch in s.chars() {
         match ch {
             'a'..='z' => out.push((ch as u8 - b'a' + b'A') as char),
+            'ａ'..='ｚ' => out.push((ch as u32 - 'ａ' as u32 + 'A' as u32) as u8 as char),
+            '０'..='９' => out.push((ch as u32 - '０' as u32 + '0' as u32) as u8 as char),
+            '＋' => out.push('+'),
+            '！' => out.push('!'),
+            '－' => out.push('-'),
             _ => out.push(ch),
         }
     }
@@ -91,7 +100,7 @@ fn load_deck_cards_from_blob(
     }
     let mut indices: Vec<usize> = Vec::with_capacity(wanted.len());
     for i in 0..card_binary::blob_card_count() {
-        if indices.len() == wanted.len() {
+        if wanted.is_empty() {
             break;
         }
         let Some(card) = card_binary::decode_card_from_blob(i) else {
