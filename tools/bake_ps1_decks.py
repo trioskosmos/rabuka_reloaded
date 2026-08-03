@@ -21,7 +21,24 @@ import struct
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "cards"))
+
+def find_repo_root() -> Path:
+    """Locate the repo root robustly (Windows batch and MSYS mangle __file__
+    differently; also tolerate being run from the repo root with a bare name)."""
+    candidates = [Path.cwd()]
+    try:
+        candidates.append(Path(__file__).resolve().parent.parent)
+    except NameError:  # not set in some embedded invocations
+        pass
+    for start in candidates:
+        for p in [start, *start.parents]:
+            if (p / "cards" / "compile_cards.py").exists():
+                return p
+    return candidates[0]
+
+
+REPO = find_repo_root()
+sys.path.insert(0, str(REPO / "cards"))
 import compile_cards  # reuse encode_card / parse_hearts / HEART_COLORS
 
 # Default energy card the deck builder may add as filler.
@@ -108,7 +125,7 @@ def build_subset_blob(cards_dict: dict, wanted: set[str]) -> bytes:
 
 
 def main() -> None:
-    repo = Path(__file__).parent.parent
+    repo = REPO
     cards_json = repo / "cards" / "cards.json"
     decks_rs = repo / "platforms" / "ps1" / "src" / "decks_baked.rs"
     out_rs = repo / "platforms" / "ps1" / "src" / "decks_card_blob.rs"

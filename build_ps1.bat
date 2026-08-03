@@ -5,10 +5,23 @@ REM Requirements:
 REM   - Rust nightly-2025-05-23 (rustup) with rust-src component
 REM   - cargo-psx  (cargo install --path research/ps1_rust/psx-sdk-rs/cargo-psx)
 REM   - psx-sdk-rs  (fetched as a git dependency of platforms/ps1)
+REM   - Python 3  (for tools\bake_ps1_decks.py)
 REM
 REM Builds to C:\rust_targets\mipsel-sony-psx\release\rabuka_ps1.exe
 setlocal
-cd /d "%~dp0platforms\ps1"
+cd /d "%~dp0"
+
+REM Bake the deck-card subset blob (12KB) from cards.json + decks_baked.rs.
+REM Keeps platforms\ps1\src\decks_card_blob.rs in sync so the build can never
+REM silently use a stale subset.
+python tools\bake_ps1_decks.py
+if errorlevel 1 (
+    echo.
+    echo FAILED: tools\bake_ps1_decks.py
+    exit /b 1
+)
+
+cd platforms\ps1
 
 REM Fat LTO + size opt shrink the MIPS code enough to fit PS1's 2MB RAM
 REM (without it, .text alone overflows the region).
