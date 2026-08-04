@@ -57,7 +57,7 @@ impl<'a> platform_ui::PlatformUi for Ps1Ui<'a> {
         self.input.just_pressed(Button::Start)
     }
     fn wait_vblank(&mut self) {
-        self.display.swap_buffers();
+        self.display.wait();
     }
 }
 
