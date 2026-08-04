@@ -1,0 +1,25 @@
+[package]
+name = "rabuka_gba"
+version = "0.1.0"
+authors = ["Rabuka Reloaded"]
+edition = "2021"
+description = "Rabuka Reloaded for the Game Boy Advance (via agb)"
+
+[dependencies]
+agb = "0.25.0"
+rabuka_engine = { path = "../../engine", default-features = false, features = ["gba"] }
+# agb requires portable-atomic's unsafe-assume-single-core, which 1.14+ dropped
+# support for on thumbv4t (ARMv4T). Pin to the last version that supports it.
+portable-atomic = { version = "=1.13.1", default-features = false, features = ["unsafe-assume-single-core", "fallback"] }
+
+[profile.dev]
+opt-level = 3
+debug = true
+
+[profile.dev.build-override]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+debug = true

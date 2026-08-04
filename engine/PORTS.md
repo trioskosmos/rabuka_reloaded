@@ -376,9 +376,14 @@ For older:
 | **DS** | 2004 | ~1270 lines | B (bytecode) | Dual screen card game |
 | **Dreamcast** | 1998 | ~1270 lines | B (bytecode + GCC backend) | VMU memory card saves |
 
-Everything below N64/DS (GBA, Genesis, SNES, etc.) is still dead —
+Everything below N64/DS (Genesis, SNES, etc.) is still dead —
 their RAM is measured in kilobytes, not megabytes. No amount of
 bytecode cleverness fits a card game engine in 64KB.
+
+**GBA is the exception** — it was declared dead (288KB RAM) but got done
+anyway: the engine's `compact_*` features + baked deck blobs fit, and the
+sprite-based `ObjectTextRenderer` (from `agb`) renders text within the 32KB
+sprite VRAM. See the GBA Port section below.
 
 ---
 
@@ -447,4 +452,32 @@ Saved to `research/wii/KEY_REFERENCE.md`:
 - **Path A (std mode)**: The Wii has 88MB RAM — no bytecode VM or no_std migration needed.
 - **PSP baked data**: Points to `psp/baked/` JSON decks (same as DC), embedded at compile time via `include_str!`.
 - **Dual input**: `Input::poll()` scans both `PAD_ScanPads` (GameCube) and `WPAD_ScanPads` (Wii Remote) — whichever you press, it works.
+
+---
+
+## GBA Port — **Done: boots & plays** (Aug 2026)
+
+Status: **Boots and plays the full flow** (mode → deck → RPS → mulligan → match)
+in mGBA. The "impossible 288KB" target was reached via `agb` + the engine's
+`compact_*` features + baked deck blobs. See `output_gba/GBA_PORT_NOTES.md`.
+
+| Piece | Detail |
+|-------|--------|
+| SDK | `agb` 0.25 (`thumbv4t-none-eabi`), `-Tgba.ld`, `agb-gbafix` |
+| Build | `cargo +nightly build -Z build-std=core,alloc` + `build_gba.bat` |
+| Engine feature | `gba` = `no_std + bytecode_abilities + compact_cards + compact_card_data + compact_state` |
+| Pin | `portable-atomic =1.13.1` (agb needs `unsafe-assume-single-core`; dropped on thumbv4t in 1.14+) |
+| Atomics | none on ARMv4T → compat `Arc` is `alloc::rc::Rc` |
+| Text | `ObjectTextRenderer` (sprite objects reuse shared glyph tiles) — the background renderer exhausts VRAM in a few screens |
+| Crash fixed | re-render overflowed 32KB sprite VRAM (`AllocError` at agb `dynamic.rs:107`) → early-return on unchanged buffer + double `frame()` flush + 240-group cap |
+
+### Files
+- `platforms/gba/` — crate (display.rs, input.rs, decks_baked.rs, bin/rabuka_gba.rs)
+- `build_gba.bat`, `output_gba/rabuka_gba.gba`
+
+### Notes
+- No atomics on ARMv4T; RNG seeded (`rng::seed(0x5EED)`).
+- GBA OAM = 128 objects max, sprite VRAM = 1024 4bpp tiles; screens capped at
+  240 groups (16×16 sprites, 4 tiles each).
+- Needs a longer soak test on real hardware.
 

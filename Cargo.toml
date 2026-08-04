@@ -6,6 +6,7 @@ members = [
     "platforms/psp",
     "platforms/ds",
     "platforms/dc",
+    "platforms/gba",
     "tools/bake",
 ]
 resolver = "2"

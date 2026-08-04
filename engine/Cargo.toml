@@ -50,6 +50,8 @@ ds = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "com
 ds_debug = ["ds"]
 # PS1 target: no_std + alloc, compact like DS (2MB RAM; card data streams from CD)
 ps1 = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state", "external_card_data"]
+# GBA target: no_std + alloc via agb (baked deck blobs from the engine)
+gba = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
 # Dreamcast target: no_std + alloc via KallistiOS + rustc_codegen_gcc
 dc = ["no_std", "debug_conditions"]
 # Wii target: no_std + alloc via devkitPPC + libogc

@@ -1,6 +1,6 @@
 # Rabuka Reloaded
 
-A certain school idol collectible card game engine, AI, and web UI — built in Rust and ported to 6 platforms.
+A certain school idol collectible card game engine, AI, and web UI — built in Rust and ported to 8 platforms.
 
 **2,280 cards · 800 unique abilities · ~1,800 tests · 90K lines of Rust**
 
@@ -28,6 +28,8 @@ A certain school idol collectible card game engine, AI, and web UI — built in 
 | **Nintendo Wii** (PowerPC 750 @ 729MHz) | 88MB | 🟡 Displays Japanese text — GX FIFO bug |
 | **PlayStation Portable** (MIPS R4000 @ 333MHz) | 32MB | 🟡 Displays Japanese text — font rendering |
 | **Nintendo DS** (ARM9 @ 67MHz) | 4MB | 🟡 Boots, loads decks, plays — ability activation heap exhaustion fixed (scratch buffers + ZoneId + SmallVec triggers); needs DS build test |
+| **PlayStation 1** (MIPS R3000A @ 33MHz) | 2MB | ✅ Works — full game flow, BIOS vblank event; card data streams from CD |
+| **Game Boy Advance** (ARM7TDMI @ 16MHz) | 288KB | 🟡 Boots & plays full flow via agb object-text rendering; sprite-VRAM crash fixed — needs longer play test |
 | **Sega Dreamcast** (SH-4 @ 200MHz) | 16MB | 🔴 Blocked — no LLVM backend for SH-4; rustc_codegen_gcc dead-code eliminates all user symbols on SH-4 no_std |
 
 For a full portability analysis covering 15+ consoles (PS1, N64, GameCube, Vita, GBA, Saturn, and more), see [engine/PORTS.md](engine/PORTS.md).
@@ -85,7 +87,9 @@ rabuka_reloaded/
 │   ├── wii/           #   Nintendo Wii (code complete)
 │   ├── psp/           #   PlayStation Portable
 │   ├── dc/            #   Sega Dreamcast
-│   └── ds/            #   Nintendo DS (working)
+│   ├── ds/            #   Nintendo DS (working)
+│   ├── ps1/           #   PlayStation 1 (working)
+│   └── gba/           #   Game Boy Advance (working, via agb)
 ├── training/          # PPO training artifacts & scripts
 ├── docs/              # GitHub Pages site
 ├── tools/             # Image baking, font generation, etc.
@@ -103,13 +107,15 @@ The engine uses Cargo feature flags to toggle platform support and optimizations
 | `wii` | Wii target (no_std + once_cell) |
 | `psp` | PSP target (no_std + alloc) |
 | `ds` | DS target (no_std + compact everything) |
+| `ps1` | PS1 target (no_std + compact everything, card data streams from CD) |
+| `gba` | GBA target (no_std + compact everything, via agb) |
 | `dc` | Dreamcast target (no_std) |
 | `bytecode_abilities` | Use bytecode VM instead of JSON serde |
 | `compact_cards` | Strip display-only fields from Card struct |
 | `compact_state` | Bounded log/application Vecs |
 | `profiling` | Timer instrumentation for flamegraphs |
 
-Console build scripts are provided: `build_3ds.bat`, `build_wii.bat`, `build_ds.bat`, `build_psp.bat`, `build_dc.bat`.
+Console build scripts are provided: `build_3ds.bat`, `build_wii.bat`, `build_ds.bat`, `build_psp.bat`, `build_dc.bat`, `build_ps1.bat`, `build_gba.bat`.
 
 ## Memory Optimization
 
@@ -211,6 +217,7 @@ See [engine/ISSUES_FOUND.md](engine/ISSUES_FOUND.md) for the full list.
 | Document | Description |
 |----------|-------------|
 | [engine/PORTS.md](engine/PORTS.md) | 450-line console port feasibility analysis for 15+ consoles |
+| [output_gba/GBA_PORT_NOTES.md](output_gba/GBA_PORT_NOTES.md) | GBA port build/toolchain + object-text rendering + VRAM crash fix |
 | [engine/PORT_TO_3DS.md](engine/PORT_TO_3DS.md) | 3DS porting plan and progress |
 | [engine/MEMORY_REFACTOR.md](engine/MEMORY_REFACTOR.md) | 1,000-line history of 40+ memory optimization tasks |
 | [engine/ISSUES_FOUND.md](engine/ISSUES_FOUND.md) | Known build issues, warnings, and clippy lints |
