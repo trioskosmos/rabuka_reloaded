@@ -974,6 +974,16 @@ impl AbilityResolver {
                 },
                 choice_exclude,
             );
+            // "ブレードをNつ以上持つ" (no 元々) — filter by CURRENT blade total
+            // (base or set + modifiers); matches() only handles printed values.
+            if prelim_filter.has_current_blade_filter() {
+                candidates = util::filter_current_blade(
+                    candidates,
+                    gs,
+                    prelim_filter.current_blade_limit,
+                    prelim_filter.current_blade_operator,
+                );
+            }
             // Filter target_count candidates by position if specified.
             if let Some(ref pos) = effect.position_any() {
                 if let Some(p) = pos.get_position() {
@@ -1114,6 +1124,26 @@ impl AbilityResolver {
                 &filter,
             );
 
+            // "ブレードをNつ以上持つ" (no 元々) — CURRENT blade total filter
+            // (base or set + modifiers). Snapshot the eligible stage members
+            // BEFORE the mutable `player` borrow (matches() only handles
+            // printed/original blade values).
+            let current_blade_eligible: SmallVec<[i16; 8]> = if filter.has_current_blade_filter() {
+                let stage_ids: Vec<i16> = {
+                    let p = gs.resolve_target_player(&target);
+                    util::zone_cards(p, Zone::Stage.to_str()).to_vec()
+                };
+                util::filter_current_blade(
+                    stage_ids,
+                    gs,
+                    filter.current_blade_limit,
+                    filter.current_blade_operator,
+                )
+                .into()
+            } else {
+                SmallVec::new()
+            };
+
             let player = gs.resolve_target_player_mut(&target);
 
             let has_selection_filter =
@@ -1183,6 +1213,12 @@ impl AbilityResolver {
             } else {
                 SmallVec::new()
             };
+
+            // "ブレードをNつ以上持つ" (no 元々) — restrict to the snapshot of
+            // current-blade-eligible stage members computed before the borrow.
+            if filter.has_current_blade_filter() {
+                all_candidates.retain(|cid| current_blade_eligible.contains(cid));
+            }
 
             // Filter by position if the effect specifies one (e.g. "center").
             if let Some(ref pos) = effect.position_any() {
@@ -1363,6 +1399,13 @@ impl AbilityResolver {
                         heart_targets.retain(|&cid| cid == expected);
                     }
                 }
+            }
+
+            // "ブレードをNつ以上持つ" (no 元々) — heart targets are resolved via
+            // a SEPARATE matching_ids_filtered call, so apply the current-blade
+            // post-filter here as well (the blade_targets path already filters).
+            if filter.has_current_blade_filter() {
+                heart_targets.retain(|cid| current_blade_eligible.contains(cid));
             }
 
             // Apply heart_colors as a target filter when the effect

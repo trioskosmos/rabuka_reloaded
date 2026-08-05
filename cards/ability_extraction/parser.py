@@ -375,6 +375,14 @@ def extract_blade_limit(text: str) -> Optional[Dict[str, Any]]:
         m = re.search(r"ブレード[の]数[がは]ちょうど(\d+)[つ個]", normalized)
     if not m:
         m = re.search(r"ブレード[の]数[がは](\d+)[つ個](?!になる)", normalized)
+    # "ブレードを4つ以上持つ" / "ブレードを4つ持つ" — the icon form of a member
+    # blade-count filter (e.g. Fire Bird "ブレードを4つ以上持つ『虹ヶ咲』のメンバー").
+    if not m:
+        m = re.search(r"ブレード[をが](\d+)[つ個](以上|以下|未満|超)持つ", normalized)
+    if not m:
+        m = re.search(r"ブレード[をが]ちょうど(\d+)[つ個]持つ", normalized)
+    if not m:
+        m = re.search(r"ブレード[をが](\d+)[つ個]持つ", normalized)
     if m:
         result: Dict[str, Any] = {"blade_limit": int(m.group(1))}
         if len(m.groups()) >= 2 and m.group(2) and m.group(2) != "ちょうど":
@@ -2053,7 +2061,9 @@ _register_action(
     ),
 )
 _register_action(
-    lambda t: "{{icon_blade.png|ブレード}}" in t and "得る" in t,
+    lambda t: "{{icon_blade.png|ブレード}}" in t
+    and "得る" in t
+    and not _blade_icon_is_target_filter(t),
     "gain_resource",
     lambda t, a: a.update(
         {
@@ -2526,6 +2536,18 @@ _register_action(
 )
 
 
+def _blade_icon_is_target_filter(text: str) -> bool:
+    """True when the {{icon_blade.png|ブレード}} icon describes the TARGET member's
+    blade count (e.g. "ブレードを4つ以上持つ『虹ヶ咲』のメンバー") rather than a
+    resource being granted. Used to keep the concurrent heart+blade-grant split
+    from mistaking a blade-count filter for a blade gain (fix D19)."""
+    if "ブレードの数が" in text:
+        return True
+    # The blade icon sits inside a "持つ" clause that precedes the gain clause.
+    gain_head = text.split("得る", 1)[0]
+    return bool(re.search(r"{{icon_blade\.png\|ブレード}}[^得]*持つ", gain_head))
+
+
 def parse_action(text: str) -> Dict[str, Any]:
     """Parse an action text."""
     # Check for optional draw action "カードを1枚引いてもよい" - CHECK THIS FIRST
@@ -2931,11 +2953,15 @@ def parse_action(text: str) -> Dict[str, Any]:
     # NEW: heart + blade concurrent grant → sequential
     # Order-invariant: detects both icon types anywhere in text.
     # Excludes character-specific patterns handled earlier by _try_character_specific.
+    # A blade icon that qualifies the TARGET member ("ブレードをNつ以上持つ" /
+    # "ブレードの数がNつ" — a filter, not a grant) must NOT be split off into a
+    # blade gain (fix D19: Fire Bird granted +4 blade the text never mentions).
     if (
         "{{icon_blade.png|ブレード}}" in text
         and "{{heart" in text
         and "得る" in text
         and "N人が" not in text
+        and not _blade_icon_is_target_filter(text)
     ):
         blade_count = text.count("{{icon_blade.png|ブレード}}")
         heart_matches = re.findall(r"\{\{heart_(\d+)\.png\|heart\d+\}\}", text)
@@ -5311,10 +5337,15 @@ def infer_count_from_icons(d, text):
     if count_match:
         d["count"] = int(count_match.group(1))
         return
-    count_match = re.search(r"(\d+)つ", text)
-    if count_match:
-        d["count"] = int(count_match.group(1))
-        return
+    # Fix D19: a numeric count in the FULL text may belong to a blade-count
+    # filter clause ("ブレードを4つ以上持つ") rather than to the resource being
+    # gained. When the blade icon is a target filter, skip that count and fall
+    # through to icon-based counting so the heart gain gets the right amount.
+    if not _blade_icon_is_target_filter(text):
+        count_match = re.search(r"(\d+)つ", text)
+        if count_match:
+            d["count"] = int(count_match.group(1))
+            return
     blade_count = effect_text.count("{{icon_blade.png|ブレード}}")
     if blade_count > 0:
         d["count"] = blade_count

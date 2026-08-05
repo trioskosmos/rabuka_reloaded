@@ -22,6 +22,7 @@ pub mod blade_per_discard_test;
 pub mod bloom_hs_test;
 pub mod bp7_character_name_condition_test;
 pub mod bp7_deck_bottom_source_test;
+pub mod bp7_fire_bird_blade_gain_test;
 pub mod bp7_heart_copy_test;
 pub mod bp7_under_member_per_unit_blade_test;
 pub mod bring_love_test;

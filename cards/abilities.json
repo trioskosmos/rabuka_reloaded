@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-05T22:16:02.854411",
+  "generated_at": "2026-08-05T23:31:15.761169",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
-  "source_file": "cards\\cards.json",
-  "engine_commit": "964db68a",
+  "source_file": "cards/cards.json",
+  "engine_commit": "f8a0fb27",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -3110,6 +3110,8 @@
           "count": 5,
           "operator": ">=",
           "negation": true,
+          "blade_limit": 5,
+          "blade_limit_operator": ">=",
           "type": "group_condition"
         },
         "card_type": "member_card",
@@ -15325,6 +15327,8 @@
           "card_type": "member_card",
           "count": 9,
           "operator": ">=",
+          "blade_limit": 9,
+          "blade_limit_operator": ">=",
           "position": "center",
           "type": "group_condition"
         },
@@ -22492,37 +22496,21 @@
       "cost": null,
       "effect": {
         "text": "自分のステージにいる{{icon_blade.png|ブレード}}を4つ以上持つ『虹ヶ咲』のメンバー1人は、ライブ終了時まで、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る",
-        "action": "sequential",
-        "actions": [
-          {
-            "action": "gain_resource",
-            "resource": "blade",
-            "count": 4,
-            "target_count": 1,
-            "card_type": "member_card",
-            "text": "自分のステージにいる{{icon_blade.png|ブレード}}を4つ以上持つ『虹ヶ咲』のメンバー1人は、ライブ終了時まで、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る",
-            "duration": "live_end"
-          },
-          {
-            "action": "gain_resource",
-            "resource": "heart",
-            "heart_colors": [
-              "heart02"
-            ],
-            "count": 4,
-            "target_count": 1,
-            "card_type": "member_card",
-            "text": "自分のステージにいる{{icon_blade.png|ブレード}}を4つ以上持つ『虹ヶ咲』のメンバー1人は、ライブ終了時まで、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る",
-            "duration": "live_end"
-          }
+        "duration": "live_end",
+        "count": 2,
+        "card_type": "member_card",
+        "target": "self",
+        "group_names": [
+          "虹ヶ咲"
         ],
+        "target_count": 1,
+        "action": "gain_resource",
+        "resource": "heart",
         "heart_colors": [
           "heart02"
         ],
-        "count": 1,
-        "group_names": [
-          "虹ヶ咲"
-        ]
+        "blade_limit": 4,
+        "blade_limit_operator": ">="
       }
     },
     {

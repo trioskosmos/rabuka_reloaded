@@ -893,6 +893,8 @@ pub enum EffectKind {
         target_from_selection: Option<bool>,
         heart_type: Option<ArcStr>,
         heart_color: Option<ArcStr>,
+        blade_limit: Option<u8>,
+        blade_limit_operator: Option<Operator>,
     },
     ChangeState {
         filter: Option<Box<EffectFilter>>,
@@ -1284,6 +1286,8 @@ impl AbilityEffect {
                 target_from_selection: bool_field!("target_from_selection"),
                 heart_type: str_field!("heart_type"),
                 heart_color: str_field!("heart_color"),
+                blade_limit: u8_field!("blade_limit"),
+                blade_limit_operator: None,
             },
             "change_state" | "set_card_identity" | "set_card_identity_all_regions" => {
                 EffectKind::ChangeState {
@@ -1581,9 +1585,9 @@ impl AbilityEffect {
 
     filter_bool_getter!(any_number_any, any_number);
 
-    u32_getter!(blade_limit_any, [ChangeState => blade_limit, MiscOp => blade_limit]);
+    u32_getter!(blade_limit_any, [ChangeState => blade_limit, MiscOp => blade_limit, GainResource => blade_limit]);
 
-    copy_getter!(blade_limit_operator_any, Operator, [ChangeState => blade_limit_operator, MiscOp => blade_limit_operator]);
+    copy_getter!(blade_limit_operator_any, Operator, [ChangeState => blade_limit_operator, MiscOp => blade_limit_operator, GainResource => blade_limit_operator]);
 
     str_getter!(blade_type_any, [MiscOp => blade_type]);
 
@@ -1968,8 +1972,14 @@ impl AbilityEffect {
 
     /// Build a `CardFilter` containing the 7 base filter fields (card_type,
     /// group, cost_limit, cost_operator, characters, exclude_characters,
-    /// exclude_self) that effect handlers most commonly need.
+    /// exclude_self) that effect handlers most commonly need. Also carries the
+    /// current-blade filter ("ブレードをNつ以上持つ", no 元々) which the caller
+    /// applies post-`matches()` via util::filter_current_blade (matches() has no
+    /// modifier access). heart_colors are only treated as a target filter when
+    /// `filter_targets_by_heart_colors` is set (a gained resource color must not
+    /// become a target filter).
     pub fn filter_subset(&self) -> crate::ability::util::CardFilter<'_> {
+        let original = self.original_value_any().unwrap_or(false);
         crate::ability::util::CardFilter {
             card_type: self.card_type_any().map(|ct| ct.as_card_str()),
             group: self.group_name(),
@@ -1997,6 +2007,26 @@ impl AbilityEffect {
                 &[]
             },
             distinct: self.distinct_any(),
+            original_blade_limit: if original {
+                self.blade_limit_any()
+            } else {
+                None
+            },
+            original_blade_operator: if original {
+                self.blade_limit_operator_any().map(Operator::as_str)
+            } else {
+                None
+            },
+            current_blade_limit: if original {
+                None
+            } else {
+                self.blade_limit_any()
+            },
+            current_blade_operator: if original {
+                None
+            } else {
+                self.blade_limit_operator_any().map(Operator::as_str)
+            },
             ..Default::default()
         }
     }

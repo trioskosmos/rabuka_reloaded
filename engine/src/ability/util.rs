@@ -786,6 +786,15 @@ pub struct CardFilter<'a> {
     /// Sum-total cost constraint — checked post-selection, not in per-card matches()
     pub cost_total: Option<u8>,
     pub cost_total_operator: Option<&'a str>,
+    /// "元々持つブレード" — printed/base blade value filter (checked in matches()).
+    pub original_blade_limit: Option<u8>,
+    pub original_blade_operator: Option<&'a str>,
+    /// "ブレードをNつ以上持つ" (no 元々) — CURRENT blade total filter (base or
+    /// set + additive modifiers). Cannot be evaluated in matches() (no mods
+    /// access), so it is applied as a post-filter by the caller via
+    /// filter_current_blade().
+    pub current_blade_limit: Option<u8>,
+    pub current_blade_operator: Option<&'a str>,
     pub characters: Option<&'a Vec<String>>,
     pub exclude_characters: Option<&'a Vec<String>>,
     pub heart_colors: &'a [String],
@@ -802,8 +811,6 @@ pub struct CardFilter<'a> {
     pub exclude_self: Option<i16>,
     /// Group names to exclude from matching (e.g. 「スリーズブーケ」以外)
     pub exclude_group_names: Option<&'a [String]>,
-    pub original_blade_limit: Option<u8>,
-    pub original_blade_operator: Option<&'a str>,
     /// Card IDs to exclude from matching (e.g. previously selected by a prior sequential action)
     pub exclude_cards: Option<&'a [i16]>,
     /// Card names to exclude from matching (resolved at runtime from
@@ -1357,8 +1364,26 @@ impl<'a> CardFilter<'a> {
             } else {
                 None
             },
-            original_blade_limit: effect.blade_limit_any(),
-            original_blade_operator,
+            original_blade_operator: if effect.original_value_any().unwrap_or(false) {
+                original_blade_operator
+            } else {
+                None
+            },
+            original_blade_limit: if effect.original_value_any().unwrap_or(false) {
+                effect.blade_limit_any()
+            } else {
+                None
+            },
+            current_blade_operator: if effect.original_value_any().unwrap_or(false) {
+                None
+            } else {
+                original_blade_operator
+            },
+            current_blade_limit: if effect.original_value_any().unwrap_or(false) {
+                None
+            } else {
+                effect.blade_limit_any()
+            },
             exclude_cards: None,
             exclude_names: None,
             ability_filter,
@@ -1405,6 +1430,8 @@ impl<'a> CardFilter<'a> {
                 exclude_self: None,
                 original_blade_limit: None,
                 original_blade_operator: None,
+                current_blade_limit: None,
+                current_blade_operator: None,
                 exclude_cards: None,
                 ability_filter: None,
                 ability_filter_triggers: None,
@@ -1415,6 +1442,42 @@ impl<'a> CardFilter<'a> {
             _ => CardFilter::default(),
         }
     }
+
+    /// Whether this filter needs a post-`matches()` current-blade check.
+    pub fn has_current_blade_filter(&self) -> bool {
+        self.current_blade_limit.is_some()
+    }
+}
+
+/// Filter member candidates by their CURRENT blade total (base or set +
+/// additive modifiers), matching "ブレードをNつ以上持つ" (no 元々) semantics.
+/// `matches()` cannot evaluate this (no modifier access), so the gain/change
+/// resolution calls this post-filter after computing candidates.
+pub fn filter_current_blade(
+    candidates: Vec<i16>,
+    gs: &crate::game_state::GameState,
+    blade_limit: Option<u8>,
+    blade_operator: Option<&str>,
+) -> Vec<i16> {
+    let Some(bl) = blade_limit else {
+        return candidates;
+    };
+    let op = blade_operator.unwrap_or(">=");
+    candidates
+        .into_iter()
+        .filter(|&cid| {
+            let base = gs
+                .card_database
+                .get_card(cid)
+                .map(|c| c.blade as i32)
+                .unwrap_or(0);
+            let set = gs.mods.get_blade_set_modifier(cid);
+            let effective = if set != 0 { set as i32 } else { base };
+            let additive = gs.mods.get_blade_modifier(cid) - set as i32;
+            let total = (effective + additive).max(0) as u8;
+            compare_counts(Some(op), total, bl)
+        })
+        .collect()
 }
 
 fn card_matches_name_fragments(db: &CardDatabase, id: i16, fragments: &[String]) -> bool {

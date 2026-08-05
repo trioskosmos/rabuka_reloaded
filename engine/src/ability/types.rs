@@ -530,6 +530,8 @@ impl Choice {
                 exclude_self: None,
                 original_blade_limit: None,
                 original_blade_operator: None,
+                current_blade_limit: None,
+                current_blade_operator: None,
                 exclude_cards: None,
                 ability_filter: None,
                 ability_filter_triggers: None,
