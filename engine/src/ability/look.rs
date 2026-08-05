@@ -872,10 +872,32 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-        count: u8,
-        target: &str,
-        source: &str,
     ) -> Result<(), String> {
+        let base_count: u8 = if let Some(ref dc) = effect.dynamic_count_any() {
+            self.resolve_dynamic_count(gs, dc)
+        } else {
+            effect.count_or(1) as u8
+        };
+        let count = if effect.per_unit_any().unwrap_or(false) {
+            use crate::ability::util;
+            let player = gs.resolve_target_player(effect.target_name());
+            let filter = util::CardFilter::from_effect(effect);
+            let per_mult = util::resolve_per_unit_count(
+                true,
+                effect.per_unit_type_any().as_deref(),
+                player,
+                &gs.card_database,
+                &filter,
+                effect.heart_colors_any(),
+                None,
+                &crate::HashMap::default(),
+            );
+            base_count * per_mult
+        } else {
+            base_count
+        };
+        let target = effect.target_name();
+        let source = effect.source_or(Zone::Deck.to_str());
         if effect.optional.unwrap_or(false) {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "pay_optional_cost:skip_optional_cost".to_string(),
@@ -979,10 +1001,11 @@ impl AbilityResolver {
     pub fn execute_reveal_per_group(
         &mut self,
         gs: &mut GameState,
-        source: &str,
-        count: u8,
-        target: &str,
+        effect: &AbilityEffect,
     ) -> Result<(), String> {
+        let source = effect.source_or(Zone::Hand.to_str());
+        let count = effect.count_or(1) as u8;
+        let target = effect.target_name();
         let card_db = gs.card_database.clone();
         let card_ids: Vec<i16> = {
             let player = gs.resolve_target_player_mut(target);
@@ -1116,8 +1139,9 @@ impl AbilityResolver {
     pub fn execute_reveal_until_live_card(
         &mut self,
         gs: &mut GameState,
-        target: &str,
+        effect: &AbilityEffect,
     ) -> Result<(), String> {
+        let target = effect.target_name();
         let (all_revealed, _) = self.reveal_until(gs, target, |card_db, cid| {
             card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false)
         });

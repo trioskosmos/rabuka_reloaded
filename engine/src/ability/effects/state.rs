@@ -20,25 +20,52 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-        state_change: &str,
-        target: &str,
-        count: u8,
-        max: bool,
-        card_type: Option<&str>,
-        cost_limit: Option<u8>,
-        optional: bool,
-        group_name: Option<&str>,
-        self_cost: bool,
-        source: Option<&str>,
-        destination: Option<&str>,
-        cost_limit_operator: Option<String>,
-        characters: Option<&Vec<String>>,
-        blade_limit: Option<u8>,
-        blade_limit_operator: Option<&str>,
     ) -> Result<(), String> {
-        let state_change = state_change.to_string();
-        let target = target.to_string();
+        let state_change = effect.state_change_any().unwrap_or("").to_string();
+        let target = effect.target_name().to_string();
+        let card_type = effect.card_type_any().map(|ct| ct.as_card_str());
         let card_type_filter = card_type.map(|s| s.to_string());
+        let cost_limit = if effect.cost_from_revealed_any().unwrap_or(false) {
+            gs.revealed_cards
+                .first()
+                .and_then(|&cid| gs.card_database.get_card(cid))
+                .and_then(|c| c.cost)
+        } else {
+            effect.cost_limit_any()
+        };
+        // Per-unit count derivation (1x per N matching cards).
+        let mut count: u8 = effect.count_or(0) as u8;
+        let mut group_name = effect.group_name();
+        if effect.per_unit_any().unwrap_or(false) {
+            let player = gs.resolve_target_player(&target);
+            let loc_binding = effect.location_any();
+            let location = loc_binding.unwrap_or(Zone::Stage.to_str());
+            let cards: Vec<i16> = util::zone_cards(player, location).to_vec();
+            let mut per_unit_filter = util::CardFilter::from_effect(effect);
+            per_unit_filter.card_type = None;
+            per_unit_filter.cost_limit = cost_limit;
+            let matching: Vec<i16> = cards
+                .iter()
+                .filter(|&&cid| per_unit_filter.matches(&gs.card_database, cid, false))
+                .copied()
+                .collect();
+            let matched_count =
+                util::apply_distinct_filter(&matching, effect.distinct_any(), &gs.card_database)
+                    .len() as u8;
+            let per_unit_cnt = effect.per_unit_count_any().unwrap_or(1) as u8;
+            count = (matched_count / per_unit_cnt) * count.max(1);
+            group_name = None;
+        }
+        let max = effect.max.unwrap_or(false);
+        let optional = effect.optional.unwrap_or(false);
+        let self_cost = effect.self_cost_any().unwrap_or(false);
+        let source = effect.source_any();
+        let destination = effect.destination.as_deref();
+        let cost_limit_operator = effect.cost_limit_operator_any().map(|s| s.to_string());
+        let characters = effect.characters_any();
+        let blade_limit = effect.blade_limit_any().map(|v| v as u8);
+        let blade_limit_operator_binding = effect.blade_limit_operator_any();
+        let blade_limit_operator = blade_limit_operator_binding.as_deref();
         // When targeting opponent, group_names is trigger-level metadata
         // (from the wrapper's condition), not an effect filter.
         let group_filter = if target == "opponent" {
@@ -769,12 +796,8 @@ impl AbilityResolver {
         Ok(())
     }
 
-    pub(crate) fn execute_set_cost(
-        &mut self,
-        gs: &mut GameState,
-        effect: &AbilityEffect,
-        value: u8,
-    ) {
+    pub(crate) fn execute_set_cost(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
+        let value: u8 = effect.value_any().unwrap_or(0) as u8;
         let target = effect.target_name();
         let ct_binding = effect.card_type_any();
         let card_type = ct_binding;
@@ -903,7 +926,111 @@ impl AbilityResolver {
         }
     }
 
-    pub(crate) fn execute_set_heart_type(
+    pub(crate) fn execute_set_heart_type(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
+        // C4: heart becomes the same as the card just placed under this member
+        // (ref_value="placed_under") — a copy, not a fixed color.
+        if effect.ref_value_any() == Some("placed_under") {
+            self.execute_set_heart_copy_from_under(gs, effect.duration_any().as_deref());
+            return;
+        }
+        let is_self_target = effect.self_target_any().unwrap_or(false);
+        let needs_target = !is_self_target
+            && (effect.heart_selection_any().unwrap_or(false)
+                || effect.group_names_any().is_some()
+                || effect.card_type_any() == Some(&crate::card::CardType::Member));
+        let ht_binding = effect.heart_type_any();
+        let heart_type = ht_binding.or(effect.heart_colors_any().first().map(|s| s.as_str()));
+
+        if is_self_target || !needs_target {
+            // Self-target (e.g. Kanan PL!S-pb1-003-R): apply to activating_card.
+            // Also fallback for member-card abilities without group/selection signals.
+            self.execute_set_heart_type_applied(
+                gs,
+                heart_type,
+                effect.target_name(),
+                effect.count_or(1) as i32,
+                effect.duration_any().as_deref(),
+            );
+        } else if self.selected_cards.is_empty() {
+            // Need target selection: find eligible stage members
+            let target = effect.target_name();
+            let stage_ids: Vec<i16> = {
+                let p = gs.resolve_target_player(target);
+                p.stage
+                    .stage
+                    .iter()
+                    .copied()
+                    .filter(|&id| id != -1)
+                    .collect()
+            };
+            let card_db = self.card_db();
+            let filter = effect.filter_subset();
+            let candidates =
+                util::matching_ids_filtered(&stage_ids, &card_db, &filter, true, None, None, None);
+            if candidates.is_empty() {
+                // No eligible targets — no-op
+                return;
+            }
+            let tc = effect.target_count_any().unwrap_or(1) as usize;
+            if candidates.len() <= tc {
+                // Auto-select: push to selected_cards and apply
+                for &cid in &candidates {
+                    if !self.selected_cards.contains(&cid) {
+                        self.selected_cards.push(cid);
+                    }
+                }
+                self.execute_set_heart_type_applied(
+                    gs,
+                    heart_type,
+                    effect.target_name(),
+                    effect.count_or(1) as i32,
+                    effect.duration_any().as_deref(),
+                );
+            } else {
+                // Multiple eligible: create SelectCard choice
+                let stage_snapshot: Vec<i16> = {
+                    let p = gs.resolve_target_player(target);
+                    p.stage.stage.to_vec()
+                };
+                let filtered_indices: Vec<usize> = candidates
+                    .iter()
+                    .filter_map(|&cid| stage_snapshot.iter().position(|&s| s == cid))
+                    .collect();
+                let mut saved = effect.clone();
+                saved.set_target_count(None);
+                let mut pending = gs.ability_queue.take_pending_actions();
+                pending.insert(0, saved);
+                gs.ability_queue.set_pending_actions(pending);
+                let desc_en = format!("Select {} member(s) for heart type conversion", tc);
+                let desc_ja = format!("ハート種類変換のメンバーを{}体選択", tc);
+                self.pending_choice = Some(
+                    Choice::select_cards(Zone::Stage.to_str().to_string(), tc, desc_en, false)
+                        .description_ja(Some(desc_ja))
+                        .card_type(effect.card_type_any().map(|s| s.to_string()))
+                        .group(effect.group_name().map(|s| s.to_string()))
+                        .characters(effect.characters_any().cloned())
+                        .filtered_indices(Some(filtered_indices))
+                        .target_player_id(Some(target.to_string()))
+                        .is_select_action(true)
+                        .build(),
+                );
+                self.sub_choice_created = true;
+            }
+        } else {
+            // Already have selected target from previous choice resolution
+            self.execute_set_heart_type_applied(
+                gs,
+                heart_type,
+                effect.target_name(),
+                effect.count_or(1) as i32,
+                effect.duration_any().as_deref(),
+            );
+        }
+    }
+
+    /// Apply a resolved heart type to the target card(s). Split out from
+    /// `execute_set_heart_type` so the dispatch stays a pure one-liner.
+    pub(crate) fn execute_set_heart_type_applied(
         &mut self,
         gs: &mut GameState,
         heart_type: Option<&str>,
@@ -1037,14 +1164,13 @@ impl AbilityResolver {
         );
     }
 
-    pub(crate) fn execute_activation_cost(
-        &mut self,
-        gs: &mut GameState,
-        operation: &str,
-        value: u8,
-        target: &str,
-        duration: Option<&str>,
-    ) {
+    pub(crate) fn execute_activation_cost(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
+        let operation_binding = effect.operation_any();
+        let operation = operation_binding.as_deref().unwrap_or("increase");
+        let value: u8 = effect.value_any().unwrap_or(0) as u8;
+        let target = effect.target_name();
+        let duration_binding = effect.duration_any();
+        let duration = duration_binding.as_deref();
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -1085,7 +1211,12 @@ impl AbilityResolver {
         }
     }
 
-    pub(crate) fn execute_reduce_live_card_set_limit(&mut self, gs: &mut GameState, count: u8) {
+    pub(crate) fn execute_reduce_live_card_set_limit(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) {
+        let count: u8 = effect.count_or(1) as u8;
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -1099,12 +1230,8 @@ impl AbilityResolver {
         player.live_card_set_limit_reduction += count;
     }
 
-    pub(crate) fn execute_set_blade_count(
-        &mut self,
-        gs: &mut GameState,
-        effect: &AbilityEffect,
-        value: u8,
-    ) {
+    pub(crate) fn execute_set_blade_count(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
+        let value: u8 = effect.value_any().unwrap_or(effect.count_or(0)) as u8;
         let target = effect.target_name();
         let pp = self.player_prefix(gs);
         let act_name = gs
@@ -1169,9 +1296,9 @@ impl AbilityResolver {
     pub(crate) fn execute_specify_heart_color(
         &mut self,
         gs: &mut GameState,
-        choice: bool,
-        _target: &str,
+        effect: &AbilityEffect,
     ) {
+        let choice = effect.choice_any().unwrap_or(false);
         log::debug!("specify_heart_color: choice={}", choice);
         if choice {
             // Q190 (2025.11.17): ALL heart (heart00) cannot be selected.
@@ -1203,9 +1330,10 @@ impl AbilityResolver {
     pub(crate) fn execute_set_card_identity_all_regions(
         &mut self,
         gs: &mut GameState,
-        identities: Option<&Vec<String>>,
-        target: &str,
+        effect: &AbilityEffect,
     ) {
+        let identities = effect.identities_any();
+        let target = effect.target_name();
         let _target = target;
         let card_id = self.activating_card_id.or(gs.activating_card);
         if let Some(card_id) = card_id {
@@ -1228,8 +1356,9 @@ impl AbilityResolver {
     pub(crate) fn execute_set_cost_to_use(
         &mut self,
         gs: &mut GameState,
-        value: u8,
+        effect: &AbilityEffect,
     ) -> Result<(), String> {
+        let value: u8 = effect.value_any().unwrap_or(0) as u8;
         let card_id = self.activating_card_id.or(gs.activating_card);
         if let Some(card_id) = card_id {
             gs.mods.set_cost_modifier(card_id, value as i16);
@@ -1244,12 +1373,11 @@ impl AbilityResolver {
         Ok(())
     }
 
-    pub(crate) fn execute_all_blade_timing(
-        &mut self,
-        gs: &mut GameState,
-        timing: &str,
-        treat_as: &str,
-    ) {
+    pub(crate) fn execute_all_blade_timing(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
+        let timing_binding = effect.timing_any();
+        let timing = timing_binding.as_deref().unwrap_or("check_required_hearts");
+        let treat_as_binding = effect.treat_as_any();
+        let treat_as = treat_as_binding.as_deref().unwrap_or("any_heart_color");
         let card_id = self.activating_card_id.or(gs.activating_card);
         if let Some(card_id) = card_id {
             gs.prohibition_effects.push(format!(
@@ -1266,12 +1394,7 @@ impl AbilityResolver {
             .push(format!("{} {}: 全ブレードタイミング", pp, act_name));
     }
 
-    pub(crate) fn execute_modify_cost(
-        &mut self,
-        gs: &mut GameState,
-        effect: &AbilityEffect,
-        value: u8,
-    ) {
+    pub(crate) fn execute_modify_cost(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
         let op_binding = effect.operation_any();
         let operation = op_binding.unwrap_or("add");
         let target = effect.target_name();
@@ -1279,6 +1402,37 @@ impl AbilityResolver {
         let card_type = ct_binding.as_deref();
         let dur_binding = effect.duration_any();
         let duration = dur_binding.as_deref();
+        // Compute the final value: base value scaled by per-unit count.
+        let mut value: u8 = effect.value_any().unwrap_or(0) as u8;
+        if effect.per_unit_any().unwrap_or(false) {
+            let put_binding = effect.per_unit_type_any();
+            let loc_binding2 = effect.location_any();
+            let per_unit_type_str = put_binding.or(loc_binding2).unwrap_or("枚");
+            let player = gs.resolve_target_player(target);
+            // Use resolve_per_unit_count which handles under_member,
+            // discard, waitroom_card and other special zones that
+            // zone_cards() cannot represent as a flat slice.
+            let per_unit_filter = crate::ability::util::CardFilter::from_effect(effect);
+            let matching_count = crate::ability::util::resolve_per_unit_count(
+                true,
+                Some(per_unit_type_str),
+                player,
+                &gs.card_database,
+                &per_unit_filter,
+                &[],
+                effect.state_any().as_deref(),
+                &gs.mods.orientation_modifiers,
+            );
+            let per_unit_count = effect.per_unit_count_any().unwrap_or(1) as u8;
+            let mut units = matching_count / per_unit_count;
+            // Apply max_repeats cap (aliased as repeat_limit).
+            // The text side-constraint "N枚までしか数えない" is parsed as
+            // max_repeats on the effect.
+            if let Some(cap) = effect.repeat_limit_any() {
+                units = units.min(cap as u8);
+            }
+            value *= units;
+        }
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card

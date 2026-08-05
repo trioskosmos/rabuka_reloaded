@@ -45,9 +45,9 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-        conditional: bool,
-        is_further: bool,
     ) -> Result<(), String> {
+        let conditional = effect.conditional.unwrap_or(false);
+        let is_further = effect.is_further.unwrap_or(false);
         #[cfg(not(feature = "no_std"))]
         let actions_str = effect
             .compound
@@ -759,9 +759,8 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-        repeat_limit: u8,
     ) -> Result<(), String> {
-        let repeat_limit = repeat_limit as usize;
+        let repeat_limit = effect.repeat_limit_any().unwrap_or(1) as usize;
         if let Some(ref actions) = effect.compound.actions {
             for _ in 0..repeat_limit {
                 for action in actions {

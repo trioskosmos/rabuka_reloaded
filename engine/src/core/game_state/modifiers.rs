@@ -1415,27 +1415,7 @@ impl GameState {
                 self.ability_queue
                     .push_constant_context(owner_id.to_string());
                 let mut resolver = AbilityResolver::new(self.card_database.clone(), Some(cid));
-                let _ = resolver.execute_modify_required_hearts(
-                    self,
-                    effect.operation_any().as_deref().unwrap_or("decrease"),
-                    effect.value_or_count(0),
-                    effect.heart_colors_any(),
-                    effect.target_name(),
-                    effect.per_unit_any().unwrap_or(false),
-                    effect.per_unit_count_any().unwrap_or(1),
-                    effect.group_name(),
-                    effect.timing_condition_any().as_deref(),
-                    effect.location_any().as_deref(),
-                    effect.original_value_any(),
-                    effect.original_count_any(),
-                    effect.original_operator_any().as_deref(),
-                    effect.exclude_self_any().unwrap_or(false),
-                    effect.self_target_any().unwrap_or(false),
-                    effect.exclude_heart_colors_any(),
-                    effect.max.unwrap_or(false),
-                    effect.repeat_limit_any(),
-                    &effect.per_unit_heart_colors_any(),
-                );
+                let _ = resolver.execute_modify_required_hearts(self, effect);
                 self.ability_queue.pop_constant_context();
                 self.activating_card = prev;
             }

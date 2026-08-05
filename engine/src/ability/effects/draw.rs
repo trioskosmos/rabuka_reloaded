@@ -509,13 +509,10 @@ impl AbilityResolver {
         Ok(())
     }
 
-    pub fn execute_draw_until_count(
-        &mut self,
-        gs: &mut GameState,
-        target_count: u8,
-        target: &str,
-        destination: &str,
-    ) {
+    pub fn execute_draw_until_count(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
+        let target_count: u8 = effect.target_count_any().unwrap_or(0) as u8;
+        let target = effect.target_name();
+        let destination = effect.destination.as_deref().unwrap_or(Zone::Hand.to_str());
         let player = gs.resolve_target_player_mut(target);
         let current_count = match Zone::from_str(destination) {
             Some(Zone::Hand) => player.hand.len(),

@@ -1844,9 +1844,10 @@ impl AbilityResolver {
     pub(crate) fn execute_play_baton_touch(
         &mut self,
         gs: &mut GameState,
-        count: u8,
-        target: &str,
+        effect: &AbilityEffect,
     ) -> Result<(), String> {
+        let count: u8 = effect.count_or(1) as u8;
+        let target = effect.target_name();
         log::debug!("play_baton_touch: count={}, target={}", count, target);
         let player_id = gs.resolve_target_player(target).id.clone();
         if gs.get_baton_touch_count(&player_id) > 0 {
@@ -1907,23 +1908,115 @@ impl AbilityResolver {
     pub fn execute_place_energy_under_member(
         &mut self,
         gs: &mut GameState,
-        count: u8,
-        target: &str,
-        position: Option<&PositionInfo>,
-        optional: bool,
-        source: Option<&str>,
-        any_number: bool,
+        effect: &AbilityEffect,
     ) {
+        self.execute_place_energy_under_member_impl(gs, effect, false)
+    }
+
+    /// Cost-path variant: forces optional=false to avoid re-prompting the
+    /// optional-cost choice (infinite-loop guard used by cost.rs re-entry).
+    pub fn execute_place_energy_under_member_non_optional(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) {
+        self.execute_place_energy_under_member_impl(gs, effect, true)
+    }
+
+    fn execute_place_energy_under_member_impl(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        force_non_optional: bool,
+    ) {
+        // Resolve the count (dynamic_count overrides energy_count).
+        let count: u8 = if let Some(ref dc) = effect.dynamic_count_any() {
+            self.resolve_dynamic_count(gs, dc)
+        } else {
+            effect.energy_count_any().unwrap_or(1) as u8
+        };
+        let target = effect.target_name().to_string();
+        let optional = !force_non_optional && effect.optional.unwrap_or(false);
+        let source = effect.source_any().map(|s| s.to_string());
+        let any_number = effect.any_number_any().unwrap_or(false);
+        let position = effect.position_any().cloned();
+
+        // Special case: source="under_member" + destination="energy_zone" means
+        // count from under member, but move from energy_deck → energy_zone (wait).
+        // e.g. PL!N-bp5-012-R+ LiveSuccess: place (under_count + 1) from deck.
+        if source.as_deref() == Some("under_member")
+            && effect.destination.as_deref() == Some("energy_zone")
+        {
+            let player = gs.resolve_target_player_mut(&target);
+            for _ in 0..count {
+                if let Some(energy) = player.energy_deck.draw() {
+                    player.energy_zone.cards.push(energy);
+                    // Don't increment active_energy_count — wait state
+                } else {
+                    break;
+                }
+            }
+            return;
+        }
+
+        // Special case: deploy from under_member to empty_area
+        // (e.g. PL!-bp6-003-R+ LiveSuccess)
+        if source.as_deref() == Some("under_member")
+            && effect.destination.as_deref() == Some("empty_area")
+        {
+            let player = gs.resolve_target_player(&target);
+            let has_empty_slot = (0..3).any(|i| player.stage.stage[i] == -1);
+            if !has_empty_slot {
+                return;
+            }
+            let pos = gs
+                .activating_card
+                .and_then(|c| player.stage.stage.iter().position(|&id| id == c))
+                .unwrap_or(1);
+            let area = match pos {
+                0 => crate::zones::MemberArea::LeftSide,
+                1 => crate::zones::MemberArea::Center,
+                _ => crate::zones::MemberArea::RightSide,
+            };
+            let under_cards = player.stage.get_under_cards(area);
+            if under_cards.is_empty() {
+                return;
+            }
+            let target_str = target.clone();
+            let desc_ja = "このメンバーの下から出すメンバーカードを選択".to_string();
+            let mut b = Choice::select_cards(
+                Zone::UnderMember.to_str(),
+                count as usize,
+                "Select a member card to deploy from under this member",
+                optional,
+            )
+            .description_ja(Some(desc_ja))
+            .card_type(effect.card_type_any().map(|s| s.to_string()))
+            .target_player_id(Some(target_str));
+            if let Some(ref groups) = effect.group_names_any() {
+                if let Some(first) = groups.first() {
+                    b = b.group(Some(first.clone()));
+                }
+            }
+            b = b.cost_limit(
+                effect.cost_limit_any().map(|v| v as u8),
+                effect.cost_limit_operator_any().map(|s| s.to_string()),
+            );
+            self.pending_choice = Some(b.build());
+            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+            return;
+        }
+
         let activating_pos = gs.activating_card.and_then(|c| {
-            gs.resolve_target_player(target)
+            gs.resolve_target_player(&target)
                 .stage
                 .stage
                 .iter()
                 .position(|&id| id == c)
         });
-        if Zone::from_str(source.unwrap_or("")) == Some(Zone::UnderMember) {
+        if Zone::from_str(source.as_deref().unwrap_or("")) == Some(Zone::UnderMember) {
             // Collect ALL energy cards from ALL stage positions
-            let player = gs.resolve_target_player_mut(target);
+            let player = gs.resolve_target_player_mut(&target);
             let mut all_under: Vec<i16> = Vec::new();
             for si in 0..3 {
                 for &cid in &player.stage.under_cards[si] {
@@ -1997,7 +2090,7 @@ impl AbilityResolver {
                 }
             }
         }
-        let player = gs.resolve_target_player_mut(target);
+        let player = gs.resolve_target_player_mut(&target);
         let mut energy_cards = Vec::new();
         for _ in 0..count {
             if let Some(energy_card) = player.energy_zone.cards.pop() {
@@ -2010,7 +2103,7 @@ impl AbilityResolver {
             return;
         }
         player.energy_zone.sub_active(energy_cards.len() as u8);
-        let target_index = match position.and_then(|p| p.get_position()) {
+        let target_index = match position.as_ref().and_then(|p| p.get_position()) {
             Some("center") | Some("中央") => 1,
             Some("left") | Some("左側") => 0,
             Some("right") | Some("右側") => 2,
@@ -3433,11 +3526,38 @@ impl AbilityResolver {
     pub(crate) fn execute_pay_energy(
         &mut self,
         gs: &mut GameState,
-        count: u8,
-        target: &str,
+        effect: &AbilityEffect,
     ) -> Result<(), String> {
+        let count: u8 = if let Some(ref dc) = effect.dynamic_count_any() {
+            self.resolve_dynamic_count(gs, dc)
+        } else {
+            effect
+                .energy_count_any()
+                .unwrap_or_else(|| effect.count_or(0)) as u8
+        };
+        if effect.optional.unwrap_or(false) {
+            let player = gs.resolve_target_player(effect.target_name());
+            if player.energy_zone.active_count() < count {
+                // Insufficient energy: skip payment and clear remaining actions
+                self.cancel_remaining_commands = true;
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.pending_actions.clear();
+                }
+                return Ok(());
+            }
+            self.pending_energy_payment = Some(count);
+            self.pending_choice = Some(Choice::SelectTarget {
+                target: "pay_optional_cost:skip_optional_cost".to_string(),
+                description: format!("Pay {} energy?", count),
+                description_en: Some(format!("Pay {} energy?", count)),
+                description_ja: Some(format!("{}エネルギー支払う？", count)),
+                allow_skip: false,
+                options: None,
+            });
+            return Ok(());
+        }
         if count > 0 {
-            let player = gs.resolve_target_player_mut(target);
+            let player = gs.resolve_target_player_mut(effect.target_name());
             player.energy_zone.pay_energy(count)?;
         }
         let pp = self.player_prefix(gs);
@@ -3453,9 +3573,10 @@ impl AbilityResolver {
     pub(crate) fn execute_discard_until_count(
         &mut self,
         gs: &mut GameState,
-        target_count: u8,
-        target: &str,
+        effect: &AbilityEffect,
     ) -> Result<(), String> {
+        let target_count: u8 = effect.target_count_any().unwrap_or(0) as u8;
+        let target = effect.target_name();
         let player = gs.resolve_target_player_mut(target);
         let current_count = player.hand.cards.len();
         if current_count <= target_count as usize {
@@ -3492,11 +3613,16 @@ impl AbilityResolver {
     pub(crate) fn execute_restriction(
         &mut self,
         gs: &mut GameState,
-        restriction_type: Option<&str>,
-        restricted_destination: Option<&str>,
-        target: &str,
-        delayed: bool,
+        effect: &AbilityEffect,
     ) -> Result<(), String> {
+        let restriction_type_binding = effect.restriction_type_any();
+        let restriction_type = restriction_type_binding.as_deref();
+        let restricted_dest_binding = effect.restricted_destination_any();
+        let restricted_destination = restricted_dest_binding
+            .as_deref()
+            .or(effect.destination.as_deref());
+        let target = effect.target_name();
+        let delayed = effect.delayed_any().unwrap_or(false);
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -3541,12 +3667,9 @@ impl AbilityResolver {
         Ok(())
     }
 
-    pub(crate) fn execute_re_yell(
-        &mut self,
-        gs: &mut GameState,
-        lose_blade_hearts: bool,
-        target: &str,
-    ) {
+    pub(crate) fn execute_re_yell(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
+        let lose_blade_hearts = effect.lose_blade_hearts_any().unwrap_or(false);
+        let target = effect.target_name();
         log::debug!("re_yell: lose_blade_hearts={}", lose_blade_hearts);
         if lose_blade_hearts {
             // Collect card IDs to clear first (avoid borrow conflict with gs.mods)
@@ -3579,7 +3702,12 @@ impl AbilityResolver {
             .push(format!("{} {}: [[log_re_yell]]", pp, act_name));
     }
 
-    pub(crate) fn execute_activation_restriction(&mut self, gs: &mut GameState, target: &str) {
+    pub(crate) fn execute_activation_restriction(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) {
+        let target = effect.target_name();
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -3630,7 +3758,9 @@ impl AbilityResolver {
         Ok(())
     }
 
-    pub(crate) fn execute_shuffle(&mut self, gs: &mut GameState, target: &str, source: &str) {
+    pub(crate) fn execute_shuffle(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
+        let target = effect.target_name();
+        let source = effect.source_or(Zone::Deck.to_str());
         let player = gs.resolve_target_player_mut(target);
         match Zone::from_str(source) {
             Some(Zone::Deck) => {
@@ -3688,7 +3818,29 @@ impl AbilityResolver {
     /// and add them to revealed_cards. The yell count is the number of times
     /// to repeat this draw-and-reveal process (calculated from per_unit for
     /// MIRAI TICKET's "for every 5 cost, perform 1 additional yell").
-    pub(crate) fn execute_perform_yell(&mut self, gs: &mut GameState, count: u8, target: &str) {
+    pub(crate) fn execute_perform_yell(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
+        let count: u8 = if effect.per_unit_any().unwrap_or(false) {
+            // per_unit with per_unit_source = "previous_moved_cards":
+            // sum costs of cards moved by the preceding action,
+            // divide by per_unit_count, cap at repeat_limit.
+            let total_cost: u8 = self
+                .moved_cards
+                .iter()
+                .filter_map(|&cid| gs.card_database.get_card(cid).and_then(|c| c.cost))
+                .map(|v| v as u8)
+                .sum();
+            let divisor = effect.per_unit_count_any().unwrap_or(1) as u8;
+            let mut c = total_cost / divisor;
+            if let Some(cap) = effect.repeat_limit_any() {
+                c = c.min(cap as u8);
+            }
+            c
+        } else if let Some(ref dc) = effect.dynamic_count_any() {
+            self.resolve_dynamic_count(gs, dc)
+        } else {
+            effect.count_or(1) as u8
+        };
+        let target = effect.target_name();
         let card_db = gs.card_database.clone();
         let bm = gs.mods.blade_modifiers.clone();
         let om = gs.mods.orientation_modifiers.clone();

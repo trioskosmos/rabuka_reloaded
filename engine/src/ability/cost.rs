@@ -900,28 +900,12 @@ impl AbilityResolver {
                 }
             }
             ActionType::PlaceEnergyUnderMember => {
-                self.execute_place_energy_under_member(
-                    gs,
-                    cost.count.unwrap_or(1),
-                    cost.target.as_deref().unwrap_or("self"),
-                    cost.position_any(),
-                    cost.optional.unwrap_or(false),
-                    cost.source.as_deref(),
-                    cost.any_number_any().unwrap_or(false),
-                );
+                self.execute_place_energy_under_member(gs, cost);
                 Ok(())
             }
             ActionType::Custom => {
                 if cost.destination.as_deref().and_then(Zone::from_str) == Some(Zone::UnderMember) {
-                    self.execute_place_energy_under_member(
-                        gs,
-                        cost.count.unwrap_or(1),
-                        cost.target.as_deref().unwrap_or("self"),
-                        cost.position_any(),
-                        cost.optional.unwrap_or(false),
-                        None,
-                        cost.any_number_any().unwrap_or(false),
-                    );
+                    self.execute_place_energy_under_member(gs, cost);
                 }
                 Ok(())
             }
@@ -1137,15 +1121,7 @@ impl AbilityResolver {
                 gs.entry_effect().map(|e| e.action.clone())
             );
             if cost.action == ActionType::PlaceEnergyUnderMember {
-                self.execute_place_energy_under_member(
-                    gs,
-                    cost.count.unwrap_or(1),
-                    cost.target.as_deref().unwrap_or("self"),
-                    cost.position_any(),
-                    false,
-                    cost.source.as_deref(),
-                    cost.any_number_any().unwrap_or(false),
-                );
+                self.execute_place_energy_under_member_non_optional(gs, &cost.0);
             }
         }
         self.pending_choice = None;
@@ -1177,15 +1153,7 @@ impl AbilityResolver {
                 // For PlaceEnergyUnderMember, call directly with optional=false
                 // to avoid re-creating the optional cost choice (infinite loop).
                 if effect.action == ActionType::PlaceEnergyUnderMember {
-                    self.execute_place_energy_under_member(
-                        gs,
-                        effect.energy_count_any().unwrap_or(effect.count_or(1)),
-                        effect.target_name(),
-                        effect.position_any(),
-                        false,
-                        effect.source_any(),
-                        effect.any_number_any().unwrap_or(false),
-                    );
+                    self.execute_place_energy_under_member_non_optional(gs, &effect);
                 } else if let Err(e) = self.execute_effect(gs, &effect) {
                     log::debug!("Failed to execute effect after optional cost: {}", e);
                 }
@@ -1199,16 +1167,7 @@ impl AbilityResolver {
             }
         } else if is_effect_optional {
             if let Some(effect) = gs.entry_effect().cloned() {
-                let new_count = effect.energy_count_any().unwrap_or(effect.count_or(1));
-                self.execute_place_energy_under_member(
-                    gs,
-                    new_count,
-                    effect.target_name(),
-                    effect.position_any(),
-                    false,
-                    effect.source_any(),
-                    effect.any_number_any().unwrap_or(false),
-                );
+                self.execute_place_energy_under_member_non_optional(gs, &effect);
             }
         }
         Ok(())

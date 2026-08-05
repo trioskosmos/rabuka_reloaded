@@ -42,11 +42,7 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         if effect.all_regions_any().unwrap_or(false) {
-            self.execute_set_card_identity_all_regions(
-                gs,
-                effect.identities_any(),
-                effect.target_name(),
-            );
+            self.execute_set_card_identity_all_regions(gs, effect);
         } else {
             self.execute_set_card_identity(
                 gs,
@@ -58,14 +54,14 @@ impl AbilityResolver {
 
     // ===== LEAF EFFECTS (all data directly from AbilityEffect params) =====
 
-    pub(crate) fn execute_activate_ability(
-        &mut self,
-        gs: &mut GameState,
-        ability_text: &str,
-        target_trigger: Option<&str>,
-        count: Option<u8>,
-        source_card: Option<&str>,
-    ) {
+    pub(crate) fn execute_activate_ability(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
+        let ability_text_binding = effect.ability_text_any();
+        let ability_text = ability_text_binding.as_deref().unwrap_or("");
+        let target_trigger_binding = effect.target_trigger_any();
+        let target_trigger = target_trigger_binding.as_deref();
+        let count = effect.count_any().map(|v| v as u8);
+        let source_card_binding = effect.source_card_any();
+        let source_card = source_card_binding.as_deref();
         let card_id = source_card.and_then(|sc| match sc {
             "cost_card" => gs
                 .recently_moved_cards

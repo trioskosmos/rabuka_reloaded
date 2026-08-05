@@ -1450,15 +1450,9 @@ impl AbilityResolver {
             Some(Zone::UnderMember) => {
                 // Move from under_member to destination needs a choice.
                 // Delegate to place_energy_under_member for choice creation.
-                self.execute_place_energy_under_member(
-                    gs,
-                    count as u8,
-                    effect.target_name(),
-                    effect.position_any(),
-                    effect.optional.unwrap_or(false),
-                    Some(Zone::UnderMember.to_str()),
-                    effect.any_number_any().unwrap_or(false),
-                );
+                let mut modified = effect.clone();
+                modified.source = Some(crate::ability::enums::Zone::UnderMember.to_str().into());
+                self.execute_place_energy_under_member(gs, &modified);
                 Ok(vec![])
             }
             _ => Err(format!("Unknown source zone: {}", source_str)),
@@ -1470,6 +1464,12 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
+        // Multiple-target move to the deck is handled by the dedicated both path.
+        if effect.multiple_targets_any().unwrap_or(false)
+            && effect.target.as_deref() == Some("deck")
+        {
+            return self.execute_move_cards_both(gs, effect);
+        }
         let count = if effect.count.is_some() {
             effect.count.unwrap() as usize
         } else if let Some(ref dc) = effect.dynamic_count_any() {

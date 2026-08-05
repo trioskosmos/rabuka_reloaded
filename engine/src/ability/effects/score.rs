@@ -15,20 +15,26 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-        operation: &str,
-        value: u8,
-        target: &str,
-        duration: Option<&str>,
-        card_type: Option<&str>,
-        group_name: Option<&str>,
-        per_unit: bool,
-        per_unit_count: u8,
-        per_unit_type: Option<&str>,
-        location: Option<&str>,
-        effect_constraint: Option<&str>,
-        self_target: bool,
-        heart_colors: &[String],
     ) -> Result<(), String> {
+        let operation = effect
+            .operation_any()
+            .as_deref()
+            .unwrap_or("add")
+            .to_string();
+        let value: u8 = effect.value_any().unwrap_or(0) as u8;
+        let target = effect.target_name().to_string();
+        let duration = effect.duration_any().map(|s| s.to_string());
+        let card_type_filter = effect
+            .card_type_any()
+            .map(|ct| ct.as_card_str().to_string());
+        let group_filter = effect.group_name().map(|s| s.to_string());
+        let per_unit = effect.per_unit_any().unwrap_or(false);
+        let per_unit_count_val = effect.per_unit_count_any().unwrap_or(1) as u8;
+        let per_unit_type_str = effect.per_unit_type_any().map(|s| s.to_string());
+        let location = effect.location_any().map(|s| s.to_string());
+        let effect_constraint = effect.effect_constraint_any().map(|s| s.to_string());
+        let self_target = effect.self_target_any().unwrap_or(false);
+        let heart_colors = effect.heart_colors_any();
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             eprintln!(
                 "[SCORE_DIAG] execute_modify_score called: value={} target={} op={} condition={:?}",
@@ -38,14 +44,6 @@ impl AbilityResolver {
                 effect.condition.is_some()
             );
         }
-        let operation = operation.to_string();
-        let target = target.to_string();
-        let duration = duration.map(|s| s.to_string());
-        let card_type_filter = card_type.map(|s| s.to_string());
-        let group_filter = group_name.map(|s| s.to_string());
-        let per_unit_count_val = per_unit_count;
-        let per_unit_type_str = per_unit_type.map(|s| s.to_string());
-        let effect_constraint = effect_constraint.map(|s| s.to_string());
         let card_db = self.card_db();
         let exclude_self_id = if effect.exclude_self_any().unwrap_or(false) {
             gs.activating_card
@@ -92,7 +90,7 @@ impl AbilityResolver {
                 let pt = per_unit_type_str.as_deref();
                 let effective_per_unit_zone = match pt {
                     Some("heart_colors") => pt,
-                    _ => location.or(pt),
+                    _ => location.as_deref().or(pt),
                 };
                 let matching_count = if effective_per_unit_zone == Some("つ") {
                     // "つ" = counter for units; for energy costs this is the
@@ -257,25 +255,30 @@ impl AbilityResolver {
     pub(crate) fn execute_modify_required_hearts(
         &mut self,
         gs: &mut GameState,
-        operation: &str,
-        mut value: u8,
-        heart_colors: &[String],
-        target: &str,
-        per_unit: bool,
-        per_unit_count: u8,
-        group_name: Option<&str>,
-        timing_condition: Option<&str>,
-        location: Option<&str>,
-        original_value: Option<bool>,
-        original_count: Option<u8>,
-        original_operator: Option<&str>,
-        exclude_self: bool,
-        self_target: bool,
-        exclude_heart_colors: &[String],
-        max: bool,
-        repeat_limit: Option<u8>,
-        per_unit_heart_colors: &[String],
+        effect: &AbilityEffect,
     ) -> Result<(), String> {
+        let operation_binding = effect.operation_any();
+        let operation = operation_binding.as_deref().unwrap_or("decrease");
+        let mut value: u8 = effect.value_or_count(0) as u8;
+        let heart_colors = effect.heart_colors_any();
+        let target = effect.target_name();
+        let per_unit = effect.per_unit_any().unwrap_or(false);
+        let per_unit_count: u8 = effect.per_unit_count_any().unwrap_or(1) as u8;
+        let group_name = effect.group_name();
+        let timing_condition_binding = effect.timing_condition_any();
+        let timing_condition = timing_condition_binding.as_deref();
+        let location_binding = effect.location_any();
+        let location = location_binding.as_deref();
+        let original_value = effect.original_value_any();
+        let original_count = effect.original_count_any().map(|v| v as u8);
+        let original_operator_binding = effect.original_operator_any();
+        let original_operator = original_operator_binding.as_deref();
+        let exclude_self = effect.exclude_self_any().unwrap_or(false);
+        let self_target = effect.self_target_any().unwrap_or(false);
+        let exclude_heart_colors = effect.exclude_heart_colors_any();
+        let max = effect.max.unwrap_or(false);
+        let repeat_limit = effect.repeat_limit_any().map(|v| v as u8);
+        let per_unit_heart_colors = effect.per_unit_heart_colors_any();
         if per_unit {
             let card_db = &gs.card_database;
             let player = gs.resolve_target_player(target);
@@ -535,12 +538,10 @@ impl AbilityResolver {
         Ok(())
     }
 
-    pub(crate) fn execute_modify_yell_count(
-        &mut self,
-        gs: &mut GameState,
-        operation: &str,
-        count: u8,
-    ) {
+    pub(crate) fn execute_modify_yell_count(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
+        let operation_binding = effect.operation_any();
+        let operation = operation_binding.as_deref().unwrap_or("subtract");
+        let count: u8 = effect.count_or(0) as u8;
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -567,9 +568,11 @@ impl AbilityResolver {
     pub(crate) fn execute_modify_limit(
         &mut self,
         gs: &mut GameState,
-        operation: &str,
-        count: u8,
+        effect: &AbilityEffect,
     ) -> Result<(), String> {
+        let operation_binding = effect.operation_any();
+        let operation = operation_binding.as_deref().unwrap_or("decrease");
+        let count: u8 = effect.count_or(0) as u8;
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -596,12 +599,14 @@ impl AbilityResolver {
     pub(crate) fn execute_modify_required_hearts_success(
         &mut self,
         gs: &mut GameState,
-        operation: &str,
-        value: u8,
-        target: &str,
-        card_type: Option<&str>,
-        heart_colors: &[String],
+        effect: &AbilityEffect,
     ) {
+        let operation_binding = effect.operation_any();
+        let operation = operation_binding.as_deref().unwrap_or("increase");
+        let value: u8 = effect.value_any().unwrap_or(0) as u8;
+        let target = effect.target_name();
+        let card_type = effect.card_type_any().map(|ct| ct.as_card_str());
+        let heart_colors = effect.heart_colors_any();
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card

@@ -10,7 +10,8 @@ import * as i18n from '../i18n/index.js';
 import { Tooltips } from '../ui_tooltips.js';
 import { TextEnricher } from '../utils/TextEnricher.js';
 
-// heart types: index 0 = heart_00 (wildcard Any), index 7 = icon_all (counts as ALL colors)
+// heart types: index 0 = heart_00 (COLORLESS — only fills heart0 reqs, e.g. b_heart07),
+// index 7 = icon_all (counts as ALL colors)
 const HEART_LABELS = ['Any', 'Pink', 'Red', 'Yellow', 'Green', 'Blue', 'Purple', 'All'];
 
 const HEART_ICONS = [
@@ -143,6 +144,15 @@ function renderHeartsCompact(hearts) {
     return `<div class="hearts-compact">${hearts.map((count, index) => {
         if (!count) return '';
         const iconSrc = HEART_ICONS[index];
+        if (index === 0) {
+            // COLORLESS hearts (Any) — e.g. b_heart07 produces these in the pool.
+            // There is no dedicated "double colorless" icon yet, so render each
+            // colorless heart as its own heart_00.png icon (2 → two icons).
+            const icons = Array.from({ length: count }, () =>
+                `<img src="${iconSrc}" class="heart-mini-icon" alt="${HEART_LABELS[index]}">`
+            ).join('');
+            return `<div class="heart-tag color-any" title="${HEART_LABELS[index]}">${icons}</div>`;
+        }
         return `
             <div class="heart-tag ${index === 0 ? 'color-any' : `color-${index}`}" title="${HEART_LABELS[index]}">
                 <img src="${iconSrc}" class="heart-mini-icon" alt="${HEART_LABELS[index]}">
@@ -404,8 +414,13 @@ function renderPerfSteps(result) {
 
     const fmtH = (arr) => arr ? arr.map((v,i) => v > 0 ? `${HEART_LABELS[i]}:${v}` : null).filter(Boolean).join(' ') : 'none';
     const fmtHeartIcon = (i) => i === 0 ? 'img/texticon/heart_00.png' : i === 7 ? 'img/texticon/icon_all.png' : `img/texticon/heart_0${i}.png`;
-    const fmtHShortReq = (arr) => arr ? arr.map((v,i) => v > 0 ? `<img src="${fmtHeartIcon(i)}" class="heart-mini-icon">${v}` : '').join('') : '';
-    const fmtHShortSrc = (arr) => arr ? arr.map((v,i) => v > 0 ? `<img src="${fmtHeartIcon(i)}" class="heart-mini-icon">${v}` : '').join('') : '';
+    // COLORLESS hearts (index 0, e.g. b_heart07) have no dedicated double icon yet —
+    // render each one as an individual heart_00.png icon.
+    const fmtHeartCount = (i, v) => i === 0
+        ? Array.from({ length: v }, () => `<img src="img/texticon/heart_00.png" class="heart-mini-icon">`).join('')
+        : `<img src="${fmtHeartIcon(i)}" class="heart-mini-icon">${v}`;
+    const fmtHShortReq = (arr) => arr ? arr.map((v,i) => v > 0 ? fmtHeartCount(i, v) : '').join('') : '';
+    const fmtHShortSrc = (arr) => arr ? arr.map((v,i) => v > 0 ? fmtHeartCount(i, v) : '').join('') : '';
 
     const totalBlades = result.yell_count || 0;
     const passedLives = (result.lives || []).filter(l => l.passed).length;
@@ -480,7 +495,11 @@ function renderPerfSteps(result) {
                     <div class="perf-step-hearts-row">
                           ${result.total_hearts ? HEART_LABELS.map((_, i) =>
                               result.total_hearts[i] > 0
-                                 ? `<span class="perf-step-heart-cell"><img src="img/texticon/heart_0${i}.png" class="heart-mini-icon"> ${result.total_hearts[i]}</span>`
+                                 ? (i === 0
+                                     // COLORLESS hearts (Any, e.g. b_heart07): render each
+                                     // as its own heart_00.png icon (no dedicated double icon yet).
+                                     ? `<span class="perf-step-heart-cell">${Array.from({ length: result.total_hearts[i] }, () => '<img src="img/texticon/heart_00.png" class="heart-mini-icon">').join('')}</span>`
+                                     : `<span class="perf-step-heart-cell"><img src="img/texticon/heart_0${i}.png" class="heart-mini-icon"> ${result.total_hearts[i]}</span>`)
                                 : ''
                         ).join('') : ''}
                     </div>
