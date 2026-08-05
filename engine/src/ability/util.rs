@@ -189,6 +189,63 @@ pub fn calculate_play_cost_reduction(
     cost_reduction
 }
 
+/// Compute the full play cost for a member card being played from hand:
+/// `base − self/stage/live-zone reductions + success-live-zone increase`,
+/// then apply a constant set-override ("このカードのコストはNになる") if present.
+///
+/// This is the single source of truth for play-cost — all four inputs
+/// (reduction, increase, set-override, base) are combined here so the flow is
+/// obvious in one place instead of split across player.rs and phases.rs.
+pub fn compute_play_cost(
+    player: &crate::player::Player,
+    card_id: i16,
+    card_db: &CardDatabase,
+    set_override: i32,
+) -> u8 {
+    let Some(card) = card_db.get_card(card_id) else {
+        return 0;
+    };
+    let base_cost = card.cost.unwrap_or(0);
+    // Card is being removed from hand; +1 recovers the true hand count for
+    // per-unit reductions.
+    let hand_count = player.hand.cards.len() + 1;
+    let reduction = calculate_play_cost_reduction(
+        &player.stage,
+        &player.success_live_card_zone.cards,
+        hand_count,
+        card_id,
+        card_db,
+    );
+    // Cost increase from 常時 abilities (success_live_zone cards → +cost).
+    let mut increase: u8 = 0;
+    for ar in &card.abilities {
+        let ability = ar.resolve();
+        if let Some(ref effect) = ability.effect {
+            if effect.action == crate::ability::enums::ActionType::ModifyCost
+                && matches!(
+                    effect.operation_any().as_deref(),
+                    Some("increase") | Some("add")
+                )
+                && crate::ability::enums::Zone::from_str(
+                    effect.location_any().as_deref().unwrap_or(""),
+                ) == Some(crate::ability::enums::Zone::SuccessLiveZone)
+            {
+                let per_unit_count = effect.per_unit_count_any().unwrap_or(1) as usize;
+                let success_count = player.success_live_card_zone.cards.len();
+                let multiplier = effect.count.unwrap_or(1);
+                increase = ((success_count / per_unit_count) as u8) * multiplier;
+            }
+        }
+    }
+    let mut cost = base_cost.saturating_sub(reduction).saturating_add(increase);
+    // Constant set-override ("コストはNになる", e.g. LL-bp7-001-R＋ ab#0)
+    // replaces the base play cost entirely. 0 means no set modifier.
+    if set_override != 0 && set_override != base_cost as i32 {
+        cost = set_override.max(0) as u8;
+    }
+    cost
+}
+
 /// Inner predicate shared across the three cost-reduction source scans.
 /// Returns `Some(reduction)` if the first qualifying ModifyCost-subtract-hand
 /// ability is found in `abilities`, or `None` if none match.

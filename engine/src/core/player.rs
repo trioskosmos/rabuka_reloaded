@@ -1,4 +1,3 @@
-use crate::ability::enums::Zone;
 use crate::zones::{
     EnergyDeck, EnergyZone, ExclusionZone, Hand, LiveCardZone, MainDeck, Stage,
     SuccessLiveCardZone, Waitroom,
@@ -225,51 +224,16 @@ impl Player {
             }
 
             // Rule 9.6.2.3: Cost is equal to the card's cost value in energy
-            let card_cost = card.cost.unwrap_or(0);
 
-            // Rule 9.6.2.3: Determine cost and pay all costs
-
-            // Rule: Cost reduction from 常時 abilities (parsed as modify_cost/subtract/hand)
-            // Card was already removed from hand, so add 1 to get true hand count
-            let hand_count = self.hand.cards.len() + 1;
-            let cost_reduction = crate::ability::util::calculate_play_cost_reduction(
-                &self.stage,
-                &self.success_live_card_zone.cards,
-                hand_count,
+            // Rule 9.6.2.3: Determine cost and pay all costs.
+            // Single consolidated play-cost computation (reductions + increase +
+            // set-override) in util::compute_play_cost.
+            let mut cost_to_pay = crate::ability::util::compute_play_cost(
+                self,
                 card_id,
                 card_db,
+                played_card_cost_mod,
             );
-            // Rule: Cost increase from 常時 abilities (e.g. success_live_zone cards → +cost)
-            let mut cost_increase: u8 = 0;
-            for ar in &card.abilities {
-                let ability = ar.resolve();
-                if let Some(ref effect) = ability.effect {
-                    if effect.action == crate::ability::enums::ActionType::ModifyCost
-                        && matches!(
-                            effect.operation_any().as_deref(),
-                            Some("increase") | Some("add")
-                        )
-                        && Zone::from_str(effect.location_any().as_deref().unwrap_or(""))
-                            == Some(Zone::SuccessLiveZone)
-                    {
-                        let per_unit_count = effect.per_unit_count_any().unwrap_or(1) as usize;
-                        let success_count = self.success_live_card_zone.cards.len();
-                        let multiplier = effect.count.unwrap_or(1);
-                        cost_increase = ((success_count / per_unit_count) as u8) * multiplier;
-                    }
-                }
-            }
-            let mut cost_to_pay = card_cost
-                .saturating_sub(cost_reduction)
-                .saturating_add(cost_increase);
-
-            // A constant set-override modifier (「このカードのコストはNになる」,
-            // e.g. LL-bp7-001-R＋ ab#0) replaces the base play cost entirely.
-            // The caller passes the already-evaluated set value (absolute).
-            if played_card_cost_mod != 0 && played_card_cost_mod != card_cost as i32 {
-                // set modifiers are stored as absolute target costs.
-                cost_to_pay = played_card_cost_mod.max(0) as u8;
-            }
 
             // Rule 9.6.2.3.2: Baton touch - if 1+ energy to pay, can send member from target area to waitroom instead
 
