@@ -22,6 +22,7 @@ pub mod blade_per_discard_test;
 pub mod bloom_hs_test;
 pub mod bp7_character_name_condition_test;
 pub mod bp7_deck_bottom_source_test;
+pub mod bp7_dia_both_hand_reorder_test;
 pub mod bp7_fire_bird_blade_gain_test;
 pub mod bp7_heart_copy_test;
 pub mod bp7_karin_dynamic_blade_wait_test;

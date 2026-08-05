@@ -9070,7 +9070,61 @@ _register_effect_rule(
 )
 
 
-# PriorityRegistry dispatching _EFFECT_RULES first (0-99), then the legacy
+def _set_both_hand_keep_shuffle_under(t: str, r: Dict[str, Any]) -> None:
+    """C6: 自分と相手はそれぞれ、手札のカードをN枚まで選び、選んだカード以外を
+    シャッフルして自身のデッキの下に置く。その後、それぞれカードをN枚引く。
+
+    Emits:
+      select   (hand, both, count=N, max)          keep up to N
+      move     (hand -> deck_bottom, exclude_selected, shuffle, both)
+      draw     (deck -> hand, both, count=N)
+    """
+    cm = re.search(r"カードを(\d+)枚まで選び", t)
+    count = int(cm.group(1)) if cm else 1
+    cm2 = re.search(r"その後、[^。]*カードを(\d+)枚引く", t)
+    draw_count = int(cm2.group(1)) if cm2 else count
+    actions = [
+        {
+            "text": t,
+            "action": "select",
+            "source": "hand",
+            "count": count,
+            "max": True,
+            "target": "both",
+            "multiple_targets": True,
+        },
+        {
+            "text": t,
+            "action": "move_cards",
+            "source": "hand",
+            "destination": "deck_bottom",
+            "shuffle": True,
+            "exclude_selected": True,
+            "card_type": "card",
+            "target": "both",
+            "multiple_targets": True,
+        },
+        {
+            "text": t,
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand",
+            "count": draw_count,
+            "target": "both",
+            "multiple_targets": True,
+        },
+    ]
+    r.clear()
+    r.update({"text": t, "action": "sequential", "actions": actions})
+
+
+_register_effect_rule(
+    EffectPattern(
+        match="選んだカード以外のカードをシャッフルし",
+        action="sequential",
+        setter=_set_both_hand_keep_shuffle_under,
+    )
+)
 # _EFFECT_HANDLERS cascade (100+). Explicit priorities keep both additive.
 _effect_registry = PriorityRegistry("effect_handlers")
 for _ri, _h in enumerate(_EFFECT_RULES):
