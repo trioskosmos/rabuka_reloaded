@@ -776,6 +776,42 @@ pub struct EffectFilter {
     pub per_unit_heart_colors: Box<Vec<String>>,
     pub cost_limit: Option<u8>,
     pub cost_limit_operator: Option<Operator>,
+    /// Blade-count target filter (e.g. "ブレードを4つ以上持つ"). Whether it
+    /// means the printed/original value or the CURRENT total is decided by the
+    /// effect's `original_value` flag when building a CardFilter.
+    pub blade_limit: Option<u8>,
+    pub blade_limit_operator: Option<Operator>,
+    pub need_heart_color: Option<ArcStr>,
+    pub need_heart_operator: Option<Operator>,
+    pub need_heart_total: Option<u8>,
+    pub cost_reference: Option<ArcStr>,
+    pub cost_offset: Option<i8>,
+    pub target_member: Option<ArcStr>,
+    pub target_from_selection: Option<bool>,
+    pub source_position: Option<ArcStr>,
+    pub exclude_selected: Option<bool>,
+    pub discard_remaining: Option<bool>,
+    pub self_cost: Option<bool>,
+    pub shuffle: Option<bool>,
+    pub effect_constraint: Option<ArcStr>,
+    pub sign: Option<ArcStr>,
+    pub heart_type: Option<ArcStr>,
+    pub alternative_count_type: Option<ArcStr>,
+    pub blind: Option<bool>,
+    pub picker: Option<ArcStr>,
+    pub reveal: Option<bool>,
+    pub choice_type: Option<ArcStr>,
+    pub choice_options: Option<Box<Vec<String>>>,
+    pub replaces_event: Option<ArcStr>,
+    pub choice_based: Option<bool>,
+    pub use_limit: Option<u8>,
+    pub triggers: Option<ArcStr>,
+    pub original_count: Option<u8>,
+    pub original_operator: Option<Operator>,
+    pub quoted_text: Option<Box<QuotedText>>,
+    pub allow_occupied_stage: Option<bool>,
+    pub state_change: Option<Box<EffectState>>,
+    pub exclude_position: Option<ArcStr>,
     pub duration: Option<ArcStr>,
     pub dynamic_count: Option<Box<DynamicCount>>,
     pub filter_targets_by_heart_colors: Option<bool>,
@@ -821,11 +857,47 @@ pub struct EffectFilter {
     pub choice_maker: Option<ArcStr>,
     pub cost_limit_min: Option<u8>,
     pub cost_limit_max: Option<u8>,
+    pub count: Option<u8>,
+    pub exclude_by_name_source: Option<ArcStr>,
+    pub baton_touch_trigger: Option<bool>,
+    pub is_reveal: Option<bool>,
+    pub resource_on_select: Option<Box<AbilityEffect>>,
+    pub replace_all: Option<bool>,
+    pub resource: Option<ArcStr>,
+    pub heart_colors_from_selected_card: Option<bool>,
+    pub heart_color: Option<ArcStr>,
+    pub ability_gain: Option<ArcStr>,
+    pub ability_gain_trigger: Option<ArcStr>,
+    pub gained_effect: Option<Box<AbilityEffect>>,
+    pub ability_text: Option<ArcStr>,
+    pub target_trigger: Option<ArcStr>,
+    pub source_card: Option<ArcStr>,
+    pub suppressed_trigger: Option<ArcStr>,
+    pub option: Option<ArcStr>,
+    pub alternative_effect: Option<Box<AbilityEffect>>,
+    pub choice_condition: Option<Box<Condition>>,
+    pub alternative_condition: Option<Box<Condition>>,
+    pub restriction_type: Option<ArcStr>,
+    pub restricted_destination: Option<ArcStr>,
+    pub delayed: Option<bool>,
+    pub phase: Option<ArcStr>,
+    pub non_stackable: Option<bool>,
+    pub heart_selection: Option<bool>,
+    pub blade_type: Option<ArcStr>,
+    pub choice: Option<bool>,
+    pub lose_blade_hearts: Option<bool>,
+    pub original_cost: Option<u8>,
+    pub parenthetical: Option<Box<Vec<String>>>,
+    pub resource_icon_count: Option<u8>,
+    pub ref_value: Option<ArcStr>,
+    pub ref_offset: Option<i8>,
+    pub id: Option<ArcStr>,
+    pub opponent_action: Option<Box<AbilityEffect>>,
 }
 
-/// Tagged union of effect-specific fields, indexed by effect action type.
-/// Each variant holds only the fields relevant to its group of actions,
-/// replacing the 142-field flat AbilityEffect struct.
+/// Tagged union of effect action types. Every field lives on the shared
+/// `EffectFilter`; each variant is just a marker carrying the filter box so the
+/// action-type dispatch in `filter()`/`filter_mut()` keeps working.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub enum EffectKind {
@@ -833,149 +905,45 @@ pub enum EffectKind {
     None,
     MoveCards {
         filter: Option<Box<EffectFilter>>,
-        count: Option<u8>,
-        shuffle: Option<bool>,
-        discard_remaining: Option<bool>,
-        exclude_selected: Option<bool>,
-        exclude_by_name_source: Option<ArcStr>,
-        source_position: Option<ArcStr>,
-        exclude_position: Option<ArcStr>,
-        allow_occupied_stage: Option<bool>,
-        target_from_selection: Option<bool>,
-        need_heart_total: Option<u8>,
-        need_heart_operator: Option<Operator>,
-        need_heart_color: Option<ArcStr>,
-        state_change: Option<Box<EffectState>>,
-        self_cost: Option<bool>,
-        cost_reference: Option<ArcStr>,
-        cost_offset: Option<i8>,
-        baton_touch_trigger: Option<bool>,
-        target_member: Option<ArcStr>,
-        quoted_text: Option<Box<QuotedText>>,
     },
     DrawCards {
         filter: Option<Box<EffectFilter>>,
-        count: Option<u8>,
     },
     SelectTarget {
         filter: Option<Box<EffectFilter>>,
-        exclude_selected: Option<bool>,
-        choice_type: Option<ArcStr>,
-        choice_options: Option<Box<Vec<String>>>,
-        reveal: Option<bool>,
-        discard_remaining: Option<bool>,
     },
     LookReveal {
         filter: Option<Box<EffectFilter>>,
-        reveal: Option<bool>,
-        blind: Option<bool>,
-        is_reveal: Option<bool>,
-        picker: Option<ArcStr>,
-        resource_on_select: Option<Box<AbilityEffect>>,
     },
     ModifyScore {
         filter: Option<Box<EffectFilter>>,
-        effect_constraint: Option<ArcStr>,
-        need_heart_operator: Option<Operator>,
-        need_heart_total: Option<u8>,
     },
     ModifyHearts {
         filter: Option<Box<EffectFilter>>,
-        original_count: Option<u8>,
-        original_operator: Option<Operator>,
-        replace_all: Option<bool>,
     },
     GainResource {
         filter: Option<Box<EffectFilter>>,
-        resource: Option<ArcStr>,
-        heart_colors_from_selected_card: Option<bool>,
-        sign: Option<ArcStr>,
-        target_from_selection: Option<bool>,
-        heart_type: Option<ArcStr>,
-        heart_color: Option<ArcStr>,
-        blade_limit: Option<u8>,
-        blade_limit_operator: Option<Operator>,
     },
     ChangeState {
         filter: Option<Box<EffectFilter>>,
-        state_change: Option<Box<EffectState>>,
-        self_cost: Option<bool>,
-        blade_limit: Option<u8>,
-        blade_limit_operator: Option<Operator>,
     },
     AbilityOp {
         filter: Option<Box<EffectFilter>>,
-        ability_gain: Option<ArcStr>,
-        ability_gain_trigger: Option<ArcStr>,
-        gained_effect: Option<Box<AbilityEffect>>,
-        ability_text: Option<ArcStr>,
-        target_trigger: Option<ArcStr>,
-        source_card: Option<ArcStr>,
-        suppressed_trigger: Option<ArcStr>,
-        use_limit: Option<u8>,
-        triggers: Option<ArcStr>,
-        option: Option<ArcStr>,
     },
     CompoundEffect {
         filter: Option<Box<EffectFilter>>,
-        choice_type: Option<ArcStr>,
-        choice_options: Option<Box<Vec<String>>>,
-        alternative_effect: Option<Box<AbilityEffect>>,
-        shuffle: Option<bool>,
-        alternative_count_type: Option<ArcStr>,
-        choice_condition: Option<Box<Condition>>,
-        alternative_condition: Option<Box<Condition>>,
     },
     RestrictionOp {
         filter: Option<Box<EffectFilter>>,
-        restriction_type: Option<ArcStr>,
-        restricted_destination: Option<ArcStr>,
-        delayed: Option<bool>,
-        phase: Option<ArcStr>,
-        non_stackable: Option<bool>,
-        replaces_event: Option<ArcStr>,
-        choice_based: Option<bool>,
     },
     PositionOp {
         filter: Option<Box<EffectFilter>>,
-        target_member: Option<ArcStr>,
-        source_position: Option<ArcStr>,
-        exclude_position: Option<ArcStr>,
-        allow_occupied_stage: Option<bool>,
     },
     MiscOp {
         filter: Option<Box<EffectFilter>>,
-        heart_type: Option<ArcStr>,
-        heart_selection: Option<bool>,
-        blade_type: Option<ArcStr>,
-        choice: Option<bool>,
-        lose_blade_hearts: Option<bool>,
-        effect_constraint: Option<ArcStr>,
-        original_count: Option<u8>,
-        original_operator: Option<Operator>,
-        original_cost: Option<u8>,
-        blade_limit: Option<u8>,
-        blade_limit_operator: Option<Operator>,
-        parenthetical: Option<Box<Vec<String>>>,
-        quoted_text: Option<Box<QuotedText>>,
-        alternative_count_type: Option<ArcStr>,
-        resource_icon_count: Option<u8>,
-        cost_reference: Option<ArcStr>,
-        cost_offset: Option<i8>,
-        blind: Option<bool>,
-        picker: Option<ArcStr>,
-        sign: Option<ArcStr>,
-        ref_value: Option<ArcStr>,
-        ref_offset: Option<i8>,
-        id: Option<ArcStr>,
     },
     CustomOp {
         filter: Option<Box<EffectFilter>>,
-        opponent_action: Option<Box<AbilityEffect>>,
-        replaces_event: Option<ArcStr>,
-        choice_based: Option<bool>,
-        use_limit: Option<u8>,
-        triggers: Option<ArcStr>,
     },
 }
 
@@ -1151,6 +1119,48 @@ impl AbilityEffect {
             per_unit_heart_colors: str_vec_field!("per_unit_heart_colors").unwrap_or_default(),
             cost_limit: u8_field!("cost_limit"),
             cost_limit_operator: None,
+            blade_limit: u8_field!("blade_limit"),
+            blade_limit_operator: obj
+                .get("blade_limit_operator")
+                .and_then(|v| v.as_str())
+                .and_then(parse_operator),
+            need_heart_color: str_field!("need_heart_color"),
+            need_heart_operator: obj
+                .get("need_heart_operator")
+                .and_then(|v| v.as_str())
+                .and_then(parse_operator),
+            need_heart_total: u8_field!("need_heart_total"),
+            cost_reference: str_field!("cost_reference"),
+            cost_offset: i8_field!("cost_offset"),
+            target_member: str_field!("target_member"),
+            target_from_selection: bool_field!("target_from_selection"),
+            source_position: str_field!("source_position"),
+            exclude_selected: bool_field!("exclude_selected"),
+            discard_remaining: bool_field!("discard_remaining"),
+            self_cost: bool_field!("self_cost"),
+            shuffle: bool_field!("shuffle"),
+            effect_constraint: str_field!("effect_constraint"),
+            sign: str_field!("sign"),
+            heart_type: str_field!("heart_type"),
+            picker: str_field!("picker"),
+            reveal: bool_field!("reveal"),
+            replaces_event: str_field!("replaces_event"),
+            use_limit: u8_field!("use_limit"),
+            triggers: str_field!("triggers"),
+            original_count: u8_field!("original_count"),
+            alternative_count_type: str_field!("alternative_count_type"),
+            blind: bool_field!("blind"),
+            allow_occupied_stage: bool_field!("allow_occupied_stage"),
+            state_change: obj
+                .get("state_change")
+                .and_then(|v| v.as_str())
+                .map(|s| Box::new(EffectState::from_str(s))),
+            exclude_position: str_field!("exclude_position"),
+            original_operator: obj
+                .get("original_operator")
+                .and_then(|v| v.as_str())
+                .and_then(parse_operator),
+            quoted_text: None,
             duration: str_field!("duration"),
             dynamic_count: obj
                 .get("dynamic_count")
@@ -1197,8 +1207,51 @@ impl AbilityEffect {
             question: str_field!("question"),
             answers: opt_str_vec_field!("answers"),
             choice_maker: str_field!("choice_maker"),
+            choice_based: bool_field!("choice_based"),
+            choice_options: opt_str_vec_field!("choice_options"),
+            choice_type: str_field!("choice_type"),
             cost_limit_min: u8_field!("cost_limit_min"),
             cost_limit_max: u8_field!("cost_limit_max"),
+            count: u8_field!("count"),
+            exclude_by_name_source: str_field!("exclude_by_name_source"),
+            baton_touch_trigger: bool_field!("baton_touch_trigger"),
+            is_reveal: bool_field!("is_reveal"),
+            resource_on_select: effect_field!("resource_on_select"),
+            replace_all: bool_field!("replace_all"),
+            resource: str_field!("resource"),
+            heart_colors_from_selected_card: bool_field!("heart_colors_from_selected_card"),
+            heart_color: str_field!("heart_color"),
+            ability_gain: str_field!("ability_gain"),
+            ability_gain_trigger: str_field!("ability_gain_trigger"),
+            gained_effect: effect_field!("gained_effect"),
+            ability_text: str_field!("ability_text"),
+            target_trigger: str_field!("target_trigger"),
+            source_card: str_field!("source_card"),
+            suppressed_trigger: str_field!("suppressed_trigger"),
+            option: str_field!("option"),
+            alternative_effect: effect_field!("alternative_effect"),
+            choice_condition: obj
+                .get("choice_condition")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            alternative_condition: obj
+                .get("alternative_condition")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            restriction_type: str_field!("restriction_type"),
+            restricted_destination: str_field!("restricted_destination"),
+            delayed: bool_field!("delayed"),
+            phase: str_field!("phase"),
+            non_stackable: bool_field!("non_stackable"),
+            heart_selection: bool_field!("heart_selection"),
+            blade_type: str_field!("blade_type"),
+            choice: bool_field!("choice"),
+            lose_blade_hearts: bool_field!("lose_blade_hearts"),
+            original_cost: u8_field!("original_cost"),
+            parenthetical: opt_str_vec_field!("parenthetical"),
+            resource_icon_count: u8_field!("resource_icon_count"),
+            ref_value: str_field!("ref_value"),
+            ref_offset: i8_field!("ref_offset"),
+            id: str_field!("id"),
+            opponent_action: effect_field!("opponent_action"),
         };
 
         let a = action.to_lowercase();
@@ -1212,41 +1265,13 @@ impl AbilityEffect {
             | "play_baton_touch"
             | "double_baton_touch" => EffectKind::MoveCards {
                 filter: Some(Box::new(filter())),
-                count: u8_field!("count"),
-                shuffle: bool_field!("shuffle"),
-                discard_remaining: bool_field!("discard_remaining"),
-                exclude_selected: bool_field!("exclude_selected"),
-                exclude_by_name_source: str_field!("exclude_by_name_source"),
-                source_position: str_field!("source_position"),
-                exclude_position: str_field!("exclude_position"),
-                allow_occupied_stage: bool_field!("allow_occupied_stage"),
-                target_from_selection: bool_field!("target_from_selection"),
-                need_heart_total: u8_field!("need_heart_total"),
-                need_heart_operator: None,
-                need_heart_color: str_field!("need_heart_color"),
-                state_change: obj
-                    .get("state_change")
-                    .and_then(|v| v.as_str())
-                    .map(|s| Box::new(EffectState::from_str(s))),
-                self_cost: bool_field!("self_cost"),
-                cost_reference: str_field!("cost_reference"),
-                cost_offset: i8_field!("cost_offset"),
-                baton_touch_trigger: bool_field!("baton_touch_trigger"),
-                target_member: str_field!("target_member"),
-                quoted_text: None,
             },
             "draw" | "draw_card" | "draw_until_count" => EffectKind::DrawCards {
                 filter: Some(Box::new(filter())),
-                count: u8_field!("count"),
             },
             "select" | "select_cards" | "select_number" | "choose_target_player" => {
                 EffectKind::SelectTarget {
                     filter: Some(Box::new(filter())),
-                    exclude_selected: bool_field!("exclude_selected"),
-                    choice_type: str_field!("choice_type"),
-                    choice_options: opt_str_vec_field!("choice_options"),
-                    reveal: bool_field!("reveal"),
-                    discard_remaining: bool_field!("discard_remaining"),
                 }
             }
             "look"
@@ -1258,47 +1283,21 @@ impl AbilityEffect {
             | "reveal_until_chosen_card"
             | "look_and_select" => EffectKind::LookReveal {
                 filter: Some(Box::new(filter())),
-                reveal: bool_field!("reveal"),
-                blind: bool_field!("blind"),
-                is_reveal: bool_field!("is_reveal"),
-                picker: str_field!("picker"),
-                resource_on_select: effect_field!("resource_on_select"),
             },
             "modify_score" => EffectKind::ModifyScore {
                 filter: Some(Box::new(filter())),
-                effect_constraint: str_field!("effect_constraint"),
-                need_heart_operator: None,
-                need_heart_total: u8_field!("need_heart_total"),
             },
             "modify_required_hearts"
             | "modify_required_hearts_global"
             | "modify_required_hearts_success" => EffectKind::ModifyHearts {
                 filter: Some(Box::new(filter())),
-                original_count: u8_field!("original_count"),
-                original_operator: None,
-                replace_all: bool_field!("replace_all"),
             },
             "gain_resource" | "pay_energy" => EffectKind::GainResource {
                 filter: Some(Box::new(filter())),
-                resource: str_field!("resource"),
-                heart_colors_from_selected_card: bool_field!("heart_colors_from_selected_card"),
-                sign: str_field!("sign"),
-                target_from_selection: bool_field!("target_from_selection"),
-                heart_type: str_field!("heart_type"),
-                heart_color: str_field!("heart_color"),
-                blade_limit: u8_field!("blade_limit"),
-                blade_limit_operator: None,
             },
             "change_state" | "set_card_identity" | "set_card_identity_all_regions" => {
                 EffectKind::ChangeState {
                     filter: Some(Box::new(filter())),
-                    state_change: obj
-                        .get("state_change")
-                        .and_then(|v| v.as_str())
-                        .map(|s| Box::new(EffectState::from_str(s))),
-                    self_cost: bool_field!("self_cost"),
-                    blade_limit: u8_field!("blade_limit"),
-                    blade_limit_operator: None,
                 }
             }
             "gain_ability"
@@ -1307,16 +1306,6 @@ impl AbilityEffect {
             | "suppress_ability_trigger"
             | "activate_ability" => EffectKind::AbilityOp {
                 filter: Some(Box::new(filter())),
-                ability_gain: str_field!("ability_gain"),
-                ability_gain_trigger: str_field!("ability_gain_trigger"),
-                gained_effect: effect_field!("gained_effect"),
-                ability_text: str_field!("ability_text"),
-                target_trigger: str_field!("target_trigger"),
-                source_card: str_field!("source_card"),
-                suppressed_trigger: str_field!("suppressed_trigger"),
-                use_limit: u8_field!("use_limit"),
-                triggers: str_field!("triggers"),
-                option: str_field!("option"),
             },
             "sequential"
             | "choice"
@@ -1325,13 +1314,6 @@ impl AbilityEffect {
             | "conditional_on_optional"
             | "conditional_on_result" => EffectKind::CompoundEffect {
                 filter: Some(Box::new(filter())),
-                choice_type: str_field!("choice_type"),
-                choice_options: opt_str_vec_field!("choice_options"),
-                alternative_effect: effect_field!("alternative_effect"),
-                shuffle: bool_field!("shuffle"),
-                alternative_count_type: str_field!("alternative_count_type"),
-                choice_condition: None,
-                alternative_condition: None,
             },
             "restriction"
             | "activation_restriction"
@@ -1339,20 +1321,9 @@ impl AbilityEffect {
             | "all_blade_timing"
             | "reduce_live_card_set_limit" => EffectKind::RestrictionOp {
                 filter: Some(Box::new(filter())),
-                restriction_type: str_field!("restriction_type"),
-                restricted_destination: str_field!("restricted_destination"),
-                delayed: bool_field!("delayed"),
-                phase: str_field!("phase"),
-                non_stackable: bool_field!("non_stackable"),
-                replaces_event: str_field!("replaces_event"),
-                choice_based: bool_field!("choice_based"),
             },
             "position_change" | "rotation" => EffectKind::PositionOp {
                 filter: Some(Box::new(filter())),
-                target_member: str_field!("target_member"),
-                source_position: str_field!("source_position"),
-                exclude_position: str_field!("exclude_position"),
-                allow_occupied_stage: bool_field!("allow_occupied_stage"),
             },
             "set_cost"
             | "set_cost_to_use"
@@ -1366,118 +1337,20 @@ impl AbilityEffect {
             | "perform_yell"
             | "modify_yell_count" => EffectKind::MiscOp {
                 filter: Some(Box::new(filter())),
-                heart_type: str_field!("heart_type"),
-                heart_selection: bool_field!("heart_selection"),
-                blade_type: str_field!("blade_type"),
-                choice: bool_field!("choice"),
-                lose_blade_hearts: bool_field!("lose_blade_hearts"),
-                effect_constraint: str_field!("effect_constraint"),
-                original_count: u8_field!("original_count"),
-                original_operator: None,
-                original_cost: u8_field!("original_cost"),
-                blade_limit: u8_field!("blade_limit"),
-                blade_limit_operator: None,
-                parenthetical: opt_str_vec_field!("parenthetical"),
-                quoted_text: None,
-                alternative_count_type: str_field!("alternative_count_type"),
-                resource_icon_count: u8_field!("resource_icon_count"),
-                cost_reference: str_field!("cost_reference"),
-                cost_offset: i8_field!("cost_offset"),
-                blind: bool_field!("blind"),
-                picker: str_field!("picker"),
-                sign: str_field!("sign"),
-                ref_value: str_field!("ref_value"),
-                ref_offset: i8_field!("ref_offset"),
-                id: str_field!("id"),
             },
             "custom" | "do_nothing" | "action_by" | "opponent_action" => EffectKind::CustomOp {
                 filter: Some(Box::new(filter())),
-                opponent_action: effect_field!("opponent_action"),
-                replaces_event: str_field!("replaces_event"),
-                choice_based: bool_field!("choice_based"),
-                use_limit: u8_field!("use_limit"),
-                triggers: str_field!("triggers"),
             },
             "" => EffectKind::SelectTarget {
                 filter: Some(Box::new(filter())),
-                exclude_selected: bool_field!("exclude_selected"),
-                choice_type: str_field!("choice_type"),
-                choice_options: opt_str_vec_field!("choice_options"),
-                reveal: bool_field!("reveal"),
-                discard_remaining: bool_field!("discard_remaining"),
             },
             _ => return None,
         })
     }
 }
 
-// Macro-generated getters for EffectKind fields
-macro_rules! str_getter {
-    ($name:ident, [$($variant:ident => $field:ident),+]) => {
-        pub fn $name(&self) -> Option<&str> {
-            match self.kind.as_deref() {
-                $(Some(EffectKind::$variant { $field, .. }) => $field.as_ref().map(|s| -> &str { s }),)+
-                _ => None,
-            }
-        }
-    };
-}
-
-macro_rules! u32_getter {
-    ($name:ident, [$($variant:ident => $field:ident),+]) => {
-        pub fn $name(&self) -> Option<u8> {
-            match self.kind.as_deref() {
-                $(Some(EffectKind::$variant { $field, .. }) => *$field,)+
-                _ => None,
-            }
-        }
-    };
-}
-
-macro_rules! bool_getter {
-    ($name:ident, [$($variant:ident => $field:ident),+]) => {
-        pub fn $name(&self) -> Option<bool> {
-            match self.kind.as_deref() {
-                $(Some(EffectKind::$variant { $field, .. }) => *$field,)+
-                _ => None,
-            }
-        }
-    };
-}
-
-macro_rules! vec_ref_getter {
-    ($name:ident, [$($variant:ident => $field:ident),+]) => {
-        pub fn $name(&self) -> Option<&Vec<String>> {
-            match self.kind.as_deref() {
-                $(Some(EffectKind::$variant { $field, .. }) => $field.as_ref().map(|b| b.as_ref()),)+
-                _ => None,
-            }
-        }
-    };
-}
-
-macro_rules! setter {
-    ($fn:ident, $field:ident: $ty:ty => [$($variant:ident),+]) => {
-        pub fn $fn(&mut self, val: Option<$ty>) {
-            match self.kind.as_deref_mut() {
-                $(Some(EffectKind::$variant { ref mut $field, .. }) => *$field = val,)+
-                _ => {}
-            }
-        }
-    };
-}
-
-macro_rules! copy_getter {
-    ($name:ident, $ty:ident, [$($variant:ident => $field:ident),+ $(,)?]) => {
-        pub fn $name(&self) -> Option<$ty> {
-            match self.kind.as_deref() {
-                $(Some(EffectKind::$variant { $field, .. }) => *$field,)+
-                _ => None,
-            }
-        }
-    };
-}
-
+// Macro-generated getters for EffectKind fields — all fields now live on the
+// shared EffectFilter, so only the filter_* getter macros are used.
 macro_rules! filter_str_getter {
     ($name:ident, $field:ident) => {
         pub fn $name(&self) -> Option<&str> {
@@ -1518,7 +1391,7 @@ macro_rules! filter_copy_getter {
 macro_rules! filter_box_vec_ref_getter {
     ($name:ident, $field:ident) => {
         pub fn $name(&self) -> Option<&Vec<String>> {
-            Some(self.kind.as_deref()?.filter()?.$field.as_ref())
+            self.kind.as_deref()?.filter()?.$field.as_deref()
         }
     };
 }
@@ -1548,11 +1421,11 @@ impl AbilityEffect {
 
     filter_opt_vec_ref_getter!(ability_filter_triggers_any, ability_filter_triggers);
 
-    str_getter!(ability_gain_any, [AbilityOp => ability_gain]);
+    filter_str_getter!(ability_gain_any, ability_gain);
 
-    str_getter!(ability_gain_trigger_any, [AbilityOp => ability_gain_trigger]);
+    filter_str_getter!(ability_gain_trigger_any, ability_gain_trigger);
 
-    str_getter!(ability_text_any, [AbilityOp => ability_text]);
+    filter_str_getter!(ability_text_any, ability_text);
 
     pub fn activation_condition_parsed_any(&self) -> Option<&Box<Condition>> {
         self.kind
@@ -1568,32 +1441,32 @@ impl AbilityEffect {
 
     filter_bool_getter!(all_regions_any, all_regions);
 
-    bool_getter!(allow_occupied_stage_any, [MoveCards => allow_occupied_stage, PositionOp => allow_occupied_stage]);
+    filter_bool_getter!(allow_occupied_stage_any, allow_occupied_stage);
 
-    str_getter!(alternative_count_type_any, [MiscOp => alternative_count_type, CompoundEffect => alternative_count_type]);
+    filter_str_getter!(alternative_count_type_any, alternative_count_type);
 
     pub fn alternative_effect_any(&self) -> Option<&Box<AbilityEffect>> {
-        match self.kind.as_deref() {
-            Some(EffectKind::CompoundEffect {
-                alternative_effect, ..
-            }) => alternative_effect.as_ref(),
-            _ => None,
-        }
+        self.kind
+            .as_deref()
+            .and_then(|k| k.filter())
+            .and_then(|f| f.alternative_effect.as_ref())
     }
 
     filter_opt_vec_ref_getter!(answers_any, answers);
 
     filter_bool_getter!(any_number_any, any_number);
 
-    u32_getter!(blade_limit_any, [ChangeState => blade_limit, MiscOp => blade_limit, GainResource => blade_limit]);
+    filter_u8_getter!(blade_limit_any, blade_limit);
 
-    copy_getter!(blade_limit_operator_any, Operator, [ChangeState => blade_limit_operator, MiscOp => blade_limit_operator, GainResource => blade_limit_operator]);
+    filter_copy_getter!(blade_limit_operator_any, Operator, blade_limit_operator);
 
-    str_getter!(blade_type_any, [MiscOp => blade_type]);
+    filter_str_getter!(blade_type_any, blade_type);
 
-    bool_getter!(blind_any, [MiscOp => blind, LookReveal => blind]);
+    filter_bool_getter!(blind_any, blind);
 
-    filter_box_vec_ref_getter!(card_names_any, card_names);
+    pub fn card_names_any(&self) -> Option<&Vec<String>> {
+        Some(&*self.kind.as_deref()?.filter()?.card_names)
+    }
 
     filter_str_getter!(card_property_any, card_property);
 
@@ -1603,15 +1476,15 @@ impl AbilityEffect {
 
     filter_opt_vec_ref_getter!(characters_any, characters);
 
-    bool_getter!(choice_any, [MiscOp => choice]);
+    filter_bool_getter!(choice_any, choice);
 
-    bool_getter!(choice_based_any, [RestrictionOp => choice_based, CustomOp => choice_based]);
+    filter_bool_getter!(choice_based_any, choice_based);
 
     filter_str_getter!(choice_maker_any, choice_maker);
 
-    vec_ref_getter!(choice_options_any, [SelectTarget => choice_options, CompoundEffect => choice_options]);
+    filter_box_vec_ref_getter!(choice_options_any, choice_options);
 
-    str_getter!(choice_type_any, [SelectTarget => choice_type, CompoundEffect => choice_type]);
+    filter_str_getter!(choice_type_any, choice_type);
 
     filter_bool_getter!(cost_from_revealed_any, cost_from_revealed);
 
@@ -1622,22 +1495,21 @@ impl AbilityEffect {
     filter_copy_getter!(cost_limit_operator_any, Operator, cost_limit_operator);
 
     pub fn cost_offset_any(&self) -> Option<i8> {
-        match self.kind.as_deref() {
-            Some(EffectKind::MoveCards { cost_offset, .. }) => *cost_offset,
-            Some(EffectKind::MiscOp { cost_offset, .. }) => *cost_offset,
-            _ => None,
-        }
+        self.kind
+            .as_deref()
+            .and_then(|k| k.filter())
+            .and_then(|f| f.cost_offset)
     }
 
-    str_getter!(cost_reference_any, [MoveCards => cost_reference, MiscOp => cost_reference]);
+    filter_str_getter!(cost_reference_any, cost_reference);
 
     filter_u8_getter!(cost_total_any, cost_total);
 
     filter_copy_getter!(cost_total_operator_any, Operator, cost_total_operator);
 
-    bool_getter!(delayed_any, [RestrictionOp => delayed]);
+    filter_bool_getter!(delayed_any, delayed);
 
-    bool_getter!(discard_remaining_any, [MoveCards => discard_remaining, SelectTarget => discard_remaining]);
+    filter_bool_getter!(discard_remaining_any, discard_remaining);
 
     pub fn distinct_any(&self) -> Option<DistinctType> {
         self.kind.as_deref()?.filter()?.distinct.as_deref().copied()
@@ -1649,11 +1521,11 @@ impl AbilityEffect {
         self.kind.as_deref()?.filter()?.dynamic_count.as_deref()
     }
 
-    str_getter!(effect_constraint_any, [ModifyScore => effect_constraint, MiscOp => effect_constraint]);
+    filter_str_getter!(effect_constraint_any, effect_constraint);
 
     filter_u8_getter!(energy_count_any, energy_count);
 
-    str_getter!(exclude_by_name_source_any, [MoveCards => exclude_by_name_source]);
+    filter_str_getter!(exclude_by_name_source_any, exclude_by_name_source);
 
     filter_opt_vec_ref_getter!(exclude_characters_any, exclude_characters);
 
@@ -1669,18 +1541,13 @@ impl AbilityEffect {
     }
 
     pub fn exclude_position_any(&self) -> Option<&str> {
-        match self.kind.as_deref() {
-            Some(EffectKind::MoveCards {
-                exclude_position, ..
-            }) => exclude_position.as_deref(),
-            Some(EffectKind::PositionOp {
-                exclude_position, ..
-            }) => exclude_position.as_deref(),
-            _ => None,
-        }
+        self.kind
+            .as_deref()
+            .and_then(|k| k.filter())
+            .and_then(|f| f.exclude_position.as_deref())
     }
 
-    bool_getter!(exclude_selected_any, [MoveCards => exclude_selected, SelectTarget => exclude_selected]);
+    filter_bool_getter!(exclude_selected_any, exclude_selected);
 
     filter_bool_getter!(exclude_self_any, exclude_self);
 
@@ -1690,10 +1557,10 @@ impl AbilityEffect {
     );
 
     pub fn gained_effect_any(&self) -> Option<&Box<AbilityEffect>> {
-        match self.kind.as_deref() {
-            Some(EffectKind::AbilityOp { gained_effect, .. }) => gained_effect.as_ref(),
-            _ => None,
-        }
+        self.kind
+            .as_deref()
+            .and_then(|k| k.filter())
+            .and_then(|f| f.gained_effect.as_ref())
     }
 
     filter_opt_vec_ref_getter!(group_names_any, group_names);
@@ -1710,31 +1577,23 @@ impl AbilityEffect {
             .unwrap_or(&[])
     }
 
-    pub fn heart_colors_from_selected_card_any(&self) -> Option<bool> {
-        match self.kind.as_deref() {
-            Some(EffectKind::GainResource {
-                heart_colors_from_selected_card,
-                ..
-            }) => *heart_colors_from_selected_card,
-            _ => None,
-        }
-    }
+    filter_bool_getter!(heart_colors_from_selected_card_any, heart_colors_from_selected_card);
 
-    str_getter!(heart_color_any, [GainResource => heart_color]);
+    filter_str_getter!(heart_color_any, heart_color);
 
-    bool_getter!(heart_selection_any, [MiscOp => heart_selection]);
+    filter_bool_getter!(heart_selection_any, heart_selection);
 
-    str_getter!(heart_type_any, [GainResource => heart_type, MiscOp => heart_type]);
+    filter_str_getter!(heart_type_any, heart_type);
 
-    str_getter!(ref_value_any, [MiscOp => ref_value]);
+    filter_str_getter!(ref_value_any, ref_value);
 
-    str_getter!(id_any, [MiscOp => id]);
+    filter_str_getter!(id_any, id);
 
     filter_opt_vec_ref_getter!(identities_any, identities);
 
     filter_str_getter!(location_any, location);
 
-    bool_getter!(lose_blade_hearts_any, [MiscOp => lose_blade_hearts]);
+    filter_bool_getter!(lose_blade_hearts_any, lose_blade_hearts);
 
     filter_bool_getter!(multiple_targets_any, multiple_targets);
 
@@ -1742,11 +1601,11 @@ impl AbilityEffect {
 
     filter_str_getter!(name_constraint_source_any, name_constraint_source);
 
-    str_getter!(need_heart_color_any, [MoveCards => need_heart_color]);
+    filter_str_getter!(need_heart_color_any, need_heart_color);
 
-    copy_getter!(need_heart_operator_any, Operator, [MoveCards => need_heart_operator, ModifyScore => need_heart_operator]);
+    filter_copy_getter!(need_heart_operator_any, Operator, need_heart_operator);
 
-    u32_getter!(need_heart_total_any, [MoveCards => need_heart_total, ModifyScore => need_heart_total]);
+    filter_u8_getter!(need_heart_total_any, need_heart_total);
 
     filter_bool_getter!(negation_any, negation);
 
@@ -1768,9 +1627,9 @@ impl AbilityEffect {
 
     filter_opt_vec_ref_getter!(or_card_types_any, or_card_types);
 
-    u32_getter!(original_count_any, [ModifyHearts => original_count, MiscOp => original_count]);
+    filter_u8_getter!(original_count_any, original_count);
 
-    copy_getter!(original_operator_any, Operator, [ModifyHearts => original_operator, MiscOp => original_operator]);
+    filter_copy_getter!(original_operator_any, Operator, original_operator);
 
     filter_bool_getter!(original_value_any, original_value);
 
@@ -1802,55 +1661,53 @@ impl AbilityEffect {
         self.kind.as_deref()?.filter()?.repeat_limit
     }
 
-    str_getter!(replaces_event_any, [RestrictionOp => replaces_event, CustomOp => replaces_event]);
+    filter_str_getter!(replaces_event_any, replaces_event);
 
     filter_bool_getter!(require_all_heart_colors_any, require_all_heart_colors);
 
-    str_getter!(resource_any, [GainResource => resource]);
+    filter_str_getter!(resource_any, resource);
 
-    u32_getter!(resource_icon_count_any, [MiscOp => resource_icon_count]);
+    filter_u8_getter!(resource_icon_count_any, resource_icon_count);
 
     pub fn resource_on_select_any(&self) -> Option<&Box<AbilityEffect>> {
-        match self.kind.as_deref() {
-            Some(EffectKind::LookReveal {
-                resource_on_select, ..
-            }) => resource_on_select.as_ref(),
-            _ => None,
-        }
+        self.kind
+            .as_deref()
+            .and_then(|k| k.filter())
+            .and_then(|f| f.resource_on_select.as_ref())
     }
 
-    str_getter!(restricted_destination_any, [RestrictionOp => restricted_destination]);
+    filter_str_getter!(restricted_destination_any, restricted_destination);
 
-    str_getter!(restriction_type_any, [RestrictionOp => restriction_type]);
+    filter_str_getter!(restriction_type_any, restriction_type);
 
-    bool_getter!(reveal_any, [LookReveal => reveal, SelectTarget => reveal]);
+    filter_bool_getter!(reveal_any, reveal);
 
     filter_bool_getter!(same_unit_name_any, same_unit_name);
     filter_bool_getter!(same_name_any, same_name);
 
-    bool_getter!(self_cost_any, [ChangeState => self_cost, MoveCards => self_cost]);
+    filter_bool_getter!(self_cost_any, self_cost);
 
     filter_bool_getter!(self_target_any, self_target);
 
-    bool_getter!(shuffle_any, [MoveCards => shuffle, CompoundEffect => shuffle]);
+    filter_bool_getter!(shuffle_any, shuffle);
 
-    str_getter!(sign_any, [GainResource => sign, MiscOp => sign]);
+    filter_str_getter!(sign_any, sign);
 
-    str_getter!(source_card_any, [AbilityOp => source_card]);
+    filter_str_getter!(source_card_any, source_card);
 
-    str_getter!(source_position_any, [MoveCards => source_position, PositionOp => source_position]);
+    filter_str_getter!(source_position_any, source_position);
 
     filter_str_getter!(source_any, source);
 
     filter_str_getter!(destination_any, destination);
 
     pub fn count_any(&self) -> Option<u8> {
-        let variant_count = match self.kind.as_deref() {
-            Some(EffectKind::MoveCards { count, .. }) => *count,
-            Some(EffectKind::DrawCards { count, .. }) => *count,
-            _ => None,
-        };
-        variant_count.or(self.count)
+        let filter_count = self
+            .kind
+            .as_deref()
+            .and_then(|k| k.filter())
+            .and_then(|f| f.count);
+        filter_count.or(self.count)
     }
 
     pub fn target_any(&self) -> Option<&str> {
@@ -1874,26 +1731,22 @@ impl AbilityEffect {
     }
 
     pub fn state_change_any(&self) -> Option<&str> {
-        match self.kind.as_deref() {
-            Some(EffectKind::ChangeState { state_change, .. }) => {
-                state_change.as_ref().map(|s| s.as_str())
-            }
-            Some(EffectKind::MoveCards { state_change, .. }) => {
-                state_change.as_ref().map(|s| s.as_str())
-            }
-            _ => None,
-        }
+        self.kind
+            .as_deref()
+            .and_then(|k| k.filter())
+            .and_then(|f| f.state_change.as_ref())
+            .map(|s| s.as_str())
     }
 
-    str_getter!(suppressed_trigger_any, [AbilityOp => suppressed_trigger]);
+    filter_str_getter!(suppressed_trigger_any, suppressed_trigger);
 
     filter_u8_getter!(target_count_any, target_count);
 
-    bool_getter!(target_from_selection_any, [MoveCards => target_from_selection, GainResource => target_from_selection]);
+    filter_bool_getter!(target_from_selection_any, target_from_selection);
 
-    str_getter!(target_member_any, [PositionOp => target_member, MoveCards => target_member]);
+    filter_str_getter!(target_member_any, target_member);
 
-    str_getter!(target_trigger_any, [AbilityOp => target_trigger]);
+    filter_str_getter!(target_trigger_any, target_trigger);
 
     filter_str_getter!(timing_any, timing);
 
@@ -1929,12 +1782,7 @@ impl AbilityEffect {
 
     filter_u8_getter!(cost_limit_max_any, cost_limit_max);
 
-    pub fn non_stackable_any(&self) -> Option<bool> {
-        match self.kind.as_deref() {
-            Some(EffectKind::RestrictionOp { non_stackable, .. }) => *non_stackable,
-            _ => None,
-        }
-    }
+    filter_bool_getter!(non_stackable_any, non_stackable);
 }
 
 impl AbilityEffect {
@@ -1957,7 +1805,7 @@ impl AbilityEffect {
     filter_setter!(set_per_unit_type, per_unit_type: ArcStr);
     filter_setter!(set_self_target, self_target: bool);
     filter_setter!(set_target_count, target_count: u8);
-    setter!(set_target_member, target_member: ArcStr => [PositionOp, MoveCards]);
+    filter_setter!(set_target_member, target_member: ArcStr);
 }
 
 impl AbilityEffect {
@@ -2121,12 +1969,10 @@ impl AbilityEffect {
     }
 
     pub fn opponent_action(&self) -> Option<&AbilityEffect> {
-        match self.kind.as_deref() {
-            Some(EffectKind::CustomOp {
-                opponent_action, ..
-            }) => opponent_action.as_deref(),
-            _ => None,
-        }
+        self.kind
+            .as_deref()
+            .and_then(|k| k.filter())
+            .and_then(|f| f.opponent_action.as_deref())
     }
 
     pub fn effect_type(&self) -> Option<&str> {
@@ -2364,6 +2210,17 @@ impl Operator {
             Operator::Eq => "=",
         }
     }
+}
+
+pub(crate) fn parse_operator(s: &str) -> Option<Operator> {
+    Some(match s {
+        ">=" => Operator::Gte,
+        "<=" => Operator::Lte,
+        ">" => Operator::Gt,
+        "<" => Operator::Lt,
+        "=" | "==" => Operator::Eq,
+        _ => return None,
+    })
 }
 
 impl_deref_str!(Operator);

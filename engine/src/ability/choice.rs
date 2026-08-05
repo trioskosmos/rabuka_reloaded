@@ -7,7 +7,7 @@ use super::types::{
 use super::util;
 use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability_queue::ConditionalChoice;
-use crate::card::{AbilityEffect, EffectKind};
+use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -2379,19 +2379,8 @@ impl super::resolver::AbilityResolver {
             if let Some(ChoiceRoute::Raw(ref raw)) = choice_card_no {
                 if let Some(tgt) = raw.strip_prefix("position_change:") {
                     if tgt == "opponent:front" {
-                        if let Some(EffectKind::MoveCards {
-                            ref mut source_position,
-                            ..
-                        }) = modified.kind.as_deref_mut()
-                        {
-                            *source_position = Some(selected.into());
-                        }
-                        if let Some(EffectKind::PositionOp {
-                            ref mut source_position,
-                            ..
-                        }) = modified.kind.as_deref_mut()
-                        {
-                            *source_position = Some(selected.into());
+                        if let Some(f) = modified.kind.as_deref_mut().and_then(|k| k.filter_mut()) {
+                            f.source_position = Some(selected.into());
                         }
                         let pc_ok =
                             self.execute_position_change_with_destination(gs, &modified, "front");

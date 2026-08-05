@@ -1403,48 +1403,29 @@ impl AbilityEffect {
                 }
             }
         }
-        match self.kind.as_deref_mut() {
-            Some(EffectKind::LookReveal {
-                ref mut resource_on_select,
-                ..
-            }) => {
-                if let Some(ref mut ros) = resource_on_select {
-                    if let Some(ros_json) = json_val.get("resource_on_select") {
-                        ros.populate_from_json(ros_json);
-                    }
+        // Nested sub-effects now live on the shared filter, so populate them
+        // whenever the JSON provides them (no per-variant match needed).
+        if let Some(f) = self.kind.as_deref_mut().and_then(|k| k.filter_mut()) {
+            if let Some(ref mut ros) = f.resource_on_select {
+                if let Some(ros_json) = json_val.get("resource_on_select") {
+                    ros.populate_from_json(ros_json);
                 }
             }
-            Some(EffectKind::CompoundEffect {
-                ref mut alternative_effect,
-                ..
-            }) => {
-                if let Some(ref mut ae) = alternative_effect {
-                    if let Some(ae_json) = json_val.get("alternative_effect") {
-                        ae.populate_from_json(ae_json);
-                    }
+            if let Some(ref mut ae) = f.alternative_effect {
+                if let Some(ae_json) = json_val.get("alternative_effect") {
+                    ae.populate_from_json(ae_json);
                 }
             }
-            Some(EffectKind::AbilityOp {
-                ref mut gained_effect,
-                ..
-            }) => {
-                if let Some(ref mut ge) = gained_effect {
-                    if let Some(ge_json) = json_val.get("gained_effect") {
-                        ge.populate_from_json(ge_json);
-                    }
+            if let Some(ref mut ge) = f.gained_effect {
+                if let Some(ge_json) = json_val.get("gained_effect") {
+                    ge.populate_from_json(ge_json);
                 }
             }
-            Some(EffectKind::CustomOp {
-                ref mut opponent_action,
-                ..
-            }) => {
-                if let Some(ref mut oa) = opponent_action {
-                    if let Some(oa_json) = json_val.get("opponent_action") {
-                        oa.populate_from_json(oa_json);
-                    }
+            if let Some(ref mut oa) = f.opponent_action {
+                if let Some(oa_json) = json_val.get("opponent_action") {
+                    oa.populate_from_json(oa_json);
                 }
             }
-            _ => {}
         }
     }
 }

@@ -3,9 +3,7 @@
 
 /// Read one field from a TAG_OBJECT_VARIANT effect object.
 /// Returns true if the field was recognized and consumed, false to skip.
-fn decode_effect_field(
-    bc: &mut BcReader,
-    key: &str,
+fn decode_effect_field(bc: &mut BcReader, key: &str,
     // AbilityEffect fields
     text: &mut ArcStr,
     action: &mut ActionType,
@@ -35,653 +33,169 @@ fn decode_effect_field(
     ek: &mut EffectKindLocals,
 ) -> Option<bool> {
     match key {
-        "text" => {
-            *text = bc.read_string_value().map(ArcStr::from).unwrap_or_default();
-            return Some(true);
-        }
-        "action" => {
-            *action = ActionType::from_str(&bc.read_string_value().unwrap_or_default())
-                .unwrap_or_default();
-            return Some(true);
-        }
-        "source" => {
-            *source = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "destination" => {
-            *destination = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "count" => {
-            *count = bc.read_u8_value();
-            return Some(true);
-        }
-        "target" => {
-            *target = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "condition" => {
-            *condition = bc.read_condition_value();
-            return Some(true);
-        }
-        "non_stackable" => {
-            *non_stackable = bc.read_bool_value();
-            return Some(true);
-        }
-        "conditional" => {
-            *conditional = bc.read_bool_value();
-            return Some(true);
-        }
-        "is_further" => {
-            *is_further = bc.read_bool_value();
-            return Some(true);
-        }
-        "optional" => {
-            *optional = bc.read_bool_value();
-            return Some(true);
-        }
-        "max" => {
-            *max = bc.read_bool_value();
-            return Some(true);
-        }
-        "effect_steps" => {
-            *effect_steps = bc.read_effect_vec_value();
-            return Some(true);
-        }
-        "look_action" => {
-            *look_action = bc.read_effect_value();
-            return Some(true);
-        }
-        "select_action" => {
-            *select_action = bc.read_effect_value();
-            return Some(true);
-        }
-        "actions" => {
-            *actions = bc.read_effect_vec_value();
-            return Some(true);
-        }
-        "primary_effect" => {
-            *primary_effect = bc.read_effect_value();
-            return Some(true);
-        }
-        "alternative_condition" => {
-            *alternative_condition = bc.read_condition_value();
-            return Some(true);
-        }
-        "result_condition" => {
-            *result_condition = bc.read_condition_value();
-            return Some(true);
-        }
-        "followup_action" => {
-            *followup_action = bc.read_effect_value();
-            return Some(true);
-        }
-        "optional_action" => {
-            *optional_action = bc.read_effect_value();
-            return Some(true);
-        }
-        "conditional_action" => {
-            *conditional_action = bc.read_effect_value();
-            return Some(true);
-        }
-        "conditional_negation" => {
-            *conditional_negation = bc.read_bool_value();
-            return Some(true);
-        }
-        "ability_gain" => {
-            ek.ability_gain = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "ability_gain_trigger" => {
-            ek.ability_gain_trigger = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "ability_text" => {
-            ek.ability_text = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "allow_occupied_stage" => {
-            ek.allow_occupied_stage = bc.read_bool_value();
-            return Some(true);
-        }
-        "alternative_count_type" => {
-            ek.alternative_count_type = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "alternative_effect" => {
-            ek.alternative_effect = bc.read_effect_value();
-            return Some(true);
-        }
-        "baton_touch_trigger" => {
-            ek.baton_touch_trigger = bc.read_bool_value();
-            return Some(true);
-        }
-        "blade_limit" => {
-            ek.blade_limit = bc.read_u8_value();
-            return Some(true);
-        }
-        "blade_limit_operator" => {
-            ek.blade_limit_operator = bc.read_operator_value();
-            return Some(true);
-        }
-        "blade_type" => {
-            ek.blade_type = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "blind" => {
-            ek.blind = bc.read_bool_value();
-            return Some(true);
-        }
-        "choice" => {
-            ek.choice = bc.read_bool_value();
-            return Some(true);
-        }
-        "choice_based" => {
-            ek.choice_based = bc.read_bool_value();
-            return Some(true);
-        }
-        "choice_condition" => {
-            ek.choice_condition = bc.read_condition_value();
-            return Some(true);
-        }
-        "choice_options" => {
-            ek.choice_options = bc.read_opt_str_vec_value();
-            return Some(true);
-        }
-        "choice_type" => {
-            ek.choice_type = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "cost_offset" => {
-            ek.cost_offset = bc.read_i8_value();
-            return Some(true);
-        }
-        "cost_reference" => {
-            ek.cost_reference = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "delayed" => {
-            ek.delayed = bc.read_bool_value();
-            return Some(true);
-        }
-        "discard_remaining" => {
-            ek.discard_remaining = bc.read_bool_value();
-            return Some(true);
-        }
-        "effect_constraint" => {
-            ek.effect_constraint = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "exclude_by_name_source" => {
-            ek.exclude_by_name_source = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "exclude_position" => {
-            ek.exclude_position = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "exclude_selected" => {
-            ek.exclude_selected = bc.read_bool_value();
-            return Some(true);
-        }
-        "gained_effect" => {
-            ek.gained_effect = bc.read_effect_value();
-            return Some(true);
-        }
-        "heart_color" => {
-            ek.heart_color = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "heart_colors_from_selected_card" => {
-            ek.heart_colors_from_selected_card = bc.read_bool_value();
-            return Some(true);
-        }
-        "heart_selection" => {
-            ek.heart_selection = bc.read_bool_value();
-            return Some(true);
-        }
-        "heart_type" => {
-            ek.heart_type = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "id" => {
-            ek.id = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "is_reveal" => {
-            ek.is_reveal = bc.read_bool_value();
-            return Some(true);
-        }
-        "lose_blade_hearts" => {
-            ek.lose_blade_hearts = bc.read_bool_value();
-            return Some(true);
-        }
-        "need_heart_color" => {
-            ek.need_heart_color = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "need_heart_operator" => {
-            ek.need_heart_operator = bc.read_operator_value();
-            return Some(true);
-        }
-        "need_heart_total" => {
-            ek.need_heart_total = bc.read_u8_value();
-            return Some(true);
-        }
-        "opponent_action" => {
-            ek.opponent_action = bc.read_effect_value();
-            return Some(true);
-        }
-        "option" => {
-            ek.option = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "original_cost" => {
-            ek.original_cost = bc.read_u8_value();
-            return Some(true);
-        }
-        "original_count" => {
-            ek.original_count = bc.read_u8_value();
-            return Some(true);
-        }
-        "original_operator" => {
-            ek.original_operator = bc.read_operator_value();
-            return Some(true);
-        }
-        "parenthetical" => {
-            ek.parenthetical = bc.read_opt_str_vec_value();
-            return Some(true);
-        }
-        "phase" => {
-            ek.phase = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "picker" => {
-            ek.picker = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "quoted_text" => {
-            ek.quoted_text = bc.read_quoted_text_value();
-            return Some(true);
-        }
-        "ref_offset" => {
-            ek.ref_offset = bc.read_i8_value();
-            return Some(true);
-        }
-        "ref_value" => {
-            ek.ref_value = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "replace_all" => {
-            ek.replace_all = bc.read_bool_value();
-            return Some(true);
-        }
-        "replaces_event" => {
-            ek.replaces_event = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "resource" => {
-            ek.resource = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "resource_icon_count" => {
-            ek.resource_icon_count = bc.read_u8_value();
-            return Some(true);
-        }
-        "resource_on_select" => {
-            ek.resource_on_select = bc.read_effect_value();
-            return Some(true);
-        }
-        "restricted_destination" => {
-            ek.restricted_destination = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "restriction_type" => {
-            ek.restriction_type = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "reveal" => {
-            ek.reveal = bc.read_bool_value();
-            return Some(true);
-        }
-        "self_cost" => {
-            ek.self_cost = bc.read_bool_value();
-            return Some(true);
-        }
-        "shuffle" => {
-            ek.shuffle = bc.read_bool_value();
-            return Some(true);
-        }
-        "sign" => {
-            ek.sign = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "source_card" => {
-            ek.source_card = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "source_position" => {
-            ek.source_position = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "state_change" => {
-            ek.state_change = bc.read_effect_state_value();
-            return Some(true);
-        }
-        "suppressed_trigger" => {
-            ek.suppressed_trigger = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "target_from_selection" => {
-            ek.target_from_selection = bc.read_bool_value();
-            return Some(true);
-        }
-        "target_member" => {
-            ek.target_member = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "target_trigger" => {
-            ek.target_trigger = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "triggers" => {
-            ek.triggers = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "use_limit" => {
-            ek.use_limit = bc.read_u8_value();
-            return Some(true);
-        }
-        "card_type" => {
-            ek.card_type = bc.read_card_type_value();
-            return Some(true);
-        }
-        "exclude_self" => {
-            ek.exclude_self = bc.read_bool_value();
-            return Some(true);
-        }
-        "same_name" => {
-            ek.same_name = bc.read_bool_value();
-            return Some(true);
-        }
-        "same_unit_name" => {
-            ek.same_unit_name = bc.read_bool_value();
-            return Some(true);
-        }
-        "group_names" => {
-            ek.group_names = bc.read_opt_str_vec_value();
-            return Some(true);
-        }
-        "self_target" => {
-            ek.self_target = bc.read_bool_value();
-            return Some(true);
-        }
-        "location" => {
-            ek.location = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "heart_colors" => {
-            ek.heart_colors = bc.read_str_vec_value();
-            return Some(true);
-        }
-        "characters" => {
-            ek.characters = bc.read_opt_str_vec_value();
-            return Some(true);
-        }
-        "exclude_characters" => {
-            ek.exclude_characters = bc.read_opt_str_vec_value();
-            return Some(true);
-        }
-        "exclude_group_names" => {
-            ek.exclude_group_names = bc.read_opt_str_vec_value();
-            return Some(true);
-        }
-        "activation_position" => {
-            ek.activation_position = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "original_value" => {
-            ek.original_value = bc.read_bool_value();
-            return Some(true);
-        }
-        "target_count" => {
-            ek.target_count = bc.read_u8_value();
-            return Some(true);
-        }
-        "per_unit" => {
-            ek.per_unit = bc.read_bool_value();
-            return Some(true);
-        }
-        "per_unit_count" => {
-            ek.per_unit_count = bc.read_u8_value();
-            return Some(true);
-        }
-        "per_unit_type" => {
-            ek.per_unit_type = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "group_reference" => {
-            ek.group_reference = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "state" => {
-            ek.state = bc.read_effect_state_value();
-            return Some(true);
-        }
-        "distinct" => {
-            ek.distinct = bc.read_distinct_value();
-            return Some(true);
-        }
-        "position" => {
-            ek.position = bc.read_position_value();
-            return Some(true);
-        }
-        "negation" => {
-            ek.negation = bc.read_bool_value();
-            return Some(true);
-        }
-        "per_unit_heart_colors" => {
-            ek.per_unit_heart_colors = bc.read_str_vec_value();
-            return Some(true);
-        }
-        "cost_limit" => {
-            ek.cost_limit = bc.read_u8_value();
-            return Some(true);
-        }
-        "cost_limit_operator" => {
-            ek.cost_limit_operator = bc.read_operator_value();
-            return Some(true);
-        }
-        "duration" => {
-            ek.duration = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "dynamic_count" => {
-            ek.dynamic_count = bc.read_dynamic_count_value();
-            return Some(true);
-        }
-        "filter_targets_by_heart_colors" => {
-            ek.filter_targets_by_heart_colors = bc.read_bool_value();
-            return Some(true);
-        }
-        "card_property" => {
-            ek.card_property = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "per_unit_location" => {
-            ek.per_unit_location = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "card_names" => {
-            ek.card_names = bc.read_str_vec_value();
-            return Some(true);
-        }
-        "all" => {
-            ek.all = bc.read_bool_value();
-            return Some(true);
-        }
-        "cost_total" => {
-            ek.cost_total = bc.read_u8_value();
-            return Some(true);
-        }
-        "cost_total_operator" => {
-            ek.cost_total_operator = bc.read_operator_value();
-            return Some(true);
-        }
-        "activation_condition_parsed" => {
-            ek.activation_condition_parsed = bc.read_condition_value();
-            return Some(true);
-        }
-        "action_by" => {
-            ek.action_by = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "trigger_type" => {
-            ek.trigger_type = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "repeat_limit" => {
-            ek.repeat_limit = bc.read_u8_value();
-            return Some(true);
-        }
-        "ability_filter" => {
-            ek.ability_filter = bc.read_ability_filter_value();
-            return Some(true);
-        }
-        "multiple_targets" => {
-            ek.multiple_targets = bc.read_bool_value();
-            return Some(true);
-        }
-        "operation" => {
-            ek.operation = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "options" => {
-            ek.options = bc.read_effect_vec_boxed_value();
-            return Some(true);
-        }
-        "name_constraint" => {
-            ek.name_constraint = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "name_constraint_source" => {
-            ek.name_constraint_source = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "ability_filter_triggers" => {
-            ek.ability_filter_triggers = bc.read_opt_str_vec_value();
-            return Some(true);
-        }
-        "or_ability_filters" => {
-            ek.or_ability_filters = bc.read_or_ability_filters_value();
-            return Some(true);
-        }
-        "energy_count" => {
-            ek.energy_count = bc.read_u8_value();
-            return Some(true);
-        }
-        "any_number" => {
-            ek.any_number = bc.read_bool_value();
-            return Some(true);
-        }
-        "require_all_heart_colors" => {
-            ek.require_all_heart_colors = bc.read_bool_value();
-            return Some(true);
-        }
-        "heart_color_count" => {
-            ek.heart_color_count = bc.read_u8_value();
-            return Some(true);
-        }
-        "value" => {
-            ek.value = bc.read_u8_value();
-            return Some(true);
-        }
-        "per_group" => {
-            ek.per_group = bc.read_bool_value();
-            return Some(true);
-        }
-        "per_group_count" => {
-            ek.per_group_count = bc.read_u8_value();
-            return Some(true);
-        }
-        "placement_order" => {
-            ek.placement_order = bc.read_placement_order_value();
-            return Some(true);
-        }
-        "or_card_types" => {
-            ek.or_card_types = bc.read_opt_str_vec_value();
-            return Some(true);
-        }
-        "exclude_heart_colors" => {
-            ek.exclude_heart_colors = bc.read_opt_str_vec_value();
-            return Some(true);
-        }
-        "cost_from_revealed" => {
-            ek.cost_from_revealed = bc.read_bool_value();
-            return Some(true);
-        }
-        "timing_condition" => {
-            ek.timing_condition = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "identities" => {
-            ek.identities = bc.read_opt_str_vec_value();
-            return Some(true);
-        }
-        "all_regions" => {
-            ek.all_regions = bc.read_bool_value();
-            return Some(true);
-        }
-        "trigger_filter" => {
-            ek.trigger_filter = bc.read_opt_str_vec_value();
-            return Some(true);
-        }
-        "effect_type" => {
-            ek.effect_type = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "timing" => {
-            ek.timing = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "treat_as" => {
-            ek.treat_as = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "question" => {
-            ek.question = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "answers" => {
-            ek.answers = bc.read_opt_str_vec_value();
-            return Some(true);
-        }
-        "choice_maker" => {
-            ek.choice_maker = bc.read_arc_str_value();
-            return Some(true);
-        }
-        "cost_limit_min" => {
-            ek.cost_limit_min = bc.read_u8_value();
-            return Some(true);
-        }
-        "cost_limit_max" => {
-            ek.cost_limit_max = bc.read_u8_value();
-            return Some(true);
-        }
-        "energy" => {
-            ek.energy_count = bc.read_u8_value();
-            return Some(true);
-        }
-        "max_repeats" => {
-            ek.repeat_limit = bc.read_u8_value();
-            return Some(true);
-        }
-        _ => {
-            bc.skip_value()?;
-            return Some(true);
+            "text" => { *text = bc.read_string_value().map(ArcStr::from).unwrap_or_default(); return Some(true); }
+            "action" => { *action = ActionType::from_str(&bc.read_string_value().unwrap_or_default()).unwrap_or_default(); return Some(true); }
+            "source" => { *source = bc.read_arc_str_value(); return Some(true); }
+            "destination" => { *destination = bc.read_arc_str_value(); return Some(true); }
+            "count" => { *count = bc.read_u8_value(); return Some(true); }
+            "target" => { *target = bc.read_arc_str_value(); return Some(true); }
+            "condition" => { *condition = bc.read_condition_value(); return Some(true); }
+            "non_stackable" => { *non_stackable = bc.read_bool_value(); return Some(true); }
+            "conditional" => { *conditional = bc.read_bool_value(); return Some(true); }
+            "is_further" => { *is_further = bc.read_bool_value(); return Some(true); }
+            "optional" => { *optional = bc.read_bool_value(); return Some(true); }
+            "max" => { *max = bc.read_bool_value(); return Some(true); }
+            "effect_steps" => { *effect_steps = bc.read_effect_vec_value(); return Some(true); }
+            "look_action" => { *look_action = bc.read_effect_value(); return Some(true); }
+            "select_action" => { *select_action = bc.read_effect_value(); return Some(true); }
+            "actions" => { *actions = bc.read_effect_vec_value(); return Some(true); }
+            "primary_effect" => { *primary_effect = bc.read_effect_value(); return Some(true); }
+            "alternative_condition" => { *alternative_condition = bc.read_condition_value(); return Some(true); }
+            "result_condition" => { *result_condition = bc.read_condition_value(); return Some(true); }
+            "followup_action" => { *followup_action = bc.read_effect_value(); return Some(true); }
+            "optional_action" => { *optional_action = bc.read_effect_value(); return Some(true); }
+            "conditional_action" => { *conditional_action = bc.read_effect_value(); return Some(true); }
+            "conditional_negation" => { *conditional_negation = bc.read_bool_value(); return Some(true); }
+            "card_type" => { ek.card_type = bc.read_card_type_value(); return Some(true); }
+            "exclude_self" => { ek.exclude_self = bc.read_bool_value(); return Some(true); }
+            "same_name" => { ek.same_name = bc.read_bool_value(); return Some(true); }
+            "same_unit_name" => { ek.same_unit_name = bc.read_bool_value(); return Some(true); }
+            "group_names" => { ek.group_names = bc.read_opt_str_vec_value(); return Some(true); }
+            "self_target" => { ek.self_target = bc.read_bool_value(); return Some(true); }
+            "location" => { ek.location = bc.read_arc_str_value(); return Some(true); }
+            "heart_colors" => { ek.heart_colors = bc.read_str_vec_value(); return Some(true); }
+            "characters" => { ek.characters = bc.read_opt_str_vec_value(); return Some(true); }
+            "exclude_characters" => { ek.exclude_characters = bc.read_opt_str_vec_value(); return Some(true); }
+            "exclude_group_names" => { ek.exclude_group_names = bc.read_opt_str_vec_value(); return Some(true); }
+            "activation_position" => { ek.activation_position = bc.read_arc_str_value(); return Some(true); }
+            "original_value" => { ek.original_value = bc.read_bool_value(); return Some(true); }
+            "target_count" => { ek.target_count = bc.read_u8_value(); return Some(true); }
+            "per_unit" => { ek.per_unit = bc.read_bool_value(); return Some(true); }
+            "per_unit_count" => { ek.per_unit_count = bc.read_u8_value(); return Some(true); }
+            "per_unit_type" => { ek.per_unit_type = bc.read_arc_str_value(); return Some(true); }
+            "group_reference" => { ek.group_reference = bc.read_arc_str_value(); return Some(true); }
+            "state" => { ek.state = bc.read_effect_state_value(); return Some(true); }
+            "distinct" => { ek.distinct = bc.read_distinct_value(); return Some(true); }
+            "position" => { ek.position = bc.read_position_value(); return Some(true); }
+            "negation" => { ek.negation = bc.read_bool_value(); return Some(true); }
+            "per_unit_heart_colors" => { ek.per_unit_heart_colors = bc.read_str_vec_value(); return Some(true); }
+            "cost_limit" => { ek.cost_limit = bc.read_u8_value(); return Some(true); }
+            "cost_limit_operator" => { ek.cost_limit_operator = bc.read_operator_value(); return Some(true); }
+            "blade_limit" => { ek.blade_limit = bc.read_u8_value(); return Some(true); }
+            "blade_limit_operator" => { ek.blade_limit_operator = bc.read_operator_value(); return Some(true); }
+            "need_heart_color" => { ek.need_heart_color = bc.read_arc_str_value(); return Some(true); }
+            "need_heart_operator" => { ek.need_heart_operator = bc.read_operator_value(); return Some(true); }
+            "need_heart_total" => { ek.need_heart_total = bc.read_u8_value(); return Some(true); }
+            "cost_reference" => { ek.cost_reference = bc.read_arc_str_value(); return Some(true); }
+            "cost_offset" => { ek.cost_offset = bc.read_i8_value(); return Some(true); }
+            "target_member" => { ek.target_member = bc.read_arc_str_value(); return Some(true); }
+            "target_from_selection" => { ek.target_from_selection = bc.read_bool_value(); return Some(true); }
+            "source_position" => { ek.source_position = bc.read_arc_str_value(); return Some(true); }
+            "exclude_selected" => { ek.exclude_selected = bc.read_bool_value(); return Some(true); }
+            "discard_remaining" => { ek.discard_remaining = bc.read_bool_value(); return Some(true); }
+            "self_cost" => { ek.self_cost = bc.read_bool_value(); return Some(true); }
+            "shuffle" => { ek.shuffle = bc.read_bool_value(); return Some(true); }
+            "effect_constraint" => { ek.effect_constraint = bc.read_arc_str_value(); return Some(true); }
+            "sign" => { ek.sign = bc.read_arc_str_value(); return Some(true); }
+            "heart_type" => { ek.heart_type = bc.read_arc_str_value(); return Some(true); }
+            "alternative_count_type" => { ek.alternative_count_type = bc.read_arc_str_value(); return Some(true); }
+            "blind" => { ek.blind = bc.read_bool_value(); return Some(true); }
+            "picker" => { ek.picker = bc.read_arc_str_value(); return Some(true); }
+            "reveal" => { ek.reveal = bc.read_bool_value(); return Some(true); }
+            "choice_type" => { ek.choice_type = bc.read_arc_str_value(); return Some(true); }
+            "choice_options" => { ek.choice_options = bc.read_opt_str_vec_value(); return Some(true); }
+            "replaces_event" => { ek.replaces_event = bc.read_arc_str_value(); return Some(true); }
+            "choice_based" => { ek.choice_based = bc.read_bool_value(); return Some(true); }
+            "use_limit" => { ek.use_limit = bc.read_u8_value(); return Some(true); }
+            "triggers" => { ek.triggers = bc.read_arc_str_value(); return Some(true); }
+            "original_count" => { ek.original_count = bc.read_u8_value(); return Some(true); }
+            "original_operator" => { ek.original_operator = bc.read_operator_value(); return Some(true); }
+            "quoted_text" => { ek.quoted_text = bc.read_quoted_text_value(); return Some(true); }
+            "allow_occupied_stage" => { ek.allow_occupied_stage = bc.read_bool_value(); return Some(true); }
+            "state_change" => { ek.state_change = bc.read_effect_state_value(); return Some(true); }
+            "exclude_position" => { ek.exclude_position = bc.read_arc_str_value(); return Some(true); }
+            "duration" => { ek.duration = bc.read_arc_str_value(); return Some(true); }
+            "dynamic_count" => { ek.dynamic_count = bc.read_dynamic_count_value(); return Some(true); }
+            "filter_targets_by_heart_colors" => { ek.filter_targets_by_heart_colors = bc.read_bool_value(); return Some(true); }
+            "card_property" => { ek.card_property = bc.read_arc_str_value(); return Some(true); }
+            "per_unit_location" => { ek.per_unit_location = bc.read_arc_str_value(); return Some(true); }
+            "card_names" => { ek.card_names = bc.read_str_vec_value(); return Some(true); }
+            "all" => { ek.all = bc.read_bool_value(); return Some(true); }
+            "cost_total" => { ek.cost_total = bc.read_u8_value(); return Some(true); }
+            "cost_total_operator" => { ek.cost_total_operator = bc.read_operator_value(); return Some(true); }
+            "activation_condition_parsed" => { ek.activation_condition_parsed = bc.read_condition_value(); return Some(true); }
+            "action_by" => { ek.action_by = bc.read_arc_str_value(); return Some(true); }
+            "trigger_type" => { ek.trigger_type = bc.read_arc_str_value(); return Some(true); }
+            "repeat_limit" => { ek.repeat_limit = bc.read_u8_value(); return Some(true); }
+            "ability_filter" => { ek.ability_filter = bc.read_ability_filter_value(); return Some(true); }
+            "multiple_targets" => { ek.multiple_targets = bc.read_bool_value(); return Some(true); }
+            "operation" => { ek.operation = bc.read_arc_str_value(); return Some(true); }
+            "options" => { ek.options = bc.read_effect_vec_boxed_value(); return Some(true); }
+            "name_constraint" => { ek.name_constraint = bc.read_arc_str_value(); return Some(true); }
+            "name_constraint_source" => { ek.name_constraint_source = bc.read_arc_str_value(); return Some(true); }
+            "ability_filter_triggers" => { ek.ability_filter_triggers = bc.read_opt_str_vec_value(); return Some(true); }
+            "or_ability_filters" => { ek.or_ability_filters = bc.read_or_ability_filters_value(); return Some(true); }
+            "energy_count" => { ek.energy_count = bc.read_u8_value(); return Some(true); }
+            "any_number" => { ek.any_number = bc.read_bool_value(); return Some(true); }
+            "require_all_heart_colors" => { ek.require_all_heart_colors = bc.read_bool_value(); return Some(true); }
+            "heart_color_count" => { ek.heart_color_count = bc.read_u8_value(); return Some(true); }
+            "value" => { ek.value = bc.read_u8_value(); return Some(true); }
+            "per_group" => { ek.per_group = bc.read_bool_value(); return Some(true); }
+            "per_group_count" => { ek.per_group_count = bc.read_u8_value(); return Some(true); }
+            "placement_order" => { ek.placement_order = bc.read_placement_order_value(); return Some(true); }
+            "or_card_types" => { ek.or_card_types = bc.read_opt_str_vec_value(); return Some(true); }
+            "exclude_heart_colors" => { ek.exclude_heart_colors = bc.read_opt_str_vec_value(); return Some(true); }
+            "cost_from_revealed" => { ek.cost_from_revealed = bc.read_bool_value(); return Some(true); }
+            "timing_condition" => { ek.timing_condition = bc.read_arc_str_value(); return Some(true); }
+            "identities" => { ek.identities = bc.read_opt_str_vec_value(); return Some(true); }
+            "all_regions" => { ek.all_regions = bc.read_bool_value(); return Some(true); }
+            "trigger_filter" => { ek.trigger_filter = bc.read_opt_str_vec_value(); return Some(true); }
+            "effect_type" => { ek.effect_type = bc.read_arc_str_value(); return Some(true); }
+            "timing" => { ek.timing = bc.read_arc_str_value(); return Some(true); }
+            "treat_as" => { ek.treat_as = bc.read_arc_str_value(); return Some(true); }
+            "question" => { ek.question = bc.read_arc_str_value(); return Some(true); }
+            "answers" => { ek.answers = bc.read_opt_str_vec_value(); return Some(true); }
+            "choice_maker" => { ek.choice_maker = bc.read_arc_str_value(); return Some(true); }
+            "cost_limit_min" => { ek.cost_limit_min = bc.read_u8_value(); return Some(true); }
+            "cost_limit_max" => { ek.cost_limit_max = bc.read_u8_value(); return Some(true); }
+            "exclude_by_name_source" => { ek.exclude_by_name_source = bc.read_arc_str_value(); return Some(true); }
+            "baton_touch_trigger" => { ek.baton_touch_trigger = bc.read_bool_value(); return Some(true); }
+            "is_reveal" => { ek.is_reveal = bc.read_bool_value(); return Some(true); }
+            "resource_on_select" => { ek.resource_on_select = bc.read_effect_value(); return Some(true); }
+            "replace_all" => { ek.replace_all = bc.read_bool_value(); return Some(true); }
+            "resource" => { ek.resource = bc.read_arc_str_value(); return Some(true); }
+            "heart_colors_from_selected_card" => { ek.heart_colors_from_selected_card = bc.read_bool_value(); return Some(true); }
+            "heart_color" => { ek.heart_color = bc.read_arc_str_value(); return Some(true); }
+            "ability_gain" => { ek.ability_gain = bc.read_arc_str_value(); return Some(true); }
+            "ability_gain_trigger" => { ek.ability_gain_trigger = bc.read_arc_str_value(); return Some(true); }
+            "gained_effect" => { ek.gained_effect = bc.read_effect_value(); return Some(true); }
+            "ability_text" => { ek.ability_text = bc.read_arc_str_value(); return Some(true); }
+            "target_trigger" => { ek.target_trigger = bc.read_arc_str_value(); return Some(true); }
+            "source_card" => { ek.source_card = bc.read_arc_str_value(); return Some(true); }
+            "suppressed_trigger" => { ek.suppressed_trigger = bc.read_arc_str_value(); return Some(true); }
+            "option" => { ek.option = bc.read_arc_str_value(); return Some(true); }
+            "alternative_effect" => { ek.alternative_effect = bc.read_effect_value(); return Some(true); }
+            "choice_condition" => { ek.choice_condition = bc.read_condition_value(); return Some(true); }
+            "restriction_type" => { ek.restriction_type = bc.read_arc_str_value(); return Some(true); }
+            "restricted_destination" => { ek.restricted_destination = bc.read_arc_str_value(); return Some(true); }
+            "delayed" => { ek.delayed = bc.read_bool_value(); return Some(true); }
+            "phase" => { ek.phase = bc.read_arc_str_value(); return Some(true); }
+            "heart_selection" => { ek.heart_selection = bc.read_bool_value(); return Some(true); }
+            "blade_type" => { ek.blade_type = bc.read_arc_str_value(); return Some(true); }
+            "choice" => { ek.choice = bc.read_bool_value(); return Some(true); }
+            "lose_blade_hearts" => { ek.lose_blade_hearts = bc.read_bool_value(); return Some(true); }
+            "original_cost" => { ek.original_cost = bc.read_u8_value(); return Some(true); }
+            "parenthetical" => { ek.parenthetical = bc.read_opt_str_vec_value(); return Some(true); }
+            "resource_icon_count" => { ek.resource_icon_count = bc.read_u8_value(); return Some(true); }
+            "ref_value" => { ek.ref_value = bc.read_arc_str_value(); return Some(true); }
+            "ref_offset" => { ek.ref_offset = bc.read_i8_value(); return Some(true); }
+            "id" => { ek.id = bc.read_arc_str_value(); return Some(true); }
+            "opponent_action" => { ek.opponent_action = bc.read_effect_value(); return Some(true); }
+            "energy" => { ek.energy_count = bc.read_u8_value(); return Some(true); }
+            "max_repeats" => { ek.repeat_limit = bc.read_u8_value(); return Some(true); }
+            _ => { bc.skip_value()?; return Some(true); }
         }
     }
-}
 
 /// Accumulator for EffectKind fields during direct decode.
 #[derive(Default)]
@@ -861,6 +375,39 @@ fn build_filter(ek: &EffectKindLocals) -> EffectFilter {
         per_unit_heart_colors: ek.per_unit_heart_colors.clone(),
         cost_limit: ek.cost_limit.clone(),
         cost_limit_operator: ek.cost_limit_operator.clone(),
+        blade_limit: ek.blade_limit.clone(),
+        blade_limit_operator: ek.blade_limit_operator.clone(),
+        need_heart_color: ek.need_heart_color.clone(),
+        need_heart_operator: ek.need_heart_operator.clone(),
+        need_heart_total: ek.need_heart_total.clone(),
+        cost_reference: ek.cost_reference.clone(),
+        cost_offset: ek.cost_offset.clone(),
+        target_member: ek.target_member.clone(),
+        target_from_selection: ek.target_from_selection.clone(),
+        source_position: ek.source_position.clone(),
+        exclude_selected: ek.exclude_selected.clone(),
+        discard_remaining: ek.discard_remaining.clone(),
+        self_cost: ek.self_cost.clone(),
+        shuffle: ek.shuffle.clone(),
+        effect_constraint: ek.effect_constraint.clone(),
+        sign: ek.sign.clone(),
+        heart_type: ek.heart_type.clone(),
+        alternative_count_type: ek.alternative_count_type.clone(),
+        blind: ek.blind.clone(),
+        picker: ek.picker.clone(),
+        reveal: ek.reveal.clone(),
+        choice_type: ek.choice_type.clone(),
+        choice_options: ek.choice_options.clone(),
+        replaces_event: ek.replaces_event.clone(),
+        choice_based: ek.choice_based.clone(),
+        use_limit: ek.use_limit.clone(),
+        triggers: ek.triggers.clone(),
+        original_count: ek.original_count.clone(),
+        original_operator: ek.original_operator.clone(),
+        quoted_text: ek.quoted_text.clone(),
+        allow_occupied_stage: ek.allow_occupied_stage.clone(),
+        state_change: ek.state_change.clone(),
+        exclude_position: ek.exclude_position.clone(),
         duration: ek.duration.clone(),
         dynamic_count: ek.dynamic_count.clone(),
         filter_targets_by_heart_colors: ek.filter_targets_by_heart_colors.clone(),
@@ -906,12 +453,15 @@ fn build_filter(ek: &EffectKindLocals) -> EffectFilter {
         choice_maker: ek.choice_maker.clone(),
         cost_limit_min: ek.cost_limit_min.clone(),
         cost_limit_max: ek.cost_limit_max.clone(),
-    }
-}
-
-fn build_abilityop(ek: &EffectKindLocals) -> EffectKind {
-    EffectKind::AbilityOp {
-        filter: Some(Box::new(build_filter(ek))),
+        count: ek.count.clone(),
+        exclude_by_name_source: ek.exclude_by_name_source.clone(),
+        baton_touch_trigger: ek.baton_touch_trigger.clone(),
+        is_reveal: ek.is_reveal.clone(),
+        resource_on_select: ek.resource_on_select.clone(),
+        replace_all: ek.replace_all.clone(),
+        resource: ek.resource.clone(),
+        heart_colors_from_selected_card: ek.heart_colors_from_selected_card.clone(),
+        heart_color: ek.heart_color.clone(),
         ability_gain: ek.ability_gain.clone(),
         ability_gain_trigger: ek.ability_gain_trigger.clone(),
         gained_effect: ek.gained_effect.clone(),
@@ -919,180 +469,109 @@ fn build_abilityop(ek: &EffectKindLocals) -> EffectKind {
         target_trigger: ek.target_trigger.clone(),
         source_card: ek.source_card.clone(),
         suppressed_trigger: ek.suppressed_trigger.clone(),
-        use_limit: ek.use_limit.clone(),
-        triggers: ek.triggers.clone(),
         option: ek.option.clone(),
+        alternative_effect: ek.alternative_effect.clone(),
+        choice_condition: ek.choice_condition.clone(),
+        alternative_condition: ek.alternative_condition.clone(),
+        restriction_type: ek.restriction_type.clone(),
+        restricted_destination: ek.restricted_destination.clone(),
+        delayed: ek.delayed.clone(),
+        phase: ek.phase.clone(),
+        non_stackable: ek.non_stackable.clone(),
+        heart_selection: ek.heart_selection.clone(),
+        blade_type: ek.blade_type.clone(),
+        choice: ek.choice.clone(),
+        lose_blade_hearts: ek.lose_blade_hearts.clone(),
+        original_cost: ek.original_cost.clone(),
+        parenthetical: ek.parenthetical.clone(),
+        resource_icon_count: ek.resource_icon_count.clone(),
+        ref_value: ek.ref_value.clone(),
+        ref_offset: ek.ref_offset.clone(),
+        id: ek.id.clone(),
+        opponent_action: ek.opponent_action.clone(),
+    }
+}
+
+fn build_abilityop(ek: &EffectKindLocals) -> EffectKind {
+    EffectKind::AbilityOp {
+        filter: Some(Box::new(build_filter(ek))),
     }
 }
 
 fn build_changestate(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::ChangeState {
         filter: Some(Box::new(build_filter(ek))),
-        state_change: ek.state_change.clone(),
-        self_cost: ek.self_cost.clone(),
-        blade_limit: ek.blade_limit.clone(),
-        blade_limit_operator: ek.blade_limit_operator.clone(),
     }
 }
 
 fn build_compoundeffect(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::CompoundEffect {
         filter: Some(Box::new(build_filter(ek))),
-        choice_type: ek.choice_type.clone(),
-        choice_options: ek.choice_options.clone(),
-        alternative_effect: ek.alternative_effect.clone(),
-        shuffle: ek.shuffle.clone(),
-        alternative_count_type: ek.alternative_count_type.clone(),
-        choice_condition: ek.choice_condition.clone(),
-        alternative_condition: ek.alternative_condition.clone(),
     }
 }
 
 fn build_customop(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::CustomOp {
         filter: Some(Box::new(build_filter(ek))),
-        opponent_action: ek.opponent_action.clone(),
-        replaces_event: ek.replaces_event.clone(),
-        choice_based: ek.choice_based.clone(),
-        use_limit: ek.use_limit.clone(),
-        triggers: ek.triggers.clone(),
     }
 }
 
 fn build_drawcards(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::DrawCards {
         filter: Some(Box::new(build_filter(ek))),
-        count: ek.count.clone(),
     }
 }
 
 fn build_gainresource(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::GainResource {
         filter: Some(Box::new(build_filter(ek))),
-        resource: ek.resource.clone(),
-        heart_colors_from_selected_card: ek.heart_colors_from_selected_card.clone(),
-        sign: ek.sign.clone(),
-        target_from_selection: ek.target_from_selection.clone(),
-        heart_type: ek.heart_type.clone(),
-        heart_color: ek.heart_color.clone(),
-        blade_limit: ek.blade_limit.clone(),
-        blade_limit_operator: ek.blade_limit_operator.clone(),
     }
 }
 
 fn build_lookreveal(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::LookReveal {
         filter: Some(Box::new(build_filter(ek))),
-        reveal: ek.reveal.clone(),
-        blind: ek.blind.clone(),
-        is_reveal: ek.is_reveal.clone(),
-        picker: ek.picker.clone(),
-        resource_on_select: ek.resource_on_select.clone(),
     }
 }
 
 fn build_miscop(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::MiscOp {
         filter: Some(Box::new(build_filter(ek))),
-        heart_type: ek.heart_type.clone(),
-        heart_selection: ek.heart_selection.clone(),
-        blade_type: ek.blade_type.clone(),
-        choice: ek.choice.clone(),
-        lose_blade_hearts: ek.lose_blade_hearts.clone(),
-        effect_constraint: ek.effect_constraint.clone(),
-        original_count: ek.original_count.clone(),
-        original_operator: ek.original_operator.clone(),
-        original_cost: ek.original_cost.clone(),
-        blade_limit: ek.blade_limit.clone(),
-        blade_limit_operator: ek.blade_limit_operator.clone(),
-        parenthetical: ek.parenthetical.clone(),
-        quoted_text: ek.quoted_text.clone(),
-        alternative_count_type: ek.alternative_count_type.clone(),
-        resource_icon_count: ek.resource_icon_count.clone(),
-        cost_reference: ek.cost_reference.clone(),
-        cost_offset: ek.cost_offset.clone(),
-        blind: ek.blind.clone(),
-        picker: ek.picker.clone(),
-        sign: ek.sign.clone(),
-        ref_value: ek.ref_value.clone(),
-        ref_offset: ek.ref_offset.clone(),
-        id: ek.id.clone(),
     }
 }
 
 fn build_modifyhearts(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::ModifyHearts {
         filter: Some(Box::new(build_filter(ek))),
-        original_count: ek.original_count.clone(),
-        original_operator: ek.original_operator.clone(),
-        replace_all: ek.replace_all.clone(),
     }
 }
 
 fn build_modifyscore(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::ModifyScore {
         filter: Some(Box::new(build_filter(ek))),
-        effect_constraint: ek.effect_constraint.clone(),
-        need_heart_operator: ek.need_heart_operator.clone(),
-        need_heart_total: ek.need_heart_total.clone(),
     }
 }
 
 fn build_movecards(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::MoveCards {
         filter: Some(Box::new(build_filter(ek))),
-        count: ek.count.clone(),
-        shuffle: ek.shuffle.clone(),
-        discard_remaining: ek.discard_remaining.clone(),
-        exclude_selected: ek.exclude_selected.clone(),
-        exclude_by_name_source: ek.exclude_by_name_source.clone(),
-        source_position: ek.source_position.clone(),
-        exclude_position: ek.exclude_position.clone(),
-        allow_occupied_stage: ek.allow_occupied_stage.clone(),
-        target_from_selection: ek.target_from_selection.clone(),
-        need_heart_total: ek.need_heart_total.clone(),
-        need_heart_operator: ek.need_heart_operator.clone(),
-        need_heart_color: ek.need_heart_color.clone(),
-        state_change: ek.state_change.clone(),
-        self_cost: ek.self_cost.clone(),
-        cost_reference: ek.cost_reference.clone(),
-        cost_offset: ek.cost_offset.clone(),
-        baton_touch_trigger: ek.baton_touch_trigger.clone(),
-        target_member: ek.target_member.clone(),
-        quoted_text: ek.quoted_text.clone(),
     }
 }
 
 fn build_positionop(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::PositionOp {
         filter: Some(Box::new(build_filter(ek))),
-        target_member: ek.target_member.clone(),
-        source_position: ek.source_position.clone(),
-        exclude_position: ek.exclude_position.clone(),
-        allow_occupied_stage: ek.allow_occupied_stage.clone(),
     }
 }
 
 fn build_restrictionop(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::RestrictionOp {
         filter: Some(Box::new(build_filter(ek))),
-        restriction_type: ek.restriction_type.clone(),
-        restricted_destination: ek.restricted_destination.clone(),
-        delayed: ek.delayed.clone(),
-        phase: ek.phase.clone(),
-        non_stackable: ek.non_stackable.clone(),
-        replaces_event: ek.replaces_event.clone(),
-        choice_based: ek.choice_based.clone(),
     }
 }
 
 fn build_selecttarget(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::SelectTarget {
         filter: Some(Box::new(build_filter(ek))),
-        exclude_selected: ek.exclude_selected.clone(),
-        choice_type: ek.choice_type.clone(),
-        choice_options: ek.choice_options.clone(),
-        reveal: ek.reveal.clone(),
-        discard_remaining: ek.discard_remaining.clone(),
     }
 }
