@@ -967,6 +967,76 @@ impl AbilityResolver {
         );
     }
 
+    pub(crate) fn execute_set_heart_copy_from_under(
+        &mut self,
+        gs: &mut GameState,
+        duration: Option<&str>,
+    ) {
+        // "このメンバーが元々持つハートは、これにより下に置いたメンバーカードが持つ
+        // ハートと同じになる" — copy the hearts of the card just placed under this
+        // member (from the preceding move_cards sub-action) onto the member.
+        let member_card = self
+            .selected_cards
+            .first()
+            .copied()
+            .or(gs.activating_card)
+            .or(self.activating_card_id)
+            .unwrap_or(-1);
+        if member_card == -1 {
+            return;
+        }
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        // The source card is the one placed under this member by the move that
+        // ran just before this step. Prefer moved_cards (the sequential's own
+        // moved cards) that now sit under the member; fall back to scanning the
+        // member's under_cards for the most recent card.
+        let source_card: Option<i16> = {
+            let player = gs.resolve_target_player("self");
+            let pos = player.stage.stage.iter().position(|&id| id == member_card);
+            let under = pos.and_then(|p| player.stage.under_cards.get(p));
+            match under {
+                Some(uc) if !uc.is_empty() => uc
+                    .iter()
+                    .rev()
+                    .find(|&&cid| self.moved_cards.contains(&cid))
+                    .copied()
+                    .or_else(|| uc.last().copied()),
+                _ => self.moved_cards.last().copied(),
+            }
+        };
+        let Some(source) = source_card else {
+            return;
+        };
+        gs.push_rule_log(format!(
+            "{} {}: [[log_set_heart_copy:target={},source={}]]",
+            pp, act_name, member_card, source
+        ));
+        gs.mods.set_heart_copy(member_card, source);
+        gs.record_ability_application(
+            member_card,
+            format!("Copy hearts from card {}", source),
+            "heart_copy",
+            source,
+            None,
+            0,
+        );
+        let ed = crate::core::types::EffectData::SetBladeCount {
+            card_id: member_card,
+        };
+        util::push_temporary_effect(
+            gs,
+            "set_heart_type",
+            duration,
+            "self",
+            &format!("Copy hearts from card {} onto card {}", source, member_card),
+            Some(ed),
+        );
+    }
+
     pub(crate) fn execute_activation_cost(
         &mut self,
         gs: &mut GameState,

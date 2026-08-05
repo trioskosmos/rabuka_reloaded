@@ -467,6 +467,7 @@ impl Player {
         heart_color_multiplier: &HashMap<i16, crate::card::HeartColor>,
         heart_override: &HashMap<i16, (crate::card::HeartColor, u8)>,
         heart_modifiers: &HashMap<i16, HashMap<crate::card::HeartColor, ModifierEntry>>,
+        heart_copy: &HashMap<i16, i16>,
     ) -> crate::card::BaseHeart {
         let mut total_hearts = crate::card::HeartMap::new();
 
@@ -480,7 +481,15 @@ impl Player {
                 continue;
             }
 
-            if let Some(card) = card_db.get_card(card_id) {
+            if let Some(&src) = heart_copy.get(&card_id) {
+                if let Some(src_card) = card_db.get_card(src) {
+                    if let Some(ref base_heart) = src_card.base_heart {
+                        for (color, count) in &base_heart.hearts {
+                            *total_hearts.entry_or_default(*color) += count;
+                        }
+                    }
+                }
+            } else if let Some(card) = card_db.get_card(card_id) {
                 if let Some(ref base_heart) = card.base_heart {
                     if let Some(override_color) = heart_color_multiplier.get(&card_id) {
                         let total: u8 = base_heart.hearts.values_sum();

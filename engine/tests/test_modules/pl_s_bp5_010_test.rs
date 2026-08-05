@@ -65,6 +65,7 @@ fn rina_bp5n_heart02_ge5_increases_opponent_need_heart00() {
         &game.state.mods.heart_color_multiplier,
         &Default::default(),
         &Default::default(),
+        &Default::default(),
     );
     let h02_total = *stage_hearts.hearts.get(&HeartColor::Heart02).unwrap_or(&0);
     assert!(
@@ -113,6 +114,7 @@ fn rina_bp5n_heart02_lt5_no_effect() {
     let stage_hearts = game.state.player1.calculate_stage_hearts(
         &game.db,
         &game.state.mods.heart_color_multiplier,
+        &Default::default(),
         &Default::default(),
         &Default::default(),
     );

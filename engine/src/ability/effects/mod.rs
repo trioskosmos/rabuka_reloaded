@@ -402,6 +402,12 @@ impl AbilityResolver {
                 Ok(())
             }
             ActionType::SetHeartType => {
+                // C4: heart becomes the same as the card just placed under this
+                // member (ref_value="placed_under") — a copy, not a fixed color.
+                if effect.ref_value_any() == Some("placed_under") {
+                    self.execute_set_heart_copy_from_under(gs, effect.duration_any().as_deref());
+                    return Ok(());
+                }
                 let is_self_target = effect.self_target_any().unwrap_or(false);
                 let needs_target = !is_self_target
                     && (effect.heart_selection_any().unwrap_or(false)

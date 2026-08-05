@@ -1729,6 +1729,8 @@ impl AbilityEffect {
 
     str_getter!(heart_type_any, [GainResource => heart_type, MiscOp => heart_type]);
 
+    str_getter!(ref_value_any, [MiscOp => ref_value]);
+
     str_getter!(id_any, [MiscOp => id]);
 
     filter_opt_vec_ref_getter!(identities_any, identities);

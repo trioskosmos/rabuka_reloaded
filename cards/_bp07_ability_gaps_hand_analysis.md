@@ -311,23 +311,25 @@ Parsed:
 - ❌ **The action "そのバトンタッチで登場したメンバーの下に置く" is not represented** → `action:"custom", destination:null`. Existing baton-touch patterns only match "バトンタッチして登場"/"からバトンタッチ"; this departing-member perspective ("バトンタッチしていた場合 … その…メンバーの下に置く") matches nothing.
 - Engine: baton-touch tracking exists (`baton_touch_arriving_card_ids`, `baton_touch_replaced_member_id`) and `under_member` placement exists, but no resolver path re-places the departed card under the arriving member. → **Overlap** (parser must emit the move; engine needs the wiring). See full analysis.
 
-### C4. `PL!N-bp7-003-R＋` 桜坂しずく ab#0 — gap: [under_member] — ❌ under-member placement swallowed into condition
+### C4. `PL!N-bp7-003-R＋` 桜坂しずく ab#0 — gap: [under_member] — ✅ FIXED (parser + engine)
 
 Japanese:
 > 起動：デッキの上からカードを5枚控え室に置く：自分の控え室にあるコスト17以下の『虹ヶ咲』のメンバーカード1枚を**このメンバーの下に置く**。そうしたとき、ライブ終了時まで、このメンバーが元々持つハートは、これにより下に置いたメンバーカードが持つハートと同じになる。
 
-Parsed:
+Parsed (fixed):
 ```json
 "cost":{"move_cards","deck_top→discard",5},
-"effect":{
-  "condition":{"comparison_condition","cost_limit":17,"<=","count":1,
-    "card_type":"member_card","group_names":["虹ヶ咲"],"location":"discard"},
-  "action":"set_heart_type","original_value":true,"self_target":true,"duration":"live_end",
-  "heart_type":null}
+"effect":{"action":"sequential","conditional":true,"actions":[
+  {"action":"move_cards","source":"discard","destination":"under_member",
+    "cost_limit":17,"cost_limit_operator":"<=","count":1,"card_type":"member_card",
+    "group_names":["虹ヶ咲"]},
+  {"action":"set_heart_type","heart_type":null,"ref_value":"placed_under",
+    "original_value":true,"self_target":true,"card_type":"member_card","duration":"live_end"}
+]}
 ```
-- ✅ Cost parsed. ✅ Final heart-set conditionally parsed as `set_heart_type{original_value:true, live_end}`.
-- ❌ **The action "…メンバーカード1枚をこのメンバーの下に置く" is completely missing.** The placing-under-member move got folded into the `condition` and no `move_cards{destination:under_member}` (or place action) is emitted. The engine would never actually move the card under the member, so the subsequent heart-set has no subject.
-- Fix: effect must be `sequential[move_cards{discard→under_member, cost≤17 虹ヶ咲 member}, set_heart_type{...}]`.
+- ✅ Cost parsed. ✅ The placing-under-member move is now emitted as `move_cards{destination:under_member, cost≤17 虹ヶ咲 member, count:1}` as the first sequential step.
+- ✅ The heart-set is the second step (`ref_value:"placed_under"` = copy the hearts of the card just placed under by the preceding move). Engine added `heart_copy` modifier (`GameModifiers.heart_copy: target member → source card`), applied in live `calculate_stage_hearts`/`get_available_hearts`/`player_perform_live`/`check_live_success`. This member's original hearts now equal the placed card's hearts.
+- Parser fix: new `_try_place_under_heart_copy` handler (matches "…をこのメンバーの下に置く。そうしたとき、…ハートは…と同じになる"), registered before `_try_conditional_sequential`.
 
 ### C5. `PL!N-bp7-004-R` 朝香果林 ab#0 — gap: [under_member] — ❌ effect mis-typed + condition dropped
 
@@ -456,7 +458,7 @@ Parsed:
 | C1 | PL!S-bp7-009-R 黒澤ルビィ ab#0 | lose_resource | ❌ | blade-loss → `action:"custom"` |
 | C2 | PL!N-bp7-005-R 宮下 愛 ab#0 | under_member, energy_deck, distinct_name | ❌ | choice option source/destination wrong (energy_deck→under_member) |
 | C3 | PL!SP-bp7-001-R 澁谷かのん ab#1 | under_member | ❌ | baton-touch re-place → `action:"custom"` |
-| C4 | PL!N-bp7-003-R＋ 桜坂しずく ab#0 | under_member | ❌ | under-member move swallowed into condition; no move emitted |
+| C4 | PL!N-bp7-003-R＋ 桜坂しずく ab#0 | under_member, heart_copy | ✅ | DONE — sequential move→under + heart_copy (ref_value="placed_under") |
 | C5 | PL!N-bp7-004-R 朝香果林 ab#0 | under_member | ❌ | effect action `place_energy_under_member` (should be change_state wait); blade-limit dropped |
 | C6 | PL!S-bp7-004-R 黒澤ダイヤ ab#0 | under_member, baton_touch, both_targets | ❌ | shuffle `target:"energy_deck"` wrong; "選んだカード以外" lost |
 | C7 | PL!S-bp7-004-R 黒澤ダイヤ ab#1 | under_member, placement_order | ❌ | look `source` missing; rest→deck_bottom missing |
@@ -474,7 +476,7 @@ Parsed:
 ## Recommended order
 
 1. Group B first (smallest, highest value): add `location:"under_member"` in the three gain_resource/condition rules (B1–B3), fix the compound-trigger OR (B4), and fix condition source/location + OR/AND branches (B5–B6).
-2. Group C parser-only: C1 (negative gain_resource / lose_resource), C2 (choice-subtree energy_deck→under_member), C4 (under-member move in sequential), C5 (change_state + blade-limit), C6 (both-target + exclude-selected), C7–C9 (look_and_select dual destination / select→move).
+2. Group C parser-only: C1 (negative gain_resource / lose_resource), C2 (choice-subtree energy_deck→under_member), C5 (change_state + blade-limit), C6 (both-target + exclude-selected), C7–C9 (look_and_select dual destination / select→move). **C4 DONE (2026-08-05, parser + engine heart_copy).**
 3. C3 last: prototype the parser emission, then confirm engine resolver wiring with `run_qa_tests.rs`.
 
 ---

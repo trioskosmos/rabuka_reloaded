@@ -2172,6 +2172,7 @@ impl GameState {
                 &self.mods.heart_color_multiplier,
                 &self.mods.heart_override,
                 &self.mods.heart_modifiers,
+                &self.mods.heart_copy,
             )
         });
         for card_id in &player.live_card_zone.cards {

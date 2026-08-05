@@ -649,6 +649,7 @@ fn hs_bp5_021_single_hasunosora_member_heart_conversion() {
         &game.state.mods.heart_color_multiplier,
         &Default::default(),
         &Default::default(),
+        &Default::default(),
     );
     // member has heart01:1, heart05:1 → 2 total, all become heart01
     let heart01 = stage_hearts
@@ -1071,6 +1072,7 @@ fn hs_bp5_021_precise_heart_count_after_transform() {
     let stage_hearts = game.state.player1.calculate_stage_hearts(
         &game.state.card_database,
         &game.state.mods.heart_color_multiplier,
+        &Default::default(),
         &Default::default(),
         &Default::default(),
     );

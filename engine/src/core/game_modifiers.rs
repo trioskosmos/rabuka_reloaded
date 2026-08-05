@@ -87,6 +87,10 @@ pub struct GameModifiers {
     /// Populated by recalculate_constants for display in breakdown.scores.
     pub constant_score_sources: Vec<(i16, String, i16)>,
     pub heart_color_multiplier: HashMap<i16, HeartColor>,
+    /// Copy another card's original hearts onto a member. Key: target member
+    /// card_id, value: source card_id whose hearts are copied (e.g. "このメンバーが
+    /// 元々持つハートは、下に置いたメンバーカードが持つハートと同じになる").
+    pub heart_copy: HashMap<i16, i16>,
     /// Number of cards moved from hand to discard by the most recent cost payment.
     pub last_cost_discard_count: u8,
     /// Card IDs moved from hand to discard by the most recent cost payment.
@@ -136,6 +140,7 @@ impl GameModifiers {
             p2_constant_total_score_bonus: 0,
             constant_score_sources: Vec::new(),
             heart_color_multiplier: HashMap::default(),
+            heart_copy: HashMap::default(),
             last_cost_discard_count: 0,
             last_cost_moved_card_ids: SmallVec::new(),
             last_cost_energy_count: 0,
@@ -316,6 +321,18 @@ impl GameModifiers {
         self.heart_override.remove(&card_id);
     }
 
+    pub fn set_heart_copy(&mut self, target_card_id: i16, source_card_id: i16) {
+        self.heart_copy.insert(target_card_id, source_card_id);
+    }
+
+    pub fn get_heart_copy(&self, target_card_id: i16) -> Option<i16> {
+        self.heart_copy.get(&target_card_id).copied()
+    }
+
+    pub fn remove_heart_copy(&mut self, target_card_id: i16) {
+        self.heart_copy.remove(&target_card_id);
+    }
+
     // ============== SCORE ==============
 
     pub fn add_score_modifier(&mut self, card_id: i16, delta: i16) {
@@ -468,6 +485,7 @@ impl GameModifiers {
         self.constant_score_bonuses.remove(&card_id);
         self.constant_heart_bonuses.remove(&card_id);
         self.heart_color_multiplier.remove(&card_id);
+        self.heart_copy.remove(&card_id);
         self.delayed_cannot_active.remove(&card_id);
     }
 }

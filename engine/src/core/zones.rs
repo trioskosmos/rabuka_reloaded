@@ -435,6 +435,7 @@ impl Stage {
         heart_override: &HashMap<i16, (HeartColor, u8)>,
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
         heart_color_multiplier: &HashMap<i16, HeartColor>,
+        heart_copy: &HashMap<i16, i16>,
     ) -> BaseHeart {
         let mut hearts = HeartMap::new();
 
@@ -449,7 +450,16 @@ impl Stage {
             }
 
             let mut card_hearts = HeartMap::new();
-            if let Some(card) = card_db.get_card(card_id) {
+            if let Some(&src) = heart_copy.get(&card_id) {
+                // Copy the referenced card's original hearts onto this member.
+                if let Some(src_card) = card_db.get_card(src) {
+                    if let Some(ref base_heart) = src_card.base_heart {
+                        for (color, count) in &base_heart.hearts {
+                            *card_hearts.entry_or_default(*color) += count;
+                        }
+                    }
+                }
+            } else if let Some(card) = card_db.get_card(card_id) {
                 if let Some(ref base_heart) = card.base_heart {
                     for (color, count) in &base_heart.hearts {
                         *card_hearts.entry_or_default(*color) += count;

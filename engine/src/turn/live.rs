@@ -75,12 +75,14 @@ impl super::TurnEngine {
             mult_ref,
             &game_state.mods.heart_override,
             &game_state.mods.heart_modifiers,
+            &game_state.mods.heart_copy,
         );
         let mut p2_stage = game_state.player2.calculate_stage_hearts(
             &game_state.card_database,
             mult_ref,
             &game_state.mods.heart_override,
             &game_state.mods.heart_modifiers,
+            &game_state.mods.heart_copy,
         );
         for snap in &game_state.performance_snapshots {
             let target = if snap.player_id == game_state.player1.id {
@@ -1193,6 +1195,7 @@ impl super::TurnEngine {
         orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
         need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
         heart_color_multiplier: &HashMap<i16, HeartColor>,
+        heart_copy: &HashMap<i16, i16>,
         cannot_live: bool,
     ) -> LivePerformanceData {
         #[cfg(not(feature = "no_std"))]
@@ -1251,6 +1254,23 @@ impl super::TurnEngine {
                             draw_icons += count;
                         }
                     }
+                }
+            }
+
+            // heart_copy (set_heart_type ref_value="placed_under"): this member's
+            // original hearts become the same as the referenced card's hearts.
+            if let Some(src) = heart_copy.get(&cid) {
+                if let Some(src_card) = card_db.get_card(*src) {
+                    let mut copied = EMPTY_H8;
+                    if let Some(ref bh) = src_card.base_heart {
+                        for (color, count) in &bh.hearts {
+                            let idx = color.index();
+                            if idx < 8 {
+                                copied[idx] += count;
+                            }
+                        }
+                    }
+                    base_h = copied;
                 }
             }
 
@@ -1368,6 +1388,7 @@ impl super::TurnEngine {
             heart_override,
             heart_modifiers,
             heart_color_multiplier,
+            heart_copy,
         );
 
         let blade_to_heart = |bc: BladeColor| -> HeartColor {
@@ -2347,6 +2368,7 @@ impl super::TurnEngine {
         heart_override: &HashMap<i16, (HeartColor, u8)>,
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
         heart_color_multiplier: &HashMap<i16, HeartColor>,
+        heart_copy: &HashMap<i16, i16>,
         live_card_ids: &[i16],
         _allocations: &[Allocation],
         yell_cards: &[YellCardResult],
@@ -2364,6 +2386,7 @@ impl super::TurnEngine {
             heart_override,
             heart_modifiers,
             heart_color_multiplier,
+            heart_copy,
         );
         for yc in yell_cards {
             for i in 0..8 {

@@ -8587,6 +8587,57 @@ def _try_timing_condition_gain(text):
     return result
 
 
+def _try_place_under_heart_copy(text):
+    """Xをこのメンバーの下に置く。そうしたとき、...このメンバーが元々持つハートは、
+    これにより下に置いたメンバーカードが持つハートと同じになる。
+
+    Sequential: first move the member card from discard to under this member,
+    then (dependent on the placement succeeding) set this member's original heart
+    to match the placed card. The heart source is the card placed under by the
+    preceding move (NOT a fixed color), emitted as heart_source="placed_under".
+    """
+    if "同じになる" not in text or "そうしたとき" not in text:
+        return None
+    # Split at そうしたとき — before it is the placement, after is the heart copy.
+    if "そうしたとき、" in text:
+        place_text, _sep, heart_text = text.partition("そうしたとき、")
+    elif "そうしたとき" in text:
+        place_text, _sep, heart_text = text.partition("そうしたとき")
+    else:
+        return None
+    place_text = place_text.strip()
+    heart_text = heart_text.strip().lstrip("、")
+    if "このメンバーの下に置く" not in place_text:
+        return None
+    if "元々持つハート" not in heart_text or "と同じになる" not in heart_text:
+        return None
+    # Parse the placement as a move_cards action (discard -> under_member).
+    move = parse_action(place_text)
+    if not move or move.get("action") != "move_cards":
+        # Fall back to generic parse_effect for the placement half.
+        move = parse_effect(place_text)
+        if not isinstance(move, dict) or move.get("action") != "move_cards":
+            return None
+    move.setdefault("destination", "under_member")
+    move.setdefault("count", 1)
+    heart = {
+        "text": heart_text,
+        "action": "set_heart_type",
+        "heart_type": None,
+        "ref_value": "placed_under",
+        "original_value": True,
+        "self_target": True,
+        "card_type": "member_card",
+        "duration": "live_end",
+    }
+    return {
+        "text": text,
+        "action": "sequential",
+        "conditional": True,
+        "actions": [move, heart],
+    }
+
+
 _EFFECT_HANDLERS = [
     # Tier 1: Very specific patterns that must be checked first.
     # These would be misparsed by any generic handler.
@@ -8612,6 +8663,7 @@ _EFFECT_HANDLERS = [
     _try_furthermore,  # さらに (furthermore/additional effect)
     _try_kore_niyori_result,  # これによりX場合 (result-based conditional)
     _try_sequential_duration,  # Duration + sequential
+    _try_place_under_heart_copy,  # 下に置く。そうしたとき、ハート=置いたカード (C4)
     _try_conditional_sequential,  # そうした場合X場合 (nested conditional-on-optional)
     # Tier 3: Sequential and compound patterns
     _try_sequential,  # その後、 (then)

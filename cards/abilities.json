@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-05T17:16:58.848517",
+  "generated_at": "2026-08-05T18:04:29.578749",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "d1ea0278",
+  "engine_commit": "467d5c24",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -6557,27 +6557,41 @@
       },
       "effect": {
         "text": "自分の控え室にあるコスト17以下の『虹ヶ咲』のメンバーカード1枚をこのメンバーの下に置く。そうしたとき、ライブ終了時まで、このメンバーが元々持つハートは、これにより下に置いたメンバーカードが持つハートと同じになる",
-        "condition": {
-          "text": "自分の控え室にあるコスト17以下の『虹ヶ咲』のメンバーカード1枚をこのメンバーの下に置く。そうしたとき",
-          "group_names": [
-            "虹ヶ咲"
-          ],
-          "target": "self",
-          "location": "discard",
-          "card_type": "member_card",
-          "count": 1,
-          "operator": "<=",
-          "comparison_type": "cost",
-          "cost_limit": 17,
-          "cost_limit_operator": "<=",
-          "type": "comparison_condition"
-        },
-        "card_type": "member_card",
-        "action": "set_heart_type",
-        "heart_type": null,
+        "action": "sequential",
+        "conditional": true,
+        "actions": [
+          {
+            "text": "自分の控え室にあるコスト17以下の『虹ヶ咲』のメンバーカード1枚をこのメンバーの下に置く。",
+            "source": "discard",
+            "destination": "under_member",
+            "cost_limit": 17,
+            "cost_limit_operator": "<=",
+            "count": 1,
+            "card_type": "member_card",
+            "target": "self",
+            "group_names": [
+              "虹ヶ咲"
+            ],
+            "action": "move_cards"
+          },
+          {
+            "text": "ライブ終了時まで、このメンバーが元々持つハートは、これにより下に置いたメンバーカードが持つハートと同じになる",
+            "action": "set_heart_type",
+            "heart_type": null,
+            "heart_source": "placed_under",
+            "original_value": true,
+            "self_target": true,
+            "card_type": "member_card",
+            "duration": "live_end",
+            "group_names": [
+              "虹ヶ咲"
+            ]
+          }
+        ],
         "original_value": true,
-        "self_target": true,
-        "duration": "live_end"
+        "group_names": [
+          "虹ヶ咲"
+        ]
       }
     },
     {

@@ -308,6 +308,7 @@ impl super::TurnEngine {
             let btm = &game_state.mods.blade_type_modifiers;
             let om = &game_state.mods.orientation_modifiers;
             let hcm = &game_state.mods.heart_color_multiplier;
+            let hcopy = &game_state.mods.heart_copy;
             let player = if is_first {
                 if game_state.player1.is_first_attacker {
                     &mut game_state.player1
@@ -333,6 +334,7 @@ impl super::TurnEngine {
                 om,
                 &nhm,
                 hcm,
+                hcopy,
                 cannot_live,
             )
         };
@@ -442,6 +444,7 @@ impl super::TurnEngine {
         let perf_data = {
             let current_ho = &game_state.mods.heart_override;
             let current_hcm = &game_state.mods.heart_color_multiplier;
+            let current_hcopy = &game_state.mods.heart_copy;
             let player = if is_first {
                 &mut game_state.player1
             } else {
@@ -455,6 +458,7 @@ impl super::TurnEngine {
                 current_ho,
                 &hm,
                 current_hcm,
+                current_hcopy,
                 &yell_data.live_card_ids,
                 &yell_data.allocations,
                 &yell_data.yell_cards,
