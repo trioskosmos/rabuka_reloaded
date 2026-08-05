@@ -459,11 +459,17 @@ fn setup_you_pb1(game: &mut TestGame, p1_energy: usize, p2_energy: usize) -> i16
     for _ in 0..p1_energy {
         game.state.player1.energy_zone.cards.push(filler);
     }
-    game.state.player1.energy_zone.set_active_count(p1_energy as u8);
+    game.state
+        .player1
+        .energy_zone
+        .set_active_count(p1_energy as u8);
     for _ in 0..p2_energy {
         game.state.player2.energy_zone.cards.push(filler);
     }
-    game.state.player2.energy_zone.set_active_count(p2_energy as u8);
+    game.state
+        .player2
+        .energy_zone
+        .set_active_count(p2_energy as u8);
     you
 }
 

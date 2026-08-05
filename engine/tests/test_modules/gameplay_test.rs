@@ -407,7 +407,8 @@ fn distortion_q96_score_permanent_after_energy_used() {
     game.state.player1.energy_zone.cards.push(energy_id);
     // active_energy_count stays at 3, cards.len() = 4, so not all active anymore
     assert!(
-        (game.state.player1.energy_zone.active_count() as usize) < game.state.player1.energy_zone.cards.len(),
+        (game.state.player1.energy_zone.active_count() as usize)
+            < game.state.player1.energy_zone.cards.len(),
         "Energy should not be all-active anymore"
     );
 

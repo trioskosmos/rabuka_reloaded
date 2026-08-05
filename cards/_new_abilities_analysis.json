@@ -1,0 +1,889 @@
+{
+  "summary": {
+    "truly_new_abilities": 94,
+    "parsed_cleanly": 63,
+    "needs_parser_work": 31,
+    "shared_abilities_with_new_cards": 11,
+    "gap_breakdown": {
+      "under_member": 17,
+      "energy_deck": 9,
+      "placement_order": 6,
+      "card_property": 4,
+      "distinct_name": 3,
+      "baton_touch": 1,
+      "both_targets": 1,
+      "lose_resource": 1
+    }
+  },
+  "new_abilities_clean": [
+    {
+      "card": "PL!S-bp7-003-R＋ | 松浦果南 (ab#0)",
+      "trigger": "ライブ開始時, 登場",
+      "action": "sequential",
+      "gaps": [],
+      "text": "自分のデッキの一番上のカードを見る。それをデッキの一番下に置いてもよい。"
+    },
+    {
+      "card": "PL!S-bp7-003-R＋ | 松浦果南 (ab#1)",
+      "trigger": "登場",
+      "action": "choice",
+      "gaps": [],
+      "text": "以下から1つを選ぶ。\n・ライブ終了時まで、自分のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下の『Aqours』のメンバーは、相手の効果によってはウェイトしない。\n・このメンバーを『Aqours』か『SaintSnow』のメンバーがいるエリアにポジションチェンジす"
+    },
+    {
+      "card": "PL!S-bp7-005-R＋ | 渡辺 曜 (ab#0)",
+      "trigger": "登場",
+      "action": "move_cards",
+      "gaps": [],
+      "text": "自分の控え室にあるメンバーカード1枚を、自分のステージにいるメンバー1人の下に置く。"
+    },
+    {
+      "card": "PL!S-bp7-005-R＋ | 渡辺 曜 (ab#1)",
+      "trigger": "常時",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "自分のステージにいる、メンバーカードが下に置かれている『Aqours』のメンバーは、{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!S-bp7-005-R＋ | 渡辺 曜 (ab#2)",
+      "trigger": "起動",
+      "action": "sequential",
+      "gaps": [],
+      "text": "{{center.png|センター}}手札を2枚控え室に置く：このメンバーと自分のステージにいるほかの『Aqours』のメンバー1人を選ぶ。それらが持つ{{toujyou.png|登場}}能力それぞれ1つを発動させる。"
+    },
+    {
+      "card": "PL!S-bp7-007-R＋ | 国木田花丸 (ab#0)",
+      "trigger": "登場",
+      "action": "sequential",
+      "gaps": [],
+      "text": "自分の控え室からコスト2以下のメンバーカードを1枚手札に加える。これによって「津島善子」か「黒澤ルビィ」を手札に加えた場合、そのカードを自分のステージのメンバーのいないエリアに登場させてもよい。"
+    },
+    {
+      "card": "PL!N-bp7-007-R＋ | 優木せつ菜 (ab#1)",
+      "trigger": "常時",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "自分のエネルギーが6枚より多いかぎり、その差に等しい数の{{heart_02.png|heart02}}を得る。"
+    },
+    {
+      "card": "PL!N-bp7-011-R＋ | ミア・テイラー (ab#0)",
+      "trigger": "自動",
+      "action": "move_cards",
+      "gaps": [],
+      "text": "このカードがデッキから控え室に置かれたとき、手札を1枚控え室に置いてもよい。そうしたとき、控え室からこのカードを手札に加える。"
+    },
+    {
+      "card": "PL!N-bp7-011-R＋ | ミア・テイラー (ab#2)",
+      "trigger": "ライブ成功時",
+      "action": "move_cards",
+      "gaps": [],
+      "text": "自分の控え室にある『虹ヶ咲』のカード1枚をデッキの一番上に置いてもよい。"
+    },
+    {
+      "card": "PL!SP-bp7-005-R＋ | 葉月 恋 (ab#1)",
+      "trigger": "自動",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "自分のカードの効果によって、自分のエネルギー置き場にエネルギーが置かれたとき、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!SP-bp7-007-R＋ | 米女メイ (ab#2)",
+      "trigger": "ライブ成功時",
+      "action": "change_state",
+      "gaps": [],
+      "text": "自分のエネルギーが相手より多い場合、エネルギーを6枚アクティブにする。"
+    },
+    {
+      "card": "PL!-PR-020-PR | 高坂穂乃果 (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "gain_ability",
+      "gaps": [],
+      "text": "{{center.png|センター}}自分のライブカード置き場にあるライブカードのスコアの合計が８以上の場合、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。"
+    },
+    {
+      "card": "PL!-PR-021-PR | 矢澤にこ (ab#0)",
+      "trigger": "常時",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "自分のエネルギーがちょうど7枚あるかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!S-bp7-001-R | 高海千歌 (ab#0)",
+      "trigger": "登場",
+      "action": "conditional_on_result",
+      "gaps": [],
+      "text": "手札を1枚控え室に置いてもよい：自分の控え室からコスト10以上のメンバーカードを1枚手札に加える。これにより「桜内梨子」か「渡辺曜」を手札に加えた場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!S-bp7-006-R | 津島善子 (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "sequential",
+      "gaps": [],
+      "text": "自分のデッキの下からカードを3枚控え室に置く。それらがすべて『Aqours』のメンバーカードの場合、ライブ終了時まで、{{heart_04.png|heart04}}を得る。"
+    },
+    {
+      "card": "PL!S-bp7-008-R | 小原鞠莉 (ab#1)",
+      "trigger": "ライブ開始時",
+      "action": "sequential",
+      "gaps": [],
+      "text": "自分のデッキの一番下のカードを控え室に置いてもよい。それが「松浦果南」か「黒澤ダイヤ」の場合、それを手札に加える。"
+    },
+    {
+      "card": "PL!S-bp7-020-L | HAPPY PARTY TRAIN (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "modify_required_hearts",
+      "gaps": [],
+      "text": "自分のステージにいるすべてのメンバーがアクティブ状態の場合、このカードの必要ハートを{{heart_00.png|heart0}}減らす。"
+    },
+    {
+      "card": "PL!S-bp7-020-L | HAPPY PARTY TRAIN (ab#1)",
+      "trigger": "ライブ開始時",
+      "action": "sequential",
+      "gaps": [],
+      "text": "自分のデッキの下からカードを1枚控え室に置く。それが『Aqours』のメンバーカードの場合、このカードの必要ハートを{{heart_00.png|heart0}}減らす。"
+    },
+    {
+      "card": "PL!S-bp7-022-L | 恋になりたいAQUARIUM (ab#0)",
+      "trigger": "常時",
+      "action": "conditional_alternative",
+      "gaps": [],
+      "text": "自分のエールは、デッキの上から行う代わりにデッキの下から行う。"
+    },
+    {
+      "card": "PL!S-bp7-022-L | 恋になりたいAQUARIUM (ab#1)",
+      "trigger": "ライブ成功時",
+      "action": "modify_score",
+      "gaps": [],
+      "text": "エールにより公開された自分のカードの中に、{{heart_02.png|heart02}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}を持つ『Aqours』のメンバーカードがそれぞれある場合、このカードのスコアを＋１する。"
+    },
+    {
+      "card": "PL!N-bp7-025-L | Colorful Dreams! Colorful Smiles! (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "ライブ終了時まで、自分のステージにいる『虹ヶ咲』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!N-bp7-025-L | Colorful Dreams! Colorful Smiles! (ab#1)",
+      "trigger": "ライブ成功時",
+      "action": "modify_score",
+      "gaps": [],
+      "text": "エールにより公開された自分のカードの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{hea"
+    },
+    {
+      "card": "PL!N-bp7-026-L | Just Believe!!! (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "sequential",
+      "gaps": [],
+      "text": "手札を2枚まで控え室に置いてもよい：自分のステージにいる『虹ヶ咲』のメンバーを、これにより控え室に置いたカードの枚数に等しい数まで選ぶ。ライブ終了時まで、それらは{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!SP-bp7-008-R | 若菜四季 (ab#0)",
+      "trigger": "起動",
+      "action": "draw_card",
+      "gaps": [],
+      "text": "このメンバーをウェイトにする：カードを1枚引く。"
+    },
+    {
+      "card": "PL!SP-bp7-008-R | 若菜四季 (ab#1)",
+      "trigger": "自動",
+      "action": "change_state",
+      "gaps": [],
+      "text": "ウェイト状態のこのメンバーがエリアを移動したとき、このメンバーをアクティブにする。"
+    },
+    {
+      "card": "PL!SP-bp7-009-R | 鬼塚夏美 (ab#0)",
+      "trigger": "常時",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "{{leftside.png|左サイド}}{{rightside.png|右サイド}}{{heart_02.png|heart02}}を得る。"
+    },
+    {
+      "card": "PL!SP-bp7-009-R | 鬼塚夏美 (ab#1)",
+      "trigger": "ライブ開始時",
+      "action": "change_state",
+      "gaps": [],
+      "text": "{{center.png|センター}}相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。"
+    },
+    {
+      "card": "PL!N-sd2-026-P | Fire Bird (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "sequential",
+      "gaps": [],
+      "text": "自分のステージにいる{{icon_blade.png|ブレード}}を4つ以上持つ『虹ヶ咲』のメンバー1人は、ライブ終了時まで、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。"
+    },
+    {
+      "card": "PL!SP-PR-024-PR | 平安名すみれ (ab#0)",
+      "trigger": "自動",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "自分がエールしたとき、エールにより公開された自分のカードの中に、{{icon_score.png|スコア}}を持つ『Liella!』のライブカードが1枚以上ある場合、ライブ終了時まで、{{heart_06.png|heart06}}を得る。"
+    },
+    {
+      "card": "PL!S-bp7-011-N | 桜内梨子 (ab#0)",
+      "trigger": "起動",
+      "action": "sequential",
+      "gaps": [],
+      "text": "このメンバーをウェイトにする：自分のデッキの下からカードを2枚控え室に置く。それらがすべて『Aqours』のメンバーカードの場合、このメンバーをアクティブにし、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!S-bp7-012-N | 松浦果南 (ab#0)",
+      "trigger": "登場",
+      "action": "sequential",
+      "gaps": [],
+      "text": "自分のステージに『Aqours』か『SaintSnow』のメンバーのみがいる場合、フォーメーションチェンジしてもよい。この効果によって『SaintSnow』のメンバーが移動した場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!S-bp7-014-N | 渡辺 曜 (ab#0)",
+      "trigger": "常時",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "相手のエネルギーが自分より多いかぎり、{{heart_02.png|heart02}}を得る。"
+    },
+    {
+      "card": "PL!S-bp7-015-N | 津島善子 (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "sequential",
+      "gaps": [],
+      "text": "自分のデッキの下からカードを1枚控え室に置く。それがライブカードの場合、ライブ終了時まで、{{heart_02.png|heart02}}を得る。"
+    },
+    {
+      "card": "PL!S-bp7-016-N | 国木田花丸 (ab#0)",
+      "trigger": "常時",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "自分のステージにメンバーが3人以上いるかぎり、{{heart_02.png|heart02}}{{heart_04.png|heart04}}{{heart_05.png|heart05}}を得る。"
+    },
+    {
+      "card": "PL!S-bp7-017-N | 小原鞠莉 (ab#0)",
+      "trigger": "登場",
+      "action": "sequential",
+      "gaps": [],
+      "text": "自分のデッキの一番下のカードを控え室に置く。それがコスト10以上のメンバーカードの場合、ライブ終了時まで、{{heart_02.png|heart02}}{{heart_05.png|heart05}}を得る。"
+    },
+    {
+      "card": "PL!S-bp7-024-L | ときめき分類学 (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "custom",
+      "gaps": [],
+      "text": "ライブ終了時まで、自分のステージにいる『Aqours』のメンバー1人は、元々持つハートがすべて{{heart_04.png|heart04}}になる。"
+    },
+    {
+      "card": "PL!S-bp7-025-L | Guilty Night, Guilty Kiss! (ab#0)",
+      "trigger": "ライブ成功時",
+      "action": "choice",
+      "gaps": [],
+      "text": "以下から1つを選ぶ。\n・相手のステージにいるコスト4以下のメンバーを2人までウェイトにする。そのメンバーは次のターンのアクティブフェイズにアクティブしない。\n・カードを1枚引く。"
+    },
+    {
+      "card": "PL!N-bp7-020-N | エマ・ヴェルデ (ab#0)",
+      "trigger": "登場",
+      "action": "sequential",
+      "gaps": [],
+      "text": "自分のデッキの上からカードを3枚控え室に置く。それらのメンバーカードの中に2種類以上のブレードハートの色がある場合、ライブ終了時まで、{{heart_04.png|heart04}}を得る。"
+    },
+    {
+      "card": "PL!N-bp7-024-N | 鐘 嵐珠 (ab#0)",
+      "trigger": "登場",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "自分のステージに『R3BIRTH』のメンバーが3人いる場合、ライブ終了時まで、{{heart_01.png|heart01}}を得る。"
+    },
+    {
+      "card": "PL!N-bp7-027-L | オードリー (ab#0)",
+      "trigger": "ライブ成功時",
+      "action": "sequential",
+      "gaps": [],
+      "text": "自分のステージにいる『虹ヶ咲』のメンバー1人を選ぶ。そのメンバーが、自分と相手のステージにいるほかのすべてのメンバーより多くの{{icon_blade.png|ブレード}}を持つ場合、このカードのスコアを＋１する。"
+    },
+    {
+      "card": "PL!N-bp7-030-L | Cheer Mode (ab#1)",
+      "trigger": "ライブ成功時",
+      "action": "sequential",
+      "gaps": [],
+      "text": "このカードをライブカード置き場から手札に戻す。その後、手札を1枚控え室に置く。"
+    },
+    {
+      "card": "PL!N-bp7-031-L | Like a Treasure (ab#0)",
+      "trigger": "ライブ成功時",
+      "action": "move_cards",
+      "gaps": [],
+      "text": "自分のデッキの上からカードを3枚控え室に置く。"
+    },
+    {
+      "card": "PL!N-bp7-031-L | Like a Treasure (ab#1)",
+      "trigger": "自動",
+      "action": "modify_score",
+      "gaps": [],
+      "text": "自分の{{live_success.png|ライブ成功時}}能力によって、カードが自分のデッキから自分の控え室に置かれるたび、それらのカードの中から『虹ヶ咲』のライブカードを1枚手札に加えてもよい。そうしたとき、このカードのスコアを＋１する。"
+    },
+    {
+      "card": "PL!SP-bp7-013-N | 唐 可可 (ab#0)",
+      "trigger": "常時",
+      "action": "sequential",
+      "gaps": [],
+      "text": "自分のステージに『KALEIDOSCORE』のメンバーが3人いるかぎり、{{heart_06.png|heart06}}{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!SP-bp7-014-N | 嵐 千砂都 (ab#0)",
+      "trigger": "自動",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "このメンバーがエリアを移動したとき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!SP-bp7-015-N | 平安名すみれ (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "draw_card",
+      "gaps": [],
+      "text": "{{icon_energy.png|E}}支払ってもよい：自分のステージに『CatChu!』のメンバーが3人いる場合、カードを1枚引く。"
+    },
+    {
+      "card": "PL!SP-bp7-016-N | 葉月 恋 (ab#0)",
+      "trigger": "自動",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "自分のカードの効果によって、自分のエネルギー置き場にエネルギーが置かれたとき、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!SP-bp7-020-N | 鬼塚夏美 (ab#0)",
+      "trigger": "常時",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "自分のエネルギーが相手より多いかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!SP-bp7-025-L | Memories (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "ライブ終了時まで、自分のステージにいる「嵐千砂都」1人は{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!SP-bp7-028-L | 未来の音が聴こえる (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "自分の控え室にある『Liella!』のメンバーカードを9枚選び、それらをシャッフルし、デッキの一番下に置いてもよい。そうしたとき、ライブ終了時まで、自分のステージにいるすべてのメンバーは{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!SP-bp7-028-L | 未来の音が聴こえる (ab#1)",
+      "trigger": "ライブ成功時",
+      "action": "modify_score",
+      "gaps": [],
+      "text": "エールにより公開された自分のカードがすべて『Liella!』の場合、このカードのスコアを＋１する。"
+    },
+    {
+      "card": "LL-bp7-001-R＋ | 国木田花丸&優木せつ菜&嵐 千砂都 (ab#0)",
+      "trigger": "常時",
+      "action": "modify_cost",
+      "gaps": [],
+      "text": "このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは10になる。"
+    },
+    {
+      "card": "LL-bp7-001-R＋ | 国木田花丸&優木せつ菜&嵐 千砂都 (ab#1)",
+      "trigger": "登場",
+      "action": "move_cards",
+      "gaps": [],
+      "text": "自分の控え室からライブカードを1枚手札に加える。"
+    },
+    {
+      "card": "PL!N-sd2-001-SD2 | 上原歩夢 (ab#0)",
+      "trigger": "起動",
+      "action": "move_cards",
+      "gaps": [],
+      "text": "{{icon_energy.png|E}}{{icon_energy.png|E}}：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。"
+    },
+    {
+      "card": "PL!N-sd2-006-SD2 | 近江彼方 (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "『虹ヶ咲』のメンバー1人をウェイトにしてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!N-sd2-010-SD2 | 三船栞子 (ab#0)",
+      "trigger": "登場",
+      "action": "draw_card",
+      "gaps": [],
+      "text": "カードを2枚引く。"
+    },
+    {
+      "card": "PL!N-sd2-010-SD2 | 三船栞子 (ab#1)",
+      "trigger": "自動",
+      "action": "sequential",
+      "gaps": [],
+      "text": "自分のステージにいる『虹ヶ咲』のメンバー1人がウェイト状態になったとき、手札を1枚控え室に置いてもよい。そうしたとき、そのメンバーをアクティブにし、ライブ終了時まで、そのメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!N-sd2-013-SD2 | 上原歩夢 (ab#0)",
+      "trigger": "ライブ開始時, 登場",
+      "action": "change_state",
+      "gaps": [],
+      "text": "自分のステージにいるメンバーが『虹ヶ咲』のみの場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）"
+    },
+    {
+      "card": "PL!N-sd2-015-SD2 | 桜坂しずく (ab#0)",
+      "trigger": "起動",
+      "action": "draw_card",
+      "gaps": [],
+      "text": "このメンバーをウェイトにし、手札を1枚控え室に置く：カードを1枚引く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）"
+    },
+    {
+      "card": "PL!N-sd2-017-SD2 | 宮下 愛 (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "change_state",
+      "gaps": [],
+      "text": "{{icon_energy.png|E}}支払ってもよい：自分のステージにいるメンバー1人をアクティブにする。"
+    },
+    {
+      "card": "PL!N-sd2-019-SD2 | 優木せつ菜 (ab#0)",
+      "trigger": "登場",
+      "action": "gain_resource",
+      "gaps": [],
+      "text": "ライブ終了時まで、{{heart_05.png|heart05}}を得る。"
+    },
+    {
+      "card": "PL!N-sd2-019-SD2 | 優木せつ菜 (ab#1)",
+      "trigger": "ライブ開始時",
+      "action": "change_state",
+      "gaps": [],
+      "text": "相手のステージにいるコスト2以下のメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）"
+    },
+    {
+      "card": "PL!N-sd2-021-SD2 | 天王寺璃奈 (ab#0)",
+      "trigger": "登場",
+      "action": "change_state",
+      "gaps": [],
+      "text": "相手のステージにいるコスト4以下のメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）"
+    }
+  ],
+  "new_abilities_with_gaps": [
+    {
+      "card": "PL!S-bp7-007-R＋ | 国木田花丸 (ab#1)",
+      "trigger": "ライブ開始時",
+      "action": "sequential",
+      "gaps": [
+        "under_member",
+        "placement_order"
+      ],
+      "text": "自分の控え室から『Aqours』のメンバーカードを3枚まで好きな順番でデッキの下に置く。ライブ終了時まで、これによりデッキに置かれたカード1枚につき、{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!N-bp7-003-R＋ | 桜坂しずく (ab#0)",
+      "trigger": "起動",
+      "action": "set_heart_type",
+      "gaps": [
+        "under_member"
+      ],
+      "text": "デッキの上からカードを5枚控え室に置く：自分の控え室にあるコスト17以下の『虹ヶ咲』のメンバーカード1枚をこのメンバーの下に置く。そうしたとき、ライブ終了時まで、このメンバーが元々持つハートは、これにより下に置いたメンバーカードが持つハートと同じになる。"
+    },
+    {
+      "card": "PL!N-bp7-003-R＋ | 桜坂しずく (ab#1)",
+      "trigger": "ライブ開始時",
+      "action": "gain_resource",
+      "gaps": [
+        "under_member",
+        "distinct_name"
+      ],
+      "text": "ライブ終了時まで、このメンバーの下に置かれている名前の異なるメンバーカード1枚につき、{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!N-bp7-006-R＋ | 近江彼方 (ab#0)",
+      "trigger": "起動",
+      "action": "sequential",
+      "gaps": [
+        "placement_order"
+      ],
+      "text": "{{icon_energy.png|E}}：自分のデッキの上からカードを4枚見る。その後、それらを好きな順番でデッキの上に置く。"
+    },
+    {
+      "card": "PL!N-bp7-006-R＋ | 近江彼方 (ab#1)",
+      "trigger": "起動",
+      "action": "choice",
+      "gaps": [
+        "card_property"
+      ],
+      "text": "デッキの上からカードを3枚控え室に置く：これにより控え室に置いたカードの中に『虹ヶ咲』のライブカードかブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合、以下から1つを選ぶ。\n・エネルギーを2枚アクティブにする。\n・ライブ終了時まで、{{icon_blade.png|ブレード}}{{ico"
+    },
+    {
+      "card": "PL!N-bp7-007-R＋ | 優木せつ菜 (ab#0)",
+      "trigger": "常時",
+      "action": "gain_resource",
+      "gaps": [
+        "under_member"
+      ],
+      "text": "このメンバーの下にあるエネルギーカード1枚につき、{{heart_02.png|heart02}}を得る。"
+    },
+    {
+      "card": "PL!N-bp7-007-R＋ | 優木せつ菜 (ab#2)",
+      "trigger": "ライブ成功時",
+      "action": "place_energy_under_member",
+      "gaps": [
+        "under_member",
+        "energy_deck"
+      ],
+      "text": "自分のエネルギーデッキから、エネルギーカード1枚をこのメンバーの下に置く。"
+    },
+    {
+      "card": "PL!N-bp7-011-R＋ | ミア・テイラー (ab#1)",
+      "trigger": "常時",
+      "action": "modify_cost",
+      "gaps": [
+        "under_member"
+      ],
+      "text": "このカードをプレイする際、自分の控え室にあるすべてのメンバーカードをシャッフルし、デッキの下に置いてもよい。そうしたとき、このカードのコストは２減る。"
+    },
+    {
+      "card": "PL!SP-bp7-003-R＋ | 嵐 千砂都 (ab#0)",
+      "trigger": "常時",
+      "action": "gain_resource",
+      "gaps": [
+        "under_member"
+      ],
+      "text": "このメンバーの下に置かれているメンバーカード1枚につき、{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!SP-bp7-003-R＋ | 嵐 千砂都 (ab#1)",
+      "trigger": "常時",
+      "action": "modify_score",
+      "gaps": [
+        "under_member"
+      ],
+      "text": "このメンバーの下にメンバーカードが3枚以上置かれているかぎり、ライブの合計スコアを＋１する。"
+    },
+    {
+      "card": "PL!SP-bp7-003-R＋ | 嵐 千砂都 (ab#2)",
+      "trigger": "起動",
+      "action": "sequential",
+      "gaps": [
+        "under_member"
+      ],
+      "text": "手札のコストが10か20のメンバーカードを1枚公開する：これにより公開したカードをこのメンバーの下に置く。その後、カードを2枚引く。"
+    },
+    {
+      "card": "PL!SP-bp7-005-R＋ | 葉月 恋 (ab#0)",
+      "trigger": "自動",
+      "action": "sequential",
+      "gaps": [
+        "energy_deck"
+      ],
+      "text": "このメンバーが登場するか、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれたとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。そのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない。"
+    },
+    {
+      "card": "PL!SP-bp7-006-R＋ | 桜小路きな子 (ab#0)",
+      "trigger": "登場",
+      "action": "move_cards",
+      "gaps": [
+        "energy_deck"
+      ],
+      "text": "エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい：自分の控え室にある『Liella!』のメンバーカードを1枚手札に加える。"
+    },
+    {
+      "card": "PL!SP-bp7-006-R＋ | 桜小路きな子 (ab#1)",
+      "trigger": "ライブ成功時",
+      "action": "modify_score",
+      "gaps": [
+        "energy_deck"
+      ],
+      "text": "{{center.png|センター}}このターン、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれていた場合、ライブの合計スコアを＋１する。"
+    },
+    {
+      "card": "PL!SP-bp7-007-R＋ | 米女メイ (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "gain_resource",
+      "gaps": [
+        "energy_deck"
+      ],
+      "text": "エネルギー置き場にあるエネルギー2枚をエネルギーデッキに置いてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!SP-bp7-007-R＋ | 米女メイ (ab#1)",
+      "trigger": "ライブ成功時",
+      "action": "sequential",
+      "gaps": [
+        "energy_deck"
+      ],
+      "text": "自分のエネルギーデッキから、エネルギーカードを2枚ウェイト状態で置く。それらのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない。"
+    },
+    {
+      "card": "PL!SP-bp1-026-L | 未来予報ハレルヤ！ (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "modify_required_hearts",
+      "gaps": [
+        "distinct_name"
+      ],
+      "text": "自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる場合、このカードを成功させるための必要ハートは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_03.png|heart03}}{{heart_03.png|"
+    },
+    {
+      "card": "PL!S-bp7-004-R | 黒澤ダイヤ (ab#0)",
+      "trigger": "登場",
+      "action": "sequential",
+      "gaps": [
+        "under_member",
+        "baton_touch",
+        "both_targets"
+      ],
+      "text": "『Aqours』のメンバーからバトンタッチして登場した場合、自分と相手はそれぞれ、自身の手札のカードを3枚まで選び、選んだカード以外のカードをシャッフルし、自身のデッキの下に置く。その後、自分と相手はそれぞれカードを3枚引く。"
+    },
+    {
+      "card": "PL!S-bp7-004-R | 黒澤ダイヤ (ab#1)",
+      "trigger": "ライブ開始時",
+      "action": "look_and_select",
+      "gaps": [
+        "under_member",
+        "placement_order"
+      ],
+      "text": "自分のデッキの下からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの下に置き、残りを控え室に置く。"
+    },
+    {
+      "card": "PL!S-bp7-008-R | 小原鞠莉 (ab#0)",
+      "trigger": "登場",
+      "action": "look_and_select",
+      "gaps": [
+        "under_member",
+        "placement_order"
+      ],
+      "text": "自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを好きな順番でデッキの下に置く。"
+    },
+    {
+      "card": "PL!S-bp7-009-R | 黒澤ルビィ (ab#0)",
+      "trigger": "常時",
+      "action": "custom",
+      "gaps": [
+        "lose_resource"
+      ],
+      "text": "このメンバーの正面のエリアにいるコスト4以下のメンバーは、{{icon_blade.png|ブレード}}を1つ失う。"
+    },
+    {
+      "card": "PL!N-bp7-004-R | 朝香果林 (ab#0)",
+      "trigger": "起動",
+      "action": "place_energy_under_member",
+      "gaps": [
+        "under_member"
+      ],
+      "text": "エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：相手のステージにいる、元々持つ{{icon_blade.png|ブレード}}の数がこのメンバーの下にあるエネルギーカードの枚数に1を足した数以下のメンバー1人をウェイトにする。"
+    },
+    {
+      "card": "PL!N-bp7-005-R | 宮下 愛 (ab#0)",
+      "trigger": "登場",
+      "action": "choice",
+      "gaps": [
+        "under_member",
+        "energy_deck",
+        "distinct_name"
+      ],
+      "text": "自分のステージに名前の異なる『DiverDiva』のメンバーが2人いる場合、以下から1つを選ぶ。\n・エネルギーを2枚アクティブにする。\n・自分のエネルギーデッキから、エネルギーカード1枚を自分のステージにいる『虹ヶ咲』のメンバーの下に置く。"
+    },
+    {
+      "card": "PL!N-bp7-026-L | Just Believe!!! (ab#1)",
+      "trigger": "ライブ成功時",
+      "action": "modify_score",
+      "gaps": [
+        "card_property"
+      ],
+      "text": "エールにより公開された自分のカードの中に、ブレードハートを持たないメンバーカードが2枚以上ある場合、このカードのスコアを＋１する。"
+    },
+    {
+      "card": "PL!SP-bp7-001-R | 澁谷かのん (ab#0)",
+      "trigger": "常時",
+      "action": "gain_resource",
+      "gaps": [
+        "under_member"
+      ],
+      "text": "このカードが『Liella!』のメンバーの下に置かれているかぎり、そのメンバーは{{icon_blade.png|ブレード}}を得る。"
+    },
+    {
+      "card": "PL!SP-bp7-001-R | 澁谷かのん (ab#1)",
+      "trigger": "自動",
+      "action": "custom",
+      "gaps": [
+        "under_member"
+      ],
+      "text": "このメンバーがステージから控え室に置かれたとき、バトンタッチしていた場合、このカードをそのバトンタッチで登場したメンバーの下に置く。"
+    },
+    {
+      "card": "PL!SP-bp7-004-R | 平安名すみれ (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "conditional_on_result",
+      "gaps": [
+        "placement_order",
+        "card_property"
+      ],
+      "text": "自分の控え室から『Liella!』のメンバーカード3枚を好きな順番でデッキの一番下に置いてもよい。これによりデッキの下に置いたカードの中にブレードハートを持たないメンバーカードが1枚以上ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレー"
+    },
+    {
+      "card": "PL!HS-PR-035-PR | 百生吟子 (ab#0)",
+      "trigger": "登場",
+      "action": "sequential",
+      "gaps": [
+        "placement_order"
+      ],
+      "text": "相手の控え室にあるメンバーカードを3枚選び、相手のデッキの下に好きな順番で置いてもよい。そうした場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする。"
+    },
+    {
+      "card": "PL!N-bp7-028-L | Cooking with Love (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "gain_resource",
+      "gaps": [
+        "under_member",
+        "card_property"
+      ],
+      "text": "自分の控え室に『虹ヶ咲』のライブカードと、ブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合、自分の控え室にあるすべてのカードをシャッフルし、デッキの下に置いてもよい。そうしたとき、ライブ終了時まで、自分のステージにいるすべての『虹ヶ咲』のメンバーは{{heart_01.png|heart"
+    },
+    {
+      "card": "PL!SP-bp7-026-L | Dears (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "sequential",
+      "gaps": [
+        "energy_deck"
+      ],
+      "text": "エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい：自分のステージに「葉月恋」がいる場合、カードを2枚引き、手札を1枚控え室に置く。"
+    },
+    {
+      "card": "PL!SP-bp7-027-L | What a Wonderful Dream!! (ab#0)",
+      "trigger": "ライブ開始時",
+      "action": "modify_score",
+      "gaps": [
+        "energy_deck"
+      ],
+      "text": "エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい：自分のエネルギーが相手より多い場合、このカードのスコアを＋１する。"
+    }
+  ],
+  "shared_abilities_new_cards": [
+    {
+      "text": "{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "new_cards": [
+        "PL!N-sd2-004-SD2 | 朝香果林 (ab#0)",
+        "PL!N-sd2-008-SD2 | エマ・ヴェルデ (ab#0)"
+      ],
+      "cards": [
+        "PL!HS-PR-018-PR | 大沢瑠璃乃 (ab#0)",
+        "PL!HS-PR-022-PR | セラス 柳田 リリエンフェルト (ab#0)",
+        "PL!SP-bp1-006-R | 桜小路きな子 (ab#0)",
+        "PL!SP-bp1-006-P | 桜小路きな子 (ab#0)",
+        "PL!SP-bp2-019-N | 若菜四季 (ab#0)",
+        "PL!SP-bp2-022-N | 鬼塚冬毬 (ab#0)",
+        "PL!S-pb1-016-N | 国木田花丸 (ab#0)",
+        "PL!S-pb1-017-N | 小原鞠莉 (ab#0)",
+        "PL!S-pb1-018-N | 黒澤ルビィ (ab#0)",
+        "PL!-bp4-010-N | 高坂穂乃果 (ab#0)",
+        "PL!N-bp4-013-N | 上原歩夢 (ab#0)",
+        "PL!HS-PR-018-RM | 大沢瑠璃乃 (ab#0)",
+        "PL!HS-sd1-006-SD | 安養寺 姫芽 (ab#1)",
+        "PL!HS-cl1-005-CL | 徒町 小鈴 (ab#0)",
+        "PL!SP-pb2-040-N | 米女メイ (ab#0)",
+        "PL!N-sd2-004-SD2 | 朝香果林 (ab#0)",
+        "PL!N-sd2-008-SD2 | エマ・ヴェルデ (ab#0)"
+      ]
+    },
+    {
+      "text": "{{icon_energy.png|E}}支払ってもよい：好きなハートの色を1つ指定する。ライブ終了時まで、そのハートを1つ得る。",
+      "new_cards": [
+        "PL!N-bp7-016-N | 朝香果林 (ab#0)"
+      ],
+      "cards": [
+        "PL!N-bp1-003-R＋ | 桜坂しずく (ab#1)",
+        "PL!N-bp1-003-P | 桜坂しずく (ab#1)",
+        "PL!N-bp1-003-P＋ | 桜坂しずく (ab#1)",
+        "PL!N-bp1-003-SEC | 桜坂しずく (ab#1)",
+        "PL!N-bp7-016-N | 朝香果林 (ab#0)"
+      ]
+    },
+    {
+      "text": "自分のデッキの上からカードを5枚見る。その中から『虹ヶ咲』のライブカードを1枚まで公開して手札に加えてもよい。残りを控え室に置く。",
+      "new_cards": [
+        "PL!N-sd1-001-P | 上原歩夢 (ab#0)",
+        "PL!N-sd1-001-SD2 | 上原歩夢 (ab#0)"
+      ],
+      "cards": [
+        "PL!N-sd1-001-SD | 上原歩夢 (ab#0)",
+        "PL!N-sd1-001-P | 上原歩夢 (ab#0)",
+        "PL!N-sd1-001-SD2 | 上原歩夢 (ab#0)"
+      ]
+    },
+    {
+      "text": "{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、自分のステージにいるほかの『虹ヶ咲』のメンバーは{{icon_blade.png|ブレード}}を得る。",
+      "new_cards": [
+        "PL!N-sd1-001-P | 上原歩夢 (ab#1)",
+        "PL!N-sd1-001-SD2 | 上原歩夢 (ab#1)"
+      ],
+      "cards": [
+        "PL!N-sd1-001-SD | 上原歩夢 (ab#1)",
+        "PL!N-sd1-001-P | 上原歩夢 (ab#1)",
+        "PL!N-sd1-001-SD2 | 上原歩夢 (ab#1)"
+      ]
+    },
+    {
+      "text": "手札を1枚控え室に置いてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "new_cards": [
+        "PL!N-sd1-004-P | 朝香果林 (ab#0)",
+        "PL!N-sd1-004-SD2 | 朝香果林 (ab#0)"
+      ],
+      "cards": [
+        "PL!N-sd1-004-SD | 朝香果林 (ab#0)",
+        "PL!N-sd1-004-P | 朝香果林 (ab#0)",
+        "PL!N-sd1-004-SD2 | 朝香果林 (ab#0)"
+      ]
+    },
+    {
+      "text": "自分のステージにいる、このターン中に登場、またはエリアを移動した『5yncri5e!』のメンバー1人につき、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}減らす。",
+      "new_cards": [
+        "PL!SP-pb1-025-SECL | Jellyfish (ab#0)"
+      ],
+      "cards": [
+        "PL!SP-pb1-025-L | Jellyfish (ab#0)",
+        "PL!SP-pb1-025-SRL | Jellyfish (ab#0)",
+        "PL!SP-pb1-025-SECL | Jellyfish (ab#0)"
+      ]
+    },
+    {
+      "text": "自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。",
+      "new_cards": [
+        "PL!N-bp7-030-L | Cheer Mode (ab#0)"
+      ],
+      "cards": [
+        "PL!-sd1-019-SD | START:DASH!! (ab#0)",
+        "PL!N-bp7-030-L | Cheer Mode (ab#0)"
+      ]
+    },
+    {
+      "text": "自分のライブカード置き場に「MY舞☆TONIGHT」以外の『Aqours』のライブカードがある場合、ライブ終了時まで、自分のステージのメンバーは{{icon_blade.png|ブレード}}を得る。",
+      "new_cards": [
+        "PL!S-bp2-023-SECL | MY舞☆TONIGHT (ab#0)"
+      ],
+      "cards": [
+        "PL!S-bp2-023-L | MY舞☆TONIGHT (ab#0)",
+        "PL!S-bp2-023-SECL | MY舞☆TONIGHT (ab#0)"
+      ]
+    },
+    {
+      "text": "自分のエネルギーが相手より多いかぎり、{{heart_06.png|heart06}}を得る。",
+      "new_cards": [
+        "PL!SP-bp7-021-N | ウィーン・マルガレーテ (ab#0)"
+      ],
+      "cards": [
+        "PL!SP-bp4-021-N | ウィーン・マルガレーテ (ab#0)",
+        "PL!SP-bp7-021-N | ウィーン・マルガレーテ (ab#0)"
+      ]
+    },
+    {
+      "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。そのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない。",
+      "new_cards": [
+        "PL!SP-bp7-027-L | What a Wonderful Dream!! (ab#1)"
+      ],
+      "cards": [
+        "PL!SP-bp7-027-L | What a Wonderful Dream!! (ab#1)"
+      ]
+    },
+    {
+      "text": "自分の控え室からメンバーカードを1枚手札に加える。",
+      "new_cards": [
+        "LL-bp7-001-R＋ | 国木田花丸&優木せつ菜&嵐 千砂都 (ab#2)"
+      ],
+      "cards": [
+        "LL-bp7-001-R＋ | 国木田花丸&優木せつ菜&嵐 千砂都 (ab#2)"
+      ]
+    }
+  ]
+}

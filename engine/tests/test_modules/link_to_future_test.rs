@@ -36,10 +36,10 @@ fn link_to_future_three_distinct_members_plus_6() {
     let link = game.id("PL!HS-bp2-020-L");
     let filler = game.id("PL!-sd1-010-SD");
 
-    // Three distinct 蓮ノ空 members on stage
-    let hasu_a = game.id("PL!HS-bp1-001-R"); // 日野下花帆
-    let hasu_b = game.id("PL!HS-sd1-001-SD"); // 村野さやか
-    let hasu_c = game.id("PL!HS-sd1-002-SD"); // 乙宗梢
+    // Three distinct-named 蓮ノ空 members on stage
+    let hasu_a = game.id("PL!HS-sd1-001-SD"); // 日野下花帆
+    let hasu_b = game.id("PL!HS-sd1-002-SD"); // 村野さやか
+    let hasu_c = game.id("PL!HS-sd1-003-SD"); // 大沢瑠璃乃
 
     game.state.player1.stage.stage = [hasu_a, hasu_b, hasu_c];
 

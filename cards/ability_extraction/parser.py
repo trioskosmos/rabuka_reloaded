@@ -5893,6 +5893,7 @@ def _try_per_unit(text):
 
     for kw, loc in [
         ("成功ライブカード置き場にある", "success_live_zone"),
+        ("メンバーの下に置かれている", "under_member"),
         ("メンバーの下にある", "under_member"),
         ("ステージにいる", "stage"),
         ("控え室にある", "discard"),

@@ -19,6 +19,7 @@ pub mod baton_touch_test;
 pub mod blade_heart_types_test;
 pub mod blade_per_discard_test;
 pub mod bloom_hs_test;
+pub mod bp7_under_member_per_unit_blade_test;
 pub mod bring_love_test;
 pub mod butterfly_wing_suppress_test;
 #[cfg(feature = "bytecode_abilities")]

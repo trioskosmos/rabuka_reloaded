@@ -1503,6 +1503,27 @@ pub fn count_matching(
         .count() as u8
 }
 
+/// Count cards matching a filter, deduplicating by card name when
+/// `filter.distinct` is set. Distinct is a set-level operation and cannot be
+/// expressed inside the per-card `matches()` predicate, so zone-wide per-unit
+/// counts must go through this instead of `count_matching`.
+pub fn count_matching_distinct(
+    cards: &[i16],
+    db: &CardDatabase,
+    filter: &CardFilter,
+    skip_empty: bool,
+) -> u8 {
+    if filter.distinct.is_none() {
+        return count_matching(cards, db, filter, skip_empty);
+    }
+    let matching: Vec<i16> = cards
+        .iter()
+        .filter(|&&id| filter.matches(db, id, skip_empty))
+        .copied()
+        .collect();
+    apply_distinct_filter(&matching, filter.distinct, db).len() as u8
+}
+
 /// Map a stage position string to its array index (0=left, 1=center, 2=right).
 /// Accepts English, Japanese, and shorthand forms.
 pub fn stage_position_index(pos: &str) -> Option<usize> {
@@ -2033,15 +2054,18 @@ pub fn resolve_per_unit_count(
             .copied()
             .collect();
         if heart_colors.is_empty() {
-            count_matching(&cards, card_db, filter, false)
+            count_matching_distinct(&cards, card_db, filter, false)
         } else {
-            cards
+            let mut matching: Vec<i16> = cards
                 .iter()
                 .filter(|&&id| {
                     filter.matches(card_db, id, false)
                         && card_matches_heart_colors(card_db, id, heart_colors)
                 })
-                .count() as u8
+                .copied()
+                .collect();
+            matching = apply_distinct_filter(&matching, filter.distinct, card_db);
+            matching.len() as u8
         }
     } else {
         let mut cards: Vec<i16> = zone_cards(player, zone).to_vec();
@@ -2057,15 +2081,18 @@ pub fn resolve_per_unit_count(
             }
         }
         if heart_colors.is_empty() {
-            count_matching(&cards, card_db, filter, is_stage)
+            count_matching_distinct(&cards, card_db, filter, is_stage)
         } else {
-            cards
+            let mut matching: Vec<i16> = cards
                 .iter()
                 .filter(|&&id| {
                     filter.matches(card_db, id, is_stage)
                         && card_matches_heart_colors(card_db, id, heart_colors)
                 })
-                .count() as u8
+                .copied()
+                .collect();
+            matching = apply_distinct_filter(&matching, filter.distinct, card_db);
+            matching.len() as u8
         }
     }
 }

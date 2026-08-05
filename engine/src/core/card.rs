@@ -2001,6 +2001,7 @@ impl AbilityEffect {
             } else {
                 &[]
             },
+            distinct: self.distinct_any(),
             ..Default::default()
         }
     }
