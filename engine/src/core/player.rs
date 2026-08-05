@@ -205,6 +205,7 @@ impl Player {
         use_baton_touch: bool,
         card_db: &CardDatabase,
         replaced_member_cost_mod: i32,
+        played_card_cost_mod: i32,
     ) -> Result<(u8, bool, Option<u8>, Option<i16>), String> {
         // Rule 8.2: Main Phase - Play member card from hand to stage
 
@@ -261,6 +262,14 @@ impl Player {
             let mut cost_to_pay = card_cost
                 .saturating_sub(cost_reduction)
                 .saturating_add(cost_increase);
+
+            // A constant set-override modifier (「このカードのコストはNになる」,
+            // e.g. LL-bp7-001-R＋ ab#0) replaces the base play cost entirely.
+            // The caller passes the already-evaluated set value (absolute).
+            if played_card_cost_mod != 0 && played_card_cost_mod != card_cost as i32 {
+                // set modifiers are stored as absolute target costs.
+                cost_to_pay = played_card_cost_mod.max(0) as u8;
+            }
 
             // Rule 9.6.2.3.2: Baton touch - if 1+ energy to pay, can send member from target area to waitroom instead
 

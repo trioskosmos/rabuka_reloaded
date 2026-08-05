@@ -1289,7 +1289,14 @@ impl AbilityResolver {
             pp, act_name, operation, value
         ));
         let player = gs.resolve_target_player_mut(target);
-        let mut card_ids: SmallVec<[i16; 8]> = if Some(&crate::card::CardType::Live) == card_type {
+        let is_hand_cost = effect.source_any() == Some("hand")
+            || effect.location_any() == Some("hand")
+            || effect.location_any() == Some("deck") && effect.source_any() == Some("hand");
+        let mut card_ids: SmallVec<[i16; 8]> = if is_hand_cost {
+            // "手札にあるこのカードのコストは..." — a cost modifier on cards in
+            // HAND (play cost), not on stage members. Collect from hand.
+            player.hand.cards.iter().copied().collect()
+        } else if Some(&crate::card::CardType::Live) == card_type {
             player.live_card_zone.cards.iter().copied().collect()
         } else if Some(&crate::card::CardType::Member) == card_type {
             player

@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-05T20:03:10.891618",
+  "generated_at": "2026-08-05T20:51:09.504679",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "be11ea95",
+  "engine_commit": "b20024a6",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -37799,28 +37799,57 @@
       "effect": {
         "text": "このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは10になる",
         "condition": {
+          "type": "compound",
+          "operator": "and",
+          "conditions": [
+            {
+              "type": "location_condition",
+              "characters": [
+                "国木田花丸"
+              ],
+              "location": "discard",
+              "count": 1,
+              "operator": ">=",
+              "target": "self",
+              "text": "「国木田花丸」のメンバーカードが控え室にある"
+            },
+            {
+              "type": "location_condition",
+              "characters": [
+                "優木せつ菜"
+              ],
+              "location": "discard",
+              "count": 1,
+              "operator": ">=",
+              "target": "self",
+              "text": "「優木せつ菜」のメンバーカードが控え室にある"
+            },
+            {
+              "type": "location_condition",
+              "characters": [
+                "嵐千砂都"
+              ],
+              "location": "discard",
+              "count": 1,
+              "operator": ">=",
+              "target": "self",
+              "text": "「嵐千砂都」のメンバーカードが控え室にある"
+            }
+          ],
           "text": "このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき",
-          "characters": [
-            "国木田花丸",
-            "優木せつ菜",
-            "嵐千砂都"
-          ],
-          "target": "self",
           "location": "discard",
-          "locations": [
-            "discard",
-            "hand"
-          ],
-          "card_type": "member_card",
-          "count": 1,
-          "type": "location_condition",
-          "operator": "="
+          "characters": [
+            "嵐千砂都"
+          ]
         },
         "action": "modify_cost",
+        "operation": "set",
+        "value": 10,
+        "source": "hand",
+        "location": "hand",
+        "card_type": "member_card",
         "self_target": true,
-        "characters": [
-          "嵐千砂都"
-        ]
+        "count": 1
       }
     },
     {

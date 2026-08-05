@@ -906,9 +906,25 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
                     trigger_condition = tc
                     break
         # Merge trigger condition with any condition already on the effect
-        # (e.g. promoted from a sub-action by _try_re_yell).
+        # (e.g. promoted from a sub-action by _try_re_yell). When the effect's
+        # own condition text is empty (as with conditionals parsed by
+        # _try_conditional), the re-derived trigger condition is the SAME
+        # logical gate — merging would double it. Skip if the effect text
+        # already contains the re-derived condition text.
         existing = effect.get("condition")
-        if existing and isinstance(existing, dict) and trigger_condition:
+        dup_cond = (
+            existing is not None
+            and trigger_condition is not None
+            and isinstance(existing, dict)
+            and (tc_text := trigger_condition.get("text"))
+            and tc_text in (effect.get("text") or "")
+        )
+        if (
+            existing
+            and isinstance(existing, dict)
+            and trigger_condition
+            and not dup_cond
+        ):
             effect["condition"] = {
                 "type": "compound",
                 "operator": "and",
@@ -1547,6 +1563,18 @@ def _handle_cost_modification(text, action):
         "増える" in text or "増やす" in text or "プラス" in text or "コストを+" in text
     ):
         action["operation"] = "add"
+    elif re.search(r"コスト[はがを]\d+になる", text) or "コストは10になる" in text:
+        # "このカードのコストは10になる" — cost SET to a value (not add/subtract).
+        action["operation"] = "set"
+        set_match = re.search(r"コスト[はがを](\d+)になる", text)
+        if set_match:
+            action["value"] = int(set_match.group(1))
+        # This is a hand-cost modifier on the card being played: the card is in
+        # hand, so the engine must look in the hand (not stage) to set its cost.
+        if "このカード" in text or "このメンバーカード" in text:
+            action["source"] = "hand"
+            action["location"] = "hand"
+            action["card_type"] = "member_card"
     # Set location for hand-based cost reductions (手札にある/手札から)
     if "手札" in text:
         action["location"] = "hand"
@@ -1579,9 +1607,10 @@ def _handle_cost_modification(text, action):
     # Replace コスト with energy texticon in the action text so the
     # frontend can render an icon instead of plain kanji for the bonus.
     # Also set count from value when no explicit icon count was found
-    # (the +N value represents N energy units of cost bonus).
+    # (the +N value represents N energy units of cost bonus). Set/cost-becomes
+    # modifiers (コストは10になる) do NOT get a count — only additive deltas do.
     if "value" in action and "コスト" in action.get("text", text):
-        if "count" not in action:
+        if "count" not in action and action.get("operation") != "set":
             action["count"] = action["value"]
         action["text"] = action.get("text", text).replace(
             "コスト", "{{icon_energy.png|E}}", 1
@@ -2930,6 +2959,50 @@ def parse_action(text: str) -> Dict[str, Any]:
 
 def _try_complex(text):
     return parse_complex_condition(text)
+
+
+def _try_character_each(text):
+    """「A」と「B」と「C」の...メンバーカードをそれぞれ1枚ずつ...控え室に置いた場合
+    — "one of EACH named character placed into the discard". Emits a compound
+    AND of one per-character location_condition so the engine requires ≥1 of
+    every name, not merely 1 card matching any name.
+    """
+    if "それぞれ" not in text or "1枚ずつ" not in text:
+        return None
+    # Names joined by と/、 before のメンバーカード / のカード
+    name_part = re.search(
+        r"((?:「[^」]+」[と、]? ?)+)(?:」?の)?(?:メンバーカード|カード)", text
+    )
+    if not name_part:
+        return None
+    names = re.findall(r"「([^」]+)」", name_part.group(1))
+    if len(names) < 2:
+        return None
+    # Only for placement-to-zone conditions (手札から...控え室/下に置いた)
+    if "控え室" not in text and "の下に置" not in text:
+        return None
+    # Location the cards were placed into (default discard / waitroom)
+    location = "discard"
+    if "デッキ" in text:
+        location = "deck"
+    subs = []
+    for name in names:
+        sub = {
+            "type": "location_condition",
+            "characters": [name],
+            "location": location,
+            "count": 1,
+            "operator": ">=",
+            "target": "self",
+            # Short text WITHOUT "手札から" so the engine treats this as a
+            # state-based discard check, not an event-based recent-move check.
+            "text": "「{}」のメンバーカードが控え室にある".format(name),
+        }
+        subs.append(sub)
+    result = {"type": "compound", "operator": "and", "conditions": subs, "text": text}
+    if "控え室" in text:
+        result["location"] = "discard"
+    return result
 
 
 def _try_compound(text):
@@ -4377,6 +4450,11 @@ def _try_live_mid(text):
 CONDITION_PATTERNS = [
     # Tier 1: Complex/compound patterns (most specific)
     ("complex", 1, _try_complex),  # nested "AかつB、CかつD" → {type: "complex"}
+    (
+        "character_each",
+        1,
+        _try_character_each,
+    ),  # "「A」と「B」と「C」...をそれぞれ1枚ずつ" → compound AND per-character
     (
         "compound",
         1,
@@ -9519,10 +9597,18 @@ def _enrich_characters(d):
         elif "text" in d:
             text = d["text"]
             if not d.get("characters"):
+                # Cost-set modifiers on "このカード" (e.g. "このカードのコストは
+                # 10になる" after placing named members) target the card itself —
+                # any 「X」names describe the CONDITION, not the modify target.
+                is_self_cost_set = (
+                    d.get("action") == "modify_cost"
+                    and d.get("operation") == "set"
+                    and ("このカード" in text or "このメンバーカード" in text)
+                )
                 cm = re.search(
                     r"((?:「[^」]+」[か、]? ?)+)の(?:メンバーカード|ライブカード)", text
                 )
-                if cm:
+                if cm and not is_self_cost_set:
                     names = re.findall(r"「([^」]+)」", cm.group(1))
                     if names:
                         d["characters"] = names

@@ -52,6 +52,7 @@ impl core::fmt::Display for ModifierEntry {
 
 impl ModifierEntry {
     pub fn total(&self) -> i32 {
+        // set (absolute override) is the base; additive deltas stack on top.
         self.set as i32 + self.additive as i32
     }
 }
@@ -74,6 +75,8 @@ pub struct GameModifiers {
     pub need_heart_modifiers: HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
     pub constant_blade_bonuses: HashMap<i16, i16>,
     pub constant_cost_bonuses: HashMap<i16, i16>,
+    /// Set-override cost bonuses ("コストはNになる") from constant abilities.
+    pub constant_cost_set_bonuses: HashMap<i16, i16>,
     pub constant_score_bonuses: HashMap<i16, i16>,
     pub constant_heart_bonuses: HashMap<i16, HashMap<String, i16>>,
     /// Track need_heart modifiers applied by constant ModifyRequiredHeartsGlobal effects.
@@ -133,6 +136,7 @@ impl GameModifiers {
             need_heart_modifiers: HashMap::default(),
             constant_blade_bonuses: HashMap::default(),
             constant_cost_bonuses: HashMap::default(),
+            constant_cost_set_bonuses: HashMap::default(),
             constant_score_bonuses: HashMap::default(),
             constant_heart_bonuses: HashMap::default(),
             constant_global_need_heart: Vec::new(),
@@ -430,8 +434,26 @@ impl GameModifiers {
         self.cost_modifiers.get(&card_id).map_or(0, |e| e.total())
     }
 
+    /// The absolute set-override cost (コストはNになる) if one exists for the
+    /// card, else None. A set override replaces the base cost entirely.
+    pub fn get_cost_modifier_set(&self, card_id: i16) -> Option<i32> {
+        self.cost_modifiers
+            .get(&card_id)
+            .map(|e| e.set as i32)
+            .filter(|&v| v != 0)
+    }
+
     pub fn set_cost_modifier(&mut self, card_id: i16, value: i16) {
         self.cost_modifiers.entry(card_id).or_default().set = value;
+    }
+
+    pub fn remove_cost_modifier_set(&mut self, card_id: i16) {
+        if let Some(entry) = self.cost_modifiers.get_mut(&card_id) {
+            entry.set = 0;
+            if entry.additive == 0 {
+                self.cost_modifiers.remove(&card_id);
+            }
+        }
     }
 
     pub fn get_orientation_modifier(&self, card_id: i16) -> Option<&str> {

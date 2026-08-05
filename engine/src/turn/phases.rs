@@ -1085,6 +1085,12 @@ impl super::TurnEngine {
             .get_area(area)
             .map(|cid| game_state.mods.get_cost_modifier(cid))
             .unwrap_or(0);
+        // Set-override play cost for the card being played (コストはNになる).
+        // 0 when no set modifier applies, otherwise the absolute target cost.
+        let played_card_id = game_state.active_player().hand.cards.get(idx).copied();
+        let played_card_cost_mod = played_card_id
+            .and_then(|cid| game_state.mods.get_cost_modifier_set(cid))
+            .unwrap_or(0);
 
         let player = game_state.active_player_mut();
         let (cost_paid, baton_touch_used, replaced_member_cost, replaced_member_id) = player
@@ -1094,6 +1100,7 @@ impl super::TurnEngine {
                 use_baton_touch,
                 &card_db,
                 replaced_member_cost_mod,
+                played_card_cost_mod,
             )?;
         game_state.baton_touch_zero_cost = baton_touch_used && cost_paid == 0;
         game_state.baton_touch_replaced_member_cost = replaced_member_cost;

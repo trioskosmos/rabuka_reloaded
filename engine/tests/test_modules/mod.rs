@@ -123,6 +123,7 @@ pub mod ladybug_test;
 pub mod link_to_future_test;
 pub mod live_success_rules_test;
 pub mod live_success_sequential_test;
+pub mod ll_bp7_001_triple_member_test;
 pub mod ll_joint_test;
 pub mod look_and_select_test;
 pub mod looked_at_discard_test;

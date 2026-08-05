@@ -464,7 +464,8 @@ impl GameState {
                                                         .resource_icon_count_any()
                                                         .unwrap_or(sub.count.unwrap_or(1))
                                                         as i32;
-                                                    *exp_blade.entry(card_id).or_insert(0) += n as i16;
+                                                    *exp_blade.entry(card_id).or_insert(0) +=
+                                                        n as i16;
                                                 }
                                                 "heart" | "ハート" => {
                                                     let n = sub.count.unwrap_or(1) as i32;
@@ -713,6 +714,9 @@ impl GameState {
         hand_ids: &[(i16, usize)],
     ) {
         let mut expected: HashMap<i16, i16> = HashMap::default();
+        // Set-operation modifiers ("このカードのコストはNになる") override the cost
+        // to an absolute value rather than adjusting it by a delta.
+        let mut expected_set: HashMap<i16, i16> = HashMap::default();
         {
             let ctx = crate::ability::condition::ConditionContext::new(self);
             // Chain stage and hand ability IDs, look up each effect, filter to ModifyCost
@@ -806,7 +810,7 @@ impl GameState {
                         "add" => *expected.entry(cid).or_insert(0) += value as i16,
                         "subtract" => *expected.entry(cid).or_insert(0) -= value as i16,
                         "set" => {
-                            expected.insert(cid, value as i16);
+                            expected_set.insert(cid, value as i16);
                         }
                         _ => {}
                     }
@@ -818,10 +822,19 @@ impl GameState {
         for (cid, old) in &old_bonuses {
             self.mods.remove_cost_modifier(*cid, *old as i16);
         }
+        // Clear previously-applied set overrides that are no longer active.
+        let old_sets = core::mem::take(&mut self.mods.constant_cost_set_bonuses);
+        for cid in old_sets.keys() {
+            self.mods.remove_cost_modifier_set(*cid);
+        }
         for (&cid, &new_val) in &expected {
             self.mods.add_cost_modifier(cid, new_val as i16);
         }
+        for (&cid, &new_val) in &expected_set {
+            self.mods.set_cost_modifier(cid, new_val as i16);
+        }
         self.mods.constant_cost_bonuses = expected;
+        self.mods.constant_cost_set_bonuses = expected_set;
     }
 
     pub fn set_heart_override(

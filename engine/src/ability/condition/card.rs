@@ -3488,19 +3488,26 @@ impl<'a> ConditionContext<'a> {
     ) -> u8 {
         // Build a single CardFilter and use its .count() — avoids re-parsing
         // the filter fields for every card in the slice.
-        let mut filter = crate::ability::util::CardFilter::default();
-        filter.card_type = card_type_filter;
-        filter.group = group_names.and_then(|g| g.first().map(|s| s.as_str()));
-        filter.heart_colors = heart_colors;
-        filter.cost_limit = cost_limit;
-        filter.cost_operator = cost_limit_operator;
-        if let Some(ex) = exclude_self {
-            filter.exclude_self = Some(ex);
-        }
-        if let Some(cp) = &condition.get_card_property() {
-            filter.card_property = Some(cp.as_str());
-            filter.negation = condition.get_negation().unwrap_or(false);
-        }
+        let filter_characters_owned: Option<Vec<String>> = condition
+            .get_characters()
+            .map(|s| s.iter().map(|x| x.clone()).collect());
+        let filter = {
+            let mut f = crate::ability::util::CardFilter::default();
+            f.card_type = card_type_filter;
+            f.group = group_names.and_then(|g| g.first().map(|s| s.as_str()));
+            f.heart_colors = heart_colors;
+            f.cost_limit = cost_limit;
+            f.cost_operator = cost_limit_operator;
+            f.characters = filter_characters_owned.as_ref();
+            if let Some(ex) = exclude_self {
+                f.exclude_self = Some(ex);
+            }
+            if let Some(cp) = &condition.get_card_property() {
+                f.card_property = Some(cp.as_str());
+                f.negation = condition.get_negation().unwrap_or(false);
+            }
+            f
+        };
         let card_db = &self.game_state.card_database;
         let mut count = 0u8;
         for &card_id in cards {

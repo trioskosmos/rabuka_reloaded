@@ -642,12 +642,33 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
   parsed as `sequential[gain_resource{blade, count:4}, gain_resource{heart, count:4}]` (lines 22470-22494).
   The **blade-4 filter became a blade+4 grant**, and the heart count 2 became 4. Severely wrong.
 
-### CLEAN-G15. Triple-name cost condition → only one name survives
+### CLEAN-G15. Triple-name cost condition → only one name survives — ✅ FIXED
 
 - D20 `LL-bp7-001-R＋` 国木田花丸&優木せつ菜&嵐 千砂都 ab#0 — "自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードを**それぞれ1枚ずつ**控え室に置いてもよい。そうしたとき、このカードのコストは10になる。" →
-  `condition{location_condition, characters:[嵐千砂都], locations:[discard,hand], count:1, operator:"="}` + `modify_cost{characters:[嵐千砂都]}` (lines 37766-37787).
-  Only「嵐千砂都」survives; 国木田花丸 and 優木せつ菜 are dropped, the
-  "それぞれ1枚ずつ" (1 of each) is lost, and `modify_cost` has **no value:10 / operation:set**.
+  was `condition{location_condition, characters:[嵐千砂都], locations:[discard,hand], count:1, operator:"="}` + `modify_cost{characters:[嵐千砂都]}`.
+  Only「嵐千砂都」survived; 国木田花丸 and 優木せつ菜 dropped, the
+  "それぞれ1枚ずつ" (1 of each) was lost, and `modify_cost` had no value:10 / operation:set.
+
+Fixed (parser + engine):
+- **Parser**: new `_try_character_each` handler (registered Tier 1) turns
+  "「A」と「B」と「C」…をそれぞれ1枚ずつ控え室に置いた" into a compound AND of one
+  per-character `location_condition{characters:[name], location:"discard", count:1, operator:">="}`.
+  `_handle_cost_modification` now parses "コストはNになる" as `operation:"set", value:N`
+  with `source/location:"hand", card_type:"member_card"`. Also stopped `_enrich_characters`
+  from leaking the condition's character names onto a self cost-set effect, and prevented
+  `parse_ability` from double-compounding the re-derived trigger condition.
+- **Engine**: `count_cards_with_filters` (used by card-count conditions) now applies
+  `condition.characters` to the filter (was silently dropped). `ModifierEntry` supports a
+  `set` cost override (コストはNになる) distinct from additive deltas:
+  `GameModifiers.constant_cost_set_bonuses`, `set_cost_modifier`, `get_cost_modifier_set`,
+  and the play-cost path (`move_card_from_hand_to_stage`) applies the set override when
+  present. Stale set values are cleared on recalc. `set+additive` stacking preserved
+  (verified by q127/special_color stacking tests).
+- **Tests**: `engine/tests/test_modules/ll_bp7_001_triple_member_test.rs` (12 tests):
+  6 constant-cost conditions (0/1/2/3 named + duplicate character + named-in-hand),
+  2 GAMEPLAY play-cost checks (costs 10 with all three in discard, costs 15 without),
+  debut adds live card, debut with no live card, live-success adds member, live-success
+  ignores live cards. Play-cost verified via actual energy spent.
 
 ### CLEAN-G16. Shuffle-to-deck-bottom action folded into condition
 
@@ -734,7 +755,7 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
 | 49 | PL!SP-bp7-025-L Memories ab#0 | ✅ | — (嵐千砂都 → blade) |
 | 50 | PL!SP-bp7-028-L 未来の音が聴こえる ab#0 | ❌ D21 | 9枚選びシャッフル→下 folded into condition |
 | 51 | PL!SP-bp7-028-L 未来の音が聴こえる ab#1 | ✅ | — (all revealed Liella! → +1) |
-| 52 | LL-bp7-001-R＋ 国木田花丸&優木せつ菜&嵐千砂都 ab#0 | ❌ D20 | only 嵐千砂都 survives; modify_cost no value/op |
+| 52 | LL-bp7-001-R＋ 国木田花丸&優木せつ菜&嵐千砂都 ab#0 | ✅ | D20 FIXED — compound 1-of-each + cost set to 10 |
 | 53 | LL-bp7-001-R＋ 国木田花丸&優木せつ菜&嵐千砂都 ab#1 | ✅ | — (discard live card → hand) |
 | 54 | PL!N-sd2-001-SD2 上原歩夢 ab#0 | ✅ | — (E2 → 虹ヶ咲 live card to hand) |
 | 55 | PL!N-sd2-006-SD2 近江彼方 ab#0 | ✅ | — (wait 虹ヶ咲 optional → blade2) |
@@ -776,7 +797,7 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
 1. Group B (B1–B6) — smallest field-gap fixes. **B1, B2 DONE (2026-08-05).**
 2. **CLEAN-G1** (6 abilities) — recurring `source:"hand"`→`deck_bottom`. **DONE (2026-08-05): parser + engine DeckBottom draw branch + optional-pay routing; tests in `bp7_deck_bottom_source_test.rs`.**
 3. **C4** (桜坂しずく ab#0) — under-member move + heart-copy. **DONE (2026-08-05): `_try_place_under_heart_copy` + `heart_copy` modifier; tests in `bp7_heart_copy_test.rs`.**
-4. CLEAN-G5 + D20 (4 abilities) — character-name conditions (`characters` array). **CLEAN-G5 DONE (2026-08-05): parser character extraction + `preceding_moved` condition/move source; tests in `bp7_character_name_condition_test.rs`. D20 (鬼塚夏美 yell-source) still open.**
+4. CLEAN-G5 + D20 (4 abilities) — character-name conditions (`characters` array). **CLEAN-G5 DONE (2026-08-05): parser character extraction + `preceding_moved` condition/move source; tests in `bp7_character_name_condition_test.rs`. D20 (国木田花丸&優木せつ菜&嵐千砂都 triple-name cost) DONE (2026-08-05): compound 1-of-each + cost set-override; tests in `ll_bp7_001_triple_member_test.rs`.**
 5. Group C parser-only (C1, C2, C5–C9).
 6. CLEAN-G2/G3/G4/G8/G9/G10/G11/G12/G13/G16/D27 (one-off structure fixes).
 7. CLEAN-G6/G7/G14/G15/D26 (structure + dynamic-count/cost restructuring).
