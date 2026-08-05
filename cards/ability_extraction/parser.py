@@ -4532,6 +4532,21 @@ def _extract_generic_fields(condition, text):
         names = re.findall(r"「([^」]+)」", cm.group(1))
         if names:
             condition["characters"] = names
+    else:
+        # 「A」か「B」の場合 / 「A」か「B」を...した場合 (character-name condition
+        # in a conditional / result-condition phrase, e.g. "それが「松浦果南」か
+        # 「黒澤ダイヤ」の場合" or "これによって「津島善子」か「黒澤ルビィ」を
+        # 手札に加えた場合"). Any bracketed names in a condition context are
+        # character filters for the counted/referenced card.
+        cm2 = re.search(r"「([^」]+)」\s*(?:か|と|、)\s*「([^」]+)」", text)
+        if cm2:
+            condition["characters"] = list(cm2.groups())
+            more = re.search(
+                r"「([^」]+)」\s*(?:か|と|、)\s*「([^」]+)」\s*(?:か|と|、)?\s*「([^」]+)」",
+                text,
+            )
+            if more:
+                condition["characters"] = list(more.groups())
 
     # Card name filter: カード名に「DreamBelievers」を含む
     cn = re.search(r"カード名に「([^」]+)」を含む", text)
@@ -4960,6 +4975,15 @@ def _infer_condition_type(condition, text):
         condition.setdefault("operator", ">=")
         condition.setdefault("target", "self")
         condition["type"] = "comparison_condition"
+    elif condition.get("characters"):
+        # "それが「X」か「Y」の場合" — a character-name filter on the card just
+        # placed/moved by the preceding step. Counts that card(s) in the
+        # preceding move filtered by character.
+        condition.setdefault("source", "preceding_moved")
+        condition.setdefault("count", 1)
+        condition.setdefault("operator", ">=")
+        condition.setdefault("target", "self")
+        condition["type"] = "location_condition"
     elif text.strip():
         condition["type"] = "custom"
     else:
@@ -7862,6 +7886,18 @@ def _try_conditional(text):
         and ("このバトンタッチで" in at or "このバトンタッチにより" in at)
     ):
         action["source"] = "recently_moved"
+
+    # "それ" / "これによって" follow-ups — the action targets the SPECIFIC card
+    # the preceding sequential step moved, not any discard card. The condition
+    # is a character/location check on `preceding_moved`; mirror that source on
+    # the move so "それを手札に加える" moves THAT card (e.g. 小原鞠莉 ab#1
+    # "それが「松浦果南」か「黒澤ダイヤ」の場合、それを手札に加える").
+    if (
+        action.get("action") == "move_cards"
+        and action.get("source") == "discard"
+        and (cond.get("source") == "preceding_moved" or at.startswith("それを手札に"))
+    ):
+        action["source"] = "preceding_moved"
 
     # Handle "条件Aの場合、または条件Bの場合、行動" — merge into OR condition
     if action.get("condition") and at.lstrip().startswith("または"):

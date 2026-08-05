@@ -555,17 +555,32 @@ Same class as C2 (choice-subtree) but here at top level — so the fix is a plai
   `action:"custom"` (line 6305) with `blade_limit:3 <=` captured but no protection primitive.
 - Same class as C1/C3 — the parser has no continuous-modifier emission for wait-immunity.
 
-### CLEAN-G5. Character-name condition reduced to "any card in hand" (names dropped)
+### CLEAN-G5. Character-name condition reduced to "any card in hand" (names dropped) — ✅ FIXED
 
 - D4 `PL!S-bp7-007-R＋` 国木田花丸 ab#0 — "これによって「**津島善子**」か「**黒澤ルビィ**」を手札に加えた場合" →
   `condition{comparison_condition, location:"hand", count:1, >=}` (line 6471) — the two
-  names are gone; the condition would pass even if the added card were anyone.
+  names are gone; the condition would pass even if the added card were anyone. ✅ now emits `characters:["津島善子","黒澤ルビィ"]`.
 - D22 `PL!S-bp7-001-R` 高海千歌 ab#0 — "これにより「**桜内梨子**」か「**渡辺曜**」を手札に加えた場合" →
-  same reduction (line 20999).
+  same reduction (line 20999). ✅ now emits `characters:["桜内梨子","渡辺曜"]`.
 - D8b `PL!S-bp7-008-R` 小原鞠莉 ab#1 — follow-up "それが「**松浦果南**」か「**黒澤ダイヤ**」の場合" →
-  `type:"custom"` (line 21284) — names also lost.
+  `type:"custom"` (line 21284) — names also lost. ✅ now emits
+  `condition{location_condition, source:"preceding_moved", characters:["松浦果南","黒澤ダイヤ"]}`.
 
-Fix: `comparison_condition` / follow-up condition needs a `characters` array.
+Fixed:
+- **Parser**: `_extract_generic_fields` now extracts 「A」か「B」 character names in any
+  conditional/result phrase (previously only the `のうち` pattern). `_infer_condition_type`
+  resolves a characters-only condition (「それが「X」か「Y」の場合」) to a
+  `location_condition` with `source:"preceding_moved"`, count≥1, target self.
+- **Parser follow-up source**: for "それを手札に加える" conditional follow-ups, the
+  move_cards action now emits `source:"preceding_moved"` instead of `source:"discard"`
+  so it targets the SPECIFIC card just placed — not any matching discard card.
+- **Engine**: `resolve_cards_from_source` gained a `preceding_moved` source handler that
+  pulls from `self.moved_cards` (the current sequential's own moves) filtered by the
+  action's `characters`.
+- **Tests**: `engine/tests/test_modules/bp7_character_name_condition_test.rs` (5 tests):
+  bottom 果南 → hand; bottom ダイヤ → hand; bottom すみれ → stays in waitroom;
+  skip optional → nothing moves; and the key edge case — discard already holds a 果南
+  but the placed card is すみれ → the pre-existing 果南 must NOT be grabbed.
 
 ### CLEAN-G6. Unresolvable `dynamic_count` references
 
@@ -673,7 +688,7 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
 | 3 | PL!S-bp7-005-R＋ 渡辺 曜 ab#0 | ❌ D1 | `destination:null` (should be under_member) |
 | 4 | PL!S-bp7-005-R＋ 渡辺 曜 ab#1 | ❌ D2 | under-card condition dropped |
 | 5 | PL!S-bp7-005-R＋ 渡辺 曜 ab#2 | ❌ D26 | select only the "other" member; this member's 登場 ability dropped |
-| 6 | PL!S-bp7-007-R＋ 国木田花丸 ab#0 | ❌ D4 | 津島善子/黒澤ルビィ names dropped; action custom |
+| 6 | PL!S-bp7-007-R＋ 国木田花丸 ab#0 | ✅ | D4 FIXED — 津島善子/黒澤ルビィ characters on condition |
 | 7 | PL!N-bp7-007-R＋ 優木せつ菜 ab#1 | ❌ D5 | dynamic_count "その差" unresolvable |
 | 8 | PL!N-bp7-011-R＋ ミア・テイラー ab#0 | ❌ D6 | optional discard-cost + そうしたとき dropped |
 | 9 | PL!N-bp7-011-R＋ ミア・テイラー ab#2 | ✅ | — (discard→deck_top optional) |
@@ -681,9 +696,9 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
 | 11 | PL!SP-bp7-007-R＋ 米女メイ ab#2 | ✅ | — (energy>opp → active 6) |
 | 12 | PL!-PR-020-PR 高坂穂乃果 ab#0 | ✅ | — (gain_ability + condition) |
 | 13 | PL!-PR-021-PR 矢澤にこ ab#0 | ✅ | — (energy==7 → blade2) |
-| 14 | PL!S-bp7-001-R 高海千歌 ab#0 | ❌ D22 | 桜内梨子/渡辺曜 names dropped in result_condition |
+| 14 | PL!S-bp7-001-R 高海千歌 ab#0 | ✅ | D22 FIXED — 桜内梨子/渡辺曜 characters on result_condition |
 | 15 | PL!S-bp7-006-R 津島善子 ab#0 | ✅ | D7 FIXED — デッキの下 → `deck_bottom` |
-| 16 | PL!S-bp7-008-R 小原鞠莉 ab#1 | ⚠️ D8b | D8 fixed (deck-bottom source) — 松浦果南/黒澤ダイヤ names still `custom` (CLEAN-G5) |
+| 16 | PL!S-bp7-008-R 小原鞠莉 ab#1 | ✅ | D8+D8b FIXED — deck-bottom source + preceding_moved character condition |
 | 17 | PL!S-bp7-020-L HAPPY PARTY TRAIN ab#0 | ✅ | — (all active → reduce hearts) |
 | 18 | PL!S-bp7-020-L HAPPY PARTY TRAIN ab#1 | ✅ | D9 FIXED — デッキの下 → `deck_bottom` |
 | 19 | PL!S-bp7-022-L 恋になりたいAQUARIUM ab#0 | ❌ D10 | yell-from-bottom → both branches `custom` |
@@ -737,7 +752,7 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
 - **38 / 63 genuinely fine** (parser produced faithful structure).
 - **25 / 63 have a genuine defect**, dominated by:
   - **6×** the `source:"hand"` deck-bottom bug (CLEAN-G1) — one parser fix, high blast radius. **FIXED (2026-08-05).**
-  - **3×** character-name conditions reduced to "any card" or `custom` (CLEAN-G5).
+  - **3×** character-name conditions reduced to "any card" or `custom` (CLEAN-G5). **FIXED (2026-08-05).**
   - **2×** unresolvable `dynamic_count` (CLEAN-G6).
   - **2×** energy-placed trigger modeled as comparison instead of zone_change (CLEAN-G17).
   - **1× each** for the rest: under-member destination null (G2), missing under-card gate (G3),
@@ -761,7 +776,7 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
 1. Group B (B1–B6) — smallest field-gap fixes. **B1, B2 DONE (2026-08-05).**
 2. **CLEAN-G1** (6 abilities) — recurring `source:"hand"`→`deck_bottom`. **DONE (2026-08-05): parser + engine DeckBottom draw branch + optional-pay routing; tests in `bp7_deck_bottom_source_test.rs`.**
 3. **C4** (桜坂しずく ab#0) — under-member move + heart-copy. **DONE (2026-08-05): `_try_place_under_heart_copy` + `heart_copy` modifier; tests in `bp7_heart_copy_test.rs`.**
-4. CLEAN-G5 + D20 (4 abilities) — character-name conditions (`characters` array).
+4. CLEAN-G5 + D20 (4 abilities) — character-name conditions (`characters` array). **CLEAN-G5 DONE (2026-08-05): parser character extraction + `preceding_moved` condition/move source; tests in `bp7_character_name_condition_test.rs`. D20 (鬼塚夏美 yell-source) still open.**
 5. Group C parser-only (C1, C2, C5–C9).
 6. CLEAN-G2/G3/G4/G8/G9/G10/G11/G12/G13/G16/D27 (one-off structure fixes).
 7. CLEAN-G6/G7/G14/G15/D26 (structure + dynamic-count/cost restructuring).

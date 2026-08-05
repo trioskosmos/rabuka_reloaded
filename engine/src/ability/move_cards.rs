@@ -427,6 +427,27 @@ impl AbilityResolver {
                 use_p2,
             );
         }
+        // "それを手札に加える" follow-ups ("if it's X, add IT to hand") — the
+        // source is the SPECIFIC card the preceding sequential step moved, not
+        // any matching card in a zone. Pull from self.moved_cards (the current
+        // sequential's own moves) filtered by the action's character filter.
+        if source_str == "preceding_moved" {
+            let cards: Vec<i16> = self
+                .moved_cards
+                .iter()
+                .filter(|&&cid| {
+                    cid != -1
+                        && character_filter.map_or(true, |cf| {
+                            util::card_matches_characters(card_db, cid, Some(cf))
+                        })
+                })
+                .copied()
+                .collect();
+            for &card_id in &cards {
+                remove_card_from_any_zone(player, &mut gs.last_vacated_stage_area, card_id);
+            }
+            return Ok(cards);
+        }
         if source_str == "looked_at_remaining" {
             return self.resolve_from_looked_at(gs, use_p2);
         }

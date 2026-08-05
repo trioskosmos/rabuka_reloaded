@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-05T19:09:25.476559",
+  "generated_at": "2026-08-05T20:03:10.891618",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "774ae685",
+  "engine_commit": "be11ea95",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -6470,6 +6470,10 @@
             "text": "これによって「津島善子」か「黒澤ルビィ」を手札に加えた場合、そのカードを自分のステージのメンバーのいないエリアに登場させてもよい",
             "condition": {
               "text": "これによって「津島善子」か「黒澤ルビィ」を手札に加えた場合",
+              "characters": [
+                "津島善子",
+                "黒澤ルビィ"
+              ],
               "location": "hand",
               "count": 1,
               "operator": ">=",
@@ -21014,6 +21018,10 @@
         },
         "result_condition": {
           "text": "これにより「桜内梨子」か「渡辺曜」を手札に加えた場合",
+          "characters": [
+            "桜内梨子",
+            "渡辺曜"
+          ],
           "location": "hand",
           "count": 1,
           "operator": ">=",
@@ -21298,11 +21306,19 @@
             "text": "それが「松浦果南」か「黒澤ダイヤ」の場合、それを手札に加える",
             "condition": {
               "text": "それが「松浦果南」か「黒澤ダイヤ」の場合",
-              "type": "custom"
+              "characters": [
+                "松浦果南",
+                "黒澤ダイヤ"
+              ],
+              "source": "preceding_moved",
+              "count": 1,
+              "operator": ">=",
+              "target": "self",
+              "type": "location_condition"
             },
             "destination": "hand",
             "action": "move_cards",
-            "source": "discard",
+            "source": "preceding_moved",
             "card_type": "card",
             "count": 1
           }
@@ -37784,6 +37800,11 @@
         "text": "このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは10になる",
         "condition": {
           "text": "このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき",
+          "characters": [
+            "国木田花丸",
+            "優木せつ菜",
+            "嵐千砂都"
+          ],
           "target": "self",
           "location": "discard",
           "locations": [
@@ -37793,10 +37814,7 @@
           "card_type": "member_card",
           "count": 1,
           "type": "location_condition",
-          "operator": "=",
-          "characters": [
-            "嵐千砂都"
-          ]
+          "operator": "="
         },
         "action": "modify_cost",
         "self_target": true,

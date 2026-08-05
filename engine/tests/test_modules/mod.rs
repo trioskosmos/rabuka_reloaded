@@ -20,6 +20,7 @@ pub mod blade_heart_colorless_test;
 pub mod blade_heart_types_test;
 pub mod blade_per_discard_test;
 pub mod bloom_hs_test;
+pub mod bp7_character_name_condition_test;
 pub mod bp7_deck_bottom_source_test;
 pub mod bp7_heart_copy_test;
 pub mod bp7_under_member_per_unit_blade_test;
