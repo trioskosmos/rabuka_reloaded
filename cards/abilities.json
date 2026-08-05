@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-05T22:09:09.765468",
+  "generated_at": "2026-08-05T22:16:02.854411",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards\\cards.json",
-  "engine_commit": "e601dbcb",
+  "engine_commit": "964db68a",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -451,8 +451,8 @@
       },
       "effect": {
         "text": "カードを1枚引く",
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -1533,8 +1533,8 @@
           "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、自分の手札が7枚以下の場合",
           "yell_trigger": true
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -2436,8 +2436,8 @@
           "cost_limit_operator": ">=",
           "type": "comparison_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -2567,8 +2567,8 @@
       },
       "effect": {
         "text": "カードを3枚引く",
-        "count": 3,
         "action": "draw_card",
+        "count": 3,
         "source": "deck",
         "destination": "hand"
       }
@@ -2860,8 +2860,8 @@
       },
       "effect": {
         "text": "カードを1枚引く",
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -2960,8 +2960,8 @@
               "count": 6,
               "cost_total": 6
             },
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand"
           },
@@ -3142,8 +3142,8 @@
         "actions": [
           {
             "text": "カードを1枚引く",
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand"
           },
@@ -4114,8 +4114,8 @@
           "ability_filter": "no_ability",
           "card_type": "member_card"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand",
         "baton_touch_trigger": true
@@ -4405,8 +4405,8 @@
               ],
               "target": "self"
             },
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand",
             "group_names": [
@@ -7410,8 +7410,8 @@
       },
       "effect": {
         "text": "カードを1枚引く",
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -7784,8 +7784,8 @@
           "target": "self",
           "location": "energy_zone"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -7831,8 +7831,8 @@
         },
         "followup_action": {
           "text": "さらにカードを1枚引く",
-          "count": 1,
           "action": "draw_card",
+          "count": 1,
           "source": "deck",
           "destination": "hand",
           "duration": "live_end"
@@ -8532,8 +8532,8 @@
           "location": "live_card_zone",
           "target": "self"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -10970,8 +10970,8 @@
         "actions": [
           {
             "text": "カードを1枚引く",
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand"
           },
@@ -10986,8 +10986,8 @@
               "location": "stage",
               "type": "location_condition"
             },
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand"
           }
@@ -11255,8 +11255,8 @@
               "type": "card_count_condition",
               "source": "preceding_moved"
             },
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand"
           }
@@ -11467,8 +11467,8 @@
       },
       "effect": {
         "text": "カードを1枚引く",
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -11594,8 +11594,8 @@
         "actions": [
           {
             "text": "カードを1枚引く",
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand"
           },
@@ -11657,8 +11657,8 @@
           "exclude_self": true,
           "type": "group_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand",
         "exclude_self": true
@@ -13544,8 +13544,8 @@
           "text": "エールにより公開された自分のカードの枚数が、相手がエールによって公開したカードの枚数より少ない場合",
           "negation": true
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -14431,8 +14431,8 @@
           "card_type": "live_card",
           "type": "location_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -14473,8 +14473,8 @@
               "state": "wait",
               "text": "相手のステージにウェイト状態のメンバーがいる場合"
             },
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand",
             "group_names": [
@@ -14897,8 +14897,8 @@
           "cost_limit": 4,
           "cost_limit_operator": "<="
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -15069,8 +15069,8 @@
           "aggregate": "total",
           "type": "comparison_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -15296,8 +15296,8 @@
           "aggregate": "total",
           "type": "comparison_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -15433,8 +15433,8 @@
           "aggregate": "total",
           "type": "comparison_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -16603,8 +16603,8 @@
           "cost_limit": 10,
           "card_type": "member_card"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -17524,8 +17524,8 @@
       "cost": null,
       "effect": {
         "text": "カードを1枚引く",
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -18820,8 +18820,8 @@
           "comparison_type": "cost",
           "type": "comparison_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -20241,8 +20241,8 @@
           "original_value": true,
           "card_property": "has_score_icon"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand",
         "original_value": true
@@ -21066,8 +21066,8 @@
           "cost_limit_operator": ">=",
           "type": "comparison_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -22132,8 +22132,8 @@
       },
       "effect": {
         "text": "カードを1枚引く",
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -22370,8 +22370,8 @@
         "actions": [
           {
             "text": "カードを1枚引く",
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand"
           },
@@ -22809,8 +22809,8 @@
               "type": "card_count_condition",
               "source": "preceding_moved"
             },
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand"
           }
@@ -23321,8 +23321,8 @@
           },
           "exclude_self": true
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand",
         "exclude_self": true,
@@ -23691,8 +23691,8 @@
           "count": 1,
           "target": "self"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand",
         "original_value": true
@@ -24100,8 +24100,8 @@
           "location": "stage",
           "type": "location_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand",
         "parenthetical": [
@@ -24691,8 +24691,8 @@
       "cost": null,
       "effect": {
         "text": "このメンバーがエリアを移動するたび、カードを1枚引く",
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand",
         "trigger_type": "each_time",
@@ -25013,8 +25013,8 @@
         "actions": [
           {
             "text": "カードを1枚引く",
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand"
           },
@@ -25098,8 +25098,8 @@
           "location": "discard",
           "target": "self"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -27027,8 +27027,8 @@
           "card_type": "live_card",
           "type": "group_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -27440,8 +27440,8 @@
           "operator": ">=",
           "type": "comparison_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand",
         "heart_colors": [
@@ -29704,8 +29704,8 @@
       "cost": null,
       "effect": {
         "text": "自分のステージにいるメンバーの{{live_success.png|ライブ成功時}}能力が解決するたび、カードを1枚引く",
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand",
         "trigger_type": "each_time",
@@ -29849,8 +29849,8 @@
           "card_type": "member_card",
           "exclude_self": true
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand",
         "exclude_self": true
@@ -29975,8 +29975,8 @@
       },
       "effect": {
         "text": "カードを1枚引く",
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -32120,8 +32120,8 @@
           "card_type": "live_card",
           "type": "group_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -32430,8 +32430,8 @@
               ],
               "original_value": true
             },
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand",
             "group_names": [
@@ -32962,8 +32962,8 @@
         "actions": [
           {
             "text": "カードを1枚引く",
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand",
             "group_names": [
@@ -32982,8 +32982,8 @@
               "card_type": "live_card",
               "type": "group_condition"
             },
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand",
             "group_names": [
@@ -33257,8 +33257,8 @@
             "self_target": true,
             "gained_effect": {
               "text": "カードを1枚引く",
-              "count": 1,
               "action": "draw_card",
+              "count": 1,
               "source": "deck",
               "destination": "hand"
             }
@@ -34788,8 +34788,8 @@
         "actions": [
           {
             "text": "カードを1枚引く",
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand"
           },
@@ -34825,8 +34825,8 @@
         "actions": [
           {
             "text": "カードを1枚引く",
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand"
           },
@@ -34846,8 +34846,8 @@
               },
               "card_type": "member_card"
             },
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand"
           }
@@ -35163,8 +35163,8 @@
           "location": "stage",
           "type": "location_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -36408,8 +36408,8 @@
               "source": "preceding_moved",
               "location": "stage"
             },
-            "count": 1,
             "action": "draw_card",
+            "count": 1,
             "source": "deck",
             "destination": "hand"
           },
@@ -36622,8 +36622,8 @@
           "count": 3,
           "type": "group_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -37251,8 +37251,8 @@
           "count": 1,
           "type": "group_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -37372,8 +37372,8 @@
           "count": 3,
           "type": "group_condition"
         },
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand"
       }
@@ -38196,8 +38196,8 @@
       },
       "effect": {
         "text": "カードを1枚引く",
-        "count": 1,
         "action": "draw_card",
+        "count": 1,
         "source": "deck",
         "destination": "hand",
         "parenthetical": [

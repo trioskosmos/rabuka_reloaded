@@ -12,35 +12,42 @@ Architecture overview:
           4. parse_action()       - individual actions (move, gain, etc.)
       → abilities.json (structured output consumed by Rust engine)
 
-=== FILE STRUCTURE (line ranges) ===
-  45- 62   Imports (parser_utils)
-  64- 103  Shared configuration constants
- 105- 169  Text extraction utilities
- 171- 204  Regex patterns
- 206- 413  Utility functions (extract_location, etc.)
- 414- 459  split_cost_effect, split_condition_action
- 460- 632  parse_complex_condition, _extract_basic_cost_fields
- 633- 714  _try_duration_prefix, extract_phase_gate
- 715- 840  parse_ability
- 841-1058  parse_cost
-1059-1296  parse_effect
-1297-1430  parse_condition
-1431-2785  parse_action + dispatch table (_R)
-2786-4277  Condition handler functions (_try_*)
-4278-4424  CONDITION_PATTERNS + _condition_registry
-4427-4766  _extract_generic_fields (fallthrough extraction)
-4767-4868  _infer_condition_type
-4869-4932  _enrich_* helpers
-4933-5048  Action utility helpers (_infer_card_type, infer_resource, etc.)
-5049-5550  _fill_defaults
-5551-8691  Effect handler functions (_try_effect_*) + _EFFECT_HANDLERS
-8692-9180  _walk (post-processing tree walker)
-9181-9720  _normalize_effect_tree
-9721-10615 process_abilities (post-hoc fixes)
-10616-10698 _propagate_optional, _merge_parenthetical
-10699-10765 Validation helpers (_VALIDATORS, _validate_effect, _enrich_effect_type)
-10766-11348 Semantic validation (_json_has*, _validate_semantic)
-11348-11351 __main__ entry point
+=== HOW TO ADD A PHRASE ===
+Every parse layer is a data table now. Adding a new phrase = adding one rule
+row in the right table, then validating (see below).
+
+  Action phrases  →  _ACTION_RULES section (module-level, above parse_action).
+                     Append an ActionRule(...) or a (condition, action_type,
+                     setter) tuple. Order = priority (first match wins).
+  Cost phrases    →  _COST_HANDLERS section (module-level, above parse_cost).
+                     Append a @_register_cost handler (text, cost) -> dict|None.
+  Effect phrases  →  _EFFECT_RULES section (module-level, above _EFFECT_HANDLERS).
+                     Append an EffectPattern(...) row; these are dispatched
+                     before every legacy _try_* handler.
+  Condition phrases → CONDITION_PATTERNS list (each (name, tier, handler)).
+
+After adding a rule, regenerate + validate:
+  cd cards/ability_extraction && python extract_card_abilities.py
+  cd ../../engine && cargo test            # 1972 tests pin the output
+  python cards/ability_extraction/tests/test_parse_action.py   # + the other test files
+
+=== FILE STRUCTURE ===
+  Imports / config / shared constants
+  parse_complex_condition, _extract_basic_cost_fields, _try_duration_prefix
+  parse_ability
+  COST RULE REGISTRY (_COST_HANDLERS) + parse_cost
+  parse_effect (dispatches _EFFECT_RULES then _EFFECT_HANDLERS)
+  parse_condition (dispatches _condition_registry)
+  ACTION RULE REGISTRY (_ACTION_RULES) + parse_action
+  Condition handler functions (_try_* for conditions)
+  CONDITION_PATTERNS + _condition_registry
+  _extract_generic_fields, _infer_condition_type, _enrich_* helpers
+  Action utility helpers, _fill_defaults
+  Effect handler functions (_try_effect_*) + _EFFECT_RULES + _EFFECT_HANDLERS
+  _walk, _normalize_effect_tree, process_abilities (post-hoc fixes)
+  _propagate_optional, _merge_parenthetical
+  Validation helpers + semantic validation
+  __main__ (--list-rules dumps every registered rule)
 
 Condition types produced (type field in condition dict):
   complex                - nested compound conditions (AかつBかつC)
@@ -75,6 +82,7 @@ with a trace of every condition and effect handler call.
 import json
 import re
 import copy
+import sys
 from typing import Dict, Any, Optional, Tuple, List, Union
 
 # Debug log accumulator: every parse_condition and parse_effect call appends
@@ -1122,7 +1130,9 @@ def _classify_cost(cost, text):
         return "move_cards"
     if cost.get("destination") == "under_member":
         return "place_energy_under_member"
-    if cost.get("destination") in ("energy_deck", "energy_zone") and not cost.get("source"):
+    if cost.get("destination") in ("energy_deck", "energy_zone") and not cost.get(
+        "source"
+    ):
         return "move_cards"
     if (
         "ウェイトにする" in text
@@ -1230,6 +1240,8 @@ def parse_cost(text: str) -> Dict[str, Any]:
     if "type" not in cost:
         cost["type"] = _classify_cost(cost, text)
     return cost
+
+
 def parse_effect(text: str) -> Dict[str, Any]:
     """Parse an effect text. Tries handlers in priority order, then falls back to single action."""
     text = normalize_fullwidth_digits(text).strip()
@@ -1717,11 +1729,13 @@ def _handle_required_hearts(t, a):
 
 _ACTION_RULES: List[Any] = []
 
+
 def _register_action(cond, act=None, setter=None):
     if isinstance(cond, ActionRule):
         _ACTION_RULES.append(cond)
     else:
         _ACTION_RULES.append((cond, act, setter))
+
 
 _register_action(
     lambda t: "シャッフルする" in t
@@ -1730,13 +1744,13 @@ _register_action(
     "shuffle",
     lambda t, a: a.update({"target": "deck" if "デッキ" in t else "energy_deck"}),
 )
-_register_action(lambda t: "入れ替える" in t or "入れ替えて" in t, "position_change", None)
+_register_action(
+    lambda t: "入れ替える" in t or "入れ替えて" in t, "position_change", None
+)
 _register_action(
     lambda t: "フォーメーションチェンジ" in t,
     "position_change",
-    lambda t, a: a.update(
-        {"optional": extract_optional(t), "multiple_targets": True}
-    ),
+    lambda t, a: a.update({"optional": extract_optional(t), "multiple_targets": True}),
 )
 _register_action(
     lambda t: "{{icon_energy.png|E}}" in t
@@ -1813,9 +1827,7 @@ _register_action(
 _register_action(
     lambda t: "引いてもよい" in t,
     "draw_card",
-    lambda t, a: a.update(
-        {"source": "deck", "destination": "hand", "optional": True}
-    ),
+    lambda t, a: a.update({"source": "deck", "destination": "hand", "optional": True}),
 )
 # Check for cost modification BEFORE general move_cards (which also matches source+dest)
 _register_action(
@@ -1845,10 +1857,7 @@ _register_action(
         else None,
         a.update({"card_type": "member_card"})
         if "このメンバー" in t
-        or (
-            "メンバー" in t
-            and ("ウェイト" in t or "レスト" in t or "アクティブ" in t)
-        )
+        or ("メンバー" in t and ("ウェイト" in t or "レスト" in t or "アクティブ" in t))
         else None,
     )[-1],
 )
@@ -1914,8 +1923,7 @@ _register_action(
 )
 _register_action(
     ActionRule(
-        condition=lambda t: "アクティブしない" in t
-        and "アクティブにしない" not in t,
+        condition=lambda t: "アクティブしない" in t and "アクティブにしない" not in t,
         action="restriction",
         defaults={"restriction_type": "cannot_active", "delayed": True},
     )
@@ -1927,9 +1935,7 @@ _register_action(
         setter=lambda t, a: a.update(
             {
                 "restriction_type": (
-                    "cannot_wait_by_effect"
-                    if "効果によっては" in t
-                    else "cannot_wait"
+                    "cannot_wait_by_effect" if "効果によっては" in t else "cannot_wait"
                 ),
                 "target": "both"
                 if "自分と相手" in t or "お互い" in t
@@ -2028,9 +2034,7 @@ _register_action(
 )
 _register_action(ActionRule(match_any=["移動する", "移動し"], action="position_change"))
 _register_action(
-    lambda t: (
-        ("置く" in t or "置いて" in t) or ("置き" in t and "置き場" not in t)
-    )
+    lambda t: (("置く" in t or "置いて" in t) or ("置き" in t and "置き場" not in t))
     and "選ぶ" not in t
     and "選び" not in t,
     "move_cards",
@@ -2191,11 +2195,7 @@ _register_action(
         or bool(re.search(r"選ん(?!だ)", t)),
         action="select",
         setter=lambda t, a: a.update(
-            {
-                "heart_colors": [
-                    m.group(1) for m in re.finditer(r"\|(heart\d{2})}", t)
-                ]
-            }
+            {"heart_colors": [m.group(1) for m in re.finditer(r"\|(heart\d{2})}", t)]}
         )
         if not a.get("source") and not a.get("card_type") and "{{heart_" in t
         else None,
@@ -2209,12 +2209,14 @@ _register_action(
     )
 )
 _register_action(
-    ActionRule(
-        match="登場させ", action="move_cards", defaults={"destination": "stage"}
-    )
+    ActionRule(match="登場させ", action="move_cards", defaults={"destination": "stage"})
 )
-_register_action(ActionRule(match_any=["起動でき", "起動して"], action="activate_ability"))
-_register_action(ActionRule(match="無効に", exclude="無効にできない", action="invalidate_ability"))
+_register_action(
+    ActionRule(match_any=["起動でき", "起動して"], action="activate_ability")
+)
+_register_action(
+    ActionRule(match="無効に", exclude="無効にできない", action="invalidate_ability")
+)
 _register_action(
     ActionRule(
         match="能力は発動しない",
@@ -2348,11 +2350,11 @@ _register_action(
 _register_action(ActionRule(match="何もしない", action="do_nothing"))
 _register_action(ActionRule(condition=lambda t: t.strip() == "", action="do_nothing"))
 _register_action(
-    ActionRule(
-        match_all=["{{icon_energy.png|E}}", "エネルギー"], action="pay_energy"
-    )
+    ActionRule(match_all=["{{icon_energy.png|E}}", "エネルギー"], action="pay_energy")
 )
-_register_action(ActionRule(match_any=["バトンタッチ", "baton touch"], action="play_baton_touch"))
+_register_action(
+    ActionRule(match_any=["バトンタッチ", "baton touch"], action="play_baton_touch")
+)
 _register_action(
     ActionRule(
         match="無効にできない",
@@ -2405,9 +2407,7 @@ _register_action(
             "trigger_filter": [
                 m.group(1).split("|")[-1]
                 for m in [
-                    re.search(
-                        r"\{\{([^}]+)\}\}", t.split("持つ")[1].split("能力")[0]
-                    )
+                    re.search(r"\{\{([^}]+)\}\}", t.split("持つ")[1].split("能力")[0])
                 ]
                 if m
             ],
@@ -2494,6 +2494,7 @@ _register_action(
     )
 )
 
+
 def _set_heart_selection_resource(t, a):
     m = re.search(r"［([^］]+)ハート］", t)
     color_map = {
@@ -2515,6 +2516,7 @@ def _set_heart_selection_resource(t, a):
         }
     )
 
+
 _register_action(
     ActionRule(
         condition=lambda t: bool(re.search(r"［[^］]+ハート］", t)),
@@ -2522,6 +2524,7 @@ _register_action(
         setter=_set_heart_selection_resource,
     )
 )
+
 
 def parse_action(text: str) -> Dict[str, Any]:
     """Parse an action text."""
@@ -2923,7 +2926,6 @@ def parse_action(text: str) -> Dict[str, Any]:
     # Replaces the ~730-line if/elif chain with data-driven rules.
     # Each rule: (condition_text_or_fn, action_type, field_setter_fn_or_None)
     # Order matches original if/elif priority.
-
 
     # Run dispatch
     # NEW: heart + blade concurrent grant → sequential
@@ -8962,12 +8964,58 @@ _EFFECT_HANDLERS = [
     _try_restriction_effect,  # Restriction effects
 ]
 
-# PriorityRegistry wrapping _EFFECT_HANDLERS for named, sorted dispatch.
-# Priority = index in the list preserves existing ordering.
+# ======================================================================
+# EFFECT RULE REGISTRY (ADD NEW EFFECT PHRASES HERE)
+# Each EffectPattern(...) row is dispatched BEFORE every legacy _try_*
+# handler, so a new phrase can be taught declaratively without touching the
+# cascade below. Row order = priority (first match wins). Keep rows narrow
+# (match/match_any + optional exclude) so they only fire on their phrase —
+# a row that overlaps a compound text will shadow the legacy cascade.
+# ======================================================================
+_EFFECT_RULES: List[Any] = []
+
+
+def _register_effect_rule(rule: EffectPattern) -> EffectPattern:
+    _EFFECT_RULES.append(rule)
+    return rule
+
+
+# --- example rows: simple phrase → shape (proven identical to legacy output) ---
+# Each setter calls _fill_defaults so the row's output carries the same
+# source/destination enrichment the legacy cascade produces. The condition
+# matches the exact phrase (post-normalization) so a row never shadows a
+# longer/structural text the legacy cascade handles better.
+def _exact_effect_phrase(phrase: str):
+    return lambda t: t.strip().rstrip("。") == phrase
+
+
+_register_effect_rule(
+    EffectPattern(
+        condition=_exact_effect_phrase("カードを1枚引く"),
+        action="draw_card",
+        defaults={"count": 1},
+        setter=lambda t, r: _fill_defaults(r, t),
+    )
+)
+_register_effect_rule(
+    EffectPattern(
+        condition=_exact_effect_phrase("カードを3枚引く"),
+        action="draw_card",
+        defaults={"count": 3},
+        setter=lambda t, r: _fill_defaults(r, t),
+    )
+)
+
+
+# PriorityRegistry dispatching _EFFECT_RULES first (0-99), then the legacy
+# _EFFECT_HANDLERS cascade (100+). Explicit priorities keep both additive.
 _effect_registry = PriorityRegistry("effect_handlers")
+for _ri, _h in enumerate(_EFFECT_RULES):
+    _hn = getattr(_h, "__name__", f"effect_rule_{_ri}")
+    _effect_registry.register(_ri, _hn, _h)
 for _i, _h in enumerate(_EFFECT_HANDLERS):
     _hn = getattr(_h, "__name__", f"handler_{_i}")
-    _effect_registry.register(_i, _hn, _h)
+    _effect_registry.register(100 + _i, _hn, _h)
 
 # ======================================================================
 # POST-PROCESSING NORMALIZERS & CHAINING
@@ -11993,7 +12041,54 @@ def _validate_semantic(abilities):
     print(f"  Validation complete: {len(issues)} issues found")
 
 
+def _list_rules() -> None:
+    """Dump every registered rule across all four parse layers. Useful for
+    seeing the whole phrase → shape mapping at once."""
+    sep = "=" * 80
+    print(sep)
+    print("ACTION RULES  (_ACTION_RULES — order = priority)")
+    print(sep)
+    for i, entry in enumerate(_ACTION_RULES):
+        if isinstance(entry, ActionRule):
+            desc = (
+                f"match={entry.match!r} match_any={entry.match_any}"
+                f" action={entry.action!r}"
+            )
+        else:
+            cond, act, setter = entry
+            if isinstance(cond, str):
+                desc = f"match={cond!r} action={act!r}"
+            else:
+                desc = f"<callable> action={act!r}"
+        print(f"  {i:3}  {desc}")
+    print(sep)
+    print("COST HANDLERS  (_COST_HANDLERS — order = priority)")
+    print(sep)
+    for i, h in enumerate(_COST_HANDLERS):
+        print(f"  {i:3}  {getattr(h, '__name__', h)}")
+    print(sep)
+    print("EFFECT RULES  (_EFFECT_RULES — dispatched before legacy handlers)")
+    print(sep)
+    for i, r in enumerate(_EFFECT_RULES):
+        print(
+            f"  {i:3}  match={getattr(r, 'match', None)!r} match_any={getattr(r, 'match_any', None)} action={r.action!r}"
+        )
+    print(sep)
+    print("EFFECT HANDLERS  (_EFFECT_HANDLERS — legacy cascade, priority 100+)")
+    print(sep)
+    for i, h in enumerate(_EFFECT_HANDLERS):
+        print(f"  {i:3}  {getattr(h, '__name__', h)}")
+    print(sep)
+    print("CONDITION PATTERNS  (name, tier — tier*100 = priority base)")
+    print(sep)
+    for name, tier, handler in CONDITION_PATTERNS:
+        print(f"  t{max(1, tier):3}  {name:40} {getattr(handler, '__name__', handler)}")
+
+
 if __name__ == "__main__":
+    if "--list-rules" in sys.argv:
+        _list_rules()
+        sys.exit(0)
     from extract_card_abilities import main
 
     main()
