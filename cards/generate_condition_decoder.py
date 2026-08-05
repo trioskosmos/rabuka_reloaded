@@ -98,12 +98,41 @@ def parse_condition_enum(text):
         if fm and bd == 1:
             fname = fm.group(1)
             ftype = fm.group(2).strip().rstrip(",")
-            if fname not in ("pub", "struct", "enum", "fn", "let", "mut", "if", "else"):
+            if fname not in ("pub", "struct", "enum", "fn", "let", "mut", "if", "else", "common"):
                 variants[cur].append((fname, ftype))
         if bd <= 0 and cur:
             cur = None
             bd = 0
     return variants
+
+
+def parse_condition_common(text):
+    """Parse the shared ConditionCommon struct field names/types."""
+    m = re_search(r"pub struct ConditionCommon\s*\{", text)
+    if not m:
+        return {}
+    start = m.end()
+    depth = 1
+    pos = start
+    while pos < len(text) and depth > 0:
+        if text[pos] == "{":
+            depth += 1
+        elif text[pos] == "}":
+            depth -= 1
+        pos += 1
+    body = text[start : pos - 1]
+    fields = {}
+    for line in body.split("\n"):
+        s = line.strip()
+        if s.startswith("#"):
+            continue
+        fm = re_match(r"(?:pub\s+)?(\w+)\s*:\s*(.+?)(?:,|$)", s)
+        if fm:
+            fname = fm.group(1)
+            ftype = fm.group(2).strip().rstrip(",")
+            if fname not in ("struct", "enum", "fn", "let", "mut", "if", "else"):
+                fields[fname] = ftype
+    return fields
 
 
 def build_field_expr(fname, ftype):
@@ -139,9 +168,14 @@ def main():
     for vname, vfields in variants.items():
         print(f"  {vname}: {len(vfields)} fields")
 
-    # Union of all field names across variants (superset locals).
+    # Union of all field names across variants + ConditionCommon (superset locals).
+    common_fields = parse_condition_common(card_rs)
     all_names = []
     seen = set()
+    for fname in common_fields:
+        if fname not in seen:
+            seen.add(fname)
+            all_names.append(fname)
     for vname, vfields in variants.items():
         for fname, _ftype in vfields:
             if fname not in seen:
@@ -152,6 +186,8 @@ def main():
     def field_type(fname):
         if fname in CONVERSION_FIELDS:
             return "Option<ArcStr>"
+        if fname in common_fields:
+            return common_fields[fname]
         for vname, vfields in variants.items():
             for fn, ft in vfields:
                 if fn == fname:
@@ -167,6 +203,7 @@ def main():
         "// `text`/`trigger_event` exist only under the `debug_conditions` feature"
     )
     lines.append("// and are skipped otherwise.")
+    lines.append("use crate::card::{ConditionCommon, DistinctInfo, TriggerEvent};")
     lines.append("")
 
     # === ConditionLocals accumulator ===
@@ -234,6 +271,11 @@ def main():
     for vname, vfields in variants.items():
         lines.append(f"fn build_{vname.lower()}(l: &ConditionLocals) -> Condition {{")
         lines.append(f"    Condition::{vname} {{")
+        lines.append("        common: Box::new(ConditionCommon {")
+        for fname in sorted(common_fields):
+            expr = build_field_expr(fname, common_fields[fname])
+            lines.append(f"            {expr},")
+        lines.append("        }),")
         for fname, ftype in vfields:
             expr = build_field_expr(fname, ftype)
             lines.append(f"        {expr},")

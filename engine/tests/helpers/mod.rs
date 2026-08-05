@@ -30,8 +30,17 @@ struct PreloadedDb {
 
 static PRELOADED: OnceLock<PreloadedDb> = OnceLock::new();
 
+/// Enable `log::debug!` output from the engine (env_logger) so ability/resolver
+/// traces show in test output. Set RUST_LOG=debug or default to debug.
+fn init_test_logger() {
+    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug"))
+        .format_timestamp(None)
+        .try_init();
+}
+
 /// Load (once) and return a pre-seeded database.
 pub fn load_real_database() -> Arc<CardDatabase> {
+    init_test_logger();
     PRELOADED.get_or_init(|| {
         let t0 = std::time::Instant::now();
         let cards =

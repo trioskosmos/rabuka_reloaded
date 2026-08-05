@@ -1,6 +1,6 @@
 use crate::helpers::*;
 use rabuka_engine::ability::condition::ConditionContext;
-use rabuka_engine::card::{ComparisonTarget, ComparisonType, Condition, ConditionCardType};
+use rabuka_engine::card::{ComparisonTarget, ComparisonType, Condition, ConditionCardType, ConditionCommon};
 use rabuka_engine::core::types::ArcStr;
 use rabuka_engine::zones::MemberArea;
 
@@ -24,84 +24,31 @@ fn live_named(game: &TestGame, name: &str) -> i16 {
 
 fn score_comparison_condition(operator: Option<&str>) -> Condition {
     Condition::Comparison {
-        text: None,
-        negation: None,
-        phase: None,
-        phase_target: None,
-        cache: None,
-        trigger_event: None,
-        comparison_type: Some(ComparisonType::Score),
-        comparison_target: Some(ComparisonTarget::Opponent),
-        target: None,
-        location: None,
-        operator: operator.map(ArcStr::from),
-        count: None,
+        common: Box::new(ConditionCommon {
+            comparison_type: Some(ComparisonType::Score),
+            comparison_target: Some(ComparisonTarget::Opponent),
+            operator: operator.map(ArcStr::from),
+            ..Default::default()
+        }),
         values: None,
-        card_type: None,
-        group_names: None,
-        position: None,
-        position_compare: None,
-        aggregate: None,
-        heart_colors: None,
-        scope: None,
         cost_total: None,
         cost_total_operator: None,
-        resource_type: None,
-        delta: None,
-        cost_limit: None,
-        source: None,
         comparison_source: None,
-        locations: None,
-        exclude_group_names: None,
-        characters: None,
-        exclude_characters: None,
-        same_name: None,
-        distinct: None,
-        all: None,
-        all_areas: None,
-        exclude_self: None,
-        self_target: None,
-        destination: None,
         state: None,
-        require_position_cards: None,
-        temporal: None,
-        yell_trigger: None,
-        no_excess_heart: None,
-        card_property: None,
         ability_filter: None,
-        ability_filter_triggers: None,
-        baton_touch_trigger: None,
-        min_baton_touch_count: None,
-        from_state: None,
-        to_state: None,
     }
 }
 
 fn group_condition() -> Condition {
     Condition::Group {
-        text: None,
-        negation: None,
-        phase: None,
-        phase_target: None,
-        cache: None,
-        trigger_event: None,
-        group_names: Some(Box::new(vec!["蓮ノ空".to_string()])),
+        common: Box::new(ConditionCommon {
+            group_names: Some(Box::new(vec!["蓮ノ空".to_string()])),
+            location: Some(ArcStr::from("stage")),
+            target: Some(ArcStr::from("self")),
+            card_type: Some(ConditionCardType::MemberCard),
+            ..Default::default()
+        }),
         all_members: None,
-        location: Some(ArcStr::from("stage")),
-        target: Some(ArcStr::from("self")),
-        heart_colors: None,
-        card_type: Some(ConditionCardType::MemberCard),
-        operator: None,
-        count: None,
-        aggregate: None,
-        exclude_characters: None,
-        temporal: None,
-        self_target: None,
-        exclude_self: None,
-        heart_source: None,
-        source: None,
-        locations: None,
-        position: None,
     }
 }
 
@@ -113,14 +60,10 @@ fn score_gt_opponent_condition() -> Condition {
 /// Helper: create compound condition (score > opponent AND 蓮ノ空 on stage)
 fn compound_dododo_condition() -> Condition {
     Condition::Compound {
-        text: None,
-        negation: None,
-        phase: None,
-        phase_target: None,
-        cache: None,
-        trigger_event: None,
-        operator: Some(ArcStr::from("and")),
-        target: None,
+        common: Box::new(ConditionCommon {
+            operator: Some(ArcStr::from("and")),
+            ..Default::default()
+        }),
         conditions: Some(vec![
             Box::new(score_comparison_condition(Some(">"))),
             Box::new(group_condition()),

@@ -533,7 +533,8 @@ impl<'a> ConditionContext<'a> {
             Condition::Compound { .. } => unreachable!(),
         };
 
-        let is_plain_location = matches!(condition, Condition::Location { count: None, .. });
+        let is_plain_location = matches!(condition, Condition::Location { .. })
+            && condition.get_count().is_none();
 
         let final_result = if condition.get_negation().unwrap_or(false)
             && !(matches!(condition, Condition::Location { .. })

@@ -2,11 +2,10 @@ use super::abilities_gen::{BYTECODE, NUM_ABILITIES, OFFSETS, STRINGS};
 use super::enums::EffectState;
 use crate::ability::enums::ActionType;
 #[cfg_attr(not(feature = "debug_conditions"), allow(unused_imports))]
-use crate::card::TriggerEvent;
 use crate::card::{
     ek_box_new, Ability, AbilityCost, AbilityEffect, AbilityFilter, AbilityFilterBranch,
     CardProperty, CardState, CardType, ComparisonTarget, ComparisonType, Condition,
-    ConditionCardType, DistinctInfo, DistinctType, DynamicCount, EffectFilter, EffectKind,
+    ConditionCardType, DistinctType, DynamicCount, EffectFilter, EffectKind,
     LocationSubChecks, Operator, PlacementOrder, PositionCharacter, PositionInfo, QuotedText,
 };
 use crate::core::types::ArcStr;
@@ -1454,15 +1453,14 @@ fn condition_populate_from_json(cond: &mut Condition, cond_json: &serde_json::Va
         }
     }
     if let Condition::Compound {
+        ref mut common,
         ref mut conditions,
-        ref mut operator,
-        ..
     } = cond
     {
-        if operator.is_none()
+        if common.operator.is_none()
             && cond_json.get("type").and_then(|t| t.as_str()) == Some("or_condition")
         {
-            *operator = Some("or".into());
+            common.operator = Some("or".into());
         }
         if let Some(ref mut conditions) = conditions {
             if let Some(json_conditions) = cond_json.get("conditions").and_then(|a| a.as_array()) {

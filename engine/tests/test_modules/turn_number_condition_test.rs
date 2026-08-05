@@ -1,5 +1,5 @@
 use rabuka_engine::ability::condition::ConditionContext;
-use rabuka_engine::card::{CardDatabase, Condition};
+use rabuka_engine::card::{CardDatabase, Condition, ConditionCommon};
 use rabuka_engine::core::types::ArcStr;
 use rabuka_engine::game_state::{GameState, Phase};
 use rabuka_engine::player::Player;
@@ -17,25 +17,13 @@ fn make_game_state(turn: u8, phase: Phase) -> GameState {
 
 fn temporal_condition(turn_number: Option<u8>, text: &str) -> Condition {
     Condition::Temporal {
-        text: Some(text.to_string()),
-        negation: None,
-        phase: Some(ArcStr::from("live_phase")),
-        phase_target: None,
-        cache: None,
-        trigger_event: None,
-        temporal: None,
+        common: Box::new(ConditionCommon {
+            text: Some(text.to_string()),
+            phase: Some(ArcStr::from("live_phase")),
+            ..Default::default()
+        }),
         turn_number,
-        count: None,
-        location: None,
-        card_type: None,
-        target: None,
-        group_names: None,
         temporal_scope: None,
-        position: None,
-        locations: None,
-        heart_colors: None,
-        aggregate: None,
-        self_target: None,
         condition: None,
     }
 }

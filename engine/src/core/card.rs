@@ -2409,13 +2409,110 @@ impl Location {
 
 impl_deref_str!(Location);
 
+/// Shared fields with consistent types across 2+ Condition variants,
+/// inlined via #[serde(flatten)] so the JSON condition shape stays flat.
+/// Fields with conflicting types across variants (state, ability_filter)
+/// stay on their variants.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+pub struct ConditionCommon {
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub ability_filter_triggers: Option<Box<Vec<String>>>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub activation_position: Option<ArcStr>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub aggregate: Option<ArcStr>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub all: Option<bool>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub all_areas: Option<bool>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub baton_touch_trigger: Option<bool>,
+    pub cache: Option<bool>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub card_property: Option<CardProperty>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub card_type: Option<ConditionCardType>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub characters: Option<Box<Vec<String>>>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub comparison_target: Option<ComparisonTarget>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub comparison_type: Option<ComparisonType>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub cost_limit: Option<u8>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub cost_limit_operator: Option<Operator>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub count: Option<u8>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub delta: Option<bool>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub destination: Option<ArcStr>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub distinct: Option<Box<DistinctInfo>>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub exclude_characters: Option<Box<Vec<String>>>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub exclude_group_names: Option<Box<Vec<String>>>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub exclude_self: Option<bool>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub from_state: Option<ArcStr>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub group_names: Option<Box<Vec<String>>>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub heart_colors: Option<Box<Vec<String>>>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub heart_source: Option<ArcStr>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub location: Option<ArcStr>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub locations: Option<Box<Vec<String>>>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub min_baton_touch_count: Option<u8>,
+    pub negation: Option<bool>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub no_excess_heart: Option<bool>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub operator: Option<ArcStr>,
+    pub phase: Option<ArcStr>,
+    pub phase_target: Option<ArcStr>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub position: Option<Box<PositionInfo>>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub position_compare: Option<ArcStr>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub require_position_cards: Option<bool>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub resource_type: Option<ArcStr>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub same_name: Option<bool>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub scope: Option<ArcStr>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub self_target: Option<bool>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub source: Option<ArcStr>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub target: Option<ArcStr>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub temporal: Option<ArcStr>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    #[cfg(feature = "debug_conditions")]
+    pub text: Option<String>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub to_state: Option<ArcStr>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    #[cfg(feature = "debug_conditions")]
+    pub trigger_event: Option<Box<TriggerEvent>>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub yell_trigger: Option<bool>,
+}
+
 /// The distinct Condition type as a serde internally-tagged enum.
 /// The Python parser already emits `"type": "card_count_condition"` etc.
 /// in the JSON — this enum consumes that tag directly via `#[serde(tag = "type")]`.
-///
-/// Each variant holds only the fields relevant to that condition kind.
-/// The common fields (text, negation, phase, cache, trigger_event) appear
-/// on every variant because any condition can carry them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde_support", serde(tag = "type"))]
@@ -2425,93 +2522,25 @@ pub enum Condition {
         serde(rename = "compound", alias = "or_condition")
     )]
     Compound {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
-        operator: Option<ArcStr>,
-        target: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
         conditions: Option<Vec<Box<Condition>>>,
     },
+
     #[cfg_attr(
         feature = "serde_support",
         serde(rename = "card_count_condition", alias = "location_condition")
     )]
     Location {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
-        // Core location fields (commonly accessed)
-        location: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        locations: Option<Box<Vec<String>>>,
-        target: Option<ArcStr>,
-        count: Option<u8>,
-        operator: Option<ArcStr>,
-        card_type: Option<ConditionCardType>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
         unit: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        comparison_target: Option<ComparisonTarget>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        comparison_type: Option<ComparisonType>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        aggregate: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        group_names: Option<Box<Vec<String>>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
         group_reference: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        exclude_group_names: Option<Box<Vec<String>>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        characters: Option<Box<Vec<String>>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        exclude_characters: Option<Box<Vec<String>>>,
-        cost_limit: Option<u8>,
-        cost_limit_operator: Option<Operator>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        heart_colors: Option<Box<Vec<String>>>,
         heart_type: Option<ArcStr>,
-        heart_source: Option<ArcStr>,
-        distinct: Option<Box<DistinctInfo>>,
-        exclude_self: Option<bool>,
-        self_target: Option<bool>,
-        source: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        activation_position: Option<ArcStr>,
-        destination: Option<ArcStr>,
         state: Option<CardState>,
-        position: Option<Box<PositionInfo>>,
-        position_compare: Option<ArcStr>,
-        require_position_cards: Option<bool>,
-        all: Option<bool>,
-        all_areas: Option<bool>,
-        temporal: Option<ArcStr>,
-        yell_trigger: Option<bool>,
-        same_name: Option<bool>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        card_property: Option<CardProperty>,
-        scope: Option<ArcStr>,
-        // Boxed sub-checks (rarely accessed together)
-        #[cfg_attr(feature = "serde_support", serde(default))]
         sub_checks: Option<Box<LocationSubChecks>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        baton_touch_trigger: Option<bool>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        min_baton_touch_count: Option<u8>,
     },
+
     #[cfg_attr(
         feature = "serde_support",
         serde(
@@ -2522,90 +2551,16 @@ pub enum Condition {
         )
     )]
     Comparison {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
-        comparison_type: Option<ComparisonType>,
-        comparison_target: Option<ComparisonTarget>,
-        target: Option<ArcStr>,
-        location: Option<ArcStr>,
-        operator: Option<ArcStr>,
-        count: Option<u8>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
         values: Option<Box<Vec<u8>>>,
-        card_type: Option<ConditionCardType>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        group_names: Option<Box<Vec<String>>>,
-        position: Option<Box<PositionInfo>>,
-        position_compare: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        aggregate: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        heart_colors: Option<Box<Vec<String>>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        scope: Option<ArcStr>,
         cost_total: Option<u8>,
         cost_total_operator: Option<Operator>,
-        resource_type: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        delta: Option<bool>,
-        cost_limit: Option<u8>,
-        source: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
         comparison_source: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        locations: Option<Box<Vec<String>>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        exclude_group_names: Option<Box<Vec<String>>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        characters: Option<Box<Vec<String>>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        exclude_characters: Option<Box<Vec<String>>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        same_name: Option<bool>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        distinct: Option<Box<DistinctInfo>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        all: Option<bool>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        all_areas: Option<bool>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        exclude_self: Option<bool>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        self_target: Option<bool>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        destination: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
         state: Option<CardState>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        require_position_cards: Option<bool>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        temporal: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        yell_trigger: Option<bool>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        no_excess_heart: Option<bool>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        card_property: Option<CardProperty>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
         ability_filter: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        ability_filter_triggers: Option<Box<Vec<String>>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        baton_touch_trigger: Option<bool>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        min_baton_touch_count: Option<u8>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        from_state: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        to_state: Option<ArcStr>,
     },
+
     #[cfg_attr(
         feature = "serde_support",
         serde(
@@ -2615,141 +2570,43 @@ pub enum Condition {
         )
     )]
     Movement {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
         movement: Option<ArcStr>,
-        location: Option<ArcStr>,
-        target: Option<ArcStr>,
-        cost_limit: Option<u8>,
-        cost_limit_operator: Option<Operator>,
-        baton_touch_trigger: Option<bool>,
-        min_baton_touch_count: Option<u8>,
-        exclude_self: Option<bool>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        group_names: Option<Box<Vec<String>>>,
-        card_type: Option<ConditionCardType>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        characters: Option<Box<Vec<String>>>,
         baton_touch_source: Option<ArcStr>,
-        card_property: Option<CardProperty>,
-        comparison_type: Option<ComparisonType>,
-        operator: Option<ArcStr>,
         self_effect_only: Option<bool>,
         energy_placed: Option<bool>,
         area_direction: Option<ArcStr>,
-        position: Option<Box<PositionInfo>>,
-        self_target: Option<bool>,
         ability_filter: Option<AbilityFilter>,
-        source: Option<ArcStr>,
-        destination: Option<ArcStr>,
-        from_state: Option<ArcStr>,
-        to_state: Option<ArcStr>,
     },
+
     #[cfg_attr(feature = "serde_support", serde(rename = "group_condition"))]
     Group {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        group_names: Option<Box<Vec<String>>>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
         all_members: Option<bool>,
-        location: Option<ArcStr>,
-        target: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        heart_colors: Option<Box<Vec<String>>>,
-        card_type: Option<ConditionCardType>,
-        operator: Option<ArcStr>,
-        count: Option<u8>,
-        aggregate: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        exclude_characters: Option<Box<Vec<String>>>,
-        temporal: Option<ArcStr>,
-        self_target: Option<bool>,
-        exclude_self: Option<bool>,
-        heart_source: Option<ArcStr>,
-        source: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        locations: Option<Box<Vec<String>>>,
-        position: Option<Box<PositionInfo>>,
     },
+
     #[cfg_attr(feature = "serde_support", serde(rename = "appearance_condition"))]
     Appearance {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
         appearance: Option<bool>,
-        baton_touch_trigger: Option<bool>,
-        location: Option<ArcStr>,
-        target: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        group_names: Option<Box<Vec<String>>>,
-        cost_limit: Option<u8>,
-        card_type: Option<ConditionCardType>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        characters: Option<Box<Vec<String>>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
         positions_characters: Option<Box<Vec<PositionCharacter>>>,
-        min_baton_touch_count: Option<u8>,
-        activation_position: Option<ArcStr>,
-        exclude_self: Option<bool>,
-        position_compare: Option<ArcStr>,
-        position: Option<Box<PositionInfo>>,
-        card_property: Option<CardProperty>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        all_areas: Option<bool>,
         cost_reference_character: Option<ArcStr>,
         cost_reference_operator: Option<Operator>,
         appearance_source: Option<ArcStr>,
-        operator: Option<ArcStr>,
     },
+
     #[cfg_attr(feature = "serde_support", serde(rename = "temporal_condition"))]
     Temporal {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
-        temporal: Option<ArcStr>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
         turn_number: Option<u8>,
-        count: Option<u8>,
-        location: Option<ArcStr>,
-        card_type: Option<ConditionCardType>,
-        target: Option<ArcStr>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        group_names: Option<Box<Vec<String>>>,
         temporal_scope: Option<ArcStr>,
-        position: Option<Box<PositionInfo>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        locations: Option<Box<Vec<String>>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        heart_colors: Option<Box<Vec<String>>>,
-        aggregate: Option<ArcStr>,
-        self_target: Option<bool>,
         condition: Option<Box<Condition>>,
     },
+
     #[cfg_attr(
         feature = "serde_support",
         serde(
@@ -2759,175 +2616,76 @@ pub enum Condition {
         )
     )]
     State {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
         state: Option<EffectState>,
         energy_state: Option<ArcStr>,
-        target: Option<ArcStr>,
-        resource_type: Option<ArcStr>,
-        all: Option<bool>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        group_names: Option<Box<Vec<String>>>,
-        card_type: Option<ConditionCardType>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        characters: Option<Box<Vec<String>>>,
-        cost_limit: Option<u8>,
-        cost_limit_operator: Option<Operator>,
-        from_state: Option<ArcStr>,
-        to_state: Option<ArcStr>,
-        count: Option<u8>,
-        operator: Option<ArcStr>,
     },
+
     #[cfg_attr(
         feature = "serde_support",
         serde(rename = "resource_condition", alias = "card_blade_condition")
     )]
     Resource {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
-        resource_type: Option<ArcStr>,
-        target: Option<ArcStr>,
-        location: Option<ArcStr>,
-        operator: Option<ArcStr>,
-        count: Option<u8>,
-        delta: Option<bool>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        heart_colors: Option<Box<Vec<String>>>,
-        position: Option<Box<PositionInfo>>,
-        source: Option<ArcStr>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
     },
+
     #[cfg_attr(feature = "serde_support", serde(rename = "ability_filter_condition"))]
     AbilityFilter {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
         ability_filter: Option<AbilityFilter>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        ability_filter_triggers: Option<Box<Vec<String>>>,
-        target: Option<ArcStr>,
-        location: Option<ArcStr>,
-        operator: Option<ArcStr>,
-        count: Option<u8>,
     },
+
     #[cfg_attr(feature = "serde_support", serde(rename = "score_threshold_condition"))]
     ScoreThreshold {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
-        count: Option<u8>,
-        operator: Option<ArcStr>,
-        target: Option<ArcStr>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
     },
+
     #[cfg_attr(
         feature = "serde_support",
         serde(rename = "choice_condition", alias = "position_change_condition")
     )]
     Choice {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
         options: Option<Box<Vec<Box<AbilityEffect>>>>,
     },
+
     #[cfg_attr(feature = "serde_support", serde(rename = "complex_condition"))]
     Complex {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
         cause: Option<Box<Condition>>,
         effect: Option<Box<AbilityEffect>>,
     },
+
     #[cfg_attr(feature = "serde_support", serde(rename = "position_condition"))]
     PositionCond {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
-        target: Option<ArcStr>,
-        position: Option<Box<PositionInfo>>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
     },
+
     #[cfg_attr(feature = "serde_support", serde(rename = "opponent_choice_condition"))]
     OpponentChoice {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
-        target: Option<ArcStr>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
     },
+
     #[cfg_attr(feature = "serde_support", serde(rename = "opponent_live_success"))]
     OpponentLiveSuccess {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
-        no_excess_heart: Option<bool>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
     },
+
     #[cfg_attr(feature = "serde_support", serde(rename = "no_excess_heart"))]
     NoExcessHeart {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
-        target: Option<ArcStr>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
     },
+
     #[cfg_attr(
         feature = "serde_support",
         serde(
@@ -2937,48 +2695,24 @@ pub enum Condition {
         )
     )]
     AlwaysTrue {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
     },
+
     #[cfg_attr(feature = "serde_support", serde(rename = "any_of_condition"))]
     AnyOf {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
         any_of: Option<Vec<String>>,
     },
+
     #[cfg_attr(
         feature = "serde_support",
         serde(rename = "all_revealed_match_heart_color")
     )]
     AllRevealedMatchHeartColor {
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        #[cfg(feature = "debug_conditions")]
-        text: Option<String>,
-        negation: Option<bool>,
-        phase: Option<ArcStr>,
-        phase_target: Option<ArcStr>,
-        cache: Option<bool>,
-        #[cfg(feature = "debug_conditions")]
-        trigger_event: Option<Box<TriggerEvent>>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        count: Option<u8>,
-        #[cfg_attr(feature = "serde_support", serde(default))]
-        operator: Option<ArcStr>,
+        #[cfg_attr(feature = "serde_support", serde(flatten))]
+        common: Box<ConditionCommon>,
     },
 }
 
@@ -3009,14 +2743,7 @@ pub struct LocationSubChecks {
 impl Default for Condition {
     fn default() -> Self {
         Condition::AlwaysTrue {
-            #[cfg(feature = "debug_conditions")]
-            text: None,
-            negation: None,
-            phase: None,
-            phase_target: None,
-            cache: None,
-            #[cfg(feature = "debug_conditions")]
-            trigger_event: None,
+            common: Box::new(ConditionCommon::default()),
         }
     }
 }
@@ -3025,239 +2752,118 @@ impl Default for Condition {
 
 /// Generate the 4 common Condition getters from a single variant list.
 /// These fields exist on ALL 20 Condition variants.
-macro_rules! condition_all_variants {
-    ($($variant:ident),+ $(,)?) => {
-        impl Condition {
-            pub fn get_negation(&self) -> Option<bool> {
-                match self {
-                    $(Condition::$variant { negation, .. } => *negation,)+
-                }
-            }
-
-            pub fn get_phase(&self) -> Option<&str> {
-                match self {
-                    $(Condition::$variant { phase, .. } => phase.as_deref(),)+
-                }
-            }
-
-            pub fn get_phase_target(&self) -> Option<&str> {
-                match self {
-                    $(Condition::$variant { phase_target, .. } => phase_target.as_deref(),)+
-                }
-            }
-
-            pub fn get_cache(&self) -> Option<bool> {
-                match self {
-                    $(Condition::$variant { cache, .. } => *cache,)+
-                }
-            }
+impl Condition {
+    /// Access the shared fields (present on every variant).
+    pub fn common(&self) -> Option<&ConditionCommon> {
+        match self {
+            Condition::Compound { common, .. } => Some(common.as_ref()),
+            Condition::Location { common, .. } => Some(common.as_ref()),
+            Condition::Comparison { common, .. } => Some(common.as_ref()),
+            Condition::Movement { common, .. } => Some(common.as_ref()),
+            Condition::Group { common, .. } => Some(common.as_ref()),
+            Condition::Appearance { common, .. } => Some(common.as_ref()),
+            Condition::Temporal { common, .. } => Some(common.as_ref()),
+            Condition::State { common, .. } => Some(common.as_ref()),
+            Condition::Resource { common, .. } => Some(common.as_ref()),
+            Condition::AbilityFilter { common, .. } => Some(common.as_ref()),
+            Condition::ScoreThreshold { common, .. } => Some(common.as_ref()),
+            Condition::Choice { common, .. } => Some(common.as_ref()),
+            Condition::Complex { common, .. } => Some(common.as_ref()),
+            Condition::PositionCond { common, .. } => Some(common.as_ref()),
+            Condition::OpponentChoice { common, .. } => Some(common.as_ref()),
+            Condition::OpponentLiveSuccess { common, .. } => Some(common.as_ref()),
+            Condition::NoExcessHeart { common, .. } => Some(common.as_ref()),
+            Condition::AlwaysTrue { common, .. } => Some(common.as_ref()),
+            Condition::AnyOf { common, .. } => Some(common.as_ref()),
+            Condition::AllRevealedMatchHeartColor { common, .. } => Some(common.as_ref()),
         }
-    };
-}
+    }
 
-condition_all_variants! {
-    Compound, Location, Comparison, Movement, Group, Appearance,
-    Temporal, State, Resource, AbilityFilter, ScoreThreshold, Choice,
-    Complex, PositionCond, OpponentChoice, OpponentLiveSuccess,
-    NoExcessHeart, AlwaysTrue, AnyOf, AllRevealedMatchHeartColor,
-}
+    /// Mutable access to the shared fields.
+    pub fn common_mut(&mut self) -> Option<&mut ConditionCommon> {
+        match self {
+            Condition::Compound { common, .. } => Some(common.as_mut()),
+            Condition::Location { common, .. } => Some(common.as_mut()),
+            Condition::Comparison { common, .. } => Some(common.as_mut()),
+            Condition::Movement { common, .. } => Some(common.as_mut()),
+            Condition::Group { common, .. } => Some(common.as_mut()),
+            Condition::Appearance { common, .. } => Some(common.as_mut()),
+            Condition::Temporal { common, .. } => Some(common.as_mut()),
+            Condition::State { common, .. } => Some(common.as_mut()),
+            Condition::Resource { common, .. } => Some(common.as_mut()),
+            Condition::AbilityFilter { common, .. } => Some(common.as_mut()),
+            Condition::ScoreThreshold { common, .. } => Some(common.as_mut()),
+            Condition::Choice { common, .. } => Some(common.as_mut()),
+            Condition::Complex { common, .. } => Some(common.as_mut()),
+            Condition::PositionCond { common, .. } => Some(common.as_mut()),
+            Condition::OpponentChoice { common, .. } => Some(common.as_mut()),
+            Condition::OpponentLiveSuccess { common, .. } => Some(common.as_mut()),
+            Condition::NoExcessHeart { common, .. } => Some(common.as_mut()),
+            Condition::AlwaysTrue { common, .. } => Some(common.as_mut()),
+            Condition::AnyOf { common, .. } => Some(common.as_mut()),
+            Condition::AllRevealedMatchHeartColor { common, .. } => Some(common.as_mut()),
+        }
+    }
 
+    pub fn get_negation(&self) -> Option<bool> {
+        self.common().and_then(|c| c.negation)
+    }
+
+    pub fn get_phase(&self) -> Option<&str> {
+        self.common().and_then(|c| c.phase.as_deref())
+    }
+
+    pub fn get_phase_target(&self) -> Option<&str> {
+        self.common().and_then(|c| c.phase_target.as_deref())
+    }
+
+    pub fn get_cache(&self) -> Option<bool> {
+        self.common().and_then(|c| c.cache)
+    }
+}
 impl Condition {
     pub fn get_text(&self) -> Option<&str> {
-        #[cfg(feature = "debug_conditions")]
-        {
-            let t: Option<&str> = match self {
-                Condition::Compound { text, .. }
-                | Condition::Location { text, .. }
-                | Condition::Comparison { text, .. }
-                | Condition::Movement { text, .. }
-                | Condition::Group { text, .. }
-                | Condition::Appearance { text, .. }
-                | Condition::Temporal { text, .. }
-                | Condition::State { text, .. }
-                | Condition::Resource { text, .. }
-                | Condition::AbilityFilter { text, .. }
-                | Condition::ScoreThreshold { text, .. }
-                | Condition::Choice { text, .. }
-                | Condition::Complex { text, .. }
-                | Condition::PositionCond { text, .. }
-                | Condition::OpponentChoice { text, .. }
-                | Condition::OpponentLiveSuccess { text, .. }
-                | Condition::NoExcessHeart { text, .. }
-                | Condition::AlwaysTrue { text, .. }
-                | Condition::AnyOf { text, .. }
-                | Condition::AllRevealedMatchHeartColor { text, .. } => text.as_deref(),
-            };
-            if t.is_none() {
-                Some("")
-            } else {
-                t
-            }
-        }
-        #[cfg(not(feature = "debug_conditions"))]
-        {
-            None
-        }
+        self.common().and_then(|c| c.text.as_deref())
     }
 
     pub fn get_trigger_event(&self) -> Option<&TriggerEvent> {
-        #[cfg(feature = "debug_conditions")]
-        {
-            match self {
-                Condition::Compound { trigger_event, .. }
-                | Condition::Location { trigger_event, .. }
-                | Condition::Comparison { trigger_event, .. }
-                | Condition::Movement { trigger_event, .. }
-                | Condition::Group { trigger_event, .. }
-                | Condition::Appearance { trigger_event, .. }
-                | Condition::Temporal { trigger_event, .. }
-                | Condition::State { trigger_event, .. }
-                | Condition::Resource { trigger_event, .. }
-                | Condition::AbilityFilter { trigger_event, .. }
-                | Condition::ScoreThreshold { trigger_event, .. }
-                | Condition::Choice { trigger_event, .. }
-                | Condition::Complex { trigger_event, .. }
-                | Condition::PositionCond { trigger_event, .. }
-                | Condition::OpponentChoice { trigger_event, .. }
-                | Condition::OpponentLiveSuccess { trigger_event, .. }
-                | Condition::NoExcessHeart { trigger_event, .. }
-                | Condition::AlwaysTrue { trigger_event, .. }
-                | Condition::AnyOf { trigger_event, .. }
-                | Condition::AllRevealedMatchHeartColor { trigger_event, .. } => {
-                    trigger_event.as_deref()
-                }
-            }
-        }
-        #[cfg(not(feature = "debug_conditions"))]
-        {
-            None
-        }
+        self.common().and_then(|c| c.trigger_event.as_deref())
     }
 
     pub fn get_location(&self) -> Option<&str> {
-        match self {
-            Condition::Location { location, .. } => location.as_deref(),
-            Condition::Comparison { location, .. } => location.as_deref(),
-            Condition::Movement { location, .. } => location.as_deref(),
-            Condition::Group { location, .. } => location.as_deref(),
-            Condition::Appearance { location, .. } => location.as_deref(),
-            Condition::Temporal { location, .. } => location.as_deref(),
-            Condition::Resource { location, .. } => location.as_deref(),
-            Condition::AbilityFilter { location, .. } => location.as_deref(),
-            _ => None,
-        }
+        self.common().and_then(|c| c.location.as_deref())
     }
 
     pub fn get_locations(&self) -> Option<&[String]> {
-        match self {
-            Condition::Location { locations, .. } => locations.as_deref().map(|v| v.as_slice()),
-            Condition::Group { locations, .. } => locations.as_deref().map(|v| v.as_slice()),
-            Condition::Temporal { locations, .. } => locations.as_deref().map(|v| v.as_slice()),
-            _ => None,
-        }
+        self.common().and_then(|c| c.locations.as_deref()).map(|v| v.as_slice())
     }
 
     pub fn get_target(&self) -> Option<&str> {
-        match self {
-            Condition::Compound { target, .. } => target.as_deref(),
-            Condition::Location { target, .. } => target.as_deref(),
-            Condition::Comparison { target, .. } => target.as_deref(),
-            Condition::Movement { target, .. } => target.as_deref(),
-            Condition::Group { target, .. } => target.as_deref(),
-            Condition::Appearance { target, .. } => target.as_deref(),
-            Condition::Temporal { target, .. } => target.as_deref(),
-            Condition::State { target, .. } => target.as_deref(),
-            Condition::Resource { target, .. } => target.as_deref(),
-            Condition::AbilityFilter { target, .. } => target.as_deref(),
-            Condition::ScoreThreshold { target, .. } => target.as_deref(),
-            Condition::PositionCond { target, .. } => target.as_deref(),
-            Condition::OpponentChoice { target, .. } => target.as_deref(),
-            Condition::NoExcessHeart { target, .. } => target.as_deref(),
-            _ => None,
-        }
+        self.common().and_then(|c| c.target.as_deref())
     }
 
     pub fn get_count(&self) -> Option<u8> {
-        match self {
-            Condition::Location { count, .. } => *count,
-            Condition::Comparison { count, .. } => *count,
-            Condition::Group { count, .. } => *count,
-            Condition::Appearance { .. } => None,
-            Condition::Temporal { count, .. } => *count,
-            Condition::State { count, .. } => *count,
-            Condition::Resource { count, .. } => *count,
-            Condition::AbilityFilter { count, .. } => *count,
-            Condition::ScoreThreshold { count, .. } => *count,
-            Condition::AllRevealedMatchHeartColor { count, .. } => *count,
-            _ => None,
-        }
+        self.common().and_then(|c| c.count)
     }
 
     pub fn get_operator(&self) -> Option<&str> {
-        match self {
-            Condition::Compound { operator, .. }
-            | Condition::Location { operator, .. }
-            | Condition::Comparison { operator, .. }
-            | Condition::Movement { operator, .. }
-            | Condition::Group { operator, .. }
-            | Condition::Appearance { operator, .. }
-            | Condition::State { operator, .. }
-            | Condition::Resource { operator, .. }
-            | Condition::AbilityFilter { operator, .. }
-            | Condition::ScoreThreshold { operator, .. }
-            | Condition::AllRevealedMatchHeartColor { operator, .. } => operator.as_deref(),
-            _ => None,
-        }
+        self.common().and_then(|c| c.operator.as_deref())
     }
 
     pub fn get_card_type(&self) -> Option<ConditionCardType> {
-        match self {
-            Condition::Location { card_type, .. } => *card_type,
-            Condition::Comparison { card_type, .. } => *card_type,
-            Condition::Movement { card_type, .. } => *card_type,
-            Condition::Group { card_type, .. } => *card_type,
-            Condition::Appearance { card_type, .. } => *card_type,
-            Condition::Temporal { card_type, .. } => *card_type,
-            Condition::State { card_type, .. } => *card_type,
-            _ => None,
-        }
+        self.common().and_then(|c| c.card_type)
     }
 
     pub fn get_group_names(&self) -> Option<&[String]> {
-        match self {
-            Condition::Location { group_names, .. } => group_names.as_ref().map(|b| b.as_slice()),
-            Condition::Comparison { group_names, .. } => group_names.as_ref().map(|b| b.as_slice()),
-            Condition::Movement { group_names, .. } => group_names.as_ref().map(|b| b.as_slice()),
-            Condition::Group { group_names, .. } => group_names.as_ref().map(|b| b.as_slice()),
-            Condition::Appearance { group_names, .. } => group_names.as_ref().map(|b| b.as_slice()),
-            Condition::Temporal { group_names, .. } => group_names.as_ref().map(|b| b.as_slice()),
-            Condition::State { group_names, .. } => group_names.as_ref().map(|b| b.as_slice()),
-            _ => None,
-        }
+        self.common().and_then(|c| c.group_names.as_deref()).map(|v| v.as_slice())
     }
 
     pub fn get_characters(&self) -> Option<&[String]> {
-        match self {
-            Condition::Location { characters, .. } => characters.as_ref().map(|b| b.as_slice()),
-            Condition::Movement { characters, .. } => characters.as_ref().map(|b| b.as_slice()),
-            Condition::Group { .. } => None,
-            Condition::Appearance { characters, .. } => characters.as_ref().map(|b| b.as_slice()),
-            Condition::State { characters, .. } => characters.as_ref().map(|b| b.as_slice()),
-            _ => None,
-        }
+        self.common().and_then(|c| c.characters.as_deref()).map(|v| v.as_slice())
     }
 
     pub fn get_exclude_characters(&self) -> Option<&[String]> {
-        match self {
-            Condition::Location {
-                exclude_characters, ..
-            } => exclude_characters.as_ref().map(|b| b.as_slice()),
-            Condition::Group {
-                exclude_characters, ..
-            } => exclude_characters.as_ref().map(|b| b.as_slice()),
-            Condition::Movement { .. } => None,
-            _ => None,
-        }
+        self.common().and_then(|c| c.exclude_characters.as_deref()).map(|v| v.as_slice())
     }
 
     pub fn get_state(&self) -> Option<CardState> {
@@ -3273,17 +2879,7 @@ impl Condition {
     }
 
     pub fn get_position(&self) -> Option<&PositionInfo> {
-        match self {
-            Condition::Location { position, .. } => position.as_deref(),
-            Condition::Comparison { position, .. } => position.as_deref(),
-            Condition::Movement { position, .. } => position.as_deref(),
-            Condition::Group { position, .. } => position.as_deref(),
-            Condition::Appearance { position, .. } => position.as_deref(),
-            Condition::Temporal { position, .. } => position.as_deref(),
-            Condition::Resource { position, .. } => position.as_deref(),
-            Condition::PositionCond { position, .. } => position.as_deref(),
-            _ => None,
-        }
+        self.common().and_then(|c| c.position.as_deref())
     }
 
     pub fn get_movement(&self) -> Option<&str> {
@@ -3294,51 +2890,31 @@ impl Condition {
     }
 
     pub fn get_temporal(&self) -> Option<&str> {
-        match self {
-            Condition::Location { temporal, .. } => temporal.as_deref(),
-            Condition::Group { temporal, .. } => temporal.as_deref(),
-            Condition::Temporal { temporal, .. } => temporal.as_deref(),
-            _ => None,
-        }
+        self.common().and_then(|c| c.temporal.as_deref())
     }
 
     pub fn get_source(&self) -> Option<&str> {
-        let direct = match self {
-            Condition::Location { source, .. } => source.as_deref(),
-            Condition::Movement { source, .. } => source.as_deref(),
-            Condition::Group { source, .. } => source.as_deref(),
-            Condition::Comparison { source, .. } => source.as_deref(),
-            Condition::Resource { source, .. } => source.as_deref(),
-            _ => None,
-        };
-        direct.or_else(|| self.get_trigger_event()?.source.as_deref())
+        self.common()
+            .and_then(|c| c.source.as_deref())
+            .or_else(|| self.get_trigger_event()?.source.as_deref())
     }
 
     pub fn get_destination(&self) -> Option<&str> {
-        let direct = match self {
-            Condition::Location { destination, .. } => destination.as_deref(),
-            Condition::Movement { destination, .. } => destination.as_deref(),
-            _ => None,
-        };
-        direct.or_else(|| self.get_trigger_event()?.destination.as_deref())
+        self.common()
+            .and_then(|c| c.destination.as_deref())
+            .or_else(|| self.get_trigger_event()?.destination.as_deref())
     }
 
     pub fn get_from_state(&self) -> Option<&str> {
-        let direct = match self {
-            Condition::Movement { from_state, .. } => from_state.as_deref(),
-            Condition::State { from_state, .. } => from_state.as_deref(),
-            _ => None,
-        };
-        direct.or_else(|| self.get_trigger_event()?.from_state.as_deref())
+        self.common()
+            .and_then(|c| c.from_state.as_deref())
+            .or_else(|| self.get_trigger_event()?.from_state.as_deref())
     }
 
     pub fn get_to_state(&self) -> Option<&str> {
-        let direct = match self {
-            Condition::Movement { to_state, .. } => to_state.as_deref(),
-            Condition::State { to_state, .. } => to_state.as_deref(),
-            _ => None,
-        };
-        direct.or_else(|| self.get_trigger_event()?.to_state.as_deref())
+        self.common()
+            .and_then(|c| c.to_state.as_deref())
+            .or_else(|| self.get_trigger_event()?.to_state.as_deref())
     }
 
     pub fn get_self_effect_only(&self) -> Option<bool> {
@@ -3352,115 +2928,39 @@ impl Condition {
     }
 
     pub fn get_heart_colors(&self) -> Option<&[String]> {
-        match self {
-            Condition::Location { heart_colors, .. } => {
-                heart_colors.as_deref().map(|v| v.as_slice())
-            }
-            Condition::Comparison { heart_colors, .. } => {
-                heart_colors.as_deref().map(|v| v.as_slice())
-            }
-            Condition::Group { heart_colors, .. } => heart_colors.as_deref().map(|v| v.as_slice()),
-            Condition::Temporal { heart_colors, .. } => {
-                heart_colors.as_deref().map(|v| v.as_slice())
-            }
-            Condition::Resource { heart_colors, .. } => {
-                heart_colors.as_deref().map(|v| v.as_slice())
-            }
-            _ => None,
-        }
+        self.common().and_then(|c| c.heart_colors.as_deref()).map(|v| v.as_slice())
     }
 
     pub fn get_exclude_self(&self) -> Option<bool> {
-        match self {
-            Condition::Location { exclude_self, .. } => *exclude_self,
-            Condition::Movement { exclude_self, .. } => *exclude_self,
-            Condition::Appearance { exclude_self, .. } => *exclude_self,
-            Condition::Group { exclude_self, .. } => *exclude_self,
-            _ => None,
-        }
+        self.common().and_then(|c| c.exclude_self)
     }
 
     pub fn get_self_target(&self) -> Option<bool> {
-        match self {
-            Condition::Location { self_target, .. } => *self_target,
-            Condition::Movement { self_target, .. } => *self_target,
-            Condition::Group { self_target, .. } => *self_target,
-            Condition::Temporal { self_target, .. } => *self_target,
-            _ => None,
-        }
+        self.common().and_then(|c| c.self_target)
     }
 
     pub fn get_cost_limit(&self) -> Option<u8> {
-        match self {
-            Condition::Location { cost_limit, .. } => *cost_limit,
-            Condition::Comparison { cost_limit, .. } => *cost_limit,
-            Condition::Movement { cost_limit, .. } => *cost_limit,
-            Condition::Appearance { cost_limit, .. } => *cost_limit,
-            Condition::State { cost_limit, .. } => *cost_limit,
-            _ => None,
-        }
+        self.common().and_then(|c| c.cost_limit)
     }
 
     pub fn get_cost_limit_operator(&self) -> Option<Operator> {
-        match self {
-            Condition::Location {
-                cost_limit_operator,
-                ..
-            } => *cost_limit_operator,
-            Condition::Movement {
-                cost_limit_operator,
-                ..
-            } => *cost_limit_operator,
-            Condition::State {
-                cost_limit_operator,
-                ..
-            } => *cost_limit_operator,
-            _ => None,
-        }
+        self.common().and_then(|c| c.cost_limit_operator)
     }
 
     pub fn get_comparison_type(&self) -> Option<&str> {
-        match self {
-            Condition::Comparison {
-                comparison_type, ..
-            } => comparison_type.map(|ct| ct.as_str()),
-            Condition::Movement {
-                comparison_type, ..
-            } => comparison_type.map(|ct| ct.as_str()),
-            Condition::Location {
-                comparison_type, ..
-            } => comparison_type.map(|ct| ct.as_str()),
-            _ => None,
-        }
+        self.common().and_then(|c| c.comparison_type.as_deref())
     }
 
     pub fn get_resource_type(&self) -> Option<&str> {
-        match self {
-            Condition::Comparison { resource_type, .. } => resource_type.as_deref(),
-            Condition::State { resource_type, .. } => resource_type.as_deref(),
-            Condition::Resource { resource_type, .. } => resource_type.as_deref(),
-            _ => None,
-        }
+        self.common().and_then(|c| c.resource_type.as_deref())
     }
 
     pub fn get_card_property(&self) -> Option<CardProperty> {
-        match self {
-            Condition::Location { card_property, .. } => *card_property,
-            Condition::Comparison { card_property, .. } => *card_property,
-            Condition::Movement { card_property, .. } => *card_property,
-            Condition::Appearance { card_property, .. } => *card_property,
-            _ => None,
-        }
+        self.common().and_then(|c| c.card_property)
     }
 
     pub fn get_aggregate(&self) -> Option<&str> {
-        match self {
-            Condition::Location { aggregate, .. } => aggregate.as_deref(),
-            Condition::Comparison { aggregate, .. } => aggregate.as_deref(),
-            Condition::Group { aggregate, .. } => aggregate.as_deref(),
-            Condition::Temporal { aggregate, .. } => aggregate.as_deref(),
-            _ => None,
-        }
+        self.common().and_then(|c| c.aggregate.as_deref())
     }
 
     pub fn get_ability_filter(&self) -> Option<&AbilityFilter> {
@@ -3472,21 +2972,7 @@ impl Condition {
     }
 
     pub fn get_baton_touch_trigger(&self) -> Option<bool> {
-        match self {
-            Condition::Movement {
-                baton_touch_trigger,
-                ..
-            } => *baton_touch_trigger,
-            Condition::Appearance {
-                baton_touch_trigger,
-                ..
-            } => *baton_touch_trigger,
-            Condition::Location {
-                baton_touch_trigger,
-                ..
-            } => *baton_touch_trigger,
-            _ => None,
-        }
+        self.common().and_then(|c| c.baton_touch_trigger)
     }
 
     pub fn get_energy_state(&self) -> Option<&str> {
@@ -3497,51 +2983,23 @@ impl Condition {
     }
 
     pub fn get_heart_source(&self) -> Option<&str> {
-        match self {
-            Condition::Location { heart_source, .. } => heart_source.as_deref(),
-            Condition::Group { heart_source, .. } => heart_source.as_deref(),
-            _ => None,
-        }
+        self.common().and_then(|c| c.heart_source.as_deref())
     }
 
     pub fn get_exclude_group_names(&self) -> Option<&[String]> {
-        match self {
-            Condition::Location {
-                exclude_group_names,
-                ..
-            } => exclude_group_names.as_ref().map(|b| b.as_slice()),
-            _ => None,
-        }
+        self.common().and_then(|c| c.exclude_group_names.as_deref()).map(|v| v.as_slice())
     }
 
     pub fn get_distinct(&self) -> Option<&DistinctInfo> {
-        match self {
-            Condition::Location { distinct, .. } => distinct.as_deref(),
-            _ => None,
-        }
+        self.common().and_then(|c| c.distinct.as_deref())
     }
 
     pub fn get_position_compare(&self) -> Option<&str> {
-        match self {
-            Condition::Location {
-                position_compare, ..
-            } => position_compare.as_deref(),
-            Condition::Comparison {
-                position_compare, ..
-            } => position_compare.as_deref(),
-            Condition::Appearance {
-                position_compare, ..
-            } => position_compare.as_deref(),
-            _ => None,
-        }
+        self.common().and_then(|c| c.position_compare.as_deref())
     }
 
     pub fn get_delta(&self) -> Option<bool> {
-        match self {
-            Condition::Comparison { delta, .. } => *delta,
-            Condition::Resource { delta, .. } => *delta,
-            _ => None,
-        }
+        self.common().and_then(|c| c.delta)
     }
 }
 
@@ -3589,100 +3047,23 @@ impl Condition {
     /// Build a `CardFilter` containing the 7 base filter fields, mirroring
     /// `AbilityEffect::filter_subset` and `AbilityCost::filter_subset`.
     pub fn filter_subset(&self) -> crate::ability::util::CardFilter<'_> {
-        let (
-            card_type,
-            group,
-            cost_limit,
-            cost_operator,
-            characters,
-            exclude_characters,
-            exclude_group_names,
-        ) = match self {
-            Condition::Location {
-                card_type,
-                group_names,
-                exclude_group_names: egn,
-                characters: ch,
-                exclude_characters: ec,
-                cost_limit: cl,
-                cost_limit_operator: clo,
-                operator,
-                ..
-            } => (
-                *card_type,
-                group_names.as_ref(),
-                *cl,
-                clo.as_deref().or(operator.as_deref()),
-                ch.as_ref(),
-                ec.as_ref(),
-                egn.as_ref(),
-            ),
-            Condition::Group {
-                card_type,
-                group_names,
-                operator,
-                ..
-            } => (
-                *card_type,
-                group_names.as_ref(),
-                None,
-                operator.as_deref(),
-                None,
-                None,
-                None,
-            ),
-            Condition::Movement {
-                card_type,
-                group_names,
-                characters,
-                ..
-            } => (
-                *card_type,
-                group_names.as_ref(),
-                None,
-                None,
-                characters.as_ref(),
-                None,
-                None,
-            ),
-            Condition::Comparison {
-                card_type,
-                group_names,
-                cost_limit,
-                operator,
-                ..
-            } => (
-                *card_type,
-                group_names.as_ref(),
-                *cost_limit,
-                operator.as_deref(),
-                None,
-                None,
-                None,
-            ),
-            Condition::Appearance {
-                card_type,
-                group_names,
-                cost_limit,
-                characters,
-                operator,
-                ..
-            } => (
-                *card_type,
-                group_names.as_ref(),
-                *cost_limit,
-                operator.as_deref(),
-                characters.as_ref(),
-                None,
-                None,
-            ),
-            _ => (None, None, None, None, None, None, None),
-        };
+        let c = self.common();
+        let card_type = c.and_then(|c| c.card_type);
+        let group_names = c.and_then(|c| c.group_names.as_ref());
+        let cost_limit = c.and_then(|c| c.cost_limit);
+        let cost_operator = c
+            .and_then(|c| c.cost_limit_operator.as_deref())
+            .or_else(|| c.and_then(|c| c.operator.as_deref()));
+        let characters = c.and_then(|c| c.characters.as_ref());
+        let exclude_characters = c.and_then(|c| c.exclude_characters.as_ref());
+        let exclude_group_names = c.and_then(|c| c.exclude_group_names.as_ref());
         crate::ability::util::CardFilter {
             card_type: card_type.map(|ct| ct.as_str()),
-            group: group.and_then(|v| v.first()).map(|s| s.as_str()),
+            group: group_names
+                .and_then(|v| v.first())
+                .map(|s| s.as_str()),
             cost_limit,
-            cost_operator: cost_operator,
+            cost_operator,
             characters: characters.map(|b| b.as_ref()),
             exclude_characters: exclude_characters.map(|b| b.as_ref()),
             exclude_self: None,
@@ -3733,63 +3114,36 @@ impl Condition {
     }
 
     pub fn get_activation_position(&self) -> Option<&str> {
-        match self {
-            Condition::Appearance {
-                activation_position,
-                ..
-            } => activation_position.as_deref(),
-            Condition::Location { sub_checks, .. } => sub_checks
-                .as_ref()
-                .and_then(|sc| sc.activation_position.as_deref()),
-            _ => None,
-        }
+        self.common()
+            .and_then(|c| c.activation_position.as_deref())
+            .or_else(|| match self {
+                Condition::Location { sub_checks, .. } => sub_checks
+                    .as_ref()
+                    .and_then(|sc| sc.activation_position.as_deref()),
+                _ => None,
+            })
     }
 
     pub fn set_position(&mut self, pos: PositionInfo) {
-        match self {
-            Condition::Location { position, .. }
-            | Condition::Comparison { position, .. }
-            | Condition::Movement { position, .. }
-            | Condition::Group { position, .. }
-            | Condition::Appearance { position, .. }
-            | Condition::Temporal { position, .. }
-            | Condition::Resource { position, .. }
-            | Condition::PositionCond { position, .. } => {
-                *position = Some(Box::new(pos));
-            }
-            _ => {}
+        if let Some(c) = self.common_mut() {
+            c.position = Some(Box::new(pos));
         }
     }
 
     pub fn set_activation_position(&mut self, act_pos: String) {
-        match self {
-            Condition::Appearance {
-                activation_position,
-                ..
-            } => {
-                *activation_position = Some(act_pos.into());
-            }
-            Condition::Location { sub_checks, .. } => {
-                let mut checks = sub_checks.take().unwrap_or_default();
-                checks.activation_position = Some(act_pos.into());
-                *sub_checks = Some(checks);
-            }
-            _ => {}
+        if let Some(c) = self.common_mut() {
+            c.activation_position = Some(act_pos.clone().into());
+        }
+        if let Condition::Location { sub_checks, .. } = self {
+            let mut checks = sub_checks.take().unwrap_or_default();
+            checks.activation_position = Some(act_pos.into());
+            *sub_checks = Some(checks);
         }
     }
 
     pub fn set_group_names(&mut self, gns: Vec<String>) {
-        match self {
-            Condition::Location { group_names, .. }
-            | Condition::Comparison { group_names, .. }
-            | Condition::Movement { group_names, .. }
-            | Condition::Group { group_names, .. }
-            | Condition::Appearance { group_names, .. }
-            | Condition::Temporal { group_names, .. }
-            | Condition::State { group_names, .. } => {
-                *group_names = Some(Box::new(gns));
-            }
-            _ => {}
+        if let Some(c) = self.common_mut() {
+            c.group_names = Some(Box::new(gns));
         }
     }
 
@@ -3836,15 +3190,14 @@ impl Condition {
     }
 
     pub fn get_no_excess_heart(&self) -> Option<bool> {
-        match self {
-            Condition::OpponentLiveSuccess {
-                no_excess_heart, ..
-            } => *no_excess_heart,
-            Condition::Location { sub_checks, .. } => {
-                sub_checks.as_ref().and_then(|sc| sc.no_excess_heart)
-            }
-            _ => None,
-        }
+        self.common()
+            .and_then(|c| c.no_excess_heart)
+            .or_else(|| match self {
+                Condition::Location { sub_checks, .. } => {
+                    sub_checks.as_ref().and_then(|sc| sc.no_excess_heart)
+                }
+                _ => None,
+            })
     }
 
     pub fn get_group_reference(&self) -> Option<&str> {
@@ -3874,29 +3227,11 @@ impl Condition {
     }
 
     pub fn get_all_areas(&self) -> Option<bool> {
-        match self {
-            Condition::Location { all_areas, .. } => *all_areas,
-            Condition::Appearance { all_areas, .. } => *all_areas,
-            _ => None,
-        }
+        self.common().and_then(|c| c.all_areas)
     }
 
     pub fn get_min_baton_touch_count(&self) -> Option<u8> {
-        match self {
-            Condition::Movement {
-                min_baton_touch_count,
-                ..
-            } => *min_baton_touch_count,
-            Condition::Appearance {
-                min_baton_touch_count,
-                ..
-            } => *min_baton_touch_count,
-            Condition::Location {
-                min_baton_touch_count,
-                ..
-            } => *min_baton_touch_count,
-            _ => None,
-        }
+        self.common().and_then(|c| c.min_baton_touch_count)
     }
 
     pub fn get_baton_touch_source(&self) -> Option<&str> {
@@ -3926,12 +3261,7 @@ impl Condition {
     }
 
     pub fn get_all(&self) -> Option<bool> {
-        match self {
-            Condition::Comparison { all, .. } => *all,
-            Condition::State { all, .. } => *all,
-            Condition::Location { all, .. } => *all,
-            _ => None,
-        }
+        self.common().and_then(|c| c.all)
     }
 
     pub fn get_area_direction(&self) -> Option<&str> {
@@ -3979,15 +3309,7 @@ impl Condition {
     }
 
     pub fn get_comparison_target(&self) -> Option<ComparisonTarget> {
-        match self {
-            Condition::Comparison {
-                comparison_target, ..
-            } => *comparison_target,
-            Condition::Location {
-                comparison_target, ..
-            } => *comparison_target,
-            _ => None,
-        }
+        self.common().and_then(|c| c.comparison_target)
     }
 
     pub fn get_cost_reference_character(&self) -> Option<&str> {
@@ -4053,28 +3375,15 @@ impl Condition {
     }
 
     pub fn get_require_position_cards(&self) -> Option<bool> {
-        match self {
-            Condition::Location {
-                require_position_cards,
-                ..
-            } => *require_position_cards,
-            _ => None,
-        }
+        self.common().and_then(|c| c.require_position_cards)
     }
 
     pub fn get_same_name(&self) -> Option<bool> {
-        match self {
-            Condition::Location { same_name, .. } => *same_name,
-            _ => None,
-        }
+        self.common().and_then(|c| c.same_name)
     }
 
     pub fn get_scope(&self) -> Option<&str> {
-        match self {
-            Condition::Location { scope, .. } => scope.as_deref(),
-            Condition::Comparison { scope, .. } => scope.as_deref(),
-            _ => None,
-        }
+        self.common().and_then(|c| c.scope.as_deref())
     }
 
     pub fn get_values(&self) -> Option<&[u8]> {
@@ -4088,23 +3397,19 @@ impl Condition {
     }
 
     pub fn get_yell_trigger(&self) -> Option<bool> {
-        match self {
-            Condition::Location { yell_trigger, .. } => *yell_trigger,
-            _ => None,
-        }
+        self.common().and_then(|c| c.yell_trigger)
     }
 
     pub fn get_ability_filter_triggers(&self) -> Option<&[String]> {
-        match self {
-            Condition::AbilityFilter {
-                ability_filter_triggers,
-                ..
-            } => ability_filter_triggers.as_ref().map(|b| &b[..]),
-            Condition::Location { sub_checks, .. } => sub_checks
-                .as_ref()
-                .and_then(|sc| sc.ability_filter_triggers.as_ref().map(|b| &b[..])),
-            _ => None,
-        }
+        self.common()
+            .and_then(|c| c.ability_filter_triggers.as_ref())
+            .map(|b| &b[..])
+            .or_else(|| match self {
+                Condition::Location { sub_checks, .. } => sub_checks
+                    .as_ref()
+                    .and_then(|sc| sc.ability_filter_triggers.as_ref().map(|b| &b[..])),
+                _ => None,
+            })
     }
 }
 

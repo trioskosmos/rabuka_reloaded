@@ -9,6 +9,10 @@ members = [
     "platforms/gba",
     "tools/bake",
 ]
+# Console platforms (gba etc.) pin portable-atomic/unsafe-assume-single-core,
+# which cannot build on the x86_64 host. Build them explicitly with `-p rabuka_gba`
+# when targeting the console; never build them as part of the default host build.
+default-members = ["engine", "tools/bake"]
 resolver = "2"
 
 [profile.dev]
