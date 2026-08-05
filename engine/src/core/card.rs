@@ -690,27 +690,12 @@ impl AbilityCost {
     /// `AbilityEffect::filter_subset` exposes. Mirrors that method so cost
     /// handlers can use the same consolidation pattern as effect handlers.
     pub fn filter_subset(&self) -> crate::ability::util::CardFilter<'_> {
-        crate::ability::util::CardFilter {
-            card_type: self.card_type_any().map(|ct| ct.as_card_str()),
-            group: self
-                .group_names_any()
-                .as_ref()
-                .and_then(|v| v.first())
-                .map(|s| s.as_str()),
-            cost_limit: self.cost_limit_any(),
-            cost_operator: self.cost_limit_operator_any().map(Operator::as_str),
-            characters: self.characters_any(),
-            exclude_characters: self.exclude_characters_any(),
-            exclude_self: if self.exclude_self_any().unwrap_or(false) {
-                Some(-1)
-            } else {
-                None
-            },
-            exclude_group_names: self.exclude_group_names_any().map(Vec::as_slice),
-            card_property: self.card_property_any(),
-            negation: self.negation_any().unwrap_or(false),
-            ..Default::default()
-        }
+        // Single filter builder: delegate to CardFilter::from_effect so the
+        // full field set (characters, need_heart_*, cost_total, distinct, ...)
+        // is always honored. Previously this was a hand-maintained minimal
+        // subset that silently dropped fields (e.g. `characters`), causing
+        // condition/effect mismatches (CLEAN-G15/D20).
+        crate::ability::util::CardFilter::from_effect(self)
     }
 }
 

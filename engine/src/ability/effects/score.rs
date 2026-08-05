@@ -74,6 +74,15 @@ impl AbilityResolver {
             }
             filter.exclude_self = exclude_self_id;
 
+            // Target selection uses a filter WITHOUT negation: card_property +
+            // negation on a modify_score describe the per-unit COUNT predicate
+            // (e.g. "ブレードハートを持たない...2枚につき"), not which members
+            // RECEIVE the modifier. Negated targets would wrongly exclude the
+            // recipients (shiki: kanon has blade_heart, still gets the score).
+            let mut target_filter = filter.clone();
+            target_filter.negation = false;
+            target_filter.card_property = None;
+
             let final_value = if per_unit {
                 // Determine the effective zone for per-unit counting.
                 // - Special pseudo-zones like "heart_colors" come from per_unit_type
@@ -118,7 +127,7 @@ impl AbilityResolver {
                 Some("member_card") => util::matching_ids(
                     util::zone_cards(player, Zone::Stage.to_str()),
                     &card_db,
-                    &filter,
+                    &target_filter,
                     true,
                 )
                 .into(),
@@ -137,7 +146,7 @@ impl AbilityResolver {
             let target_card_ids: Vec<(i16, i16)> = candidate_ids
                 .iter()
                 .filter(|&&card_id| {
-                    if !filter.matches(&card_db, card_id, false) {
+                    if !target_filter.matches(&card_db, card_id, false) {
                         return false;
                     }
                     if self_target {

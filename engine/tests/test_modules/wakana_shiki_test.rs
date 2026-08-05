@@ -39,13 +39,14 @@ fn trigger_and_drain(game: &mut TestGame) {
 /// 若菜四季 (PL!SP-pb2-008-R) — LiveSuccess: per-unit score +1 per 2 Liella! member
 /// cards among yell-revealed. Capped at +2 total.
 ///
-/// Per_unit counting uses UnderMember zone (per_unit_type="枚" + member_card).
-/// CardFilter::from_effect() hardcodes negation=false, so matching cards
-/// are Liella! members WITH blade_heart.
+/// The card counts Liella! members WITHOUT blade_heart ("ブレードハートを持たない").
+/// Per_unit counting uses UnderMember zone (per_unit_type="枚" + member_card) and
+/// honors card_property+negation on the per-unit count, but the negation is NOT
+/// a target filter — Kanon (has blade_heart) still receives the score.
 ///
 /// Setup: Shiki (trigger) + Kanon (target, has blade_heart) on stage.
 /// Live card in live_card_zone (required for should_trigger_live_success).
-/// Under-member: 6 Liella! member cards with blade_heart.
+/// Under-member: 6 Liella! member cards WITHOUT blade_heart (唐 可可).
 /// Expected: 6/2*1 = raw 3, capped at max_repeats=2 → target gets +2.
 #[test]
 fn shiki_per_unit_score_capped_at_2() {
@@ -53,8 +54,8 @@ fn shiki_per_unit_score_capped_at_2() {
     let mut game = TestGame::new(db);
 
     let shiki = game.id("PL!SP-pb2-008-R");
-    let kanon = game.id("PL!SP-sd1-001-SD"); // Liella!, has blade_heart
-    let under_card = game.id("PL!SP-sd1-003-SD"); // Liella! member, has blade_heart
+    let kanon = game.id("PL!SP-sd1-001-SD"); // Liella!, has blade_heart (score target)
+    let under_card = game.id("PL!SP-sd1-002-SD"); // Liella! member, NO blade_heart (counted)
     let live = game.id("PL!-sd1-020-SD"); // filler live card
     let filler = game.id("PL!-sd1-010-SD");
 
@@ -95,7 +96,7 @@ fn shiki_per_unit_score_no_cap_needed() {
 
     let shiki = game.id("PL!SP-pb2-008-R");
     let kanon = game.id("PL!SP-sd1-001-SD");
-    let under_card = game.id("PL!SP-sd1-003-SD");
+    let under_card = game.id("PL!SP-sd1-002-SD"); // Liella! member, NO blade_heart (counted)
     let live = game.id("PL!-sd1-020-SD");
     let filler = game.id("PL!-sd1-010-SD");
 

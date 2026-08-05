@@ -1308,7 +1308,7 @@ impl<'a> CardFilter<'a> {
             ability_filter_triggers: effect.ability_filter_triggers_any().map(|v| &**v),
             or_ability_filters: effect.or_ability_filters_any().map(|v| &**v),
             card_property,
-            negation: false,
+            negation: effect.negation_any().unwrap_or(false),
         }
     }
 

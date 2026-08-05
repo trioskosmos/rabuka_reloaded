@@ -3487,27 +3487,34 @@ impl<'a> ConditionContext<'a> {
         condition: &Condition,
     ) -> u8 {
         // Build a single CardFilter and use its .count() — avoids re-parsing
-        // the filter fields for every card in the slice.
-        let filter_characters_owned: Option<Vec<String>> = condition
-            .get_characters()
-            .map(|s| s.iter().map(|x| x.clone()).collect());
-        let filter = {
-            let mut f = crate::ability::util::CardFilter::default();
-            f.card_type = card_type_filter;
-            f.group = group_names.and_then(|g| g.first().map(|s| s.as_str()));
-            f.heart_colors = heart_colors;
-            f.cost_limit = cost_limit;
-            f.cost_operator = cost_limit_operator;
-            f.characters = filter_characters_owned.as_ref();
-            if let Some(ex) = exclude_self {
-                f.exclude_self = Some(ex);
-            }
-            if let Some(cp) = &condition.get_card_property() {
-                f.card_property = Some(cp.as_str());
-                f.negation = condition.get_negation().unwrap_or(false);
-            }
-            f
-        };
+        // the filter fields for every card in the slice. Base it on the
+        // condition's own filter (filter_subset → the single CardFilter builder)
+        // so characters/heart_colors/etc. are never silently dropped.
+        let mut filter = condition.filter_subset();
+        if let Some(ct) = card_type_filter {
+            filter.card_type = Some(ct);
+        }
+        if let Some(gn) = group_names {
+            filter.group = gn.first().map(|s| s.as_str());
+        }
+        if !heart_colors.is_empty() {
+            filter.heart_colors = heart_colors;
+        }
+        if let Some(cl) = cost_limit {
+            filter.cost_limit = Some(cl);
+        }
+        if let Some(co) = cost_limit_operator {
+            filter.cost_operator = Some(co);
+        }
+        if let Some(ex) = exclude_self {
+            filter.exclude_self = Some(ex);
+        }
+        // card_property + negation live on the Condition variant (not in the
+        // flat EffectFilter that filter_subset reads), so re-apply them here.
+        if let Some(cp) = &condition.get_card_property() {
+            filter.card_property = Some(cp.as_str());
+            filter.negation = condition.get_negation().unwrap_or(false);
+        }
         let card_db = &self.game_state.card_database;
         let mut count = 0u8;
         for &card_id in cards {
