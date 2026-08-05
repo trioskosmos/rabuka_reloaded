@@ -64,8 +64,8 @@ impl AbilityResolver {
         let cost_limit_operator = effect.cost_limit_operator_any().map(|s| s.to_string());
         let characters = effect.characters_any();
         let blade_limit: Option<u8> = if effect.blade_limit_from_energy_under_any().unwrap_or(false) {
-            // C5: dynamic limit = (energy cards under the activating member) + blade_limit.
-            let base = effect.blade_limit_any().unwrap_or(0) as i32;
+            // C5: dynamic limit = (energy cards under the activating member) + offset.
+            let base = effect.blade_limit_offset_any().unwrap_or(0) as i32;
             let under_count = gs.activating_card.map_or(0, |aid| {
                 let p = gs.resolve_target_player("self");
                 p.stage

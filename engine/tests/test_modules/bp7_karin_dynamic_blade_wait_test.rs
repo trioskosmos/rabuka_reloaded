@@ -16,6 +16,50 @@
 /// These tests pin the behavior as written: the cost moves exactly one energy
 /// from the energy zone under 朝香果林, then exactly one opponent member whose
 /// ORIGINAL (printed) blade is at most `(energy under her) + 1` is waited.
+
+// ====================================================================
+// Bytecode roundtrip: the card's ability is decoded from the embedded
+// abilities.bin (NOT abilities.json), so this proves the compressed
+// bytecode carries the parser output without dropping fields.
+// ====================================================================
+
+/// The decoded 朝香果林 ab#0 effect must carry the dynamic blade limit as an
+/// explicit offset: `blade_limit_from_energy_under = true` + `blade_limit_offset = 1`
+/// (the "1を足した数"), so the JSON/bytecode reads "+1 on top of the energy-under
+/// count" rather than a fixed limit of 1.
+#[test]
+fn c5_bytecode_carries_explicit_offset() {
+    let db = load_real_database();
+    let karin_id = card_id(&db, "PL!N-bp7-004-P");
+    let card = db
+        .get_card(karin_id)
+        .expect("karin card in database");
+
+    let ability = card
+        .abilities
+        .first()
+        .expect("karin has a 起動 ability")
+        .resolve();
+    let effect = ability.effect.as_deref().expect("ability has an effect");
+
+    assert_eq!(
+        effect.blade_limit_from_energy_under_any(),
+        Some(true),
+        "bytecode must carry the energy-under flag"
+    );
+    assert_eq!(
+        effect.blade_limit_offset_any(),
+        Some(1),
+        "the +1 (1を足した数) must be an explicit offset, not a fixed limit"
+    );
+    assert_eq!(
+        effect.blade_limit_any(),
+        None,
+        "no static blade_limit should be set for the dynamic form"
+    );
+    assert_eq!(effect.blade_limit_operator_any().map(|o| o.as_str()), Some("<="));
+    assert_eq!(effect.state_change_any(), Some("wait"));
+}
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
