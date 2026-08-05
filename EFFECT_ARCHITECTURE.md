@@ -87,6 +87,34 @@ python cards/generate_effect_decoder.py
 
 The generator parses `card.rs`, so it stays in sync automatically.
 
+## Next target: the `Condition` enum (same anti-pattern, bigger)
+
+`Condition` (`card.rs`, ~20 variants) repeats the same fields in **every** variant,
+exactly the duplication `EffectFilter` just removed from effects:
+
+- 6 fields appear in **all 20** variants: `text, negation, phase, phase_target,
+  cache, trigger_event`.
+- 49 of its 77 distinct fields appear on 2+ variants (target, operator, count,
+  location, position, card_type, group_names, characters, cost_limit,
+  heart_colors, exclude_self, self_target, source, …).
+
+Plan (mirror the EffectFilter change):
+
+1. Extract a shared `ConditionCommon` struct holding every field that appears on
+   ≥2 variants. Each `Condition` variant keeps only its unique fields
+   (e.g. `Compound.conditions`, `Comparison.comparison_type/values`,
+   `Movement.movement/tense`) plus `common: Option<Box<ConditionCommon>>`.
+2. Getters read from `common` (one place per field instead of N variants).
+3. Regenerate `condition_decoder_gen.rs` via `generate_condition_decoder.py`
+   (it already parses `card.rs`), update the JSON populate path.
+4. Rewrite the ~40 variant pattern-matches in `condition.rs` to read from
+   `common`.
+5. `cargo test --test run_all` must stay green (1989 tests pin behavior).
+
+Parser side: the `_COST_HANDLERS` / `_ACTION_RULES` / `_EFFECT_RULES` /
+`_CONDITION_HANDLERS` registries are already data-driven (recent commits);
+review overlap before adding more rows.
+
 ## Fixing an ability: tests-first workflow
 
 For every parser/engine fix (each entry in `cards/_bp07_ability_gaps_hand_analysis.md`):
