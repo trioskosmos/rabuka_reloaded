@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-05T20:51:09.504679",
+  "generated_at": "2026-08-05T21:34:15.442638",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
-  "source_file": "cards/cards.json",
-  "engine_commit": "b20024a6",
+  "source_file": "cards\\cards.json",
+  "engine_commit": "84928621",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -6294,15 +6294,16 @@
         "options": [
           {
             "text": "ライブ終了時まで、自分のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下の『Aqours』のメンバーは、相手の効果によってはウェイトしない。",
-            "duration": "live_end",
+            "duration": null,
             "source": "stage",
             "count": 3,
             "card_type": "member_card",
-            "target": "both",
+            "target": "opponent",
             "group_names": [
               "Aqours"
             ],
-            "action": "custom",
+            "action": "restriction",
+            "restriction_type": "cannot_wait_by_effect",
             "original_value": true,
             "blade_limit": 3,
             "blade_limit_operator": "<="
@@ -6453,40 +6454,38 @@
       "cost": null,
       "effect": {
         "text": "自分の控え室からコスト2以下のメンバーカードを1枚手札に加える。これによって「津島善子」か「黒澤ルビィ」を手札に加えた場合、そのカードを自分のステージのメンバーのいないエリアに登場させてもよい",
-        "action": "sequential",
-        "actions": [
-          {
-            "text": "自分の控え室からコスト2以下のメンバーカードを1枚手札に加える",
-            "source": "discard",
-            "destination": "hand",
-            "cost_limit": 2,
-            "cost_limit_operator": "<=",
-            "count": 1,
-            "card_type": "member_card",
-            "target": "self",
-            "action": "move_cards"
-          },
-          {
-            "text": "これによって「津島善子」か「黒澤ルビィ」を手札に加えた場合、そのカードを自分のステージのメンバーのいないエリアに登場させてもよい",
-            "condition": {
-              "text": "これによって「津島善子」か「黒澤ルビィ」を手札に加えた場合",
-              "characters": [
-                "津島善子",
-                "黒澤ルビィ"
-              ],
-              "location": "hand",
-              "count": 1,
-              "operator": ">=",
-              "target": "self",
-              "type": "comparison_condition"
-            },
-            "destination": "stage",
-            "card_type": "member_card",
-            "target": "self",
-            "optional": true,
-            "action": "custom"
-          }
-        ]
+        "action": "conditional_on_result",
+        "primary_effect": {
+          "text": "自分の控え室からコスト2以下のメンバーカードを1枚手札に加える",
+          "source": "discard",
+          "destination": "hand",
+          "cost_limit": 2,
+          "cost_limit_operator": "<=",
+          "count": 1,
+          "card_type": "member_card",
+          "target": "self",
+          "action": "move_cards"
+        },
+        "result_condition": {
+          "text": "これによって「津島善子」か「黒澤ルビィ」を手札に加えた場合",
+          "characters": [
+            "津島善子",
+            "黒澤ルビィ"
+          ],
+          "location": "hand",
+          "count": 1,
+          "operator": ">=",
+          "target": "self",
+          "type": "comparison_condition"
+        },
+        "followup_action": {
+          "text": "そのカードを自分のステージのメンバーのいないエリアに登場させてもよい",
+          "destination": "stage",
+          "card_type": "member_card",
+          "target": "self",
+          "optional": true,
+          "action": "custom"
+        }
       }
     },
     {
@@ -20292,6 +20291,7 @@
             "destination": "under_member",
             "card_type": "member_card",
             "action": "move_cards",
+            "self_target": true,
             "count": 1,
             "source": "those_cards",
             "group_names": [
@@ -21339,12 +21339,11 @@
       "cost": null,
       "effect": {
         "text": "このメンバーの正面のエリアにいるコスト4以下のメンバーは、{{icon_blade.png|ブレード}}を1つ失う",
-        "cost_limit": 4,
-        "cost_limit_operator": "<=",
+        "action": "gain_resource",
+        "sign": "negative",
+        "resource": "blade",
         "count": 1,
-        "card_type": "member_card",
-        "position": "front",
-        "action": "custom"
+        "position": "front"
       }
     },
     {
@@ -21449,19 +21448,9 @@
       "cost": null,
       "effect": {
         "text": "自分のエールは、デッキの上から行う代わりにデッキの下から行う",
-        "action": "conditional_alternative",
-        "alternative_effect": {
-          "text": "デッキの下から行う",
-          "source": "deck_bottom",
-          "action": "custom"
-        },
-        "primary_effect": {
-          "text": "自分のエールは、デッキの上から行う",
-          "source": "deck_top",
-          "count": 1,
-          "target": "self",
-          "action": "custom"
-        }
+        "action": "custom",
+        "custom_type": "yell_source_modifier",
+        "yell_source": "deck_bottom"
       }
     },
     {
@@ -22005,21 +21994,22 @@
       "effect": {
         "text": "このメンバーがステージから控え室に置かれたとき、バトンタッチしていた場合、このカードをそのバトンタッチで登場したメンバーの下に置く",
         "condition": {
+          "type": "movement_condition",
+          "movement": "baton_touch",
+          "target": "self",
+          "baton_touch_trigger": true,
           "text": "このメンバーがステージから控え室に置かれたとき、バトンタッチしていた場合",
-          "location": "discard",
-          "locations": [
-            "discard",
-            "stage"
-          ],
-          "card_type": "member_card",
-          "self_target": true,
-          "type": "location_condition",
-          "target": "self"
+          "trigger_event": {
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "discard"
+          }
         },
+        "destination": "under_member",
         "card_type": "member_card",
-        "action": "custom",
-        "destination": null,
-        "self_target": true
+        "action": "move_cards",
+        "self_target": true,
+        "count": 1
       }
     },
     {
@@ -36511,11 +36501,13 @@
           "Aqours"
         ],
         "target_count": 1,
-        "action": "custom",
+        "action": "set_heart_type",
+        "heart_type": "heart04",
+        "original_value": true,
+        "self_target": false,
         "heart_colors": [
           "heart04"
-        ],
-        "original_value": true
+        ]
       }
     },
     {
@@ -36780,11 +36772,12 @@
           ]
         },
         "source": "energy_deck",
+        "destination": "under_member",
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "move_cards",
-        "destination": null
+        "action": "place_energy_under_member",
+        "energy_count": 1
       }
     },
     {
@@ -37135,9 +37128,11 @@
           {
             "text": "このカードをライブカード置き場から手札に戻す",
             "source": "live_card_zone",
+            "destination": "hand",
             "card_type": "live_card",
-            "action": "custom",
-            "self_target": true
+            "action": "move_cards",
+            "self_target": true,
+            "count": 1
           },
           {
             "text": "手札を1枚控え室に置く",

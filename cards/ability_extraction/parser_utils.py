@@ -474,6 +474,11 @@ DESTINATION_PATTERNS: List[Tuple[str, str]] = [
     ("手札に加える", "hand"),
     ("手札に加えて", "hand"),
     ("手札に置く", "hand"),
+    ("手札に戻す", "hand"),
+    ("手札に戻し", "hand"),
+    ("デッキの上に戻す", "deck_top"),
+    ("デッキの上に戻し", "deck_top"),
+    ("エネルギーデッキに戻す", "energy_deck"),
     ("ステージに置く", "stage"),
     ("ステージに登場させる", "stage"),
     ("エネルギー置き場に置く", "energy_zone"),
@@ -489,6 +494,9 @@ DESTINATION_PATTERNS: List[Tuple[str, str]] = [
     ("このメンバーの下に置く", "under_member"),
     ("このメンバーの下に置いて", "under_member"),
     ("このメンバーの下に置き", "under_member"),
+    ("登場したメンバーの下に置く", "under_member"),
+    ("登場したメンバーの下に置いて", "under_member"),
+    ("登場したメンバーの下に置き", "under_member"),
 ]
 
 STATE_CHANGE_PATTERNS: List[Tuple[str, str]] = [

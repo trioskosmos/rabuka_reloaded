@@ -2113,6 +2113,21 @@ def parse_action(text: str) -> Dict[str, Any]:
         "place_energy_under_member",
         lambda t, a: a.update({"energy_count": count or 1}),
     )
+    # Self-move under a member (e.g. "このカードを…登場したメンバーの下に置く"):
+    # no explicit source, no energy → the activating card itself moves under another member.
+    R(
+        lambda t, a: destination == "under_member"
+        and "source" not in a
+        and "エネルギー" not in t
+        and ("置く" in t or "置いて" in t),
+        "move_cards",
+        lambda t, a: a.update(
+            {
+                "self_target": True,
+                "card_type": "member_card" if "メンバー" in t else "card",
+            }
+        ),
+    )
     R(
         lambda t: "枚になるまで" in t and "引く" in t,
         "draw_until_count",
@@ -2259,6 +2274,30 @@ def parse_action(text: str) -> Dict[str, Any]:
             and "アクティブにしない" not in t,
             action="restriction",
             defaults={"restriction_type": "cannot_active", "delayed": True},
+        )
+    )
+    R(
+        ActionRule(
+            match="ウェイトしない",
+            action="restriction",
+            setter=lambda t, a: a.update(
+                {
+                    "restriction_type": (
+                        "cannot_wait_by_effect"
+                        if "効果によっては" in t
+                        else "cannot_wait"
+                    ),
+                    "target": "both"
+                    if "自分と相手" in t or "お互い" in t
+                    else "opponent"
+                    if "相手の" in t
+                    else "self"
+                    if "自分" in t
+                    else None,
+                    "card_type": "member_card" if "メンバー" in t else None,
+                    "duration": "live_end" if "ライブ終了時まで" in t else None,
+                }
+            ),
         )
     )
     R(
@@ -2614,9 +2653,13 @@ def parse_action(text: str) -> Dict[str, Any]:
         "gain_resource",
         lambda t, a: a.update({"resource": "heart", "heart_selection": True}),
     )
-    # "ハートはすべてheartXXになる" / "ハートは選んだハートになる" → set_heart_type
+    # "ハートはすべてheartXXになる" / "ハートがすべてheartXXになる" /
+    # "ハートは選んだハートになる" → set_heart_type
     R(
-        lambda t: "ハートは" in t and "になる" in t and not "ハートを" in t,
+        lambda t: ("ハートは" in t or "ハートが" in t)
+        and "になる" in t
+        and "ハートを" not in t
+        and (("すべて" in t and "{{heart_" in t) or "選んだハート" in t),
         "set_heart_type",
         lambda t, a: a.update(
             {
@@ -3614,7 +3657,11 @@ def _try_temporal_turn_phase(text):
 
 
 def _try_baton_touch(text):
-    is_teita = "とバトンタッチしていた" in text or "とバトンタッチしていて" in text
+    is_teita = (
+        "とバトンタッチしていた" in text
+        or "とバトンタッチしていて" in text
+        or "バトンタッチしていた" in text
+    )
     if not (
         "バトンタッチして登場した" in text
         or "バトンタッチして登場しており" in text
@@ -6185,6 +6232,29 @@ def _propagate(src, dst, skip_existing=False):
             dst[k] = src[k]
 
 
+def _try_yell_source_modifier(text):
+    """エールは、デッキの上から行う代わりにデッキの下から行う — modifies where the
+    player's yell draws from. The engine has no yell-source mechanic yet, so emit a
+    typed custom (rendered from raw text) instead of misreading it as a conditional
+    alternative. `custom_type`/`yell_source` let analysis tooling find this gap."""
+    if "エール" not in text or "代わりに" not in text or "行う" not in text:
+        return None
+    if "デッキの上から" not in text and "デッキの下から" not in text:
+        return None
+    if not re.search(
+        r"エール.*?代わりに.*?(デッキの[上下]から|山札の[上下]から).*?行う", text
+    ):
+        return None
+    return {
+        "text": text,
+        "action": "custom",
+        "custom_type": "yell_source_modifier",
+        "yell_source": "deck_bottom"
+        if "デッキの下から" in text or "山札の下から" in text
+        else "deck_top",
+    }
+
+
 def _try_conditional_alternative(text):
     """代わりに — conditional alternative effects."""
     if ALTERNATIVE_MARKER not in text:
@@ -8097,8 +8167,13 @@ def _try_baton_touch_effect(text):
 
 
 def _try_kore_niyori_result(text):
-    """これにより～した場合/とき — conditional on result (invalidation follow-up, discard follow-up, etc.)."""
-    if "これにより" not in text:
+    """これにより/これによって～した場合/とき — conditional on result (invalidation follow-up, discard follow-up, etc.)."""
+    marker = None
+    for m in ("これにより", "これによって"):
+        if m in text:
+            marker = m
+            break
+    if marker is None:
         return None
     # If the text contains a choice marker (以下から1つを選ぶ), the choice handler
     # should process this instead — this is a "choose from options with conditional
@@ -8107,18 +8182,18 @@ def _try_kore_niyori_result(text):
         return None
     # Support both 場合 and とき as condition markers
     cond_marker = None
-    for marker in ["場合", "とき"]:
-        m = re.search(r"これにより(.+?)" + marker, text)
-        if m:
-            cond_marker = marker
+    for m in ["場合", "とき"]:
+        mm = re.search(re.escape(marker) + r"(.+?)" + m, text)
+        if mm:
+            cond_marker = m
             break
     if cond_marker is None:
         return None
-    m = re.search(r"これにより(.+?)" + cond_marker, text)
+    m = re.search(re.escape(marker) + r"(.+?)" + cond_marker, text)
     if not m:
         return None
-    parts = text.split("これにより", 1)
-    sp = "これにより" + parts[1].strip()
+    parts = text.split(marker, 1)
+    sp = marker + parts[1].strip()
     if cond_marker not in sp:
         return None
     cp, fp = sp.split(cond_marker, 1)
@@ -8339,6 +8414,8 @@ def _set_lose_resource_fields(text, result):
         result["resource"] = "blade"
     elif "ハート" in text:
         result["resource"] = "heart"
+    if "余剰ハート" in text:
+        result["resource"] = "surplus_heart"
     blade_count = len(re.findall(r"\{\{icon_blade\.png\|ブレード\}\}", text))
     if blade_count > 0:
         result["count"] = blade_count
@@ -8346,13 +8423,22 @@ def _set_lose_resource_fields(text, result):
     if heart_count > 0:
         result["count"] = heart_count
         result["heart_colors"] = extract_heart_types(text)
+    # No resource icons: pull the count from a counter particle (e.g. "ブレードを1つ失う")
+    if result.get("count") is None:
+        cm = re.search(r"(\d+)(?:つ|個|枚)", text)
+        if cm:
+            result["count"] = int(cm.group(1))
+    if "すべて" in text or "全て" in text:
+        result["all"] = True
     if "ライブ終了時まで" in text:
         result["duration"] = "live_end"
 
 
 _try_lose_resource = EffectPattern(
-    match="を失う",
-    exclude_any=["もう一度エールを行う", "もう1度エールを行う"],
+    # "を失う" is not enough: corpus also writes "を1つ失う" (count between verb and particle).
+    condition=lambda t: re.search(r"(ブレード|ハート|余剰ハート).*?失う", t) is not None
+    and "もう一度エールを行う" not in t
+    and "もう1度エールを行う" not in t,
     action="gain_resource",
     defaults={"sign": "negative"},
     setter=_set_lose_resource_fields,
@@ -8412,20 +8498,25 @@ def _try_duration_effect(text):
 
 
 def _try_restriction_effect(text):
-    """アクティブにならない/にしない — restriction effect preventing activation.
+    """アクティブにならない/にしない/ウェイトしない — restriction preventing activation or wait.
     Matches both "効果によってはアクティブにならない" and plain "アクティブフェイズにアクティブにならない".
-    Also matches "アクティブにしない" (causative negative, e.g. 近江彼方)."""
-    if "アクティブにならない" not in text and "アクティブにしない" not in text:
+    Also matches "アクティブにしない" (causative negative, e.g. 近江彼方) and
+    "ウェイトしない" (immune to wait, e.g. choice option on 恋になりたいAQUARIUM)."""
+    has_wait = "ウェイトしない" in text
+    has_active = "アクティブにならない" in text or "アクティブにしない" in text
+    if not has_wait and not has_active:
         return None
     result = {
         "text": text,
         "action": "restriction",
-        "restriction_type": "cannot_activate",
+        "restriction_type": "cannot_wait" if has_wait else "cannot_activate",
     }
     if "アクティブフェイズ" in text:
         result["phase"] = "active_phase"
     if "効果によっては" in text:
-        result["restriction_type"] = "cannot_activate_by_effect"
+        result["restriction_type"] = (
+            "cannot_wait_by_effect" if has_wait else "cannot_activate_by_effect"
+        )
     if "自分と相手の" in text:
         result["target"] = "both"
     elif "自分の" in text:
@@ -8438,6 +8529,16 @@ def _try_restriction_effect(text):
         result["card_type"] = "member_card"
     if "エネルギー" in text:
         result["card_type"] = "energy_card"
+    # Wait-immunity targets specific members (blade count / group / original-value filters)
+    if has_wait:
+        bl = extract_blade_limit(text)
+        if bl:
+            result.update(bl)
+        gns = extract_group_names(text)
+        if gns:
+            result["group_names"] = gns
+        if "元々" in text:
+            result["original_value"] = True
     return result
 
 
@@ -8763,6 +8864,7 @@ _EFFECT_HANDLERS = [
     _try_timing_condition_gain,  # このターン中にエリアを移動した全てのX...
     _try_self_and_other,  # XとYを得る (two different targets)
     _try_per_unit,  # XにつきY (per-unit gain — restructures text)
+    _try_yell_source_modifier,  # エールはデッキの下から行う (yell-source modifier)
     _try_conditional_alternative,  # X場合Y、そうでない場合Z (if/else)
     _try_character_specific,  # 「X」のキャラ specific effect
     _try_activation_suffix,  # （この能力は...） activation conditions
