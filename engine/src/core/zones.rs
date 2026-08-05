@@ -5,15 +5,15 @@ use crate::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
-#[derive(Debug,  Clone,  Copy,  PartialEq,  Eq)]
-#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum Orientation {
     Active,
     Wait,
 }
 
-#[derive(Debug,  Clone,  Copy,  PartialEq,  Eq,  Hash)]
-#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde_support", serde(rename_all = "lowercase"))]
 pub enum MemberArea {
     LeftSide,
@@ -142,8 +142,11 @@ use crate::constants::{EMPTY_SLOT, STAGE_SIZE};
 
 // Orientation and other state tracked in GameState modifiers
 
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct Stage {
     // Rule 5.3: Stage - Where member cards are placed during Main Phase
     // Has three areas: Left Side, Center, Right Side
@@ -483,8 +486,11 @@ impl Stage {
 
 // Removed: use crate::card::parse_heart_color directly
 
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct LiveCardZone {
     // Rule 5.2: Live Card Zone - Where member and live cards are placed during Live Card Set Phase
     pub cards: SmallVec<[i16; MAX_LIVE_CARDS]>, // Card IDs - stack-allocated for up to MAX_LIVE_CARDS cards
@@ -552,7 +558,7 @@ impl LiveCardZone {
             &HashMap<i16, HashMap<crate::card::HeartColor, ModifierEntry>>,
         >,
         score_modifiers: Option<&HashMap<i16, i32>>,
-        constant_total_score_bonus: i32,
+        constant_total_score_bonus: i16,
     ) -> u8 {
         let mut total_score = 0;
 
@@ -584,7 +590,7 @@ impl LiveCardZone {
                                         *adjusted.hearts.entry_or_default(*color) =
                                             (adjusted.hearts.get(color).copied().unwrap_or(0)
                                                 as i32
-                                                + me.additive)
+                                                + me.additive as i32)
                                                 .max(0)
                                                 as u8;
                                     }
@@ -637,13 +643,16 @@ use alloc::{
     vec::Vec,
 };
 
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct EnergyZone {
     // Rule 5.1: Energy Zone - Where energy cards are placed and activated
     // Q15: Energy deck cards are face-down; energy zone cards are face-up.
     pub cards: SmallVec<[i16; MAX_ENERGY_CARDS]>,
-    pub(crate) active_energy_count: usize,
+    pub(crate) active_energy_count: u8,
 }
 
 impl Default for EnergyZone {
@@ -684,29 +693,29 @@ impl EnergyZone {
         Ok(())
     }
 
-    pub fn active_count(&self) -> usize {
+    pub fn active_count(&self) -> u8 {
         self.active_energy_count
     }
 
-    pub fn set_active_count(&mut self, count: usize) {
+    pub fn set_active_count(&mut self, count: u8) {
         self.active_energy_count = count;
     }
 
-    pub fn add_active(&mut self, delta: usize) {
+    pub fn add_active(&mut self, delta: u8) {
         self.active_energy_count = self.active_energy_count.saturating_add(delta);
     }
 
-    pub fn sub_active(&mut self, delta: usize) {
+    pub fn sub_active(&mut self, delta: u8) {
         self.active_energy_count = self.active_energy_count.saturating_sub(delta);
     }
 
     // Q56/Q138: Cost payment — full amount required; under-member energy cannot pay costs.
-    pub fn can_pay_energy(&self, amount: usize) -> bool {
+    pub fn can_pay_energy(&self, amount: u8) -> bool {
         // Rule 5.9: Check if player has enough active energy cards
         self.active_energy_count >= amount
     }
 
-    pub fn pay_energy_count(&mut self, amount: usize) -> bool {
+    pub fn pay_energy_count(&mut self, amount: u8) -> bool {
         // Rule 5.9: Pay energy by decrementing active count
         if self.active_energy_count >= amount {
             self.active_energy_count -= amount;
@@ -716,7 +725,7 @@ impl EnergyZone {
         }
     }
 
-    pub fn pay_energy(&mut self, amount: usize) -> Result<(), String> {
+    pub fn pay_energy(&mut self, amount: u8) -> Result<(), String> {
         // Rule 5.9: Pay energy by decrementing active count
         // log::debug!("pay_energy called: amount={}, active_energy_count={}", amount, self.active_energy_count);
 
@@ -737,13 +746,16 @@ impl EnergyZone {
 
     pub fn activate_all(&mut self) {
         // Set all energy cards to active state
-        self.active_energy_count = self.cards.len();
+        self.active_energy_count = self.cards.len() as u8;
         // log::debug!("Activated {} energy cards (active_energy_count={})", self.cards.len(), self.active_energy_count);
     }
 }
 
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct MainDeck {
     /// Card IDs. **Index 0 = top of deck.** Drawing/peeking reads from index 0.
     /// Pushing to the end (`cards.push()`) adds to the bottom.
@@ -795,8 +807,11 @@ impl MainDeck {
     }
 }
 
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct EnergyDeck {
     pub cards: SmallVec<[i16; 20]>,
 }
@@ -827,8 +842,11 @@ impl EnergyDeck {
     }
 }
 
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct Hand {
     // Rule 5.4: Hand - Where cards drawn from main deck are held
     pub cards: SmallVec<[i16; 7]>, // Card IDs - stack-allocated for up to 7 cards
@@ -868,8 +886,11 @@ impl Hand {
     }
 }
 
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct Waitroom {
     // Rule 5.5: Waitroom - Where used cards are placed
     // Used for refresh when main deck is empty
@@ -910,8 +931,11 @@ impl Waitroom {
     }
 }
 
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct SuccessLiveCardZone {
     // Rule 5.6: Success Live Card Zone - Where won live cards are placed
     // Victory condition: 3 cards in this zone
@@ -940,8 +964,11 @@ impl SuccessLiveCardZone {
     }
 }
 
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct ExclusionZone {
     // Rule 5.7: Exclusion Zone - Where excluded cards are placed
     pub cards: SmallVec<[i16; 10]>, // Card IDs - stack-allocated for up to 10 cards
@@ -966,8 +993,11 @@ impl ExclusionZone {
     }
 }
 
-#[derive(Debug,  Clone,  Default)]
-#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct ResolutionZone {
     // Rule 5.8: Resolution Zone - Temporary holding area for cards being resolved
     pub cards: SmallVec<[i16; 10]>, // Card IDs - stack-allocated for up to 10 cards

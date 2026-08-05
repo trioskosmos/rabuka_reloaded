@@ -29,8 +29,7 @@ fn drain_verdicts_since(_snapshot: usize) -> Vec<AbilityLogItem> {
 }
 
 use super::types::{
-    AbilityTraceNode, Choice, EffectPipeline, EffectSpawnContext, ExecutionContext, StepState,
-    ZoneSnapshot,
+    Choice, EffectPipeline, EffectSpawnContext, ExecutionContext, StepState, ZoneSnapshot,
 };
 use super::util;
 use crate::card::{Ability, AbilityEffect, CardDatabase, Condition, Keyword};
@@ -63,7 +62,7 @@ pub struct AbilityResolver {
     /// by a distinct/target_count action. Used by the saved action to exclude
     /// cards selected BEFORE the choice, without excluding the card selected
     /// BY the choice.
-    pub selected_count_at_save: Option<usize>,
+    pub selected_count_at_save: Option<u8>,
     pub pending_stage_cards: SmallVec<[(i16, String); 2]>,
     pub debug_trace: bool,
     pub pipeline: EffectPipeline,
@@ -118,10 +117,6 @@ impl AbilityResolver {
             formation_plan: SmallVec::new(),
         }
     }
-
-    /// Buffer a log text entry (goes to `rule_log` at flush time).
-    #[allow(unused)]
-    pub fn buffer_log<E: AsRef<str>>(&mut self, _gs: &GameState, _text: E) {}
 
     /// Set `pending_choice` and return `Ok(())` in one call.
     /// Replaces the repeated 2-liner:
@@ -1039,39 +1034,6 @@ impl AbilityResolver {
         }
 
         Ok(())
-    }
-
-    /// Record the start of an effect execution to the trace.
-    pub fn trace_effect_start(
-        &mut self,
-        gs: &GameState,
-        effect_name: &str,
-        card_name: Option<String>,
-    ) {
-        if !self.debug_trace {
-            return;
-        }
-        let before = ZoneSnapshot::from_game_state(gs);
-        let node = AbilityTraceNode::new(effect_name)
-            .with_card(card_name)
-            .with_before(before);
-        self.pipeline.trace.add_child(node);
-    }
-
-    /// Record the end of an effect execution (update after state in the last trace node).
-    pub fn trace_effect_end(&mut self, gs: &GameState) {
-        if !self.debug_trace {
-            return;
-        }
-        let after = ZoneSnapshot::from_game_state(gs);
-        if let Some(last_child) = self.pipeline.trace.children.last_mut() {
-            last_child.after = Some(after);
-        }
-    }
-
-    /// Get a reference to the current trace node for adding details.
-    pub fn get_trace_node(&mut self) -> &mut AbilityTraceNode {
-        &mut self.pipeline.trace
     }
 
     pub fn card_matches_type(

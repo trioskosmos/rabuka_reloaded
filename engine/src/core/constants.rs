@@ -13,8 +13,5 @@ pub const MAX_ENERGY_CARDS: usize = 12;
 /// Maximum number of cards that can be set in live card zone
 pub const MAX_LIVE_CARDS: usize = 3;
 
-/// Default maximum size for game state history (for loop detection)
-pub const DEFAULT_HISTORY_SIZE: usize = 1000;
-
 /// Victory condition: number of cards in success live card zone to win
 pub const VICTORY_CARD_COUNT: usize = 3;

@@ -20,19 +20,6 @@ fn _prohibition_destination_blocks(prohibition: &str, zone: &str) -> bool {
         || (dest_zone == Some(Zone::SuccessLiveZone) && target_zone == Some(Zone::LiveCardZone))
 }
 
-#[cfg(feature = "ds_debug")]
-extern "C" {
-    fn nds_println(text: *const u8);
-}
-#[cfg(feature = "ds_debug")]
-fn ds_print(s: &str) {
-    let mut msg = alloc::string::String::from(s);
-    msg.push('\0');
-    unsafe {
-        nds_println(msg.as_ptr());
-    }
-}
-
 impl GameState {
     fn stage_card_ids(&self) -> impl Iterator<Item = i16> + '_ {
         self.player1
@@ -681,31 +668,19 @@ impl GameState {
         trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
         triggering_member_id: Option<i16>,
     ) {
-        #[cfg(feature = "ds_debug")]
-        ds_print(&alloc::format!("TAA:cid={:?}", source_card_id));
         if let Some(ref card_no) = source_card_id {
-            #[cfg(feature = "ds_debug")]
-            ds_print("TAA:GET");
             let card_id = if let Some(cid) = explicit_card_id {
-                #[cfg(feature = "ds_debug")]
-                ds_print("TAA:DBGET");
                 Some(cid)
             } else {
                 self.find_card_by_number_for_player(card_no, &player_id).1
             };
-            #[cfg(feature = "ds_debug")]
-            ds_print("TAA:GOT");
             if let Some(cid) = card_id {
                 if let Some(card) = self.card_database.get_card(cid) {
-                    #[cfg(feature = "ds_debug")]
-                    ds_print("TAA:ITER");
                     // Check original abilities
                     let expected_id = |ability: &crate::card::Ability| -> String {
                         format!("{}_{}", card_no, ability.full_text)
                     };
                     for (ability_index, ability) in card.abilities.iter().enumerate() {
-                        #[cfg(feature = "ds_debug")]
-                        ds_print("TAA:RES");
                         if Self::ability_matches_trigger(&ability.resolve(), &trigger_type)
                             && ability_id == expected_id(&ability.resolve())
                         {
@@ -997,9 +972,9 @@ impl GameState {
             // Snapshot queue length before resolution. Entries at indices >= pre_len
             // are freshly triggered (each_time watchers) by the current resolution
             // and must be drained depth-first (§9.5.3.2→§9.5.3.1 loopback).
-            let pre_len = self
-                .depth_first_cutoff
-                .unwrap_or_else(|| self.ability_queue.len());
+            let pre_len =
+                self.depth_first_cutoff
+                    .unwrap_or_else(|| self.ability_queue.len() as u16) as usize;
             self.depth_first_cutoff = None;
 
             let available_indices: Vec<usize> = (0..pre_len)
@@ -2176,28 +2151,6 @@ impl GameState {
             || self.current_phase == Phase::SecondAttackerPerformance
     }
 
-    /// Check whether a prohibition_effects entry of the form
-    /// "restriction:cannot_place:<destination>" blocks placing in the given zone.
-    /// LiveCardZone and SuccessLiveZone are interchangeable for placement purposes.
-    fn _prohibition_destination_blocks(prohibition: &str, zone: &str) -> bool {
-        let parts: Vec<&str> = prohibition.split(':').collect();
-        if parts.len() < 3 {
-            return false;
-        }
-        let dest = parts[2];
-        if dest.is_empty() {
-            // No destination specified — assume the restriction targets the
-            // success live card zone (the most common use case for dynamic
-            // cannot_place restrictions like メビウスループ).
-            return zone == Zone::SuccessLiveZone.to_str();
-        }
-        let dest_zone = Zone::from_str(dest);
-        let target_zone = Zone::from_str(zone);
-        dest_zone == target_zone
-            || (dest_zone == Some(Zone::LiveCardZone) && target_zone == Some(Zone::SuccessLiveZone))
-            || (dest_zone == Some(Zone::SuccessLiveZone) && target_zone == Some(Zone::LiveCardZone))
-    }
-
     pub fn should_trigger_live_success(&self, player: &Player) -> bool {
         // Rule 8.3.15-8.3.16: Heart requirements gate whether the live succeeds.
         // If the live card's need_heart isn't satisfied by stage hearts, the live fails
@@ -2240,7 +2193,7 @@ impl GameState {
                                 if me.additive != 0 {
                                     *hearts.entry_or_default(*color) =
                                         (hearts.get(color).copied().unwrap_or(0) as i32
-                                            + me.additive)
+                                            + me.additive as i32)
                                             .max(0) as u8;
                                 }
                             }
@@ -2361,38 +2314,6 @@ impl GameState {
                 );
             }
         }
-    }
-
-    pub fn get_triggerable_abilities(
-        &self,
-        card: &crate::card::Card,
-        trigger: AbilityTrigger,
-        player: &Player,
-    ) -> Vec<crate::Arc<crate::card::Ability>> {
-        card.resolved_abilities()
-            .filter(|ability| {
-                // Skip abilities with null triggers - they should not auto-trigger during any phase
-                if ability.triggers.is_none() {
-                    return false;
-                }
-
-                let trigger_match = Self::ability_matches_trigger(ability, &trigger);
-                match trigger {
-                    AbilityTrigger::Activation
-                    | AbilityTrigger::Constant
-                    | AbilityTrigger::Auto => trigger_match,
-                    AbilityTrigger::Debut => {
-                        trigger_match && self.should_trigger_debut(player, card)
-                    }
-                    AbilityTrigger::LiveStart => {
-                        trigger_match && self.should_trigger_live_start(player)
-                    }
-                    AbilityTrigger::LiveSuccess => {
-                        trigger_match && self.should_trigger_live_success(player)
-                    }
-                }
-            })
-            .collect()
     }
 
     pub fn check_expired_effects(&mut self) {
@@ -2548,7 +2469,7 @@ impl GameState {
                                 .parse::<i32>()
                                 .ok()
                         }) {
-                            self.mods.remove_score_modifier(card_id, val);
+                            self.mods.remove_score_modifier(card_id, val as i16);
                             log::debug!(
                                 "Reverted gained ability score modifier +{} for card {}",
                                 val,
@@ -2668,10 +2589,6 @@ impl GameState {
         }
 
         self.game_state_history.push(state_hash);
-
-        if self.game_state_history.len() > self.max_state_history_size {
-            self.game_state_history.remove(0);
-        }
 
         false
     }

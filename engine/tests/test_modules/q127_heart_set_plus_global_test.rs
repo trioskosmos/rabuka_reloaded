@@ -670,7 +670,7 @@ fn q127_build_card_needs_set_plus_additive() {
                     if me.additive != 0 {
                         let idx = color.index();
                         let current = need[idx] as i32;
-                        need[idx] = (current + me.additive).max(0) as u32;
+                        need[idx] = (current + me.additive as i32).max(0) as u32;
                     }
                 }
             }

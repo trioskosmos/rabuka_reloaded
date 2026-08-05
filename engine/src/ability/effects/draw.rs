@@ -718,7 +718,7 @@ impl AbilityResolver {
     /// Build EffectData for a single-card resource grant (blade or heart).
     pub(crate) fn make_card_effect_data(
         card_id: i16,
-        amount: i32,
+        amount: i16,
         color: Option<&str>,
     ) -> crate::core::types::EffectData {
         crate::core::types::EffectData::SingleCard {

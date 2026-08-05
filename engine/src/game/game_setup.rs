@@ -36,8 +36,8 @@ pub fn area_label_ja(area: &str) -> &str {
     }
 }
 
-#[derive(Debug,  Clone,  Copy,  PartialEq,  Eq)]
-#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum ActionType {
     Pass,
     RockChoice,           // Q16: RPS - choose Rock
@@ -209,15 +209,21 @@ macro_rules! action_desc {
     };
 }
 
-#[derive( Clone)]
-#[cfg_attr(feature = "serde_support", derive(Serialize,  Deserialize))]
+#[derive(Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct Action {
     pub description: String,
-    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub description_ja: Option<String>,
     pub action_type: ActionType,
     pub parameters: Option<ActionParameters>,
-    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub selected: Option<bool>,
 }
 
@@ -236,8 +242,8 @@ impl Action {
     }
 }
 
-#[derive( Clone,  Debug)]
-#[cfg_attr(feature = "serde_support", derive(Serialize,  Deserialize))]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct ActionParameters {
     pub card_id: Option<i16>,      // Database card ID - reliable identifier
     pub card_index: Option<usize>, // Array position - kept for backward compatibility
@@ -248,18 +254,24 @@ pub struct ActionParameters {
     pub card_name: Option<String>,
     pub card_no: Option<String>,
     pub ability_index: Option<usize>, // Which ability on the card (for use_ability actions)
-    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub source_ability: Option<String>, // Full ability text block (for display)
     pub base_cost: Option<u8>,
     pub final_cost: Option<u8>,
     pub available_areas: Option<Vec<AreaInfo>>,
     pub double_baton_pairs: Option<Vec<DoubleBatonPair>>, // Available double baton pair+placement options
-    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub disabled: Option<bool>, // Card is visible but not selectable (greyscale)
 }
 
-#[derive( Clone,  Debug)]
-#[cfg_attr(feature = "serde_support", derive(Serialize,  Deserialize))]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct AreaInfo {
     pub area: String,
     pub available: bool,
@@ -268,8 +280,8 @@ pub struct AreaInfo {
     pub existing_member_name: Option<String>,
 }
 
-#[derive( Clone,  Debug)]
-#[cfg_attr(feature = "serde_support", derive(Serialize,  Deserialize))]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct DoubleBatonPair {
     pub areas: Vec<String>, // The 2 members to replace (e.g., ["left", "center"])
     pub placement: String,  // Where the card ends up (e.g., "left")
@@ -1216,7 +1228,9 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
     }];
 
     for (hand_index, card_id) in mulligan_player.hand.cards.iter().enumerate() {
-        let is_selected = game_state.mulligan_selected_indices.contains(&hand_index);
+        let is_selected = game_state
+            .mulligan_selected_indices
+            .contains(&(hand_index as u8));
         let card = game_state.card_database.get_card(*card_id);
         let card_name = card.map(|c| c.name.as_ref()).unwrap_or("Unknown");
         let card_no_str = card.map(|c| c.card_no.to_string()).unwrap_or_default();
@@ -1865,7 +1879,9 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
     let already_selected = game_state.live_card_selected_indices.len();
     let max_allowed = max_live_cards.max(0) as usize;
     for (hand_index, card_id) in active_player.hand.cards.iter().enumerate() {
-        let is_selected = game_state.live_card_selected_indices.contains(&hand_index);
+        let is_selected = game_state
+            .live_card_selected_indices
+            .contains(&(hand_index as u8));
         let at_limit = already_selected >= max_allowed;
         if at_limit && !is_selected {
             continue;

@@ -1,7 +1,6 @@
 use crate::ability::enums::Zone;
 use crate::ability_queue::AbilityQueue;
 use crate::card::CardDatabase;
-use crate::constants::DEFAULT_HISTORY_SIZE;
 use crate::core::game_modifiers::{CardOrientation, GameModifiers};
 use crate::player::Player;
 use crate::zones::{MemberArea, ResolutionZone};
@@ -58,12 +57,9 @@ pub struct GameState {
     pub resolution_zone: ResolutionZone,
     pub heart_color_decision_phase: String,
     /// Engine-internal loop-detection history. Skipped on the wire: the 3DS
-    /// client never runs the engine and it only inflates every state transfer
-    /// (up to 1000 × u64 ≈ 8KB) for no reason.
+    /// client never runs the engine and it only inflates every state transfer.
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub game_state_history: Vec<u64>,
-    #[cfg_attr(feature = "serde_support", serde(skip))]
-    pub max_state_history_size: usize,
     pub rule_log: Vec<String>,
     /// Engine-internal structured log. Skipped on the wire: the client's game
     /// log overlay reads `rule_log`, not this.
@@ -80,8 +76,8 @@ pub struct GameState {
     pub constant_cannot_activate_members: SmallVec<[String; 4]>,
     pub cannot_live_players: SmallVec<[String; 2]>,
     pub turn_limited_abilities_used: HashMap<(i16, usize, u8), u8>,
-    pub mulligan_selected_indices: SmallVec<[usize; 2]>,
-    pub live_card_selected_indices: SmallVec<[usize; 3]>,
+    pub mulligan_selected_indices: SmallVec<[u8; 2]>,
+    pub live_card_selected_indices: SmallVec<[u8; 3]>,
     pub auto_ability_trigger_counts: SmallVec<[(String, u8); 8]>,
     pub turn_limit_usage: SmallVec<[(String, u8); 8]>,
     pub card_instance_mapping: HashMap<i16, u8>,
@@ -103,15 +99,15 @@ pub struct GameState {
     /// `core::mem::take` at the start of each call and swapped back at the end.
     /// All skipped on the wire: transient engine-internal buffers.
     #[cfg_attr(feature = "serde_support", serde(skip))]
-    pub scratch_exp_blade: HashMap<i16, i32>,
+    pub scratch_exp_blade: HashMap<i16, i16>,
     #[cfg_attr(feature = "serde_support", serde(skip))]
-    pub scratch_exp_cost: HashMap<i16, i32>,
+    pub scratch_exp_cost: HashMap<i16, i16>,
     #[cfg_attr(feature = "serde_support", serde(skip))]
-    pub scratch_exp_score: HashMap<i16, i32>,
+    pub scratch_exp_score: HashMap<i16, i16>,
     #[cfg_attr(feature = "serde_support", serde(skip))]
-    pub scratch_exp_heart: HashMap<i16, HashMap<String, i32>>,
+    pub scratch_exp_heart: HashMap<i16, HashMap<String, i16>>,
     #[cfg_attr(feature = "serde_support", serde(skip))]
-    pub scratch_entry_positions: HashMap<i16, Option<usize>>,
+    pub scratch_entry_positions: HashMap<i16, Option<u8>>,
     pub negated_abilities: SmallVec<[i16; 8]>,
     pub replacement_effects: SmallVec<[ReplacementEffect; 2]>,
     pub constant_ability_statuses: SmallVec<[crate::types::ConstantAbilityStatus; 6]>,
@@ -160,7 +156,7 @@ pub struct GameState {
     /// (card_id, from_state, to_state). Cleared after post-resolution TAS scan.
     pub recently_state_changed: SmallVec<[(i16, String, String); 2]>,
     pub debut_ability_triggers: SmallVec<[(String, i16); 4]>,
-    pub last_vacated_stage_area: Option<usize>,
+    pub last_vacated_stage_area: Option<u8>,
     // --- 4-byte aligned (u8, Option<i32>) ---
     pub turn_number: u8,
     pub live_cheer_count: u8,
@@ -203,7 +199,7 @@ pub struct GameState {
     /// are newly-triggered (each_time watchers) and must be force-resolved before
     /// stale entries are offered to the player. Set by process_player_abilities and
     /// resume_queue_with_choice before calling process_current_ability.
-    pub depth_first_cutoff: Option<usize>,
+    pub depth_first_cutoff: Option<u16>,
     // --- 1-byte aligned (bool, enum) ---
     pub rps_winner: Option<u8>,
     pub current_turn_phase: TurnPhase,
@@ -356,7 +352,6 @@ impl GameState {
             resolution_zone: ResolutionZone::new(),
             heart_color_decision_phase: "none".to_string(),
             game_state_history: Vec::new(),
-            max_state_history_size: DEFAULT_HISTORY_SIZE,
             rule_log: Vec::new(),
             structured_log: Vec::new(),
             turn1_abilities_played: SmallVec::new(),
@@ -882,7 +877,7 @@ impl GameState {
         effect_type: &str,
         target_card_id: i16,
         heart_color: Option<u8>,
-        amount: i32,
+        amount: i16,
     ) {
         self.ability_applications
             .push(crate::types::AbilityApplication {

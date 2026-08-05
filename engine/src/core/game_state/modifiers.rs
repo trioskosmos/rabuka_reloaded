@@ -50,7 +50,7 @@ impl GameState {
         exp_heart.clear();
         let mut exp_prohibition: Vec<String> = Vec::new();
         self.constant_cannot_activate_members.clear();
-        let mut exp_global_need_heart: Vec<(i16, String, i32)> = Vec::new();
+        let mut exp_global_need_heart: Vec<(i16, String, i16)> = Vec::new();
         let mut p1_constant_score_bonus: i32 = 0;
         let mut p2_constant_score_bonus: i32 = 0;
         let mut jyouji_statuses: Vec<crate::types::ConstantAbilityStatus> = Vec::new();
@@ -60,12 +60,12 @@ impl GameState {
         entry_positions.clear();
         for (pos, &cid) in self.player1.stage.stage.iter().enumerate() {
             if cid != -1 {
-                entry_positions.insert(cid, Some(pos));
+                entry_positions.insert(cid, Some(pos as u8));
             }
         }
         for (pos, &cid) in self.player2.stage.stage.iter().enumerate() {
             if cid != -1 {
-                entry_positions.entry(cid).or_insert(Some(pos));
+                entry_positions.entry(cid).or_insert(Some(pos as u8));
             }
         }
         tdbg!("RC:4 ENTRY_POSITIONS_DONE count={}", entry_positions.len());
@@ -198,7 +198,7 @@ impl GameState {
                                                 .unwrap_or(effect.count_any().unwrap_or(1))
                                                 as i32
                                         };
-                                        *exp_blade.entry(card_id).or_insert(0) += n;
+                                        *exp_blade.entry(card_id).or_insert(0) += n as i16;
                                     }
                                     "heart" | "ハート" => {
                                         let n = if effect.per_unit_any().unwrap_or(false) {
@@ -244,14 +244,14 @@ impl GameState {
                                                 .entry(card_id)
                                                 .or_default()
                                                 .entry("heart00".to_string())
-                                                .or_insert(0) += n;
+                                                .or_insert(0) += n as i16;
                                         } else {
                                             for hc in effect.heart_colors_any() {
                                                 *exp_heart
                                                     .entry(card_id)
                                                     .or_default()
                                                     .entry(hc.clone())
-                                                    .or_insert(0) += n;
+                                                    .or_insert(0) += n as i16;
                                             }
                                         }
                                     }
@@ -260,18 +260,18 @@ impl GameState {
                             }
                             crate::ability::enums::ActionType::ModifyScore => {
                                 let sv = effect.value_any().unwrap_or(0) as i32;
-                                *exp_score.entry(card_id).or_insert(0) += sv;
+                                *exp_score.entry(card_id).or_insert(0) += sv as i16;
                                 if sv != 0 {
                                     self.mods.constant_score_sources.push((
                                         card_id,
                                         effect.text.to_string(),
-                                        sv,
+                                        sv as i16,
                                     ));
                                 }
                             }
                             crate::ability::enums::ActionType::ModifyCost => {
                                 *exp_cost.entry(card_id).or_insert(0) +=
-                                    effect.value_any().unwrap_or(0) as i32;
+                                    effect.value_any().unwrap_or(0) as i16;
                             }
                             crate::ability::enums::ActionType::Restriction => {
                                 if let Some(rt) = effect.restriction_type_any() {
@@ -348,7 +348,7 @@ impl GameState {
                                         .entry(card_id)
                                         .or_default()
                                         .entry("all".to_string())
-                                        .or_insert(0) += 1i32;
+                                        .or_insert(0) += 1i16;
                                 } else if let Some(gain_text) = effect.ability_gain_any().as_deref()
                                 {
                                     // Determine which player this card belongs to
@@ -374,7 +374,7 @@ impl GameState {
                                                 self.mods.constant_score_sources.push((
                                                     card_id,
                                                     gain_text.to_string(),
-                                                    val,
+                                                    val as i16,
                                                 ));
                                             }
                                         } else if action
@@ -403,7 +403,7 @@ impl GameState {
                                                 self.mods.constant_score_sources.push((
                                                     card_id,
                                                     gain_text.to_string(),
-                                                    val,
+                                                    val as i16,
                                                 ));
                                             }
                                         }
@@ -440,7 +440,7 @@ impl GameState {
                                         exp_global_need_heart.push((
                                             *card_id,
                                             color.clone(),
-                                            delta,
+                                            delta as i16,
                                         ));
                                     }
                                 }
@@ -464,7 +464,7 @@ impl GameState {
                                                         .resource_icon_count_any()
                                                         .unwrap_or(sub.count.unwrap_or(1))
                                                         as i32;
-                                                    *exp_blade.entry(card_id).or_insert(0) += n;
+                                                    *exp_blade.entry(card_id).or_insert(0) += n as i16;
                                                 }
                                                 "heart" | "ハート" => {
                                                     let n = sub.count.unwrap_or(1) as i32;
@@ -473,7 +473,7 @@ impl GameState {
                                                             .entry(card_id)
                                                             .or_default()
                                                             .entry(hc.clone())
-                                                            .or_insert(0) += n;
+                                                            .or_insert(0) += n as i16;
                                                     }
                                                 }
                                                 _ => {}
@@ -501,10 +501,10 @@ impl GameState {
         tdbg!("RC:7 BLADE");
         let old_blade = core::mem::take(&mut self.mods.constant_blade_bonuses);
         for (cid, val) in &old_blade {
-            self.mods.remove_blade_modifier(*cid, *val);
+            self.mods.remove_blade_modifier(*cid, *val as i16);
         }
         for (&cid, &val) in &exp_blade {
-            self.mods.add_blade_modifier(cid, val);
+            self.mods.add_blade_modifier(cid, val as i16);
         }
         self.mods.constant_blade_bonuses = exp_blade;
         self.scratch_exp_blade = old_blade;
@@ -513,10 +513,10 @@ impl GameState {
         tdbg!("RC:8 COST");
         let old_cost = core::mem::take(&mut self.mods.constant_cost_bonuses);
         for (cid, val) in &old_cost {
-            self.mods.remove_cost_modifier(*cid, *val);
+            self.mods.remove_cost_modifier(*cid, *val as i16);
         }
         for (&cid, &val) in &exp_cost {
-            self.mods.add_cost_modifier(cid, val);
+            self.mods.add_cost_modifier(cid, val as i16);
         }
         self.mods.constant_cost_bonuses = exp_cost;
         self.scratch_exp_cost = old_cost;
@@ -525,17 +525,17 @@ impl GameState {
         tdbg!("RC:9 SCORE");
         let old_score = core::mem::take(&mut self.mods.constant_score_bonuses);
         for (cid, val) in &old_score {
-            self.mods.remove_score_modifier(*cid, *val);
+            self.mods.remove_score_modifier(*cid, *val as i16);
         }
         for (&cid, &val) in &exp_score {
-            self.mods.add_score_modifier(cid, val);
+            self.mods.add_score_modifier(cid, val as i16);
         }
         self.mods.constant_score_bonuses = exp_score;
         self.scratch_exp_score = old_score;
 
         // Per-player global score bonus (from GainAbility modify_score)
-        self.mods.p1_constant_total_score_bonus = p1_constant_score_bonus;
-        self.mods.p2_constant_total_score_bonus = p2_constant_score_bonus;
+        self.mods.p1_constant_total_score_bonus = p1_constant_score_bonus as i16;
+        self.mods.p2_constant_total_score_bonus = p2_constant_score_bonus as i16;
 
         // Heart — clear old constant heart modifiers first, then re-apply new ones.
         tdbg!("RC:10 HEART");
@@ -545,7 +545,7 @@ impl GameState {
             for (cid, cols) in &old_heart {
                 for (color_str, &delta) in cols {
                     let hc = crate::card::parse_heart_color(color_str);
-                    self.mods.remove_heart_modifier(*cid, hc, delta);
+                    self.mods.remove_heart_modifier(*cid, hc, delta as i16);
                 }
             }
             self.scratch_exp_heart = old_heart;
@@ -553,7 +553,7 @@ impl GameState {
         for (cid, cols) in &exp_heart {
             for (color_str, delta) in cols {
                 let hc = crate::card::parse_heart_color(color_str);
-                self.mods.add_heart_modifier(*cid, hc, *delta);
+                self.mods.add_heart_modifier(*cid, hc, *delta as i16);
             }
         }
         self.mods.constant_heart_bonuses = exp_heart;
@@ -573,11 +573,13 @@ impl GameState {
         let old_global_nh = core::mem::take(&mut self.mods.constant_global_need_heart);
         for (card_id, color_str, delta) in &old_global_nh {
             let hc = crate::card::parse_heart_color(color_str);
-            self.mods.add_need_heart_modifier(*card_id, hc, -*delta);
+            self.mods
+                .add_need_heart_modifier(*card_id, hc, -*delta as i16);
         }
         for (card_id, color_str, delta) in &exp_global_need_heart {
             let hc = crate::card::parse_heart_color(color_str);
-            self.mods.add_need_heart_modifier(*card_id, hc, *delta);
+            self.mods
+                .add_need_heart_modifier(*card_id, hc, *delta as i16);
         }
         self.mods.constant_global_need_heart = exp_global_need_heart;
         tdbg!("RC:12b GLOBAL_NEED_HEART_DONE");
@@ -614,7 +616,7 @@ impl GameState {
             })
             .collect();
 
-        let mut expected: HashMap<i16, i32> = HashMap::default();
+        let mut expected: HashMap<i16, i16> = HashMap::default();
         {
             let ctx = crate::ability::condition::ConditionContext::new(self);
             for &(cid, ability_idx) in &blade_ids {
@@ -677,17 +679,17 @@ impl GameState {
                             .unwrap_or(effect.count_any().unwrap_or(1))
                             as i32
                     };
-                    *expected.entry(cid).or_insert(0) += count;
+                    *expected.entry(cid).or_insert(0) += count as i16;
                 }
             }
         }
 
         let old_bonuses = core::mem::take(&mut self.mods.constant_blade_bonuses);
         for (cid, old) in &old_bonuses {
-            self.mods.remove_blade_modifier(*cid, *old);
+            self.mods.remove_blade_modifier(*cid, *old as i16);
         }
         for (&cid, &new_val) in &expected {
-            self.mods.add_blade_modifier(cid, new_val);
+            self.mods.add_blade_modifier(cid, new_val as i16);
         }
         self.mods.constant_blade_bonuses = expected;
         self.recalculate_constant_cost_modifiers();
@@ -710,7 +712,7 @@ impl GameState {
         stage_ids: &[(i16, usize)],
         hand_ids: &[(i16, usize)],
     ) {
-        let mut expected: HashMap<i16, i32> = HashMap::default();
+        let mut expected: HashMap<i16, i16> = HashMap::default();
         {
             let ctx = crate::ability::condition::ConditionContext::new(self);
             // Chain stage and hand ability IDs, look up each effect, filter to ModifyCost
@@ -801,10 +803,10 @@ impl GameState {
                     let op_str = effect.operation_any().unwrap_or("add");
                     let op = op_str;
                     match op {
-                        "add" => *expected.entry(cid).or_insert(0) += value,
-                        "subtract" => *expected.entry(cid).or_insert(0) -= value,
+                        "add" => *expected.entry(cid).or_insert(0) += value as i16,
+                        "subtract" => *expected.entry(cid).or_insert(0) -= value as i16,
                         "set" => {
-                            expected.insert(cid, value);
+                            expected.insert(cid, value as i16);
                         }
                         _ => {}
                     }
@@ -814,10 +816,10 @@ impl GameState {
 
         let old_bonuses = core::mem::take(&mut self.mods.constant_cost_bonuses);
         for (cid, old) in &old_bonuses {
-            self.mods.remove_cost_modifier(*cid, *old);
+            self.mods.remove_cost_modifier(*cid, *old as i16);
         }
         for (&cid, &new_val) in &expected {
-            self.mods.add_cost_modifier(cid, new_val);
+            self.mods.add_cost_modifier(cid, new_val as i16);
         }
         self.mods.constant_cost_bonuses = expected;
     }
@@ -1287,7 +1289,7 @@ impl GameState {
         // ── Clear previously-applied success zone bonuses ──
         let old_sz_blade = core::mem::take(&mut self.mods.success_zone_blade_bonuses);
         for (cid, val) in &old_sz_blade {
-            self.mods.remove_blade_modifier(*cid, *val);
+            self.mods.remove_blade_modifier(*cid, *val as i16);
         }
         let old_sz_heart = core::mem::take(&mut self.mods.success_zone_heart_bonuses);
         for (cid, cols) in &old_sz_heart {
@@ -1298,7 +1300,7 @@ impl GameState {
         }
         let old_sz_score = core::mem::take(&mut self.mods.success_zone_score_bonuses);
         for (cid, val) in &old_sz_score {
-            self.mods.remove_score_modifier(*cid, *val);
+            self.mods.remove_score_modifier(*cid, *val as i16);
         }
 
         // Track non-stackable effects locally so they are reset each evaluation
@@ -1512,12 +1514,12 @@ impl GameState {
                                     target_id
                                 );
                             }
-                            self.mods.add_blade_modifier(target_id, amount);
+                            self.mods.add_blade_modifier(target_id, amount as i16);
                             *self
                                 .mods
                                 .success_zone_blade_bonuses
                                 .entry(target_id)
-                                .or_insert(0) += amount;
+                                .or_insert(0) += amount as i16;
                         }
                     }
                     "heart" | "ハート" => {
@@ -1529,14 +1531,14 @@ impl GameState {
                         for &target_id in &candidates {
                             for color_str in &heart_colors {
                                 let hc = crate::card::parse_heart_color(color_str);
-                                self.mods.add_heart_modifier(target_id, hc, amount);
+                                self.mods.add_heart_modifier(target_id, hc, amount as i16);
                                 *self
                                     .mods
                                     .success_zone_heart_bonuses
                                     .entry(target_id)
                                     .or_default()
                                     .entry(color_str.clone())
-                                    .or_insert(0) += amount;
+                                    .or_insert(0) += amount as i16;
                             }
                         }
                     }
@@ -1567,18 +1569,18 @@ impl GameState {
                 for &target_id in &targets {
                     match op {
                         "set" => {
-                            self.mods.set_score_modifier(target_id, value);
+                            self.mods.set_score_modifier(target_id, value as i16);
                             self.mods
                                 .success_zone_score_bonuses
-                                .insert(target_id, value);
+                                .insert(target_id, value as i16);
                         }
                         _ => {
-                            self.mods.add_score_modifier(target_id, value);
+                            self.mods.add_score_modifier(target_id, value as i16);
                             *self
                                 .mods
                                 .success_zone_score_bonuses
                                 .entry(target_id)
-                                .or_insert(0) += value;
+                                .or_insert(0) += value as i16;
                         }
                     }
                 }

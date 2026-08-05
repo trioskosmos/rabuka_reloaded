@@ -640,8 +640,8 @@ impl AbilityResolver {
                         .energy_zone
                         .cards
                         .len()
-                        .saturating_sub(player.energy_zone.active_count()),
-                    _ => player.energy_zone.active_count(),
+                        .saturating_sub(player.energy_zone.active_count() as usize),
+                    _ => player.energy_zone.active_count() as usize,
                 };
                 let capped = (count as usize).min(available) as u8;
                 log::debug!(
@@ -657,8 +657,8 @@ impl AbilityResolver {
                         .energy_zone
                         .cards
                         .len()
-                        .saturating_sub(player.energy_zone.active_count()),
-                    _ => player.energy_zone.active_count(),
+                        .saturating_sub(player.energy_zone.active_count() as usize),
+                    _ => player.energy_zone.active_count() as usize,
                 };
                 log::debug!("[ENERGY] count=0 (all): effective={}", val);
                 val as u8
@@ -762,7 +762,7 @@ impl AbilityResolver {
                     gs.mods.add_orientation_modifier(*card_id, "active");
                 }
                 let player = gs.resolve_target_player_mut(target);
-                player.energy_zone.add_active(active_cards.len());
+                player.energy_zone.add_active(active_cards.len() as u8);
             }
             _ => {}
         }
@@ -817,7 +817,7 @@ impl AbilityResolver {
         gs.rule_log
             .push(format!("{} {}: [[log_set_cost]]", pp, act_name));
         for card_id in card_ids {
-            gs.mods.set_cost_modifier(card_id, value as i32);
+            gs.mods.set_cost_modifier(card_id, value as i16);
         }
     }
 
@@ -1081,7 +1081,7 @@ impl AbilityResolver {
             }
         }
         for &card_id in &stage_cards {
-            gs.mods.set_blade_modifier(card_id, value as i32);
+            gs.mods.set_blade_modifier(card_id, value as i16);
             // Register for cleanup at live end / duration expiry
             if effect.duration_any().is_some() {
                 util::push_temporary_effect(
@@ -1162,7 +1162,7 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         let card_id = self.activating_card_id.or(gs.activating_card);
         if let Some(card_id) = card_id {
-            gs.mods.set_cost_modifier(card_id, value as i32);
+            gs.mods.set_cost_modifier(card_id, value as i16);
         }
         let pp = self.player_prefix(gs);
         let act_name = gs
@@ -1260,9 +1260,9 @@ impl AbilityResolver {
             }
         }
         let delta = match operation {
-            "add" => value as i32,
-            "subtract" => -(value as i32),
-            "set" => value as i32,
+            "add" => value as i16,
+            "subtract" => -(value as i16),
+            "set" => value as i16,
             _ => {
                 log::debug!("Unknown operation: {}", operation);
                 return;

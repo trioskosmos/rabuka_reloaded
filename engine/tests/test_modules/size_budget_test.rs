@@ -19,7 +19,7 @@ fn hot_struct_size_budget() {
     println!("=== HOT STRUCT SIZES (default features, 64-bit) ===");
     let _ = size_of::<GameModifiers>();
 
-    let mut rows: Vec<(&str, usize, usize)> = vec![
+    let rows: Vec<(&str, usize, usize)> = vec![
         ("AbilityQueueEntry", size_of::<AbilityQueueEntry>(), 700),
         ("AbilityResolver", size_of::<AbilityResolver>(), 2200),
         (

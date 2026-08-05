@@ -5,7 +5,7 @@ fn setup_baton_touch_scenario(
     game: &mut TestGame,
     niji_card: i16,
     arriving_card: i16,
-) -> (usize, usize) {
+) -> (usize, u8) {
     // Add energy cards (inactive, available for activation effect)
     for _ in 0..5 {
         let e = game.new_id("LL-E-001-SD");
@@ -58,7 +58,7 @@ fn niji_bp5_partner_cost10_noblade_energizes_2() {
     let final_energy_active = game.state.player1.energy_zone.active_count();
 
     assert!(
-        final_energy_active >= initial_energy_active + 2,
+        final_energy_active >= initial_energy_active + 2u8,
         "Partner cost=10 no blade → should activate 2 energy (was {}, now {})",
         initial_energy_active,
         final_energy_active
@@ -81,7 +81,7 @@ fn niji_bp5_partner_cost15_noblade_energizes_2_and_draws_1() {
     let final_hand = game.state.player1.hand.cards.len();
 
     assert!(
-        final_energy_active >= initial_energy_active + 2,
+        final_energy_active >= initial_energy_active + 2u8,
         "Partner cost=15 no blade → should activate 2 energy (was {}, now {})",
         initial_energy_active,
         final_energy_active

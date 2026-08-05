@@ -7,19 +7,6 @@ use alloc::{
     vec::Vec,
 };
 
-#[cfg(feature = "ds_debug")]
-extern "C" {
-    fn nds_println(text: *const u8);
-}
-#[cfg(feature = "ds_debug")]
-fn ds_print(s: &str) {
-    let mut msg = alloc::string::String::from(s);
-    msg.push('\0');
-    unsafe {
-        nds_println(msg.as_ptr());
-    }
-}
-
 impl super::TurnEngine {
     pub(crate) fn trigger_debut_abilities(
         game_state: &mut GameState,
@@ -78,14 +65,8 @@ impl super::TurnEngine {
                             card_no_clone
                         );
                         if card.card_no.as_ref() == card_no_clone {
-                            #[cfg(feature = "ds_debug")]
-                            ds_print("TD:FOUND");
                             for (ability_index, ar) in card.abilities.iter().enumerate() {
-                                #[cfg(feature = "ds_debug")]
-                                ds_print("TD:RESOLVE");
                                 let ability = ar.resolve();
-                                #[cfg(feature = "ds_debug")]
-                                ds_print("TD:DONE");
                                 let trigger_match = ability.triggers.as_ref().is_some_and(|t| {
                                     t.contains(crate::triggers::DEBUT)
                                         || t.contains(crate::triggers::DEBUT_EN)
@@ -149,8 +130,6 @@ impl super::TurnEngine {
                                         card_no_clone.clone(),
                                         card_id,
                                     ));
-                                    #[cfg(feature = "ds_debug")]
-                                    ds_print("TD:PUSH");
                                 }
                             }
                             break;
@@ -160,12 +139,8 @@ impl super::TurnEngine {
             }
         }
 
-        #[cfg(feature = "ds_debug")]
-        ds_print("TD:TRIG");
         let moved_snapshot = game_state.recently_moved_cards.clone();
         for (ability_id, card_no, stage_card_id) in abilities_to_trigger {
-            #[cfg(feature = "ds_debug")]
-            ds_print("TD:CALL");
             game_state.trigger_auto_ability(
                 ability_id,
                 AbilityTrigger::Debut,
@@ -175,44 +150,7 @@ impl super::TurnEngine {
                 moved_snapshot.clone(),
                 None,
             );
-            #[cfg(feature = "ds_debug")]
-            ds_print("TD:CALLDONE");
         }
-        #[cfg(feature = "ds_debug")]
-        ds_print("TD:DONE");
-    }
-
-    /// Count how many stage members have an ability with a trigger containing the given substring.
-    pub fn count_stage_members_with_trigger(
-        game_state: &GameState,
-        player_id: &str,
-        trigger_substring: &str,
-    ) -> u8 {
-        let player = if player_id == game_state.player1.id {
-            &game_state.player1
-        } else {
-            &game_state.player2
-        };
-        let mut count = 0u8;
-        for &cid in &player.stage.stage {
-            if cid == -1 {
-                continue;
-            }
-            if let Some(card) = game_state.card_database.get_card(cid) {
-                for ar in &card.abilities {
-                    let ability = ar.resolve();
-                    if ability
-                        .triggers
-                        .as_ref()
-                        .is_some_and(|t| t.contains(trigger_substring))
-                    {
-                        count += 1;
-                        break; // count each member once
-                    }
-                }
-            }
-        }
-        count
     }
 
     fn is_trigger_suppressed(game_state: &GameState, player_id: &str, trigger_name: &str) -> bool {
@@ -457,11 +395,6 @@ impl super::TurnEngine {
         log::debug!("[AUTO_TRIGGER] checking stage for player {}", player_id);
         // Delegate to GameState's method, which handles the scan + enqueue
         game_state.trigger_auto_abilities_for_player(player_id);
-    }
-
-    pub fn trigger_and_process_auto_abilities(game_state: &mut GameState, player_id: &str) {
-        Self::trigger_auto_abilities_for_player(game_state, player_id);
-        game_state.process_pending_auto_abilities(player_id);
     }
 
     pub fn trigger_live_success_abilities(game_state: &mut GameState, player_id: &str) {

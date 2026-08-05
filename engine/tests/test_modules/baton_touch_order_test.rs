@@ -8,7 +8,7 @@ fn fill_deck(game: &mut TestGame) {
     }
 }
 
-fn active_energy(g: &TestGame) -> usize {
+fn active_energy(g: &TestGame) -> u8 {
     g.state.player1.energy_zone.active_count()
 }
 

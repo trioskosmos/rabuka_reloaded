@@ -941,7 +941,7 @@ fn setup_wien(game: &mut TestGame, p1_rem: usize, _p1_active: usize, p2_total: u
     for _ in 0..p2_total {
         game.state.player2.energy_zone.cards.push(filler);
     }
-    game.state.player2.energy_zone.set_active_count(p2_total);
+    game.state.player2.energy_zone.set_active_count(p2_total as u8);
     game.play_to_stage(wien_id, rabuka_engine::zones::MemberArea::Center);
     wien_id
 }

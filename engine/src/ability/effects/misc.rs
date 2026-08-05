@@ -286,14 +286,14 @@ impl AbilityResolver {
         is_temporary: bool,
         effect_data: &mut Option<crate::core::types::EffectData>,
         heart_color_str: &Option<String>,
-        heart_to_add: i32,
+        heart_to_add: i16,
         effect_text: &str,
     ) {
         for &(color, dist_count) in heart_distribution {
             let dist_amount = if is_negative {
-                -(dist_count as i32)
+                -(dist_count as i16)
             } else {
-                dist_count as i32
+                dist_count as i16
             };
             gs.mods.add_heart_modifier_with_trace(
                 card_id,
@@ -309,7 +309,7 @@ impl AbilityResolver {
                 let items: Vec<crate::core::types::CardEffectItem> = heart_distribution
                     .iter()
                     .map(|&(c, dc)| {
-                        let amount = if is_negative { -(dc as i32) } else { dc as i32 };
+                        let amount = if is_negative { -(dc as i16) } else { dc as i16 };
                         crate::core::types::CardEffectItem {
                             card_id,
                             amount,
@@ -731,7 +731,7 @@ impl AbilityResolver {
                 }
             });
             if let Some(card_id) = card_id {
-                let amount = effect.count_or(1) as i32;
+                let amount = effect.count_or(1) as i16;
                 gs.mods.add_heart_modifier_with_trace(
                     card_id,
                     crate::card::HeartColor::All,
@@ -1011,7 +1011,7 @@ impl AbilityResolver {
                     .collect();
                 let mut saved = effect.clone();
                 saved.set_target_count(None);
-                self.selected_count_at_save = Some(self.selected_cards.len());
+                self.selected_count_at_save = Some(self.selected_cards.len() as u8);
                 let mut pending = gs.ability_queue.take_pending_actions();
                 pending.insert(0, saved);
                 gs.ability_queue.set_pending_actions(pending);
@@ -1125,9 +1125,9 @@ impl AbilityResolver {
                 && !all_selected.is_empty()
             {
                 if let Some(save_len) = self.selected_count_at_save {
-                    if save_len < all_selected.len() {
+                    if (save_len as usize) < all_selected.len() {
                         let prev: SmallVec<[i16; 8]> =
-                            all_selected[..save_len].iter().copied().collect();
+                            all_selected[..save_len as usize].iter().copied().collect();
                         if !prev.is_empty() {
                             Some(prev)
                         } else {
@@ -1300,8 +1300,8 @@ impl AbilityResolver {
                     // Saved action from distinct choice: target only the
                     // NEWLY selected cards (after the pre-choice save point).
                     if let Some(save_len) = self.selected_count_at_save {
-                        if save_len < selected_for_current.len() {
-                            selected_for_current[save_len..].to_vec()
+                        if (save_len as usize) < selected_for_current.len() {
+                            selected_for_current[save_len as usize..].to_vec()
                         } else {
                             selected_for_current
                         }
@@ -1402,14 +1402,14 @@ impl AbilityResolver {
         let mut effect_data: Option<crate::core::types::EffectData> = None;
         let is_negative = sign == Some("negative");
         let blades_to_add = if is_negative {
-            -(final_count as i32)
+            -(final_count as i16)
         } else {
-            final_count as i32
+            final_count as i16
         };
         let heart_to_add = if is_negative {
-            -(final_count as i32)
+            -(final_count as i16)
         } else {
-            final_count as i32
+            final_count as i16
         };
         let heart_color_val =
             crate::card::parse_heart_color(heart_color_str.as_deref().unwrap_or("heart00"));
@@ -1460,9 +1460,9 @@ impl AbilityResolver {
                 if resource == "heart" || resource == "ハート" {
                     for (color, color_amount) in &heart_distribution {
                         let amount = if is_negative {
-                            -(*color_amount as i32)
+                            -(*color_amount as i16)
                         } else {
-                            *color_amount as i32
+                            *color_amount as i16
                         };
                         gs.mods.add_heart_modifier_with_trace(
                             card_id,
@@ -1479,7 +1479,7 @@ impl AbilityResolver {
                             let color_name = format!("{:?}", color).to_lowercase();
                             items.push(crate::core::types::CardEffectItem {
                                 card_id,
-                                amount: *color_amount as i32,
+                                amount: *color_amount as i16,
                                 color: Some(color_name),
                             });
                         }
@@ -1754,9 +1754,9 @@ impl AbilityResolver {
                     }
                     for &(color, dist_count) in &heart_distribution {
                         let dist_amount = if is_negative {
-                            -(dist_count as i32)
+                            -(dist_count as i16)
                         } else {
-                            dist_count as i32
+                            dist_count as i16
                         };
                         gs.mods.add_heart_modifier_with_trace(
                             card_id,
@@ -1775,7 +1775,7 @@ impl AbilityResolver {
                             .iter()
                             .flat_map(|&cid| {
                                 heart_distribution.iter().map(move |&(c, dc)| {
-                                    let amount = if is_negative { -(dc as i32) } else { dc as i32 };
+                                    let amount = if is_negative { -(dc as i16) } else { dc as i16 };
                                     crate::core::types::CardEffectItem {
                                         card_id: cid,
                                         amount,
@@ -1808,7 +1808,7 @@ impl AbilityResolver {
                 .iter()
                 .map(|&cid| crate::core::types::CardEffectItem {
                     card_id: cid,
-                    amount: final_count as i32,
+                    amount: final_count as i16,
                     color: None,
                 })
                 .collect();
@@ -2009,7 +2009,7 @@ impl AbilityResolver {
         if energy_cards.is_empty() {
             return;
         }
-        player.energy_zone.sub_active(energy_cards.len());
+        player.energy_zone.sub_active(energy_cards.len() as u8);
         let target_index = match position.and_then(|p| p.get_position()) {
             Some("center") | Some("中央") => 1,
             Some("left") | Some("左側") => 0,
@@ -3438,7 +3438,7 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         if count > 0 {
             let player = gs.resolve_target_player_mut(target);
-            player.energy_zone.pay_energy(count as usize)?;
+            player.energy_zone.pay_energy(count)?;
         }
         let pp = self.player_prefix(gs);
         let act_name = gs

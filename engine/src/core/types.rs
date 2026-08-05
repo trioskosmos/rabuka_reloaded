@@ -219,7 +219,7 @@ pub enum Duration {
 )]
 pub struct CardEffectItem {
     pub card_id: i16,
-    pub amount: i32,
+    pub amount: i16,
     #[cfg_attr(
         feature = "serde_support",
         serde(default, skip_serializing_if = "Option::is_none")
@@ -244,7 +244,7 @@ pub enum EffectData {
     },
     SingleCard {
         card_id: i16,
-        amount: i32,
+        amount: i16,
         #[cfg_attr(
             feature = "serde_support",
             serde(default, skip_serializing_if = "Option::is_none")
@@ -255,7 +255,7 @@ pub enum EffectData {
         items: Vec<CardEffectItem>,
     },
     AllCards {
-        amount: i32,
+        amount: i16,
     },
     SetBladeCount {
         card_id: i16,
@@ -330,7 +330,7 @@ impl EffectData {
         }
     }
 
-    pub fn amount(&self) -> Option<i32> {
+    pub fn amount(&self) -> Option<i16> {
         match self {
             EffectData::SingleCard { amount, .. } => Some(*amount),
             EffectData::AllCards { amount } => Some(*amount),
@@ -343,7 +343,7 @@ impl EffectData {
 
 pub struct CardEffectItemRef<'a> {
     pub card_id: i16,
-    pub amount: i32,
+    pub amount: i16,
     pub color: Option<&'a str>,
 }
 
@@ -845,7 +845,7 @@ pub struct AbilityApplication {
     pub effect_type: EffectType,
     pub target_card_id: i16,
     pub heart_color: Option<u8>,
-    pub amount: i32,
+    pub amount: i16,
 }
 
 #[derive(Debug, Clone)]
@@ -871,7 +871,7 @@ pub struct Adjustment {
     #[cfg_attr(feature = "serde_support", serde(rename = "type"))]
     pub adjustment_type: AdjustmentType,
     pub desc: String,
-    pub value: i32,
+    pub value: i16,
     pub color: u8,
     pub source: String,
 }

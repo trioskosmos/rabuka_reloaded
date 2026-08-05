@@ -69,7 +69,7 @@ fn hanamaru_constant_cost_per_success_card() {
     let expected_cost = base_cost + 1;
     assert!(
         game.state.player1.energy_zone.active_count()
-            <= (base_cost as usize + 5) - expected_cost as usize,
+            <= ((base_cost as u8) + 5) - expected_cost as u8,
         "Should consume base + 1 energy (success_live_zone card increases cost)"
     );
 }
@@ -378,7 +378,7 @@ fn wien_energy_setup(energy_count: usize) -> (TestGame, i16) {
     game.state
         .player1
         .energy_zone
-        .set_active_count(energy_count);
+        .set_active_count(energy_count as u8);
 
     (game, wien)
 }

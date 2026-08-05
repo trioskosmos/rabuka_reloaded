@@ -671,7 +671,7 @@ impl super::TurnEngine {
                 // process_current_ability (each_time watchers) are excluded from
                 // the stale-entries pool when process_player_abilities re-enters.
                 let cutoff = game_state.ability_queue.len();
-                game_state.depth_first_cutoff = Some(cutoff);
+                game_state.depth_first_cutoff = Some(cutoff as u16);
                 game_state.ability_queue.promote_entry_by_abs(queue_index);
                 if game_state.ability_queue.start_next() {
                     let saved_moved = game_state.recently_moved_cards.take();
@@ -1296,21 +1296,5 @@ impl super::TurnEngine {
         for card_id in cards {
             player.waitroom.add_card(card_id);
         }
-    }
-
-    pub fn player_set_live_cards(player: &mut crate::player::Player, num_cards_to_set: usize) {
-        let mut cards_set = Vec::new();
-        let mut held_back = Vec::new();
-        while let Some(card_id) = player.hand.cards.pop() {
-            if cards_set.len() < num_cards_to_set {
-                cards_set.push(card_id);
-            } else {
-                held_back.push(card_id);
-            }
-        }
-        for card_id in cards_set {
-            player.live_card_zone.cards.push(card_id);
-        }
-        player.hand.cards = held_back.into_iter().rev().collect();
     }
 }

@@ -25,27 +25,13 @@ macro_rules! dprintln {
     }};
 }
 
-// tprintln! — debug output on TOP screen (timing/status).
-// Appends to top text buffer, rendered in _3ds_swap_buffers().
-#[macro_export]
-#[allow(unused_macros)]
-macro_rules! tprintln {
-    ($($arg:tt)*) => {{
-        let msg = format!($($arg)*);
-        let s = format!("{}\n\0", msg);
-        unsafe { _3ds_debug_print(s.as_ptr()); }
-        unsafe { _3ds_text_add_top(s.as_ptr()); }
-    }};
-}
-
 #[derive(Clone)]
 pub enum SetupPhase {
     PickMode(usize), // cursor: 0=sandbox, 1=vsAI, 2=AIvsAI, 3=tests, 4=localMP
     PickDeck(usize, bool, bool), // cursor, vs_ai flag, is_multiplayer
     PickDeck2(usize, usize, bool), // cursor, p1_idx, vs_ai
     Loading(usize, usize, bool), // p1_idx, p2_idx, vs_ai
-    #[allow(dead_code)]
-    Testing, // On-device test suite
+    Testing,         // On-device test suite
     // Multiplayer lobby phases
     MultiplayerDeck(usize), // cursor, selecting deck for multiplayer
     MultiplayerPickRole(usize, usize), // deck_idx, role_cursor (0=Host, 1=Client)

@@ -17,13 +17,13 @@ fn give_energy_p2(game: &mut TestGame, n: usize) {
         let e = game.id("LL-E-001-SD");
         game.state.player2.energy_zone.cards.push(e);
     }
-    game.state.player2.energy_zone.add_active(n);
+    game.state.player2.energy_zone.add_active(n as u8);
 }
 
-fn energy_p1(g: &TestGame) -> usize {
+fn energy_p1(g: &TestGame) -> u8 {
     g.state.player1.energy_zone.active_count()
 }
-fn energy_p2(g: &TestGame) -> usize {
+fn energy_p2(g: &TestGame) -> u8 {
     g.state.player2.energy_zone.active_count()
 }
 

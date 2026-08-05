@@ -41,7 +41,7 @@ fn setup_game() -> TestGame {
     game
 }
 
-fn snapshot_adjustments<'a>(game: &'a TestGame) -> Vec<(&'a str, i32, u8)> {
+fn snapshot_adjustments<'a>(game: &'a TestGame) -> Vec<(&'a str, i16, u8)> {
     let mut items = Vec::new();
     for snap in &game.state.performance_snapshots {
         for live in &snap.lives {

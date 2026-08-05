@@ -72,7 +72,7 @@ pub struct AbilityApplicationDisplay {
     pub source_card_id: i16,
     pub effect_type: String,
     pub target_card_id: i16,
-    pub amount: i32,
+    pub amount: i16,
 }
 
 #[derive(Clone)]
@@ -921,7 +921,7 @@ pub fn player_to_display(
         .iter()
         .enumerate()
         .map(|(i, &card_id)| {
-            let orientation = if i < player.energy_zone.active_count() {
+            let orientation = if i < player.energy_zone.active_count() as usize {
                 Some(Orientation::Active)
             } else {
                 Some(Orientation::Wait)
@@ -1280,7 +1280,7 @@ pub fn player_to_display(
         name: player.name.to_string(),
         is_first_attacker: player.is_first_attacker,
         exclusion_zone: zone_to_display(&player.exclusion_zone.cards, card_db),
-        energy_active_count: player.energy_zone.active_count(),
+        energy_active_count: player.energy_zone.active_count() as usize,
         stage_hearts: stage_hearts_display,
     }
 }
@@ -1347,14 +1347,24 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         }
         _ => None,
     };
+    let mulligan_indices_usize: Vec<usize> = game_state
+        .mulligan_selected_indices
+        .iter()
+        .map(|&i| i as usize)
+        .collect();
+    let live_indices_usize: Vec<usize> = game_state
+        .live_card_selected_indices
+        .iter()
+        .map(|&i| i as usize)
+        .collect();
     let p1_mulligan = mulligan_player_id
         .as_ref()
         .is_some_and(|id| *id == game_state.player1.id)
-        .then_some(game_state.mulligan_selected_indices.as_slice());
+        .then_some(mulligan_indices_usize.as_slice());
     let p2_mulligan = mulligan_player_id
         .as_ref()
         .is_some_and(|id| *id == game_state.player2.id)
-        .then_some(game_state.mulligan_selected_indices.as_slice());
+        .then_some(mulligan_indices_usize.as_slice());
 
     let live_card_player_id = match game_state.current_phase {
         crate::game_state::Phase::LiveCardSetFirstAttacker => {
@@ -1372,11 +1382,11 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     let p1_live_selection = live_card_player_id
         .as_ref()
         .is_some_and(|id| *id == game_state.player1.id)
-        .then_some(game_state.live_card_selected_indices.as_slice());
+        .then_some(live_indices_usize.as_slice());
     let p2_live_selection = live_card_player_id
         .as_ref()
         .is_some_and(|id| *id == game_state.player2.id)
-        .then_some(game_state.live_card_selected_indices.as_slice());
+        .then_some(live_indices_usize.as_slice());
 
     let mut blade_flat: HashMap<i16, i32> = HashMap::with_capacity_and_hasher(
         game_state.mods.blade_modifiers.len(),
@@ -1388,7 +1398,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     );
     for (&k, v) in &game_state.mods.blade_modifiers {
         blade_flat.insert(k, v.total());
-        blade_set_flat.insert(k, v.set);
+        blade_set_flat.insert(k, v.set as i32);
     }
 
     let mut score_flat: HashMap<i16, i32> = HashMap::with_capacity_and_hasher(
@@ -1401,7 +1411,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     );
     for (&k, v) in &game_state.mods.score_modifiers {
         score_flat.insert(k, v.total());
-        score_set_flat.insert(k, v.set);
+        score_set_flat.insert(k, v.set as i32);
     }
 
     let mut heart_flat: HashMap<i16, HashMap<crate::card::HeartColor, i32>> =
@@ -1418,7 +1428,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         let total: HashMap<crate::card::HeartColor, i32> =
             colors.iter().map(|(&c, e)| (c, e.total())).collect();
         let set: HashMap<crate::card::HeartColor, i32> =
-            colors.iter().map(|(&c, e)| (c, e.set)).collect();
+            colors.iter().map(|(&c, e)| (c, e.set as i32)).collect();
         heart_flat.insert(k, total);
         heart_set_flat.insert(k, set);
     }
@@ -1439,7 +1449,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         HashMap::with_capacity_and_hasher(game_state.mods.cost_modifiers.len(), Default::default());
     for (&k, v) in &game_state.mods.cost_modifiers {
         cost_flat.insert(k, v.total());
-        cost_set_flat.insert(k, v.set);
+        cost_set_flat.insert(k, v.set as i32);
     }
 
     // ── Build bonus_triggers map from gained_card_abilities ────────
@@ -1536,10 +1546,10 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     let queue_current_idx = match game_state.ability_queue.get_state() {
         QueueState::Idle => 0,
         QueueState::WaitingForAutoAbilityChoice { .. } => 0,
-        QueueState::PayingCost { entry_index } => *entry_index,
-        QueueState::WaitingForChoice { entry_index, .. } => *entry_index,
-        QueueState::ExecutingEffect { entry_index } => *entry_index,
-        QueueState::Completed { entry_index } => *entry_index,
+        QueueState::PayingCost { entry_index } => *entry_index as usize,
+        QueueState::WaitingForChoice { entry_index, .. } => *entry_index as usize,
+        QueueState::ExecutingEffect { entry_index } => *entry_index as usize,
+        QueueState::Completed { entry_index } => *entry_index as usize,
     };
 
     // Debut triggers
@@ -1582,7 +1592,12 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .mods
         .constant_heart_bonuses
         .iter()
-        .map(|(cid, map)| (*cid, map.clone()))
+        .map(|(cid, map)| {
+            (
+                *cid,
+                map.iter().map(|(k, &v)| (k.clone(), v as i32)).collect(),
+            )
+        })
         .collect();
 
     // Delayed cannot active: HashMap<i16, u8>
@@ -1597,7 +1612,11 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     });
 
     // Mulligan indices
-    let mulligan_indices: Vec<usize> = game_state.mulligan_selected_indices.to_vec();
+    let mulligan_indices: Vec<usize> = game_state
+        .mulligan_selected_indices
+        .iter()
+        .map(|&i| i as usize)
+        .collect();
 
     let player1 = player_to_display(
         &game_state.player1,
@@ -1821,9 +1840,24 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         ability_applications: ability_apps,
         effect_creation_counter: game_state.effect_creation_counter,
         last_state_change_wait_to_active_count: game_state.last_state_change_wait_to_active_count,
-        constant_blade_bonuses: game_state.mods.constant_blade_bonuses.clone(),
-        constant_cost_bonuses: game_state.mods.constant_cost_bonuses.clone(),
-        constant_score_bonuses: game_state.mods.constant_score_bonuses.clone(),
+        constant_blade_bonuses: game_state
+            .mods
+            .constant_blade_bonuses
+            .iter()
+            .map(|(&k, &v)| (k, v as i32))
+            .collect(),
+        constant_cost_bonuses: game_state
+            .mods
+            .constant_cost_bonuses
+            .iter()
+            .map(|(&k, &v)| (k, v as i32))
+            .collect(),
+        constant_score_bonuses: game_state
+            .mods
+            .constant_score_bonuses
+            .iter()
+            .map(|(&k, &v)| (k, v as i32))
+            .collect(),
         constant_heart_bonuses: const_heart,
         constant_global_need_heart: game_state
             .mods

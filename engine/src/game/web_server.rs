@@ -164,7 +164,6 @@ pub struct Room {
     pub custom_decks: Option<HashMap<i32, CustomDeck>>,
 
     #[cfg_attr(feature = "serde_support", serde(skip))]
-    #[allow(dead_code)]
     pub game_state: Option<Arc<RwLock<GameState>>>, // Per-room game state
 
     // Per-room state (completely isolated from other rooms)

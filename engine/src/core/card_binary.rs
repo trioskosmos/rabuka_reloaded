@@ -26,7 +26,7 @@ fn blob() -> &'static [u8] {
     }
 }
 use crate::core::types::ArcStr;
-use crate::{HashMap, HashSet};
+use crate::HashMap;
 #[cfg(feature = "no_std")]
 use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
 
@@ -66,50 +66,6 @@ fn card_data_offset(idx: usize) -> Option<usize> {
         start += len as usize;
     }
     Some(data_start + start)
-}
-
-/// Get string by index from the card string table (0 = empty string).
-fn get_str(idx: u16) -> &'static str {
-    #[cfg(feature = "external_card_data")]
-    {
-        get_str_from_blob(idx)
-    }
-    #[cfg(not(feature = "external_card_data"))]
-    {
-        if (idx as usize) < CARD_STRINGS.len() {
-            CARD_STRINGS[idx as usize]
-        } else {
-            ""
-        }
-    }
-}
-
-/// Parse a length-prefixed (u16) string from the blob's strtab.
-#[cfg(feature = "external_card_data")]
-fn get_str_from_blob(idx: u16) -> &'static str {
-    let b = blob();
-    let (_num, strtab_len, strtab_start, _, _) = match parse_header() {
-        Some(h) => h,
-        None => return "",
-    };
-    let strtab_end = strtab_start + strtab_len as usize;
-    let mut pos = strtab_start;
-    for _ in 0..idx {
-        if pos + 2 > strtab_end {
-            return "";
-        }
-        let len = u16::from_le_bytes([b[pos], b[pos + 1]]) as usize;
-        pos += 2 + len;
-    }
-    if pos + 2 > strtab_end {
-        return "";
-    }
-    let len = u16::from_le_bytes([b[pos], b[pos + 1]]) as usize;
-    pos += 2;
-    if pos + len > strtab_end {
-        return "";
-    }
-    core::str::from_utf8(&b[pos..pos + len]).unwrap_or("")
 }
 
 /// Find a string's index in the blob strtab (external mode).
@@ -448,22 +404,6 @@ pub fn find_card_index_by_no(card_no: &str) -> Option<usize> {
         start += len as usize;
     }
     None
-}
-
-/// Resolve deck card indices from a list of card_no strings.
-pub fn resolve_deck_indices(card_nos: &[&str]) -> Vec<usize> {
-    let mut indices = Vec::with_capacity(card_nos.len());
-    let mut seen: HashSet<String> = HashSet::default();
-    for cn in card_nos {
-        let s = cn.to_string();
-        if !seen.contains(&s) {
-            seen.insert(s);
-            if let Some(idx) = find_card_index_by_no(cn) {
-                indices.push(idx);
-            }
-        }
-    }
-    indices
 }
 
 #[cfg(test)]

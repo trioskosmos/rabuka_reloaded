@@ -12,29 +12,7 @@ extern "C" {
     fn _3ds_tdbg(msg: *const u8);
 }
 
-/// Debug trace step counter — incremented at key points in handle_play_member_to_stage.
-/// The DS reads this via C FFI to determine where it hangs.
-#[cfg(feature = "ds_debug")]
-#[no_mangle]
-pub static HANDLE_PLAY_STEP: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
-
-/// Direct screen print for DS debug. Uses the C shim's nds_println.
-#[cfg(feature = "ds_debug")]
-extern "C" {
-    fn nds_println(text: *const u8);
-}
-
-#[cfg(feature = "ds_debug")]
-fn ds_print(s: &str) {
-    // Append null terminator and call C function
-    let mut msg = alloc::string::String::from(s);
-    msg.push('\0');
-    unsafe {
-        nds_println(msg.as_ptr());
-    }
-}
-
-#[allow(unused_macros)]
+#[cfg(feature = "3ds")]
 macro_rules! tdbg {
     ($($arg:tt)*) => {{
         let msg = format!($($arg)*);
@@ -43,7 +21,6 @@ macro_rules! tdbg {
     }};
 }
 #[cfg(not(feature = "3ds"))]
-#[allow(unused_macros)]
 macro_rules! tdbg {
     ($($arg:tt)*) => {};
 }
@@ -653,11 +630,11 @@ impl super::TurnEngine {
         if let Some(pos) = game_state
             .mulligan_selected_indices
             .iter()
-            .position(|&x| x == idx)
+            .position(|&x| x == idx as u8)
         {
             game_state.mulligan_selected_indices.remove(pos);
         } else {
-            game_state.mulligan_selected_indices.push(idx);
+            game_state.mulligan_selected_indices.push(idx as u8);
         }
         Ok(())
     }
@@ -673,8 +650,13 @@ impl super::TurnEngine {
             _ => return Ok(()),
         };
         // Use provided indices (from PVP/local selection) or fallback to server state
-        let mulligan_indices =
-            card_indices.unwrap_or_else(|| game_state.mulligan_selected_indices.to_vec());
+        let mulligan_indices: Vec<usize> = card_indices.unwrap_or_else(|| {
+            game_state
+                .mulligan_selected_indices
+                .iter()
+                .map(|&i| i as usize)
+                .collect()
+        });
         // Sort descending so removals don't shift other targets
         let mut sorted_indices = mulligan_indices.clone();
         sorted_indices.sort_unstable();
@@ -780,7 +762,7 @@ impl super::TurnEngine {
         if let Some(pos) = game_state
             .live_card_selected_indices
             .iter()
-            .position(|&x| x == idx)
+            .position(|&x| x == idx as u8)
         {
             game_state.live_card_selected_indices.remove(pos);
         } else {
@@ -790,7 +772,7 @@ impl super::TurnEngine {
             if game_state.live_card_selected_indices.len() >= max_allowed {
                 return Err("Cannot select more live cards: limit reached".to_string());
             }
-            game_state.live_card_selected_indices.push(idx);
+            game_state.live_card_selected_indices.push(idx as u8);
         }
         Ok(())
     }
@@ -800,9 +782,14 @@ impl super::TurnEngine {
         card_indices: Option<Vec<usize>>,
     ) -> Result<(), String> {
         let is_second = matches!(game_state.current_phase, Phase::LiveCardSetSecondAttacker);
-        let live_indices = card_indices
-            .filter(|v| !v.is_empty())
-            .unwrap_or_else(|| game_state.live_card_selected_indices.to_vec());
+        let live_indices: Vec<usize> =
+            card_indices.filter(|v| !v.is_empty()).unwrap_or_else(|| {
+                game_state
+                    .live_card_selected_indices
+                    .iter()
+                    .map(|&i| i as usize)
+                    .collect()
+            });
         let mut sorted_indices: Vec<usize> = live_indices.clone();
         sorted_indices.sort_unstable();
         sorted_indices.dedup();
@@ -865,20 +852,6 @@ impl super::TurnEngine {
         game_state.clear_baton_touch_tracking();
 
         let card_db = game_state.card_database.clone();
-
-        // DS debug: step 1 = entered function
-        #[cfg(feature = "ds_debug")]
-        {
-            HANDLE_PLAY_STEP.store(1, core::sync::atomic::Ordering::Relaxed);
-            ds_print("HPM:1");
-        }
-
-        // DS debug: step 2 = before cost/move
-        #[cfg(feature = "ds_debug")]
-        {
-            HANDLE_PLAY_STEP.store(2, core::sync::atomic::Ordering::Relaxed);
-            ds_print("HPM:2");
-        }
 
         // Recalculate constant cost modifiers (hand-based cost reductions, etc.)
         // BEFORE paying cost, so the modifiers are in effect.
@@ -978,10 +951,10 @@ impl super::TurnEngine {
                 .saturating_sub(combined_reduction);
             if final_cost > 0 {
                 let player = game_state.active_player_mut();
-                if player.energy_zone.active_count() < final_cost as usize {
+                if player.energy_zone.active_count() < final_cost {
                     return Err("Not enough energy to play this card".to_string());
                 }
-                player.energy_zone.pay_energy(final_cost as usize)?;
+                player.energy_zone.pay_energy(final_cost)?;
             }
             // Check cannot_baton_touch protection for each target member
             {
@@ -1053,7 +1026,7 @@ impl super::TurnEngine {
             } else {
                 Some(db_areas[1] as usize)
             };
-            game_state.last_vacated_stage_area = other_vacated;
+            game_state.last_vacated_stage_area = other_vacated.map(|v| v as u8);
             // Remove card from hand
             let player = game_state.active_player_mut();
             player.hand.cards.remove(idx);
@@ -1143,11 +1116,6 @@ impl super::TurnEngine {
         // Track area move for movement_condition "moves"
         log::debug!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
 
-        #[cfg(feature = "ds_debug")]
-        {
-            HANDLE_PLAY_STEP.store(3, core::sync::atomic::Ordering::Relaxed);
-            ds_print("HPM:3");
-        }
         Self::trigger_debut_abilities(
             game_state,
             &player_id,
@@ -1155,22 +1123,12 @@ impl super::TurnEngine {
             cost_paid,
             baton_touch_used,
         );
-        #[cfg(feature = "ds_debug")]
-        {
-            HANDLE_PLAY_STEP.store(4, core::sync::atomic::Ordering::Relaxed);
-            ds_print("HPM:4");
-        }
         Self::trigger_auto_abilities_for_player(game_state, &player_id);
         let sb_opponent_id = game_state.opponent_id(&player_id);
         Self::trigger_auto_abilities_for_player(game_state, &sb_opponent_id);
         // Process ALL queued abilities now: movement-triggered (baton_touch, etc.)
         // are ahead of appearance-triggered in the queue, so they resolve first.
         game_state.process_pending_auto_abilities(&player_id);
-        #[cfg(feature = "ds_debug")]
-        {
-            HANDLE_PLAY_STEP.store(5, core::sync::atomic::Ordering::Relaxed);
-            ds_print("HPM:5");
-        }
         tdbg!("PHASE_AUTO2:0 recalc");
         game_state.mark_constants_dirty();
         game_state.recalculate_constants();
@@ -1227,13 +1185,6 @@ impl super::TurnEngine {
         // inside trigger_auto_abilities_for_player_with_event.
         if replaced_member_id.is_some() {
             game_state.process_pending_auto_abilities(&player_id);
-        }
-
-        // DS debug: step 6 = success, about to return
-        #[cfg(feature = "ds_debug")]
-        {
-            HANDLE_PLAY_STEP.store(6, core::sync::atomic::Ordering::Relaxed);
-            ds_print("HPM:6");
         }
 
         Ok(())

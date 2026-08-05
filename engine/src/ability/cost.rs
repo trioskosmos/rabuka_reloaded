@@ -599,10 +599,10 @@ impl AbilityResolver {
             //   is insufficient, validate_cost rejects the entire cost.
             ActionType::SequentialCost => {
                 if let Some(ref costs) = cost.compound.actions {
-                    let start_idx = gs
-                        .ability_queue
-                        .current_entry()
-                        .map_or(0, |e| e.cost_paid_index);
+                    let start_idx =
+                        gs.ability_queue
+                            .current_entry()
+                            .map_or(0, |e| e.cost_paid_index) as usize;
                     for i in start_idx..costs.len() {
                         if let Err(e) = self.validate_cost(gs, &costs[i]) {
                             return Err(format!("Cannot pay sequential cost: {}", e));
@@ -629,7 +629,7 @@ impl AbilityResolver {
                             self.pay_cost(gs, sub_cost)?;
                         }
                         if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                            entry.cost_paid_index = i + 1;
+                            entry.cost_paid_index = (i + 1) as u8;
                         }
                         if self.pending_choice.is_some() {
                             // If we auto-paid binary costs before this choice, override
@@ -735,7 +735,7 @@ impl AbilityResolver {
                         return Ok(());
                     }
                     // Show active energy cards for selection (one by one with skip)
-                    let filtered_indices: Vec<usize> = (0..active_count).collect();
+                    let filtered_indices: Vec<usize> = (0..active_count as usize).collect();
                     self.pending_choice = Some(
                         Choice::select_cards(
                             Zone::Energy.to_str().to_string(),
@@ -800,7 +800,7 @@ impl AbilityResolver {
                 let player = gs.resolve_target_player_mut(target);
 
                 if energy > 0 {
-                    player.energy_zone.pay_energy(energy as usize)?
+                    player.energy_zone.pay_energy(energy)?
                 }
                 Ok(())
             }
@@ -820,7 +820,7 @@ impl AbilityResolver {
                         player.energy_deck.cards.push(card);
                     }
                 }
-                player.energy_zone.sub_active(count);
+                player.energy_zone.sub_active(count as u8);
                 Ok(())
             }
             ActionType::Reveal => {
@@ -985,8 +985,8 @@ impl AbilityResolver {
         if let Some(count) = self.pending_energy_payment {
             self.pending_energy_payment = None;
             let player = gs.resolve_target_player_mut("self");
-            if player.energy_zone.active_count() >= count as usize {
-                player.energy_zone.pay_energy(count as usize)?;
+            if player.energy_zone.active_count() >= count {
+                player.energy_zone.pay_energy(count)?;
             } else {
                 // Insufficient energy: clear remaining commands and return
                 self.cancel_remaining_commands = true;
@@ -1032,7 +1032,7 @@ impl AbilityResolver {
                     let tgt = cost.target.as_deref().unwrap_or("self");
                     gs.resolve_target_player_mut(tgt)
                         .energy_zone
-                        .pay_energy(energy as usize)?;
+                        .pay_energy(energy)?;
                 }
             }
             if cost.state_change_any().as_deref() == Some("wait") {

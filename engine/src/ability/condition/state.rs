@@ -326,7 +326,7 @@ impl<'a> ConditionContext<'a> {
             match state {
                 "active" => {
                     if all_cards {
-                        player.energy_zone.active_count() == player.energy_zone.cards.len()
+                        player.energy_zone.active_count() as usize == player.energy_zone.cards.len()
                     } else {
                         player.energy_zone.active_count() > 0
                     }
@@ -335,7 +335,7 @@ impl<'a> ConditionContext<'a> {
                     if all_cards {
                         player.energy_zone.active_count() == 0
                     } else {
-                        player.energy_zone.active_count() < player.energy_zone.cards.len()
+                        player.energy_zone.active_count() < player.energy_zone.cards.len() as u8
                     }
                 }
                 _ => true,
@@ -916,18 +916,6 @@ impl<'a> ConditionContext<'a> {
         } else {
             true
         }
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn evaluate_position_change_condition(&self, condition: &Condition) -> bool {
-        let optional = condition.get_options().map(|_| true).unwrap_or(false);
-        if optional {
-            if self.game_state.position_change_occurred_this_turn {
-                return true;
-            }
-            return false;
-        }
-        self.game_state.position_change_occurred_this_turn
     }
 
     pub(crate) fn evaluate_state_change_condition(&self, condition: &Condition) -> bool {

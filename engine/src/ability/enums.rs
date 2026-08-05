@@ -95,36 +95,6 @@ impl Zone {
             Zone::ExclusionZone => "exclusion_zone",
         }
     }
-
-    /// Human-readable zone label for UI/messages.
-    pub fn label(&self) -> &'static str {
-        match self {
-            Zone::Hand => "Hand",
-            Zone::Stage => "Stage",
-            Zone::StageCenter => "Center",
-            Zone::StageLeft => "Left",
-            Zone::StageRight => "Right",
-            Zone::Discard => "Discard",
-            Zone::Waitroom => "Waitroom",
-            Zone::Energy => "Energy",
-            Zone::EnergyZone => "Energy Zone",
-            Zone::Deck => "Deck",
-            Zone::DeckTop => "Deck Top",
-            Zone::DeckBottom => "Deck Bottom",
-            Zone::SuccessZone => "Success Zone",
-            Zone::LiveCardZone => "Live Card Zone",
-            Zone::SuccessLiveZone => "Success Live Zone",
-            Zone::EnergyDeck => "Energy Deck",
-            Zone::EmptyArea => "Empty Area",
-            Zone::SameArea => "Same Area",
-            Zone::UnderMember => "Under Member",
-            Zone::LookedAt => "Looked At",
-            Zone::RevealedCards => "Revealed Cards",
-            Zone::SelectedCards => "Selected Cards",
-            Zone::Resolution => "Resolution",
-            Zone::ExclusionZone => "Exclusion Zone",
-        }
-    }
 }
 
 impl core::fmt::Display for Zone {

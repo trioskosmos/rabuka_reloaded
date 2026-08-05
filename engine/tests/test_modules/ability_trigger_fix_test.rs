@@ -468,7 +468,7 @@ fn baton_touch_cleared_between_actions() {
         .db
         .get_card(fresh_card)
         .and_then(|c| c.cost)
-        .unwrap_or(0) as usize;
+        .unwrap_or(0) as u8;
     let energy_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         energy_after,

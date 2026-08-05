@@ -85,7 +85,7 @@ fn assert_score(game: &TestGame, expected: i32) {
     assert_eq!(game.state.mods.get_score_modifier(live_card_id), expected);
 }
 
-fn assert_energy(game: &TestGame, active: usize, total: usize) {
+fn assert_energy(game: &TestGame, active: u8, total: usize) {
     assert_eq!(game.state.player1.energy_zone.active_count(), active);
     assert_eq!(game.state.player1.energy_zone.cards.len(), total);
 }
@@ -407,7 +407,7 @@ fn distortion_q96_score_permanent_after_energy_used() {
     game.state.player1.energy_zone.cards.push(energy_id);
     // active_energy_count stays at 3, cards.len() = 4, so not all active anymore
     assert!(
-        game.state.player1.energy_zone.active_count() < game.state.player1.energy_zone.cards.len(),
+        (game.state.player1.energy_zone.active_count() as usize) < game.state.player1.energy_zone.cards.len(),
         "Energy should not be all-active anymore"
     );
 

@@ -325,7 +325,7 @@ impl super::TurnEngine {
                                 if me.additive != 0 {
                                     let idx = color.index();
                                     let current = required_arr[idx] as i32;
-                                    required_arr[idx] = (current + me.additive).max(0) as u8;
+                                    required_arr[idx] = (current + me.additive as i32).max(0) as u8;
                                 }
                             }
                             eprintln!(
@@ -409,7 +409,7 @@ impl super::TurnEngine {
                                         } else {
                                             String::new()
                                         },
-                                        value: total,
+                                        value: total as i16,
                                         color: color.index() as u8,
                                         source: if verbose {
                                             format!("{} req modifier ({})", card.name, color_label)
@@ -636,12 +636,12 @@ impl super::TurnEngine {
                 let pre = pre_score_flat.get(&cid).copied().unwrap_or(0);
                 let delta = post_total - pre;
                 if delta != 0 {
-                    game_state.mods.add_score_modifier(cid, -delta);
+                    game_state.mods.add_score_modifier(cid, -delta as i16);
                 }
             }
             for (&cid, &pre_total) in &pre_score_flat {
                 if !post.contains_key(&cid) {
-                    game_state.mods.set_score_modifier(cid, pre_total);
+                    game_state.mods.set_score_modifier(cid, pre_total as i16);
                 }
             }
         }
@@ -1656,7 +1656,7 @@ impl super::TurnEngine {
                             if me.additive != 0 {
                                 let idx = color.index();
                                 let current = need[idx] as i32;
-                                need[idx] = (current + me.additive).max(0) as u8;
+                                need[idx] = (current + me.additive as i32).max(0) as u8;
                             }
                         }
                     }
@@ -2416,7 +2416,7 @@ impl super::TurnEngine {
                         if me.additive != 0 {
                             let idx = color.index();
                             let current = required_arr[idx] as i32;
-                            required_arr[idx] = (current + me.additive).max(0) as u8;
+                            required_arr[idx] = (current + me.additive as i32).max(0) as u8;
                         }
                     }
                 }
@@ -2691,16 +2691,6 @@ pub fn build_snapshot(
     }
 }
 
-fn card_name_by_no(card_db: &CardDatabase, card_no: &str) -> String {
-    if card_no.is_empty() {
-        return "?".to_string();
-    }
-    card_db
-        .get_card_by_no(card_no)
-        .map(|c| c.name.to_string())
-        .unwrap_or_else(|| card_no.to_string().into())
-}
-
 fn fmt_player_id(id: &str) -> String {
     let mut digits = id.chars().filter(|c| c.is_ascii_digit());
     match digits.next() {
@@ -2713,162 +2703,4 @@ fn fmt_player_id(id: &str) -> String {
             s
         }
     }
-}
-
-fn fmt_hearts(arr: &[u8; 8]) -> String {
-    arr.iter()
-        .enumerate()
-        .filter(|(_, &v)| v > 0)
-        .map(|(i, v)| {
-            format!(
-                "{}:{}",
-                crate::card::HeartColor::from_index(i).short_label(),
-                v
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-fn fmt_heart_vec(arr: &[u8; 8]) -> String {
-    arr.iter()
-        .enumerate()
-        .map(|(i, v)| {
-            format!(
-                "{}:{}",
-                crate::card::HeartColor::from_index(i).short_label(),
-                v
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-pub fn snapshot_to_rule_log(
-    snap: &crate::types::PerformanceSnapshot,
-    card_db: &CardDatabase,
-) -> Vec<String> {
-    let player = fmt_player_id(&snap.player_id);
-    let heart_labels = ["h00", "h01", "h02", "h03", "h04", "h05", "h06"];
-    let mut lines = Vec::new();
-
-    lines.push(format!("[Turn {}] ── {} Performance ──", snap.turn, player));
-
-    // ── Stage members ──
-    let mut _stage_total_blades = 0u8;
-    let mut stage_total_hearts = [0u8; 8];
-    for mc in &snap.member_contributions {
-        let name = card_name_by_no(card_db, &mc.card_no);
-        let total_blade = mc.base_blades + mc.bonus_blades;
-        _stage_total_blades += total_blade;
-        for i in 0..7 {
-            stage_total_hearts[i] += mc.base_hearts[i] + mc.bonus_hearts[i];
-        }
-
-        // Base hearts
-        let base_h = fmt_hearts(&mc.base_hearts);
-        let blade_str = if mc.bonus_blades > 0 {
-            format!("★{} (+{} from abilities)", total_blade, mc.bonus_blades)
-        } else {
-            format!("★{}", total_blade)
-        };
-        if base_h.is_empty() {
-            lines.push(format!("  Stage: {}  {}", name, blade_str));
-        } else {
-            lines.push(format!("  Stage: {}  {}  ♥[{}]", name, blade_str, base_h));
-        }
-
-        // Ability bonuses
-        for ab in &mc.ability_heart_bonuses {
-            let color_str = ab
-                .color
-                .map(|c| heart_labels[c as usize].to_string())
-                .unwrap_or_default();
-            lines.push(format!(
-                "    Ability: {}  ♥{}+{}",
-                ab.source, color_str, ab.amount
-            ));
-        }
-        for ab in &mc.ability_blade_bonuses {
-            lines.push(format!("    Ability: {}  ★+{}", ab.source, ab.amount));
-        }
-    }
-
-    // ── Yell cards ──
-    let mut yell_total_hearts = [0u8; 8];
-    if snap.yell_count > 0 {
-        lines.push(format!("  Yell ({} cards):", snap.yell_count));
-        for yc in &snap.yell_cards {
-            let name = card_name_by_no(card_db, &yc.card_no);
-            let bh = fmt_hearts(&yc.blade_hearts);
-            for i in 0..8 {
-                yell_total_hearts[i] += yc.blade_hearts[i];
-            }
-            if bh.is_empty() {
-                lines.push(format!(
-                    "    {}  ♪{}  ⎋{}",
-                    name, yc.note_icons, yc.draw_icons
-                ));
-            } else {
-                lines.push(format!(
-                    "    {}  ♥[{}]  ♪{}  ⎋{}",
-                    name, bh, yc.note_icons, yc.draw_icons
-                ));
-            }
-        }
-    }
-
-    // ── Total hearts breakdown ──
-    lines.push("  Hearts breakdown:".to_string());
-    lines.push(format!(
-        "    Base hearts:      [{}]",
-        fmt_heart_vec(&stage_total_hearts)
-    ));
-    if yell_total_hearts.iter().any(|&v| v > 0) {
-        lines.push(format!(
-            "    Yell hearts:      [{}]",
-            fmt_heart_vec(&yell_total_hearts)
-        ));
-    }
-    if !snap.breakdown.hearts.is_empty() {
-        for hs in &snap.breakdown.hearts {
-            let hv = fmt_heart_vec(&hs.value);
-            if hv.chars().any(|c| {
-                c != '0'
-                    && c != ':'
-                    && c != 'h'
-                    && c != '0'
-                    && c != '1'
-                    && c != '2'
-                    && c != '3'
-                    && c != '4'
-                    && c != '5'
-                    && c != '6'
-            }) {
-                // has non-zero values
-                lines.push(format!("    {}: [{}]", hs.source, hv));
-            }
-        }
-    }
-    let total_h = fmt_heart_vec(&snap.total_hearts);
-    lines.push(format!("    Total hearts:     [{}]", total_h));
-
-    // ── Live cards ──
-    for live in &snap.lives {
-        let name = card_name_by_no(card_db, &live.card_no);
-        let need_h = fmt_hearts(&live.required);
-        let filled_h = fmt_hearts(&live.filled);
-        let spare_h = fmt_hearts(&live.spare);
-        let result = if live.passed { "PASS" } else { "FAIL" };
-        lines.push(format!(
-            "  Live: {}  need[{}]  filled[{}]  spare[{}]  score +{}  → {}",
-            name, need_h, filled_h, spare_h, live.score, result
-        ));
-    }
-
-    // ── Score ──
-    let pass_str = if snap.success { "PASS" } else { "FAIL" };
-    lines.push(format!("  Score: {}  {}", snap.total_score, pass_str));
-
-    lines
 }

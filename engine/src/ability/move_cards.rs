@@ -23,7 +23,7 @@ pub enum MoveCardsTarget {
 
 fn remove_card_from_any_zone(
     player: &mut crate::player::Player,
-    last_vacated_stage_area: &mut Option<usize>,
+    last_vacated_stage_area: &mut Option<u8>,
     card_id: i16,
 ) {
     if let Some(pos) = player.hand.cards.iter().position(|&id| id == card_id) {
@@ -34,7 +34,7 @@ fn remove_card_from_any_zone(
         player.stage.stage[pos] = -1;
         // Rule 9.6.2.1.2.1: Card left stage, clean up tracking.
         player.deployed_this_turn.retain(|id| *id != card_id);
-        *last_vacated_stage_area = Some(pos);
+        *last_vacated_stage_area = Some(pos as u8);
     } else if let Some(pos) = player
         .energy_zone
         .cards
@@ -159,7 +159,7 @@ impl AbilityResolver {
         player_target: &str,
         card_id: i16,
         destination: &str,
-        vacated_area: Option<usize>,
+        vacated_area: Option<u8>,
         is_max: bool,
         count: usize,
         state_change: Option<String>,
@@ -194,8 +194,8 @@ impl AbilityResolver {
             if available_slots.len() > 1 {
                 // Prefer the vacated area (other baton-passed position) if still empty
                 if let Some(va) = vacated_area {
-                    if va < 3 && player.stage.stage[va] == -1 {
-                        player.stage.stage[va] = card_id;
+                    if va < 3 && player.stage.stage[va as usize] == -1 {
+                        player.stage.stage[va as usize] = card_id;
                         if source_zone != Zone::Stage.to_str() {
                             // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
                             player.track_deployment(card_id);
@@ -263,7 +263,7 @@ impl AbilityResolver {
             let member_card = self.activating_card_id.or(activating_card);
             member_card
                 .and_then(|cid| player.stage.stage.iter().position(|&id| id == cid))
-                .or(vacated_area)
+                .or(vacated_area.map(|v| v as usize))
                 .or_else(|| {
                     self.moved_cards
                         .iter()
@@ -273,9 +273,9 @@ impl AbilityResolver {
         } else if Zone::from_str(destination) == Some(Zone::Deck)
             || Zone::from_str(destination) == Some(Zone::DeckTop)
         {
-            deck_position.or(vacated_area)
+            deck_position.or(vacated_area.map(|v| v as usize))
         } else {
-            vacated_area
+            vacated_area.map(|v| v as usize)
         };
         log::debug!(
             "[TRACE_PLACE] dest={} card={} pos_to_use={:?} vacated_area={:?} stage_before={:?}",
@@ -922,7 +922,7 @@ impl AbilityResolver {
                     let idx = activating_card_id
                         .and_then(|act_id| player.stage.stage.iter().position(|&id| id == act_id))
                         .ok_or_else(|| "Activating card not found at stage".to_string())?;
-                    gs.last_vacated_stage_area = Some(idx);
+                    gs.last_vacated_stage_area = Some(idx as u8);
                     if destination != "same_area" {
                         Ok(player
                             .remove_member_from_stage_with_recycling(idx, card_db)
@@ -969,7 +969,7 @@ impl AbilityResolver {
                                     let cid =
                                         player.remove_member_from_stage_with_recycling(i, card_db);
                                     if cid.is_some() {
-                                        vacated = Some(i);
+                                        vacated = Some(i as u8);
                                     }
                                     cid
                                 })
@@ -1957,7 +1957,7 @@ impl AbilityResolver {
                         "opponent" => &mut gs.player2,
                         _ => &mut gs.player1,
                     };
-                    p.energy_zone.active_energy_count += moved_cards.len();
+                    p.energy_zone.active_energy_count += moved_cards.len() as u8;
                 }
             }
         }
@@ -2005,34 +2005,6 @@ impl AbilityResolver {
             for &card_id in moved_cards {
                 self.fire_debut_side_effects(gs, card_id, tgt);
             }
-        }
-    }
-
-    /// Mark selected energy zone cards as wait state.
-    pub fn mark_energy_as_wait(
-        &mut self,
-        gs: &mut GameState,
-        indices: &[usize],
-        validate_card: &mut impl FnMut(i16) -> bool,
-    ) {
-        let to_mark: Vec<i16> = {
-            let player = gs.active_player_mut();
-            indices
-                .iter()
-                .filter_map(|&idx| {
-                    if idx < player.energy_zone.cards.len()
-                        && validate_card(player.energy_zone.cards[idx])
-                    {
-                        Some(player.energy_zone.cards[idx])
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        };
-        for cid in to_mark {
-            gs.mods.clear_all_for_card(cid);
-            gs.mods.add_orientation_modifier(cid, "wait");
         }
     }
 
@@ -2185,7 +2157,7 @@ impl AbilityResolver {
         card_ids: &[i16],
         src_zone: &str,
         dest: &str,
-        vacated_area: Option<usize>,
+        vacated_area: Option<u8>,
         target: &str,
     ) -> Result<Vec<i16>, String> {
         let card_db = gs.card_database.clone();
@@ -2892,7 +2864,7 @@ impl AbilityResolver {
                 player.energy_zone.active_energy_count = player
                     .energy_zone
                     .active_energy_count
-                    .saturating_sub(removed.len());
+                    .saturating_sub(removed.len() as u8);
                 removed
             };
             {
@@ -2927,7 +2899,7 @@ impl AbilityResolver {
         player.energy_zone.active_energy_count = player
             .energy_zone
             .active_energy_count
-            .saturating_sub(to_mark.len());
+            .saturating_sub(to_mark.len() as u8);
         for cid in to_mark {
             gs.mods.clear_all_for_card(cid);
             gs.mods.add_orientation_modifier(cid, "wait");

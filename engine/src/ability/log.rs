@@ -2,8 +2,8 @@ use crate::ability::debug::ABILITY_DEBUG;
 #[cfg(feature = "serde_support")]
 use serde::Serialize;
 
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( Serialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize))]
 #[cfg_attr(feature = "serde_support", serde(tag = "kind"))]
 pub enum AbilityLogItem {
     Condition {
@@ -12,7 +12,10 @@ pub enum AbilityLogItem {
         expectation: String,
         actual: String,
         passed: bool,
-        #[cfg_attr(feature = "serde_support", serde(default, skip_serializing_if = "Vec::is_empty"))]
+        #[cfg_attr(
+            feature = "serde_support",
+            serde(default, skip_serializing_if = "Vec::is_empty")
+        )]
         children: Vec<AbilityLogItem>,
     },
     Cost {
@@ -26,11 +29,6 @@ pub enum AbilityLogItem {
         text: String,
         action: String,
         details: String,
-    },
-    KeyValue {
-        key: String,
-        value: String,
-        passed: bool,
     },
 }
 

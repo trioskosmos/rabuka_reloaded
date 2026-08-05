@@ -928,7 +928,8 @@ impl ZoneSnapshot {
                 + p2.stage.stage.iter().filter(|&&id| id != -1).count(),
             waitroom_count: p1.waitroom.len() + p2.waitroom.len(),
             energy_count: p1.energy_zone.cards.len() + p2.energy_zone.cards.len(),
-            active_energy_count: p1.energy_zone.active_count() + p2.energy_zone.active_count(),
+            active_energy_count: p1.energy_zone.active_count() as usize
+                + p2.energy_zone.active_count() as usize,
             deck_count: p1.main_deck.cards.len() + p2.main_deck.cards.len(),
         }
     }
@@ -1021,9 +1022,6 @@ pub struct StepState {
     /// Number of cards drawn by the most recent draw step. Read by the
     /// sequential handler to populate `StepOutput::value` for the step.
     pub last_draw_count: u8,
-    /// Total count of cards looked at by the most recent look step. Read
-    /// by the sequential handler for `StepOutput::value` on look steps.
-    pub looked_at_total_count: usize,
 }
 
 impl StepState {
@@ -1054,6 +1052,5 @@ impl StepState {
     pub fn clear(&mut self) {
         self.step_results.clear();
         self.last_draw_count = 0;
-        self.looked_at_total_count = 0;
     }
 }

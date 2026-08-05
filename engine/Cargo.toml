@@ -44,18 +44,17 @@ alloc_tracker = []
 # Generic no_std flag — used in cfg gates so ports don't touch engine source
 no_std = []
 # PSP target: no_std + alloc mode for mipsel-sony-psp
-psp = ["no_std", "debug_conditions", "bytecode_abilities"]
+psp = ["no_std", "debug_conditions", "bytecode_abilities", "compact_card_data"]
 # DS target: no_std + alloc, minimal features for tight 4MB ROM
 ds = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
-ds_debug = ["ds"]
 # PS1 target: no_std + alloc, compact like DS (2MB RAM; card data streams from CD)
 ps1 = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state", "external_card_data"]
 # GBA target: no_std + alloc via agb (baked deck blobs from the engine)
 gba = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
 # Dreamcast target: no_std + alloc via KallistiOS + rustc_codegen_gcc
-dc = ["no_std", "debug_conditions"]
+dc = ["no_std", "debug_conditions", "bytecode_abilities", "compact_card_data"]
 # Wii target: no_std + alloc via devkitPPC + libogc
-wii = ["no_std", "bytecode_abilities"]
+wii = ["no_std", "bytecode_abilities", "compact_card_data"]
 # Bytecode abilities: use pre-compiled bytecode instead of JSON serde
 # for ability loading. Dramatically reduces memory footprint (~7KB vs 1.4MB).
 bytecode_abilities = []

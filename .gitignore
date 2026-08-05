@@ -68,3 +68,7 @@ hf_temp/
 
 # ps1 iso tool binaries
 /tools/mkpsxiso/
+
+# Generated duplicate Rust sources (canonical copies live in engine/src)
+cards/build/abilities_gen.rs
+cards/build/cards_gen.rs

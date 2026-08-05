@@ -12,8 +12,11 @@ use crate::{HashMap, VecDeque};
 use alloc::string::{String, ToString};
 use smallvec::SmallVec;
 
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 
 pub struct Player {
     pub id: String,
@@ -303,8 +306,7 @@ impl Player {
                         let active_energy_count = self.energy_zone.active_count();
 
                         // Allow baton touch if cost_to_pay is 0 (equal/lower cost) OR if there's sufficient energy to pay the reduced cost
-                        cost_to_pay == 0
-                            || (cost_to_pay > 0 && active_energy_count >= cost_to_pay as usize)
+                        cost_to_pay == 0 || (cost_to_pay > 0 && active_energy_count >= cost_to_pay)
                     }
                 } else {
                     // No member in target area, can't baton touch
@@ -356,7 +358,7 @@ impl Player {
             if cost_to_pay > 0 {
                 // Use EnergyZone::pay_energy to actually tap energy cards
 
-                if let Err(e) = self.energy_zone.pay_energy(cost_to_pay as usize) {
+                if let Err(e) = self.energy_zone.pay_energy(cost_to_pay) {
                     self.hand.cards.insert(hand_index, card_id);
 
                     return Err(e);

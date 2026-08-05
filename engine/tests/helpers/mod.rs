@@ -236,7 +236,7 @@ impl TestGame {
             let energy_card = self.id("LL-E-001-SD");
             self.state.player1.energy_zone.cards.push(energy_card);
         }
-        self.state.player1.energy_zone.add_active(count);
+        self.state.player1.energy_zone.add_active(count as u8);
     }
 
     /// Dump structured_log entries to stderr for inspection.
@@ -931,7 +931,7 @@ impl TestGame {
     pub fn assert_energy(&self, expected: u32, msg: &str) {
         let actual = self.state.player1.energy_zone.active_count();
         assert_eq!(
-            actual, expected as usize,
+            actual, expected as u8,
             "{}: expected {} energy, got {}",
             msg, expected, actual
         );

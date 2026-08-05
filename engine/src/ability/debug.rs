@@ -55,7 +55,6 @@ impl AbDebug {
     }
     pub fn cost_pay(&mut self, _cost: &crate::card::AbilityEffect, _ok: bool) {}
     pub fn effect(&mut self, _effect: &crate::card::AbilityEffect) {}
-    pub fn print_cost(&mut self, _cost: &crate::card::AbilityEffect, _prefix: &str) {}
 }
 
 #[cfg(not(feature = "no_std"))]
@@ -159,13 +158,6 @@ mod inner {
                 return;
             }
             self.p("EFFECT", format_args!("{}", effect.action));
-        }
-
-        pub fn print_cost(&mut self, cost: &AbilityEffect, _prefix: &str) {
-            if !super::ABILITY_DEBUG.load(Ordering::Relaxed) {
-                return;
-            }
-            self.p("COST", format_args!("{}", cost.action));
         }
     }
 }

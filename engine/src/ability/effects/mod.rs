@@ -709,7 +709,7 @@ impl AbilityResolver {
                 };
                 if effect.optional.unwrap_or(false) {
                     let player = gs.resolve_target_player(effect.target_name());
-                    if player.energy_zone.active_count() < count as usize {
+                    if player.energy_zone.active_count() < count {
                         // Insufficient energy: skip payment and clear remaining actions
                         self.cancel_remaining_commands = true;
                         if let Some(entry) = gs.ability_queue.current_entry_mut() {

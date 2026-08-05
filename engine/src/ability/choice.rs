@@ -145,16 +145,6 @@ impl super::resolver::AbilityResolver {
         Ok(())
     }
 
-    pub fn expire_live_end_effects(&mut self, _gs: &mut GameState) {
-        let initial_count = self.duration_effects.len();
-        self.duration_effects
-            .retain(|(_, duration)| duration != "live_end");
-        let expired_count = initial_count - self.duration_effects.len();
-        if expired_count > 0 {
-            log::debug!("Expired {} effects with duration 'live_end'", expired_count);
-        }
-    }
-
     /// Shared epilogue: clear pending_choice, resume execution, process pending sequential actions.
     fn finalize_choice(
         &mut self,
@@ -753,7 +743,7 @@ impl super::resolver::AbilityResolver {
             if count_paid > 0 {
                 let player =
                     gs.resolve_target_player_mut(target_player_id.as_deref().unwrap_or("self"));
-                player.energy_zone.pay_energy(count_paid)?;
+                player.energy_zone.pay_energy(count_paid as u8)?;
                 gs.mods.last_cost_energy_count += count_paid as u8;
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.cost_paid = true;
@@ -766,7 +756,7 @@ impl super::resolver::AbilityResolver {
                 player.energy_zone.active_energy_count
             };
             if count_paid > 0 && energy_left > 0 {
-                let efi: Vec<usize> = (0..energy_left).collect();
+                let efi: Vec<usize> = (0..energy_left as usize).collect();
                 let target = target_player_id
                     .clone()
                     .unwrap_or_else(|| "self".to_string().into());
@@ -1768,7 +1758,7 @@ impl super::resolver::AbilityResolver {
             );
             if moved_count > 0 {
                 if let Some(pos) = last_vacated {
-                    gs.last_vacated_stage_area = Some(pos);
+                    gs.last_vacated_stage_area = Some(pos as u8);
                 }
                 self.selected_cards = valid_ids.clone().into();
                 self.moved_cards = valid_ids.clone().into();

@@ -54,10 +54,10 @@ fn hand_card_cost_reduced_by_hand_count_minus_1() {
         .get(&card)
         .copied()
         .unwrap_or(0);
-    // cost_mod is i32, stored as -2 for "subtract 2 from cost"
+    // cost_mod is i16, stored as -2 for "subtract 2 from cost"
     assert_eq!(
         cost_mod,
-        -(expected_reduction as i32),
+        -(expected_reduction as i16),
         "card's cost should be reduced by hand_count-1 = {} (base {}, hand {}, got {})",
         expected_reduction,
         base_cost,

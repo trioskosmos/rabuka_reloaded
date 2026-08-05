@@ -5,8 +5,11 @@ use crate::HashMap;
 use alloc::{string::String, vec::Vec};
 use smallvec::SmallVec;
 
-#[derive(Debug,  Clone,  Copy,  PartialEq,  Eq,  Hash)]
-#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum CardOrientation {
     Active,
     Wait,
@@ -30,12 +33,15 @@ impl core::fmt::Display for CardOrientation {
 /// Stores both the additive delta and absolute set value for a modifier.
 /// Replaces the old dual-map pattern (`blade_modifiers` + `set_blade_modifiers`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde_support", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct ModifierEntry {
     /// Accumulated via repeated `add_*` / `+=` calls.
-    pub additive: i32,
+    pub additive: i16,
     /// Set via `set_*` calls (absolute override).
-    pub set: i32,
+    pub set: i16,
 }
 
 impl core::fmt::Display for ModifierEntry {
@@ -46,14 +52,17 @@ impl core::fmt::Display for ModifierEntry {
 
 impl ModifierEntry {
     pub fn total(&self) -> i32 {
-        self.set + self.additive
+        self.set as i32 + self.additive as i32
     }
 }
 
 /// Holds all modifier data for GameState.
 /// Extracted to reduce the 99-field GameState struct.
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( serde::Serialize,  serde::Deserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct GameModifiers {
     pub blade_modifiers: HashMap<i16, ModifierEntry>,
     pub blade_type_modifiers: HashMap<i16, BladeColor>,
@@ -63,20 +72,20 @@ pub struct GameModifiers {
     pub cost_modifiers: HashMap<i16, ModifierEntry>,
     pub score_modifiers: HashMap<i16, ModifierEntry>,
     pub need_heart_modifiers: HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
-    pub constant_blade_bonuses: HashMap<i16, i32>,
-    pub constant_cost_bonuses: HashMap<i16, i32>,
-    pub constant_score_bonuses: HashMap<i16, i32>,
-    pub constant_heart_bonuses: HashMap<i16, HashMap<String, i32>>,
+    pub constant_blade_bonuses: HashMap<i16, i16>,
+    pub constant_cost_bonuses: HashMap<i16, i16>,
+    pub constant_score_bonuses: HashMap<i16, i16>,
+    pub constant_heart_bonuses: HashMap<i16, HashMap<String, i16>>,
     /// Track need_heart modifiers applied by constant ModifyRequiredHeartsGlobal effects.
     /// Key: (target_card_id, heart_color_str) → total delta applied.
-    pub constant_global_need_heart: Vec<(i16, String, i32)>,
+    pub constant_global_need_heart: Vec<(i16, String, i16)>,
     /// Per-player global constant score bonus from GainAbility (modify_score) effects.
     /// Accumulated in recalculate_constants, added directly to each player's total live score.
-    pub p1_constant_total_score_bonus: i32,
-    pub p2_constant_total_score_bonus: i32,
+    pub p1_constant_total_score_bonus: i16,
+    pub p2_constant_total_score_bonus: i16,
     /// Source info for constant score bonuses: (card_id, ability_text, value)
     /// Populated by recalculate_constants for display in breakdown.scores.
-    pub constant_score_sources: Vec<(i16, String, i32)>,
+    pub constant_score_sources: Vec<(i16, String, i16)>,
     pub heart_color_multiplier: HashMap<i16, HeartColor>,
     /// Number of cards moved from hand to discard by the most recent cost payment.
     pub last_cost_discard_count: u8,
@@ -92,13 +101,13 @@ pub struct GameModifiers {
     pub last_surplus_loss_count: u8,
     /// Blade bonuses contributed by constant abilities on success zone cards.
     /// Key: target member card_id, value: total blade amount from success zone.
-    pub success_zone_blade_bonuses: HashMap<i16, i32>,
+    pub success_zone_blade_bonuses: HashMap<i16, i16>,
     /// Heart bonuses contributed by constant abilities on success zone cards.
     /// Key: target member card_id → {heart_color_str → amount}.
-    pub success_zone_heart_bonuses: HashMap<i16, HashMap<String, i32>>,
+    pub success_zone_heart_bonuses: HashMap<i16, HashMap<String, i16>>,
     /// Score bonuses contributed by constant abilities on success zone cards.
     /// Key: target live card card_id, value: total score amount from success zone.
-    pub success_zone_score_bonuses: HashMap<i16, i32>,
+    pub success_zone_score_bonuses: HashMap<i16, i16>,
 }
 
 impl Default for GameModifiers {
@@ -140,15 +149,16 @@ impl GameModifiers {
 
     // ============== BLADE ==============
 
-    pub fn add_blade_modifier(&mut self, card_id: i16, delta: i32) {
-        self.blade_modifiers.entry(card_id).or_default().additive += delta;
+    pub fn add_blade_modifier(&mut self, card_id: i16, delta: i16) {
+        let entry = self.blade_modifiers.entry(card_id).or_default();
+        entry.additive = entry.additive.saturating_add(delta);
     }
 
     /// Like add_blade_modifier but also records the source for snapshot tracing.
     pub fn add_blade_modifier_with_trace(
         &mut self,
         card_id: i16,
-        delta: i32,
+        delta: i16,
         trace: &mut SmallVec<[AbilityApplication; 4]>,
         source_card_id: i16,
         ability_text: &str,
@@ -168,9 +178,9 @@ impl GameModifiers {
         });
     }
 
-    pub fn remove_blade_modifier(&mut self, card_id: i16, delta: i32) {
+    pub fn remove_blade_modifier(&mut self, card_id: i16, delta: i16) {
         if let Some(entry) = self.blade_modifiers.get_mut(&card_id) {
-            entry.additive -= delta;
+            entry.additive = entry.additive.saturating_sub(delta);
             if entry.additive == 0 && entry.set == 0 {
                 self.blade_modifiers.remove(&card_id);
             }
@@ -182,10 +192,12 @@ impl GameModifiers {
     }
 
     pub fn get_blade_set_modifier(&self, card_id: i16) -> i32 {
-        self.blade_modifiers.get(&card_id).map_or(0, |e| e.set)
+        self.blade_modifiers
+            .get(&card_id)
+            .map_or(0, |e| e.set as i32)
     }
 
-    pub fn set_blade_modifier(&mut self, card_id: i16, value: i32) {
+    pub fn set_blade_modifier(&mut self, card_id: i16, value: i16) {
         self.blade_modifiers.entry(card_id).or_default().set = value;
     }
 
@@ -212,9 +224,10 @@ impl GameModifiers {
 
     // ============== HEART ==============
 
-    pub fn add_heart_modifier(&mut self, card_id: i16, color: HeartColor, delta: i32) {
+    pub fn add_heart_modifier(&mut self, card_id: i16, color: HeartColor, delta: i16) {
         let colors = self.heart_modifiers.entry(card_id).or_default();
-        colors.entry(color).or_default().additive += delta;
+        let entry = colors.entry(color).or_default();
+        entry.additive = entry.additive.saturating_add(delta);
     }
 
     /// Like add_heart_modifier but also records the source for snapshot tracing.
@@ -222,7 +235,7 @@ impl GameModifiers {
         &mut self,
         card_id: i16,
         color: HeartColor,
-        delta: i32,
+        delta: i16,
         trace: &mut SmallVec<[AbilityApplication; 4]>,
         source_card_id: i16,
         ability_text: &str,
@@ -257,7 +270,7 @@ impl GameModifiers {
         color_val() + wildcard_val()
     }
 
-    pub fn set_heart_modifier(&mut self, card_id: i16, color: HeartColor, value: i32) {
+    pub fn set_heart_modifier(&mut self, card_id: i16, color: HeartColor, value: i16) {
         self.heart_modifiers
             .entry(card_id)
             .or_default()
@@ -266,10 +279,10 @@ impl GameModifiers {
             .set = value;
     }
 
-    pub fn remove_heart_modifier(&mut self, card_id: i16, color: HeartColor, delta: i32) {
+    pub fn remove_heart_modifier(&mut self, card_id: i16, color: HeartColor, delta: i16) {
         if let Some(colors) = self.heart_modifiers.get_mut(&card_id) {
             if let Some(entry) = colors.get_mut(&color) {
-                entry.additive -= delta;
+                entry.additive = entry.additive.saturating_sub(delta);
                 if entry.additive == 0 && entry.set == 0 {
                     colors.remove(&color);
                 }
@@ -305,13 +318,14 @@ impl GameModifiers {
 
     // ============== SCORE ==============
 
-    pub fn add_score_modifier(&mut self, card_id: i16, delta: i32) {
-        self.score_modifiers.entry(card_id).or_default().additive += delta;
+    pub fn add_score_modifier(&mut self, card_id: i16, delta: i16) {
+        let entry = self.score_modifiers.entry(card_id).or_default();
+        entry.additive = entry.additive.saturating_add(delta);
     }
 
-    pub fn remove_score_modifier(&mut self, card_id: i16, delta: i32) {
+    pub fn remove_score_modifier(&mut self, card_id: i16, delta: i16) {
         if let Some(entry) = self.score_modifiers.get_mut(&card_id) {
-            entry.additive -= delta;
+            entry.additive = entry.additive.saturating_sub(delta);
             if entry.additive == 0 && entry.set == 0 {
                 self.score_modifiers.remove(&card_id);
             }
@@ -322,12 +336,14 @@ impl GameModifiers {
         self.score_modifiers.get(&card_id).map_or(0, |e| e.total())
     }
 
-    pub fn set_score_modifier(&mut self, card_id: i16, value: i32) {
+    pub fn set_score_modifier(&mut self, card_id: i16, value: i16) {
         self.score_modifiers.entry(card_id).or_default().set = value;
     }
 
     pub fn get_score_set_modifier(&self, card_id: i16) -> i32 {
-        self.score_modifiers.get(&card_id).map_or(0, |e| e.set)
+        self.score_modifiers
+            .get(&card_id)
+            .map_or(0, |e| e.set as i32)
     }
 
     pub fn clear_score_set_modifier(&mut self, card_id: i16) {
@@ -341,9 +357,10 @@ impl GameModifiers {
 
     // ============== NEED HEART ==============
 
-    pub fn add_need_heart_modifier(&mut self, card_id: i16, color: HeartColor, delta: i32) {
+    pub fn add_need_heart_modifier(&mut self, card_id: i16, color: HeartColor, delta: i16) {
         let colors = self.need_heart_modifiers.entry(card_id).or_default();
-        colors.entry(color).or_default().additive += delta;
+        let entry = colors.entry(color).or_default();
+        entry.additive = entry.additive.saturating_add(delta);
     }
 
     pub fn get_need_heart_modifier(&self, card_id: i16, color: HeartColor) -> i32 {
@@ -353,7 +370,7 @@ impl GameModifiers {
             .map_or(0, |e| e.total())
     }
 
-    pub fn set_need_heart_modifier(&mut self, card_id: i16, color: HeartColor, value: i32) {
+    pub fn set_need_heart_modifier(&mut self, card_id: i16, color: HeartColor, value: i16) {
         self.need_heart_modifiers
             .entry(card_id)
             .or_default()
@@ -378,13 +395,14 @@ impl GameModifiers {
 
     // ============== COST ==============
 
-    pub fn add_cost_modifier(&mut self, card_id: i16, delta: i32) {
-        self.cost_modifiers.entry(card_id).or_default().additive += delta;
+    pub fn add_cost_modifier(&mut self, card_id: i16, delta: i16) {
+        let entry = self.cost_modifiers.entry(card_id).or_default();
+        entry.additive = entry.additive.saturating_add(delta);
     }
 
-    pub fn remove_cost_modifier(&mut self, card_id: i16, delta: i32) {
+    pub fn remove_cost_modifier(&mut self, card_id: i16, delta: i16) {
         if let Some(entry) = self.cost_modifiers.get_mut(&card_id) {
-            entry.additive = (entry.additive - delta).max(0);
+            entry.additive = entry.additive.saturating_sub(delta).max(0);
             if entry.additive == 0 && entry.set == 0 {
                 self.cost_modifiers.remove(&card_id);
             }
@@ -395,7 +413,7 @@ impl GameModifiers {
         self.cost_modifiers.get(&card_id).map_or(0, |e| e.total())
     }
 
-    pub fn set_cost_modifier(&mut self, card_id: i16, value: i32) {
+    pub fn set_cost_modifier(&mut self, card_id: i16, value: i16) {
         self.cost_modifiers.entry(card_id).or_default().set = value;
     }
 

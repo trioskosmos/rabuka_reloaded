@@ -412,7 +412,7 @@ fn chika_bp5_no_reduction_for_member_with_ability() {
 
     assert_eq!(
         energy_before - energy_after,
-        target_cost,
+        target_cost as u8,
         "Full cost paid — no reduction"
     );
 }

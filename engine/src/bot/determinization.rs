@@ -72,7 +72,7 @@ impl DeterminizationSampler {
         }
         player
             .energy_zone
-            .set_active_count(view.active_energy_count);
+            .set_active_count(view.active_energy_count as u8);
 
         for &cid in &view.waitroom {
             player.waitroom.cards.push(cid);

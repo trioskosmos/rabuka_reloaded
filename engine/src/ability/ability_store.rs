@@ -28,19 +28,6 @@ impl AbilityRef {
     /// so the game continues running. The error includes the ability index and
     /// byte range for debugging.
     pub fn resolve(&self) -> Arc<Ability> {
-        #[cfg(feature = "ds_debug")]
-        {
-            extern "C" {
-                fn nds_println(text: *const u8);
-            }
-            let mut msg = alloc::string::String::new();
-            msg.push_str("ARES:");
-            msg.push_str(&alloc::string::ToString::to_string(&self.0));
-            msg.push('\0');
-            unsafe {
-                nds_println(msg.as_ptr());
-            }
-        }
         match crate::ability::vm::get_ability(self.0 as usize) {
             Ok(ability) => Arc::new(ability),
             Err(e) => {
@@ -55,9 +42,3 @@ impl AbilityRef {
         self.resolve()
     }
 }
-
-pub fn cache_size() -> usize {
-    0
-}
-
-pub fn init_ability_store(_count: usize) {}

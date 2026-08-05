@@ -891,7 +891,7 @@ impl<'a> ConditionContext<'a> {
                                         .heart_modifiers
                                         .get(&cid)
                                         .and_then(|hm| hm.get(&color))
-                                        .map(|e| e.set + e.additive)
+                                        .map(|e| e.set as i32 + e.additive as i32)
                                         .unwrap_or(0)
                                 })
                                 .sum();
@@ -1415,7 +1415,11 @@ impl<'a> ConditionContext<'a> {
             .mods
             .heart_modifiers
             .get(&card_id)
-            .map(|hm| hm.values().map(|e| e.set + e.additive).sum::<i32>())
+            .map(|hm| {
+                hm.values()
+                    .map(|e| e.set as i32 + e.additive as i32)
+                    .sum::<i32>()
+            })
             .unwrap_or(0);
 
         HeartTotal::Value((base_sum as i32 + modifier_total).max(0) as u8)

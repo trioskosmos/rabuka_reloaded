@@ -668,7 +668,7 @@ fn sumire_explicit_double_baton_via_card_indices() {
     let energy_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         energy_after,
-        energy_before.saturating_sub(expected_cost as usize),
+        energy_before.saturating_sub(expected_cost as u8),
         "Energy: paid {}, remaining {}",
         expected_cost,
         energy_after
@@ -738,7 +738,7 @@ fn sumire_explicit_double_baton_to_left_no_debut() {
     let energy_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         energy_after,
-        energy_before.saturating_sub(expected_cost as usize),
+        energy_before.saturating_sub(expected_cost as u8),
         "Energy: paid {}, remaining {}",
         expected_cost,
         energy_after

@@ -18,8 +18,8 @@ use alloc::{
 
 /// Discriminator data for choice routing. Replaces the old `conditional_choice: Option<String>`
 /// which serialized three different types to JSON strings at runtime.
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum ConditionalChoice {
     /// Plain string value (color name, sentinel like "pay_optional_cost")
     Str(String),
@@ -32,8 +32,8 @@ pub enum ConditionalChoice {
 }
 
 /// Unique identifier for an ability instance in the queue
-#[derive(Debug,  Clone,  PartialEq,  Eq)]
-#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct AbilityId(pub String);
 
 impl AbilityId {
@@ -43,26 +43,26 @@ impl AbilityId {
 }
 
 /// Current state of ability queue processing
-#[derive(Debug,  Clone,  PartialEq,  Eq)]
-#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum QueueState {
     /// Queue is idle, ready to process next ability
     Idle,
     /// Waiting for player to choose which auto ability resolves first (Rule 9.5.3)
     WaitingForAutoAbilityChoice { choice: Choice },
     /// Currently paying cost for an ability
-    PayingCost { entry_index: usize },
+    PayingCost { entry_index: u8 },
     /// Waiting for user choice (cost payment, target selection, etc.)
-    WaitingForChoice { entry_index: usize, choice: Choice },
+    WaitingForChoice { entry_index: u8, choice: Choice },
     /// Executing the effect of an ability
-    ExecutingEffect { entry_index: usize },
+    ExecutingEffect { entry_index: u8 },
     /// Ability completed, will transition to Idle
-    Completed { entry_index: usize },
+    Completed { entry_index: u8 },
 }
 
 /// Entry in the ability queue
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct AbilityQueueEntry {
     pub id: AbilityId,
     pub card_no: String,
@@ -76,7 +76,7 @@ pub struct AbilityQueueEntry {
     /// Whether the cost has been fully paid (for re-entry after cost choice)
     pub cost_paid: bool,
     /// Stored choice result for resumption
-    pub cost_paid_index: usize,
+    pub cost_paid_index: u8,
     /// Discriminator for routing choice results to the correct handler.
     pub choice_card_no: Option<crate::ability::types::ChoiceRoute>,
     /// Discriminator data for choice routing
@@ -119,12 +119,12 @@ pub struct AbilityQueueEntry {
 }
 
 /// Unified ability queue with proper state management
-#[derive(Debug,  Clone)]
-#[cfg_attr(feature = "serde_support", derive( Serialize,  Deserialize))]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct AbilityQueue {
     entries: Vec<AbilityQueueEntry>,
     state: QueueState,
-    current_index: usize,
+    current_index: u8,
     /// Set by the resolver when a new pending choice is about to be stored.
     /// The web handler checks this after execute_main_phase_action to decide
     /// whether to push an additional history snapshot at the choice boundary.
@@ -161,7 +161,7 @@ impl AbilityQueue {
             QueueState::PayingCost { entry_index }
             | QueueState::WaitingForChoice { entry_index, .. }
             | QueueState::ExecutingEffect { entry_index }
-            | QueueState::Completed { entry_index } => self.entries.get(*entry_index),
+            | QueueState::Completed { entry_index } => self.entries.get(*entry_index as usize),
             QueueState::Idle | QueueState::WaitingForAutoAbilityChoice { .. } => None,
         }
     }
@@ -171,7 +171,7 @@ impl AbilityQueue {
             QueueState::PayingCost { entry_index }
             | QueueState::WaitingForChoice { entry_index, .. }
             | QueueState::ExecutingEffect { entry_index }
-            | QueueState::Completed { entry_index } => *entry_index,
+            | QueueState::Completed { entry_index } => *entry_index as usize,
             QueueState::Idle | QueueState::WaitingForAutoAbilityChoice { .. } => return None,
         };
         self.entries.get_mut(idx)
@@ -214,8 +214,8 @@ impl AbilityQueue {
         }
 
         // Find next uncompleted entry
-        while self.current_index < self.entries.len() {
-            let entry = &self.entries[self.current_index];
+        while (self.current_index as usize) < self.entries.len() {
+            let entry = &self.entries[self.current_index as usize];
             if !entry.completed {
                 self.state = QueueState::PayingCost {
                     entry_index: self.current_index,
@@ -233,7 +233,7 @@ impl AbilityQueue {
         match &mut self.state {
             QueueState::PayingCost { entry_index }
             | QueueState::ExecutingEffect { entry_index } => {
-                let idx = *entry_index;
+                let idx = *entry_index as usize;
                 // G1/G3: route choice to opponent when spawn context says opponent
                 let opponent_id: Option<String> = self.entries.get(idx).and_then(|entry| {
                     if entry.choice_player_id.is_some() {
@@ -274,7 +274,7 @@ impl AbilityQueue {
                     }
                 }
                 self.state = QueueState::WaitingForChoice {
-                    entry_index: idx,
+                    entry_index: idx as u8,
                     choice: choice_clone,
                 };
             }
@@ -315,7 +315,7 @@ impl AbilityQueue {
                 };
                 self.entries.push(dummy_entry);
                 self.state = QueueState::WaitingForChoice {
-                    entry_index: self.entries.len() - 1,
+                    entry_index: (self.entries.len() - 1) as u8,
                     choice: choice_clone,
                 };
             }
@@ -351,7 +351,7 @@ impl AbilityQueue {
             | QueueState::WaitingForChoice { entry_index, .. }
             | QueueState::ExecutingEffect { entry_index }
             | QueueState::Completed { entry_index } => {
-                if let Some(entry) = self.entries.get_mut(*entry_index) {
+                if let Some(entry) = self.entries.get_mut(*entry_index as usize) {
                     entry.completed = true;
                 }
             }
@@ -365,7 +365,7 @@ impl AbilityQueue {
     /// Clear completed entries to free memory
     pub fn clear_completed(&mut self) {
         self.entries.retain(|e| !e.completed);
-        if self.current_index > self.entries.len() {
+        if (self.current_index as usize) > self.entries.len() {
             self.current_index = 0;
         }
     }
@@ -409,7 +409,9 @@ impl AbilityQueue {
             choice_effect_text: None,
             condition_cache: SmallVec::new(),
         });
-        self.state = QueueState::ExecutingEffect { entry_index: idx };
+        self.state = QueueState::ExecutingEffect {
+            entry_index: idx as u8,
+        };
     }
 
     /// Pop the temporary constant evaluation context and restore idle.
@@ -465,13 +467,13 @@ impl AbilityQueue {
     /// Used by Rule 9.5.3 auto-ability ordering: player picks which standby ability
     /// resolves first, and this moves it to the head of the queue.
     pub fn promote_entry(&mut self, from_index: usize) {
-        let absolute = self.current_index + from_index;
+        let absolute = self.current_index as usize + from_index;
         if absolute >= self.entries.len() || from_index == 0 {
             return;
         }
         let entry = self.entries.remove(absolute);
         self.entries.insert(0, entry);
-        if self.current_index > absolute {
+        if (self.current_index as usize) > absolute {
             self.current_index = self.current_index.saturating_sub(1);
         } else {
             self.current_index = 0;
@@ -507,7 +509,7 @@ impl AbilityQueue {
     /// drain loops to process newly-queued entries in-place.
     pub fn set_current_entry(&mut self, absolute: usize) {
         if absolute < self.entries.len() {
-            self.current_index = absolute;
+            self.current_index = absolute as u8;
         }
     }
 

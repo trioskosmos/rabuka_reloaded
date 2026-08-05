@@ -134,7 +134,7 @@ impl AbilityResolver {
                     ids
                 }
             };
-            let target_card_ids: Vec<(i16, i32)> = candidate_ids
+            let target_card_ids: Vec<(i16, i16)> = candidate_ids
                 .iter()
                 .filter(|&&card_id| {
                     if !filter.matches(&card_db, card_id, false) {
@@ -151,10 +151,10 @@ impl AbilityResolver {
                 })
                 .map(|&card_id| {
                     let delta = match operation.as_str() {
-                        "add" => final_value as i32,
-                        "remove" => -(final_value as i32),
-                        "set" => final_value as i32,
-                        _ => 0i32,
+                        "add" => final_value as i16,
+                        "remove" => -(final_value as i16),
+                        "set" => final_value as i16,
+                        _ => 0i16,
                     };
                     (card_id, delta)
                 })
@@ -180,7 +180,7 @@ impl AbilityResolver {
         for (card_id, delta) in &live_card_ids {
             if let Some(constraint) = &effect_constraint {
                 let current_mod = gs.mods.get_score_modifier(*card_id);
-                if constraint.as_str() == "min:0" && current_mod + delta < 0 {
+                if constraint.as_str() == "min:0" && current_mod + (*delta as i32) < 0 {
                     continue;
                 }
             }
@@ -468,15 +468,15 @@ impl AbilityResolver {
                 match operation {
                     "decrease" => {
                         gs.mods
-                            .add_need_heart_modifier(*card_id, color, -(value as i32));
+                            .add_need_heart_modifier(*card_id, color, -(value as i16));
                     }
                     "increase" => {
                         gs.mods
-                            .add_need_heart_modifier(*card_id, color, value as i32);
+                            .add_need_heart_modifier(*card_id, color, value as i16);
                     }
                     "set" => {
                         gs.mods
-                            .set_need_heart_modifier(*card_id, color, per_color_value as i32);
+                            .set_need_heart_modifier(*card_id, color, per_color_value as i16);
                     }
                     _ => return Err(format!("Unknown operation: {}", operation)),
                 }
@@ -506,8 +506,8 @@ impl AbilityResolver {
             let color = crate::card::parse_heart_color(hc);
             for card_id in &card_ids {
                 let modifier_value = match operation {
-                    "increase" => value as i32,
-                    "decrease" => -(value as i32),
+                    "increase" => value as i16,
+                    "decrease" => -(value as i16),
                     _ => return Err(format!("Unknown operation: {}", operation)),
                 };
                 gs.mods
@@ -614,8 +614,8 @@ impl AbilityResolver {
             vec![]
         };
         let delta = match operation {
-            "increase" => value as i32,
-            "decrease" => -(value as i32),
+            "increase" => value as i16,
+            "decrease" => -(value as i16),
             _ => {
                 log::debug!("Unknown operation: {}", operation);
                 return;
@@ -631,7 +631,8 @@ impl AbilityResolver {
         for card_id in card_ids {
             for color_str in &color_strs {
                 let color = crate::card::parse_heart_color(color_str);
-                gs.mods.add_need_heart_modifier(card_id, color, delta);
+                gs.mods
+                    .add_need_heart_modifier(card_id, color, delta as i16);
             }
         }
     }

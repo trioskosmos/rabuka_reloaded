@@ -73,18 +73,6 @@ impl GameState {
         self.prohibition_effects.iter().any(|e| e.contains(action))
     }
 
-    pub fn record_turn_limited_ability_use(&mut self, key: (i16, usize, u8)) {
-        *self.turn_limited_abilities_used.entry(key).or_insert(0) += 1;
-    }
-
-    pub fn has_turn_limited_ability_been_used(&self, key: &(i16, usize, u8)) -> bool {
-        self.turn_limited_abilities_used
-            .get(key)
-            .copied()
-            .unwrap_or(0)
-            > 0
-    }
-
     pub fn move_resolution_zone_to_waitroom(&mut self, player_id: &str) {
         let player = if player_id == self.player1.id {
             &mut self.player1
