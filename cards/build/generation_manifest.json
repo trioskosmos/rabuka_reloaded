@@ -1,16 +1,16 @@
 {
   "schema": "compiled_abilities.v1",
   "compiler": "cards/compile_abilities.py",
-  "engine_commit": "467d5c24",
+  "engine_commit": "09f8863d",
   "input": {
     "source": "cards/abilities.json",
-    "sha256": "8c097c87e7b255ab",
+    "sha256": "bbac48eb93ffcf6e",
     "unique_abilities": 936
   },
   "output": {
     "bytecode_bytes": 91104,
-    "interned_strings": 5667,
+    "interned_strings": 5668,
     "card_ability_pairs": 2011,
-    "sha256": "a8b68534d1c4f278"
+    "sha256": "02f7df260de1f31a"
   }
 }

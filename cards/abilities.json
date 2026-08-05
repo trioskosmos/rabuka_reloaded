@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-05T18:04:29.578749",
+  "generated_at": "2026-08-05T18:51:44.926553",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "467d5c24",
+  "engine_commit": "09f8863d",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -6578,7 +6578,7 @@
             "text": "ライブ終了時まで、このメンバーが元々持つハートは、これにより下に置いたメンバーカードが持つハートと同じになる",
             "action": "set_heart_type",
             "heart_type": null,
-            "heart_source": "placed_under",
+            "ref_value": "placed_under",
             "original_value": true,
             "self_target": true,
             "card_type": "member_card",
