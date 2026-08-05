@@ -1030,6 +1030,69 @@ impl super::resolver::AbilityResolver {
         } else {
             &mapped_indices
         };
+        // C6 keep-N-shuffle-rest: the selected hand cards are KEPT in hand (not
+        // moved); the handler later shuffles the non-selected under the deck.
+        // Record the chosen card IDs into selected_cards and return — do NOT
+        // execute the selection (move) or clear selected_cards.
+        if self.keep_shuffle_under_phase > 0 {
+            let target = ctx
+                .target_player_id
+                .as_deref()
+                .unwrap_or("self")
+                .to_string();
+            let hand_cards: Vec<i16> = {
+                let p = gs.resolve_target_player_mut(&target);
+                p.hand.cards.to_vec()
+            };
+            // Record the chosen hand POSITIONS to keep (hand is unchanged during
+            // selection, so these absolute positions map onto the snapshot).
+            for &idx in hand_idx.iter() {
+                if !self.keep_shuffle_selected.contains(&idx) {
+                    self.keep_shuffle_selected.push(idx);
+                }
+            }
+            let count = self.keep_shuffle_under_count as usize;
+            let available_idxs: Vec<usize> = (0..hand_cards.len())
+                .filter(|i| !self.keep_shuffle_selected.contains(i))
+                .collect();
+            if hand_idx.len() < count && !hand_idx.is_empty() && !available_idxs.is_empty() {
+                // Still selecting (up to N) and more cards remain: re-prompt for
+                // the remaining, excluding positions already kept.
+                let remaining = count.saturating_sub(self.keep_shuffle_selected.len().min(count));
+                let fi = Some(available_idxs);
+                let desc = format!(
+                    "Select up to {} more card(s) from hand to keep",
+                    remaining
+                );
+                self.pending_choice = Some(
+                    self.build_reprompt(
+                        ctx,
+                        Zone::Hand.to_str(),
+                        remaining,
+                        desc,
+                        "手札からさらに選ぶ（スキップで終了）".to_string(),
+                        true,
+                        fi,
+                        Some(target.clone()),
+                        ctx.cost_total,
+                        ctx.cost_total_operator.clone(),
+                    )
+                    .build(),
+                );
+                self.store_pending_choice(gs);
+                return Ok(());
+            }
+            // Opponent's selection is recorded (phase 2). The effect does not
+            // re-enter at phase 2 (sub-choice resolution), so move opponent's
+            // non-selected hand cards under opponent's deck right here.
+            if self.keep_shuffle_under_phase == 2 {
+                let snapshot = self.keep_shuffle_under_snapshots[1].clone();
+                self.move_non_selected_hand_to_deck_bottom(gs, "opponent", &snapshot);
+                self.keep_shuffle_under_phase = 0;
+                self.keep_shuffle_under_snapshots.clear();
+            }
+            return self.handle_selection_epilogue(gs, _context);
+        }
         if !hand_idx.is_empty() || ctx.allow_skip {
             if !hand_idx.is_empty() && ctx.count > 0 && hand_idx.len() < ctx.count {
                 let target = ctx

@@ -9075,9 +9075,9 @@ def _set_both_hand_keep_shuffle_under(t: str, r: Dict[str, Any]) -> None:
     シャッフルして自身のデッキの下に置く。その後、それぞれカードをN枚引く。
 
     Emits:
-      select   (hand, both, count=N, max)          keep up to N
-      move     (hand -> deck_bottom, exclude_selected, shuffle, both)
-      draw     (deck -> hand, both, count=N)
+      select (hand, both, count=N, max, keep_shuffle_under)  keep up to N,
+              shuffle the REST under own deck (handled by the engine)
+      draw   (deck -> hand, both, count=N)
     """
     cm = re.search(r"カードを(\d+)枚まで選び", t)
     count = int(cm.group(1)) if cm else 1
@@ -9090,17 +9090,7 @@ def _set_both_hand_keep_shuffle_under(t: str, r: Dict[str, Any]) -> None:
             "source": "hand",
             "count": count,
             "max": True,
-            "target": "both",
-            "multiple_targets": True,
-        },
-        {
-            "text": t,
-            "action": "move_cards",
-            "source": "hand",
-            "destination": "deck_bottom",
-            "shuffle": True,
-            "exclude_selected": True,
-            "card_type": "card",
+            "keep_shuffle_under": True,
             "target": "both",
             "multiple_targets": True,
         },

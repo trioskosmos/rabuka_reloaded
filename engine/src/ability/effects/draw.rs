@@ -319,7 +319,116 @@ impl AbilityResolver {
         } else {
             effect.source_or(Zone::Hand.to_str())
         };
+        // C6 keep-N-shuffle-rest: both players keep up to N hand cards, shuffle
+        // the rest under their own deck. Handled entirely here (per-player
+        // selection + move), so the engine executes it exactly as written.
+        if effect.keep_shuffle_under_any().unwrap_or(false) {
+            return self.execute_both_hand_keep_shuffle_under(gs, effect);
+        }
         self.execute_select(gs, source, effect)
+    }
+
+    /// C6: 自分と相手はそれぞれ手札のカードをN枚まで選び(keep)、選んだカード以外を
+    /// シャッフルして自身のデッキの下に置く。
+    ///
+    /// Phase 0 → create self's hand selection choice (count N, max).
+    /// Phase 1 → self's selection resolved: move self's non-selected hand cards
+    ///           under self's deck (shuffled); create opponent's selection choice.
+    /// Phase 2 → opponent's selection resolved: move opponent's non-selected
+    ///           hand cards under opponent's deck (shuffled). Done.
+    pub fn execute_both_hand_keep_shuffle_under(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
+        let count = effect.count_or(1);
+        let phase = self.keep_shuffle_under_phase;
+        if phase == 0 {
+            self.keep_shuffle_under_count = count;
+            let player = gs.resolve_target_player_mut("self");
+            self.keep_shuffle_under_snapshots.clear();
+            self.keep_shuffle_under_snapshots
+                .push(player.hand.cards.to_vec());
+            let c = self.make_hand_selection_choice(gs, "self", count, effect);
+            self.keep_shuffle_under_phase = 1;
+            self.pending_choice = Some(c);
+            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+            return Ok(());
+        }
+        if phase == 1 {
+            // Self's selection is in self.selected_cards. Move self's non-selected
+            // hand cards under self's deck (shuffled).
+            let snapshot = self.keep_shuffle_under_snapshots[0].clone();
+            self.move_non_selected_hand_to_deck_bottom(gs, "self", &snapshot);
+            let player = gs.resolve_target_player_mut("opponent");
+            self.keep_shuffle_under_snapshots
+                .push(player.hand.cards.to_vec());
+            let c = self.make_hand_selection_choice(gs, "opponent", count, effect);
+            self.keep_shuffle_under_phase = 2;
+            self.pending_choice = Some(c);
+            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+            return Ok(());
+        }
+        // phase == 2: opponent's selection resolved.
+        let snapshot = self.keep_shuffle_under_snapshots[1].clone();
+        self.move_non_selected_hand_to_deck_bottom(gs, "opponent", &snapshot);
+        self.keep_shuffle_under_phase = 0;
+        self.keep_shuffle_under_snapshots.clear();
+        Ok(())
+    }
+
+    fn make_hand_selection_choice(
+        &mut self,
+        gs: &mut GameState,
+        player_target: &str,
+        count: u8,
+        _effect: &AbilityEffect,
+    ) -> crate::ability::types::Choice {
+        let player = gs.resolve_target_player_mut(player_target);
+        let hand_count = player.hand.cards.len();
+        let pick = count.min(hand_count as u8) as usize;
+        crate::ability::types::Choice::select_cards(
+            Zone::Hand.to_str(),
+            pick,
+            format!("Select up to {} card(s) to keep", count),
+            true, // allow_skip — "まで" means up to N
+        )
+        .target_player_id(Some(player_target.to_string()))
+        .build()
+    }
+
+    /// Move a player's hand cards that are NOT in `self.selected_cards` (their
+    /// kept selection) under their own deck, shuffled. Kept cards stay in hand.
+    pub(crate) fn move_non_selected_hand_to_deck_bottom(
+        &mut self,
+        gs: &mut GameState,
+        player_target: &str,
+        hand_snapshot: &[i16],
+    ) {
+        // hand_snapshot is the player's hand at selection time (unchanged since).
+        // Keep snapshot[kept_pos] in hand; move the other positions under deck.
+        let kept_positions = self.keep_shuffle_selected.to_vec();
+        let player = gs.resolve_target_player_mut(player_target);
+        // Remove the non-selected cards (the hand equals the snapshot here).
+        for (idx, cid) in hand_snapshot.iter().enumerate() {
+            if !kept_positions.contains(&idx) {
+                if let Some(pos) = player.hand.cards.iter().position(|c| c == cid) {
+                    player.hand.cards.remove(pos);
+                }
+            }
+        }
+        // "シャッフルし、自身のデッキの下に置く" — shuffle the moved cards, then
+        // place them at the bottom of the deck in the shuffled order.
+        let mut to_move: Vec<i16> = hand_snapshot
+            .iter()
+            .enumerate()
+            .filter(|(idx, _)| !kept_positions.contains(idx))
+            .map(|(_, cid)| *cid)
+            .collect();
+        crate::rng::shuffle_slice(&mut to_move);
+        for cid in to_move {
+            player.main_deck.cards.push(cid);
+        }
     }
 
     pub fn execute_draw(

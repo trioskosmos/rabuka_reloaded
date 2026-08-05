@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T02:35:36.633768",
+  "generated_at": "2026-08-06T02:48:16.654650",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "158ee13b",
+  "engine_commit": "44e242d1",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -21101,27 +21101,13 @@
             "source": "hand",
             "count": 3,
             "max": true,
+            "keep_shuffle_under": true,
             "target": "both",
             "multiple_targets": true,
             "group_names": [
               "Aqours"
             ],
             "shuffle": true,
-            "baton_touch_trigger": true
-          },
-          {
-            "text": "『Aqours』のメンバーからバトンタッチして登場した場合、自分と相手はそれぞれ、自身の手札のカードを3枚まで選び、選んだカード以外のカードをシャッフルし、自身のデッキの下に置く。その後、自分と相手はそれぞれカードを3枚引く",
-            "action": "move_cards",
-            "source": "selected_cards",
-            "destination": "deck_bottom",
-            "shuffle": true,
-            "exclude_selected": true,
-            "card_type": "card",
-            "target": "both",
-            "multiple_targets": true,
-            "group_names": [
-              "Aqours"
-            ],
             "baton_touch_trigger": true
           },
           {

@@ -56,6 +56,16 @@ pub struct AbilityResolver {
     pub selected_cards: SmallVec<[i16; 4]>,
     pub selected_area: Option<String>,
     pub moved_cards: SmallVec<[i16; 4]>,
+    /// C6 keep-N-shuffle-rest: phase 0=idle, 1=awaiting self's hand selection,
+    /// 2=awaiting opponent's hand selection. Snapshots hold each player's hand
+    /// at selection time so the non-selected cards can be moved under the deck.
+    pub keep_shuffle_under_phase: u8,
+    pub keep_shuffle_under_count: u8,
+    pub keep_shuffle_under_snapshots: SmallVec<[Vec<i16>; 2]>,
+    /// The hand POSITIONS each player chose to KEEP (per keep-shuffle phase).
+    /// Stored as positions, not card ids, because a hand can hold multiple
+    /// copies of the same card id (e.g. test fillers).
+    pub keep_shuffle_selected: SmallVec<[usize; 8]>,
     pub spawn_context: EffectSpawnContext,
     pub sub_choice_created: bool,
     /// Snapshot of `selected_cards.len()` taken when a choice is created
@@ -101,6 +111,10 @@ impl AbilityResolver {
             selected_cards: SmallVec::new(),
             selected_area: None,
             moved_cards: SmallVec::new(),
+            keep_shuffle_under_phase: 0,
+            keep_shuffle_under_count: 0,
+            keep_shuffle_under_snapshots: SmallVec::new(),
+            keep_shuffle_selected: SmallVec::new(),
             spawn_context: EffectSpawnContext::default(),
             sub_choice_created: false,
             selected_count_at_save: None,

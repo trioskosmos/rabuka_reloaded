@@ -787,6 +787,9 @@ pub struct EffectFilter {
     /// The addend used when `blade_limit_from_energy_under` is set (the
     /// "1を足した数" +N in the text), so the JSON makes the +N explicit.
     pub blade_limit_offset: Option<u8>,
+    /// C6 keep-N-shuffle-rest: both players each select up to `count` hand
+    /// cards to keep; the OTHER hand cards shuffle under their own deck.
+    pub keep_shuffle_under: Option<bool>,
     pub need_heart_color: Option<ArcStr>,
     pub need_heart_operator: Option<Operator>,
     pub need_heart_total: Option<u8>,
@@ -1132,6 +1135,7 @@ impl AbilityEffect {
                 .and_then(parse_operator),
             blade_limit_from_energy_under: bool_field!("blade_limit_from_energy_under"),
             blade_limit_offset: u8_field!("blade_limit_offset"),
+            keep_shuffle_under: bool_field!("keep_shuffle_under"),
             need_heart_color: str_field!("need_heart_color"),
             need_heart_operator: obj
                 .get("need_heart_operator")
@@ -1467,6 +1471,7 @@ impl AbilityEffect {
     filter_u8_getter!(blade_limit_any, blade_limit);
     filter_bool_getter!(blade_limit_from_energy_under_any, blade_limit_from_energy_under);
     filter_u8_getter!(blade_limit_offset_any, blade_limit_offset);
+    filter_bool_getter!(keep_shuffle_under_any, keep_shuffle_under);
 
     filter_copy_getter!(blade_limit_operator_any, Operator, blade_limit_operator);
 

@@ -51,19 +51,34 @@ fn baton_touch_dia(game: &mut TestGame) -> i16 {
     dia
 }
 
-/// Count cards under the deck bottom region (the last N cards of main_deck).
-fn deck_bottom_region(game: &mut TestGame, player: usize) -> Vec<i16> {
-    let deck = if player == 1 {
-        &game.state.player1.main_deck.cards
-    } else {
-        &game.state.player2.main_deck.cards
-    };
-    // The cards moved to "deck bottom" are the ones placed at the end.
-    deck.to_vec()
+/// Drive both players through the keep-N-shuffle-rest: each player keeps the
+/// given hand indices on their FIRST hand choice; every subsequent hand choice
+/// (a "select more" re-prompt) is skipped so the player keeps exactly those.
+fn both_players_keep(game: &mut TestGame, keep_indices: &[usize]) {
+    let mut self_done = false;
+    let mut opp_done = false;
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 30 {
+        guard += 1;
+        match game.get_pending_choice() {
+            rabuka_engine::ability::types::Choice::SelectCard {
+                target_player_id, ..
+            } => {
+                let tp = target_player_id.as_deref().unwrap_or("self");
+                if tp == "self" && !self_done {
+                    game.select_indices(keep_indices);
+                    self_done = true;
+                } else if tp == "opponent" && !opp_done {
+                    game.select_indices(keep_indices);
+                    opp_done = true;
+                } else {
+                    game.select_indices(&[]); // skip re-prompt
+                }
+            }
+            _ => game.select_indices(&[]),
+        }
+    }
 }
-
-/// Basic flow: 4 cards in each hand → each selects 3 to keep → 1 shuffled under
-/// own deck → both draw 3.
 #[test]
 fn c6_keep_3_shuffle_rest_under_then_draw_3() {
     let db = load_real_database();
@@ -175,5 +190,130 @@ fn c6_hands_processed_independently() {
         game.state.player2.hand.cards.len(),
         p2_hand_before + 3,
         "P2: none sent under, 3 drawn"
+    );
+}
+
+// ====================================================================
+// More edge cases
+// ====================================================================
+
+/// Keep fewer than the max (2 of 5) → 3 go under each deck; both draw 3.
+#[test]
+fn c6_select_2_shuffle_3_under() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    seed_decks(&mut game);
+    fill_hands(&mut game, 5);
+    let p1_hand_before = game.state.player1.hand.cards.len();
+    let p2_hand_before = game.state.player2.hand.cards.len();
+    let p1_deck_before = game.state.player1.main_deck.cards.len();
+    let p2_deck_before = game.state.player2.main_deck.cards.len();
+
+    baton_touch_dia(&mut game);
+    both_players_keep(&mut game, &[0, 1]); // each keeps 2 of 5
+
+    // Both: kept 2, sent 3 under, drew 3 → 2+3 = 5 (== before).
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        p1_hand_before,
+        "P1: kept 2, sent 3 under, drew 3"
+    );
+    assert_eq!(
+        game.state.player2.hand.cards.len(),
+        p2_hand_before,
+        "P2: kept 2, sent 3 under, drew 3"
+    );
+    // 3 moved under, then 3 drawn from the top → deck length unchanged.
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        p1_deck_before,
+        "P1 deck net unchanged (3 under, 3 drawn)"
+    );
+    assert_eq!(
+        game.state.player2.main_deck.cards.len(),
+        p2_deck_before,
+        "P2 deck net unchanged (3 under, 3 drawn)"
+    );
+}
+
+/// Skip the selection entirely (up to N, can keep 0) → the whole hand goes
+/// under each deck, then both draw 3.
+#[test]
+fn c6_skip_keeps_none_shuffles_all_under() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    seed_decks(&mut game);
+    fill_hands(&mut game, 3);
+    let p1_hand_before = game.state.player1.hand.cards.len();
+    let p2_hand_before = game.state.player2.hand.cards.len();
+    let p1_deck_before = game.state.player1.main_deck.cards.len();
+    let p2_deck_before = game.state.player2.main_deck.cards.len();
+
+    baton_touch_dia(&mut game);
+    both_players_keep(&mut game, &[]); // each keeps 0
+
+    // 0 kept + 3 drawn = 3 (same as before, since all 3 went under).
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        p1_hand_before,
+        "P1: kept 0, all 3 under, drew 3"
+    );
+    assert_eq!(
+        game.state.player2.hand.cards.len(),
+        p2_hand_before,
+        "P2: kept 0, all 3 under, drew 3"
+    );
+    // 3 moved under, 3 drawn → net unchanged.
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        p1_deck_before,
+        "P1 deck net unchanged (3 under, 3 drawn)"
+    );
+    assert_eq!(
+        game.state.player2.main_deck.cards.len(),
+        p2_deck_before,
+        "P2 deck net unchanged (3 under, 3 drawn)"
+    );
+}
+
+/// Hand of exactly N (the max) → all kept, nothing shuffled under.
+#[test]
+fn c6_hand_exactly_max_all_kept() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    seed_decks(&mut game);
+    fill_hands(&mut game, 3);
+    let p1_hand_before = game.state.player1.hand.cards.len();
+    let p2_hand_before = game.state.player2.hand.cards.len();
+    let p1_deck_before = game.state.player1.main_deck.cards.len();
+    let p2_deck_before = game.state.player2.main_deck.cards.len();
+
+    baton_touch_dia(&mut game);
+    both_players_keep(&mut game, &[0, 1, 2]); // each keeps all 3 (== max)
+
+    // Both kept all 3, nothing under, drew 3 → +3.
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        p1_hand_before + 3,
+        "P1: kept all 3, nothing under, drew 3"
+    );
+    assert_eq!(
+        game.state.player2.hand.cards.len(),
+        p2_hand_before + 3,
+        "P2: kept all 3, nothing under, drew 3"
+    );
+    // Nothing moved under, 3 drawn → 3 fewer in each deck.
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        p1_deck_before - 3,
+        "P1 deck: 3 drawn, nothing moved under"
+    );
+    assert_eq!(
+        game.state.player2.main_deck.cards.len(),
+        p2_deck_before - 3,
+        "P2 deck: 3 drawn, nothing moved under"
     );
 }
