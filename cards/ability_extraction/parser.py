@@ -1137,6 +1137,17 @@ def _classify_cost(cost, text):
     if cost.get("source") and cost.get("destination"):
         return "move_cards"
     if cost.get("destination") == "under_member":
+        # Placing a card under a member: infer the placed card's type from the
+        # object, not from the "このメンバーの下に" location phrase.
+        #   energy under member: "エネルギー置き場にあるエネルギー1枚を…下に置く"
+        #   member under member: "このカードを…登場したメンバーの下に置く"
+        if re.search(r"エネルギー\s*\d*\s*枚", text) or "エネルギーカード" in text:
+            cost["card_type"] = "energy_card"
+        elif "このカード" in text or "メンバーカード" in text:
+            cost["card_type"] = "member_card"
+        if not cost.get("source"):
+            src = extract_source(text)
+            cost["source"] = src or "energy_zone"
         return "place_energy_under_member"
     if cost.get("destination") in ("energy_deck", "energy_zone") and not cost.get(
         "source"
@@ -9033,6 +9044,27 @@ _register_effect_rule(
         condition=_exact_effect_phrase("カードを3枚引く"),
         action="draw_card",
         defaults={"count": 3},
+        setter=lambda t, r: _fill_defaults(r, t),
+    )
+)
+# C5: dynamic blade-limit wait — "元々持つブレードの数がこのメンバーの下にある
+# エネルギーカードの枚数に1を足した数以下のメンバー1人をウェイトにする".
+# The limit is computed at resolution time as (energy cards under this member) + 1.
+_register_effect_rule(
+    EffectPattern(
+        match="の下にあるエネルギーカードの枚数に1を足した数以下",
+        action="change_state",
+        defaults={
+            "state_change": "wait",
+            "count": 1,
+            "card_type": "member_card",
+            "target": "opponent",
+            "original_value": True,
+            "blade_limit": 1,
+            "blade_limit_operator": "<=",
+            "blade_limit_from_energy_under": True,
+            "source": None,
+        },
         setter=lambda t, r: _fill_defaults(r, t),
     )
 )

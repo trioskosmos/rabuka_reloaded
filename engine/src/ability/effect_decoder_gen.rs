@@ -83,6 +83,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "cost_limit_operator" => { ek.cost_limit_operator = bc.read_operator_value(); return Some(true); }
             "blade_limit" => { ek.blade_limit = bc.read_u8_value(); return Some(true); }
             "blade_limit_operator" => { ek.blade_limit_operator = bc.read_operator_value(); return Some(true); }
+            "blade_limit_from_energy_under" => { ek.blade_limit_from_energy_under = bc.read_bool_value(); return Some(true); }
             "need_heart_color" => { ek.need_heart_color = bc.read_arc_str_value(); return Some(true); }
             "need_heart_operator" => { ek.need_heart_operator = bc.read_operator_value(); return Some(true); }
             "need_heart_total" => { ek.need_heart_total = bc.read_u8_value(); return Some(true); }
@@ -218,6 +219,7 @@ pub(crate) struct EffectKindLocals {
     pub any_number: Option<bool>,
     pub baton_touch_trigger: Option<bool>,
     pub blade_limit: Option<u8>,
+    pub blade_limit_from_energy_under: Option<bool>,
     pub blade_limit_operator: Option<Operator>,
     pub blade_type: Option<ArcStr>,
     pub blind: Option<bool>,
@@ -377,6 +379,7 @@ fn build_filter(ek: &EffectKindLocals) -> EffectFilter {
         cost_limit_operator: ek.cost_limit_operator.clone(),
         blade_limit: ek.blade_limit.clone(),
         blade_limit_operator: ek.blade_limit_operator.clone(),
+        blade_limit_from_energy_under: ek.blade_limit_from_energy_under.clone(),
         need_heart_color: ek.need_heart_color.clone(),
         need_heart_operator: ek.need_heart_operator.clone(),
         need_heart_total: ek.need_heart_total.clone(),

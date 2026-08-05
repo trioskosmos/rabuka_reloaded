@@ -63,7 +63,22 @@ impl AbilityResolver {
         let destination = effect.destination.as_deref();
         let cost_limit_operator = effect.cost_limit_operator_any().map(|s| s.to_string());
         let characters = effect.characters_any();
-        let blade_limit = effect.blade_limit_any().map(|v| v as u8);
+        let blade_limit: Option<u8> = if effect.blade_limit_from_energy_under_any().unwrap_or(false) {
+            // C5: dynamic limit = (energy cards under the activating member) + blade_limit.
+            let base = effect.blade_limit_any().unwrap_or(0) as i32;
+            let under_count = gs.activating_card.map_or(0, |aid| {
+                let p = gs.resolve_target_player("self");
+                p.stage
+                    .stage
+                    .iter()
+                    .position(|&id| id == aid)
+                    .map(|idx| p.stage.under_cards[idx].len() as i32)
+                    .unwrap_or(0)
+            });
+            Some((under_count + base).max(0) as u8)
+        } else {
+            effect.blade_limit_any().map(|v| v as u8)
+        };
         let blade_limit_operator_binding = effect.blade_limit_operator_any();
         let blade_limit_operator = blade_limit_operator_binding.as_deref();
         // When targeting opponent, group_names is trigger-level metadata

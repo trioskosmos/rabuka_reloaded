@@ -86,3 +86,22 @@ python cards/generate_effect_decoder.py
 ```
 
 The generator parses `card.rs`, so it stays in sync automatically.
+
+## Fixing an ability: tests-first workflow
+
+For every parser/engine fix (each entry in `cards/_bp07_ability_gaps_hand_analysis.md`):
+
+1. **Write the Rust integration tests first** (`engine/tests/test_modules/*_test.rs`,
+   registered in `mod.rs`), encoding exactly what the Japanese text says — not what
+   the current parser emits. Cover **every edge case** the text implies (boundaries,
+   negative cases, group/type filters, original-vs-current values, prompts vs
+   auto-targeting, duration/cleanup).
+2. **Steal the harness from tests of similar abilities** (same trigger, same
+   action type): live-start gain tests, wait/change_state tests,
+   place_energy_under_member tests, both-player effects, etc.
+3. Run the new tests — they must FAIL against the current parser/engine output.
+4. Fix `cards/ability_extraction/parser.py`, regenerate:
+   `bash cards/regenerate.sh` (extract + compile + schema).
+5. Fix the engine (`engine/src/...`) as needed.
+6. `cargo test --test run_all` — new tests pass AND all existing tests stay green.
+7. Commit. Then move to the next ability.

@@ -781,6 +781,9 @@ pub struct EffectFilter {
     /// effect's `original_value` flag when building a CardFilter.
     pub blade_limit: Option<u8>,
     pub blade_limit_operator: Option<Operator>,
+    /// Dynamic blade limit: when set, the effective blade_limit is
+    /// (energy cards under the activating member) + blade_limit (C5).
+    pub blade_limit_from_energy_under: Option<bool>,
     pub need_heart_color: Option<ArcStr>,
     pub need_heart_operator: Option<Operator>,
     pub need_heart_total: Option<u8>,
@@ -1124,6 +1127,7 @@ impl AbilityEffect {
                 .get("blade_limit_operator")
                 .and_then(|v| v.as_str())
                 .and_then(parse_operator),
+            blade_limit_from_energy_under: bool_field!("blade_limit_from_energy_under"),
             need_heart_color: str_field!("need_heart_color"),
             need_heart_operator: obj
                 .get("need_heart_operator")
@@ -1457,6 +1461,7 @@ impl AbilityEffect {
     filter_bool_getter!(any_number_any, any_number);
 
     filter_u8_getter!(blade_limit_any, blade_limit);
+    filter_bool_getter!(blade_limit_from_energy_under_any, blade_limit_from_energy_under);
 
     filter_copy_getter!(blade_limit_operator_any, Operator, blade_limit_operator);
 
