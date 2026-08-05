@@ -30,12 +30,11 @@ struct PreloadedDb {
 
 static PRELOADED: OnceLock<PreloadedDb> = OnceLock::new();
 
-/// Enable `log::debug!` output from the engine (env_logger) so ability/resolver
-/// traces show in test output. Set RUST_LOG=debug or default to debug.
+/// Enable `log::debug!` output from the engine (env_logger). OFF by default;
+/// turn it on for a specific test with e.g. `RUST_LOG=debug cargo test --test
+/// run_all <failing_test> -- --nocapture`.
 fn init_test_logger() {
-    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug"))
-        .format_timestamp(None)
-        .try_init();
+    let _ = env_logger::Builder::from_env(env_logger::Env::default()).try_init();
 }
 
 /// Load (once) and return a pre-seeded database.
