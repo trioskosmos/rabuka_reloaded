@@ -799,6 +799,15 @@ impl MainDeck {
         }
     }
 
+    /// Draw the bottom card (last index). Returns None if deck is empty.
+    pub fn draw_bottom(&mut self) -> Option<i16> {
+        if self.cards.is_empty() {
+            None
+        } else {
+            self.cards.pop()
+        }
+    }
+
     pub fn draw_multiple(&mut self, count: usize) -> Vec<i16> {
         (0..count).filter_map(|_| self.draw()).collect()
     }

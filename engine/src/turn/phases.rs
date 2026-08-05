@@ -408,17 +408,26 @@ impl super::TurnEngine {
                     if let Some(ref bheart) = card.blade_heart {
                         for (color, count) in &bheart.hearts {
                             use crate::card::HeartColor;
+                            // b_heart07 mechanic: the key parses to HeartColor::Heart00
+                            // (colorless), and `b_heart07: N` means 2×N colorless hearts.
+                            // Colorless hearts can ONLY replace heart0 requirements —
+                            // never a specific color (heart01-heart06).
+                            let amount = if *color == HeartColor::Heart00 {
+                                count * 2
+                            } else {
+                                *count
+                            };
                             match color {
                                 HeartColor::Draw => {}
                                 HeartColor::Score => {
-                                    notes += count;
-                                    new_cheer_count += count;
+                                    notes += amount;
+                                    new_cheer_count += amount;
                                 }
                                 _ => {
                                     let idx = color.index();
                                     if idx < 8 {
-                                        bh[idx] += count;
-                                        new_total_hearts[idx] += count;
+                                        bh[idx] += amount;
+                                        new_total_hearts[idx] += amount;
                                     }
                                 }
                             }

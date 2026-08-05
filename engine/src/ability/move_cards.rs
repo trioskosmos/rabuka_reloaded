@@ -906,6 +906,45 @@ impl AbilityResolver {
                 }
                 Ok(drawn)
             }
+            Some(Zone::DeckBottom) => {
+                // Take `count` cards from the BOTTOM of the deck (last indices),
+                // e.g. "自分のデッキの下からカードを3枚控え室に置く".
+                if effect.optional.unwrap_or(false) {
+                    let entry = gs.ability_queue.current_entry();
+                    let decided = entry
+                        .as_ref()
+                        .and_then(|e| e.conditional_choice.as_ref())
+                        .is_some();
+                    if !decided {
+                        if let Some(entry_mut) = gs.ability_queue.current_entry_mut() {
+                            entry_mut.choice_card_no =
+                                Some(crate::ability::types::ChoiceRoute::Raw(
+                                    "pay_optional_cost".to_string(),
+                                ));
+                        }
+                        self.pending_choice = Some(Choice::SelectTarget {
+                            target: "pay_optional_cost:skip_optional_cost".to_string(),
+                            description: "Place bottom card of deck to waiting room?".to_string(),
+                            description_en: Some(
+                                "Place bottom card of deck to waiting room?".to_string(),
+                            ),
+                            description_ja: Some("山札の下を控え室に置きますか？".to_string()),
+                            allow_skip: true,
+                            options: Some(vec!["No".to_string(), "Yes".to_string()]),
+                        });
+                        return Ok(vec![]);
+                    }
+                }
+                let mut drawn = Vec::new();
+                for _i in 0..count {
+                    if let Some(card) = player.main_deck.draw_bottom() {
+                        drawn.push(card);
+                    } else {
+                        break;
+                    }
+                }
+                Ok(drawn)
+            }
             Some(Zone::EnergyDeck) => {
                 let mut drawn = Vec::new();
                 for _i in 0..count {
@@ -1410,7 +1449,6 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        // Resolve dynamic_count if count is not explicitly set
         let count = if effect.count.is_some() {
             effect.count.unwrap() as usize
         } else if let Some(ref dc) = effect.dynamic_count_any() {
@@ -1574,8 +1612,6 @@ impl AbilityResolver {
             &destination,
             &card_db,
         )?;
-
-        // --- STEP 2: Any-order deck placement (before consuming taken) ---
         let is_deck_dest = Zone::from_str(&destination) == Some(Zone::Deck)
             || Zone::from_str(&destination) == Some(Zone::DeckTop);
         let is_eligible_source = Zone::from_str(&source) == Some(Zone::Discard)

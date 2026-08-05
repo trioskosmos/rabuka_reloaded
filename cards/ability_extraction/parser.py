@@ -2622,11 +2622,11 @@ def parse_action(text: str) -> Dict[str, Any]:
         ActionRule(
             match="繰り返してもよい",
             action="repeat_procedure",
-            setter=lambda t, a: a.update(
-                {"max_repeats": int(re.search(r"(\d+)回", t).group(1))}
-            )
-            if re.search(r"(\d+)回", t)
-            else None,
+            setter=lambda t, a: (
+                a.update({"max_repeats": int(m.group(1))})
+                if (m := re.search(r"(\d+)回", t)) is not None
+                else None
+            ),
         )
     )
     R(ActionRule(match="何もしない", action="do_nothing"))
@@ -2777,28 +2777,33 @@ def parse_action(text: str) -> Dict[str, Any]:
             setter=lambda t, a: a.update({"condition_text": t}),
         )
     )
+
+    def _set_heart_selection_resource(t, a):
+        m = re.search(r"［([^］]+)ハート］", t)
+        color_map = {
+            "緑": "heart01",
+            "赤": "heart02",
+            "青": "heart03",
+            "黄": "heart04",
+            "紫": "heart05",
+            "白": "heart06",
+        }
+        selected = ""
+        if m is not None:
+            selected = m.group(1)
+        a.update(
+            {
+                "resource": "heart",
+                "heart_selection": True,
+                "heart_colors": [color_map.get(selected, "heart00")],
+            }
+        )
+
     R(
         ActionRule(
             condition=lambda t: bool(re.search(r"［[^］]+ハート］", t)),
             action="gain_resource",
-            setter=lambda t, a: a.update(
-                {
-                    "resource": "heart",
-                    "heart_selection": True,
-                    "heart_colors": [
-                        {
-                            "緑": "heart01",
-                            "赤": "heart02",
-                            "青": "heart03",
-                            "黄": "heart04",
-                            "紫": "heart05",
-                            "白": "heart06",
-                        }.get(re.search(r"［([^］]+)ハート］", t).group(1), "heart00")
-                    ]
-                    if re.search(r"［([^］]+)ハート］", t)
-                    else ["heart00"],
-                }
-            ),
+            setter=_set_heart_selection_resource,
         )
     )
 

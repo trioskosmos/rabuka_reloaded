@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-05T18:51:44.926553",
+  "generated_at": "2026-08-05T19:09:25.476559",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "09f8863d",
+  "engine_commit": "774ae685",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -21165,6 +21165,7 @@
         "action": "look_and_select",
         "look_action": {
           "text": "自分のデッキの下からカードを3枚見る。",
+          "source": "deck_bottom",
           "count": 3,
           "target": "self",
           "action": "look_at"
@@ -21196,11 +21197,11 @@
         "actions": [
           {
             "text": "自分のデッキの下からカードを3枚控え室に置く",
+            "source": "deck_bottom",
             "destination": "discard",
             "count": 3,
             "target": "self",
             "action": "move_cards",
-            "source": "hand",
             "card_type": "card",
             "heart_colors": [
               "heart04"
@@ -21285,11 +21286,11 @@
         "actions": [
           {
             "text": "自分のデッキの一番下のカードを控え室に置いてもよい",
+            "source": "deck_bottom",
             "destination": "discard",
             "target": "self",
             "optional": true,
             "action": "move_cards",
-            "source": "hand",
             "card_type": "card",
             "count": 1
           },
@@ -21378,11 +21379,11 @@
         "actions": [
           {
             "text": "自分のデッキの下からカードを1枚控え室に置く",
+            "source": "deck_bottom",
             "destination": "discard",
             "count": 1,
             "target": "self",
             "action": "move_cards",
-            "source": "hand",
             "card_type": "card",
             "heart_colors": [
               "heart00"
@@ -21435,6 +21436,7 @@
         "action": "conditional_alternative",
         "alternative_effect": {
           "text": "デッキの下から行う",
+          "source": "deck_bottom",
           "action": "custom"
         },
         "primary_effect": {
@@ -35965,6 +35967,7 @@
         "actions": [
           {
             "text": "自分のデッキの一番下のカードを見る",
+            "source": "deck_bottom",
             "target": "self",
             "action": "look_at",
             "count": 1
@@ -36004,11 +36007,11 @@
         "actions": [
           {
             "text": "自分のデッキの下からカードを2枚控え室に置く",
+            "source": "deck_bottom",
             "destination": "discard",
             "count": 2,
             "target": "self",
             "action": "move_cards",
-            "source": "hand",
             "card_type": "card"
           },
           {
@@ -36181,11 +36184,11 @@
         "actions": [
           {
             "text": "自分のデッキの下からカードを1枚控え室に置く",
+            "source": "deck_bottom",
             "destination": "discard",
             "count": 1,
             "target": "self",
             "action": "move_cards",
-            "source": "hand",
             "card_type": "card",
             "heart_colors": [
               "heart02"
@@ -36267,10 +36270,10 @@
         "actions": [
           {
             "text": "自分のデッキの一番下のカードを控え室に置く",
+            "source": "deck_bottom",
             "destination": "discard",
             "target": "self",
             "action": "move_cards",
-            "source": "hand",
             "card_type": "card",
             "count": 1,
             "heart_colors": [
@@ -36381,11 +36384,11 @@
               "location": "stage",
               "target": "self"
             },
+            "source": "deck_bottom",
             "destination": "discard",
             "count": 5,
             "target": "self",
             "action": "move_cards",
-            "source": "hand",
             "card_type": "card"
           },
           {

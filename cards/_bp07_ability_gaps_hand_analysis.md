@@ -499,7 +499,7 @@ Same legend as Part 1:
 
 ## New defect groups discovered in the "clean" set
 
-### CLEAN-G1. "デッキの下から / デッキの一番下" → `source: "hand"` (recurring bug, 6 abilities)
+### CLEAN-G1. "デッキの下から / デッキの一番下" → `source: "hand"` (recurring bug, 6 abilities) — ✅ FIXED
 
 The phrase "自分のデッキの下から…控え室に置く" (and "デッキの一番下のカード") is
 parsed as a move **from the hand** instead of from `deck_bottom`. This is a real
@@ -507,15 +507,31 @@ bug affecting the whole BP07 N-block. Text clearly says the card comes from the
 bottom of the deck.
 
 Affected (all confirmed in JSON):
-- D7  `PL!S-bp7-006-R` 津島善子 ab#0 — `"source": "hand"` (line 21187)
-- D8  `PL!S-bp7-008-R` 小原鞠莉 ab#1 — `"source": "hand"` (line 21276)
-- D9  `PL!S-bp7-020-L` HAPPY PARTY TRAIN ab#1 — `"source": "hand"` (line 21369)
-- D11 `PL!S-bp7-011-N` 桜内梨子 ab#0 — `"source": "hand"` (line 35995)
-- D13 `PL!S-bp7-015-N` 津島善子 ab#0 — `"source": "hand"` (line 36172)
-- D14 `PL!S-bp7-017-N` 小原鞠莉 ab#0 — `"source": "hand"` (line 36257)
+- D7  `PL!S-bp7-006-R` 津島善子 ab#0 — was `"source": "hand"` → now `deck_bottom` ✅
+- D8  `PL!S-bp7-008-R` 小原鞠莉 ab#1 — was `"source": "hand"` → now `deck_bottom` ✅
+- D9  `PL!S-bp7-020-L` HAPPY PARTY TRAIN ab#1 — was `"source": "hand"` → now `deck_bottom` ✅
+- D11 `PL!S-bp7-011-N` 桜内梨子 ab#0 — was `"source": "hand"` → now `deck_bottom` ✅
+- D13 `PL!S-bp7-015-N` 津島善子 ab#0 — was `"source": "hand"` → now `deck_bottom` ✅
+- D14 `PL!S-bp7-017-N` 小原鞠莉 ab#0 — was `"source": "hand"` → now `deck_bottom` ✅
 
-Fix: recognize デッキの下/一番下 as `source:"deck_bottom"` for `move_cards`
-(these are deck-bottom **to discard**, distinct from the C7/C8 look pattern).
+Fixed (parser + engine + tests):
+- **Parser**: `SOURCE_PATTERNS` in parser_utils.py gained `デッキの一番下のカードを` and
+  `デッキの下から` → `deck_bottom` (placed before the generic `デッキの上から`).
+- **Engine**: `resolve_cards_from_source` in move_cards.rs had a `Deck|DeckTop`
+  branch but NO `DeckBottom` arm — the source silently resolved to nothing, so
+  zero cards were ever moved. Added `Zone::DeckBottom` arm that pops from the
+  deck end via a new `MainDeck::draw_bottom()` (zones.rs). Optional deck-bottom
+  moves (e.g. 鞠莉 "…置いてもよい") also needed the yes/no prompt: reused the
+  `pay_optional_cost` choice routing, and `handle_optional_cost_payment`'s
+  `is_deck_top` gate now also accepts `deck_bottom` so paying the optional move
+  re-runs it with the card actually drawn.
+- **Tests**: `engine/tests/test_modules/bp7_deck_bottom_source_test.rs` (4 tests)
+  covering 津島善子 PL!S-bp7-006-R (live start, bottom 3 → discard + Aqours
+  heart04 follow-up), 津島善子 PL!S-bp7-015-N (live start, bottom 1), and
+  小原鞠莉 PL!S-bp7-008-R (optional "一番下" discard). All verify the BOTTOM
+  cards (not top / not hand) leave the deck.
+- All 10 deck_bottom source nodes in the DB verified legitimate (7 move→discard,
+  2 look_at, 1 yell-source). No unintended re-parses.
 
 ### CLEAN-G2. `destination: null` on "…の下に置く" (member-under placement)
 
@@ -666,10 +682,10 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
 | 12 | PL!-PR-020-PR 高坂穂乃果 ab#0 | ✅ | — (gain_ability + condition) |
 | 13 | PL!-PR-021-PR 矢澤にこ ab#0 | ✅ | — (energy==7 → blade2) |
 | 14 | PL!S-bp7-001-R 高海千歌 ab#0 | ❌ D22 | 桜内梨子/渡辺曜 names dropped in result_condition |
-| 15 | PL!S-bp7-006-R 津島善子 ab#0 | ❌ D7 | デッキの下 from → `source:"hand"` |
-| 16 | PL!S-bp7-008-R 小原鞠莉 ab#1 | ❌ D8+D8b | deck-bottom → hand; 松浦果南/黒澤ダイヤ → custom |
+| 15 | PL!S-bp7-006-R 津島善子 ab#0 | ✅ | D7 FIXED — デッキの下 → `deck_bottom` |
+| 16 | PL!S-bp7-008-R 小原鞠莉 ab#1 | ⚠️ D8b | D8 fixed (deck-bottom source) — 松浦果南/黒澤ダイヤ names still `custom` (CLEAN-G5) |
 | 17 | PL!S-bp7-020-L HAPPY PARTY TRAIN ab#0 | ✅ | — (all active → reduce hearts) |
-| 18 | PL!S-bp7-020-L HAPPY PARTY TRAIN ab#1 | ❌ D9 | デッキの下 from → `source:"hand"` |
+| 18 | PL!S-bp7-020-L HAPPY PARTY TRAIN ab#1 | ✅ | D9 FIXED — デッキの下 → `deck_bottom` |
 | 19 | PL!S-bp7-022-L 恋になりたいAQUARIUM ab#0 | ❌ D10 | yell-from-bottom → both branches `custom` |
 | 20 | PL!S-bp7-022-L 恋になりたいAQUARIUM ab#1 | ✅ | — (revealed heart02/04/05 → +1) |
 | 21 | PL!N-bp7-025-L Colorful Dreams! ab#0 | ✅ | — (1 虹ヶ咲 member → blade) |
@@ -681,12 +697,12 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
 | 27 | PL!SP-bp7-009-R 鬼塚夏美 ab#1 | ✅ | — (center, blade≤2 opp → wait) |
 | 28 | PL!N-sd2-026-P Fire Bird ab#0 | ❌ D19 | blade4 filter → blade+4; heart 2 → 4 |
 | 29 | PL!SP-PR-024-PR 平安名すみれ ab#0 | ✅ | — (yell + score-icon card → heart06) |
-| 30 | PL!S-bp7-011-N 桜内梨子 ab#0 | ❌ D11 | デッキの下 from → `source:"hand"` |
+| 30 | PL!S-bp7-011-N 桜内梨子 ab#0 | ✅ | D11 FIXED — デッキの下 → `deck_bottom` |
 | 31 | PL!S-bp7-012-N 松浦果南 ab#0 | ❌ D12 | formation-change action missing |
 | 32 | PL!S-bp7-014-N 渡辺 曜 ab#0 | ✅ | — (opp energy>self → heart02) |
-| 33 | PL!S-bp7-015-N 津島善子 ab#0 | ❌ D13 | デッキの下 from → `source:"hand"` |
+| 33 | PL!S-bp7-015-N 津島善子 ab#0 | ✅ | D13 FIXED — デッキの下 → `deck_bottom` |
 | 34 | PL!S-bp7-016-N 国木田花丸 ab#0 | ✅ | — (3+ members → heart02/04/05) |
-| 35 | PL!S-bp7-017-N 小原鞠莉 ab#0 | ❌ D14 | デッキの一番下 from → `source:"hand"` |
+| 35 | PL!S-bp7-017-N 小原鞠莉 ab#0 | ✅ | D14 FIXED — デッキの一番下 → `deck_bottom` |
 | 36 | PL!S-bp7-024-L ときめき分類学 ab#0 | ❌ D15 | 元々のハートがheart04になる → `custom` |
 | 37 | PL!S-bp7-025-L Guilty Night, Guilty Kiss! ab#0 | ✅ | — (choice: wait≤2 / draw1) |
 | 38 | PL!N-bp7-020-N エマ・ヴェルデ ab#0 | ❌ D27 | "2種類以上のブレードハートの色" → only `count:1 >=` of member cards, color-diversity lost |
@@ -720,7 +736,7 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
 
 - **38 / 63 genuinely fine** (parser produced faithful structure).
 - **25 / 63 have a genuine defect**, dominated by:
-  - **6×** the `source:"hand"` deck-bottom bug (CLEAN-G1) — one parser fix, high blast radius.
+  - **6×** the `source:"hand"` deck-bottom bug (CLEAN-G1) — one parser fix, high blast radius. **FIXED (2026-08-05).**
   - **3×** character-name conditions reduced to "any card" or `custom` (CLEAN-G5).
   - **2×** unresolvable `dynamic_count` (CLEAN-G6).
   - **2×** energy-placed trigger modeled as comparison instead of zone_change (CLEAN-G17).
@@ -743,9 +759,10 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
 ## Recommended order (updated)
 
 1. Group B (B1–B6) — smallest field-gap fixes. **B1, B2 DONE (2026-08-05).**
-2. **CLEAN-G1** (6 abilities) — single recurring `source:"hand"`→`deck_bottom` fix.
-3. CLEAN-G5 + D20 (4 abilities) — character-name conditions (`characters` array).
-4. Group C parser-only (C1, C2, C4–C9).
-5. CLEAN-G2/G3/G4/G8/G9/G10/G11/G12/G13/G16/D27 (one-off structure fixes).
-6. CLEAN-G6/G7/G14/G15/D26 (structure + dynamic-count/cost restructuring).
-7. C3 + CLEAN-G17 (overlap / trigger-modeling) last, engine-aware.
+2. **CLEAN-G1** (6 abilities) — recurring `source:"hand"`→`deck_bottom`. **DONE (2026-08-05): parser + engine DeckBottom draw branch + optional-pay routing; tests in `bp7_deck_bottom_source_test.rs`.**
+3. **C4** (桜坂しずく ab#0) — under-member move + heart-copy. **DONE (2026-08-05): `_try_place_under_heart_copy` + `heart_copy` modifier; tests in `bp7_heart_copy_test.rs`.**
+4. CLEAN-G5 + D20 (4 abilities) — character-name conditions (`characters` array).
+5. Group C parser-only (C1, C2, C5–C9).
+6. CLEAN-G2/G3/G4/G8/G9/G10/G11/G12/G13/G16/D27 (one-off structure fixes).
+7. CLEAN-G6/G7/G14/G15/D26 (structure + dynamic-count/cost restructuring).
+8. C3 + CLEAN-G17 (overlap / trigger-modeling) last, engine-aware.

@@ -89,7 +89,13 @@ impl core::fmt::Display for CardType {
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum HeartColor {
     #[cfg_attr(feature = "serde_support", serde(rename = "heart00", alias = "heart0"))]
-    Heart00, // Index 0 - wildcard, can be treated as any heart01-heart06
+    // Index 0 - COLORLESS heart (heart_00.png, rule 2.1.1.2: "a heart icon that
+    // does not specify a color"). A colorless heart can ONLY satisfy the heart0
+    // requirement bucket of a live card (the total-count bucket of rule 2.11.3);
+    // it can NEVER be used as a specific color (heart01-heart06). This is the
+    // opposite of the icon_all heart (HeartColor::All, index 7, rule 2.1.1.3)
+    // which CAN be treated as any one color during the performance check.
+    Heart00,
     #[cfg_attr(feature = "serde_support", serde(rename = "heart01"))]
     Heart01,
     #[cfg_attr(feature = "serde_support", serde(rename = "heart02"))]
@@ -4449,6 +4455,12 @@ impl core::str::FromStr for HeartColor {
             ($($variant:ident => $str:expr, $sl:expr, $idx:expr),+ $(,)?) => {
                 Ok(match s {
                     $($str => HeartColor::$variant,)+
+                    // `b_heart07` is a blade heart that produces COLORLESS
+                    // (heart0 / heart00) hearts. Mechanic: `b_heart07: N` grants
+                    // 2×N colorless hearts (the ×2 is applied at conversion in
+                    // live.rs / phases.rs). Colorless hearts can ONLY satisfy
+                    // heart0 requirements — never a specific color.
+                    "heart07" | "b_heart07" => HeartColor::Heart00,
                     _ if s.starts_with("b_") => {
                         HeartColor::from_str(&s[2..]).unwrap_or(HeartColor::Heart00)
                     }

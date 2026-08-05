@@ -1001,7 +1001,7 @@ impl AbilityResolver {
         let is_deck_top = gs
             .entry_effect()
             .and_then(|e| e.source.as_deref())
-            .is_some_and(|s| s == "deck_top" || s == "deck")
+            .is_some_and(|s| s == "deck_top" || s == "deck" || s == "deck_bottom")
             || gs
                 .ability_queue
                 .current_entry()
@@ -1010,6 +1010,7 @@ impl AbilityResolver {
                     pa.iter().any(|a| {
                         a.source.as_deref() == Some("deck_top")
                             || a.source.as_deref() == Some("deck")
+                            || a.source.as_deref() == Some("deck_bottom")
                     })
                 })
                 .unwrap_or(false);

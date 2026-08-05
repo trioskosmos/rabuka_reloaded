@@ -338,13 +338,17 @@ impl super::TurnEngine {
                             eprintln!("[LIVE-DBG] live[{}] no modifiers", i);
                         }
                         let passed = {
-                            let mut wildcard = filled[0] + filled[7];
+                            // COLORLESS hearts (filled[0], e.g. from b_heart07) count
+                            // toward the heart0/total bucket but can NEVER be used as a
+                            // specific color — only icon_all (filled[7]) can cover a
+                            // colored-note deficit.
+                            let mut icon_all = filled[7];
                             let mut ok = true;
                             let total_filled: u8 = filled.iter().sum();
                             let total_required: u8 = required_arr.iter().sum();
                             eprintln!(
-                                "[LIVE-DBG] live[{}] total_filled={} total_required={} wildcard={}",
-                                i, total_filled, total_required, wildcard
+                                "[LIVE-DBG] live[{}] total_filled={} total_required={} icon_all={}",
+                                i, total_filled, total_required, icon_all
                             );
                             if total_filled < total_required {
                                 eprintln!("[LIVE-DBG] live[{}] FAIL: total_filled({}) < total_required({})",
@@ -352,27 +356,27 @@ impl super::TurnEngine {
                                 ok = false;
                             }
                             if ok && required_arr[0] > 0 {
-                                let h00_satisfied: u8 = filled[1..7].iter().sum();
-                                if h00_satisfied + wildcard < required_arr[0] {
-                                    eprintln!("[LIVE-DBG] live[{}] FAIL: h00_req={} h00_satisfied={} wildcard={}",
-                                        i, required_arr[0], h00_satisfied, wildcard);
+                                let any_hearts: u8 = filled[1..7].iter().sum::<u8>() + filled[0];
+                                if any_hearts + icon_all < required_arr[0] {
+                                    eprintln!("[LIVE-DBG] live[{}] FAIL: h00_req={} any_hearts={} icon_all={}",
+                                        i, required_arr[0], any_hearts, icon_all);
                                     ok = false;
                                 } else {
-                                    let used = required_arr[0].saturating_sub(h00_satisfied);
-                                    wildcard = wildcard.saturating_sub(used);
+                                    let used = required_arr[0].saturating_sub(any_hearts);
+                                    icon_all = icon_all.saturating_sub(used);
                                 }
                             }
                             if ok {
                                 for idx in 1..7 {
                                     if filled[idx] < required_arr[idx] {
                                         let deficit = required_arr[idx] - filled[idx];
-                                        eprintln!("[LIVE-DBG] live[{}] color[{}] deficit={} wildcard_remaining={}",
-                                            i, idx, deficit, wildcard);
-                                        if wildcard >= deficit {
-                                            wildcard -= deficit;
+                                        eprintln!("[LIVE-DBG] live[{}] color[{}] deficit={} icon_all_remaining={}",
+                                            i, idx, deficit, icon_all);
+                                        if icon_all >= deficit {
+                                            icon_all -= deficit;
                                         } else {
-                                            eprintln!("[LIVE-DBG] live[{}] FAIL: color[{}] deficit={} can't cover with wildcard={}",
-                                                i, idx, deficit, wildcard);
+                                            eprintln!("[LIVE-DBG] live[{}] FAIL: color[{}] deficit={} can't cover with icon_all={}",
+                                                i, idx, deficit, icon_all);
                                             ok = false;
                                             break;
                                         }
@@ -1399,7 +1403,9 @@ impl super::TurnEngine {
                 BladeColor::Green => HeartColor::Heart04,
                 BladeColor::Blue => HeartColor::Heart05,
                 BladeColor::Purple => HeartColor::Heart06,
-                BladeColor::All => HeartColor::Heart00,
+                // ALL blade = "any one color heart" (rule 2.1.1.3), i.e. icon_all
+                // (HeartColor::All, index 7) — NOT colorless Heart00.
+                BladeColor::All => HeartColor::All,
             }
         };
         let override_color = (0..3)
@@ -1459,6 +1465,18 @@ impl super::TurnEngine {
 
                 if let Some(ref bh) = card.blade_heart {
                     for (color, count) in &bh.hearts {
+                        // b_heart07 mechanic: the key parses to HeartColor::Heart00
+                        // (colorless), and `b_heart07: N` means 2×N colorless hearts.
+                        // A colorless heart can ONLY be used to replace heart0
+                        // requirements — never a specific color (heart01-heart06).
+                        // The ×2 is applied on the ORIGINAL color (before any
+                        // set_blade_type recoloring), so a recolored b_heart07 still
+                        // contributes 2 hearts of the new color.
+                        let amount = if *color == HeartColor::Heart00 {
+                            count * 2
+                        } else {
+                            *count
+                        };
                         // Draw/Score special icons are never converted by
                         // set_blade_type — they pass through unchanged.
                         let effective_color =
@@ -1471,21 +1489,21 @@ impl super::TurnEngine {
                         // Mapped to HeartColor::All (icon_all, index 7) so the UI
                         // displays icon_all.png for BAll yell hearts.
                         if effective_color == HeartColor::BAll {
-                            *owned_hearts.hearts.entry_or_default(HeartColor::All) += count;
-                            bh_arr[7] += count;
-                            total_hearts_arr[7] += count;
+                            *owned_hearts.hearts.entry_or_default(HeartColor::All) += amount;
+                            bh_arr[7] += amount;
+                            total_hearts_arr[7] += amount;
                         } else if effective_color == HeartColor::Draw {
-                            draw_icons += count;
+                            draw_icons += amount;
                         // Q44: Each score icon revealed during yell adds 1 to total score.
                         } else if effective_color == HeartColor::Score {
-                            note_icons += count;
-                            cheer_icon_count += count;
+                            note_icons += amount;
+                            cheer_icon_count += amount;
                         } else {
                             let idx = effective_color.index();
                             if idx < 8 {
-                                *owned_hearts.hearts.entry_or_default(effective_color) += count;
-                                bh_arr[idx] += count;
-                                total_hearts_arr[idx] += count;
+                                *owned_hearts.hearts.entry_or_default(effective_color) += amount;
+                                bh_arr[idx] += amount;
+                                total_hearts_arr[idx] += amount;
                             }
                         }
                     }
@@ -1607,11 +1625,12 @@ impl super::TurnEngine {
     ///
     /// Strategy (in order per card):
     ///   1a_colored       — matching colored hearts → specific color req
-    ///   1b_h00_wild      — Heart00 wildcard → remaining color deficit (NO icon_all yet)
-    ///   2_wildcard       — remaining Heart00 wild → color deficit (second pass)
     ///   3a_colored_surplus — leftover colored hearts → Heart00 req (demand-aware:
     ///                        prefers colors with most surplus vs future demand)
-    ///   3b_h00           — Heart00 → remaining Heart00 req
+    ///   3b_h00           — Heart00 (COLORLESS, e.g. from b_heart07) → Heart00 req.
+    ///                      A colorless heart can NEVER fill a specific color req —
+    ///                      it only counts toward the heart0/total bucket
+    ///                      (rule 2.1.1.2 / 2.11.3).
     ///   4_all_cleanup    — icon_all → ANY remaining deficit (color first, then heart00)
     ///                     NO icon_all is used before this phase.
     ///
@@ -1743,49 +1762,10 @@ impl super::TurnEngine {
                 }
             }
 
-            // Phase 1b: Heart00 wild → remaining color deficit (no icon_all)
-            for c in 1..7 {
-                if need[c] > filled[c] && pool[0] > 0 {
-                    let deficit = need[c] - filled[c];
-                    let take = pool[0].min(deficit);
-                    allocs.push(Allocation {
-                        target_idx: live_idx as u8,
-                        target_name: card_name.clone(),
-                        source_type: SourceType::Stage,
-                        source_name: SourceName::WildcardHeart00,
-                        source_slot: None,
-                        wildcard: true,
-                        color: c as u8,
-                        amount: take,
-                        is_bonus: false,
-                        phase: AllocPhase::H00Wild,
-                    });
-                    pool[0] -= take;
-                    filled[c] += take;
-                }
-            }
-
-            // Phase 2: remaining Heart00 wild → color deficit (second pass for multi-deficit)
-            for c in 1..7 {
-                if need[c] > filled[c] && pool[0] > 0 {
-                    let deficit = need[c] - filled[c];
-                    let take = pool[0].min(deficit);
-                    allocs.push(Allocation {
-                        target_idx: live_idx as u8,
-                        target_name: card_name.clone(),
-                        source_type: SourceType::Stage,
-                        source_name: SourceName::WildcardHeart00,
-                        source_slot: None,
-                        wildcard: true,
-                        color: c as u8,
-                        amount: take,
-                        is_bonus: false,
-                        phase: AllocPhase::Wildcard,
-                    });
-                    pool[0] -= take;
-                    filled[c] += take;
-                }
-            }
+            // NOTE: There is deliberately NO phase where Heart00 (COLORLESS)
+            // hearts fill a specific color requirement. A colorless heart
+            // (e.g. from b_heart07) can ONLY replace heart0 requirements
+            // (rule 2.1.1.2), never a heart01-heart06 note (rule 2.11.3).
 
             // Phase 3a: total remaining deficit = total_required - total_filled_so_far.
             // Need[0] is the "any" portion, but the total must also be met.
@@ -1826,7 +1806,9 @@ impl super::TurnEngine {
                     }
                 }
 
-                // Phase 3b: Heart00 → remaining Heart00 deficit
+                // Phase 3b: Heart00 (COLORLESS) → remaining Heart00 deficit.
+                // Colorless hearts (e.g. b_heart07) go ONLY into the heart0
+                // bucket — never a specific color.
                 if filled_h00 < h00_deficit && pool[0] > 0 {
                     let take = pool[0].min(h00_deficit - filled_h00);
                     allocs.push(Allocation {
@@ -1919,27 +1901,30 @@ impl super::TurnEngine {
         for (i, cn) in card_needs.iter().enumerate() {
             let filled = per_card_filled[i];
             let req = cn.need;
-            let mut wildcard = filled[0] + filled[7];
             let mut ok = true;
             let total_filled: u8 = filled.iter().sum();
             let total_required: u8 = req.iter().sum();
             if total_filled < total_required {
                 ok = false;
             }
+            // COLORLESS hearts (filled[0], e.g. from b_heart07) count toward the
+            // heart0/total bucket but can NEVER be used as a specific color.
+            // Only icon_all (filled[7]) can cover a colored-note deficit.
+            let mut icon_all = filled[7];
             if ok && req[0] > 0 {
-                let h00_satisfied: u8 = filled[1..7].iter().sum();
-                if h00_satisfied + wildcard < req[0] {
+                let any_hearts: u8 = filled[1..7].iter().sum::<u8>() + filled[0];
+                if any_hearts + icon_all < req[0] {
                     ok = false;
                 } else {
-                    wildcard = wildcard.saturating_sub(req[0].saturating_sub(h00_satisfied));
+                    icon_all = icon_all.saturating_sub(req[0].saturating_sub(any_hearts));
                 }
             }
             if ok {
                 for idx in 1..7 {
                     if filled[idx] < req[idx] {
                         let deficit = req[idx] - filled[idx];
-                        if wildcard >= deficit {
-                            wildcard -= deficit;
+                        if icon_all >= deficit {
+                            icon_all -= deficit;
                         } else {
                             ok = false;
                             break;
@@ -2006,49 +1991,10 @@ impl super::TurnEngine {
             }
         }
 
-        // Phase 1b: Heart00 → color deficit (no choice, uses only heart00)
-        for c in 1..7 {
-            if need[c] > filled[c] && pool[0] > 0 {
-                let deficit = need[c] - filled[c];
-                let take = pool[0].min(deficit);
-                allocs.push(Allocation {
-                    target_idx: idx as u8,
-                    target_name: card_name.clone(),
-                    source_type: SourceType::Stage,
-                    source_name: SourceName::WildcardHeart00,
-                    source_slot: None,
-                    wildcard: true,
-                    color: c as u8,
-                    amount: take,
-                    is_bonus: false,
-                    phase: AllocPhase::H00Wild,
-                });
-                pool[0] -= take;
-                filled[c] += take;
-            }
-        }
-
-        // Phase 2: second pass Heart00 → color deficit
-        for c in 1..7 {
-            if need[c] > filled[c] && pool[0] > 0 {
-                let deficit = need[c] - filled[c];
-                let take = pool[0].min(deficit);
-                allocs.push(Allocation {
-                    target_idx: idx as u8,
-                    target_name: card_name.clone(),
-                    source_type: SourceType::Stage,
-                    source_name: SourceName::WildcardHeart00,
-                    source_slot: None,
-                    wildcard: true,
-                    color: c as u8,
-                    amount: take,
-                    is_bonus: false,
-                    phase: AllocPhase::Wildcard,
-                });
-                pool[0] -= take;
-                filled[c] += take;
-            }
-        }
+        // NOTE: There is deliberately NO phase where Heart00 (COLORLESS)
+        // hearts fill a specific color requirement. A colorless heart
+        // (e.g. from b_heart07) can ONLY replace heart0 requirements
+        // (rule 2.1.1.2), never a heart01-heart06 note (rule 2.11.3).
 
         // ----- Choice phases: Phase 3a (which surplus colors → heart00) -----
         let total_filled_so_far: u8 = filled.iter().sum();
@@ -2166,7 +2112,9 @@ impl super::TurnEngine {
         let total_required: u8 = need.iter().sum();
         let h00_deficit = total_required.saturating_sub(total_filled_so_far);
 
-        // Phase 3b: Heart00 → remaining deficit (no choice, forced)
+        // Phase 3b: Heart00 (COLORLESS) → remaining heart0/total deficit.
+        // Colorless hearts (e.g. b_heart07) go ONLY into the heart0 bucket —
+        // never a specific color. Forced (no choice).
         if h00_deficit > 0 && pool[0] > 0 {
             let take = pool[0].min(h00_deficit);
             allocs.push(Allocation {
@@ -2328,25 +2276,28 @@ impl super::TurnEngine {
     }
 
     /// Check if a single card's requirements are satisfied with its filled array.
+    /// COLORLESS hearts (filled[0], e.g. from b_heart07) count toward the
+    /// heart0/total bucket but can NEVER be used as a specific color — only
+    /// icon_all (filled[7]) can cover a colored-note deficit.
     fn card_ok_with_wildcard(filled: [u8; 8], need: [u8; 8]) -> bool {
-        let mut wildcard = filled[0] + filled[7];
+        let mut icon_all = filled[7];
         let total_filled: u8 = filled.iter().sum();
         let total_required: u8 = need.iter().sum();
         if total_filled < total_required {
             return false;
         }
         if need[0] > 0 {
-            let h00_satisfied: u8 = filled[1..7].iter().sum();
-            if h00_satisfied + wildcard < need[0] {
+            let any_hearts: u8 = filled[1..7].iter().sum::<u8>() + filled[0];
+            if any_hearts + icon_all < need[0] {
                 return false;
             }
-            wildcard = wildcard.saturating_sub(need[0].saturating_sub(h00_satisfied));
+            icon_all = icon_all.saturating_sub(need[0].saturating_sub(any_hearts));
         }
         for idx in 1..7 {
             if filled[idx] < need[idx] {
                 let deficit = need[idx] - filled[idx];
-                if wildcard >= deficit {
-                    wildcard -= deficit;
+                if icon_all >= deficit {
+                    icon_all -= deficit;
                 } else {
                     return false;
                 }
@@ -2444,7 +2395,10 @@ impl super::TurnEngine {
                     }
                 }
                 let filled = per_card_filled[live_idx];
-                let mut wildcard = filled[0] + filled[7];
+                // COLORLESS hearts (filled[0], e.g. from b_heart07) count toward the
+                // heart0/total bucket but can NEVER be used as a specific color —
+                // only icon_all (filled[7]) can cover a colored-note deficit.
+                let mut icon_all = filled[7];
                 let mut ok = true;
                 let total_filled: u8 = filled.iter().sum();
                 let total_required: u8 = required_arr.iter().sum();
@@ -2452,20 +2406,20 @@ impl super::TurnEngine {
                     ok = false;
                 }
                 if ok && required_arr[0] > 0 {
-                    let h00_satisfied: u8 = filled[1..7].iter().sum();
-                    if h00_satisfied + wildcard < required_arr[0] {
+                    let any_hearts: u8 = filled[1..7].iter().sum::<u8>() + filled[0];
+                    if any_hearts + icon_all < required_arr[0] {
                         ok = false;
                     } else {
-                        wildcard =
-                            wildcard.saturating_sub(required_arr[0].saturating_sub(h00_satisfied));
+                        icon_all =
+                            icon_all.saturating_sub(required_arr[0].saturating_sub(any_hearts));
                     }
                 }
                 if ok {
                     for idx in 1..7 {
                         if filled[idx] < required_arr[idx] {
                             let deficit = required_arr[idx] - filled[idx];
-                            if wildcard >= deficit {
-                                wildcard -= deficit;
+                            if icon_all >= deficit {
+                                icon_all -= deficit;
                             } else {
                                 ok = false;
                                 break;

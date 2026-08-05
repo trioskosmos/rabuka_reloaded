@@ -421,6 +421,8 @@ SOURCE_PATTERNS: List[Tuple[str, str]] = [
     ("ステージから", "stage"),
     # Standard patterns (longest-first for correct matching)
     ("デッキの一番下から", "deck_bottom"),
+    ("デッキの一番下のカードを", "deck_bottom"),
+    ("デッキの下から", "deck_bottom"),
     ("デッキの上から", "deck_top"),
     ("エネルギーデッキから", "energy_deck"),
     ("デッキから", "deck"),
@@ -891,7 +893,7 @@ class PriorityRegistry:
     """Priority-sorted handler registry. No fragile ordering — add handlers at any priority."""
 
     def __init__(self, name: str = "registry"):
-        self._handlers: List[Tuple[int, str, callable]] = []
+        self._handlers: List[Tuple[int, str, Callable]] = []
         self._name = name
         self._sorted = False
 
@@ -909,7 +911,9 @@ class PriorityRegistry:
             self._sorted = True
         return self._handlers
 
-    def dispatch(self, text: str, ctx: dict = None, *, default: Any = None) -> Any:
+    def dispatch(
+        self, text: str, ctx: Optional[dict] = None, *, default: Any = None
+    ) -> Any:
         """Run handlers in priority order. First non-None return wins."""
         if ctx is None:
             ctx = {}
@@ -959,7 +963,7 @@ class ActionRule:
     setter: Optional[Callable] = None  # complex setter (text, action) → None
     extract_optional: bool = False  # auto-detect optional from "もよい"
 
-    def matches(self, text: str, action: Dict = None) -> bool:
+    def matches(self, text: str, action: Optional[Dict] = None) -> bool:
         if self.match and self.match not in text:
             return False
         if self.match_any and not any(m in text for m in self.match_any):
@@ -1039,7 +1043,7 @@ class EffectPattern:
                 return False
         return True
 
-    def __call__(self, text: str, ctx: dict = None) -> Optional[Dict]:
+    def __call__(self, text: str, ctx: Optional[dict] = None) -> Optional[Dict]:
         if not self.matches(text):
             return None
         result: Dict = {"text": text, "action": self.action}
