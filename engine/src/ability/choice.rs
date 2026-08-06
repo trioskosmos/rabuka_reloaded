@@ -2877,7 +2877,7 @@ impl super::resolver::AbilityResolver {
                 // The player chose to place the card — insert use_limit key
                 // after the player borrow is done (avoid conflicts with gs).
                 if let Some(key) = use_limit_key {
-                    gs.record_ability_use(key, true, "c2880");
+                    gs.record_ability_use(key);
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
                         log::debug!("[DECK_DIAG] recorded use_limit for optional effect");
                     }
@@ -3015,7 +3015,7 @@ impl super::resolver::AbilityResolver {
                         // instead of this each_time ab#1) leaves the real ability unmarked
                         // as used, so a later movement re-trigger re-queues it forever.
                         let key = (cid, entry.ability_index, turn);
-                        gs.record_ability_use(key, true, "c3011");
+                        gs.record_ability_use(key);
                     }
                 }
             }

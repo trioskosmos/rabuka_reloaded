@@ -728,21 +728,13 @@ impl AbilityResolver {
         self.current_ability_index = Some(ability_index);
         gs.activating_card = activating_card;
 
-        if let Some(ref key) = ability_key {
+        if let Some(card_id) = activating_card {
             if let Some(use_limit) = ability.use_limit {
-                let used = gs
-                    .turn_limited_abilities_used
-                    .get(key)
-                    .copied()
-                    .unwrap_or(0);
-                if u8::from(used) >= use_limit {
+                let used = gs.ability_uses_used(card_id, ability_index);
+                if used >= use_limit {
                     let msg = format!(
                         "Ability already used {} of {} times this turn",
                         used, use_limit
-                    );
-                    eprintln!(
-                        "[REN_GATE] resolve({:?}) BLOCKED: used={} limit={}",
-                        key, used, use_limit
                     );
                     dbg.p("RESULT", &msg);
                     let items = drain_verdicts();
@@ -832,7 +824,7 @@ impl AbilityResolver {
                         .as_ref()
                         .is_none_or(|e| self.can_activate_effect(gs, e));
                     if can_activate {
-                        gs.record_ability_use(*key, true, "r831");
+                        gs.record_ability_use(*key);
                     }
                 }
             }
@@ -938,7 +930,7 @@ impl AbilityResolver {
                         && ability.triggers.as_deref() == Some(crate::triggers::ACTIVATION)
                     {
                         if let Some(ref key) = ability_key {
-                            gs.record_ability_use(*key, true, "r937");
+                            gs.record_ability_use(*key);
                         }
                     }
                     dbg.p("RESULT", "effect condition not met — skipped");
@@ -982,7 +974,7 @@ impl AbilityResolver {
                     ) || is_optional_pos;
                     if let Some(ref key) = ability_key {
                         if ability.use_limit.is_some() && !skip_use_limit {
-                            gs.record_ability_use(*key, true, "r981");
+                            gs.record_ability_use(*key);
                         }
                     }
                 }
@@ -1015,7 +1007,7 @@ impl AbilityResolver {
                         .as_ref()
                         .is_none_or(|e| self.can_activate_effect(gs, e));
                     if can_activate {
-                        gs.record_ability_use(*key, true, "r1014");
+                        gs.record_ability_use(*key);
                     }
                 }
             }
@@ -1038,7 +1030,7 @@ impl AbilityResolver {
                         .as_ref()
                         .is_none_or(|e| self.can_activate_effect(gs, e))
                 {
-                    gs.record_ability_use(key, true, "r1037");
+                    gs.record_ability_use(key);
                 }
             }
         }

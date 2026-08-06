@@ -529,6 +529,33 @@ validate the destination zone (only count cards still in the target zone) — wa
 destination zone — it counts cards from recently_moved_cards by type/property")
 and regressed 3 Rurino tests. The correct fix is the enqueue-time use_limit gate.
 
+### RT1 hardening — single source of truth for use_limit (2026-08-06)
+
+The follow-up refactor removed the scattered, inconsistent use-limit handling
+that made RT1 hard to find and easy to regress:
+
+- **One recorder.** `GameState::record_ability_use(key)` is now the *only* method
+  that mutates `turn_limited_abilities_used`. The ~8 ad-hoc call sites that each
+  hand-rolled `turn_limited_abilities_used.entry(key).or_insert(0) += 1` (resolver
+  `r831/r937/r981/r1014/r1037`, choice `c2880/c3011`, actions `a935`) now all
+  delegate to it. It guarantees once-per-activation (via the current queue entry's
+  `use_limit_recorded`) and saturates the `u8` count so a runaway caller can never
+  overflow it again.
+- **One gate.** The trigger-time gate (`ability_has_remaining_uses`, used by the
+  enqueue scan) and the resolution-time gate (used in `resolver.rs`) both read the
+  same accessor, so they can never disagree about whether an ability still has
+  uses left. This is the invariant that prevents the each_time re-queue loop.
+- **Key derived from the current entry.** The optional-cost handler records the use
+  against `entry.ability_index` — the ability actually being resolved — instead of
+  scanning the card for the *first* ability with a use_limit. That removes the
+  "recorded the wrong ability (ab#0 instead of ab#1)" bug class entirely.
+- **No debug spam.** The temporary `[REN_UL]`/`[REN_GATE]` `eprintln!`
+  instrumentation is removed (use-limit events are `log::debug!` behind the
+  existing `ABILITY_DEBUG` flag). The two safety timeouts
+  (`process_current_ability`, `handle_conditional_optional` → `AbilityQueue::clear()`)
+  remain as defense-in-depth.
+
+
 ---
 
 # Part 2 — Clean-abilities audit (the 63 "clean" abilities)

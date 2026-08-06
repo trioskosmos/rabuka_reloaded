@@ -51,36 +51,56 @@ impl GameState {
         })
     }
 
-    /// Record one use of a limited ability (once/twice per turn). Guarded so a
-    /// single activation that resolves across multiple phases (e.g. a choice)
-    /// only consumes one use. Returns true if the use was newly recorded.
-    pub(crate) fn record_ability_use(
-        &mut self,
-        key: (i16, usize, u8),
-        has_use_limit: bool,
-        site: &str,
-    ) -> bool {
-        if !has_use_limit {
-            return false;
-        }
-        let already = self
+    /// Uses of `(card_id, ability_index)` already consumed this turn.
+    pub fn ability_uses_used(&self, card_id: i16, ability_index: usize) -> u8 {
+        self.turn_limited_abilities_used
+            .get(&(card_id, ability_index, self.turn_number))
+            .copied()
+            .unwrap_or(0)
+    }
+
+    /// True if the ability may still be used this turn (below its per-turn limit).
+    /// Abilities without a limit are always allowed. This is the single source of
+    /// truth for the trigger-time gate (see `trigger_auto_abilities_for_player_with_event`)
+    /// and the resolution-time gate (see `resolver.rs`): keeping them in sync is what
+    /// prevents a once-per-turn each_time watcher from being re-queued forever.
+    pub fn ability_has_remaining_uses(&self, card_id: i16, ability_index: usize) -> bool {
+        let Some(limit) = self
+            .card_database
+            .get_card(card_id)
+            .and_then(|c| c.abilities.get(ability_index))
+            .and_then(|ar| ar.resolve().use_limit)
+        else {
+            return true;
+        };
+        self.ability_uses_used(card_id, ability_index) < limit
+    }
+
+    /// Record one use of a limited ability this turn. This is the **only** method
+    /// that mutates `turn_limited_abilities_used`.
+    ///
+    /// Two guarantees make the per-turn limit robust regardless of how the caller
+    /// reached us:
+    ///   - *Once-per-activation*: a single activation that resolves across several
+    ///     phases/choices (cost → effect → optional follow-up) consumes exactly one
+    ///     use. Callers may invoke this from any branch point; the current queue
+    ///     entry's `use_limit_recorded` flag deduplicates them.
+    ///   - *Overflow-proof*: the count saturates, so a runaway caller can never
+    ///     overflow the `u8` counter (and once saturated the enqueue gate keeps
+    ///     rejecting the ability).
+    ///
+    /// Returns true iff this call actually consumed a (new) use.
+    pub(crate) fn record_ability_use(&mut self, key: (i16, usize, u8)) -> bool {
+        if self
             .ability_queue
             .current_entry()
-            .is_some_and(|e| e.use_limit_recorded);
-        if already {
-            eprintln!(
-                "[REN_UL] record_ability_use({:?}) ALREADY recorded @{} — skipping",
-                key, site
-            );
+            .is_some_and(|e| e.use_limit_recorded)
+        {
+            log::debug!("[use_limit] {key:?} already recorded this activation — skipping");
             return false;
         }
-        *self.turn_limited_abilities_used.entry(key).or_insert(0) += 1;
-        eprintln!(
-            "[REN_UL] record_ability_use({:?}) @{} now used={}",
-            key,
-            site,
-            self.turn_limited_abilities_used.get(&key).copied().unwrap_or(0)
-        );
+        let entry = self.turn_limited_abilities_used.entry(key).or_insert(0);
+        *entry = entry.saturating_add(1);
         if let Some(e) = self.ability_queue.current_entry_mut() {
             e.use_limit_recorded = true;
         }
@@ -616,21 +636,10 @@ impl GameState {
             // effect's card movement (e.g. a "recover a card to hand" follow-up),
             // and without this guard a used ability gets re-queued forever,
             // flooding the queue in a runaway loop. Declined abilities are not
-            // recorded as used, so they still re-trigger (Q233).
-            if let Some(card) = self.card_database.get_card(card_id) {
-                if let Some(ar) = card.abilities.get(ability_idx) {
-                    if let Some(limit) = ar.resolve().use_limit {
-                        let key = (card_id, ability_idx, self.turn_number);
-                        let used = self
-                            .turn_limited_abilities_used
-                            .get(&key)
-                            .copied()
-                            .unwrap_or(0);
-                        if used >= limit {
-                            continue;
-                        }
-                    }
-                }
+            // recorded as used, so they still re-trigger (Q233). This mirrors the
+            // resolution-time gate in resolver.rs via the shared accessor.
+            if !self.ability_has_remaining_uses(card_id, ability_idx) {
+                continue;
             }
             // Look up card_no from the card_id for the queue entry
             let card_no = self
