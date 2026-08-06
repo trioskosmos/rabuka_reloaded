@@ -1604,6 +1604,9 @@ def parse_condition(text: str) -> Dict[str, Any]:
             _enrich_or_location(result, text)
             # Heart-content filter: 必要ハートに含まれるheartXXがN → add heart_colors
             _enrich_heart_content(result, text)
+            # G11 blade-max comparison flag (handler path skips _extract_generic_fields)
+            if "より多くの" in text and "ブレード" in text and "持つ" in text:
+                result["blade_greater_than_all"] = True
             return result
 
     # Fall-through: generic field extraction + type inference
@@ -5449,6 +5452,13 @@ def _extract_generic_fields(condition, text):
         bl = extract_blade_limit(text)
         if bl:
             condition.update(bl)
+
+    # G11: "…ほかのすべてのメンバーより多くのブレードを持つ場合" — the referenced
+    # member has strictly MORE blade than every other stage member on both sides.
+    # Emits a dedicated flag the engine resolves as a max-comparison
+    # (see evaluate_blade_greater_than_all). Distinct from a plain blade count limit.
+    if "より多くの" in text and "ブレード" in text and "持つ" in text:
+        condition["blade_greater_than_all"] = True
 
 
 def _infer_condition_type(condition, text):

@@ -2458,6 +2458,8 @@ pub struct ConditionCommon {
     pub all_areas: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub baton_touch_trigger: Option<bool>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub blade_greater_than_all: Option<bool>,
     pub cache: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub card_property: Option<CardProperty>,
@@ -3306,6 +3308,10 @@ impl Condition {
 
     pub fn get_all(&self) -> Option<bool> {
         self.common().and_then(|c| c.all)
+    }
+
+    pub fn get_blade_greater_than_all(&self) -> Option<bool> {
+        self.common().and_then(|c| c.blade_greater_than_all)
     }
 
     pub fn get_area_direction(&self) -> Option<&str> {

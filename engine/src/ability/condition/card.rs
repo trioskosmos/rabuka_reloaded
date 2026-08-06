@@ -1201,6 +1201,12 @@ impl<'a> ConditionContext<'a> {
             return false;
         }
 
+        // G11: "ほかのすべてのメンバーより多くのブレードを持つ" — the selected
+        // member has strictly MORE blade than every other stage member (both sides).
+        if condition.get_blade_greater_than_all().unwrap_or(false) {
+            return self.evaluate_blade_greater_than_all(condition, is_both);
+        }
+
         // all=true with no operator/count → "more hearts than all others" comparison
         if condition.get_all().unwrap_or(false)
             && condition.get_operator().is_none()
@@ -1504,8 +1510,69 @@ impl<'a> ConditionContext<'a> {
         true
     }
 
+    /// G11: "そのメンバーが、自分と相手のステージにいるほかのすべてのメンバー
+    /// より多くのブレードを持つ場合" — the SELECTED member (from a preceding
+    /// select step) has strictly MORE blade than every other stage member on
+    /// both sides. Reference is the last selected card, not the activating card
+    /// (which for a live-success live card is the live card itself).
+    fn evaluate_blade_greater_than_all(&self, condition: &Condition, is_both: bool) -> bool {
+        let reference_id = match self.selected_card_ids.last() {
+            Some(&id) => id,
+            None => return false,
+        };        let reference_blade = self
+            .game_state
+            .card_database
+            .get_card(reference_id)
+            .map(|c| c.blade)
+            .unwrap_or(0);
+        let card_db = &self.game_state.card_database;
+        let card_type = condition.get_card_type().map(|ct| ct.as_str());
+
+        let mut other_ids: Vec<i16> = self
+            .resolve_condition_player("self")
+            .stage
+            .stage
+            .iter()
+            .filter(|&&cid| {
+                cid != -1
+                    && cid != reference_id
+                    && util::card_matches_type(card_db, cid, card_type)
+            })
+            .copied()
+            .collect();
+
+        if is_both {
+            let opp_ids: Vec<i16> = self
+                .resolve_condition_player("opponent")
+                .stage
+                .stage
+                .iter()
+                .filter(|&&cid| {
+                    cid != -1
+                        && cid != reference_id
+                        && util::card_matches_type(card_db, cid, card_type)
+                })
+                .copied()
+                .collect();
+            other_ids.extend(opp_ids);
+        }
+
+        // No other members → the predicate is vacuously true.
+        if other_ids.is_empty() {
+            return true;
+        }
+
+        other_ids.iter().all(|&other_id| {
+            self.game_state
+                .card_database
+                .get_card(other_id)
+                .map(|c| c.blade)
+                .unwrap_or(0)
+                < reference_blade
+        })
+    }
+
     /// "元々持つブレード" — checks base/printed blade (card.blade from DB).
-    ///
     /// Per Q195 (qa_data.json:1071-1074): "元々持つブレードの数を変更した後、
     /// ブレードを得る効果が適用される" — setting the original blade changes
     /// the base (Rules 9.9.1.4), then +blade effects stack on top (9.9.1.5).

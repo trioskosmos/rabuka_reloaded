@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T20:58:22.181388",
+  "generated_at": "2026-08-06T22:08:34.353190",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "7610530c",
+  "engine_commit": "6e042559",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -37076,6 +37076,7 @@
               "text": "そのメンバーが、自分と相手のステージにいるほかのすべてのメンバーより多くの{{icon_blade.png|ブレード}}を持つ場合",
               "exclude_self": true,
               "scope": "both",
+              "blade_greater_than_all": true,
               "all": true,
               "target": "self"
             },
