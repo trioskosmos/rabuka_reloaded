@@ -5027,6 +5027,63 @@ def _try_discard_shuffle_to_bottom_optional(text):
     }
 
 
+def _try_discard_hand_recover_self_optional(text):
+    """G7 (ミア・テイラー ab#0): '手札をN枚控え室に置いてもよい。そうしたとき、
+    控え室からこのカードを手札に加える' → conditional_on_optional.
+    optional_action: discard N cards from hand (may). conditional_action (on
+    accept): recover THIS card (self_target) from discard back to hand. The
+    recover is gated on the optional actually being performed."""
+    if "手札を" not in text or "控え室に置いてもよい" not in text:
+        return None
+    if "そうしたとき" not in text or "手札に加える" not in text:
+        return None
+    if "控え室から" not in text and "控え室にある" not in text:
+        return None
+    opt_text, _, cons_text = text.partition("そうしたとき")
+    opt_text = opt_text.strip()
+    cons_text = cons_text.strip().lstrip("、")
+    m = re.search(r"(\d+)枚", opt_text)
+    count = int(m.group(1)) if m else 1
+    discard_opt = {
+        "action": "move_cards",
+        "source": "hand",
+        "destination": "discard",
+        "count": count,
+        "card_type": "card",
+        "target": "self",
+        "optional": True,
+        "text": opt_text,
+    }
+    discard_done = dict(discard_opt)
+    discard_done["optional"] = False
+    cons = parse_action(cons_text)
+    if not isinstance(cons, dict) or cons.get("action") != "move_cards":
+        cons = parse_effect(cons_text)
+    if isinstance(cons, dict) and cons.get("action") == "move_cards":
+        cons["source"] = "discard"
+        cons["destination"] = "hand"
+        cons["self_target"] = True
+        cons["card_type"] = "card"
+        cons.setdefault("count", 1)
+    else:
+        cons = {
+            "action": "move_cards",
+            "source": "discard",
+            "destination": "hand",
+            "count": 1,
+            "card_type": "card",
+            "self_target": True,
+            "text": cons_text,
+        }
+    return {
+        "text": text,
+        "action": "conditional_on_optional",
+        "optional_action": discard_opt,
+        "conditional_action": {"action": "sequential", "actions": [discard_done, cons]},
+        "conditional_negation": False,
+    }
+
+
 def _extract_generic_fields(condition, text):
     """Extract all generic fields from text into condition dict (no early return)."""
     # Character names: 「A」か「B」か「C」がいる, 「A」と「B」がいる,
@@ -9308,6 +9365,7 @@ _EFFECT_HANDLERS = [
     # Tier 2: Conditional/optional effect shapes
     _try_those_cards_add_hand_optional,  # G13: それらのカードの中から…手札に加えてもよい。そうしたとき…
     _try_discard_shuffle_to_bottom_optional,  # G16: 控え室N枚選びシャッフル→デッキ一番下・そうしたとき…
+    _try_discard_hand_recover_self_optional,  # G7: 手札をN枚控え室に置いてもよい。そうしたとき、控え室からこのカードを手札に加える
     _try_discard_live_and_member_optional,  # B6: 控え室にライブカードとmember無ブレードがある場合→シャッフルデッキ下・そうしたときheart01
     _try_unless_effect,  # しないかぎり (unless-pay)
     _try_opponent_action,  # 相手は... (opponent action)

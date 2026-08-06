@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T19:18:34.220256",
+  "generated_at": "2026-08-06T20:44:23.283276",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "fcef5646",
+  "engine_commit": "6e4657a0",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -6859,6 +6859,42 @@
       "cost": null,
       "effect": {
         "text": "このカードがデッキから控え室に置かれたとき、手札を1枚控え室に置いてもよい。そうしたとき、控え室からこのカードを手札に加える",
+        "action": "conditional_on_optional",
+        "optional_action": {
+          "action": "move_cards",
+          "source": "hand",
+          "destination": "discard",
+          "count": 1,
+          "card_type": "card",
+          "target": "self",
+          "text": "このカードがデッキから控え室に置かれたとき、手札を1枚控え室に置いてもよい。"
+        },
+        "conditional_action": {
+          "action": "sequential",
+          "actions": [
+            {
+              "action": "move_cards",
+              "source": "hand",
+              "destination": "discard",
+              "count": 1,
+              "card_type": "card",
+              "target": "self",
+              "optional": false,
+              "text": "このカードがデッキから控え室に置かれたとき、手札を1枚控え室に置いてもよい。"
+            },
+            {
+              "text": "控え室からこのカードを手札に加える",
+              "source": "discard",
+              "destination": "hand",
+              "action": "move_cards",
+              "self_target": true,
+              "card_type": "card",
+              "count": 1
+            }
+          ],
+          "text": "このカードがデッキから控え室に置かれたとき、手札を1枚控え室に置いてもよい。そうしたとき、控え室からこのカードを手札に加える"
+        },
+        "conditional_negation": false,
         "condition": {
           "type": "card_count_condition",
           "count": 1,
@@ -6870,13 +6906,7 @@
           },
           "self_target": true,
           "destination": "discard"
-        },
-        "source": "discard",
-        "destination": "hand",
-        "action": "move_cards",
-        "self_target": true,
-        "card_type": "card",
-        "count": 1
+        }
       }
     },
     {

@@ -36,6 +36,7 @@ pub mod bp7_watanabe_under_card_blade_test;
 pub mod bp7_watanabe_select_self_and_other_test;
 pub mod bp7_like_a_treasure_optional_test;
 pub mod bp7_mirai_no_oto_optional_test;
+pub mod bp7_mia_optional_recover_test;
 pub mod bp7_emma_color_diversity_test;pub mod bp7_kanata_choice_test;
 pub mod bp7_cooking_with_love_test;
 pub mod bp7_karin_dynamic_blade_wait_test;

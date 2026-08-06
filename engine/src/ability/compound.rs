@@ -380,14 +380,21 @@ impl AbilityResolver {
 
                     let moved_before = self.moved_cards.len();
                     let selected_before = self.selected_cards.len();
-                    // "…したとき" (when you do so) gate: a modify_score step that
-                    // immediately follows a those_cards→hand move only applies when
-                    // that move actually added a card. The flag is set by
-                    // resolve_from_those_cards and cleared after every sub-action so
-                    // it never gates an unrelated later score step.
-                    if action.action == ActionType::ModifyScore
-                        && self.last_move_moved_any == Some(false)
-                    {
+                    // "…したとき" (when you do so) gate: a consequence step that
+                    // immediately follows a move is only applied when that move
+                    // actually moved a card. Consequence shapes: a modify_score
+                    // (G13 "そうしたとき +1") and a recover-self move
+                    // (G7 "そうしたとき 控え室からこのカードを手札に加える").
+                    // The flag is set by execute_move_cards and cleared after every
+                    // sub-action so it never gates an unrelated later step.
+                    let is_gated_consequence = action.action == ActionType::ModifyScore
+                        || (action.action == ActionType::MoveCards
+                            && action.destination.as_deref() == Some("hand")
+                            && action.self_target_any().unwrap_or(false)
+                            && action.source_any().is_some_and(|s| {
+                                s == "discard" || s == "waitroom"
+                            }));
+                    if is_gated_consequence && self.last_move_moved_any == Some(false) {
                         self.last_move_moved_any = None;
                         continue 'action_loop;
                     }

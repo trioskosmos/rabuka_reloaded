@@ -1846,6 +1846,10 @@ impl AbilityResolver {
         }
 
         let state_change = effect.state_change_any().map(|s| s.to_string());
+        // Record whether this move actually moved any cards. Used by the
+        // "…したとき" (when you do so) pattern: a consequence step directly
+        // following a move that moved nothing must be skipped.
+        self.last_move_moved_any = Some(!moved_cards.is_empty());
         self.finalize_card_movement(
             gs,
             &moved_cards,
