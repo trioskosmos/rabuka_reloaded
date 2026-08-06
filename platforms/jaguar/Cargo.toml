@@ -1,0 +1,18 @@
+[package]
+name = "rabuka_jaguar"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+rabuka_engine = { path = "../../engine", default-features = false, features = ["jaguar"] }
+
+[profile.release]
+panic = "abort"
+opt-level = "z"
+lto = true
+codegen-units = 1

@@ -2853,11 +2853,25 @@ impl Condition {
 }
 impl Condition {
     pub fn get_text(&self) -> Option<&str> {
-        self.common().and_then(|c| c.text.as_deref())
+        #[cfg(feature = "debug_conditions")]
+        {
+            self.common().and_then(|c| c.text.as_deref())
+        }
+        #[cfg(not(feature = "debug_conditions"))]
+        {
+            None
+        }
     }
 
     pub fn get_trigger_event(&self) -> Option<&TriggerEvent> {
-        self.common().and_then(|c| c.trigger_event.as_deref())
+        #[cfg(feature = "debug_conditions")]
+        {
+            self.common().and_then(|c| c.trigger_event.as_deref())
+        }
+        #[cfg(not(feature = "debug_conditions"))]
+        {
+            None
+        }
     }
 
     pub fn get_location(&self) -> Option<&str> {

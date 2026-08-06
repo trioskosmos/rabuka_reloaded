@@ -55,6 +55,8 @@ gba = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "co
 dc = ["no_std", "debug_conditions", "bytecode_abilities", "compact_card_data"]
 # Wii target: no_std + alloc via devkitPPC + libogc
 wii = ["no_std", "bytecode_abilities", "compact_card_data"]
+# Atari Jaguar target: no_std + alloc, compact like PS1 (2MB main RAM)
+jaguar = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
 # Bytecode abilities: use pre-compiled bytecode instead of JSON serde
 # for ability loading. Dramatically reduces memory footprint (~7KB vs 1.4MB).
 bytecode_abilities = []

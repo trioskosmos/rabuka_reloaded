@@ -692,12 +692,18 @@ impl AbilityResolver {
     ) -> Result<Option<Vec<i16>>, String> {
         // Handle "those_cards" alias: resolve to the trigger_moved_cards stored
         // in the ability queue entry (the cards that triggered the each_time
-        // ability), not the full discard pile (Q221).
-        if let Some(trigger_cards) = gs
+        // ability), not the full discard pile (Q221). Fall back to the global
+        // recently_moved_cards snapshot when the queue entry doesn't carry it
+        // (e.g. a live-card each_time fired outside the TAS scan).
+        let trigger_cards = gs
             .ability_queue
             .current_entry()
             .and_then(|e| e.trigger_moved_cards.clone())
-        {
+            .filter(|c| !c.is_empty())
+            .or_else(|| {
+                gs.recently_moved_cards.clone().map(|c| c.into_iter().collect())
+            });
+        if let Some(trigger_cards) = trigger_cards {
             if !trigger_cards.is_empty() {
                 if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
                 {

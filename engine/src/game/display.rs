@@ -1505,7 +1505,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     // exactly one badge no matter how many times the gained ability was recorded
     // or how many recalculate_constants passes ran.
     for triggers in bonus_triggers.values_mut() {
-        let mut seen = std::collections::HashSet::with_capacity(triggers.len());
+        let mut seen: HashSet<String> = HashSet::default();
         triggers.retain(|t| seen.insert(t.clone()));
     }
     let temp_effects: Vec<TempEffectDisplay> = game_state
