@@ -778,12 +778,14 @@ Fixed (parser + engine):
   destination:energy_zone}`. Borderline but a real trigger-modeling gap (compare 桜小路きな子 ab#1
   which did produce a `zone_change` trigger_event).
 
-### CLEAN-G18. Color-diversity condition collapsed to a plain card count
+### CLEAN-G18. Color-diversity condition collapsed to a plain card count — ✅ FIXED (parser + engine)
 
 - D27 `PL!N-bp7-020-N` エマ・ヴェルデ ab#0 — "それらのメンバーカードの中に**2種類以上のブレードハートの色**がある場合" →
-  `condition{card_count_condition, card_type:member_card, count:1, >=}` (line 36786). The "2種類以上"
-  (≥2 distinct blade-heart colors) requirement is lost; any 1 member card satisfies it.
-  Compare Colorful Dreams ab#1 which correctly produced `unit:"types"`.
+  now `card_count_condition{card_type:member_card, count:2, operator:">=", unit:"types", source:"preceding_moved"}` (was `count:1 >=` of any member card — color diversity lost).
+- **Parser**: added the `(\d+)種類以上の.+?色がある場合` pattern (→ `unit:"types"`) and `source:"preceding_moved"` for "それらの…色がある場合" (scope to the milled cards).
+- **Engine**: `resolve_moved_cards_source` now honors `unit:"types"` — it counts DISTINCT blade-heart colors among the moved member cards instead of card count.
+- **Tests**: `bp7_emma_color_diversity_test.rs` (5 gameplay edge cases): 2 distinct colors → heart04, 3 distinct → heart04, all same color → no, only 1 member milled → no, members with no blade heart → no.
+
 
 ### CLEAN-G19. Select excludes self for a "this member + 1 other" target — ✅ FIXED (parser)
 

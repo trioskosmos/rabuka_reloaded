@@ -2058,7 +2058,7 @@ impl<'a> ConditionContext<'a> {
         let moved_group_name = condition
             .get_group_names()
             .and_then(|g| g.first().map(|s| s.as_str()));
-        let actual = moved_source
+        let moved_ids = moved_source
             .iter()
             .filter(|&&cid| {
                 // Energy is tracked as an anonymous `-1` resource for
@@ -2171,7 +2171,26 @@ impl<'a> ConditionContext<'a> {
 
                 true
             })
-            .count() as u8;
+            .copied()
+            .collect::<Vec<i16>>();
+        // unit:"types" → count DISTINCT blade-heart colors among the moved member
+        // cards (G18: "…の中に2種類以上のブレードハートの色がある場合"), not card count.
+        let unit_is_types = condition.get_unit().as_deref() == Some("types");
+        let actual: u8 = if unit_is_types {
+            let mut colors: HashSet<HeartColor> = HashSet::default();
+            for &cid in &moved_ids {
+                if let Some(card) = card_db.get_card(cid) {
+                    if let Some(ref bh) = card.blade_heart {
+                        for color in bh.hearts.keys() {
+                            colors.insert(*color);
+                        }
+                    }
+                }
+            }
+            colors.len() as u8
+        } else {
+            moved_ids.len() as u8
+        };
         // negation for the count comparison only applies when card_property is not
         // driving the per-card filter (handled above). For pure count negation
         // ("ない場合" style), flip the compare result.

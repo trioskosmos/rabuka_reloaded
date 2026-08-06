@@ -3602,6 +3602,7 @@ def _try_card_count(text):
         (r"(\d+)つ以上ある", ">=", None),
         (r"(\d+)枚以上ある", ">=", None),
         (r"(\d+)種類以上ある", ">=", "types"),
+        (r"(\d+)種類以上の.+?色がある場合", ">=", "types"),
         (r"(\d+)枚ある", "=", None),
         (r"(\d+)枚以上", ">=", None),
         (r"(\d+)人以上", ">=", "人"),
@@ -3619,6 +3620,10 @@ def _try_card_count(text):
                 result["unit"] = unit
             elif len(m.groups()) >= 2 and m.group(2):
                 result["unit"] = m.group(2)
+            # G18: "それらのメンバーカードの中に…色がある場合" — the color diversity
+            # is counted among the cards just moved (preceding_moved), not the stage.
+            if "それらの" in text and "色がある" in text:
+                result["source"] = "preceding_moved"
             _enrich_card_count_condition(result, text)
             compound = _try_hand_count_compound(result, text)
             return compound or result

@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T19:01:04.670389",
+  "generated_at": "2026-08-06T19:18:34.220256",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "63947ac9",
+  "engine_commit": "fcef5646",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -36855,11 +36855,13 @@
           {
             "text": "それらのメンバーカードの中に2種類以上のブレードハートの色がある場合、ライブ終了時まで、{{heart_04.png|heart04}}を得る",
             "condition": {
-              "text": "それらのメンバーカードの中に2種類以上のブレードハートの色がある場合",
-              "card_type": "member_card",
+              "type": "card_count_condition",
+              "count": 2,
               "operator": ">=",
-              "count": 1,
-              "type": "card_count_condition"
+              "text": "それらのメンバーカードの中に2種類以上のブレードハートの色がある場合",
+              "unit": "types",
+              "source": "preceding_moved",
+              "card_type": "member_card"
             },
             "action": "gain_resource",
             "resource": "heart",
