@@ -2924,7 +2924,19 @@ impl AbilityResolver {
                     .saturating_sub(removed.len() as u8);
                 removed
             };
-            {
+            if dst == Zone::UnderMember.to_str() {
+                if cids.is_empty() {
+                    // Optional placement was skipped (allow_skip). Clear the
+                    // pending conditional actions (そうした場合) so subsequent
+                    // effects (e.g. draw / gain_resource) do not still fire.
+                    gs.ability_queue.take_pending_actions();
+                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                        entry.optional_cost_result = Some(false);
+                    }
+                } else {
+                    self.place_energy_under_member_selected(gs, &cids);
+                }
+            } else {
                 let player = gs.resolve_target_player_mut("self");
                 for &cid in &cids {
                     crate::ability::util::place_card_in_zone(player, cid, dst, None, false, 1);
@@ -2939,6 +2951,77 @@ impl AbilityResolver {
             self.execute_selected_energy_zone_cards(gs, indices, count)?;
         }
         Ok(())
+    }
+
+    /// Place the tapped energy cards under the activating member (Rule 10.5.3).
+    /// Used for the energy_zone → under_member placement choice. Falls back to
+    /// the moved_cards / center / left / right slots when the activating card is
+    /// not on stage. If the chosen slot has no member, energy goes to the energy
+    /// deck (Rule 10.5.4).
+    fn place_energy_under_member_selected(
+        &mut self,
+        gs: &mut GameState,
+        cids: &[i16],
+    ) {
+        if cids.is_empty() {
+            return;
+        }
+        let activating_pos =
+            gs.activating_card.and_then(|c| gs.resolve_target_player("self").stage.stage.iter().position(|&id| id == c));
+        let player = gs.resolve_target_player_mut("self");
+        let target_index = if let Some(idx) = activating_pos {
+            if player.stage.stage[idx] != -1 {
+                idx
+            } else {
+                for &card in cids {
+                    player.energy_deck.cards.push(card);
+                }
+                return;
+            }
+        } else if let Some(idx) = self
+            .moved_cards
+            .iter()
+            .rev()
+            .find_map(|&cid| player.stage.stage.iter().position(|&id| id == cid))
+        {
+            idx
+        } else if player.stage.stage[1] != -1 {
+            1
+        } else if player.stage.stage[0] != -1 {
+            0
+        } else if player.stage.stage[2] != -1 {
+            2
+        } else {
+            for &card in cids {
+                player.energy_deck.cards.push(card);
+            }
+            return;
+        };
+        if player.stage.stage[target_index] == -1 {
+            for &card in cids {
+                player.energy_deck.cards.push(card);
+            }
+            return;
+        }
+        let area = match target_index {
+            0 => crate::zones::MemberArea::LeftSide,
+            1 => crate::zones::MemberArea::Center,
+            _ => crate::zones::MemberArea::RightSide,
+        };
+        for &card in cids {
+            player.stage.place_under_card(area, card);
+        }
+        gs.mark_constants_dirty();
+        gs.recalculate_constants();
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.push_rule_log(format!(
+            "{} {}: [[log_energy_under:n={}]]",
+            pp, act_name, cids.len()
+        ));
     }
 
     /// Execute energy zone cards: move to wait state.

@@ -69,7 +69,7 @@ fn azuna_q158_blade_all_members() {
     advance_to_live_start(&mut game);
 
     if game.has_pending_choice() {
-        game.select_option(1);
+        game.select_energy_from_zone(1);
     }
 
     assert_eq!(
@@ -115,7 +115,7 @@ fn azuna_q158_blade_single_member() {
     advance_to_live_start(&mut game);
 
     if game.has_pending_choice() {
-        game.select_option(1);
+        game.select_energy_from_zone(1);
     }
 
     assert_eq!(game.state.mods.get_blade_modifier(ayumu), 2);
@@ -147,7 +147,7 @@ fn azuna_q158_blade_not_gained_if_energy_not_placed() {
     advance_to_live_start(&mut game);
 
     if game.has_pending_choice() {
-        game.select_option(0);
+        game.select_indices(&[]);
     }
 
     assert_eq!(game.state.mods.get_blade_modifier(ayumu), 0);
@@ -185,7 +185,7 @@ fn azuna_q157_energy_under_member_uses_any_energy() {
     advance_to_live_start(&mut game);
 
     if game.has_pending_choice() {
-        game.select_option(1);
+        game.select_energy_from_zone(1);
     }
 
     assert_eq!(
@@ -224,7 +224,7 @@ fn azuna_q184_energy_under_member_not_counted() {
     advance_to_live_start(&mut game);
 
     if game.has_pending_choice() {
-        game.select_option(1);
+        game.select_energy_from_zone(1);
     }
 
     assert_eq!(

@@ -1982,7 +1982,6 @@ impl AbilityResolver {
         let optional = !force_non_optional && effect.optional.unwrap_or(false);
         let source = effect.source_any().map(|s| s.to_string());
         let any_number = effect.any_number_any().unwrap_or(false);
-        let position = effect.position_any().cloned();
 
         // Special case: source="under_member" + destination="energy_zone" means
         // count from under member, but move from energy_deck → energy_zone (wait).
@@ -2050,15 +2049,7 @@ impl AbilityResolver {
             return;
         }
 
-        let activating_pos = gs.activating_card.and_then(|c| {
-            gs.resolve_target_player(&target)
-                .stage
-                .stage
-                .iter()
-                .position(|&id| id == c)
-        });
         if Zone::from_str(source.as_deref().unwrap_or("")) == Some(Zone::UnderMember) {
-            // Collect ALL energy cards from ALL stage positions
             let player = gs.resolve_target_player_mut(&target);
             let mut all_under: Vec<i16> = Vec::new();
             for si in 0..3 {
@@ -2098,123 +2089,33 @@ impl AbilityResolver {
 
         // Original logic: move from energy_zone to under_member
         // This should only execute if source is NOT "under_member"
-        if optional {
-            // If the optional cost was already paid (re-entry from
-            // handle_optional_cost_payment), skip the prompt and place energy.
-            let cost_already_paid = gs
-                .ability_queue
-                .current_entry()
-                .is_some_and(|e| e.optional_cost_result == Some(true));
-            if cost_already_paid {
-                // Fall through to energy placement
-            } else {
-                let is_activation = self
-                    .current_ability
-                    .as_ref()
-                    .and_then(|a| a.triggers.as_ref())
-                    .is_some_and(|t| &**t == crate::triggers::ACTIVATION);
-                if !is_activation {
-                    self.pending_choice = Some(Choice::SelectTarget {
-                        target: "pay_optional_cost:skip_optional_cost".to_string(),
-                        description: "Place energy under member? (pay or skip)".to_string(),
-                        description_en: Some(
-                            "Place energy under member? (pay or skip)".to_string(),
-                        ),
-                        description_ja: Some(
-                            "メンバーの下にエネルギーを置く（支払う/スキップ）？".to_string(),
-                        ),
-                        allow_skip: false,
-                        options: None,
-                    });
-                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
-                    }
-                    return;
-                }
-            }
-        }
-        let player = gs.resolve_target_player_mut(&target);
-        let mut energy_cards = Vec::new();
-        for _ in 0..count {
-            if let Some(energy_card) = player.energy_zone.cards.pop() {
-                energy_cards.push(energy_card);
-            } else {
-                break;
-            }
-        }
-        if energy_cards.is_empty() {
+        // Ask the player to tap the specific energy card(s) to place under the
+        // member. Both active and waited energy cards are selectable. Skippable
+        // only when the placement is optional (single prompt, no separate
+        // pay/skip gate).
+        if gs.resolve_target_player(&target).energy_zone.cards.is_empty() {
             return;
         }
-        player.energy_zone.sub_active(energy_cards.len() as u8);
-        let target_index = match position.as_ref().and_then(|p| p.get_position()) {
-            Some("center") | Some("中央") => 1,
-            Some("left") | Some("左側") => 0,
-            Some("right") | Some("右側") => 2,
-            None => {
-                // Default to activating card's position
-                if let Some(idx) = activating_pos {
-                    if player.stage.stage[idx] != -1 {
-                        idx
-                    } else {
-                        for card in energy_cards {
-                            player.energy_deck.cards.push(card);
-                        }
-                        return;
-                    }
-                } else {
-                    // Activating card not on stage (e.g. moved to discard as cost).
-                    // Search moved_cards for the most recent card placed on stage
-                    // (e.g. by a preceding same_area move in a sequential compound).
-                    if let Some(idx) = self
-                        .moved_cards
-                        .iter()
-                        .rev()
-                        .find_map(|&cid| player.stage.stage.iter().position(|&id| id == cid))
-                    {
-                        idx
-                    } else if player.stage.stage[1] != -1 {
-                        1
-                    } else if player.stage.stage[0] != -1 {
-                        0
-                    } else if player.stage.stage[2] != -1 {
-                        2
-                    } else {
-                        for card in energy_cards {
-                            player.energy_deck.cards.push(card);
-                        }
-                        return;
-                    }
-                }
-            }
-            _ => 1,
+        let desc_ja = if count == 1 {
+            "このメンバーの下に置くエネルギーカードを選択".to_string()
+        } else {
+            format!("このメンバーの下に置くエネルギーカードを{}枚選択", count)
         };
-        if player.stage.stage[target_index] == -1 {
-            // Rule 10.5.4: Energy without a member goes to energy deck
-            for card in energy_cards {
-                player.energy_deck.cards.push(card);
-            }
-            return;
-        }
-        // Rule 10.5.3: Energy placed under member — track it for recycling
-        let area = match target_index {
-            0 => crate::zones::MemberArea::LeftSide,
-            1 => crate::zones::MemberArea::Center,
-            _ => crate::zones::MemberArea::RightSide,
-        };
-        for card in energy_cards {
-            player.stage.place_under_card(area, card);
-        }
-        gs.mark_constants_dirty();
-        gs.recalculate_constants();
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        gs.push_rule_log(format!(
-            "{} {}: [[log_energy_under:n={}]]",
-            pp, act_name, count
-        ));
+        self.pending_choice = Some(
+            Choice::select_cards(
+                Zone::Energy.to_str(),
+                count as usize,
+                "Choose energy card(s) to place under member",
+                optional,
+            )
+            .destination(Some("under_member".to_string()))
+            .card_type(Some("energy_card".to_string()))
+            .target_player_id(Some(target.clone()))
+            .description_ja(Some(desc_ja))
+            .build(),
+        );
+        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+        return;
     }
 
     pub fn execute_position_change(

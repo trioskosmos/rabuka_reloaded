@@ -19,7 +19,7 @@ fn kasumi_constant_score_bonus_applies_when_energy_under() {
 
     // Pay the optional cost (place 2 energy under)
     assert!(game.has_pending_choice());
-    game.select_option(1);
+    game.select_energy_from_zone(2);
 
     assert_eq!(
         game.state.player1.stage.under_cards[1].len(),
@@ -45,7 +45,7 @@ fn kasumi_constant_score_without_energy_under() {
 
     // Skip the optional cost
     assert!(game.has_pending_choice());
-    game.select_option(0);
+    game.select_indices(&[]);
 
     assert_eq!(
         game.state.player1.stage.under_cards[1].len(),

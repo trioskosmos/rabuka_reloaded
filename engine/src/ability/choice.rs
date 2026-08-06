@@ -738,7 +738,10 @@ impl super::resolver::AbilityResolver {
             return Ok(());
         }
 
-        if Zone::from_str(zone) == Some(Zone::Energy) && !effect_started {
+        if Zone::from_str(zone) == Some(Zone::Energy)
+            && !effect_started
+            && ctx.destination.as_deref() != Some("under_member")
+        {
             let count_paid = indices.len();
             if count_paid > 0 {
                 let player =

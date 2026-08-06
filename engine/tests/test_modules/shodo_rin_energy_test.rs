@@ -33,6 +33,7 @@ fn rin_activate_places_energy_under_draws_heart() {
     let active_before = game.state.player1.energy_zone.active_count();
 
     game.activate_ability(rin);
+    game.select_energy_from_zone(1);
 
     // 1 energy moved from zone to under
     assert_eq!(
@@ -88,6 +89,7 @@ fn rin_turn1_use_limit() {
     game.give_energy(10);
 
     game.activate_ability(rin);
+    game.select_energy_from_zone(1);
     assert_eq!(
         game.state
             .mods
@@ -135,6 +137,7 @@ fn rin_activate_across_turns() {
     game.give_energy(10);
 
     game.activate_ability(rin);
+    game.select_energy_from_zone(1);
     assert_eq!(
         game.state
             .player1
@@ -176,6 +179,7 @@ fn rin_activate_across_turns() {
 
     // Second activation in turn 2 — use_limit resets cross-turn.
     game.activate_ability(rin);
+    game.select_energy_from_zone(1);
     let final_under = game
         .state
         .player1

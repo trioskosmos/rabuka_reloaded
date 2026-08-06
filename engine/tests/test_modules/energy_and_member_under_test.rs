@@ -63,7 +63,7 @@ fn kasumi_debut_place_two_energy_under() {
     game.give_energy(13);
     game.play_to_stage(kasumi, MemberArea::Center);
     assert!(game.has_pending_choice(), "should prompt optional cost");
-    game.select_option(1); // "pay" (index 1 = pay_optional_cost)
+    game.select_energy_from_zone(2); // select the 2 energy cards to place under
     assert_eq!(
         game.state.player1.energy_zone.cards.len(),
         11,
@@ -82,7 +82,7 @@ fn kasumi_q184_under_energy_not_counted_in_zone() {
     game.give_energy(13);
     game.play_to_stage(kasumi, MemberArea::Center);
     assert!(game.has_pending_choice());
-    game.select_option(1); // "pay"
+    game.select_energy_from_zone(2); // select the 2 energy cards to place under
     assert_eq!(
         game.state.player1.energy_zone.cards.len(),
         11,
@@ -231,8 +231,9 @@ fn mia_use_limit_not_enforced() {
         .push(game.id("PL!-sd1-010-SD"));
     game.give_energy(5);
     game.activate_ability(mia);
+    game.select_energy_from_zone(1); // pay the 1-energy cost
     if game.has_pending_choice() {
-        game.select_indices(&[0]);
+        game.select_indices(&[0]); // select which niji live to retrieve
     }
     assert!(
         game.state.player1.hand.cards.contains(&niji1),
@@ -294,7 +295,7 @@ fn ayumu_bp3n_debit_place_one_under_draw_two() {
     game.play_to_stage(ayumu, MemberArea::Center);
     // play_to_stage removes ayumu from hand → hand_before - 1 = 2
     assert!(game.has_pending_choice(), "should prompt optional cost");
-    game.select_option(1); // "pay"
+    game.select_energy_from_zone(1); // place 1 energy under
     assert_eq!(
         game.state.player1.energy_zone.cards.len(),
         energy_before - 1,
@@ -369,7 +370,7 @@ fn ayumu_bp3n_q157_wait_energy_placed_under() {
         .push(game.id("LL-E-001-SD"));
     game.play_to_stage(ayumu, MemberArea::Center);
     assert!(game.has_pending_choice());
-    game.select_option(1); // "pay"
+    game.select_energy_from_zone(1); // place 1 energy under (the wait energy)
     assert_eq!(
         game.state
             .player1

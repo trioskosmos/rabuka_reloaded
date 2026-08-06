@@ -23,11 +23,9 @@ fn emma_bp5_q215_wait_energy_placed_then_activate() {
     game.give_energy(5);
 
     game.activate_ability(emma);
+    game.select_energy_from_zone(1); // place 1 energy under member
 
-    // Select 2 energy to deactivate (the energy activation will remove them from zone)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Select energy to deactivate (the energy activation will remove them from zone)
     if game.has_pending_choice() {
         game.select_indices(&[0]);
     }

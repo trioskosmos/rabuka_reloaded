@@ -99,6 +99,7 @@ fn ranju_activate_places_one_energy_under_draws_one_gains_heart01() {
         .len();
 
     game.activate_ability(card);
+    game.select_energy_from_zone(1);
 
     assert_eq!(
         game.state.player1.energy_zone.cards.len(),
@@ -177,6 +178,7 @@ fn ranju_activate_use_limit_enforces_turn1() {
     let energy_before = game.state.player1.energy_zone.cards.len();
 
     game.activate_ability(card);
+    game.select_energy_from_zone(1);
     assert_eq!(
         game.state.player1.energy_zone.cards.len(),
         energy_before - 1,
@@ -205,6 +207,7 @@ fn ranju_activate_under_follows_position_change() {
     fill_decks(&mut game, filler);
 
     game.activate_ability(card);
+    game.select_energy_from_zone(1);
     assert_eq!(
         game.state
             .player1
@@ -485,6 +488,7 @@ fn ranju_activate_then_live_success_uses_accumulated_under() {
 
     // Activate once → 1 energy under
     game.activate_ability(card);
+    game.select_energy_from_zone(1);
     assert_eq!(
         game.state
             .player1

@@ -272,6 +272,7 @@ fn c5_multiple_candidates_selects_one() {
     game.state.player2.stage.stage[1] = sumire;
     game.give_energy(1);
     game.activate_ability(karin);
+    game.select_energy_from_zone(1); // pay the 1-energy cost
 
     assert_eq!(
         game.pending_choice_type().as_deref(),
@@ -328,6 +329,7 @@ fn c5_no_eligible_opponent_no_effect() {
     let sumire = place_opponent(&mut game, "PL!SP-PR-024-PR"); // 平安名すみれ, blade 3
     game.give_energy(1);
     game.activate_ability(karin); // threshold 2, blade 3 > 2
+    game.select_energy_from_zone(1); // pay the 1-energy cost
 
     assert!(
         game.state

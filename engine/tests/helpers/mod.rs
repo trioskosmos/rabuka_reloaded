@@ -437,6 +437,15 @@ impl TestGame {
         }
     }
 
+    /// Answer a pending SelectCard choice over the energy zone by selecting the
+    /// first `count` energy cards (the under-member placement choice). Panics if
+    /// the pending choice is not an energy SelectCard or if there aren't enough
+    /// energy cards to select.
+    pub fn select_energy_from_zone(&mut self, count: usize) {
+        let idxs: Vec<usize> = (0..count).collect();
+        self.select_indices(&idxs);
+    }
+
     /// Try to select indices, returning the error instead of panicking.
     pub fn try_select_indices(&mut self, indices: &[usize]) -> Result<(), String> {
         if let Err(_) = self.select_via_generated(indices) {
