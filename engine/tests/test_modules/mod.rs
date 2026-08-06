@@ -42,6 +42,7 @@ pub mod bp7_mirai_no_oto_optional_test;
 pub mod bp7_mia_optional_recover_test;
 pub mod bp7_q269_mia_yell_no_trigger_test;
 pub mod bp7_mia_play_cost_reduction_test;
+pub mod bp7_q271_colorful_dreams_test;
 pub mod bp7_kanan_formation_change_test;
 pub mod bp7_kanan_wait_immunity_test;
 pub mod bp7_wait_immunity_helpers;

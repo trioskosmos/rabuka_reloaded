@@ -72,7 +72,14 @@ specific rule described. `partial` = some adjacent mechanic is tested but the QA
 > ライブ成功時：エールにより公開された自分のカードの中に heart01〜heart06 のうち3種類以上ある場合、このカードのスコアを＋１する。
 - **QA rule**: cards with only 桃/青/ALL **blade-heart** do NOT satisfy a "3 types of heart
   color" condition — blade-heart is not a heart color.
-- **Status**: **gap**. No test references `PL!N-bp7-025`.
+- **Status**: ✓ covered — `bp7_q271_colorful_dreams_test.rs` (9 tests) drives ab#1 (Q271: peach/
+  blue/ALL blade-hearts → no score; 3 blade-heart colors mapping to heart colors → no score;
+  3 distinct base hearts → +1; single multi-heart card → +1; 2 base hearts → no score; blade
+  doesn't add a color; empty reveal → no score) and ab#0 (ライブ開始時 虹ヶ咲 member gains 1 blade;
+  non-虹ヶ咲 gains none).
+- **Engine fix (Q271)**: `resolve_zone_card_count`'s RevealedCards "types" branch now counts only
+  base-heart colors when `heart_source` is not `blade` (previously it also added blade-heart
+  colors, so a blade-heart set could wrongly satisfy the condition).
 
 ## Q272 — Just Believe!!! PL!N-bp7-026-L ab#0 (ライブ開始時)
 > ライブ開始時：手札を2枚まで控え室に置いてもよい：自分のステージにいる『虹ヶ咲』のメンバーを、これにより控え室に置いたカードの枚数に等しい数まで選ぶ。ライブ終了時まで、それらはブレードを得る。
@@ -159,7 +166,7 @@ cards (except Fire Bird) have no gameplay test.
 | Q269 | PL!N-bp7-011 ミア | yell reveal does not trigger 自動 | ✓ `bp7_q269_mia_yell_no_trigger_test` |
 | Q270 | PL!N-bp7-020 エマ | ALL-heart not a blade-heart color | ✓ `bp7_emma_color_diversity_test` |
 | Q277 | PL!N-bp7-011 ミア | refresh before 自動 resolve | ✓ `bp7_q269_mia_yell_no_trigger_test` |
-| Q271 | PL!N-bp7-025 Colorful Dreams | blade-heart ≠ heart color (score) | **gap** |
+| Q271 | PL!N-bp7-025 Colorful Dreams | blade-heart ≠ heart color (score) | ✓ `bp7_q271_colorful_dreams_test` |
 | Q272 | PL!N-bp7-026 Just Believe | no-repeat select | **gap** |
 | Q273 | PL!S-bp7-005 渡辺曜 | activated 登場 ability pays cost | partial |
 | Q274 | PL!S-bp7-003 松浦果南 | wait-immune member still selectable | **gap** |

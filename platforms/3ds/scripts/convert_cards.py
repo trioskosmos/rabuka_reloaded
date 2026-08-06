@@ -37,10 +37,20 @@ MANIFEST_REL = "../romfs/cards_manifest.json"
 # Long-edge target for resized card PNGs (1:1 with the ~188px detail display).
 # Higher = sharper but larger atlases. Override with RABUKA_CARD_RES.
 TARGET_LONG = int(os.environ.get("RABUKA_CARD_RES", "192"))
+# Texture format for the .t3x atlases. ETC1/ETC1A4 are 4-bit-per-pixel GPU
+# formats the 3DS decodes natively (~4x smaller than rgba5551). Use
+# rgba5551 for maximum quality at the cost of size.
+TEX_FORMAT = os.environ.get("RABUKA_TEX_FMT", "auto-etc1")
+# ETC1 works on 4x4 blocks, so card sizes must be multiples of 4.
+BLOCK = 4
 # How many tex3ds jobs to run at once. tex3ds is single-threaded per file, so
 # running several in parallel speeds up the atlas build dramatically.
 PARALLEL = max(1, min(8, int(os.environ.get("RABUKA_PARALLEL", "8"))))
 CACHE_RES_MARKER = ".res"
+
+
+def align4(v: int) -> int:
+    return max(BLOCK, (v // BLOCK) * BLOCK)
 
 
 def resolve(path: str) -> str:
@@ -83,19 +93,22 @@ def convert_webp_to_png(src_dir: str, cache_dir: str) -> dict[str, list[str]]:
     """
     os.makedirs(cache_dir, exist_ok=True)
     marker = os.path.join(cache_dir, CACHE_RES_MARKER)
-    cur_res = ""
+    cur_marker = ""
     if os.path.exists(marker):
         try:
-            cur_res = open(marker, "r", encoding="ascii").read().strip()
+            cur_marker = open(marker, "r", encoding="ascii").read().strip()
         except OSError:
-            cur_res = ""
-    if cur_res != str(TARGET_LONG):
+            cur_marker = ""
+    # Resolution OR format change invalidates the cache (ETC1 needs 4-aligned
+    # dims, so the resized PNGs must be re-encoded when the format changes).
+    want_marker = f"{TARGET_LONG}|{TEX_FORMAT}"
+    if cur_marker != want_marker:
         for f in os.listdir(cache_dir):
             if f.lower().endswith(".png"):
                 os.remove(os.path.join(cache_dir, f))
-        print(f"Resolution changed to {TARGET_LONG}; re-encoding card cache")
+        print(f"Card cache stale (res/format change) - re-encoding")
         with open(marker, "w", encoding="ascii") as f:
-            f.write(str(TARGET_LONG))
+            f.write(want_marker)
 
     files = sorted(f for f in os.listdir(src_dir) if f.lower().endswith(".webp"))
     if not files:
@@ -119,9 +132,11 @@ def convert_webp_to_png(src_dir: str, cache_dir: str) -> dict[str, list[str]]:
         w, h = img.size
 
         if w > h:
-            new_w, new_h = TARGET_LONG, int(h * TARGET_LONG / w)
+            new_w = align4(TARGET_LONG)
+            new_h = align4(int(h * TARGET_LONG / w))
         else:
-            new_h, new_w = TARGET_LONG, int(w * TARGET_LONG / h)
+            new_h = align4(TARGET_LONG)
+            new_w = align4(int(w * TARGET_LONG / h))
 
         img = img.resize((new_w, new_h), Image.LANCZOS)
         img.save(dst, "PNG")
@@ -171,10 +186,10 @@ def chunk_by_area(cache_dir: str, sorted_pngs: list[str], max_area: int) -> list
 
 
 def _build_one(tex3ds: str, cache_dir: str, atlas_dir: str,
-               atlas_name: str, chunk: list[str]):
+               atlas_name: str, chunk: list[str], tex_format: str):
     """Run tex3ds for a single atlas chunk. Returns (atlas_name, chunk, result)."""
     atlas_path = os.path.join(atlas_dir, atlas_name)
-    args = [tex3ds, "--atlas", "-o", atlas_path, "-f", "rgba5551", "-z", "auto"]
+    args = [tex3ds, "--atlas", "-o", atlas_path, "-f", tex_format, "-z", "auto"]
     args.extend(os.path.join(cache_dir, p) for p in chunk)
     result = subprocess.run(args, capture_output=True, text=True)
     return atlas_name, chunk, result
@@ -202,9 +217,10 @@ def generate_atlases(cache_dir: str, atlas_dir: str, by_set: dict[str, list[str]
     manifest = dict(manifest)
     built = 0
     skipped = 0
-    # If the atlas resolution marker differs from the current TARGET_LONG,
-    # every set is stale and must be rebuilt (e.g. after changing RABUKA_CARD_RES).
+    # If the atlas resolution/format marker differs from the current settings,
+    # every set is stale and must be rebuilt.
     res_changed = manifest.get("_res") is None or str(manifest.get("_res")) != str(TARGET_LONG)
+    fmt_changed = manifest.get("_fmt") is None or str(manifest.get("_fmt")) != TEX_FORMAT
     max_area = 850 * 850  # conservative pixel budget per atlas texture (fits 1024^2)
 
     tasks = []
@@ -214,7 +230,7 @@ def generate_atlases(cache_dir: str, atlas_dir: str, by_set: dict[str, list[str]
         atlas_names = [f"cards_{set_prefix}_{i}.t3x" for i in range(len(chunks))]
         card_nos = [p.removesuffix(".png") for p in sorted_pngs]
 
-        if not force and not res_changed and not set_is_dirty(atlas_dir, manifest, atlas_names, card_nos):
+        if not force and not res_changed and not fmt_changed and not set_is_dirty(atlas_dir, manifest, atlas_names, card_nos):
             skipped += 1
             continue
         for atlas_name, chunk in zip(atlas_names, chunks):
@@ -222,9 +238,9 @@ def generate_atlases(cache_dir: str, atlas_dir: str, by_set: dict[str, list[str]
 
     if tasks:
         print(f"Building {len(tasks)} atlas files ({skipped} sets unchanged) "
-              f"at res={TARGET_LONG} ({PARALLEL} parallel)...")
+              f"at res={TARGET_LONG} fmt={TEX_FORMAT} ({PARALLEL} parallel)...")
         with ThreadPoolExecutor(max_workers=PARALLEL) as ex:
-            futs = {ex.submit(_build_one, tex3ds, cache_dir, atlas_dir, an, ch): (an, ch)
+            futs = {ex.submit(_build_one, tex3ds, cache_dir, atlas_dir, an, ch, TEX_FORMAT): (an, ch)
                     for an, ch in tasks}
             for fut in as_completed(futs):
                 atlas_name, chunk, result = fut.result()
@@ -237,7 +253,9 @@ def generate_atlases(cache_dir: str, atlas_dir: str, by_set: dict[str, list[str]
                 built += 1
 
     manifest["_res"] = str(TARGET_LONG)
-    print(f"Built {built} atlas files ({skipped} sets unchanged) at res={TARGET_LONG}")
+    manifest["_fmt"] = TEX_FORMAT
+    print(f"Built {built} atlas files ({skipped} sets unchanged) "
+          f"at res={TARGET_LONG} fmt={TEX_FORMAT}")
     return manifest
 
 
@@ -267,11 +285,14 @@ def main():
             with open(manifest_path, "w", encoding="utf-8") as f:
                 json.dump(manifest, f, ensure_ascii=False, indent=2)
             print(f"Wrote manifest: {manifest_path} ({len(manifest)} entries)")
-            # Persist the resolution marker so the build script can detect a
-            # resolution change and trigger an atlas rebuild.
+            # Persist the resolution/format markers so the build script can
+            # detect a change and trigger an atlas rebuild.
             res_marker = os.path.join(atlas_dir, "..", "cards_res.txt")
             with open(res_marker, "w", encoding="ascii") as f:
                 f.write(str(TARGET_LONG))
+            fmt_marker = os.path.join(atlas_dir, "..", "cards_fmt.txt")
+            with open(fmt_marker, "w", encoding="ascii") as f:
+                f.write(TEX_FORMAT)
 
     if by_set:
         total = sum(len(v) for v in by_set.values())

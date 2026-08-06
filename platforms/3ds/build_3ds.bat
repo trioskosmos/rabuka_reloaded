@@ -54,22 +54,26 @@ if exist "%~dp0..\..\web_ui\img\cards_webp\*.webp" (
     cd /d "%~dp0"
     call :need_images
     if errorlevel 1 (
-        where python3 >nul 2>&1
+        where py >nul 2>&1
         if !errorlevel! equ 0 (
-            python3 -c "import PIL" >nul 2>&1
+            py -c "import PIL" >nul 2>&1
             if !errorlevel! equ 0 (
-                python3 scripts/convert_cards.py
+                py scripts/convert_cards.py
             ) else (
-                echo [WARN] python3 has no Pillow - trying py...
-                where py >nul 2>&1
+                where python3 >nul 2>&1
                 if !errorlevel! equ 0 (
-                    py scripts/convert_cards.py
+                    python3 -c "import PIL" >nul 2>&1
+                    if !errorlevel! equ 0 (
+                        python3 scripts/convert_cards.py
+                    ) else (
+                        echo [WARN] Neither py nor python3 has Pillow - skipping card image conversion
+                    )
                 ) else (
-                    echo [WARN] No python with Pillow found - skipping card image conversion
+                    echo [WARN] python3 not found - skipping card image conversion
                 )
             )
         ) else (
-            echo [WARN] python3 not found - skipping card image conversion
+            echo [WARN] py not found - skipping card image conversion
         )
     ) else (
         echo [4/7] Card images are up to date - skipping conversion
@@ -161,10 +165,11 @@ if errorlevel 1 ( exit /b 1 ) else ( exit /b 0 )
 
 :need_images
 rem Returns errorlevel 0 if atlases are up to date (no rebuild needed),
-rem 1 if the manifest is missing/incomplete, the resolution changed, or any
-rem webp is newer than the newest atlas. "Incomplete" means the manifest has
+rem 1 if the manifest is missing/incomplete, the resolution/format changed, or
+rem any webp is newer than the newest atlas. "Incomplete" means the manifest has
 rem fewer card entries than there are webp sources (guards against a previous
 rem partial build being wrongly skipped).
 if "%RABUKA_CARD_RES%"=="" set "RABUKA_CARD_RES=192"
-powershell -NoProfile -Command "$m='%~dp0romfs\cards_manifest.json';$a=Get-ChildItem '%~dp0romfs\cards\cards_*.t3x' -ErrorAction SilentlyContinue;if(-not (Test-Path $m) -or -not $a){exit 1};$r='%~dp0romfs\cards_res.txt';$t=$env:RABUKA_CARD_RES;$stored='';if(Test-Path $r){$stored=(Get-Content $r -Raw).Trim()};if($stored -ne $t){exit 1};$w=Get-ChildItem '%~dp0..\..\web_ui\img\cards_webp\*.webp' -ErrorAction SilentlyContinue;if(-not $w){exit 1};$mc=([regex]::Matches((Get-Content $m -Raw),'atlas')).Count;if($mc -lt $w.Count){exit 1};$wMax=($w | ForEach-Object { $_.LastWriteTime } | Measure-Object -Maximum).Maximum;$aMax=($a | ForEach-Object { $_.LastWriteTime } | Measure-Object -Maximum).Maximum;if($wMax -gt $aMax){exit 1}else{exit 0}"
+if "%RABUKA_TEX_FMT%"=="" set "RABUKA_TEX_FMT=auto-etc1"
+powershell -NoProfile -Command "$m='%~dp0romfs\cards_manifest.json';$a=Get-ChildItem '%~dp0romfs\cards\cards_*.t3x' -ErrorAction SilentlyContinue;if(-not (Test-Path $m) -or -not $a){exit 1};$r='%~dp0romfs\cards_res.txt';$tr=$env:RABUKA_CARD_RES;$sr='';if(Test-Path $r){$sr=(Get-Content $r -Raw).Trim()};if($sr -ne $tr){exit 1};$f='%~dp0romfs\cards_fmt.txt';$tf=$env:RABUKA_TEX_FMT;$sf='';if(Test-Path $f){$sf=(Get-Content $f -Raw).Trim()};if($sf -ne $tf){exit 1};$w=Get-ChildItem '%~dp0..\..\web_ui\img\cards_webp\*.webp' -ErrorAction SilentlyContinue;if(-not $w){exit 1};$mc=([regex]::Matches((Get-Content $m -Raw),'atlas')).Count;if($mc -lt $w.Count){exit 1};$wMax=($w | ForEach-Object { $_.LastWriteTime } | Measure-Object -Maximum).Maximum;$aMax=($a | ForEach-Object { $_.LastWriteTime } | Measure-Object -Maximum).Maximum;if($wMax -gt $aMax){exit 1}else{exit 0}"
 if errorlevel 1 ( exit /b 1 ) else ( exit /b 0 )

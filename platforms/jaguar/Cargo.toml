@@ -14,7 +14,7 @@ rabuka_engine = { path = "../../engine", default-features = false, features = ["
 [profile.release]
 panic = "abort"
 opt-level = "z"
-lto = true
+lto = false
 
 
 

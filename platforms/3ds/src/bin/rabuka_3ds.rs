@@ -28,7 +28,6 @@
 // Desktop mode uses none of these; suppress warnings
 #![cfg_attr(not(feature = "3ds"), allow(unused_imports, dead_code))]
 
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -150,13 +149,16 @@ fn main() {
                 dprintln!("[2/3] Deserializing cards...");
                 let reader = YieldReader {
                     inner: std::io::Cursor::new(&bytes),
-                    threshold: 8192,
+                    threshold: 65536,
                     counter: 0,
                 };
-                match rmp_serde::from_read::<_, HashMap<String, Card>>(reader) {
+                // Deserialize the msgpack map directly into a Vec of (key, card)
+                // pairs — avoids HashMap hashing/alloc overhead that we'd only
+                // throw away anyway (keys are unused after this step).
+                match rmp_serde::from_read::<_, Vec<(String, Card)>>(reader) {
                     Ok(map) => {
                         let t1 = unsafe { _3ds_system_tick() };
-                        let cards: Vec<_> = map.into_values().collect();
+                        let cards: Vec<_> = map.into_iter().map(|(_, c)| c).collect();
                         dprintln!("  {} cards ({} ms)", cards.len(), ticks_to_ms(t1 - t0));
                         drop(bytes);
                         // Load deck list and go to setup

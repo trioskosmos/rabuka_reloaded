@@ -2345,6 +2345,10 @@ impl<'a> ConditionContext<'a> {
                             continue;
                         }
                         if let Some(card) = card_db.get_card(cid) {
+                            // Q271: blade-hearts are NOT heart colors. When the
+                            // condition counts base-heart types (heart_source is not
+                            // "blade"), only base hearts contribute; a blade-heart
+                            // condition counts only blade hearts.
                             if !is_blade {
                                 if let Some(ref bh) = card.base_heart {
                                     for color in bh.hearts.keys() {
@@ -2354,10 +2358,12 @@ impl<'a> ConditionContext<'a> {
                                     }
                                 }
                             }
-                            if let Some(ref bld) = card.blade_heart {
-                                for color in bld.hearts.keys() {
-                                    if required_colors.contains(color) {
-                                        present.insert(*color);
+                            if is_blade {
+                                if let Some(ref bld) = card.blade_heart {
+                                    for color in bld.hearts.keys() {
+                                        if required_colors.contains(color) {
+                                            present.insert(*color);
+                                        }
                                     }
                                 }
                             }
