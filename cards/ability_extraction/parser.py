@@ -4981,6 +4981,47 @@ def _try_those_cards_add_hand_optional(text):
     }
 
 
+def _try_discard_shuffle_to_bottom_optional(text):
+    """G16: '自分の控え室にある…メンバーカードをN枚選び、それらをシャッフルし、
+    デッキの一番下に置いてもよい。そうしたとき、[consequence]' →
+    conditional_on_optional{optional: move discard→deck_bottom (shuffle, any order),
+    conditional: consequence}."""
+    if "選び" not in text or "シャッフル" not in text:
+        return None
+    if "デッキの一番下に置いてもよい" not in text or "そうしたとき" not in text:
+        return None
+    opt_text, _, cons_text = text.partition("そうしたとき")
+    opt_text = opt_text.strip()
+    cons_text = cons_text.strip().lstrip("、")
+    groups = list(dict.fromkeys(extract_group_names(opt_text)))
+    m = re.search(r"(\d+)枚", opt_text)
+    count = int(m.group(1)) if m else 1
+    move_opt = {
+        "action": "move_cards",
+        "source": "discard",
+        "destination": "deck_bottom",
+        "count": count,
+        "card_type": "member_card",
+        "target": "self",
+        "shuffle": True,
+        "placement_order": "any_order",
+        "optional": True,
+        "text": opt_text,
+    }
+    if groups:
+        move_opt["group_names"] = groups
+    move_done = dict(move_opt)
+    move_done["optional"] = False
+    cons = parse_effect(cons_text)
+    return {
+        "text": text,
+        "action": "conditional_on_optional",
+        "optional_action": move_opt,
+        "conditional_action": {"action": "sequential", "actions": [move_done, cons]},
+        "conditional_negation": False,
+    }
+
+
 def _extract_generic_fields(condition, text):
     """Extract all generic fields from text into condition dict (no early return)."""
     # Character names: 「A」か「B」か「C」がいる, 「A」と「B」がいる,
@@ -9261,6 +9302,7 @@ _EFFECT_HANDLERS = [
     _try_each_time,  # Xたび (each-time trigger + effect)
     # Tier 2: Conditional/optional effect shapes
     _try_those_cards_add_hand_optional,  # G13: それらのカードの中から…手札に加えてもよい。そうしたとき…
+    _try_discard_shuffle_to_bottom_optional,  # G16: 控え室N枚選びシャッフル→デッキ一番下・そうしたとき…
     _try_discard_live_and_member_optional,  # B6: 控え室にライブカードとmember無ブレードがある場合→シャッフルデッキ下・そうしたときheart01
     _try_unless_effect,  # しないかぎり (unless-pay)
     _try_opponent_action,  # 相手は... (opponent action)

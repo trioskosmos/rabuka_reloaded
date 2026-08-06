@@ -728,11 +728,11 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
 - **Tests**: `bp7_like_a_treasure_optional_test.rs` (3 structure tests: conditional_on_optional, optional_action moves a 虹ヶ咲 live card to hand, accepted branch = move then +1 score).
 
 
-### CLEAN-G14. Blade-limit filter misparsed as a resource gain (Fire Bird)
+### CLEAN-G14. Blade-limit filter misparsed as a resource gain (Fire Bird) — ✅ FIXED
 
 - D19 `PL!N-sd2-026-P` Fire Bird ab#0 — "自分のステージにいる**ブレードを4つ以上持つ**『虹ヶ咲』のメンバー1人は、ライブ終了時まで、heart02×2を得る。" →
-  parsed as `sequential[gain_resource{blade, count:4}, gain_resource{heart, count:4}]` (lines 22470-22494).
-  The **blade-4 filter became a blade+4 grant**, and the heart count 2 became 4. Severely wrong.
+  now `gain_resource{heart, heart_colors:[heart02], count:2, card_type:member_card, group_names:["虹ヶ咲"], target_count:1, duration:"live_end", blade_limit:4, blade_limit_operator:">="}` (was a misparse into `gain_resource{blade, count:4}` + `gain_resource{heart, count:4}`).
+
 
 ### CLEAN-G15. Triple-name cost condition → only one name survives — ✅ FIXED
 
@@ -762,12 +762,13 @@ Fixed (parser + engine):
   debut adds live card, debut with no live card, live-success adds member, live-success
   ignores live cards. Play-cost verified via actual energy spent.
 
-### CLEAN-G16. Shuffle-to-deck-bottom action folded into condition
+### CLEAN-G16. Shuffle-to-deck-bottom action folded into condition — ✅ FIXED (parser)
 
 - D21 `PL!SP-bp7-028-L` 未来の音が聴こえる ab#0 — "自分の控え室にある『Liella!』のメンバーカードを**9枚選び、シャッフルし、デッキの一番下に置いてもよい。そうしたとき、**…すべてのメンバーはブレードを得る。" →
-  parsed as `condition{group_condition, shuffle:true, count:9} + gain_resource{blade, all}` (lines 37700-37723).
-  The **"そうしたとき"** structure is flattened: the shuffle+place-under is a condition, not an
-  action, and the follow-up gain applies without checking the result actually happened.
+  now `conditional_on_optional{optional_action: move_cards{source:"discard", destination:"deck_bottom", count:9, card_type:"member_card", group_names:["Liella!"], shuffle:true, placement_order:"any_order"}, conditional_action: sequential[move_to_bottom, gain_resource{blade, all}]}` (was a `group_condition{shuffle:true,count:9}` + `gain_resource` — the move never actually happened).
+- **Parser**: new `_try_discard_shuffle_to_bottom_optional` handler (Tier 2) emits the conditional_on_optional.
+- **Tests**: `bp7_mirai_no_oto_optional_test.rs` (3 structure tests: conditional_on_optional, optional action shuffles 9 Liella! discard→deck_bottom in any order, accepted branch = move then blade gain).
+
 
 ### CLEAN-G17. Trigger "エネルギーがメンバーの下に置かれたとき" under-parsed
 

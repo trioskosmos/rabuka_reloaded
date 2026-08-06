@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T18:41:13.124864",
+  "generated_at": "2026-08-06T19:01:04.670389",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "9c57145c",
+  "engine_commit": "63947ac9",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -37853,29 +37853,64 @@
       "cost": null,
       "effect": {
         "text": "自分の控え室にある『Liella!』のメンバーカードを9枚選び、それらをシャッフルし、デッキの一番下に置いてもよい。そうしたとき、ライブ終了時まで、自分のステージにいるすべてのメンバーは{{icon_blade.png|ブレード}}を得る",
-        "condition": {
-          "text": "自分の控え室にある『Liella!』のメンバーカードを9枚選び、それらをシャッフルし、デッキの一番下に置いてもよい。そうしたとき",
+        "action": "conditional_on_optional",
+        "optional_action": {
+          "action": "move_cards",
+          "source": "discard",
+          "destination": "deck_bottom",
+          "count": 9,
+          "card_type": "member_card",
+          "target": "self",
+          "shuffle": true,
+          "placement_order": "any_order",
+          "text": "自分の控え室にある『Liella!』のメンバーカードを9枚選び、それらをシャッフルし、デッキの一番下に置いてもよい。",
+          "group_names": [
+            "Liella!"
+          ]
+        },
+        "conditional_action": {
+          "action": "sequential",
+          "actions": [
+            {
+              "action": "move_cards",
+              "source": "discard",
+              "destination": "deck_bottom",
+              "count": 9,
+              "card_type": "member_card",
+              "target": "self",
+              "shuffle": true,
+              "placement_order": "any_order",
+              "optional": false,
+              "text": "自分の控え室にある『Liella!』のメンバーカードを9枚選び、それらをシャッフルし、デッキの一番下に置いてもよい。",
+              "group_names": [
+                "Liella!"
+              ],
+              "all": true
+            },
+            {
+              "text": "自分のステージにいるすべてのメンバーは{{icon_blade.png|ブレード}}を得る",
+              "duration": "live_end",
+              "card_type": "member_card",
+              "target": "self",
+              "action": "gain_resource",
+              "resource": "blade",
+              "all": true,
+              "shuffle": true
+            }
+          ],
+          "text": "自分の控え室にある『Liella!』のメンバーカードを9枚選び、それらをシャッフルし、デッキの一番下に置いてもよい。そうしたとき、ライブ終了時まで、自分のステージにいるすべてのメンバーは{{icon_blade.png|ブレード}}を得る",
           "group_names": [
             "Liella!"
           ],
-          "target": "self",
-          "location": "discard",
-          "locations": [
-            "discard",
-            "deck"
-          ],
-          "card_type": "member_card",
-          "count": 9,
-          "type": "group_condition",
-          "shuffle": true
+          "shuffle": true,
+          "all": true
         },
-        "card_type": "member_card",
-        "target": "self",
-        "action": "gain_resource",
-        "resource": "blade",
-        "all": true,
-        "duration": "live_end",
-        "shuffle": true
+        "conditional_negation": false,
+        "group_names": [
+          "Liella!"
+        ],
+        "shuffle": true,
+        "all": true
       }
     },
     {
