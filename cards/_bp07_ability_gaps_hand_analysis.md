@@ -335,23 +335,22 @@ Parsed (fixed):
 - ✅ The heart-set is the second step (`ref_value:"placed_under"` = copy the hearts of the card just placed under by the preceding move). Engine added `heart_copy` modifier (`GameModifiers.heart_copy: target member → source card`), applied in live `calculate_stage_hearts`/`get_available_hearts`/`player_perform_live`/`check_live_success`. This member's original hearts now equal the placed card's hearts.
 - Parser fix: new `_try_place_under_heart_copy` handler (matches "…をこのメンバーの下に置く。そうしたとき、…ハートは…と同じになる"), registered before `_try_conditional_sequential`.
 
-### C5. `PL!N-bp7-004-R` 朝香果林 ab#0 — gap: [under_member] — ❌ effect mis-typed + condition dropped
+### C5. `PL!N-bp7-004-R` 朝香果林 ab#0 — gap: [under_member] — ✅ FIXED (behavior verified + tests)
 
 Japanese:
 > 起動：エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：相手のステージにいる、元々持つブレードの数がこのメンバーの下にあるエネルギーカードの枚数に1を足した数以下のメンバー1人をウェイトにする。
 
-Parsed:
+Parsed (fixed):
 ```json
 "cost":{"type":"place_energy_under_member","destination":"under_member","count":1,
-  "card_type":"member_card"},
-"effect":{"source":"under_member","state_change":"wait","count":1,"card_type":"member_card",
-  "target":"opponent","action":"place_energy_under_member","original_value":true,
-  "energy_count":1,"target_member":"this_member"}
+  "source":"energy_zone","card_type":"energy_card"},
+"effect":{"action":"change_state","state_change":"wait","count":1,"card_type":"member_card",
+  "target":"opponent","original_value":true,
+  "blade_limit_from_energy_under":true,"blade_limit_offset":1,"blade_limit_operator":"<="}
 ```
-- ✅ Cost (energy under this member) correct — though `card_type:"member_card"` on cost is a type-slip (should be energy_card).
-- ❌ **Effect `action` is wrong**: `"place_energy_under_member"` — the actual effect is to **wait (ウェイトにする) one opponent member**. It should be `change_state{state_change:wait}`.
-- ❌ **The blade-limit condition is dropped**: "元々持つブレードの数が【下にあるエネルギー枚数+1】以下のメンバー1人" — neither the `blade_limit` nor the dynamic comparison to energy-under count is represented.
-- Fix: effect → `change_state{state_change:wait, target:opponent, member_card, blade_limit:dynamic(energy_under+1), <=}`.
+- ✅ **Fixed**: cost is `place_energy_under_member` from `energy_zone`; effect is `change_state{state_change:wait, target:opponent, original_value:true, blade_limit_from_energy_under:true, blade_limit_offset:1, blade_limit_operator:"<="}`.
+- ✅ Engine correctly computes the dynamic limit `energy_under(this member) + 1` (after the cost) and compares each opponent's ORIGINAL blade.
+- ✅ Tests: `bp7_karin_wait_blade_limit_test.rs` (`karin_*`) — asserts the cost places energy under 朝香果林, a blade-1 member is waited at limit 2, a blade-4 member is not, and (dynamic proof) a blade-4 member IS waited when pre-seeded energy raises the limit to 5.
 
 ### C6. `PL!S-bp7-004-R` 黒澤ダイヤ ab#0 — gap: [under_member, baton_touch, both_targets] — ❌ target mis-parsed, "選んだカード以外" lost
 

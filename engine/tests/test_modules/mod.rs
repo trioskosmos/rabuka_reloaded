@@ -28,7 +28,7 @@ pub mod bp7_fire_bird_blade_gain_test;
 pub mod bp7_heart_copy_test;
 pub mod bp7_kanon_baton_touch_replace_test;
 pub mod bp7_kanon_under_member_blade_test;
-pub mod bp7_kanata_choice_test;
+pub mod bp7_karin_wait_blade_limit_test;pub mod bp7_kanata_choice_test;
 pub mod bp7_cooking_with_love_test;
 pub mod bp7_karin_dynamic_blade_wait_test;
 pub mod bp7_under_member_per_unit_blade_test;
