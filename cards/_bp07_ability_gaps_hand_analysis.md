@@ -702,11 +702,11 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
   `position_change`/formation-change move is missing entirely; the "移動した場合"
   condition has no preceding action to observe.
 
-### CLEAN-G10. "元々持つハートがすべてheart04になる" → `custom`
+### CLEAN-G10. "元々持つハートがすべてheart04になる" → `custom` — ✅ FIXED
 
 - D15 `PL!S-bp7-024-L` ときめき分類学 ab#0 — "ライブ終了時まで、自分のステージにいる『Aqours』のメンバー1人は、**元々持つハートがすべてheart04になる**。" →
-  `action:"custom"` (line 36479) with `heart_colors:[heart04], original_value:true`. This is a
-  `set_heart_type` effect (compare C4's shape) but it fell to custom.
+  now `action:"set_heart_type"`, `heart_type:"heart04"`, `original_value:true`, `group_names:["Aqours"]`, `count:1`, `target_count:1`, `duration:"live_end"` (was `custom`).
+
 
 ### CLEAN-G11. "より多くのブレードを持つ" max-comparison missing
 
@@ -714,16 +714,19 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
   condition `location_condition{stage, exclude_self, scope:both, all}` (line 36953) with **no
   blade comparison** — the "has more blade than all others" predicate is not represented.
 
-### CLEAN-G12. "ライブカード置き場から手札に戻す" → `custom`
+### CLEAN-G12. "ライブカード置き場から手札に戻す" → `custom` — ✅ FIXED
 
 - D17 `PL!N-bp7-030-L` Cheer Mode ab#1 — "このカードを**ライブカード置き場から手札に戻す**。" →
-  `action:"custom"` (line 37104). No `move_cards{live_card_zone→hand, self}` emitted.
+  now `move_cards{source:"live_card_zone", destination:"hand", self_target:true, card_type:"live_card", count:1}` (was `custom`).
 
-### CLEAN-G13. Optional add-to-hand action missing (Like a Treasure)
+
+### CLEAN-G13. Optional add-to-hand action missing (Like a Treasure) — ✅ FIXED (parser)
 
 - D18 `PL!N-bp7-031-L` Like a Treasure ab#1 — "それらのカードの中から『虹ヶ咲』の**ライブカードを1枚手札に加えてもよい**。そうしたとき、このカードのスコアを＋１する。" →
-  parsed as `compound condition + modify_score` only (line 37150). The **move to hand is
-  absent** — the effect just scores, never actually adds the card.
+  now `conditional_on_optional{optional_action: move_cards{source:"those_cards", destination:"hand", card_type:"live_card", group_names:["虹ヶ咲"], count:1}, conditional_action: sequential[move_to_hand, modify_score{+1}]}` (was only a `modify_score` — the move to hand was absent).
+- **Parser**: new `_try_those_cards_add_hand_optional` handler (Tier 2) emits the conditional_on_optional for "それらのカードの中から…手札に加えてもよい。そうしたとき、…".
+- **Tests**: `bp7_like_a_treasure_optional_test.rs` (3 structure tests: conditional_on_optional, optional_action moves a 虹ヶ咲 live card to hand, accepted branch = move then +1 score).
+
 
 ### CLEAN-G14. Blade-limit filter misparsed as a resource gain (Fire Bird)
 

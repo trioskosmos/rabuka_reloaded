@@ -4942,6 +4942,45 @@ def _try_discard_live_and_member_optional(text):
     }
 
 
+def _try_those_cards_add_hand_optional(text):
+    """G13: 'それらのカードの中から『X』のライブカードをN枚手札に加えてもよい。
+    そうしたとき、[consequence]' → conditional_on_optional. Accepting runs the
+    move-to-hand AND the consequence."""
+    if "それらのカードの中から" not in text or "手札に加えてもよい" not in text:
+        return None
+    if "そうしたとき" not in text:
+        return None
+    opt_text, _, cons_text = text.partition("そうしたとき")
+    opt_text = opt_text.strip()
+    cons_text = cons_text.strip().lstrip("、")
+    groups = list(dict.fromkeys(extract_group_names(opt_text)))
+    m = re.search(r"(\d+)枚", opt_text)
+    count = int(m.group(1)) if m else 1
+    card_type = "live_card" if "ライブカード" in opt_text else "card"
+    move_opt = {
+        "action": "move_cards",
+        "source": "those_cards",
+        "destination": "hand",
+        "card_type": card_type,
+        "count": count,
+        "target": "self",
+        "optional": True,
+        "text": opt_text,
+    }
+    if groups:
+        move_opt["group_names"] = groups
+    move_done = dict(move_opt)
+    move_done["optional"] = False
+    cons = parse_effect(cons_text)
+    return {
+        "text": text,
+        "action": "conditional_on_optional",
+        "optional_action": move_opt,
+        "conditional_action": {"action": "sequential", "actions": [move_done, cons]},
+        "conditional_negation": False,
+    }
+
+
 def _extract_generic_fields(condition, text):
     """Extract all generic fields from text into condition dict (no early return)."""
     # Character names: 「A」か「B」か「C」がいる, 「A」と「B」がいる,
@@ -9221,6 +9260,7 @@ _EFFECT_HANDLERS = [
     _try_answer_choice,  # 回答がXの場合 (answer-based choice)
     _try_each_time,  # Xたび (each-time trigger + effect)
     # Tier 2: Conditional/optional effect shapes
+    _try_those_cards_add_hand_optional,  # G13: それらのカードの中から…手札に加えてもよい。そうしたとき…
     _try_discard_live_and_member_optional,  # B6: 控え室にライブカードとmember無ブレードがある場合→シャッフルデッキ下・そうしたときheart01
     _try_unless_effect,  # しないかぎり (unless-pay)
     _try_opponent_action,  # 相手は... (opponent action)

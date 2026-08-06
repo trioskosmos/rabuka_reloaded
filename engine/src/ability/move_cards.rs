@@ -2880,7 +2880,7 @@ impl AbilityResolver {
             .and_then(|sa| sa.remainder_destination_any())
             .map(|s| s.to_string())
             .or_else(|| current.and_then(|c| c.remainder_destination_any()).map(|s| s.to_string()));
-        let remainder_order = select_action
+        let _remainder_order = select_action
             .as_ref()
             .and_then(|sa| sa.remainder_placement_order_any())
             .or_else(|| current.and_then(|c| c.remainder_placement_order_any()));

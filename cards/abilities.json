@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T18:33:20.443363",
+  "generated_at": "2026-08-06T18:41:13.124864",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "5ac050b6",
+  "engine_commit": "9c57145c",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -37284,44 +37284,65 @@
       "cost": null,
       "effect": {
         "text": "自分の{{live_success.png|ライブ成功時}}能力によって、カードが自分のデッキから自分の控え室に置かれるたび、それらのカードの中から『虹ヶ咲』のライブカードを1枚手札に加えてもよい。そうしたとき、このカードのスコアを+1する",
-        "condition": {
-          "type": "compound",
-          "operator": "and",
-          "conditions": [
-            {
-              "text": "それらのカードの中から『虹ヶ咲』のライブカードを1枚手札に加えてもよい。そうしたとき",
-              "group_names": [
-                "虹ヶ咲"
-              ],
-              "location": "hand",
-              "card_type": "live_card",
-              "count": 1,
-              "type": "group_condition"
-            },
-            {
-              "type": "card_count_condition",
-              "count": 1,
-              "operator": ">=",
-              "text": "自分の{{live_success.png|ライブ成功時}}能力によって、カードが自分のデッキから自分の控え室に置かれる",
-              "trigger_event": {
-                "type": "zone_change",
-                "destination": "discard"
-              },
-              "target": "self",
-              "destination": "discard",
-              "location": "hand"
-            }
-          ],
-          "text": "それらのカードの中から『虹ヶ咲』のライブカードを1枚手札に加えてもよい。そうしたとき、かつ、自分の{{live_success.png|ライブ成功時}}能力によって、カードが自分のデッキから自分の控え室に置かれる",
+        "action": "conditional_on_optional",
+        "optional_action": {
+          "action": "move_cards",
+          "source": "those_cards",
+          "destination": "hand",
+          "card_type": "live_card",
+          "count": 1,
+          "target": "self",
+          "text": "それらのカードの中から『虹ヶ咲』のライブカードを1枚手札に加えてもよい。",
           "group_names": [
             "虹ヶ咲"
           ]
         },
-        "action": "modify_score",
-        "value": 1,
-        "operation": "add",
-        "self_target": true,
+        "conditional_action": {
+          "action": "sequential",
+          "actions": [
+            {
+              "action": "move_cards",
+              "source": "those_cards",
+              "destination": "hand",
+              "card_type": "live_card",
+              "count": 1,
+              "target": "self",
+              "optional": false,
+              "text": "それらのカードの中から『虹ヶ咲』のライブカードを1枚手札に加えてもよい。",
+              "group_names": [
+                "虹ヶ咲"
+              ]
+            },
+            {
+              "text": "このカードのスコアを+1する",
+              "action": "modify_score",
+              "value": 1,
+              "operation": "add",
+              "self_target": true,
+              "group_names": [
+                "虹ヶ咲"
+              ]
+            }
+          ],
+          "text": "自分の{{live_success.png|ライブ成功時}}能力によって、カードが自分のデッキから自分の控え室に置かれるたび、それらのカードの中から『虹ヶ咲』のライブカードを1枚手札に加えてもよい。そうしたとき、このカードのスコアを+1する",
+          "group_names": [
+            "虹ヶ咲"
+          ]
+        },
+        "conditional_negation": false,
         "trigger_type": "each_time",
+        "condition": {
+          "type": "card_count_condition",
+          "count": 1,
+          "operator": ">=",
+          "text": "自分の{{live_success.png|ライブ成功時}}能力によって、カードが自分のデッキから自分の控え室に置かれる",
+          "trigger_event": {
+            "type": "zone_change",
+            "destination": "discard"
+          },
+          "target": "self",
+          "destination": "discard"
+        },
         "group_names": [
           "虹ヶ咲"
         ]

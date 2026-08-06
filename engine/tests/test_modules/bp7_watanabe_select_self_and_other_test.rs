@@ -10,17 +10,12 @@
 /// this member's own 登場 ability would never fire. These tests pin that THIS
 /// member is selectable (count 2, not exclude_self) and that its 登場 ability fires.
 use crate::helpers::*;
-use rabuka_engine::zones::MemberArea;
 
 const WATANABE: &str = "PL!S-bp7-005-R＋"; // 渡辺 曜 (Aqours) — has 登場 ab#0 (place discard member under)
 const HANAMARU: &str = "PL!S-bp7-007-R＋"; // 国木田花丸 (Aqours) — has 登場 ab#0 (recover cost<=2 member)
 const DISCARD_TARGET: &str = "PL!-sd1-001-SD"; // generic member for 渡辺曜's 登場 to place under
 
 fn activate_ab2(game: &mut TestGame, watanabe: i16) {
-    TurnEngine_activate_ab2(game, watanabe);
-}
-
-fn TurnEngine_activate_ab2(game: &mut TestGame, watanabe: i16) {
     rabuka_engine::turn::TurnEngine::execute_main_phase_action_with_ability_index(
         &mut game.state,
         &rabuka_engine::game_setup::ActionType::UseAbility,
