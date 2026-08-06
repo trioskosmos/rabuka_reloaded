@@ -906,14 +906,17 @@ Fixed (parser + engine):
 - **G9** (果南 ab#0) — `_try_kore_niyori_result` now recognizes `この効果によって` and attaches a leading gate condition to the primary; engine `evaluate_group_condition` `all_members` now matches ANY listed group (`『Aqours』か『SaintSnow』`); 3 gameplay tests in `bp7_kanan_formation_change_test.rs`.
 - **G4 (engine)** (松浦果南 ab#1) — `cannot_wait_by_effect` now enforced: `GameState.wait_immune_members` records (member_id, owner_id); `execute_change_state` member_op wait path drops members immune against the effect's controller (opponent wait blocked, self allowed). Verified against **5 diverse wait abilities** (朝香果林 / 矢澤にこ / 高坂穂乃果 / 西木野真姫 / 園田海未) in their existing test files + shared helper `bp7_wait_immunity_helpers`.
 
-**Remaining to fix (4 items):**
-| Item | Defect |
-|---|---|
-| CLEAN-G4 (engine) `PL!S-bp7-003-R＋` 松浦果南 ab#1 | parser emits `restriction{cannot_wait_by_effect}`, but `execute_restriction` does not enforce wait-immunity |
-| CLEAN-G6 `PL!N-bp7-007-R＋` 優木せつ菜 ab#1 + `PL!N-bp7-026-L` Just Believe!!! ab#0 | unresolvable `dynamic_count` ("その差") |
-| CLEAN-G8 (engine) `PL!S-bp7-022-L` 恋になりたいAQUARIUM ab#0 | parser emits `custom{yell_source_modifier, deck_bottom}` — engine support unverified |
-| CLEAN-G11 `PL!N-bp7-027-L` オードリー ab#0 | "more blade than all others" max-comparison missing |
-| CLEAN-G17 `PL!SP-bp7-016-N` 葉月 恋 ab#0 + `PL!SP-bp7-005-R＋` 葉月 恋 ab#1 | energy-placed trigger modeled as comparison, not `zone_change` |
+**Remaining to fix (0 items):**
+
+All BP07 / NSD02 gaps are now fixed (with gameplay tests). Final sweep (this session):
+- **G11 オードリー blade-max comparison** — parser `blade_greater_than_all` + engine `evaluate_blade_greater_than_all` (selected member's blade vs all others on both stages); 5 live-success gameplay tests.
+- **G6 せつ菜 ab#1 dynamic_count** — energy-difference resolved (energy − threshold) + comparison_target false-positive fix; 10 gameplay tests for all 3 せつ菜 abilities.
+- **G17 葉月恋 energy-placed trigger** — `_try_movement` emits a movement_condition (energy_placed + self_effect_only) for past-tense "置かれた" into the zone; 5 gameplay tests.
+- **G8 恋になりたいAQUARIUM yell-source** — engine decodes `custom_type`/`yell_source` and uses `draw_bottom()` for the cheer reveal when a yell_source_modifier live card is in play; 7 gameplay tests.
+
+Engine refactors:
+- dynamic_count resolution unified into `GameState::resolve_dynamic_count` (single source of truth).
+- `resolve_per_unit_count` gained an explicit `host_card_id` param (under-member host scoping no longer overloads `filter.exclude_self`).
 
 ## Recommended order (updated)
 
