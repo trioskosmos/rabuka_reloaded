@@ -48,7 +48,7 @@ pub mod bp7_q273_watanabe_cost_test;
 pub mod bp7_kanan_formation_change_test;
 pub mod bp7_kanan_wait_immunity_test;
 pub mod bp7_wait_immunity_helpers;
-pub mod bp7_emma_color_diversity_test;pub mod bp7_kanata_choice_test;
+pub mod bp7_q270_emma_color_diversity_test;pub mod bp7_kanata_choice_test;
 pub mod bp7_cooking_with_love_test;
 pub mod bp7_karin_dynamic_blade_wait_test;
 pub mod bp7_under_member_per_unit_blade_test;

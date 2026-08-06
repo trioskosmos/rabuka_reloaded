@@ -62,12 +62,11 @@ impl AbilityResolver {
         let source_card_binding = effect.source_card_any();
         let source_card = source_card_binding.as_deref();
 
-        // Which cards' abilities are fired. With no explicit source_card (the
-        // parser leaves source null for 「それらが持つ登場能力」), the cards are the
-        // ones selected by the preceding `select` step (e.g. 渡辺曜 ab#2:
-        // select THIS + 1 other Aqours member, then fire each of their 登場
-        // abilities). "previous_selected" fires EVERY selected card.
-        let use_selected = source_card.is_none() || source_card == Some("previous_selected");
+        // Which cards' abilities are fired. "previous_selected" (emitted by the
+        // parser for 「そのカード/それらが持つ…能力を発動させる」) fires EVERY selected
+        // card — e.g. 渡辺曜 ab#2: select THIS + 1 other Aqours member, then fire
+        // each of their 登場 abilities.
+        let use_selected = source_card == Some("previous_selected");
         let card_ids: Vec<i16> = if use_selected {
             self.selected_cards.iter().copied().collect()
         } else {

@@ -8644,6 +8644,10 @@ def _try_ability_activation(text):
     # Detect "これにより" pattern — references the card from the cost payment
     if "これにより" in target_raw:
         result["source_card"] = "cost_card"
+    # "そのカード/そのメンバーの…能力を発動させる" / "それらが持つ…能力を発動させる" — the
+    # fired ability belongs to the card(s) selected by the preceding `select` step.
+    elif "その" in target_raw or "それら" in target_raw:
+        result["source_card"] = "previous_selected"
     result["target"] = target_raw
     tm = re.search(r"\{\{(.+?)\}\}", target_raw)
     if tm:

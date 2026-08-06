@@ -1,1 +1,1 @@
-auto-etc1
+etc1

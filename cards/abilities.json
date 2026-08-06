@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-07T04:09:39.495246",
+  "generated_at": "2026-08-07T06:40:05.462646",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "8bc5b079",
+  "engine_commit": "4a4c279e",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -6421,6 +6421,7 @@
           {
             "text": "それらが持つ{{toujyou.png|登場}}能力それぞれ1つを発動させる",
             "action": "activate_ability",
+            "source_card": "previous_selected",
             "target": "それらが持つ{{toujyou.png|登場}}能力",
             "target_trigger": "登場",
             "ability_text": "登場_ability",
@@ -13903,6 +13904,7 @@
           {
             "text": "そのカードの{{toujyou.png|登場}}能力1つを発動させる",
             "action": "activate_ability",
+            "source_card": "previous_selected",
             "target": "そのカードの{{toujyou.png|登場}}能力",
             "target_trigger": "登場",
             "ability_text": "登場_ability",
@@ -32479,6 +32481,7 @@
           {
             "text": "そのメンバーの{{live_start.png|ライブ開始時}}能力1つを発動させてもよい",
             "action": "activate_ability",
+            "source_card": "previous_selected",
             "target": "そのメンバーの{{live_start.png|ライブ開始時}}能力",
             "target_trigger": "ライブ開始時",
             "ability_text": "ライブ開始時_ability",
