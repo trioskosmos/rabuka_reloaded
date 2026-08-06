@@ -382,23 +382,23 @@ Parsed (abridged):
 - The keep-≤3/shuffle-rest-under/draw-3 both-player structure is `select{keep_shuffle_under, max, target:both}` + `draw_card{3, both}`.
 - Tests: `bp7_dia_both_hand_reorder_test.rs` (`c6_*`) — incl. new `c6_non_aqours_baton_touch_does_not_fire` (source-group gate).
 
-### C7. `PL!S-bp7-004-R` 黒澤ダイヤ ab#1 — gap: [under_member, placement_order] — ⚠️/❌ look source + rest placement wrong
+### C7. `PL!S-bp7-004-R` 黒澤ダイヤ ab#1 — gap: [under_member, placement_order] — ✅ FIXED (parser + engine)
 
 Japanese:
 > ライブ開始時：自分のデッキの**下**からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの**下**に置き、残りを控え室に置く。
 
-Parsed:
+Parsed (fixed):
 ```json
 {"action":"look_and_select",
- "look_action":{"action":"look_at","count":3,"target":"self"},   // ❌ no source (should be deck_bottom)
+ "look_action":{"action":"look_at","count":3,"target":"self","source":"deck_bottom"},
  "select_action":{"action":"select_cards","discard_remaining":true,
-   "reveal":false,"destination":"discard",                       // ❌ should have deck_bottom placement
+   "reveal":false,"destination":"deck_bottom","placement_order":"any_order",
+   "any_number":true,
    "text":"好きな枚数を好きな順番でデッキの下に置き、残りを控え室に置く"}}
 ```
-- ❌ `look_action` has **no `source`** — it should be `deck_bottom` (デッキの下から見る).
-- ❌ `select_action` only has `destination:"discard"` + `discard_remaining:true` — the "好きな順番で**デッキの下**に置き" part is missing entirely (no `destination:deck_bottom`, no `placement_order`).
-- `under_member` flag spurious (it's デッキの下, not メンバーの下).
-- Fix: look_action `source:deck_bottom`; select_action needs both a deck_bottom placement (any_order) and a discard remaining.
+- ✅ **Fixed**: `look_action` now has `source:deck_bottom`; `select_action` now has `destination:deck_bottom` + `placement_order:any_order` + `any_number` (added the deck_BOTTOM pattern to `_build_look_select_actions`, mirroring the existing deck_top one).
+- ✅ **Engine**: `execute_look_at` now handles `Zone::DeckBottom` by DRAINING the bottom N cards from the deck (previously it fell into the generic `zone_cards` copy branch, leaving the cards in the deck and duplicating them). Kept cards go back on the deck bottom, the rest to the waitroom.
+- Tests: `bp7_dia_look_bottom_select_test.rs`.
 
 ### C8. `PL!S-bp7-008-R` 小原鞠莉 ab#0 — gap: [under_member, placement_order] — ❌ "残りをデッキの下" parsed as discard
 

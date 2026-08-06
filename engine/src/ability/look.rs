@@ -915,7 +915,8 @@ impl AbilityResolver {
         // Rule 10.2.2.2 / Q85: If deck has fewer cards than needed, take
         // what's available (Q85 multi-step: draw → refresh → draw remaining).
         let look_from_deck = Zone::from_str(source) == Some(Zone::Deck)
-            || Zone::from_str(source) == Some(Zone::DeckTop);
+            || Zone::from_str(source) == Some(Zone::DeckTop)
+            || Zone::from_str(source) == Some(Zone::DeckBottom);
         if look_from_deck {
             let deck_count = gs.resolve_target_player(target).main_deck.cards.len();
             if (deck_count as u8) < count {
@@ -935,6 +936,13 @@ impl AbilityResolver {
         let cards: Vec<i16> = match Zone::from_str(source) {
             Some(Zone::Deck) | Some(Zone::DeckTop) => {
                 player.main_deck.draw_multiple(count as usize)
+            }
+            Some(Zone::DeckBottom) => {
+                // "自分のデッキの下からN枚見る" — take (and REMOVE) the bottom N
+                // cards of the deck. The bottom-most card is the last index.
+                let n = player.main_deck.cards.len();
+                let start = n.saturating_sub(count as usize);
+                player.main_deck.cards.drain(start..).collect()
             }
             Some(Zone::Stage) => {
                 let sc: Vec<i16> = player

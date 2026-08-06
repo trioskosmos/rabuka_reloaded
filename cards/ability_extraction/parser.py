@@ -7316,6 +7316,17 @@ def _build_look_select_actions_inner(select_text):
         result["reveal"] = False
         return result
 
+    # Pattern: any number → deck_BOTTOM → discard remaining (C7 黒澤ダイヤ ab#1)
+    if (
+        "好きな枚数を好きな順番でデッキの下に置き" in select_text
+        and "残りを控え室に置く" in select_text
+    ):
+        result["destination"] = "deck_bottom"
+        result["placement_order"] = "any_order"
+        result["any_number"] = True
+        result["reveal"] = False
+        return result
+
     # Issue 12: Pattern: hand + deck_top remainder (e.g. "1枚を手札に加え、残りをデッキの上に戻す")
     if "手札に加え" in select_text and "残りをデッキの上" in select_text:
         result["destination"] = "hand"

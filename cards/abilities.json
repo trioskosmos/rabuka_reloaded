@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T17:33:52.998621",
+  "generated_at": "2026-08-06T17:40:12.176702",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "f39ffbdc",
+  "engine_commit": "f5a51678",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -21208,8 +21208,10 @@
           "action": "select_cards",
           "discard_remaining": true,
           "text": "好きな枚数を好きな順番でデッキの下に置き、残りを控え室に置く",
-          "reveal": false,
-          "destination": "discard"
+          "destination": "deck_bottom",
+          "placement_order": "any_order",
+          "any_number": true,
+          "reveal": false
         }
       }
     },
