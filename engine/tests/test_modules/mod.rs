@@ -26,6 +26,7 @@ pub mod bp7_ai_choice_under_member_test;
 pub mod bp7_dia_both_hand_reorder_test;
 pub mod bp7_fire_bird_blade_gain_test;
 pub mod bp7_heart_copy_test;
+pub mod bp7_kanon_baton_touch_replace_test;
 pub mod bp7_kanon_under_member_blade_test;
 pub mod bp7_kanata_choice_test;
 pub mod bp7_cooking_with_love_test;

@@ -298,20 +298,22 @@ Parsed:
 - ✅ **Fixed**: option 2 now emits `place_energy_under_member{source:"energy_deck", destination:"under_member", group_names:["虹ヶ咲"]}` (parser_utils gained `energy_deck` source + `メンバーの下に置く` under_member destination patterns).
 - ✅ **Engine**: `execute_place_energy_under_member_impl` now handles `source:"energy_deck"` — draws from the energy deck and places under the activating member when it matches the group filter (else the first matching member). Tests: `bp7_ai_choice_under_member_test.rs` (`ai_*`).
 
-### C3. `PL!SP-bp7-001-R` 澁谷かのん ab#1 — gap: [under_member] — ❌ effect becomes `custom`
+### C3. `PL!SP-bp7-001-R` 澁谷かのん ab#1 — gap: [under_member] — ✅ FIXED (behavior verified + edge tests)
 
 Japanese:
 > 自動：このメンバーがステージから控え室に置かれたとき、バトンタッチしていた場合、このカードをそのバトンタッチで登場したメンバーの下に置く。
 
-Parsed:
+Parsed (fixed):
 ```json
-{"condition":{"type":"location_condition","location":"discard",
-  "locations":["discard","stage"],"card_type":"member_card","self_target":true,"target":"self"},
- "card_type":"member_card","action":"custom","destination":null,"self_target":true}
+{"condition":{"type":"movement_condition","movement":"baton_touch","target":"self",
+  "baton_touch_trigger":true,"trigger_event":{"type":"baton_touch","tense":"past","location":"discard"}},
+ "destination":"under_member","card_type":"member_card","action":"move_cards",
+ "self_target":true,"count":1}
 ```
-- ✅ Trigger + condition (stage→discard) parsed.
-- ❌ **The action "そのバトンタッチで登場したメンバーの下に置く" is not represented** → `action:"custom", destination:null`. Existing baton-touch patterns only match "バトンタッチして登場"/"からバトンタッチ"; this departing-member perspective ("バトンタッチしていた場合 … その…メンバーの下に置く") matches nothing.
-- Engine: baton-touch tracking exists (`baton_touch_arriving_card_ids`, `baton_touch_replaced_member_id`) and `under_member` placement exists, but no resolver path re-places the departed card under the arriving member. → **Overlap** (parser must emit the move; engine needs the wiring). See full analysis.
+- ✅ The baton-touch-trigger movement condition + `move_cards{destination:under_member, self_target}` now represent the departing-member perspective ("バトンタッチしていた場合 … その…メンバーの下に置く").
+- ✅ Engine: when a member is baton-touched over, the displaced member goes to the waitroom and ab#1 moves it under the arriving member (the one in its slot).
+- ✅ Tests: `bp7_kanon_baton_touch_replace_test.rs` (`kanon_*`) — positive placement, no-baton-touch stays in waitroom, kanon-as-arriver not displaced, slot-specific host.
+
 
 ### C4. `PL!N-bp7-003-R＋` 桜坂しずく ab#0 — gap: [under_member] — ✅ FIXED (parser + engine)
 
