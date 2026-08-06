@@ -5261,8 +5261,13 @@ def _extract_generic_fields(condition, text):
                     noun_pos = text.find(noun)
                     marker_pos = text.find("より", noun_pos + len(noun))
                     if noun_pos >= 0 and marker_pos > noun_pos:
-                        condition["comparison_target"] = tgt
-                        break
+                        # G6: "自分のエネルギーが6枚より多い" — the "より" belongs to a
+                        # NUMERIC THRESHOLD ("6枚より"), not to "自分". A "N<unit>より"
+                        # is a count-vs-threshold comparison, not a player-vs-player
+                        # comparison_target. Don't set comparison_target for those.
+                        if not re.search(r"\d+[枚人個種類つ]?より", text):
+                            condition["comparison_target"] = tgt
+                            break
     # Fix: when target=both AND comparison_target is set, the comparison_target
     # already handles the opponent side, so target should be self
     if condition.get("target") == "both" and condition.get("comparison_target"):
@@ -10248,6 +10253,28 @@ def _mark_under_card_gain(effect, text):
         effect["requires_under_card"] = True
 
 
+def _fix_energy_difference_dynamic_count(effect):
+    """G6: 'エネルギーがN枚より多いかぎり、その差に等しい数のXを得る' — the
+    dynamic_count reference 'その差' is unresolvable prose. Rewrite it to
+    'energy_difference' + base_reference=N (the threshold) when the effect's
+    condition is an energy-count comparison, so the engine computes energy − N."""
+    if not isinstance(effect, dict):
+        return
+    dc = effect.get("dynamic_count")
+    cond = effect.get("condition")
+    if not isinstance(dc, dict) or dc.get("reference") != "その差":
+        return
+    if not isinstance(cond, dict):
+        return
+    if (
+        cond.get("resource_type") == "energy"
+        and cond.get("operator") in (">", ">=")
+        and isinstance(cond.get("count"), int)
+    ):
+        dc["reference"] = "energy_difference"
+        dc["base_reference"] = str(cond["count"])
+
+
 def _fix_select_self_and_other(effect):
     """CLEAN-G19: 'このメンバーと…ほかの『X』のメンバー1人を選ぶ' — the select AND the
     follow-up 登場-ability activation must include THIS member (not exclude_self)."""
@@ -10281,6 +10308,7 @@ def _normalize_effect_tree(effect, original_text=None):
     _enrich_characters(effect)
     _clean_gain_resource(effect)
     _fix_select_self_and_other(effect)
+    _fix_energy_difference_dynamic_count(effect)
     src = original_text or effect.get("text", "") or ""
     _mark_under_card_gain(effect, src)
     # "『X』のメンバーからバトンタッチして登場した場合" — the baton-touch source group

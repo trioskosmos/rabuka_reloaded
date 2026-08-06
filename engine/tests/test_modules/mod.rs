@@ -1,4 +1,4 @@
-pub mod ability_engine_fixes_test;
+﻿pub mod ability_engine_fixes_test;
 pub mod ability_from_source_test;
 pub mod abundant_test;
 pub mod action_coverage_test;
@@ -34,6 +34,7 @@ pub mod bp7_mari_look_top_split_test;
 pub mod bp7_ginko_select_discard_deck_bottom_test;
 pub mod bp7_watanabe_under_card_blade_test;
 pub mod bp7_audrey_blade_max_test;
+pub mod bp7_setsuna_abilities_test;
 pub mod bp7_watanabe_select_self_and_other_test;
 pub mod bp7_like_a_treasure_optional_test;
 pub mod bp7_mirai_no_oto_optional_test;
@@ -289,7 +290,7 @@ pub mod yoshiko_test;
 pub mod you_debut_test;
 pub mod zero_tested_action_types_test;
 
-// PVP room / web server integration tests (excluded from main test suite — runs slowly)
+// PVP room / web server integration tests (excluded from main test suite 窶・runs slowly)
 // pub mod pvp_room_test;
 
 // Playthrough of coverage-gap test cards
@@ -347,7 +348,7 @@ pub mod pl_sp_pb2_005_test;
 pub mod trigger_card_integration_test;
 pub mod upper_batch_on_yell_test;
 
-// Otherwise-condition routing (reveal → conditional → otherwise)
+// Otherwise-condition routing (reveal 竊・conditional 竊・otherwise)
 pub mod otherwise_condition_flow_test;
 
 // Multi-color heart gain (PL!S-PR-040-PR / PL!N-PR-023-PR)
@@ -360,32 +361,32 @@ pub mod modify_required_hearts_exclude_heart_test;
 pub mod wakana_shiki_test;
 pub mod zettai_lover_test;
 
-// KALEIDOSCORE debut: discard → energy wait + conditional draw (PL!SP-pb2-013-R)
+// KALEIDOSCORE debut: discard 竊・energy wait + conditional draw (PL!SP-pb2-013-R)
 pub mod keke_pb2_013_debut_test;
 
 // CatChu! per-unit energy activation (PL!SP-pb2-018-R)
 pub mod catchu_energy_activation_test;
 pub mod live_cards_disappear_test;
 
-// Q176: 園田海未 pb1-013 — opponent picks from your hand blind, reveal live → +1 score
+// Q176: 蝨堤伐豬ｷ譛ｪ pb1-013 窶・opponent picks from your hand blind, reveal live 竊・+1 score
 pub mod umi_pb1_013_test;
-// Q176 companion: 園田海未 PR-014 — you pick from opponent's hand blind, reveal → draw
+// Q176 companion: 蝨堤伐豬ｷ譛ｪ PR-014 窶・you pick from opponent's hand blind, reveal 竊・draw
 pub mod umi_pr014_test;
 
-// ノンフィクション!! (PL!SP-bp4-024) — LiveStart cost comparison (ab#0)
+// 繝弱Φ繝輔ぅ繧ｯ繧ｷ繝ｧ繝ｳ!! (PL!SP-bp4-024) 窶・LiveStart cost comparison (ab#0)
 pub mod nonfiction_cost_comparison_test;
 
-// SELF CONTROL!! + 鹿角聖良: position_change triggers moved-this-turn blade grant
+// SELF CONTROL!! + 鮖ｿ隗定＊濶ｯ: position_change triggers moved-this-turn blade grant
 pub mod self_control_position_change_test;
 
-// 桜内梨子 (PL!S-bp5-002) — LiveStart center: left_cost == right_cost → wait opponent low-blade
+// 譯懷・譴ｨ蟄・(PL!S-bp5-002) 窶・LiveStart center: left_cost == right_cost 竊・wait opponent low-blade
 // Verifies require_position_cards: both positions must have cards (empty = no trigger)
 pub mod riko_bp5_center_cost_equal_test;
 
-// Wonder zone (PL!-bp5-020-L) — modify_required_hearts per-unit with per_unit_heart_colors + max_repeats
+// Wonder zone (PL!-bp5-020-L) 窶・modify_required_hearts per-unit with per_unit_heart_colors + max_repeats
 pub mod auto_system_stress_test;
 pub mod baton_touch_order_test;
 pub mod wonder_zone_max_repeats_test;
 
-// 平安名すみれ (PL!SP-bp2-004-R) — constant: center has highest cost → heart03
+// 蟷ｳ螳牙錐縺吶∩繧・(PL!SP-bp2-004-R) 窶・constant: center has highest cost 竊・heart03
 pub mod sumire_bp2_center_cost_test;

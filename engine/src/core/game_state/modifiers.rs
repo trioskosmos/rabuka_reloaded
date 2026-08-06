@@ -162,9 +162,10 @@ impl GameState {
                                             let zone =
                                                 loc_b.or(per_b).unwrap_or(Zone::Hand.to_str());
                                             let mut filter = effect.filter_subset();
-                                            if filter.exclude_self == Some(-1) {
-                                                filter.exclude_self = Some(card_id);
-                                            }
+                                            // "このメンバーの下" per-unit counts must be scoped to
+                                            // the HOST member (card_id). Force exclude_self to the
+                                            // host so resolve_per_unit_count finds the host area.
+                                            filter.exclude_self = Some(card_id);
                                             let per_count =
                                                 crate::ability::util::resolve_per_unit_count(
                                                     true,
@@ -201,7 +202,15 @@ impl GameState {
                                         *exp_blade.entry(card_id).or_insert(0) += n as i16;
                                     }
                                     "heart" | "ハート" => {
-                                        let n = if effect.per_unit_any().unwrap_or(false) {
+                                        let n = if let Some(ref dc) = effect.dynamic_count_any() {
+                                            let player = if self.player1.stage.stage.contains(&card_id)
+                                            {
+                                                &self.player1
+                                            } else {
+                                                &self.player2
+                                            };
+                                            self.resolve_constant_dynamic_count(&player, dc)
+                                        } else if effect.per_unit_any().unwrap_or(false) {
                                             let player =
                                                 if self.player1.stage.stage.contains(&card_id) {
                                                     &self.player1
@@ -213,9 +222,10 @@ impl GameState {
                                             let zone =
                                                 loc_b.or(per_b).unwrap_or(Zone::Hand.to_str());
                                             let mut filter = effect.filter_subset();
-                                            if filter.exclude_self == Some(-1) {
-                                                filter.exclude_self = Some(card_id);
-                                            }
+                                            // "このメンバーの下" per-unit counts must be scoped to
+                                            // the HOST member (card_id). Force exclude_self to the
+                                            // host so resolve_per_unit_count finds the host area.
+                                            filter.exclude_self = Some(card_id);
                                             let per_count =
                                                 crate::ability::util::resolve_per_unit_count(
                                                     true,
@@ -223,7 +233,7 @@ impl GameState {
                                                     player,
                                                     &self.card_database,
                                                     &filter,
-                                                    effect.heart_colors_any(),
+                                                    &[],
                                                     effect.state_any().as_deref(),
                                                     &self.mods.orientation_modifiers,
                                                 );
@@ -598,10 +608,38 @@ impl GameState {
         tdbg!("RC:14b SUCCESS_ZONE_DONE");
     }
 
+    /// Resolve a dynamic_count for a 常時 (constant) gain_resource. The constant
+    /// path has no AbilityResolver, so it handles the refs used by continuous
+    /// gains directly. G6: "energy_difference" = energy − base_reference (e.g.
+    /// せつ菜 ab#1 "エネルギーが6枚より多いかぎり、その差に等しい数のheart02").
+    fn resolve_constant_dynamic_count(
+        &self,
+        player: &crate::player::Player,
+        dc: &crate::card::DynamicCount,
+    ) -> i32 {
+        match dc.reference.as_deref() {
+            Some("energy_difference") => {
+                let threshold = dc
+                    .base_reference
+                    .as_deref()
+                    .and_then(|s| s.parse::<u8>().ok())
+                    .unwrap_or(0);
+                (player.energy_zone.cards.len() as i32) - (threshold as i32)
+            }
+            Some("previous_moved_cards") | Some("previous_move") => {
+                self.mods.last_cost_discard_count as i32
+            }
+            Some("unit_count") => player.stage.stage.iter().filter(|&&c| c != -1).count() as i32,
+            _ => dc
+                .calculation_value
+                .map(|v| v as i32)
+                .unwrap_or_else(|| 1),
+        }
+    }
+
     pub fn recalculate_constant_blade_modifiers(&mut self) {
         let card_db = self.card_database.clone();
         let all_ids = self.collect_constant_stage_effect_ids();
-        // Filter to blade gain_resource abilities by looking up each effect
         let blade_ids: Vec<(i16, usize)> = all_ids
             .into_iter()
             .filter(|&(cid, idx)| {
@@ -648,9 +686,10 @@ impl GameState {
                             .or(per_type)
                             .unwrap_or(crate::ability::enums::Zone::Hand.to_str());
                         let mut filter = effect.filter_subset();
-                        if filter.exclude_self == Some(-1) {
-                            filter.exclude_self = Some(cid);
-                        }
+                        // "このメンバーの下" per-unit counts must be scoped to the HOST
+                        // member (cid). Force exclude_self to the host so
+                        // resolve_per_unit_count finds the host area.
+                        filter.exclude_self = Some(cid);
                         let per_count = crate::ability::util::resolve_per_unit_count(
                             true,
                             Some(zone),

@@ -2166,13 +2166,37 @@ pub fn resolve_per_unit_count(
         _ => return 1,
     };
     if Zone::from_str(zone) == Some(Zone::UnderMember) {
-        let cards: Vec<i16> = player
-            .stage
-            .under_cards
-            .iter()
-            .flat_map(|sv| sv.iter())
-            .copied()
-            .collect();
+        // "このメンバーの下に置かれているカード1枚につき" is scoped to the HOST
+        // member (whose ability this is), not to every member's under-cards.
+        // recalculate_constants sets filter.exclude_self to the host card id.
+        // When no host is known, fall back to counting under-cards of all members.
+        let cards: Vec<i16> = if let Some(host_id) = filter.exclude_self {
+            if host_id < 0 {
+                player
+                    .stage
+                    .under_cards
+                    .iter()
+                    .flat_map(|sv| sv.iter())
+                    .copied()
+                    .collect()
+            } else {
+                player
+                    .stage
+                    .stage
+                    .iter()
+                    .position(|&id| id == host_id)
+                    .map(|idx| player.stage.under_cards[idx].iter().copied().collect())
+                    .unwrap_or_default()
+            }
+        } else {
+            player
+                .stage
+                .under_cards
+                .iter()
+                .flat_map(|sv| sv.iter())
+                .copied()
+                .collect()
+        };
         if heart_colors.is_empty() {
             count_matching_distinct(&cards, card_db, filter, false)
         } else {

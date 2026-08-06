@@ -136,6 +136,15 @@ impl AbilityResolver {
                 let player = gs.resolve_target_player("self");
                 player.stage.stage.iter().filter(|&&c| c != -1).count() as u8
             }
+            Some("energy_difference") => {
+                let threshold = dc
+                    .base_reference
+                    .as_deref()
+                    .and_then(|s| s.parse::<u8>().ok())
+                    .unwrap_or(0);
+                let player = gs.resolve_target_player("self");
+                (player.energy_zone.cards.len() as u8).saturating_sub(threshold)
+            }
             Some("its_difference") | Some("その差") => {
                 let self_score: u8 = gs
                     .player1

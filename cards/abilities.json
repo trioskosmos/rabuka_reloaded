@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T22:08:34.353190",
+  "generated_at": "2026-08-06T23:02:40.319345",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "6e042559",
+  "engine_commit": "f75a13e3",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -6799,15 +6799,15 @@
           "resource_type": "energy",
           "count": 6,
           "operator": ">",
-          "comparison_target": "self",
           "type": "comparison_condition"
         },
         "duration": "as_long_as",
         "conditional": true,
         "dynamic_count": {
           "type": "dynamic_count",
-          "reference": "その差",
-          "mode": "equals"
+          "reference": "energy_difference",
+          "mode": "equals",
+          "base_reference": "6"
         },
         "action": "gain_resource",
         "resource": "heart",
