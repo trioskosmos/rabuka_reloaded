@@ -545,7 +545,32 @@ pub(crate) fn render_board(
                                 card_w,
                                 card_h,
                             );
-                            // Name + stats at top of right column
+                            // Scrollable ability text (right column)
+                            let text_top = card_y + 40.0;
+                            let mut ty = text_top - detail_scroll_y;
+                            for ab in card.resolved_abilities() {
+                                let ab_text =
+                                    i18n::translate_ability(&ab.full_text, current_lang());
+                                let w = wrap_ability_text(&ab_text, text_w, 0.65);
+                                for line in w.lines() {
+                                    if ty > -20.0 && ty < 240.0 {
+                                        render_text_with_icons(text_x, ty, line, COL_LIGHT, 0.65);
+                                    }
+                                    ty += 18.0;
+                                }
+                                ty += 3.0;
+                            }
+                            ability_end = ty;
+                            // Clip: draw an opaque cover over the top of the right
+                            // column so scrolled text is hidden beneath the name/stats,
+                            // then redraw name + stats on top of it.
+                            _3ds_top_queue_rect(
+                                text_x,
+                                52.0,
+                                400.0 - text_x,
+                                text_top - 52.0,
+                                COL_CARD,
+                            );
                             let display_name = i18n::card_display_name(&card.name, current_lang());
                             _3ds_top_queue_text(
                                 text_x,
@@ -575,21 +600,6 @@ pub(crate) fn render_board(
                                 COL_LIGHT,
                                 0.65f32,
                             );
-                            // Scrollable ability text (right column)
-                            let mut ty = card_y + 40.0 - detail_scroll_y;
-                            for ab in card.resolved_abilities() {
-                                let ab_text =
-                                    i18n::translate_ability(&ab.full_text, current_lang());
-                                let w = wrap_ability_text(&ab_text, text_w, 0.65);
-                                for line in w.lines() {
-                                    if ty > -20.0 && ty < 240.0 {
-                                        render_text_with_icons(text_x, ty, line, COL_LIGHT, 0.65);
-                                    }
-                                    ty += 18.0;
-                                }
-                                ty += 3.0;
-                            }
-                            ability_end = ty;
                             // Scroll indicators (right edge)
                             let arrow_x = 400.0 - 18.0;
                             if ty > 228.0 {

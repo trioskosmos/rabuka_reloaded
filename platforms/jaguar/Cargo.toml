@@ -15,7 +15,6 @@ rabuka_engine = { path = "../../engine", default-features = false, features = ["
 panic = "abort"
 opt-level = "z"
 lto = true
-codegen-units = 1
 
 
 

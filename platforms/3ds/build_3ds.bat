@@ -31,14 +31,20 @@ echo [3/7] cargo-3ds ready
 echo [4/7] Pre-baking card data (unified bake tool)...
 if not exist "%~dp0romfs" mkdir "%~dp0romfs"
 if not exist "%~dp0romfs\decks" mkdir "%~dp0romfs\decks"
-cd /d "%~dp0..\..\tools\bake"
-cargo run --release -- 3ds "%~dp0romfs"
-if %errorlevel% neq 0 (
-    echo [FAIL] bake failed.
-    pause
-    exit /b 1
+call :need_bake "%~dp0romfs\cards.bin"
+if errorlevel 1 (
+    echo [4/7] Baking cards.bin...
+    cd /d "%~dp0..\..\tools\bake"
+    cargo run --release -- 3ds "%~dp0romfs"
+    if !errorlevel! neq 0 (
+        echo [FAIL] bake failed.
+        pause
+        exit /b 1
+    )
+    cd /d "%~dp0..\.."
+) else (
+    echo [4/7] cards.bin is up to date - skipping bake
 )
-cd /d "%~dp0..\.."
 echo [4/7] cards.bin + abilities.json ready
 
 copy /Y "%~dp0..\..\web_ui\decks\*.txt" "%~dp0romfs\decks\" >nul
@@ -46,22 +52,27 @@ copy /Y "%~dp0..\..\web_ui\decks\*.txt" "%~dp0romfs\decks\" >nul
 echo [4/7] Card images (incremental atlas build)...
 if exist "%~dp0..\..\web_ui\img\cards_webp\*.webp" (
     cd /d "%~dp0"
-    where python3 >nul 2>&1
-    if !errorlevel! equ 0 (
-        python3 -c "import PIL" >nul 2>&1
+    call :need_images
+    if errorlevel 1 (
+        where python3 >nul 2>&1
         if !errorlevel! equ 0 (
-            python3 scripts/convert_cards.py
-        ) else (
-            echo [WARN] python3 has no Pillow - trying py...
-            where py >nul 2>&1
+            python3 -c "import PIL" >nul 2>&1
             if !errorlevel! equ 0 (
-                py scripts/convert_cards.py
+                python3 scripts/convert_cards.py
             ) else (
-                echo [WARN] No python with Pillow found - skipping card image conversion
+                echo [WARN] python3 has no Pillow - trying py...
+                where py >nul 2>&1
+                if !errorlevel! equ 0 (
+                    py scripts/convert_cards.py
+                ) else (
+                    echo [WARN] No python with Pillow found - skipping card image conversion
+                )
             )
+        ) else (
+            echo [WARN] python3 not found - skipping card image conversion
         )
     ) else (
-        echo [WARN] python3 not found - skipping card image conversion
+        echo [4/7] Card images are up to date - skipping conversion
     )
 ) else (
     echo [WARN] No card webp images found - skipping card image conversion
@@ -138,3 +149,18 @@ echo   3DSX: output\rabuka_3ds.3dsx (run via 3dslink / SD card)
 echo   CIA:  see above (install via FBI on 3DS)
 echo.
 pause
+exit /b 0
+
+:need_bake
+rem Returns errorlevel 0 if cards.bin is up to date (no rebuild needed),
+rem 1 if any source (cards.json / abilities.json / deck txt) is newer.
+set "DST=%~1"
+if not exist "%DST%" exit /b 1
+powershell -NoProfile -Command "$src=@('%~dp0..\..\cards\cards.json','%~dp0..\..\cards\abilities.json');$d='%~dp0..\..\web_ui\decks';if(Test-Path $d){$src+=(Get-ChildItem $d -Filter '*.txt' | ForEach-Object { $_.FullName })};$dst='%~1';if(-not (Test-Path $dst)){exit 1};$max=[datetime]::MinValue;$any=$false;foreach($s in $src){if(Test-Path $s){$t=(Get-Item $s).LastWriteTime;if($t -gt $max){$max=$t};$any=$true}};if(-not $any){exit 1};if($max -gt (Get-Item $dst).LastWriteTime){exit 1}else{exit 0}"
+if errorlevel 1 ( exit /b 1 ) else ( exit /b 0 )
+
+:need_images
+rem Returns errorlevel 0 if atlases are up to date (no rebuild needed),
+rem 1 if the manifest is missing or any webp is newer than the newest atlas.
+powershell -NoProfile -Command "$m='%~dp0romfs\cards_manifest.json';$a=Get-ChildItem '%~dp0romfs\cards\cards_*.t3x' -ErrorAction SilentlyContinue;if(-not (Test-Path $m) -or -not $a){exit 1};$w=Get-ChildItem '%~dp0..\..\web_ui\img\cards_webp\*.webp' -ErrorAction SilentlyContinue;if(-not $w){exit 1};$wMax=($w | ForEach-Object { $_.LastWriteTime } | Measure-Object -Maximum).Maximum;$aMax=($a | ForEach-Object { $_.LastWriteTime } | Measure-Object -Maximum).Maximum;if($wMax -gt $aMax){exit 1}else{exit 0}"
+if errorlevel 1 ( exit /b 1 ) else ( exit /b 0 )

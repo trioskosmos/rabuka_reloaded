@@ -19,13 +19,18 @@ specific rule described. `partial` = some adjacent mechanic is tested but the QA
 - **QA rule**: paying the wait cost with a 0-blade member means the opponent target must have
   `0 - 2` = impossible; so a 0-blade opponent member cannot be waited. Blade comparison is on
   **original blade count** (元々持つ), and waited members' blades don't count toward yell reveal.
-- **Status**: **gap**. No test references `PL!SP-pb2-009`.
+- **Status**: ✓ covered — `bp7_q266_natsumi_blade_wait_test.rs` (5 tests) drives the real
+  blade-0 wait cost boundary (costed B0→nothing waitable, B2→blade-0 only, B4→blade-2/3,
+  skip-cost→nothing).
 
 ## Q267 — 天王寺璃奈 PL!N-bp7-009-R ab#0 (登場)
 > 登場：自分と相手はそれぞれ、自身のデッキの上からカードを7枚控え室に置く。
 - **QA rule**: if the deck runs exactly to 0 during the mill, a refresh happens immediately
   (before the auto-ability/effect continues), so cards leave the waitroom.
-- **Status**: **gap**. No test references `PL!N-bp7-009`.
+- **Status**: ✓ covered — `bp7_q267_rinna_mill_refresh_test.rs` (4 tests) drives the real
+  mill through the card's 登場 (both players each mill 7): deck-0 mid-mill refresh completes
+  to 7 total, deck=exactly-7 no-refresh boundary, deck=5 refresh→still 7 total, and both
+  players refreshing their own deck.
 
 ## Q268 — 三船栞子 PL!N-bp7-010-R ab#0 (起動)
 > 起動：エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：自分の控え室からコスト2以下の『虹ヶ咲』のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。
@@ -40,8 +45,14 @@ specific rule described. `partial` = some adjacent mechanic is tested but the QA
   NOT trigger.
 - **Q277 rule**: when a mill empties the deck to exactly 0, refresh occurs **before** the 自動
   ability resolves; the card leaves the waitroom and can no longer be added to hand.
-- **Status**: `bp7_mia_optional_recover_test.rs` covers the optional-discard recovery path.
-  The Q269 (yell-reveal no-trigger) and Q277 (refresh-before-resolve) edges: **gap**.
+- **Status**: ✓ covered — `bp7_mia_optional_recover_test.rs` covers the optional-discard
+  recovery path; `bp7_q269_mia_yell_no_trigger_test.rs` covers the Q269 yell-reveal
+  no-trigger edge (3 tests + deck→discard control) and the Q277 refresh-before-resolve
+  edge (2 tests + no-refresh control).
+- **Note (ab#1 常時)**: the play-time "プレイする際…コストは２減る" ability is parsed but
+  **not offered during the play action** (`handle_play_member_to_stage` only applies constant
+  cost modifiers; there is no play-time optional cost-reduction hook). This is a remaining
+  **engine gap**, not a test gap.
 
 ## Q270 — エマ・ヴェルデ PL!N-bp7-020-N ab#0 (登場)
 > 登場：自分のデッキの上からカードを3枚控え室に置く。それらのメンバーカードの中に2種類以上のブレードハートの色がある場合、ライブ終了時まで、heart04を得る。
@@ -137,11 +148,11 @@ cards (except Fire Bird) have no gameplay test.
 
 | QA | Card | Rule | Status |
 |----|------|------|--------|
-| Q266 | PL!SP-pb2-009 鬼塚夏美 | blade-0 wait cost ⇒ cannot wait 0-blade opp | **gap** |
-| Q267 | PL!N-bp7-009 天王寺璃奈 | deck-to-0 refresh mid-mill | **gap** |
+| Q266 | PL!SP-pb2-009 鬼塚夏美 | blade-0 wait cost ⇒ cannot wait 0-blade opp | ✓ `bp7_q266_natsumi_blade_wait_test` |
+| Q267 | PL!N-bp7-009 天王寺璃奈 | deck-to-0 refresh mid-mill | ✓ `bp7_q267_rinna_mill_refresh_test` |
 | Q268 | PL!N-bp7-010 三船栞子 | cost payable with no empty area | **gap** |
-| Q269 | PL!N-bp7-011 ミア | yell reveal does not trigger 自動 | **gap** |
-| Q277 | PL!N-bp7-011 ミア | refresh before 自動 resolve | **gap** |
+| Q269 | PL!N-bp7-011 ミア | yell reveal does not trigger 自動 | ✓ `bp7_q269_mia_yell_no_trigger_test` |
+| Q277 | PL!N-bp7-011 ミア | refresh before 自動 resolve | ✓ `bp7_q269_mia_yell_no_trigger_test` |
 | Q270 | PL!N-bp7-020 エマ | ALL-heart not a blade-heart color | partial |
 | Q271 | PL!N-bp7-025 Colorful Dreams | blade-heart ≠ heart color (score) | **gap** |
 | Q272 | PL!N-bp7-026 Just Believe | no-repeat select | **gap** |

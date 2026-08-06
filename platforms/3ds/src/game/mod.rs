@@ -462,7 +462,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
                 }
                 for (i, cid) in ec.iter().enumerate().take(30) {
                     // Energy cards: tapped if position >= active_count (front = active)
-                    let tapped = i >= e_active;
+                    let tapped = i >= e_active as usize;
                     set_slot($energy_fn, i as i32, *cid, false, tapped);
                 }
                 let hc = &pb.hand.cards;
