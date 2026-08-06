@@ -161,6 +161,10 @@ if errorlevel 1 ( exit /b 1 ) else ( exit /b 0 )
 
 :need_images
 rem Returns errorlevel 0 if atlases are up to date (no rebuild needed),
-rem 1 if the manifest is missing or any webp is newer than the newest atlas.
-powershell -NoProfile -Command "$m='%~dp0romfs\cards_manifest.json';$a=Get-ChildItem '%~dp0romfs\cards\cards_*.t3x' -ErrorAction SilentlyContinue;if(-not (Test-Path $m) -or -not $a){exit 1};$w=Get-ChildItem '%~dp0..\..\web_ui\img\cards_webp\*.webp' -ErrorAction SilentlyContinue;if(-not $w){exit 1};$wMax=($w | ForEach-Object { $_.LastWriteTime } | Measure-Object -Maximum).Maximum;$aMax=($a | ForEach-Object { $_.LastWriteTime } | Measure-Object -Maximum).Maximum;if($wMax -gt $aMax){exit 1}else{exit 0}"
+rem 1 if the manifest is missing/incomplete, the resolution changed, or any
+rem webp is newer than the newest atlas. "Incomplete" means the manifest has
+rem fewer card entries than there are webp sources (guards against a previous
+rem partial build being wrongly skipped).
+if "%RABUKA_CARD_RES%"=="" set "RABUKA_CARD_RES=192"
+powershell -NoProfile -Command "$m='%~dp0romfs\cards_manifest.json';$a=Get-ChildItem '%~dp0romfs\cards\cards_*.t3x' -ErrorAction SilentlyContinue;if(-not (Test-Path $m) -or -not $a){exit 1};$r='%~dp0romfs\cards_res.txt';$t=$env:RABUKA_CARD_RES;$stored='';if(Test-Path $r){$stored=(Get-Content $r -Raw).Trim()};if($stored -ne $t){exit 1};$w=Get-ChildItem '%~dp0..\..\web_ui\img\cards_webp\*.webp' -ErrorAction SilentlyContinue;if(-not $w){exit 1};$mc=([regex]::Matches((Get-Content $m -Raw),'atlas')).Count;if($mc -lt $w.Count){exit 1};$wMax=($w | ForEach-Object { $_.LastWriteTime } | Measure-Object -Maximum).Maximum;$aMax=($a | ForEach-Object { $_.LastWriteTime } | Measure-Object -Maximum).Maximum;if($wMax -gt $aMax){exit 1}else{exit 0}"
 if errorlevel 1 ( exit /b 1 ) else ( exit /b 0 )

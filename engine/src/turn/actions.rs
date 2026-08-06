@@ -449,6 +449,26 @@ impl super::TurnEngine {
             return Ok(());
         }
 
+        // Play-time cost reduction choice (常時「このカードをプレイする際…コストは減る」).
+        if let crate::ability::types::Choice::SelectTarget { target, .. } = &choice {
+            if target == "play_time_cost_reduction" {
+                let accepted = card_id == Some(1); // option "Yes"
+                game_state.play_time_cost_reduction_accepted = Some(accepted);
+                let play = game_state
+                    .play_time_cost_play
+                    .clone()
+                    .ok_or("No pending play-time cost play to resume")?;
+                game_state.ability_queue.complete_current();
+                return Self::handle_play_member_to_stage(
+                    game_state,
+                    Some(play.card_id),
+                    None,
+                    Some(play.area),
+                    Some(false),
+                );
+            }
+        }
+
         let choice_card_no = game_state
             .ability_queue
             .current_entry()

@@ -929,6 +929,14 @@ impl super::TurnEngine {
             .unwrap_or_default();
         let player_id = player.id.clone();
 
+        // Play-time optional cost reduction (常時「このカードをプレイする際…コストは減る」).
+        // e.g. ミア PL!N-bp7-011 ab#1: shuffle all waitroom member cards to deck bottom,
+        // if you do this card's cost is reduced by the stated amount.
+        if let Some(play) = Self::play_time_cost_reduction_hook(game_state, card_id, area)? {
+            game_state.play_time_cost_play = Some(play);
+            return Ok(());
+        }
+
         // If double baton with explicit areas (card_indices from UI), replace ALL specified members
         // BEFORE placing the card. Single baton via the area buttons stays single — the
         // constant ability (play_baton_touch, count>1) is offered as separate gold buttons.
@@ -1209,6 +1217,130 @@ impl super::TurnEngine {
         }
 
         Ok(())
+    }
+
+    /// Play-time optional cost reduction hook (常時「このカードをプレイする際…コストは減る」).
+    ///
+    /// Two-phase:
+    ///  - First entry (no saved play state): if the card being played has a play-time
+    ///    cost-reduction ability, offer the optional choice and return `Some` (play pauses).
+    ///  - Re-entry (saved play state): apply the accepted reduction + the waitroom shuffle,
+    ///    then return `None` so the normal play (cost payment) continues.
+    fn play_time_cost_reduction_hook(
+        game_state: &mut GameState,
+        card_id: i16,
+        area: crate::zones::MemberArea,
+    ) -> Result<Option<crate::game_state::PlayTimeCostPlay>, String> {
+        let player_id = game_state.active_player().id.clone();
+        let reduction = Self::play_time_cost_reduction_amount(game_state, card_id);
+
+        // Re-entry: we already offered the choice and it was answered.
+        if let Some(play) = game_state.play_time_cost_play.take() {
+            let accepted = game_state.play_time_cost_reduction_accepted.take().unwrap_or(false);
+            if accepted {
+                if let Some(red) = reduction {
+                    // compute_play_cost only reads the set-override for a
+                    // stateful play cost; express the -2 as an absolute cost.
+                    let base = game_state
+                        .card_database
+                        .get_card(card_id)
+                        .and_then(|c| c.cost)
+                        .unwrap_or(0);
+                    game_state.mods.set_cost_modifier(card_id, (base as i32 - red as i32) as i16);
+                    Self::shuffle_waitroom_members_to_deck_bottom(game_state, &player_id);
+                    game_state.push_rule_log(format!(
+                        "{} uses play-time cost reduction: {} cost reduced by {}, waitroom members shuffled to deck bottom",
+                        player_id, card_id, red
+                    ));
+                }
+            }
+            // `play` carries the original area; ensure the play continues at it.
+            let _ = play;
+            return Ok(None);
+        }
+
+        // First entry: offer the optional choice if a play-time reduction exists.
+        if reduction.is_some() {
+            let play = crate::game_state::PlayTimeCostPlay { card_id, area };
+            game_state.ability_queue.pause_for_choice(
+                crate::ability::types::Choice::SelectTarget {
+                    target: "play_time_cost_reduction".into(),
+                    options: Some(vec!["No".to_string(), "Yes".to_string()]),
+                    allow_skip: true,
+                    description: "Use this card's play-time cost reduction?".to_string(),
+                    description_en: Some(
+                        "Use this card's play-time cost reduction?".to_string(),
+                    ),
+                    description_ja: Some(
+                        "このカードのプレイ時コスト軽減を使用しますか？".to_string(),
+                    ),
+                },
+            );
+            return Ok(Some(play));
+        }
+
+        Ok(None)
+    }
+
+    /// Return the cost reduction amount for a play-time cost-reduction ability on `card_id`,
+    /// or None if the card has none (or it is not a play-time 常時 modify_cost).
+    fn play_time_cost_reduction_amount(game_state: &GameState, card_id: i16) -> Option<i8> {
+        use crate::ability::enums::ActionType;
+        let card = game_state.card_database.get_card(card_id)?;
+        card.resolved_abilities().find_map(|ab| {
+            let triggers = ab.triggers.as_deref().unwrap_or("");
+            if !triggers.contains("常時") {
+                return None;
+            }
+            let effect = ab.effect.as_ref()?;
+            if effect.action != ActionType::ModifyCost {
+                return None;
+            }
+            // Play-time gating condition: a condition over ALL member cards in the
+            // discard (the "shuffle all waitroom members" side of the ability).
+            // Requiring `all` + member_card excludes ordinary conditional play-cost
+            // 常時 abilities (e.g. LL-bp7-001's Compound discard condition, which has
+            // no `all`/card_type).
+            use crate::card::ConditionCardType;
+            let cond = effect.condition.as_ref()?;
+            if cond.get_location() != Some("discard")
+                || cond.get_all() != Some(true)
+                || cond.get_card_type() != Some(ConditionCardType::MemberCard)
+            {
+                return None;
+            }
+            effect.count_any().map(|c| c as i8)
+        })
+    }
+
+    /// Shuffle all member cards in the player's waitroom to the bottom of the deck.
+    fn shuffle_waitroom_members_to_deck_bottom(game_state: &mut GameState, player_id: &str) {
+        let mut members: Vec<i16> = Vec::new();
+        let mut remaining: Vec<i16> = Vec::new();
+        {
+            let player = if player_id == game_state.player1.id {
+                &game_state.player1
+            } else {
+                &game_state.player2
+            };
+            for &cid in &player.waitroom.cards {
+                if game_state.card_database.get_card(cid).is_some_and(|c| c.is_member()) {
+                    members.push(cid);
+                } else {
+                    remaining.push(cid);
+                }
+            }
+        }
+        crate::rng::shuffle_slice(&mut members);
+        let player = if player_id == game_state.player1.id {
+            &mut game_state.player1
+        } else {
+            &mut game_state.player2
+        };
+        player.waitroom.cards = remaining.into();
+        // Shuffled member cards go to the deck bottom so they don't interfere
+        // with the top-of-deck draw.
+        player.main_deck.cards.extend(members);
     }
 
     pub fn setup_initial_energy(game_state: &mut GameState) {

@@ -36,7 +36,10 @@ specific rule described. `partial` = some adjacent mechanic is tested but the QA
 > 起動：エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：自分の控え室からコスト2以下の『虹ヶ咲』のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。
 - **QA rule**: the cost (place 1 energy under self) can be paid **even when there is no empty
   area** to put the new member — cost is payable independent of whether the effect fully resolves.
-- **Status**: **gap**. No test references `PL!N-bp7-010`.
+- **Status**: ✓ covered — `bp7_q268_shioriko_empty_area_deploy_test.rs` (8 tests) drives the
+  real 起動: cost is payable with NO empty area (Q268 core), deploy-to-empty-area-in-wait,
+  cost>2 / non-虹ヶ咲 target exclusion, exactly-one-of-two deployed, ターン1回 limit, and
+  no-target+no-empty-area cost still paid.
 
 ## Q269 / Q277 — ミア・テイラー PL!N-bp7-011-R＋ ab#0 (自動) + ab#1 (常時)
 > 自動：このカードがデッキから控え室に置かれたとき、手札を1枚控え室に置いてもよい。そうしたとき、控え室からこのカードを手札に加える。
@@ -49,19 +52,21 @@ specific rule described. `partial` = some adjacent mechanic is tested but the QA
   recovery path; `bp7_q269_mia_yell_no_trigger_test.rs` covers the Q269 yell-reveal
   no-trigger edge (3 tests + deck→discard control) and the Q277 refresh-before-resolve
   edge (2 tests + no-refresh control).
-- **Note (ab#1 常時)**: the play-time "プレイする際…コストは２減る" ability is parsed but
-  **not offered during the play action** (`handle_play_member_to_stage` only applies constant
-  cost modifiers; there is no play-time optional cost-reduction hook). This is a remaining
-  **engine gap**, not a test gap.
+- **ab#1 (常時)**: ✓ implemented + covered — the play-time "プレイする際…コストは２減る"
+  ability is now wired into `handle_play_member_to_stage` (two-phase hook + resume), offering
+  the optional choice on play; accepting shuffles waitroom members to deck bottom and reduces
+  the cost by 2. Covered by `bp7_mia_play_cost_reduction_test.rs` (accept/decline/no-waitroom).
 
 ## Q270 — エマ・ヴェルデ PL!N-bp7-020-N ab#0 (登場)
 > 登場：自分のデッキの上からカードを3枚控え室に置く。それらのメンバーカードの中に2種類以上のブレードハートの色がある場合、ライブ終了時まで、heart04を得る。
 - **QA rule**: "2 types of blade-heart color" — an ALL-heart card is not a blade-heart color;
   a green blade-heart is one type. So {ALL-heart, green-blade-heart} = only 1 type → no heart04.
   "2種類以上" = 2 or more distinct **blade-heart** colors.
-- **Status**: `bp7_emma_color_diversity_test.rs` covers the 2-distinct-color rule (5 tests).
-  The specific QA edge (ALL-heart vs blade-heart counting) is **partial** — verify the ALL-heart
-  card is not counted as a blade-heart color.
+- **Status**: ✓ covered — `bp7_emma_color_diversity_test.rs` covers the 2-distinct-color rule
+  (5 tests: 2/3 distinct → heart04, 1 color → none, single member → none, no blade heart →
+  none). The ALL-heart-vs-blade-heart counting edge: no member card in the DB has a
+  colorless/ALL blade heart, so the "not counted as a blade-heart color" case is subsumed by
+  the no-blade-heart test (non-color blade hearts never contribute a distinct color).
 
 ## Q271 — Colorful Dreams! Colorful Smiles! PL!N-bp7-025-L ab#1 (ライブ成功時)
 > ライブ成功時：エールにより公開された自分のカードの中に heart01〜heart06 のうち3種類以上ある場合、このカードのスコアを＋１する。
@@ -150,10 +155,10 @@ cards (except Fire Bird) have no gameplay test.
 |----|------|------|--------|
 | Q266 | PL!SP-pb2-009 鬼塚夏美 | blade-0 wait cost ⇒ cannot wait 0-blade opp | ✓ `bp7_q266_natsumi_blade_wait_test` |
 | Q267 | PL!N-bp7-009 天王寺璃奈 | deck-to-0 refresh mid-mill | ✓ `bp7_q267_rinna_mill_refresh_test` |
-| Q268 | PL!N-bp7-010 三船栞子 | cost payable with no empty area | **gap** |
+| Q268 | PL!N-bp7-010 三船栞子 | cost payable with no empty area | ✓ `bp7_q268_shioriko_empty_area_deploy_test` |
 | Q269 | PL!N-bp7-011 ミア | yell reveal does not trigger 自動 | ✓ `bp7_q269_mia_yell_no_trigger_test` |
+| Q270 | PL!N-bp7-020 エマ | ALL-heart not a blade-heart color | ✓ `bp7_emma_color_diversity_test` |
 | Q277 | PL!N-bp7-011 ミア | refresh before 自動 resolve | ✓ `bp7_q269_mia_yell_no_trigger_test` |
-| Q270 | PL!N-bp7-020 エマ | ALL-heart not a blade-heart color | partial |
 | Q271 | PL!N-bp7-025 Colorful Dreams | blade-heart ≠ heart color (score) | **gap** |
 | Q272 | PL!N-bp7-026 Just Believe | no-repeat select | **gap** |
 | Q273 | PL!S-bp7-005 渡辺曜 | activated 登場 ability pays cost | partial |

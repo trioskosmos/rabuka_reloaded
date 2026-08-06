@@ -27,15 +27,20 @@ import sys
 import subprocess
 import argparse
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from PIL import Image
 
 SRC_REL = "../../../web_ui/img/cards_webp"
 CACHE_REL = "../.card_png_cache"
 ATLAS_REL = "../romfs/cards"
 MANIFEST_REL = "../romfs/cards_manifest.json"
-# Long-edge target for resized card PNGs. Higher = sharper when cards are
-# blown up in detail view, but larger atlases. Override with RABUKA_CARD_RES.
-TARGET_LONG = int(os.environ.get("RABUKA_CARD_RES", "160"))
+# Long-edge target for resized card PNGs (1:1 with the ~188px detail display).
+# Higher = sharper but larger atlases. Override with RABUKA_CARD_RES.
+TARGET_LONG = int(os.environ.get("RABUKA_CARD_RES", "192"))
+# How many tex3ds jobs to run at once. tex3ds is single-threaded per file, so
+# running several in parallel speeds up the atlas build dramatically.
+PARALLEL = max(1, min(8, int(os.environ.get("RABUKA_PARALLEL", "8"))))
+CACHE_RES_MARKER = ".res"
 
 
 def resolve(path: str) -> str:
@@ -72,9 +77,26 @@ def convert_webp_to_png(src_dir: str, cache_dir: str) -> dict[str, list[str]]:
     """Convert .webp -> .png into the persistent cache, grouped by set prefix.
 
     A PNG is only regenerated when its source WebP is newer (or the PNG is
-    missing), so incremental builds skip unchanged cards entirely.
+    missing). If the resolution marker in the cache differs from the current
+    TARGET_LONG, the whole cache is cleared and re-encoded so the resize
+    actually takes effect.
     """
     os.makedirs(cache_dir, exist_ok=True)
+    marker = os.path.join(cache_dir, CACHE_RES_MARKER)
+    cur_res = ""
+    if os.path.exists(marker):
+        try:
+            cur_res = open(marker, "r", encoding="ascii").read().strip()
+        except OSError:
+            cur_res = ""
+    if cur_res != str(TARGET_LONG):
+        for f in os.listdir(cache_dir):
+            if f.lower().endswith(".png"):
+                os.remove(os.path.join(cache_dir, f))
+        print(f"Resolution changed to {TARGET_LONG}; re-encoding card cache")
+        with open(marker, "w", encoding="ascii") as f:
+            f.write(str(TARGET_LONG))
+
     files = sorted(f for f in os.listdir(src_dir) if f.lower().endswith(".webp"))
     if not files:
         print(f"No .webp files found in {src_dir}")
@@ -110,24 +132,64 @@ def convert_webp_to_png(src_dir: str, cache_dir: str) -> dict[str, list[str]]:
     return by_set
 
 
-def set_is_dirty(atlas_path: str, manifest: dict, atlas_name: str,
+def set_is_dirty(atlas_dir: str, manifest: dict, atlas_names: list[str],
                  card_nos: list[str]) -> bool:
-    """True if this set's atlas must be rebuilt (missing or has new cards)."""
-    if not os.path.exists(atlas_path):
-        return True
+    """True if this set's atlases must be rebuilt (missing or has new cards)."""
+    for an in atlas_names:
+        if not os.path.exists(os.path.join(atlas_dir, an)):
+            return True
     for cn in card_nos:
         entry = manifest.get(cn)
-        if not isinstance(entry, dict) or entry.get("atlas") != atlas_name:
+        if not isinstance(entry, dict):
+            return True
+        if not any(entry.get("atlas") == an for an in atlas_names):
             return True
     return False
 
 
+def chunk_by_area(cache_dir: str, sorted_pngs: list[str], max_area: int) -> list[list[str]]:
+    """Split a set's PNGs into chunks whose total pixel area fits one texture.
+
+    tex3ds packs a chunk into a single texture; oversized sets would fail with
+    "No atlas solution found", so we chunk so each atlas stays within limits.
+    """
+    chunks: list[list[str]] = []
+    cur: list[str] = []
+    cur_area = 0
+    for p in sorted_pngs:
+        with Image.open(os.path.join(cache_dir, p)) as im:
+            a = im.size[0] * im.size[1]
+        if cur and cur_area + a > max_area:
+            chunks.append(cur)
+            cur = []
+            cur_area = 0
+        cur.append(p)
+        cur_area += a
+    if cur:
+        chunks.append(cur)
+    return chunks
+
+
+def _build_one(tex3ds: str, cache_dir: str, atlas_dir: str,
+               atlas_name: str, chunk: list[str]):
+    """Run tex3ds for a single atlas chunk. Returns (atlas_name, chunk, result)."""
+    atlas_path = os.path.join(atlas_dir, atlas_name)
+    args = [tex3ds, "--atlas", "-o", atlas_path, "-f", "rgba5551", "-z", "auto"]
+    args.extend(os.path.join(cache_dir, p) for p in chunk)
+    result = subprocess.run(args, capture_output=True, text=True)
+    return atlas_name, chunk, result
+
+
 def generate_atlases(cache_dir: str, atlas_dir: str, by_set: dict[str, list[str]],
                      manifest: dict, force: bool) -> dict:
-    """Run tex3ds per dirty set, writing atlases to atlas_dir.
+    """Run tex3ds per dirty set, chunking oversized sets into multiple atlases.
 
-    Reads resized PNGs from the cache, outputs .t3x into romfs/cards, and
-    returns the merged card->atlas manifest.
+    Reads resized PNGs from the cache, outputs .t3x files into romfs/cards, and
+    returns the merged card->atlas manifest. Each card maps to (atlas, index);
+    a set may span several atlases (cards_<set>_0.t3x, _1.t3x, ...).
+
+    tex3ds is single-threaded per file, so chunks are built concurrently to
+    make the atlas build much faster.
     """
     tex3ds = os.path.join(
         os.environ.get("DEVKITPRO", "C:/devkitPro"), "tools", "bin", "tex3ds.exe"
@@ -140,34 +202,42 @@ def generate_atlases(cache_dir: str, atlas_dir: str, by_set: dict[str, list[str]
     manifest = dict(manifest)
     built = 0
     skipped = 0
-    for set_prefix, pngs in by_set.items():
-        atlas_name = f"cards_{set_prefix}.t3x"
-        atlas_path = os.path.join(atlas_dir, atlas_name)
+    # If the atlas resolution marker differs from the current TARGET_LONG,
+    # every set is stale and must be rebuilt (e.g. after changing RABUKA_CARD_RES).
+    res_changed = manifest.get("_res") is None or str(manifest.get("_res")) != str(TARGET_LONG)
+    max_area = 850 * 850  # conservative pixel budget per atlas texture (fits 1024^2)
 
+    tasks = []
+    for set_prefix, pngs in by_set.items():
         sorted_pngs = sorted(pngs)
+        chunks = chunk_by_area(cache_dir, sorted_pngs, max_area)
+        atlas_names = [f"cards_{set_prefix}_{i}.t3x" for i in range(len(chunks))]
         card_nos = [p.removesuffix(".png") for p in sorted_pngs]
 
-        if not force and not set_is_dirty(atlas_path, manifest, atlas_name, card_nos):
+        if not force and not res_changed and not set_is_dirty(atlas_dir, manifest, atlas_names, card_nos):
             skipped += 1
             continue
+        for atlas_name, chunk in zip(atlas_names, chunks):
+            tasks.append((atlas_name, chunk))
 
-        args = [tex3ds, "--atlas", "-o", atlas_path, "-f", "rgba5551", "-z", "auto"]
-        args.extend(os.path.join(cache_dir, p) for p in sorted_pngs)
+    if tasks:
+        print(f"Building {len(tasks)} atlas files ({skipped} sets unchanged) "
+              f"at res={TARGET_LONG} ({PARALLEL} parallel)...")
+        with ThreadPoolExecutor(max_workers=PARALLEL) as ex:
+            futs = {ex.submit(_build_one, tex3ds, cache_dir, atlas_dir, an, ch): (an, ch)
+                    for an, ch in tasks}
+            for fut in as_completed(futs):
+                atlas_name, chunk, result = fut.result()
+                if result.returncode != 0:
+                    print(f"    FAILED {atlas_name}:\n{result.stderr}", file=sys.stderr)
+                    continue
+                for idx, png_name in enumerate(chunk):
+                    card_no = png_name.removesuffix(".png")
+                    manifest[card_no] = {"atlas": atlas_name, "index": idx}
+                built += 1
 
-        print(f"  {atlas_name} ({len(sorted_pngs)} cards)...")
-        result = subprocess.run(args, capture_output=True, text=True)
-        if result.returncode != 0:
-            print(f"    FAILED:\n{result.stderr}", file=sys.stderr)
-            continue
-
-        # Rebuild manifest entries for this whole set (indices = input order,
-        # matching how tex3ds preserves subtexture ordering).
-        for idx, png_name in enumerate(sorted_pngs):
-            card_no = png_name.removesuffix(".png")
-            manifest[card_no] = {"atlas": atlas_name, "index": idx}
-        built += 1
-
-    print(f"Created/updated {built} atlas files ({skipped} unchanged)")
+    manifest["_res"] = str(TARGET_LONG)
+    print(f"Built {built} atlas files ({skipped} sets unchanged) at res={TARGET_LONG}")
     return manifest
 
 
@@ -197,6 +267,11 @@ def main():
             with open(manifest_path, "w", encoding="utf-8") as f:
                 json.dump(manifest, f, ensure_ascii=False, indent=2)
             print(f"Wrote manifest: {manifest_path} ({len(manifest)} entries)")
+            # Persist the resolution marker so the build script can detect a
+            # resolution change and trigger an atlas rebuild.
+            res_marker = os.path.join(atlas_dir, "..", "cards_res.txt")
+            with open(res_marker, "w", encoding="ascii") as f:
+                f.write(str(TARGET_LONG))
 
     if by_set:
         total = sum(len(v) for v in by_set.values())

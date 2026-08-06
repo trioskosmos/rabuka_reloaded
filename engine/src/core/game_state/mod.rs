@@ -39,6 +39,15 @@ pub use crate::types::{
     ScoreLine, TemporaryEffect, TriggeredAbility, TurnPhase, YellCardResult,
 };
 
+/// State saved while a play action is paused for a play-time cost-reduction
+/// choice (常時「このカードをプレイする際…コストは減る」).
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+pub struct PlayTimeCostPlay {
+    pub card_id: i16,
+    pub area: crate::zones::MemberArea,
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct GameState {
@@ -125,6 +134,12 @@ pub struct GameState {
     pub initial_yell_revealed_cards: SmallVec<[i16; 8]>,
     /// Cards revealed by a re-yell (set after perform_yell draws new cards).
     pub re_yell_revealed_cards: SmallVec<[i16; 8]>,
+    /// Pending play-time cost-reduction resume state (常時「このカードをプレイする際
+    /// …コストは減る」). Set when a play action offers the optional reduction choice;
+    /// consumed on the re-entered play action after the choice is answered.
+    pub play_time_cost_play: Option<PlayTimeCostPlay>,
+    /// Whether the player accepted the play-time cost reduction choice.
+    pub play_time_cost_reduction_accepted: Option<bool>,
     pub looked_at_cards: SmallVec<[i16; 8]>,
     pub ability_applications: SmallVec<[crate::types::AbilityApplication; 4]>,
     /// Synced from batch_movements by push_movement_event().
@@ -399,6 +414,8 @@ impl GameState {
             player2_cheer_revealed_cards: SmallVec::new(),
             initial_yell_revealed_cards: SmallVec::new(),
             re_yell_revealed_cards: SmallVec::new(),
+            play_time_cost_play: None,
+            play_time_cost_reduction_accepted: None,
             looked_at_cards: SmallVec::new(),
             ability_applications: SmallVec::new(),
             recently_moved_cards: None,
