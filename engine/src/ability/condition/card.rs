@@ -1946,7 +1946,8 @@ impl<'a> ConditionContext<'a> {
                     .turn_movements
                     .iter()
                     .filter(|m| {
-                        let src_ok = m.source_zone == source_zone
+                        let src_ok = source_zone.is_empty()
+                            || m.source_zone == source_zone
                             || (source_zone == "discard" && m.source_zone == "waitroom")
                             || (source_zone == "waitroom" && m.source_zone == "discard");
                         let cause_ok = (condition.get_self_target().unwrap_or(false)
@@ -2000,7 +2001,8 @@ impl<'a> ConditionContext<'a> {
                     .turn_movements
                     .iter()
                     .filter(|m| {
-                        let src_ok = m.source_zone == source_zone
+                        let src_ok = source_zone.is_empty()
+                            || m.source_zone == source_zone
                             || (source_zone == "discard" && m.source_zone == "waitroom")
                             || (source_zone == "waitroom" && m.source_zone == "discard");
                         let cause_ok = (condition.get_self_target().unwrap_or(false)
@@ -2602,7 +2604,7 @@ impl<'a> ConditionContext<'a> {
 
         let is_old_movement = condition.get_source() == Some("preceding_moved")
             || condition.get_source() == Some("previous_moved_cards");
-        let is_new_movement = condition.get_source().map_or(false, |s| {
+        let is_new_movement = condition.get_source().map_or(true, |s| {
             s != "preceding_moved" && s != "previous_moved_cards"
         }) && condition.get_destination().is_some();
 

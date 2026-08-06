@@ -91,6 +91,11 @@ pub struct AbilityResolver {
     pub pending_reprompt_choice: Option<Choice>,
     /// Buffer for structured ability resolution log items.
     pub log_items: Vec<AbilityLogItem>,
+    /// Tracks whether the most recent "those_cards" move actually moved any
+    /// card. Used by the "…したとき" (when you do so) pattern: a
+    /// `modify_score` step directly following a `those_cards`→hand move must
+    /// only apply when the move actually added a card.
+    pub last_move_moved_any: Option<bool>,
     /// Formation change plan: (member_id, chosen_destination) pairs accumulated
     /// across sequential choices.  All swaps execute as a batch at the end.
     pub formation_plan: SmallVec<[(i16, String); 2]>,
@@ -129,6 +134,7 @@ impl AbilityResolver {
             pending_reprompt_choice: None,
             log_items: Vec::new(),
             formation_plan: SmallVec::new(),
+            last_move_moved_any: None,
         }
     }
 

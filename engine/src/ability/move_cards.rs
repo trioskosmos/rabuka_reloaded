@@ -481,6 +481,9 @@ impl AbilityResolver {
             )? {
                 return Ok(result);
             }
+            // resolve_from_those_cards returned None — no explicit trigger_moved_cards
+            // was recorded (e.g. legacy trigger_auto_ability with None). Fall through
+            // to the discard-pile resolution below (the historic Q252 pick-card flow).
         }
         let effective_source = if source_str == "those_cards" {
             Zone::Discard.to_str()
@@ -690,19 +693,16 @@ impl AbilityResolver {
         use_p2: bool,
         card_db: &crate::card::CardDatabase,
     ) -> Result<Option<Vec<i16>>, String> {
-        // Handle "those_cards" alias: resolve to the trigger_moved_cards stored
-        // in the ability queue entry (the cards that triggered the each_time
-        // ability), not the full discard pile (Q221). Fall back to the global
-        // recently_moved_cards snapshot when the queue entry doesn't carry it
-        // (e.g. a live-card each_time fired outside the TAS scan).
+        // Handle "those_cards" alias: resolve to the cards that triggered the
+        // each_time, captured as `trigger_moved_cards` on THIS queue entry at
+        // enqueue time (the authoritative "cards that triggered me"). If no
+        // explicit snapshot was recorded (None), return None so the caller can
+        // fall through to the legacy discard-pile resolution.
         let trigger_cards = gs
             .ability_queue
             .current_entry()
             .and_then(|e| e.trigger_moved_cards.clone())
-            .filter(|c| !c.is_empty())
-            .or_else(|| {
-                gs.recently_moved_cards.clone().map(|c| c.into_iter().collect())
-            });
+            .filter(|c| !c.is_empty());
         if let Some(trigger_cards) = trigger_cards {
             if !trigger_cards.is_empty() {
                 if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
@@ -725,7 +725,14 @@ impl AbilityResolver {
                     }
                 }
                 if all_matching.is_empty() {
-                    // No matching cards — proceed to default source resolution.
+                    // The trigger moved cards, but none matched the filters
+                    // (e.g. no 虹ヶ咲 live card among the milled batch). "Those
+                    // cards" means ONLY the moved cards — nothing qualifies, so
+                    // the move adds nothing. Signal this explicitly so a
+                    // following "…したとき" modify_score step is skipped, and do
+                    // NOT fall through to the discard pile.
+                    self.last_move_moved_any = Some(false);
+                    return Ok(Some(vec![]));
                 } else if all_matching.len() <= count as usize {
                     // Exactly `count` or fewer match — take them directly.
                     let found = all_matching[..count.min(all_matching.len())].to_vec();
@@ -742,6 +749,7 @@ impl AbilityResolver {
                             }
                         }
                     }
+                    self.last_move_moved_any = Some(!found.is_empty());
                     return Ok(Some(found));
                 } else if &*destination == "deck_top_or_bottom" {
                     // Q252: more matching cards than count, player chooses which one.

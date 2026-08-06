@@ -380,6 +380,18 @@ impl AbilityResolver {
 
                     let moved_before = self.moved_cards.len();
                     let selected_before = self.selected_cards.len();
+                    // "…したとき" (when you do so) gate: a modify_score step that
+                    // immediately follows a those_cards→hand move only applies when
+                    // that move actually added a card. The flag is set by
+                    // resolve_from_those_cards and cleared after every sub-action so
+                    // it never gates an unrelated later score step.
+                    if action.action == ActionType::ModifyScore
+                        && self.last_move_moved_any == Some(false)
+                    {
+                        self.last_move_moved_any = None;
+                        continue 'action_loop;
+                    }
+                    self.last_move_moved_any = None;
                     match self.execute_effect(gs, &action_to_execute) {
                         Ok(_) => {
                             if ABILITY_DEBUG.load(Ordering::Relaxed) {
