@@ -51,6 +51,42 @@ impl GameState {
         })
     }
 
+    /// Record one use of a limited ability (once/twice per turn). Guarded so a
+    /// single activation that resolves across multiple phases (e.g. a choice)
+    /// only consumes one use. Returns true if the use was newly recorded.
+    pub(crate) fn record_ability_use(
+        &mut self,
+        key: (i16, usize, u8),
+        has_use_limit: bool,
+        site: &str,
+    ) -> bool {
+        if !has_use_limit {
+            return false;
+        }
+        let already = self
+            .ability_queue
+            .current_entry()
+            .is_some_and(|e| e.use_limit_recorded);
+        if already {
+            eprintln!(
+                "[REN_UL] record_ability_use({:?}) ALREADY recorded @{} — skipping",
+                key, site
+            );
+            return false;
+        }
+        *self.turn_limited_abilities_used.entry(key).or_insert(0) += 1;
+        eprintln!(
+            "[REN_UL] record_ability_use({:?}) @{} now used={}",
+            key,
+            site,
+            self.turn_limited_abilities_used.get(&key).copied().unwrap_or(0)
+        );
+        if let Some(e) = self.ability_queue.current_entry_mut() {
+            e.use_limit_recorded = true;
+        }
+        true
+    }
+
     fn build_ability_queue_entry(
         &self,
         card_no: String,
@@ -82,6 +118,7 @@ impl GameState {
             choice_card_no: None,
             conditional_choice: None,
             effect_started: false,
+            use_limit_recorded: false,
             optional_cost_result: None,
             choice_player_id: None,
             pending_actions: Vec::new(),
@@ -573,6 +610,27 @@ impl GameState {
             let num_key = ((card_id as u32) << 16) | (ability_idx as u32);
             if !self.this_batch_triggered_ability_ids.contains(&num_key) {
                 self.this_batch_triggered_ability_ids.push(num_key);
+            }
+            // §once-per-turn: skip if this ability has already consumed its
+            // use_limit this turn. Each_time triggers re-scan after a triggered
+            // effect's card movement (e.g. a "recover a card to hand" follow-up),
+            // and without this guard a used ability gets re-queued forever,
+            // flooding the queue in a runaway loop. Declined abilities are not
+            // recorded as used, so they still re-trigger (Q233).
+            if let Some(card) = self.card_database.get_card(card_id) {
+                if let Some(ar) = card.abilities.get(ability_idx) {
+                    if let Some(limit) = ar.resolve().use_limit {
+                        let key = (card_id, ability_idx, self.turn_number);
+                        let used = self
+                            .turn_limited_abilities_used
+                            .get(&key)
+                            .copied()
+                            .unwrap_or(0);
+                        if used >= limit {
+                            continue;
+                        }
+                    }
+                }
             }
             // Look up card_no from the card_id for the queue entry
             let card_no = self
@@ -1207,6 +1265,19 @@ impl GameState {
     }
 
     pub(crate) fn process_current_ability(&mut self) {
+        // Safety timeout: a runaway ability re-trigger loop (e.g. an each_time
+        // watcher re-queued by its own effect's movement) must never spin forever.
+        // Abort resolution past an absurd number of calls instead of hanging or
+        // overflowing a counter.
+        use core::sync::atomic::{AtomicU32, Ordering};
+        static PCA_CALLS: AtomicU32 = AtomicU32::new(0);
+        if PCA_CALLS.fetch_add(1, Ordering::Relaxed) > 200_000 {
+            log::error!(
+                "[PCA_TIMEOUT] exceeded 200k process_current_ability calls; aborting to break runaway loop"
+            );
+            self.ability_queue.clear();
+            return;
+        }
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!(
                 "[PCA_ENTER] has_resolver={}",

@@ -83,6 +83,10 @@ pub struct AbilityQueueEntry {
     pub conditional_choice: Option<ConditionalChoice>,
     /// Whether the effect has started executing (prevents re-processing)
     pub effect_started: bool,
+    /// Whether this activation's use-limit consumption has already been recorded.
+    /// Choice abilities resolve across multiple phases; this prevents the counter
+    /// from incrementing more than once per activation.
+    pub use_limit_recorded: bool,
     /// Result of the optional cost evaluation.
     /// None = not evaluated, Some(true) = paid, Some(false) = skipped.
     pub optional_cost_result: Option<bool>,
@@ -139,6 +143,14 @@ impl AbilityQueue {
             current_index: 0,
             snapshot_requested: false,
         }
+    }
+
+    /// Hard-abort: drop all pending entries and return the queue to Idle.
+    /// Used as a safety valve when a runaway loop is detected.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.state = QueueState::Idle;
+        self.current_index = 0;
     }
 
     /// Check if queue is idle (no ability being processed)
@@ -303,6 +315,7 @@ impl AbilityQueue {
                     choice_card_no: None,
                     conditional_choice: None,
                     effect_started: false,
+                    use_limit_recorded: false,
                     optional_cost_result: None,
                     choice_player_id: None,
                     pending_actions: Vec::new(),
@@ -399,6 +412,7 @@ impl AbilityQueue {
             choice_card_no: None,
             conditional_choice: None,
             effect_started: false,
+            use_limit_recorded: false,
             optional_cost_result: None,
             choice_player_id: None,
             pending_actions: Vec::new(),
@@ -585,6 +599,7 @@ mod tests {
             choice_card_no: None,
             conditional_choice: None,
             effect_started: false,
+            use_limit_recorded: false,
             optional_cost_result: None,
             choice_player_id: None,
             trigger_moved_cards: None,

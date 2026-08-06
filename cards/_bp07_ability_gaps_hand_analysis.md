@@ -208,24 +208,20 @@ Parsed:
 - ❌ **"メンバーの下に置かれている" dropped** — the condition does not say the *this card* must be `location:under_member`. This is a persistent "as long as X is under a Liella! member" effect; without the location the condition is vacuous.
 - Fix: add `location:"under_member"` to the condition node.
 
-### B4. `PL!SP-bp7-005-R＋` 葉月 恋 ab#0 — gap: [energy_deck] — ⚠️ second trigger dropped
+### B4. `PL!SP-bp7-005-R＋` 葉月 恋 ab#0 — gap: [energy_deck] — ✅ DONE (parser + engine + tests)
 
 Japanese:
 > 自動：このメンバーが登場するか、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれたとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。…
 
-Parsed:
-```json
-{"condition":{"type":"appearance_condition","appearance":true,
-  "trigger_event":{"type":"appearance","location":"stage"},
-  "location":"stage","target":"self","card_type":"member_card"},
- "action":"sequential":[move_cards{source:energy_deck,destination:energy_zone,state_change:wait},
-                        restriction{cannot_active,delayed}]}
-```
-- ✅ The effect (energy_deck → energy_zone wait + cannot_active) is correct; the `energy_deck` **source** is handled.
-- ❌ **"…か、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれたとき" is dropped.** The trigger is an OR: (a) this member appears, **or** (b) energy moved from energy_zone to energy_deck. Only (a) was captured. This is a compound-trigger bug, not an energy_deck-source bug.
-- Fix: condition needs a compound OR of appearance + zone_change(energy_zone→energy_deck).
+Fixed (2026-08-06):
+- **Parser**: the generic `_try_or` split now emits a compound `or_condition` whose leg1 is a **bare** `appearance_condition` (no `card_type`) and leg2 is a `card_count_condition` with `trigger_event{zone_change, source:energy_zone, destination:energy_deck}`. `_try_or` also aggregates a top-level `trigger_event{type:"or", events:[…]}` from the legs so the engine prefilters on real events.
+- **Parser invariant**: self-appearance card_type is stripped centrally by `_strip_self_appearance_card_type` (applied over the whole effect tree in `process_abilities`), so the engine's self-trigger guard works — the appearance leg requires a real debut.
+- **Engine**: `resolve_moved_cards_source` now accepts the `-1` anonymous energy resource for `resource_type=="energy"` zone-change conditions (energy_zone↔energy_deck).
+- **Tests**: `engine/tests/test_modules/bp7_ren_both_trigger_test.rs` (11 tests) — appearance leg, energy_zone→energy_deck leg, WAIT-not-active, once-per-turn with both legs, empty deck, no-trigger, opponent energy move, other-member appearance, multiple moves single-fire, wrong source zone, and a verdict-tree assertion via the `assert_ability!` helper.
 
-### B5. `PL!N-bp7-006-R＋` 近江彼方 ab#1 — gap: [card_property] — ⚠️ wrong condition location, OR branch lost
+Next: B5 近江彼方 ab#1 (compound OR condition source + live-card OR branch).
+
+### B5. `PL!N-bp7-006-R＋` 近江彼方 ab#1 — gap: [card_property] — 🔧 IN PROGRESS (tests written first; wrong condition location + OR branch lost)
 
 Japanese:
 > 起動：デッキの上からカードを3枚控え室に置く：これにより控え室に置いたカードの中に『虹ヶ咲』のライブカードかブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合、以下から1つを選ぶ。…
@@ -452,7 +448,7 @@ Parsed:
 | B1 | PL!N-bp7-003-R＋ 桜坂しずく ab#1 | under_member, distinct_name | ✅ | DONE — gain_resource now has `location:under_member` + distinct-name dedup |
 | B2 | PL!SP-bp7-003-R＋ 嵐 千砂都 ab#0 | under_member | ✅ | DONE — gain_resource now has `location:under_member` |
 | B3 | PL!SP-bp7-001-R 澁谷かのん ab#0 | under_member | ⚠️ | condition missing `location:under_member` |
-| B4 | PL!SP-bp7-005-R＋ 葉月 恋 ab#0 | energy_deck | ⚠️ | compound trigger (energy_zone→energy_deck) dropped |
+| B4 | PL!SP-bp7-005-R＋ 葉月 恋 ab#0 | energy_deck | ✅ | DONE — OR (appearance | energy_zone→energy_deck) + no card_type on self-appearance; 11 tests |
 | B5 | PL!N-bp7-006-R＋ 近江彼方 ab#1 | card_property | ⚠️ | condition `location:"stage"` wrong (should be preceding_moved); live-card OR lost |
 | B6 | PL!N-bp7-028-L Cooking with Love ab#0 | under_member, card_property | ⚠️ | condition `location:"stage"` wrong (should be discard); live-card AND lost |
 | C1 | PL!S-bp7-009-R 黒澤ルビィ ab#0 | lose_resource | ❌ | blade-loss → `action:"custom"` |
@@ -478,6 +474,60 @@ Parsed:
 1. Group B first (smallest, highest value): add `location:"under_member"` in the three gain_resource/condition rules (B1–B3), fix the compound-trigger OR (B4), and fix condition source/location + OR/AND branches (B5–B6).
 2. Group C parser-only: C1 (negative gain_resource / lose_resource), C2 (choice-subtree energy_deck→under_member), C5 (change_state + blade-limit), C6 (both-target + exclude-selected), C7–C9 (look_and_select dual destination / select→move). **C4 DONE (2026-08-05, parser + engine heart_copy).**
 3. C3 last: prototype the parser emission, then confirm engine resolver wiring with `run_qa_tests.rs`.
+
+---
+
+# Part 1b — Engine runtime fixes (each_time watcher use-limit)
+
+Date: 2026-08-06.
+These are **not** parser gaps — the parser/JSON was faithful. They are runtime
+infinite-loop / use-tracking bugs in the ability engine, surfaced by the
+`ren_test::ren_ab1_two_copies_both_trigger` test (`PL!SP-bp5-005-R＋` 葉月 恋 ab#1:
+"自分のカードが1枚以上いずれかの領域から控え室に置かれるたび、E支払ってもよい。
+そうした場合、それらのカードの中から1枚手札に加える", auto, once per turn).
+
+## RT1. each_time discard watcher re-queued forever (runaway loop) — FIXED
+
+Root cause chain (in order of how deep the bug hid):
+1. **Trigger condition counts stale batch cards.** The old-format
+   `preceding_moved` condition (`card_count_condition`, `location:"discard"`) has
+   no `destination`/`locations` array, so it counts **all** cards in the movement
+   batch regardless of where they moved. After ab#1 recovers a card *to hand*
+   (discard→hand), the re-scan's batch still contains the original milled cards
+   (which remain in discard), so the "card was placed into discard" condition
+   still passes → ab#1 re-triggers on its own effect's movement.
+2. **use_limit was enforced only on completion, not at enqueue.** `trigger_auto_
+   abilities_for_player_with_event` enqueued the ability every time the condition
+   passed; `use_limit=1` was only checked later (in `resolve()`), so a used-but-
+   not-yet-completed ability got re-queued, re-executed, re-moved a card, and
+   re-triggered itself — flooding the queue (~+100 entries per pass) until a
+   `u8` counter overflowed (`movement_event_counter`, then `turn_limited_
+   abilities_used`).
+3. **The optional-cost handler recorded the wrong ability's use.** In
+   `choice.rs` `handle_conditional_optional`, when the player chose to pay, it
+   recorded the use against the **first** ability on the card with a `use_limit`
+   (for Ren, ab#0 the mill) instead of the **currently resolving** ability
+   (ab#1). So ab#1 was never marked as used at pay-time — too late to matter.
+
+Fixes (engine only, all tests green: **2027 passed**):
+- `trigger_auto_abilities_for_player_with_event`: skip enqueueing an auto ability
+  whose `use_limit` is already fully consumed this turn. Declined (unused)
+  abilities are not recorded, so they still re-trigger (Q233 preserved).
+- `choice.rs` `handle_conditional_optional`: record use against
+  `entry.ability_index` (the actual ability being resolved), not the first
+  use-limited ability on the card.
+- Added safety **timeouts** so any residual runaway loop aborts instead of
+  hanging/overflowing: `process_current_ability` and `handle_conditional_optional`
+  each abort the queue past 200k invocations (`AbilityQueue::clear()` added).
+- The `u8` counters (`movement_event_counter`, `turn_limited_abilities_used`) were
+  left as-is; the loop is now prevented at the source so they can't overflow.
+
+Note: the initial root-cause candidate — making the `preceding_moved` condition
+validate the destination zone (only count cards still in the target zone) — was
+**attempted and reverted**. It breaks the documented contract in
+`on_hand_to_discard_test.rs` ("the preceding_moved path does NOT validate the
+destination zone — it counts cards from recently_moved_cards by type/property")
+and regressed 3 Rurino tests. The correct fix is the enqueue-time use_limit gate.
 
 ---
 

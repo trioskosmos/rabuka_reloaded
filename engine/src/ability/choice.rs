@@ -2877,7 +2877,7 @@ impl super::resolver::AbilityResolver {
                 // The player chose to place the card — insert use_limit key
                 // after the player borrow is done (avoid conflicts with gs).
                 if let Some(key) = use_limit_key {
-                    *gs.turn_limited_abilities_used.entry(key).or_insert(0) += 1;
+                    gs.record_ability_use(key, true, "c2880");
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
                         log::debug!("[DECK_DIAG] recorded use_limit for optional effect");
                     }
@@ -2969,6 +2969,17 @@ impl super::resolver::AbilityResolver {
         gs: &mut GameState,
         selected: &str,
     ) -> Result<(), String> {
+        // Safety timeout: a runaway optional-cost re-trigger loop (see the
+        // each_time watcher fix) must abort rather than hang forever.
+        use core::sync::atomic::{AtomicU32, Ordering};
+        static CHOICE_CALLS: AtomicU32 = AtomicU32::new(0);
+        if CHOICE_CALLS.fetch_add(1, Ordering::Relaxed) > 200_000 {
+            log::error!(
+                "[CHOICE_TIMEOUT] exceeded 200k conditional-optional resolutions; aborting"
+            );
+            gs.ability_queue.clear();
+            return Ok(());
+        }
         // Read before clear_choice_state since it nullifies conditional_choice.
         let entry_eff = gs.entry_effect().cloned();
         let cond_choice = gs.entry_conditional_choice();
@@ -2998,20 +3009,13 @@ impl super::resolver::AbilityResolver {
                 if let Some(entry) = gs.ability_queue.current_entry() {
                     if let Some(cid) = entry.card_id {
                         let turn = gs.turn_number;
-                        for (idx, ar) in gs
-                            .card_database
-                            .get_card(cid)
-                            .map(|c| &c.abilities)
-                            .into_iter()
-                            .flatten()
-                            .enumerate()
-                        {
-                            if ar.resolve().use_limit.is_some() {
-                                let key = (cid, idx, turn);
-                                *gs.turn_limited_abilities_used.entry(key).or_insert(0) += 1;
-                                break;
-                            }
-                        }
+                        // Record the use against the ability ACTUALLY being resolved
+                        // (entry.ability_index), not the first ability on the card with a
+                        // use_limit. Recording the wrong ability (e.g. the parent's ab#0
+                        // instead of this each_time ab#1) leaves the real ability unmarked
+                        // as used, so a later movement re-trigger re-queues it forever.
+                        let key = (cid, entry.ability_index, turn);
+                        gs.record_ability_use(key, true, "c3011");
                     }
                 }
             }

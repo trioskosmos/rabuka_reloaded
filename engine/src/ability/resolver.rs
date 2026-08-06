@@ -740,6 +740,10 @@ impl AbilityResolver {
                         "Ability already used {} of {} times this turn",
                         used, use_limit
                     );
+                    eprintln!(
+                        "[REN_GATE] resolve({:?}) BLOCKED: used={} limit={}",
+                        key, used, use_limit
+                    );
                     dbg.p("RESULT", &msg);
                     let items = drain_verdicts();
                     self.push_ability_result(gs, "skipped", items, Some(&msg));
@@ -828,7 +832,7 @@ impl AbilityResolver {
                         .as_ref()
                         .is_none_or(|e| self.can_activate_effect(gs, e));
                     if can_activate {
-                        *gs.turn_limited_abilities_used.entry(*key).or_insert(0) += 1;
+                        gs.record_ability_use(*key, true, "r831");
                     }
                 }
             }
@@ -934,7 +938,7 @@ impl AbilityResolver {
                         && ability.triggers.as_deref() == Some(crate::triggers::ACTIVATION)
                     {
                         if let Some(ref key) = ability_key {
-                            *gs.turn_limited_abilities_used.entry(*key).or_insert(0) += 1;
+                            gs.record_ability_use(*key, true, "r937");
                         }
                     }
                     dbg.p("RESULT", "effect condition not met — skipped");
@@ -978,7 +982,7 @@ impl AbilityResolver {
                     ) || is_optional_pos;
                     if let Some(ref key) = ability_key {
                         if ability.use_limit.is_some() && !skip_use_limit {
-                            *gs.turn_limited_abilities_used.entry(*key).or_insert(0) += 1;
+                            gs.record_ability_use(*key, true, "r981");
                         }
                     }
                 }
@@ -1011,7 +1015,7 @@ impl AbilityResolver {
                         .as_ref()
                         .is_none_or(|e| self.can_activate_effect(gs, e));
                     if can_activate {
-                        *gs.turn_limited_abilities_used.entry(*key).or_insert(0) += 1;
+                        gs.record_ability_use(*key, true, "r1014");
                     }
                 }
             }
@@ -1034,7 +1038,7 @@ impl AbilityResolver {
                         .as_ref()
                         .is_none_or(|e| self.can_activate_effect(gs, e))
                 {
-                    *gs.turn_limited_abilities_used.entry(key).or_insert(0) += 1;
+                    gs.record_ability_use(key, true, "r1037");
                 }
             }
         }

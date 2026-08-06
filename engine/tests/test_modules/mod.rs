@@ -26,6 +26,7 @@ pub mod bp7_dia_both_hand_reorder_test;
 pub mod bp7_fire_bird_blade_gain_test;
 pub mod bp7_heart_copy_test;
 pub mod bp7_kanon_under_member_blade_test;
+pub mod bp7_kanata_choice_test;
 pub mod bp7_karin_dynamic_blade_wait_test;
 pub mod bp7_under_member_per_unit_blade_test;
 pub mod bp7_ren_both_trigger_test;

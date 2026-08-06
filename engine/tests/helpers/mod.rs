@@ -554,6 +554,13 @@ impl TestGame {
         }
     }
 
+    /// Answer a pending 2+-option effect choice ("以下から1つを選ぶ", presented as
+    /// a `SelectTarget` with target="choice") by choosing option `idx` (0-based).
+    pub fn select_choice_option(&mut self, idx: usize) {
+        TurnEngine::resume_with_choice(&mut self.state, Some(idx as i16), None)
+            .expect("select_choice_option failed");
+    }
+
     /// Answer a pending SelectCard choice over the energy zone by selecting the
     /// first `count` energy cards (the under-member placement choice). Panics if
     /// the pending choice is not an energy SelectCard or if there aren't enough

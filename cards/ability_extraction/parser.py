@@ -4773,6 +4773,55 @@ for _ci, (_cn, _ct, _ch) in enumerate(CONDITION_PATTERNS):
     _condition_registry.register(_ct * 100 + _ci, _cn, _ch)
 
 
+def _try_placed_discard_live_or_member(text):
+    """B5 近江彼方 ab#1: "…控え室に置いたカードの中に『X』のライブカードか
+    ブレードハートを持たない『X』のメンバーカードがある場合".
+
+    Among the cards just placed into the discard by the preceding cost, is there
+    a group-X LIVE card OR a group-X member card without a blade heart?  Emits an
+    or_condition of two card_count_conditions scoped to source:"preceding_moved".
+    """
+    if "の中に" not in text or "ライブカードか" not in text or "持たない" not in text:
+        return None
+    if not ("控え室に置いた" in text or "置いたカード" in text):
+        return None
+    # Group name(s) from 『』 (e.g. 『虹ヶ咲』).
+    groups = list(dict.fromkeys(extract_group_names(text)))
+    if not groups:
+        return None
+    # Only fire when the live-card alternative and the blade-heartless member
+    # alternative both refer to the same group clause (the target pattern).
+    if "メンバーカード" not in text:
+        return None
+    leg_live = {
+        "type": "card_count_condition",
+        "source": "preceding_moved",
+        "card_type": "live_card",
+        "group_names": groups,
+        "count": 1,
+        "operator": ">=",
+    }
+    leg_member = {
+        "type": "card_count_condition",
+        "source": "preceding_moved",
+        "card_type": "member_card",
+        "card_property": "has_blade_heart",
+        "negation": True,
+        "group_names": groups,
+        "count": 1,
+        "operator": ">=",
+    }
+    return {
+        "type": "or_condition",
+        "source": "preceding_moved",
+        "conditions": [leg_live, leg_member],
+        "text": text,
+    }
+
+
+_condition_registry.register(1, "placed_discard_live_or_member", _try_placed_discard_live_or_member)
+
+
 def _extract_generic_fields(condition, text):
     """Extract all generic fields from text into condition dict (no early return)."""
     # Character names: 「A」か「B」か「C」がいる, 「A」と「B」がいる,

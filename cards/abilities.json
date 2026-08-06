@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T14:23:10.696737",
+  "generated_at": "2026-08-06T14:45:13.519805",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "b17a600a",
+  "engine_commit": "7bed66d1",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -6695,16 +6695,40 @@
       "effect": {
         "text": "これにより控え室に置いたカードの中に『虹ヶ咲』のライブカードかブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合、以下から1つを選ぶ。\n・エネルギーを2枚アクティブにする。\n・ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "condition": {
-          "type": "location_condition",
-          "card_type": "member_card",
-          "location": "stage",
+          "type": "or_condition",
+          "source": "preceding_moved",
+          "conditions": [
+            {
+              "type": "card_count_condition",
+              "source": "preceding_moved",
+              "card_type": "live_card",
+              "group_names": [
+                "虹ヶ咲"
+              ],
+              "count": 1,
+              "operator": ">=",
+              "text": "これにより控え室に置いたカードの中に『虹ヶ咲』のライブカードかブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合"
+            },
+            {
+              "type": "card_count_condition",
+              "source": "preceding_moved",
+              "card_type": "member_card",
+              "card_property": "has_blade_heart",
+              "negation": true,
+              "group_names": [
+                "虹ヶ咲"
+              ],
+              "count": 1,
+              "operator": ">=",
+              "text": "これにより控え室に置いたカードの中に『虹ヶ咲』のライブカードかブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合"
+            }
+          ],
           "text": "これにより控え室に置いたカードの中に『虹ヶ咲』のライブカードかブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合",
-          "negation": true,
           "card_property": "has_blade_heart",
+          "negation": true,
           "group_names": [
             "虹ヶ咲"
-          ],
-          "target": "self"
+          ]
         },
         "action": "choice",
         "options": [

@@ -932,10 +932,7 @@ impl super::TurnEngine {
                         if let Some(cid) = entry.card_id {
                             let turn = game_state.turn_number;
                             let key = (cid, entry.ability_index, turn);
-                            *game_state
-                                .turn_limited_abilities_used
-                                .entry(key)
-                                .or_insert(0) += 1;
+                            game_state.record_ability_use(key, true, "a935");
                         }
                     }
                 }
