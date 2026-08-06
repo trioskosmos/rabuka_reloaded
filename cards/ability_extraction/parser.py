@@ -3288,6 +3288,9 @@ def _try_distinct(text):
         m = re.search(r"(\d+)(人|枚|つ)以上", text)
     if not m:
         m = re.search(r"(\d+)人以上", text)
+    if not m:
+        # "名前の異なる『X』のメンバーが2人いる場合" — no 以上, exact people count.
+        m = re.search(r"(\d+)人(?:いる|ある)", text)
     if m:
         result["count"] = int(m.group(1))
         result["operator"] = ">="

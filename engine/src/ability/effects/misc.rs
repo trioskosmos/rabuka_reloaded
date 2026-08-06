@@ -2051,6 +2051,52 @@ impl AbilityResolver {
             return;
         }
 
+        if source.as_deref() == Some("energy_deck") {
+            // Move `count` energy cards from the ENERGY DECK under a member on
+            // stage (e.g. "自分のエネルギーデッキから、エネルギーカード1枚を…
+            // メンバーの下に置く"). Prefer the activating card when it matches the
+            // effect's group filter (or there is no filter); otherwise fall back
+            // to the first stage member that matches the filter.
+            let card_db = gs.card_database.clone();
+            let activating = gs.activating_card;
+            let matches_group = |id: i16| -> bool {
+                match effect.group_names_any() {
+                    Some(groups) => groups
+                        .iter()
+                        .any(|g| crate::ability::util::card_matches_group_str(&card_db, id, Some(g))),
+                    None => true,
+                }
+            };
+            let player = gs.resolve_target_player_mut(&target);
+            if player.energy_deck.cards.is_empty() {
+                return;
+            }
+            let idx = activating
+                .and_then(|c| player.stage.stage.iter().position(|&id| id == c))
+                .filter(|&i| player.stage.stage[i] != -1 && matches_group(player.stage.stage[i]))
+                .or_else(|| {
+                    (0..3).find(|&i| {
+                        player.stage.stage[i] != -1 && matches_group(player.stage.stage[i])
+                    })
+                })
+                .unwrap_or(1);
+            let area = match idx {
+                0 => crate::zones::MemberArea::LeftSide,
+                1 => crate::zones::MemberArea::Center,
+                _ => crate::zones::MemberArea::RightSide,
+            };
+            for _ in 0..count {
+                if let Some(energy) = player.energy_deck.draw() {
+                    player.stage.place_under_card(area, energy);
+                } else {
+                    break;
+                }
+            }
+            gs.mark_constants_dirty();
+            gs.recalculate_constants();
+            return;
+        }
+
         if Zone::from_str(source.as_deref().unwrap_or("")) == Some(Zone::UnderMember) {
             let player = gs.resolve_target_player_mut(&target);
             let mut all_under: Vec<i16> = Vec::new();

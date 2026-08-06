@@ -280,7 +280,7 @@ Parsed:
 - ✅ **Engine fix**: Updated `recalculate_constant_blade_modifiers()` in `modifiers.rs` to handle `position: "front"` (targeting opponent mirrored slot `2 - slot_idx`) and `sign: "negative"`.
 - ✅ **Tests**: 9 unit tests passing in `bp7_ruby_front_blade_test.rs`.
 
-### C2. `PL!N-bp7-005-R` 宮下 愛 ab#0 — gap: [under_member, energy_deck, distinct_name] — ❌ choice option broken
+### C2. `PL!N-bp7-005-R` 宮下 愛 ab#0 — gap: [under_member, energy_deck, distinct_name] — ✅ FIXED (parser + engine)
 
 Japanese:
 > 登場：自分のステージに名前の異なる『DiverDiva』のメンバーが2人いる場合、以下から1つを選ぶ。・エネルギーを2枚アクティブにする。・自分のエネルギーデッキから、エネルギーカード1枚を自分のステージにいる『虹ヶ咲』のメンバーの下に置く。
@@ -288,15 +288,15 @@ Japanese:
 Parsed:
 ```json
 {"condition":{"type":"location_condition","target":"self","distinct":"card_name",
-  "location":"stage","group_names":["DiverDiva"]},
+  "count":2,"operator":">=","unit":"人","location":"stage","group_names":["DiverDiva"]},
  "action":"choice","options":[
    {"action":"change_state","state_change":"active","count":2,"card_type":"energy_card"},
-   {"action":"move_cards","source":"stage","count":1,"card_type":"energy_card",
-    "target":"self","group_names":["虹ヶ咲"],"destination":null}]}
+   {"action":"place_energy_under_member","source":"energy_deck","destination":"under_member",
+    "count":1,"energy_count":1,"card_type":"energy_card","target":"self","group_names":["虹ヶ咲"]}]}
 ```
-- ✅ Top-level `distinct:card_name` (名前の異なる DiverDiva) handled; option 1 fine.
-- ❌ **Option 2 is broken**: `source:"stage"` is wrong (should be `"energy_deck"`), `destination:null` is wrong (should be `"under_member"`), and it should use `place_energy_under_member` (like A4) or `move_cards` with `destination:"under_member"`. Compare A4 which produced the correct shape.
-- Fix: in choice-subtree handling, recognize "エネルギーデッキから…メンバーの下に置く" → `place_energy_under_member{source:energy_deck, destination:under_member}`.
+- ✅ **Fixed**: the `distinct:card_name` condition now carries `count:2` (from "2人" — `_try_distinct` previously only parsed "N以上"; added a `(\d+)人いる|ある` fallback), so 1 DiverDiva member no longer satisfies it.
+- ✅ **Fixed**: option 2 now emits `place_energy_under_member{source:"energy_deck", destination:"under_member", group_names:["虹ヶ咲"]}` (parser_utils gained `energy_deck` source + `メンバーの下に置く` under_member destination patterns).
+- ✅ **Engine**: `execute_place_energy_under_member_impl` now handles `source:"energy_deck"` — draws from the energy deck and places under the activating member when it matches the group filter (else the first matching member). Tests: `bp7_ai_choice_under_member_test.rs` (`ai_*`).
 
 ### C3. `PL!SP-bp7-001-R` 澁谷かのん ab#1 — gap: [under_member] — ❌ effect becomes `custom`
 

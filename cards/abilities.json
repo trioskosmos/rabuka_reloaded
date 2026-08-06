@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T16:38:49.443854",
+  "generated_at": "2026-08-06T17:08:22.907655",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "e5f16537",
+  "engine_commit": "60859c57",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -6348,11 +6348,11 @@
       "effect": {
         "text": "自分の控え室にあるメンバーカード1枚を、自分のステージにいるメンバー1人の下に置く",
         "source": "discard",
+        "destination": "under_member",
         "count": 1,
         "card_type": "member_card",
         "target": "self",
-        "action": "move_cards",
-        "destination": null
+        "action": "move_cards"
       }
     },
     {
@@ -6512,7 +6512,7 @@
           {
             "text": "自分の控え室から『Aqours』のメンバーカードを3枚まで好きな順番でデッキの下に置く",
             "source": "discard",
-            "destination": "deck_bottom",
+            "destination": "under_member",
             "placement_order": "any_order",
             "count": 3,
             "card_type": "member_card",
@@ -18777,7 +18777,7 @@
         "primary_effect": {
           "text": "自分と相手はそれぞれ、自身の控え室にあるすべてのメンバーカードをシャッフルし、自身のデッキの下に置く",
           "source": "discard",
-          "destination": "deck_bottom",
+          "destination": "under_member",
           "card_type": "member_card",
           "target": "deck",
           "multiple_targets": true,
@@ -21632,6 +21632,9 @@
           "distinct": "card_name",
           "text": "自分のステージに名前の異なる『DiverDiva』のメンバーが2人いる場合",
           "location": "stage",
+          "count": 2,
+          "operator": ">=",
+          "unit": "人",
           "group_names": [
             "DiverDiva"
           ]
@@ -21647,15 +21650,16 @@
           },
           {
             "text": "自分のエネルギーデッキから、エネルギーカード1枚を自分のステージにいる『虹ヶ咲』のメンバーの下に置く",
-            "source": "stage",
+            "source": "energy_deck",
+            "destination": "under_member",
             "count": 1,
             "card_type": "energy_card",
             "target": "self",
             "group_names": [
               "虹ヶ咲"
             ],
-            "action": "move_cards",
-            "destination": null
+            "action": "place_energy_under_member",
+            "energy_count": 1
           }
         ],
         "count": 1,
@@ -21685,7 +21689,7 @@
           {
             "text": "自分の控え室からブレードハートを持たないメンバーカードを4枚まで好きな順番でデッキの下に置いてもよい",
             "source": "discard",
-            "destination": "deck_bottom",
+            "destination": "under_member",
             "placement_order": "any_order",
             "count": 4,
             "card_type": "member_card",
@@ -34327,7 +34331,7 @@
         "primary_effect": {
           "text": "自分の控え室にあるすべてのメンバーカードをシャッフルし、デッキの下に置いてもよい",
           "source": "discard",
-          "destination": "deck_bottom",
+          "destination": "under_member",
           "card_type": "member_card",
           "target": "deck",
           "optional": true,
@@ -36163,7 +36167,7 @@
           {
             "text": "自分は、そのプレイヤーの控え室にあるメンバーカードを2枚まで好きな順番でデッキの下に置く",
             "source": "discard",
-            "destination": "deck_bottom",
+            "destination": "under_member",
             "placement_order": "any_order",
             "count": 2,
             "card_type": "member_card",
@@ -36376,7 +36380,7 @@
       "effect": {
         "text": "自分の控え室から『Aqours』のカードを2枚まで好きな順番でデッキの下に置く",
         "source": "discard",
-        "destination": "deck_bottom",
+        "destination": "under_member",
         "placement_order": "any_order",
         "count": 2,
         "target": "self",
@@ -36705,7 +36709,8 @@
       "cost": null,
       "effect": {
         "text": "自分のエネルギーデッキから、エネルギーカード1枚を自分のステージにいる『虹ヶ咲』のメンバーの下に置いてもよい",
-        "source": "stage",
+        "source": "energy_deck",
+        "destination": "under_member",
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
@@ -36713,8 +36718,8 @@
           "虹ヶ咲"
         ],
         "optional": true,
-        "action": "move_cards",
-        "destination": null
+        "action": "place_energy_under_member",
+        "energy_count": 1
       }
     },
     {
