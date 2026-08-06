@@ -8652,7 +8652,7 @@ def _try_baton_touch_effect(text):
 def _try_kore_niyori_result(text):
     """これにより/これによって～した場合/とき — conditional on result (invalidation follow-up, discard follow-up, etc.)."""
     marker = None
-    for m in ("これにより", "これによって"):
+    for m in ("これにより", "これによって", "この効果によって"):
         if m in text:
             marker = m
             break
@@ -8711,9 +8711,18 @@ def _try_kore_niyori_result(text):
             cond = None
     primary_text = parts[0].strip()
     # Skip empty/trivial primary text (e.g. cost text already consumed, or just bracket fragments)
-    if not primary_text or re.match(r"^[\s）」\)』」、。]*$", primary_text):
+    if not primary_text or re.match(r"^[\s）」）』」、。]*$", primary_text):
         return None
     primary = parse_action(primary_text)
+    # If the primary carries a leading gate condition ("…場合、"/"…とき、"), only
+    # parse_effect attaches it to the action (e.g. 果南 ab#0 "…のみがいる場合、
+    # フォーメーションチェンジしてもよい"). For plain primaries (no gate) keep
+    # parse_action's exact structure so other conditional_on_result abilities
+    # (e.g. c8 百生吟子) are unchanged.
+    if re.search(r"(?:場合|とき)、", primary_text):
+        pe = parse_effect(primary_text)
+        if isinstance(pe, dict):
+            primary = pe
     return {
         "text": text,
         "action": "conditional_on_result",

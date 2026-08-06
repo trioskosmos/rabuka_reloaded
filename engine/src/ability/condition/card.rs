@@ -1733,10 +1733,20 @@ impl<'a> ConditionContext<'a> {
             let location = condition.get_location().unwrap_or("");
             let target = condition.get_target().unwrap_or("self");
             let player = self.resolve_condition_player(target);
-            let group_name = condition
+            // "…のみがいる" — every card in the zone must belong to ONE of the
+            // listed groups (e.g. 『Aqours』か『SaintSnow』). The group list is an
+            // OR: a card matches if it is in ANY listed group, not just the first.
+            let groups: Vec<String> = condition
                 .get_group_names()
-                .and_then(|gn| gn.first().map(|s| s.as_str()));
+                .map(|g| g.to_vec())
+                .unwrap_or_default();
             let card_db = &self.game_state.card_database;
+            let matches = |id: i16| {
+                groups.is_empty()
+                    || groups.iter().any(|g| {
+                        crate::ability::util::card_matches_group_str(card_db, id, Some(g))
+                    })
+            };
             match Zone::from_str(location) {
                 Some(Zone::Stage) => {
                     return player
@@ -1744,19 +1754,13 @@ impl<'a> ConditionContext<'a> {
                         .stage
                         .iter()
                         .filter(|&&id| id != -1)
-                        .all(|&id| {
-                            crate::ability::util::card_matches_group_str(card_db, id, group_name)
-                        });
+                        .all(|&id| matches(id));
                 }
                 Some(Zone::LiveCardZone) => {
-                    return player.live_card_zone.cards.iter().all(|&id| {
-                        crate::ability::util::card_matches_group_str(card_db, id, group_name)
-                    });
+                    return player.live_card_zone.cards.iter().all(|&id| matches(id));
                 }
                 Some(Zone::SuccessLiveZone) => {
-                    return player.success_live_card_zone.cards.iter().all(|&id| {
-                        crate::ability::util::card_matches_group_str(card_db, id, group_name)
-                    });
+                    return player.success_live_card_zone.cards.iter().all(|&id| matches(id));
                 }
                 _ => return false,
             }
@@ -3859,17 +3863,19 @@ impl<'a> ConditionContext<'a> {
                 filter.exclude_self = exclude_id;
                 let groups_vec = condition.get_group_names().map(|v| v.to_vec());
                 filter.groups = groups_vec.as_ref();
-                let max_cost = cards
-                    .iter()
-                    .filter(|&&id| filter.matches(card_db, id, false))
-                    .filter_map(|&id| {
-                        let base = card_db.get_card(id).and_then(|c| c.cost)?;
-                        Some(
-                            (base as i32 + self.game_state.mods.get_cost_modifier(id)).max(0) as u8,
-                        )
-                    })
-                    .max()
-                    .unwrap_or(0);
+                let mut max_cost: u8 = 0;
+                for &id in cards.iter() {
+                    if !filter.matches(card_db, id, false) {
+                        continue;
+                    }
+                    if let Some(base) = card_db.get_card(id).and_then(|c| c.cost) {
+                        let v = (base as i32 + self.game_state.mods.get_cost_modifier(id)).max(0)
+                            as u8;
+                        if v > max_cost {
+                            max_cost = v;
+                        }
+                    }
+                }
                 return max_cost;
             }
             // Fallback for cost comparison with specific location and non-self

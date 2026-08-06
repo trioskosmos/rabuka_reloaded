@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T20:44:23.283276",
+  "generated_at": "2026-08-06T20:58:22.181388",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "6e4657a0",
+  "engine_commit": "7610530c",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -12069,16 +12069,6 @@
         "action": "conditional_on_result",
         "primary_effect": {
           "text": "エールにより公開された自分のカードの中にライブカードがないとき、それらのカードをすべて控え室に置いてもよい",
-          "source": "revealed_cards",
-          "dynamic_count": {
-            "type": "revealed_cards",
-            "reference": "previous_reveal"
-          },
-          "destination": "discard",
-          "card_type": "card",
-          "optional": true,
-          "action": "move_cards",
-          "all": true,
           "condition": {
             "type": "location_condition",
             "location": "revealed_cards",
@@ -12087,6 +12077,16 @@
             "negation": true,
             "card_type": "live_card"
           },
+          "destination": "discard",
+          "optional": true,
+          "action": "move_cards",
+          "source": "revealed_cards",
+          "card_type": "card",
+          "dynamic_count": {
+            "type": "revealed_cards",
+            "reference": "previous_reveal"
+          },
+          "all": true,
           "location": "revealed_cards"
         },
         "result_condition": {
@@ -36162,31 +36162,45 @@
       "cost": null,
       "effect": {
         "text": "自分のステージに『Aqours』か『SaintSnow』のメンバーのみがいる場合、フォーメーションチェンジしてもよい。この効果によって『SaintSnow』のメンバーが移動した場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-        "action": "sequential",
-        "actions": [
-          {
-            "text": "この効果によって『SaintSnow』のメンバーが移動した場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-            "condition": {
-              "type": "movement_condition",
-              "text": "この効果によって『SaintSnow』のメンバーが移動した場合",
-              "trigger_event": {
-                "type": "area_move",
-                "tense": "past"
-              },
-              "movement": "position_change",
-              "group_names": [
-                "SaintSnow"
-              ],
-              "card_type": "member_card"
-            },
-            "action": "gain_resource",
-            "resource": "blade",
-            "count": 2,
-            "duration": "live_end",
-            "timing_condition": "moved_this_turn",
-            "target": "self"
-          }
-        ],
+        "action": "conditional_on_result",
+        "primary_effect": {
+          "text": "自分のステージに『Aqours』か『SaintSnow』のメンバーのみがいる場合、フォーメーションチェンジしてもよい",
+          "condition": {
+            "text": "自分のステージに『Aqours』か『SaintSnow』のメンバーのみがいる場合",
+            "group_names": [
+              "Aqours",
+              "SaintSnow"
+            ],
+            "target": "self",
+            "location": "stage",
+            "card_type": "member_card",
+            "all_members": true,
+            "type": "group_condition"
+          },
+          "optional": true,
+          "action": "position_change",
+          "multiple_targets": true
+        },
+        "result_condition": {
+          "type": "movement_condition",
+          "text": "この効果によって『SaintSnow』のメンバーが移動した場合",
+          "trigger_event": {
+            "type": "area_move",
+            "tense": "past"
+          },
+          "movement": "position_change",
+          "group_names": [
+            "SaintSnow"
+          ],
+          "card_type": "member_card"
+        },
+        "followup_action": {
+          "text": "ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+          "duration": "live_end",
+          "action": "gain_resource",
+          "resource": "blade",
+          "count": 2
+        },
         "group_names": [
           "Aqours",
           "SaintSnow"
