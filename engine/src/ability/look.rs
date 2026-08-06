@@ -891,6 +891,7 @@ impl AbilityResolver {
                 effect.heart_colors_any(),
                 None,
                 &crate::HashMap::default(),
+                None,
             );
             base_count * per_mult
         } else {

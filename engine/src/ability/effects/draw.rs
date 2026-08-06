@@ -74,146 +74,16 @@ impl AbilityResolver {
         gs: &mut GameState,
         dc: &crate::card::DynamicCount,
     ) -> u8 {
-        let get_revealed_count = |gs: &crate::game_state::GameState| {
-            let cheer = gs.cheer_revealed_cards();
-            if !cheer.is_empty() {
-                cheer.len() as u8
-            } else {
-                let player = gs.resolve_target_player("self");
-                gs.revealed_cards
-                    .iter()
-                    .filter(|&&cid| {
-                        player.hand.cards.contains(&cid)
-                            || player.waitroom.cards.contains(&cid)
-                            || player.stage.stage.contains(&cid)
-                            || player.stage.under_cards.iter().any(|v| v.contains(&cid))
-                            || player.energy_zone.cards.contains(&cid)
-                            || player.main_deck.cards.contains(&cid)
-                            || player.energy_deck.cards.contains(&cid)
-                            || player.live_card_zone.cards.contains(&cid)
-                            || player.success_live_card_zone.cards.contains(&cid)
-                            || gs.resolution_zone.cards.contains(&cid)
-                    })
-                    .count() as u8
-            }
-        };
-
-        let reference_text = dc.reference.as_deref().or(dc.base_reference.as_deref());
-
-        let mut count = match reference_text {
-            Some("selected_card_score") => {
-                if let Some(&card_id) = self.selected_cards.first() {
-                    if let Some(card) = gs.card_database.get_card(card_id) {
-                        card.score.unwrap_or(0)
-                    } else {
-                        0
-                    }
-                } else {
-                    0
-                }
-            }
-            Some("previous_moved_cards") | Some("previous_move") => {
-                if !self.moved_cards.is_empty() {
-                    self.moved_cards.len() as u8
-                } else if let Some(ref moved_cards) = gs.recently_moved_cards {
-                    moved_cards.len() as u8
-                } else {
-                    gs.mods.last_cost_discard_count
-                }
-            }
-            Some("previous_draw") => {
-                let last_draw = self.step_state.last_draw_count;
-                if last_draw > 0 {
-                    last_draw
-                } else if let Some(ref moved_cards) = gs.recently_moved_cards {
-                    moved_cards.len() as u8
-                } else {
-                    0
-                }
-            }
-            Some("revealed_cards") | Some("previous_reveal") => get_revealed_count(gs),
-            Some("unit_count") => {
-                let player = gs.resolve_target_player("self");
-                player.stage.stage.iter().filter(|&&c| c != -1).count() as u8
-            }
-            Some("energy_difference") => {
-                let threshold = dc
-                    .base_reference
-                    .as_deref()
-                    .and_then(|s| s.parse::<u8>().ok())
-                    .unwrap_or(0);
-                let player = gs.resolve_target_player("self");
-                (player.energy_zone.cards.len() as u8).saturating_sub(threshold)
-            }
-            Some("its_difference") | Some("その差") => {
-                let self_score: u8 = gs
-                    .player1
-                    .success_live_card_zone
-                    .cards
-                    .iter()
-                    .filter_map(|&id| gs.card_database.get_card(id).and_then(|c| c.score))
-                    .sum();
-                let opp_score: u8 = gs
-                    .player2
-                    .success_live_card_zone
-                    .cards
-                    .iter()
-                    .filter_map(|&id| gs.card_database.get_card(id).and_then(|c| c.score))
-                    .sum();
-                self_score.abs_diff(opp_score)
-            }
-            Some(reference) if reference.contains("これにより控え室に置いた数") => {
-                if let Some(ref moved) = gs.recently_moved_cards {
-                    moved.len() as u8
-                } else {
-                    self.moved_cards.len() as u8
-                }
-            }
-            Some(reference)
-                if reference.contains("合計スコア") || reference == "total_live_score" =>
-            {
-                let player = gs.resolve_target_player("self");
-                player
-                    .live_card_zone
-                    .cards
-                    .iter()
-                    .filter_map(|&id| gs.card_database.get_card(id).and_then(|c| c.score))
-                    .sum::<u8>()
-            }
-            Some(reference) if reference.contains("ステージ") && reference.contains("メンバー") =>
-            {
-                let target = if reference.contains("相手") || reference.contains("opponent") {
-                    "opponent"
-                } else {
-                    "self"
-                };
-                let player = gs.resolve_target_player(target);
-                player.stage.stage.iter().filter(|&&c| c != -1).count() as u8
-            }
-            Some("energy_cards_under_this_member") => {
-                let player = gs.resolve_target_player("self");
-                let activating_id = gs.activating_card;
-                let pos = activating_id
-                    .and_then(|c| player.stage.stage.iter().position(|&id| id == c))
-                    .unwrap_or(1);
-                let area = match pos {
-                    0 => crate::zones::MemberArea::LeftSide,
-                    1 => crate::zones::MemberArea::Center,
-                    _ => crate::zones::MemberArea::RightSide,
-                };
-                player.stage.get_under_cards(area).len() as u8
-            }
-            _ => match dc.count_type.as_str() {
-                "revealed_cards" => get_revealed_count(gs),
-                _ => 0,
-            },
-        };
-        if let Some(ref calculation) = dc.calculation {
-            if &**calculation == "add" {
-                count += dc.calculation_value.unwrap_or(0);
-            }
-        }
-        count
+        // Single source of truth is GameState::resolve_dynamic_count
+        // (dynamic_count.rs) — the constant path calls it too. Passing the
+        // resolver's transient step context keeps one definition of each
+        // dynamic reference.
+        gs.resolve_dynamic_count(
+            dc,
+            &self.moved_cards,
+            &self.selected_cards,
+            self.step_state.last_draw_count,
+        )
     }
     pub(crate) fn execute_draw_wrapper(
         &mut self,

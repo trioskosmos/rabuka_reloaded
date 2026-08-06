@@ -1479,6 +1479,7 @@ impl AbilityResolver {
                 &[],
                 effect.state_any().as_deref(),
                 &gs.mods.orientation_modifiers,
+                gs.activating_card,
             );
             let per_unit_count = effect.per_unit_count_any().unwrap_or(1) as u8;
             let mut units = matching_count / per_unit_count;

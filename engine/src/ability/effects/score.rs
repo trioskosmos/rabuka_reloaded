@@ -107,6 +107,7 @@ impl AbilityResolver {
                         heart_colors,
                         effect.state_any().as_deref(),
                         &orientation_modifiers,
+                        None,
                     )
                 };
                 // per_unit_count: apply value once per N units (e.g. 4 energy = +1)

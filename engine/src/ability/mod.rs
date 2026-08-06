@@ -5,6 +5,7 @@ pub mod condition;
 pub mod cost;
 pub mod debug;
 pub mod describe;
+pub mod dynamic_count;
 pub mod effects;
 pub mod enums;
 #[cfg(not(feature = "no_std"))]

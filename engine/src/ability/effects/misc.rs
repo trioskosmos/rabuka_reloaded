@@ -531,6 +531,7 @@ impl AbilityResolver {
                 &[],
                 effect.state_any().as_deref(),
                 orientation_modifiers,
+                None,
             )
         };
         // For per_unit_type="discard": always use tracked move/cost counts,

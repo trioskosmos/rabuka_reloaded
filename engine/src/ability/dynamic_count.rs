@@ -1,0 +1,163 @@
+//! Single source of truth for resolving a `DynamicCount` reference into a count.
+//!
+//! Both the constant-path (`recalculate_constants`) and the ability-execution
+//! path (`AbilityResolver`) call this one method, so dynamic_count semantics live
+//! in exactly one place instead of being duplicated per caller.
+use crate::card::DynamicCount;
+use crate::game_state::GameState;
+
+impl GameState {
+    /// Resolve a `DynamicCount` reference against the current game state.
+    ///
+    /// The transient resolver context (which cards moved / were selected / how
+    /// many were drawn in the current step) is passed in because the constant
+    /// path has no `AbilityResolver`. Callers that don't have that context pass
+    /// empty slices / 0.
+    pub(crate) fn resolve_dynamic_count(
+        &self,
+        dc: &DynamicCount,
+        moved_cards: &[i16],
+        selected_cards: &[i16],
+        last_draw_count: u8,
+    ) -> u8 {
+        let reference_text = dc.reference.as_deref().or(dc.base_reference.as_deref());
+
+        let mut count = match reference_text {
+            Some("selected_card_score") => {
+                if let Some(&card_id) = selected_cards.first() {
+                    if let Some(card) = self.card_database.get_card(card_id) {
+                        card.score.unwrap_or(0)
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                }
+            }
+            Some("previous_moved_cards") | Some("previous_move") => {
+                if !moved_cards.is_empty() {
+                    moved_cards.len() as u8
+                } else if let Some(ref recently_moved) = self.recently_moved_cards {
+                    recently_moved.len() as u8
+                } else {
+                    self.mods.last_cost_discard_count
+                }
+            }
+            Some("previous_draw") => {
+                if last_draw_count > 0 {
+                    last_draw_count
+                } else if let Some(ref recently_moved) = self.recently_moved_cards {
+                    recently_moved.len() as u8
+                } else {
+                    0
+                }
+            }
+            Some("revealed_cards") | Some("previous_reveal") => self.revealed_count(),
+            Some("unit_count") => {
+                let player = self.resolve_target_player("self");
+                player.stage.stage.iter().filter(|&&c| c != -1).count() as u8
+            }
+            Some("energy_difference") => {
+                let threshold = dc
+                    .base_reference
+                    .as_deref()
+                    .and_then(|s| s.parse::<u8>().ok())
+                    .unwrap_or(0);
+                let player = self.resolve_target_player("self");
+                (player.energy_zone.cards.len() as u8).saturating_sub(threshold)
+            }
+            Some("its_difference") | Some("その差") => {
+                let self_score: u8 = self
+                    .player1
+                    .success_live_card_zone
+                    .cards
+                    .iter()
+                    .filter_map(|&id| self.card_database.get_card(id).and_then(|c| c.score))
+                    .sum();
+                let opp_score: u8 = self
+                    .player2
+                    .success_live_card_zone
+                    .cards
+                    .iter()
+                    .filter_map(|&id| self.card_database.get_card(id).and_then(|c| c.score))
+                    .sum();
+                self_score.abs_diff(opp_score)
+            }
+            Some(reference) if reference.contains("これにより控え室に置いた数") => {
+                if let Some(ref recently_moved) = self.recently_moved_cards {
+                    recently_moved.len() as u8
+                } else {
+                    moved_cards.len() as u8
+                }
+            }
+            Some(reference)
+                if reference.contains("合計スコア") || reference == "total_live_score" =>
+            {
+                let player = self.resolve_target_player("self");
+                player
+                    .live_card_zone
+                    .cards
+                    .iter()
+                    .filter_map(|&id| self.card_database.get_card(id).and_then(|c| c.score))
+                    .sum::<u8>()
+            }
+            Some(reference) if reference.contains("ステージ") && reference.contains("メンバー") =>
+            {
+                let target = if reference.contains("相手") || reference.contains("opponent") {
+                    "opponent"
+                } else {
+                    "self"
+                };
+                let player = self.resolve_target_player(target);
+                player.stage.stage.iter().filter(|&&c| c != -1).count() as u8
+            }
+            Some("energy_cards_under_this_member") => {
+                let player = self.resolve_target_player("self");
+                let activating_id = self.activating_card;
+                let pos = activating_id
+                    .and_then(|c| player.stage.stage.iter().position(|&id| id == c))
+                    .unwrap_or(1);
+                let area = match pos {
+                    0 => crate::zones::MemberArea::LeftSide,
+                    1 => crate::zones::MemberArea::Center,
+                    _ => crate::zones::MemberArea::RightSide,
+                };
+                player.stage.get_under_cards(area).len() as u8
+            }
+            _ => match dc.count_type.as_str() {
+                "revealed_cards" => self.revealed_count(),
+                _ => 0,
+            },
+        };
+        if let Some(ref calculation) = dc.calculation {
+            if &**calculation == "add" {
+                count += dc.calculation_value.unwrap_or(0);
+            }
+        }
+        count
+    }
+
+    /// Number of cards in the revealed (yell) pool belonging to "self".
+    fn revealed_count(&self) -> u8 {
+        let cheer = self.cheer_revealed_cards();
+        if !cheer.is_empty() {
+            return cheer.len() as u8;
+        }
+        let player = self.resolve_target_player("self");
+        self.revealed_cards
+            .iter()
+            .filter(|&&cid| {
+                player.hand.cards.contains(&cid)
+                    || player.waitroom.cards.contains(&cid)
+                    || player.stage.stage.contains(&cid)
+                    || player.stage.under_cards.iter().any(|v| v.contains(&cid))
+                    || player.energy_zone.cards.contains(&cid)
+                    || player.main_deck.cards.contains(&cid)
+                    || player.energy_deck.cards.contains(&cid)
+                    || player.live_card_zone.cards.contains(&cid)
+                    || player.success_live_card_zone.cards.contains(&cid)
+                    || self.resolution_zone.cards.contains(&cid)
+            })
+            .count() as u8
+    }
+}
