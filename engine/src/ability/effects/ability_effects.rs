@@ -59,68 +59,82 @@ impl AbilityResolver {
         let ability_text = ability_text_binding.as_deref().unwrap_or("");
         let target_trigger_binding = effect.target_trigger_any();
         let target_trigger = target_trigger_binding.as_deref();
-        let count = effect.count_any().map(|v| v as u8);
         let source_card_binding = effect.source_card_any();
         let source_card = source_card_binding.as_deref();
-        let card_id = source_card.and_then(|sc| match sc {
-            "cost_card" => gs
-                .recently_moved_cards
-                .as_ref()
-                .and_then(|cards| cards.last().copied()),
-            "previous_selected" => self.selected_cards.last().copied(),
-            _ => None,
+
+        // Which cards' abilities are fired. With no explicit source_card (the
+        // parser leaves source null for 「それらが持つ登場能力」), the cards are the
+        // ones selected by the preceding `select` step (e.g. 渡辺曜 ab#2:
+        // select THIS + 1 other Aqours member, then fire each of their 登場
+        // abilities). "previous_selected" fires EVERY selected card.
+        let use_selected = source_card.is_none() || source_card == Some("previous_selected");
+        let card_ids: Vec<i16> = if use_selected {
+            self.selected_cards.iter().copied().collect()
+        } else {
+            let single = source_card.and_then(|sc| match sc {
+                "cost_card" => gs
+                    .recently_moved_cards
+                    .as_ref()
+                    .and_then(|cards| cards.last().copied()),
+                _ => None,
+            });
+            single.into_iter().collect()
+        };
+
+        // The ability trigger to fire. When the parser leaves target_trigger null
+        // (only the human target text "…登場能力…" remains), infer 登場.
+        let trigger = target_trigger.or_else(|| {
+            let t = effect.target_name();
+            if t.contains("登場") {
+                Some("登場")
+            } else {
+                None
+            }
         });
-        if let Some(cid) = card_id {
-            let trigger = target_trigger.map(|t| t.to_string());
-            let card_data = gs
-                .card_database
-                .get_card(cid)
-                .map(|c| (c.abilities.clone(), c.name.to_string()));
-            if let Some((abilities, cn)) = card_data {
-                if let Some(ref trig) = trigger {
-                    let matching: Vec<_> = abilities
-                        .iter()
-                        .map(|a| a.resolve())
-                        .filter(|a| {
-                            let at = a
-                                .triggers
-                                .as_ref()
-                                .and_then(|t| t.split('/').next())
-                                .unwrap_or("");
-                            at == trig
-                        })
-                        .collect();
-                    let selected = if matching.len() > 1 && count.unwrap_or(1) == 1 {
-                        // Multiple abilities match the trigger; use the first one.
-                        // (A full implementation would prompt the player, but for
-                        // engine purposes, picking the first matching ability is
-                        // sufficient since abilities of the same trigger on a card
-                        // are typically ordered by priority.)
-                        matching.first()
-                    } else {
-                        matching.first()
-                    };
-                    if let Some(ability) = selected {
-                        if let Some(ref effect) = ability.effect {
-                            // Q240: Set activating_card to the TARGET card (the one whose
-                            // ability is being activated) so position checks like
-                            // activation_position evaluate the correct card, not the activator.
-                            let saved_activating = gs.activating_card;
-                            gs.activating_card = Some(cid);
-                            let _ = self.execute_effect(gs, effect);
-                            gs.activating_card = saved_activating;
-                        }
-                        let pp = self.player_prefix(gs);
-                        let act_name = gs
-                            .activating_card
-                            .map(|c| self.card_name(c))
-                            .unwrap_or_default();
-                        gs.push_rule_log(format!(
-                            "{} {}: [[log_activated_ability:trigger={}]]: {}",
-                            pp, act_name, trig, cn
-                        ));
-                        return;
-                    }
+
+        let player_id = gs
+            .ability_queue
+            .current_entry()
+            .map(|e| e.player_id.clone())
+            .unwrap_or_default();
+
+        if let Some(trig) = trigger {
+            for cid in card_ids {
+                // Clone the card data so the immutable borrow is dropped before
+                // the mutable gs.trigger_auto_ability call below.
+                let (card_no, name, abilities) = match gs.card_database.get_card(cid) {
+                    Some(c) => (c.card_no.to_string(), c.name.to_string(), c.abilities.clone()),
+                    None => continue,
+                };
+                let matching: Vec<_> = abilities
+                    .iter()
+                    .map(|a| a.resolve())
+                    .filter(|a| {
+                        a.triggers
+                            .as_ref()
+                            .and_then(|t| t.split('/').next())
+                            .unwrap_or("")
+                            == trig
+                    })
+                    .collect();
+                if let Some(ability) = matching.first() {
+                    // Q273: fire through the normal ability queue so the 登場
+                    // ability's own cost is paid before its effect resolves.
+                    let ability_id = format!("{}_{}", card_no, ability.full_text);
+                    gs.trigger_auto_ability(
+                        ability_id,
+                        crate::game_state::AbilityTrigger::Debut,
+                        player_id.clone(),
+                        Some(card_no),
+                        Some(cid),
+                        None,
+                        None,
+                    );
+                    let pp = self.player_prefix(gs);
+                    gs.push_rule_log(format!(
+                        "{} {}: [[log_activated_ability:trigger={}]]",
+                        pp, trig, name
+                    ));
                 }
             }
             return;

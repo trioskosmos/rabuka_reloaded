@@ -82,6 +82,15 @@ if exist "%~dp0..\..\web_ui\img\cards_webp\*.webp" (
     echo [WARN] No card webp images found - skipping card image conversion
 )
 
+echo [4/7] Japanese font (subset, auto-rebuild on new chars)...
+cd /d "%~dp0"
+where py >nul 2>&1
+if !errorlevel! equ 0 (
+    py scripts\build_font.py
+) else (
+    echo [WARN] py not found - skipping font rebuild
+)
+
 echo [5/7] Building 3DS binary...
 if exist "%~dp0target" rmdir /s /q "%~dp0target"
 if exist "C:\rust_targets\armv6k-nintendo-3ds\release\rabuka_3ds.3dsx" del "C:\rust_targets\armv6k-nintendo-3ds\release\rabuka_3ds.3dsx"

@@ -92,8 +92,14 @@ specific rule described. `partial` = some adjacent mechanic is tested but the QA
 ## Q273 — 渡辺 曜 PL!S-bp7-005-R＋ ab#2 (起動 センター)
 > 起動：手札を2枚控え室に置く：このメンバーと自分のステージにいるほかの『Aqours』のメンバー1人を選ぶ。それらが持つ登場能力それぞれ1つを発動させる。
 - **QA rule**: an 登場 ability activated this way still pays its own cost if it has one.
-- **Status**: `bp7_watanabe_select_self_and_other_test.rs` covers the self+other selection and
-  firing both 登場 abilities. The "activated ability pays its own cost" edge: **partial**.
+- **Status**: ✓ covered — `bp7_q273_watanabe_cost_test.rs` (2 tests) drives ab#2 firing both
+  selected members' 登場 abilities and verifies the fired 登場 ability's cost is offered and
+  paid (Q273), plus 渡辺's own 登場 fires (member placed under her).
+- **Engine fix (Q273)**: `execute_activate_ability` previously fired only the LAST selected card's
+  ability and executed its effect directly (skipping the cost). It now (a) fires EVERY selected
+  member's 登場 ability (「それらが…それぞれ」) and (b) enqueues each fired ability through the
+  normal queue so its own cost is paid before the effect resolves; the trigger is inferred as 登場
+  when the parser leaves `target_trigger` null.
 
 ## Q274 / Q275 — 松浦果南 PL!S-bp7-003-R＋ ab#1 option 1 (登場)
 > 登場：以下から1つを選ぶ。・ライブ終了時まで、自分のステージにいる元々持つブレードの数が3つ以下の『Aqours』のメンバーは、相手の効果によってはウェイトしない。
@@ -171,7 +177,7 @@ cards (except Fire Bird) have no gameplay test.
 | Q277 | PL!N-bp7-011 ミア | refresh before 自動 resolve | ✓ `bp7_q269_mia_yell_no_trigger_test` |
 | Q271 | PL!N-bp7-025 Colorful Dreams | blade-heart ≠ heart color (score) | ✓ `bp7_q271_colorful_dreams_test` |
 | Q272 | PL!N-bp7-026 Just Believe | no-repeat select | ✓ `bp7_q272_just_believe_test` |
-| Q273 | PL!S-bp7-005 渡辺曜 | activated 登場 ability pays cost | partial |
+| Q273 | PL!S-bp7-005 渡辺曜 | activated 登場 ability pays cost | ✓ `bp7_q273_watanabe_cost_test` |
 | Q274 | PL!S-bp7-003 松浦果南 | wait-immune member still selectable | **gap** |
 | Q275 | PL!S-bp7-003 松浦果南 | not a legal forced-wait choice | **gap** |
 | Q276 | PL!N-bp7-030 Cheer Mode | return-to-hand beats success zone | partial |
