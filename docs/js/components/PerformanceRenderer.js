@@ -711,7 +711,6 @@ function renderLiveCards(result) {
         .filter(cd => cd && (cd.card_type === 'Member' || cd.type === 'member'));
     const memberImgSection = revealedMembers.length > 0 ? `
         <div class="perf-revealed-members">
-            <div class="perf-mini-heading" style="margin: 6px 0 4px;">${tr('perf_revealed_members')}</div>
             <div class="perf-revealed-grid">
                 ${revealedMembers.map(cd => `
                     <div class="perf-revealed-member-card">

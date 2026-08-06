@@ -240,6 +240,42 @@ impl Stage {
         &self.under_cards[index]
     }
 
+    /// If `under_card` is physically stacked beneath a member, return that
+    /// host member's id (the top card of the slot holding `under_card`).
+    /// `None` if the card isn't under any member on this stage.
+    pub fn host_of_under_card(&self, under_card: i16) -> Option<i16> {
+        for idx in 0..STAGE_SIZE {
+            if self.under_cards[idx].contains(&under_card) {
+                let host = self.stage[idx];
+                return if host == EMPTY_SLOT {
+                    None
+                } else {
+                    Some(host)
+                };
+            }
+        }
+        None
+    }
+
+    /// Iterate (under_card, host_member) pairs for every card stacked beneath a
+    /// member on this stage.
+    pub fn under_cards_with_hosts(&self) -> Vec<(i16, i16)>
+    where
+        Self: Sized,
+    {
+        let mut out = Vec::new();
+        for idx in 0..STAGE_SIZE {
+            let host = self.stage[idx];
+            if host == EMPTY_SLOT {
+                continue;
+            }
+            for &uc in &self.under_cards[idx] {
+                out.push((uc, host));
+            }
+        }
+        out
+    }
+
     // Q140/Q141: Energy under a member goes to energy deck when the member leaves stage.
     /// Rule 10.5.3-10.5.4: When a member leaves its area, recycle under-cards:
     /// - Member cards under → go to waitroom

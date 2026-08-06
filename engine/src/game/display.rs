@@ -1414,6 +1414,16 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         score_set_flat.insert(k, v.set as i32);
     }
 
+    // Gained constant abilities (gain_ability 常時 → +N live score) apply
+    // through constant_score_sources / constant_total_score_bonus so they are
+    // counted once in the live total. Surface the same value as the hosting
+    // card's bonus_score so it renders with a normal "+N score" badge.
+    for (cid, _text, val) in &game_state.mods.constant_score_sources {
+        if *val != 0 {
+            *score_flat.entry(*cid).or_insert(0) += *val as i32;
+        }
+    }
+
     let mut heart_flat: HashMap<i16, HashMap<crate::card::HeartColor, i32>> =
         HashMap::with_capacity_and_hasher(
             game_state.mods.heart_modifiers.len(),
@@ -1490,6 +1500,13 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
                 bonus_triggers.entry(card_id).or_default().push(icon_name);
             }
         }
+    }
+    // De-duplicate trigger texticons so a trigger (e.g. "常時" → jyouji) renders
+    // exactly one badge no matter how many times the gained ability was recorded
+    // or how many recalculate_constants passes ran.
+    for triggers in bonus_triggers.values_mut() {
+        let mut seen = std::collections::HashSet::with_capacity(triggers.len());
+        triggers.retain(|t| seen.insert(t.clone()));
     }
     let temp_effects: Vec<TempEffectDisplay> = game_state
         .temporary_effects

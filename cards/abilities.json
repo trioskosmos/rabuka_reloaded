@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T02:48:16.654650",
+  "generated_at": "2026-08-06T13:28:59.263351",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "44e242d1",
+  "engine_commit": "51bfdc1a",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -7044,16 +7044,35 @@
       "effect": {
         "text": "このメンバーが登場するか、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれたとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。そのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない",
         "condition": {
-          "type": "appearance_condition",
-          "appearance": true,
-          "text": "このメンバーが登場するか、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれたとき",
-          "trigger_event": {
-            "type": "appearance",
-            "location": "stage"
-          },
-          "location": "stage",
-          "target": "self",
-          "card_type": "member_card"
+          "type": "or_condition",
+          "conditions": [
+            {
+              "type": "appearance_condition",
+              "appearance": true,
+              "text": "このメンバーが登場",
+              "trigger_event": {
+                "type": "appearance",
+                "location": "stage"
+              },
+              "location": "stage"
+            },
+            {
+              "type": "card_count_condition",
+              "count": 1,
+              "operator": ">=",
+              "text": "自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれたとき",
+              "trigger_event": {
+                "type": "zone_change",
+                "source": "energy_zone",
+                "destination": "energy_deck"
+              },
+              "target": "self",
+              "resource_type": "energy",
+              "source": "energy_zone",
+              "destination": "energy_deck"
+            }
+          ],
+          "text": "このメンバーが登場するか、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれたとき"
         },
         "action": "sequential",
         "actions": [
@@ -7165,14 +7184,14 @@
           "trigger_event": {
             "type": "zone_change",
             "source": "energy_zone",
-            "destination": "deck"
+            "destination": "energy_deck"
           },
           "target": "self",
           "resource_type": "energy",
           "temporal": "this_turn",
           "temporal_scope": "this_turn",
           "source": "energy_zone",
-          "destination": "deck",
+          "destination": "energy_deck",
           "position": "center",
           "activation_position": "center"
         },
@@ -15008,8 +15027,7 @@
               "group_names": [
                 "Printemps"
               ],
-              "baton_touch_trigger": true,
-              "card_type": "member_card"
+              "baton_touch_trigger": true
             },
             "duration": "unless"
           }
@@ -16936,8 +16954,7 @@
           "location": "stage",
           "exclude_self": true,
           "target": "self",
-          "cost_limit": 11,
-          "card_type": "member_card"
+          "cost_limit": 11
         },
         "source": "energy_deck",
         "destination": "energy_zone",
@@ -21945,6 +21962,7 @@
           "group_names": [
             "Liella!"
           ],
+          "location": "under_member",
           "card_type": "member_card",
           "self_target": true,
           "type": "group_condition"
@@ -23271,17 +23289,32 @@
       "effect": {
         "text": "自分のステージに、このメンバーか、ほかのメンバーがバトンタッチして登場したとき、カードを1枚引く",
         "condition": {
-          "type": "movement_condition",
-          "movement": "baton_touch",
-          "target": "self",
-          "baton_touch_trigger": true,
+          "type": "or_condition",
+          "conditions": [
+            {
+              "text": "自分のステージに、このメンバー",
+              "target": "self",
+              "location": "stage",
+              "card_type": "member_card",
+              "type": "location_condition"
+            },
+            {
+              "type": "movement_condition",
+              "movement": "baton_touch",
+              "target": "self",
+              "baton_touch_trigger": true,
+              "text": "ほかのメンバーがバトンタッチして登場したとき",
+              "trigger_event": {
+                "type": "baton_touch",
+                "tense": "past",
+                "location": "stage"
+              },
+              "exclude_self": true
+            }
+          ],
           "text": "自分のステージに、このメンバーか、ほかのメンバーがバトンタッチして登場したとき",
-          "trigger_event": {
-            "type": "baton_touch",
-            "tense": "past",
-            "location": "stage"
-          },
-          "exclude_self": true
+          "exclude_self": true,
+          "baton_touch_trigger": true
         },
         "action": "draw_card",
         "count": 1,
@@ -33701,8 +33734,7 @@
             "type": "appearance",
             "location": "stage"
           },
-          "location": "stage",
-          "card_type": "member_card"
+          "location": "stage"
         },
         "action": "sequential",
         "actions": [

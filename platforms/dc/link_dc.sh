@@ -4,7 +4,7 @@ KOS_BASE=/opt/toolchains/dc/rust/kos
 KOS_PORTS=/opt/toolchains/dc/rust/kos-ports
 PATH=/opt/toolchains/dc/rust/sh-elf/bin:/opt/toolchains/dc/rust/kos/utils/build_wrappers:/opt/toolchains/dc/rust/bin:/usr/bin:/bin
 BLD=/opt/toolchains/dc/rust/build_target
-OUT=/mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/output_dc
+OUT=/mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/platforms/dc/output
 SRC=/mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/platforms/dc
 
 echo "=== Compile entry.c ==="

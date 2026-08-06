@@ -3875,20 +3875,43 @@ def _try_temporal_count(text):
 
 
 def _try_or(text):
-    # Only split on "あるか、" (OR pattern: condition A あるか、condition B)
-    # NOT on generic "か、" which appears in other grammar patterns
-    if "あるか、" not in text:
-        return None
-    parts = [p.strip() for p in text.split("あるか、") if p.strip()]
-    if len(parts) < 2:
-        return None
-    # Restore "ある" suffix lost during split on "あるか、"
-    parts = [p + "ある" if i < len(parts) - 1 else p for i, p in enumerate(parts)]
-    # Also add "場合" to last part if present in original
-    parsed = [parse_condition(p) for p in parts]
-    if len(parsed) < 2:
-        return None
-    return {"type": "or_condition", "conditions": parsed, "text": text}
+    # Delegate to the specialized OR helpers first — they build richer
+    # movement/live_success legs than a generic split can. Falls back to the
+    # generic split (handles compound triggers like this B4/かのん pattern).
+    for specialized in (
+        _try_live_success_or_move,
+        _try_appear_or_move,
+    ):
+        try:
+            specialized_result = specialized(text)
+        except (KeyError, IndexError):
+            specialized_result = None
+        if specialized_result is not None:
+            return specialized_result
+    # OR trigger patterns: "A あるか、B" / "A するか、B" / "A たか、B" / "A か、B"
+    # Split candidates from most-specific marker to generic "か、".
+    # Only accept when every part parses into a real condition (guards against
+    # generic "か、" that appears inside single clauses, e.g. "できるか、できないか").
+    markers = ["あるか、", "するか、", "たか、", "か、"]
+    for marker in markers:
+        if marker not in text:
+            continue
+        parts = [p.strip() for p in text.split(marker) if p.strip()]
+        if len(parts) < 2:
+            continue
+        # Restore "ある" suffix lost during split on "あるか、"
+        if marker == "あるか、":
+            parts = [
+                p + "ある" if i < len(parts) - 1 else p
+                for i, p in enumerate(parts)
+            ]
+        parsed = [parse_condition(p) for p in parts]
+        if len(parsed) < 2 or any(
+            p is None or p.get("type") in ("custom",) for p in parsed
+        ):
+            continue
+        return {"type": "or_condition", "conditions": parsed, "text": text}
+    return None
 
 
 def _extract_place_restriction_destination(text):
@@ -4044,6 +4067,8 @@ def _try_zone_placement(text):
             src = "discard"
         elif "ライブカード置き場" in source_text:
             src = "live_card_zone"
+        elif "エネルギーデッキ" in source_text:
+            src = "energy_deck"
         elif "エネルギー置き場" in source_text:
             src = "energy_zone"
         elif "手札" in source_text or "手元" in source_text:
@@ -4065,6 +4090,8 @@ def _try_zone_placement(text):
             dest = "hand"
         elif "ステージ" in dest_text:
             dest = "stage"
+        elif "エネルギーデッキ" in dest_text:
+            dest = "energy_deck"
         elif "デッキ" in dest_text:
             dest = "deck"
         else:
@@ -4240,9 +4267,13 @@ def _try_appearance(text):
     cl = extract_cost_limit(text)
     if cl is not None:
         result["cost_limit"] = cl
-    # Extract card type (e.g. メンバー → member_card)
+    # Extract card type (e.g. メンバー → member_card). Self-appearance
+    # ("このメンバーが登場"/"このカードが登場") must stay a bare appearance —
+    # the engine's self-trigger guard relies on a condition with NO card-type
+    # filter to require a real debut event.
     ct = extract_card_type(text)
-    if ct:
+    self_appearance = "このメンバー" in text or "このカード" in text
+    if ct and not self_appearance:
         result["card_type"] = ct
     # Extract position (左サイド/右サイド/センター) — skip when
     # positions_characters already encodes per-position character mappings.
@@ -4796,6 +4827,15 @@ def _extract_generic_fields(condition, text):
     if "公開した" in text or "公開された" in text or "公開する" in text:
         condition["location"] = "revealed_cards"
 
+    # Under-member scope: "…の下に置かれているかぎり" / "…の下に置かれている"
+    # (e.g. 澁谷かのん ab#0 「このカードが『Liella!』のメンバーの下に置かれて
+    # いるかぎり」). The subject card being under a member is an `under_member`
+    # location, not expressible via the zone-name LOCATION_PATTERNS above.
+    if condition.get("location") is None and (
+        "の下に置かれている" in text or "の下に置かれていて" in text
+    ):
+        condition["location"] = "under_member"
+
     # Ability filter: has ability / no ability
     if "能力を持つ" in text and "能力を持たない" not in text:
         condition["ability_filter"] = "has_ability"
@@ -4872,7 +4912,16 @@ def _extract_generic_fields(condition, text):
 
     # Card type, count, operator
     ct = extract_card_type(text)
-    if ct:
+    # Self-appearance ("このメンバーが登場"/"このカードが登場") must stay a
+    # bare appearance — the engine's self-trigger guard relies on a condition
+    # with NO card-type filter to require a real debut event.
+    self_appearance = (
+        condition.get("type") == "appearance_condition"
+        and ("このメンバー" in text or "このカード" in text)
+    )
+    if self_appearance:
+        condition.pop("card_type", None)
+    elif ct:
         condition["card_type"] = ct
     cnt = extract_count(text)
     if cnt is not None:

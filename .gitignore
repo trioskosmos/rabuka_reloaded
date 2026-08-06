@@ -32,14 +32,13 @@ ports/*/target/
 # 3DS card conversion intermediates (PNGs only — .t3x atlases are tracked)
 ports/3ds/romfs/cards/*.png
 
-output_3ds/
-
-# Wii build output
-output_wii/
+# Platform build outputs (3DS / Wii / Dreamcast builds are bulky)
+platforms/3ds/output/
+platforms/wii/output/
 
 # Dreamcast toolchain build artifacts
 dc-toolchain/
-output_dc/
+platforms/dc/output/
 
 # Build intermediates
 a.out

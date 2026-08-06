@@ -689,6 +689,68 @@ impl GameState {
         for (cid, old) in &old_bonuses {
             self.mods.remove_blade_modifier(*cid, *old as i16);
         }
+        // Under-card constant blade abilities ("常時：このカードが『X』のメンバーの
+        // 下に置かれているかぎり、そのメンバーはブレードを得る"). Unlike stage
+        // abilities, the blade is granted to the HOST member the card is stacked
+        // under (not to the ability card itself, which isn't on stage).
+        {
+            for (under_cid, host) in self
+                .player1
+                .stage
+                .under_cards_with_hosts()
+                .into_iter()
+                .chain(self.player2.stage.under_cards_with_hosts().into_iter())
+            {
+                let card = match self.card_database.get_card(under_cid) {
+                    Some(c) => c,
+                    None => continue,
+                };
+                for (_ability_idx, ar) in card.abilities.iter().enumerate() {
+                    if !GameState::ability_matches_trigger(
+                        &ar.resolve(),
+                        &crate::game_state::AbilityTrigger::Constant,
+                    ) {
+                        continue;
+                    }
+                    let ability = ar.resolve();
+                    let Some(ref effect) = ability.effect else {
+                        continue;
+                    };
+                    if effect.action != crate::ability::enums::ActionType::GainResource
+                        || !matches!(
+                            effect.resource_any().as_deref(),
+                            Some("blade") | Some("ブレード")
+                        )
+                    {
+                        continue;
+                    }
+                    let Some(ref cond) = effect.condition else {
+                        continue;
+                    };
+                    // Only under-member-scoped grants route to the host; a generic
+                    // constant gain on an under-card has no such meaning.
+                    if cond.get_location() != Some("under_member") {
+                        continue;
+                    }
+                    let Some(groups) = cond.get_group_names() else {
+                        continue;
+                    };
+                    // Condition met iff this card is under a host of the group.
+                    if !crate::ability::util::card_matches_any_group(
+                        &self.card_database,
+                        host,
+                        groups,
+                    ) {
+                        continue;
+                    }
+                    let count = effect
+                        .resource_icon_count_any()
+                        .unwrap_or(effect.count_any().unwrap_or(1))
+                        as i16;
+                    *expected.entry(host).or_insert(0) += count;
+                }
+            }
+        }
         for (&cid, &new_val) in &expected {
             self.mods.add_blade_modifier(cid, new_val as i16);
         }
@@ -1240,10 +1302,13 @@ impl GameState {
         }
     }
     pub fn add_gained_ability(&mut self, card_id: i16, ability_type: String) {
-        self.gained_abilities
-            .entry(card_id)
-            .or_default()
-            .push(ability_type);
+        let list = self.gained_abilities.entry(card_id).or_default();
+        // Idempotent: recalculate_constants runs on every state change and calls
+        // this for the same constant gain_ability repeatedly — don't accumulate
+        // duplicate entries (which previously multiplied bonus_triggers badges).
+        if !list.contains(&ability_type) {
+            list.push(ability_type);
+        }
     }
 
     pub fn remove_gained_abilities(&mut self, card_id: i16) {

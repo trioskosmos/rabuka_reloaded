@@ -1249,9 +1249,13 @@ export const CardRenderer = {
                 'kidou': 'kidou.png',
                 'jidou': 'jidou.png',
             };
+            const seenTriggers = new Set();
             card.bonus_triggers.forEach(trigger => {
                 const icon = triggerIconMap[trigger];
-                if (icon) {
+                // De-duplicate so a trigger renders exactly one badge even if the
+                // engine reports it multiple times.
+                if (icon && !seenTriggers.has(icon)) {
+                    seenTriggers.add(icon);
                     bonuses.push({ type: 'bonus-trigger', value: null, icon: icon, isAdditive: false });
                 }
             });

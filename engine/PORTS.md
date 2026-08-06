@@ -407,7 +407,7 @@ match what cargo fetches (0.2.186). Fixing this requires:
 3. Or removing the `rand` dep which pulls in getrandom (engine binary only, not lib)
 
 ### binary
-- `output_dc/rabuka_dc.elf` — valid SH-4 ELF, statically linked, 4.6KB
+- `platforms/dc/output/rabuka_dc.elf` — valid SH-4 ELF, statically linked, 4.6KB
 - Machine: Renesas SH, Entry: 0x1038 (_start → abort via weak _arch_main)
 - To make runnable: need entry point to reach Rust code
 
@@ -432,7 +432,7 @@ Status: **Code complete in `platforms/wii/`**. 88MB RAM → Path A (JSON interpr
 | `src/input.rs` | Both GameCube (`PAD`) and Wii Remote (`WPAD`) input in one poll |
 | `src/lib.rs` | Re-exports display + input modules |
 | `src/bin/rabuka_wii.rs` | Game loop — identical logic to DC port, adapted for libogc |
-| `build_wii.bat` | Build script: `cargo +nightly build -Z build-std=std,panic_abort` |
+| `platforms/wii/build_wii.bat` | Build script: `cargo +nightly build -Z build-std=std,panic_abort` |
 
 ### Build
 ```bash
@@ -459,12 +459,12 @@ Saved to `research/wii/KEY_REFERENCE.md`:
 
 Status: **Boots and plays the full flow** (mode → deck → RPS → mulligan → match)
 in mGBA. The "impossible 288KB" target was reached via `agb` + the engine's
-`compact_*` features + baked deck blobs. See `output_gba/GBA_PORT_NOTES.md`.
+`compact_*` features + baked deck blobs. See `platforms/gba/output/GBA_PORT_NOTES.md`.
 
 | Piece | Detail |
 |-------|--------|
 | SDK | `agb` 0.25 (`thumbv4t-none-eabi`), `-Tgba.ld`, `agb-gbafix` |
-| Build | `cargo +nightly build -Z build-std=core,alloc` + `build_gba.bat` |
+| Build | `cargo +nightly build -Z build-std=core,alloc` + `platforms/gba/build_gba.bat` |
 | Engine feature | `gba` = `no_std + bytecode_abilities + compact_cards + compact_card_data + compact_state` |
 | Pin | `portable-atomic =1.13.1` (agb needs `unsafe-assume-single-core`; dropped on thumbv4t in 1.14+) |
 | Atomics | none on ARMv4T → compat `Arc` is `alloc::rc::Rc` |
@@ -473,7 +473,7 @@ in mGBA. The "impossible 288KB" target was reached via `agb` + the engine's
 
 ### Files
 - `platforms/gba/` — crate (display.rs, input.rs, decks_baked.rs, bin/rabuka_gba.rs)
-- `build_gba.bat`, `output_gba/rabuka_gba.gba`
+- `platforms/gba/build_gba.bat`, `platforms/gba/output/rabuka_gba.gba`
 
 ### Notes
 - No atomics on ARMv4T; RNG seeded (`rng::seed(0x5EED)`).
