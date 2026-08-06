@@ -75,6 +75,10 @@ pub struct GameState {
     pub cannot_activate_members: SmallVec<[String; 2]>,
     pub constant_cannot_activate_members: SmallVec<[String; 4]>,
     pub cannot_live_players: SmallVec<[String; 2]>,
+    /// Member cards that are immune to being put to WAIT by an OPPONENT's effect
+    /// ("相手の効果によってはウェイトしない"), recorded as (member_id, owner_id) by
+    /// the `cannot_wait_by_effect` restriction. Cleared at the end of the live.
+    pub wait_immune_members: SmallVec<[(i16, String); 8]>,
     pub turn_limited_abilities_used: HashMap<(i16, usize, u8), u8>,
     pub mulligan_selected_indices: SmallVec<[u8; 2]>,
     pub live_card_selected_indices: SmallVec<[u8; 3]>,
@@ -364,6 +368,7 @@ impl GameState {
             cannot_activate_members: SmallVec::new(),
             constant_cannot_activate_members: SmallVec::new(),
             cannot_live_players: SmallVec::new(),
+    wait_immune_members: SmallVec::new(),
             turn_limited_abilities_used: HashMap::default(),
             mulligan_selected_indices: SmallVec::new(),
             live_card_selected_indices: SmallVec::new(),

@@ -2606,6 +2606,9 @@ impl GameState {
         if self.current_turn_phase != TurnPhase::Live && !self.cannot_live_players.is_empty() {
             self.cannot_live_players.clear();
         }
+        if self.current_turn_phase != TurnPhase::Live && !self.wait_immune_members.is_empty() {
+            self.wait_immune_members.clear();
+        }
     }
 
     pub fn add_replacement_effect(

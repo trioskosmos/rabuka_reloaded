@@ -1,9 +1,35 @@
 use crate::helpers::*;
+use crate::test_modules::bp7_wait_immunity_helpers::*;
 use rabuka_engine::zones::MemberArea;
 
 // ====================================================================
 // Tests for previously untested edge-case abilities
 // ====================================================================
+
+/// 穂乃果's cost-limit wait is blocked by 松浦果南's wait-immunity on the target.
+#[test]
+fn honoka_cost_limit_wait_blocked_by_wait_immunity() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db.clone());
+
+    // Player2 protects their 果南 (cost 4, blade 2).
+    let p2_kanan = p2_establish_wait_immunity(&mut g);
+
+    // Player1 activates 穂乃果 (self→discard, wait opponent cost ≤ 4).
+    let honoka = g.id("PL!-bp6-010-N");
+    g.state.player1.hand.cards.push(honoka);
+    g.give_energy(10);
+    g.play_to_stage(honoka, MemberArea::RightSide);
+    g.activate_ability(honoka);
+    while g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+
+    assert!(
+        !is_waited(&g, p2_kanan),
+        "穂乃果's cost-limit wait must be blocked by wait-immunity"
+    );
+}
 
 /// Test Named Baton Touch Ability (`PL!N-pb1-022-P+` - Mia Taylor)
 /// "登場:「三船栞子」からバトンタッチして登場した場合、カードを2枚引き、手札を1枚控え室に置く。"

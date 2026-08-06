@@ -18,6 +18,44 @@
 ///   4. Advance to LiveStart with SELF CONTROL!! as live card.
 ///   5. SELF CONTROL!! fires: only Seira A and Seira B get blade; filler does not.
 use crate::helpers::*;
+use crate::test_modules::bp7_wait_immunity_helpers::*;
+use rabuka_engine::zones::MemberArea;
+
+/// 聖良's ab#1 (area-move trigger) wait is blocked by wait-immunity.
+#[test]
+fn seira_area_move_wait_blocked_by_immunity() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    // Player2 protects their 果南 (blade 2).
+    let p2_kanan = p2_establish_wait_immunity(&mut game);
+
+    // Player1: 聖良 at center, filler at right (destination for position change).
+    let seira = game.id("PL!S-bp5-111-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage[1] = seira;
+    game.state.player1.stage.stage[2] = filler;
+    game.give_energy(10);
+
+    // Activate 聖良 ab#0 (position change) → 聖良 moves areas → ab#1 fires and
+    // would wait the opponent's blade≤2 member (果南, blade 2).
+    game.activate_ability(seira);
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 20 {
+        guard += 1;
+        let t = game.pending_choice_type();
+        match t.as_deref() {
+            Some("SelectCard") => game.select_indices(&[0]),
+            Some("SelectPosition") | Some("SelectTarget") => game.select_option(1),
+            _ => game.select_indices(&[0]),
+        }
+    }
+
+    assert!(
+        !is_waited(&game, p2_kanan),
+        "聖良's area-move wait must be blocked by wait-immunity"
+    );
+}
 
 fn fill_decks(game: &mut TestGame) {
     let filler = game.id("PL!-sd1-010-SD");

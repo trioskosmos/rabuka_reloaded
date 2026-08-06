@@ -528,3 +528,113 @@ cargo test --test run_all 2>&1 | grep "test result"
 ```
 
 You should see `1159 passed; 0 failed`. The exact count varies as tests are added, but zero failures is the invariant.
+
+---
+
+## Involved Patterns (recurring — reuse, don't re-derive)
+
+These are non-obvious setups that keep coming up. Copy them.
+
+### A. Triggering an each_time / auto ability directly (no live-phase scaffolding)
+
+Many each_time abilities watch a zone change (e.g. "a card is placed from your deck to
+your discard by a live-success ability"). Driving them through the full live phase is
+fragile. Instead, run the **real TAS scan** with a recorded movement event:
+
+```rust
+for &cid in &moved {
+    game.state.push_movement_event(cid, "deck", "discard", Some(cause_card), "p1", true);
+}
+game.state.trigger_auto_abilities_for_player(&game.state.player1.id.clone());
+game.state.process_pending_auto_abilities(&game.state.player1.id.clone());
+```
+
+`push_movement_event` sets both `recently_moved_cards` and `turn_movements` (with source/
+destination), so movement `Location` conditions evaluate correctly. The TAS scan enqueues
+the each_time with `trigger_moved_cards` = the moved batch. See
+`bp7_like_a_treasure_optional_test.rs` / `bp7_mia_optional_recover_test.rs`.
+
+Then drain the choice(s), matching on `Choice::SelectTarget { target, .. } if target == "conditional_optional"`:
+
+```rust
+let mut guard = 0;
+while game.has_pending_choice() && guard < 40 {
+    guard += 1;
+    match game.get_pending_choice() {
+        Choice::SelectTarget { target, options, .. } if target == "conditional_optional" => {
+            game.select_choice_option(if accept { 1 } else { 0 });
+        }
+        Choice::SelectCard { count, .. } => {
+            if *count > 0 { game.select_indices(&[0]); } else { game.select_indices(&[]); }
+        }
+        _ => break,
+    }
+}
+```
+
+### B. Making PLAYER2 act (opponent effects)
+
+`TestGame` starts with player1 as first attacker / active player, so all `play_to_stage`
+and `activate_ability` helpers act as player1. To make an OPPONENT (player2) effect, flip
+`is_first_attacker`:
+
+```rust
+fn set_active(game: &mut TestGame, p1_active: bool) {
+    game.state.player1.is_first_attacker = p1_active;
+    game.state.player2.is_first_attacker = !p1_active;
+}
+```
+
+Then `activate_ability(p2_card)` / `play_to_stage(p2_card, ...)` act as player2, and the
+ability's controller (`gs.ability_master_id()`) is player2. Player2 needs their own energy
+(`player2.energy_zone.cards.push(e); add_active(n)`). Shared helper:
+`bp7_wait_immunity_helpers::set_active`.
+
+### C. Wait-immunity (BP07 G4) — 松浦果南 `PL!S-bp7-003-R＋` ab#1 option 1
+
+Choosing option 1 grants "相手の効果によってはウェイトしない" (owner's Aqours members with
+blade ≤ 3 are immune to the OPPONENT's wait effects). To test: player2 establishes immunity
+on their own 果南, then player1's wait ability targets it → blocked.
+
+```rust
+use crate::test_modules::bp7_wait_immunity_helpers::*;
+let p2_kanan = p2_establish_wait_immunity(&mut game); // player2 plays 果南, option 1
+// ... player1's wait ability targets player2's 果南 ...
+assert!(!is_waited(&game, p2_kanan), "opponent wait must be blocked");
+```
+
+The same immunity is verified against 5 diverse wait abilities across existing wait-test
+files: 朝香果林 (blade-limit 起動), 矢澤にこ (opponent-waits-own), 高坂穂乃果 (cost-limit),
+西木野真姫 (opponent-own, BiBi), 園田海未 (debut cost-limit).
+
+### D. Regenerating abilities.json / parser output
+
+After editing the Python parser, regenerate everything the engine consumes:
+
+```bash
+cd cards/ability_extraction && python extract_card_abilities.py   # rewrites cards/abilities.json
+cd ../../engine && cargo test                                     # bytecode/abilities_gen.rs auto-regen'd
+```
+
+`extract_card_abilities.py` also re-runs `compile_abilities.py` (regenerates
+`engine/src/ability/abilities_gen.rs`). Re-parsing changes the whole corpus, so a tiny parser
+edit can shift OTHER abilities — always run the full suite and diff the relevant card's JSON
+in `cards/abilities.json`.
+
+### E. "…したとき" (when you do so) consequence gating
+
+`conditional_on_optional{optional_action, conditional_action}` — on accept the engine runs
+`conditional_action`. The consequence is gated on the move actually happening via
+`AbilityResolver.last_move_moved_any` (set by `execute_move_cards`); a following
+`ModifyScore` or self-recover move is skipped when the preceding move moved nothing. Tests:
+`bp7_like_a_treasure_optional_test.rs`, `bp7_mia_optional_recover_test.rs`.
+
+### F. Reading a card's parsed effect during debugging
+
+`cards/abilities.json` is grouped by unique ability text. Quick inspect with python:
+
+```bash
+cd cards && python -c "import json; d=json.load(open('abilities.json',encoding='utf-8')); [print(json.dumps(a['effect'],ensure_ascii=False)) for a in d['unique_abilities'] if any('PL!X-...' in c for c in a.get('cards',[]))]"
+```
+
+This is debugging/verification, NOT a test — never assert on the JSON in a test.

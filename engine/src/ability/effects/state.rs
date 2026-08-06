@@ -453,6 +453,21 @@ impl AbilityResolver {
             } else {
                 candidates.iter().take(change_count).collect()
             };
+            // Wait-immunity ("相手の効果によってはウェイトしない"): drop members that
+            // are recorded as wait-immune against the current effect's controller.
+            let actual_targets: Vec<_> = if state_change == "wait" {
+                let controller = gs.ability_master_id();
+                actual_targets
+                    .into_iter()
+                    .filter(|(_, cid)| {
+                        !gs.wait_immune_members.iter().any(|(m, owner)| {
+                            *m == *cid && controller.as_deref().is_some_and(|c| c != owner)
+                        })
+                    })
+                    .collect()
+            } else {
+                actual_targets
+            };
 
             log::debug!(
                 "[EXEC_CHANGE_STATE] targets={:?} state_change={}",
@@ -791,7 +806,34 @@ impl AbilityResolver {
 
         match state_change {
             "wait" | "ウェイト" => {
+                // Wait-immunity: members protected by a `cannot_wait_by_effect`
+                // restriction are not put to WAIT by the OPPONENT's effects
+                // ("相手の効果によってはウェイトしない").
+                let controller = gs.ability_master_id();
+                let skip: Vec<i16> = wait_cards
+                    .iter()
+                    .filter(|&&cid| {
+                        let protected = gs
+                            .wait_immune_members
+                            .iter()
+                            .any(|(m, _)| *m == cid);
+                        if !protected {
+                            return false;
+                        }
+                        let owner = gs
+                            .wait_immune_members
+                            .iter()
+                            .find(|(m, _)| *m == cid)
+                            .map(|(_, o)| o.as_str())
+                            .unwrap_or_default();
+                        controller.as_deref().is_some_and(|c| c != owner)
+                    })
+                    .copied()
+                    .collect();
                 for card_id in &wait_cards {
+                    if skip.contains(card_id) {
+                        continue;
+                    }
                     gs.mods.add_orientation_modifier(*card_id, "wait");
                 }
                 for _ in 0..deactivate_count {

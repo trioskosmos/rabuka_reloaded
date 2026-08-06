@@ -237,6 +237,7 @@ impl super::TurnEngine {
                     game_state.turn_limited_abilities_used.clear();
                     game_state.cannot_activate_members.clear();
                     game_state.cannot_live_players.clear();
+                    game_state.wait_immune_members.clear();
                     game_state.turn_number += 1;
                     Self::log_turn_start(game_state);
                     Self::log_phase(game_state, "phase_active_first");

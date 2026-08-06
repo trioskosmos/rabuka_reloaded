@@ -3656,6 +3656,79 @@ impl AbilityResolver {
                 gs.cannot_live_players.push(resolved);
             }
         }
+        // Handle cannot_wait_by_effect — record the protected member cards.
+        // "…は相手の効果によってはウェイトしない" — the members matching the
+        // restriction's filter (group + blade-limit) on the CONTROLLER'S OWN stage
+        // are immune to wait effects from the opponent. The restriction protects
+        // the owner's own members ("自分のステージにいる…"), so resolve the owner
+        // from the ability controller, not the parsed (often misleading) target.
+        if restriction_type == Some("cannot_wait_by_effect") {
+            let master = gs.ability_master_id();
+            let owner_is_p2 = matches!(
+                master.as_deref(),
+                Some("player2") | Some("p2")
+            );
+            let (owner_stage, owner_id): (Vec<i16>, String) = if owner_is_p2 {
+                (
+                    gs.player2.stage.stage.iter().copied().collect(),
+                    gs.player2.id.clone(),
+                )
+            } else {
+                (
+                    gs.player1.stage.stage.iter().copied().collect(),
+                    gs.player1.id.clone(),
+                )
+            };
+            let card_db = &gs.card_database;
+            let groups: Vec<String> = effect
+                .group_names_any()
+                .map(|g| g.to_vec())
+                .unwrap_or_default();
+            let ct = effect.card_type_any().map(|c| c.as_card_str());
+            let blade_limit = effect.blade_limit_any().unwrap_or(u8::MAX) as u8;
+            let blade_op = effect.blade_limit_operator_any().map(|o| o.as_str());
+            let mut to_protect: Vec<i16> = Vec::new();
+            for &cid in &owner_stage {
+                if cid == -1 {
+                    continue;
+                }
+                let base_blade = card_db
+                    .get_card(cid)
+                    .map(|c| c.blade as i32)
+                    .unwrap_or(0);
+                if let Some(t) = ct {
+                    if !crate::ability::util::card_matches_type(card_db, cid, Some(t)) {
+                        continue;
+                    }
+                }
+                if !groups.is_empty()
+                    && !groups.iter().any(|g| {
+                        crate::ability::util::card_matches_group_str(card_db, cid, Some(g))
+                    })
+                {
+                    continue;
+                }
+                let blade = base_blade + gs.mods.get_blade_modifier(cid);
+                if crate::ability::util::compare_counts(
+                    blade_op,
+                    blade.max(0) as u8,
+                    blade_limit,
+                ) {
+                    to_protect.push(cid);
+                }
+            }
+            // Store as (member_id, owner_id) so the wait check knows whose member
+            // is protected; opponents' wait effects on that member are blocked.
+            for cid in to_protect {
+                if !gs
+                    .wait_immune_members
+                    .iter()
+                    .any(|(m, _)| *m == cid)
+                {
+                    gs.wait_immune_members.push((cid, owner_id.clone()));
+                }
+            }
+        }
         Ok(())
     }
 

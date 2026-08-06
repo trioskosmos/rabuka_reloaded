@@ -895,30 +895,35 @@ Fixed (parser + engine):
 ## Status as of 2026-08-06
 
 **Done so far (with tests):**
-- Flagged set: **B1, B2, B4, B6, C1–C9** (13 / 15).
-- Clean set: **CLEAN-G1, G2, G3, G5, G10, G12, G13, G14, G15, G16, G18, G19** (12 / 19 groups).
+- Flagged set: **B1, B2, B3, B4, B6, C1–C9** (14 / 15).
+- Clean set: **CLEAN-G1, G2, G3, G4, G5, G7, G9, G10, G12, G13, G14, G15, G16, G18, G19** (15 / 19 groups).
 
-**Remaining to fix (9 items):**
+**Newly confirmed done this session:**
+- **B3** (澁谷かのん ab#0) — the `location:under_member` condition was already fixed in `abilities.json`; 11 gameplay tests in `bp7_kanon_under_member_blade_test.rs`.
+- **B5** (近江彼方 ab#1) — `or_condition` + `source:preceding_moved` already fixed; 9 gameplay tests in `bp7_kanata_choice_test.rs`.
+- **G4 parser** (松浦果南 ab#1) — now emits `restriction{cannot_wait_by_effect}` (was `custom`). **Engine enforcement still missing.**
+- **G7** (ミア ab#0) — new parser `_try_discard_hand_recover_self_optional` → `conditional_on_optional`; engine `last_move_moved_any` recorded on every move finalize + sequential gate generalized to self-recover; 5 gameplay tests in `bp7_mia_optional_recover_test.rs`.
+- **G9** (果南 ab#0) — `_try_kore_niyori_result` now recognizes `この効果によって` and attaches a leading gate condition to the primary; engine `evaluate_group_condition` `all_members` now matches ANY listed group (`『Aqours』か『SaintSnow』`); 3 gameplay tests in `bp7_kanan_formation_change_test.rs`.
+- **G4 (engine)** (松浦果南 ab#1) — `cannot_wait_by_effect` now enforced: `GameState.wait_immune_members` records (member_id, owner_id); `execute_change_state` member_op wait path drops members immune against the effect's controller (opponent wait blocked, self allowed). Verified against **5 diverse wait abilities** (朝香果林 / 矢澤にこ / 高坂穂乃果 / 西木野真姫 / 園田海未) in their existing test files + shared helper `bp7_wait_immunity_helpers`.
+
+**Remaining to fix (4 items):**
 | Item | Defect |
 |---|---|
-| B3 `PL!SP-bp7-001-R` 澁谷かのん ab#0 | condition missing `location:under_member` |
-| B5 `PL!N-bp7-006-R＋` 近江彼方 ab#1 | condition `location:"stage"` wrong (should be preceding_moved); live-card OR lost |
-| CLEAN-G4 `PL!S-bp7-003-R＋` 松浦果南 ab#1 | option1 ウェイトしない → `custom` (no protection primitive) |
+| CLEAN-G4 (engine) `PL!S-bp7-003-R＋` 松浦果南 ab#1 | parser emits `restriction{cannot_wait_by_effect}`, but `execute_restriction` does not enforce wait-immunity |
 | CLEAN-G6 `PL!N-bp7-007-R＋` 優木せつ菜 ab#1 + `PL!N-bp7-026-L` Just Believe!!! ab#0 | unresolvable `dynamic_count` ("その差") |
-| CLEAN-G7 `PL!N-bp7-011-R＋` ミア・テイラー ab#0 | optional discard-cost + そうしたとき structure dropped |
-| CLEAN-G8 `PL!S-bp7-022-L` 恋になりたいAQUARIUM ab#0 | yell-from-bottom → both branches `custom` |
-| CLEAN-G9 `PL!S-bp7-012-N` 松浦果南 ab#0 | formation-change action dropped |
+| CLEAN-G8 (engine) `PL!S-bp7-022-L` 恋になりたいAQUARIUM ab#0 | parser emits `custom{yell_source_modifier, deck_bottom}` — engine support unverified |
 | CLEAN-G11 `PL!N-bp7-027-L` オードリー ab#0 | "more blade than all others" max-comparison missing |
 | CLEAN-G17 `PL!SP-bp7-016-N` 葉月 恋 ab#0 + `PL!SP-bp7-005-R＋` 葉月 恋 ab#1 | energy-placed trigger modeled as comparison, not `zone_change` |
 
 ## Recommended order (updated)
 
-1. Group B (B1–B6) — smallest field-gap fixes. **B1, B2, B4, B6 DONE (2026-08-05).**
+1. Group B (B1–B6) — smallest field-gap fixes. **B1–B6 DONE.**
 2. **CLEAN-G1** (6 abilities) — recurring `source:"hand"`→`deck_bottom`. **DONE (2026-08-05): parser + engine DeckBottom draw branch + optional-pay routing; tests in `bp7_deck_bottom_source_test.rs`.**
 3. **C4** (桜坂しずく ab#0) — under-member move + heart-copy. **DONE (2026-08-05): `_try_place_under_heart_copy` + `heart_copy` modifier; tests in `bp7_heart_copy_test.rs`.**
-4. CLEAN-G5 + D20 (4 abilities) — character-name conditions (`characters` array). **CLEAN-G5 DONE (2026-08-05): parser character extraction + `preceding_moved` condition/move source; tests in `bp7_character_name_condition_test.rs`. D20 (国木田花丸&優木せつ菜&嵐千砂都 triple-name cost) DONE (2026-08-05): compound 1-of-each + cost set-override; tests in `ll_bp7_001_triple_member_test.rs`.**
-5. Group C parser-only (C1, C2, C5–C9). **All DONE (2026-08-05/06).**
-6. **CLEAN-G13** (Like a Treasure ab#1). **DONE (2026-08-06): parser + engine `those_cards`/movement-condition/score-gate refactor; 9 real-gameplay tests in `bp7_like_a_treasure_optional_test.rs`.**
-7. **CLEAN-G16/G18** (未来の音 / エマ color-diversity). **DONE — JSON-shape tests replaced with real gameplay edge cases (5 each).**
-8. Next: CLEAN-G2/G3/G10/G12/G14/G15/G19 already DONE; remaining one-off fixes are **B3, B5, G4, G6, G7, G8, G9, G11, G17 (9 items)**.
-9. C3 + CLEAN-G17 (overlap / trigger-modeling) — the trigger-modeling half of G17 remains; C3 done.
+4. CLEAN-G5 + D20 (4 abilities) — character-name conditions (`characters` array). **DONE.**
+5. Group C parser-only (C1, C2, C5–C9). **All DONE.**
+6. **CLEAN-G13** (Like a Treasure ab#1). **DONE (2026-08-06): `those_cards`/movement-condition/score-gate refactor; 9 gameplay tests in `bp7_like_a_treasure_optional_test.rs`.**
+7. **CLEAN-G16/G18** (未来の音 / エマ color-diversity). **DONE — JSON-shape tests replaced with real gameplay edge cases.**
+8. **CLEAN-G7** (ミア ab#0). **DONE (2026-08-06): parser `_try_discard_hand_recover_self_optional` + engine `last_move_moved_any` gating; 5 gameplay tests in `bp7_mia_optional_recover_test.rs`.**
+9. **CLEAN-G9** (果南 ab#0). **DONE (2026-08-06): parser `この効果によって` gate + engine `all_members` any-group; 3 gameplay tests in `bp7_kanan_formation_change_test.rs`.**
+10. Next: **G4 engine enforcement** (wait-immunity), then **G11 blade-max comparison**, **G6 dynamic_count**, **G17 trigger-modeling**, **G8 yell-source engine**. These are engine-heavy.

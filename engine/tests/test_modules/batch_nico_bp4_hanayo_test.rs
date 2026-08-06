@@ -1,6 +1,38 @@
 /// Batch: remaining 1-QA cards with simple testable abilities
 use crate::helpers::*;
+use crate::test_modules::bp7_wait_immunity_helpers::*;
 use rabuka_engine::zones::MemberArea;
+
+/// にこ's debut wait is blocked by 松浦果南's wait-immunity on the opponent's member.
+#[test]
+fn nico_bp4_debut_wait_blocked_by_wait_immunity() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    // Player2 protects their 果南 (Aqours, blade 2).
+    let p2_kanan = p2_establish_wait_immunity(&mut game);
+    assert!(
+        game.state
+            .wait_immune_members
+            .iter()
+            .any(|(m, o)| *m == p2_kanan && o == "p2"),
+        "player2's 果南 should be protected"
+    );
+
+    // Player1 plays にこ → would wait an opponent (player2) active member.
+    let nico = game.id("PL!-bp4-009-R");
+    game.add_to_hand(nico);
+    game.give_energy(10);
+    game.play_to_stage(nico, MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert!(
+        !is_waited(&game, p2_kanan),
+        "にこ's opponent wait must be blocked by wait-immunity"
+    );
+}
 
 /// PL!-bp4-009-R (矢澤にこ) Q189: Debut — opponent chooses 1 of their own active members to wait.
 #[test]
