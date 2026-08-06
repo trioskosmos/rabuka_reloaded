@@ -42,6 +42,12 @@ pub struct Player {
 
     pub exclusion_zone: ExclusionZone,
 
+    /// G8: while a 恋になりたいAQUARIUM-style live card (custom
+    /// yell_source_modifier) is in this player's live/success zone, their yell
+    /// reveals from the deck BOTTOM instead of the top. Refreshed each
+    /// recalculate_constants by GameState::refresh_yell_sources.
+    pub yell_from_bottom: bool,
+
     // Rule 9.6.2.1.2.1: Track card IDs that moved from non-stage to stage this turn.
     // When checking if an area can be specified for playing a new member, resolve the
     // card currently in that area — if its ID is in this set, the area is locked.
@@ -88,6 +94,8 @@ impl Player {
             success_live_card_zone: SuccessLiveCardZone::new(),
 
             exclusion_zone: ExclusionZone::new(),
+
+            yell_from_bottom: false,
 
             deployed_this_turn: SmallVec::new(),
 

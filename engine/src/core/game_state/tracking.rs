@@ -39,11 +39,18 @@ impl GameState {
         }
 
         // Q104 / Rule 10.2.1: refresh from waitroom when deck runs out mid-draw.
+        let from_bottom = player.yell_from_bottom;
         for _ in 0..blade_count {
             if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
                 player.refresh();
             }
-            if let Some(card_id) = player.main_deck.draw() {
+            // G8: 恋になりたいAQUARIUM makes the yell reveal from the deck bottom.
+            let card_id = if from_bottom {
+                player.main_deck.draw_bottom()
+            } else {
+                player.main_deck.draw()
+            };
+            if let Some(card_id) = card_id {
                 self.resolution_zone.cards.push(card_id);
                 self.cheer_checks_done += 1;
             }

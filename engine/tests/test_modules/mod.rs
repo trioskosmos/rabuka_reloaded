@@ -34,6 +34,7 @@ pub mod bp7_mari_look_top_split_test;
 pub mod bp7_ginko_select_discard_deck_bottom_test;
 pub mod bp7_watanabe_under_card_blade_test;
 pub mod bp7_audrey_blade_max_test;
+pub mod bp7_aquarium_yell_source_test;
 pub mod bp7_setsuna_abilities_test;
 pub mod bp7_watanabe_select_self_and_other_test;
 pub mod bp7_like_a_treasure_optional_test;

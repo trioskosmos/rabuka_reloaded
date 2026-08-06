@@ -846,6 +846,8 @@ pub struct EffectFilter {
     pub or_ability_filters: Option<Box<Vec<AbilityFilterBranch>>>,
     pub energy_count: Option<u8>,
     pub any_number: Option<bool>,
+    pub custom_type: Option<ArcStr>,
+    pub yell_source: Option<ArcStr>,
     pub require_all_heart_colors: Option<bool>,
     pub heart_color_count: Option<u8>,
     pub value: Option<u8>,
@@ -1220,6 +1222,8 @@ impl AbilityEffect {
             or_ability_filters: None,
             energy_count: u8_field!("energy_count").or_else(|| u8_field!("energy")),
             any_number: bool_field!("any_number"),
+            custom_type: str_field!("custom_type"),
+            yell_source: str_field!("yell_source"),
             require_all_heart_colors: bool_field!("require_all_heart_colors"),
             heart_color_count: u8_field!("heart_color_count"),
             value: u8_field!("value"),
@@ -1490,6 +1494,9 @@ impl AbilityEffect {
     filter_opt_vec_ref_getter!(answers_any, answers);
 
     filter_bool_getter!(any_number_any, any_number);
+
+    filter_str_getter!(custom_type_any, custom_type);
+    filter_str_getter!(yell_source_any, yell_source);
 
     filter_u8_getter!(blade_limit_any, blade_limit);
     filter_bool_getter!(blade_limit_from_energy_under_any, blade_limit_from_energy_under);

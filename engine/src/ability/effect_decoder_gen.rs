@@ -141,6 +141,8 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "or_ability_filters" => { ek.or_ability_filters = bc.read_or_ability_filters_value(); return Some(true); }
             "energy_count" => { ek.energy_count = bc.read_u8_value(); return Some(true); }
             "any_number" => { ek.any_number = bc.read_bool_value(); return Some(true); }
+            "custom_type" => { ek.custom_type = bc.read_arc_str_value(); return Some(true); }
+            "yell_source" => { ek.yell_source = bc.read_arc_str_value(); return Some(true); }
             "require_all_heart_colors" => { ek.require_all_heart_colors = bc.read_bool_value(); return Some(true); }
             "heart_color_count" => { ek.heart_color_count = bc.read_u8_value(); return Some(true); }
             "value" => { ek.value = bc.read_u8_value(); return Some(true); }
@@ -223,6 +225,8 @@ pub(crate) struct EffectKindLocals {
     pub alternative_effect: Option<Box<AbilityEffect>>,
     pub answers: Option<Box<Vec<String>>>,
     pub any_number: Option<bool>,
+    pub custom_type: Option<ArcStr>,
+    pub yell_source: Option<ArcStr>,
     pub baton_touch_trigger: Option<bool>,
     pub blade_limit: Option<u8>,
     pub blade_limit_from_energy_under: Option<bool>,
@@ -448,6 +452,8 @@ fn build_filter(ek: &EffectKindLocals) -> EffectFilter {
         or_ability_filters: ek.or_ability_filters.clone(),
         energy_count: ek.energy_count.clone(),
         any_number: ek.any_number.clone(),
+        custom_type: ek.custom_type.clone(),
+        yell_source: ek.yell_source.clone(),
         require_all_heart_colors: ek.require_all_heart_colors.clone(),
         heart_color_count: ek.heart_color_count.clone(),
         value: ek.value.clone(),

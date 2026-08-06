@@ -607,6 +607,41 @@ impl GameState {
         tdbg!("RC:14 SUCCESS_ZONE");
         self.evaluate_success_zone_constant_modifiers();
         tdbg!("RC:14b SUCCESS_ZONE_DONE");
+        self.refresh_yell_sources();
+    }
+
+    /// G8: set each player's yell source from 常時 yell_source_modifier live cards
+    /// (e.g. 恋になりたいAQUARIUM "デッキの上から行う代わりにデッキの下から行う").
+    /// A live card in the live/success zone whose custom effect is
+    /// custom{yell_source_modifier, yell_source:deck_bottom} sets yell_from_bottom.
+    fn refresh_yell_sources(&mut self) {
+        let db = self.card_database.clone();
+        for player in [&mut self.player1, &mut self.player2] {
+            player.yell_from_bottom = false;
+            let cids: Vec<i16> = player
+                .live_card_zone
+                .cards
+                .iter()
+                .chain(player.success_live_card_zone.cards.iter())
+                .copied()
+                .collect();
+            for cid in cids {
+                let Some(card) = db.get_card(cid) else { continue };
+                let has_yell_bottom = card.abilities.iter().any(|ar| {
+                    let a = ar.resolve();
+                    a.triggers.as_ref().is_some_and(|t| {
+                        t.contains(crate::triggers::CONSTANT)
+                    }) && a.effect.as_ref().is_some_and(|e| {
+                        e.custom_type_any() == Some("yell_source_modifier")
+                            && e.yell_source_any().as_deref() == Some("deck_bottom")
+                    })
+                });
+                if has_yell_bottom {
+                    player.yell_from_bottom = true;
+                    break;
+                }
+            }
+        }
     }
 
     pub fn recalculate_constant_blade_modifiers(&mut self) {
