@@ -9323,6 +9323,94 @@ def _has_original_modifier(text):
     return "元々持つ" in text or "元々" in text
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# Field-propagation schema (single source of truth)
+# ─────────────────────────────────────────────────────────────────────────
+# The walkers below copy fields from parent context onto nested sub-actions
+# without knowing each action's semantics. That is fine for generic fields
+# (target, position, duration) but several fields are type-specific and must
+# only ever land on an action whose own text says so — otherwise they silently
+# change what the action targets (e.g. heart_colors on a move filters to one
+# color; card_type/group_names on gain_resource redirects to group members).
+#
+# _CONTEXT_FIELDS        : the generic fields we propagate from parent context.
+# _BLOCKED_FOR_ACTION    : action -> fields NEVER copied from context.
+# _OWN_TEXT_REQUIRED     : (action, field) -> the sub-action must mention the
+#                          field's subject in its own text, or the field is
+#                          dropped (parent-context inheritance would be wrong).
+#                          A callable value gets (sub, field_value) and returns
+#                          whether to allow propagation.
+# These tables are consulted by _clean_action_list AND _walk_extract_heart_colors
+# so a single edit fixes every propagation path (no more ad-hoc scattered guards).
+_CONTEXT_FIELDS = (
+    "exclude_self",
+    "exclude_by_name_source",
+    "all",
+    "target",
+    "position",
+    "activation_position",
+    "source_position",
+    "exclude_position",
+    "group_names",
+    "exclude_group_names",
+    "heart_colors",
+    "shuffle",
+    "optional",
+    "duration",
+    "count",
+)
+
+_BLOCKED_FOR_ACTION = {
+    # A gain's heart color is chosen by a preceding select; never inherit it.
+    # card_type also never propagates onto a gain (only when text targets it).
+    "gain_resource": {"heart_colors", "card_type"},
+    # Heart color on a move means "move cards OF this color"; never from context.
+    "move_cards": {"heart_colors"},
+}
+
+
+def _propagation_allowed(f, sub, parent_effect):
+    """Return True if parent field `f` may be copied onto sub-action `sub`."""
+    sub_action = sub.get("action")
+    # exclude_self never lands on self-targeting / resource-grant actions.
+    if f == "exclude_self" and (
+        sub.get("target") == "self"
+        or sub_action in ("gain_resource", "set_heart_type", "heart_selection", "modify_score")
+    ):
+        return False
+    # group_names on energy change_state is meaningless.
+    if (
+        f == "group_names"
+        and sub_action == "change_state"
+        and sub.get("card_type") == "energy_card"
+    ):
+        return False
+    # group_names on gain_resource only if the text targets the group explicitly.
+    if f == "group_names" and sub_action == "gain_resource":
+        return False
+    # group_names on specify_heart_color / reveal: no group filtering.
+    if f == "group_names" and sub_action in ("specify_heart_color", "reveal"):
+        return False
+    # group_names on modify_cost only for per-unit (needs the count filter).
+    if (
+        f == "group_names"
+        and sub_action == "modify_cost"
+        and not sub.get("per_unit")
+    ):
+        return False
+    # group_names / heart_colors on move_cards only if the move's own text
+    # mentions the subject (parent-context inheritance would mis-target the move).
+    if f == "group_names" and sub_action == "move_cards":
+        sub_text = sub.get("text", "")
+        return any(g in sub_text for g in parent_effect[f])
+    if f == "heart_colors" and sub_action == "move_cards":
+        sub_text = sub.get("text", "")
+        return "heart" in sub_text or "ハート" in sub_text or "色" in sub_text
+    if f in _BLOCKED_FOR_ACTION.get(sub_action, set()):
+        return False
+    return True
+
+
 def _clean_action_list(actions, parent_effect=None, parent_text=""):
     if not actions:
         return actions
@@ -9334,112 +9422,18 @@ def _clean_action_list(actions, parent_effect=None, parent_text=""):
         cleaned.append(a)
     if not cleaned:
         return actions[-1:] if actions else []
-    # Propagate fields from parent to each sub-action
+    # Propagate fields from parent to each sub-action (schema-driven).
     if parent_effect:
-        for f in (
-            "exclude_self",
-            "exclude_by_name_source",
-            "all",
-            "target",
-            "position",
-            "activation_position",
-            "source_position",
-            "exclude_position",
-            "group_names",
-            "exclude_group_names",
-            "heart_colors",
-            "shuffle",
-            "optional",
-            "duration",
-            "count",
-        ):
+        for f in _CONTEXT_FIELDS:
             if f in parent_effect:
                 for sub in cleaned:
-                    if f not in sub:
-                        # Don't propagate exclude_self to self-targeting
-                        # sub-actions — it's contradictory.
-                        if f == "exclude_self" and (
-                            sub.get("target") == "self"
-                            or sub.get("action")
-                            in (
-                                "gain_resource",
-                                "set_heart_type",
-                                "heart_selection",
-                                "modify_score",
-                            )
-                        ):
-                            continue
-                        # Don't propagate group_names to energy change_state actions
-                        if (
-                            f == "group_names"
-                            and sub.get("action") == "change_state"
-                            and sub.get("card_type") == "energy_card"
-                        ):
-                            continue
-                        # Don't propagate group_names to move_cards sub-actions
-                        # unless the group name appears in the sub-action's own text.
-                        # This prevents parent-context groups (e.g. "μ's", "Liella!")
-                        # from leaking into generic cost payments like
-                        # "手札を1枚控え室に置く" (discard any card).
-                        if f == "group_names" and sub.get("action") == "move_cards":
-                            sub_text = sub.get("text", "")
-                            if not any(g in sub_text for g in parent_effect[f]):
-                                continue
-                        # Don't propagate group_names to gain_resource sub-actions.
-                        # group_names should only appear on gain_resource when the
-                        # ability text explicitly says "Groupのメンバーにブレードを与える".
-                        # Leaked group_names cause the engine to distribute resources
-                        # to ALL matching group members instead of the activating card.
-                        if f == "group_names" and sub.get("action") == "gain_resource":
-                            continue
-                        # Don't propagate group_names to specify_heart_color or
-                        # reveal sub-actions — group filtering doesn't apply to
-                        # color selection or deck revelation (only to selection).
-                        if f == "group_names" and sub.get("action") in (
-                            "specify_heart_color",
-                            "reveal",
-                        ):
-                            continue
-                        # Don't propagate group_names to modify_cost sub-actions
-                        # UNLESS it's a per-unit cost modifier (which needs the
-                        # group filter to count the right cards on stage).
-                        # Leaked group_names on non-per-unit modify_cost would
-                        # cause the engine to apply cost changes to ALL matching
-                        # group members instead of just this card.
-                        if (
-                            f == "group_names"
-                            and sub.get("action") == "modify_cost"
-                            and not sub.get("per_unit")
-                        ):
-                            continue
-                        # Don't propagate heart_colors to gain_resource actions
-                        # (the heart color was selected by a previous select action)
-                        if f == "heart_colors" and sub.get("action") == "gain_resource":
-                            continue
-                        # Don't propagate heart_colors to move_cards sub-actions
-                        # unless the sub-action's own text references a heart color.
-                        # heart_colors on a move filters targets by heart color,
-                        # which breaks generic shuffle/placement moves (e.g. B6
-                        # "控え室のすべてのカードをシャッフルし、デッキの下に置く").
-                        if f == "heart_colors" and sub.get("action") == "move_cards":
-                            sub_text = sub.get("text", "")
-                            if not (
-                                "heart" in sub_text
-                                or "ハート" in sub_text
-                                or "色" in sub_text
-                            ):
-                                continue
+                    if f not in sub and _propagation_allowed(f, sub, parent_effect):
                         sub[f] = parent_effect[f]
         # Propagate card_type from parent to sub-actions that don't have it
         pt = parent_effect.get("card_type")
         if pt:
             for sub in cleaned:
-                if "card_type" not in sub:
-                    # Don't propagate card_type to gain_resource sub-actions.
-                    # card_type should only appear on gain_resource when the ability
-                    # text explicitly says "メンバーカードにブレードを与える".
-                    if sub.get("action") == "gain_resource":
-                        continue
+                if "card_type" not in sub and _propagation_allowed("card_type", sub, parent_effect):
                     sub["card_type"] = pt
         # Propagate cost_limit from parent to sub-actions
         cl = parent_effect.get("cost_limit")
@@ -9631,12 +9625,11 @@ def _walk_extract_heart_colors(d, d_text, ctx_text):
             search_text = d_text or ""
             # Actions with explicit heart_color (e.g. from character_effects)
             # should not inherit aggregate heart_colors from parent context.
-            # Blanket moves (all:true — e.g. "控え室のすべてのカードをシャッフルし
-            # デッキの下に置く") move EVERY card and must never inherit heart_colors
-            # from a parent's gain text, or the engine filters them to one color.
+            # Heart color is only inherited from context when the schema allows
+            # it for this action type (never for blanket/all moves or gains).
             if not re.search(r"heart_\d+", search_text) and ctx_text:
                 if not d.get("heart_color"):
-                    if not (d.get("action") == "move_cards" and d.get("all")):
+                    if _propagation_allowed("heart_colors", d, {"text": ctx_text}):
                         search_text = ctx_text
         hc = list(
             dict.fromkeys(
