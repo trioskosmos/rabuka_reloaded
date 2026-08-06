@@ -781,13 +781,12 @@ Fixed (parser + engine):
   (≥2 distinct blade-heart colors) requirement is lost; any 1 member card satisfies it.
   Compare Colorful Dreams ab#1 which correctly produced `unit:"types"`.
 
-### CLEAN-G19. Select excludes self for a "this member + 1 other" target
+### CLEAN-G19. Select excludes self for a "this member + 1 other" target — ✅ FIXED (parser)
 
 - D26 `PL!S-bp7-005-R＋` 渡辺 曜 ab#2 — "このメンバー**と**自分のステージにいるほかの『Aqours』のメンバー1人を選ぶ。それらが持つ登場能力それぞれ1つを発動させる。" →
-  the first select is `{source:"stage", count:1, exclude_self:true, group:Aqours}` (line 6406)
-  and the `activate_ability` count is 1. The text selects **this member plus one other** (two
-  targets) and activates *their* 登場 abilities; the JSON only ever targets the single non-self
-  member, so this member's 登場 ability would never fire.
+  the select was `{source:"stage", count:1, exclude_self:true, group:Aqours}` (only the other member) and the `activate_ability` also `exclude_self:true`, so this member's 登場 ability never fired.
+- **Fixed**: `_fix_select_self_and_other` (from `_normalize_effect_tree`) — when the effect text has "このメンバーと…を選ぶ", the `select` becomes `count:2` with `exclude_self` removed, and the follow-up `activate_ability` also drops `exclude_self` (so THIS member's 登場 ability is targeted too).
+- **Tests**: `bp7_watanabe_select_self_and_other_test.rs` (the select is over 2 candidates including this member).
 
 ## Full per-card verdict table (all 63)
 

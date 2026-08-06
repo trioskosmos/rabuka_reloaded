@@ -10084,6 +10084,29 @@ def _mark_under_card_gain(effect, text):
         effect["requires_under_card"] = True
 
 
+def _fix_select_self_and_other(effect):
+    """CLEAN-G19: 'このメンバーと…ほかの『X』のメンバー1人を選ぶ' — the select AND the
+    follow-up 登場-ability activation must include THIS member (not exclude_self)."""
+    if not isinstance(effect, dict):
+        return
+    root_text = effect.get("text", "") or ""
+    has_self_and = "このメンバーと" in root_text and "を選ぶ" in root_text
+
+    def walk(node):
+        if isinstance(node, dict):
+            if has_self_and and node.get("action") in ("select", "activate_ability"):
+                node.pop("exclude_self", None)
+                if node.get("action") == "select":
+                    node["count"] = 2
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(effect)
+
+
 def _normalize_effect_tree(effect, original_text=None):
     if not effect or not isinstance(effect, dict):
         return effect
@@ -10093,6 +10116,7 @@ def _normalize_effect_tree(effect, original_text=None):
     _enrich_gain_abilities(effect)
     _enrich_characters(effect)
     _clean_gain_resource(effect)
+    _fix_select_self_and_other(effect)
     src = original_text or effect.get("text", "") or ""
     _mark_under_card_gain(effect, src)
     # "『X』のメンバーからバトンタッチして登場した場合" — the baton-touch source group

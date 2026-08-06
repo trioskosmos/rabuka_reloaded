@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T18:21:44.805333",
+  "generated_at": "2026-08-06T18:33:20.443363",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "1ab1f216",
+  "engine_commit": "5ac050b6",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -6409,10 +6409,9 @@
           {
             "text": "このメンバーと自分のステージにいるほかの『Aqours』のメンバー1人を選ぶ",
             "source": "stage",
-            "count": 1,
+            "count": 2,
             "card_type": "member_card",
             "target": "self",
-            "exclude_self": true,
             "group_names": [
               "Aqours"
             ],
@@ -6427,7 +6426,6 @@
             "ability_text": "登場_ability",
             "count": 1,
             "multiple_targets": true,
-            "exclude_self": true,
             "activation_position": "center",
             "group_names": [
               "Aqours"
