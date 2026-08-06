@@ -84,7 +84,10 @@ specific rule described. `partial` = some adjacent mechanic is tested but the QA
 ## Q272 — Just Believe!!! PL!N-bp7-026-L ab#0 (ライブ開始時)
 > ライブ開始時：手札を2枚まで控え室に置いてもよい：自分のステージにいる『虹ヶ咲』のメンバーを、これにより控え室に置いたカードの枚数に等しい数まで選ぶ。ライブ終了時まで、それらはブレードを得る。
 - **QA rule**: the same member cannot be selected multiple times (no-repeat selection).
-- **Status**: **gap**. No test references `PL!N-bp7-026`.
+- **Status**: ✓ covered — `bp7_q272_just_believe_test.rs` (10 tests) drives ab#0 (Q272: discard-1 → 1 blade;
+  discard-2 → 2 distinct members each get 1; **1 member + discard 2 → exactly 1 blade (cannot select twice)**;
+  non-虹ヶ咲 not selectable; skip discard → no blade) and ab#1 (ライブ成功時: 2+ member cards without
+  blade-hearts among revealed → +1 score; 1 only / with-blade / mixed / live card → no score).
 
 ## Q273 — 渡辺 曜 PL!S-bp7-005-R＋ ab#2 (起動 センター)
 > 起動：手札を2枚控え室に置く：このメンバーと自分のステージにいるほかの『Aqours』のメンバー1人を選ぶ。それらが持つ登場能力それぞれ1つを発動させる。
@@ -167,7 +170,7 @@ cards (except Fire Bird) have no gameplay test.
 | Q270 | PL!N-bp7-020 エマ | ALL-heart not a blade-heart color | ✓ `bp7_emma_color_diversity_test` |
 | Q277 | PL!N-bp7-011 ミア | refresh before 自動 resolve | ✓ `bp7_q269_mia_yell_no_trigger_test` |
 | Q271 | PL!N-bp7-025 Colorful Dreams | blade-heart ≠ heart color (score) | ✓ `bp7_q271_colorful_dreams_test` |
-| Q272 | PL!N-bp7-026 Just Believe | no-repeat select | **gap** |
+| Q272 | PL!N-bp7-026 Just Believe | no-repeat select | ✓ `bp7_q272_just_believe_test` |
 | Q273 | PL!S-bp7-005 渡辺曜 | activated 登場 ability pays cost | partial |
 | Q274 | PL!S-bp7-003 松浦果南 | wait-immune member still selectable | **gap** |
 | Q275 | PL!S-bp7-003 松浦果南 | not a legal forced-wait choice | **gap** |

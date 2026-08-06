@@ -39,8 +39,9 @@ MANIFEST_REL = "../romfs/cards_manifest.json"
 TARGET_LONG = int(os.environ.get("RABUKA_CARD_RES", "192"))
 # Texture format for the .t3x atlases. ETC1/ETC1A4 are 4-bit-per-pixel GPU
 # formats the 3DS decodes natively (~4x smaller than rgba5551). Use
-# rgba5551 for maximum quality at the cost of size.
-TEX_FORMAT = os.environ.get("RABUKA_TEX_FMT", "auto-etc1")
+# rgba5551 for maximum quality at the cost of size. Forcing etc1 flattens
+# card alpha (fills transparency) for the smallest atlases.
+TEX_FORMAT = os.environ.get("RABUKA_TEX_FMT", "etc1")
 # ETC1 works on 4x4 blocks, so card sizes must be multiples of 4.
 BLOCK = 4
 # How many tex3ds jobs to run at once. tex3ds is single-threaded per file, so
@@ -51,6 +52,16 @@ CACHE_RES_MARKER = ".res"
 
 def align4(v: int) -> int:
     return max(BLOCK, (v // BLOCK) * BLOCK)
+
+
+def load_card_image(path: str) -> Image.Image:
+    """Open a source card image, and flatten alpha when the target format is
+    ETC1 (which has no alpha) so transparent regions don't encode as garbage."""
+    img = Image.open(path).convert("RGBA")
+    if TEX_FORMAT == "etc1":
+        bg = Image.new("RGBA", img.size, (0, 0, 0, 255))
+        img = Image.alpha_composite(bg, img).convert("RGB")
+    return img
 
 
 def resolve(path: str) -> str:
@@ -128,7 +139,7 @@ def convert_webp_to_png(src_dir: str, cache_dir: str) -> dict[str, list[str]]:
         if os.path.exists(dst) and os.path.getmtime(dst) >= os.path.getmtime(src):
             continue
 
-        img = Image.open(src).convert("RGBA")
+        img = load_card_image(src)
         w, h = img.size
 
         if w > h:
