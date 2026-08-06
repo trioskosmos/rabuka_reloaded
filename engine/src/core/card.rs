@@ -1123,11 +1123,27 @@ impl AbilityEffect {
                 .and_then(|v| v.as_str())
                 .map(|s| Box::new(EffectState::from_str(s))),
             distinct: None,
-            position: None,
+            position: obj.get("position").and_then(|v| match v {
+                serde_json::Value::String(s) if !s.is_empty() => {
+                    Some(Box::new(PositionInfo::String(s.clone())))
+                }
+                serde_json::Value::Object(m) => {
+                    let pos = m.get("position").and_then(|p| p.as_str()).map(String::from);
+                    let tgt = m.get("target").and_then(|t| t.as_str()).map(ArcStr::from);
+                    Some(Box::new(PositionInfo::Struct {
+                        position: pos.map(ArcStr::from),
+                        target: tgt,
+                    }))
+                }
+                _ => None,
+            }),
             negation: bool_field!("negation"),
             per_unit_heart_colors: str_vec_field!("per_unit_heart_colors").unwrap_or_default(),
             cost_limit: u8_field!("cost_limit"),
-            cost_limit_operator: None,
+            cost_limit_operator: obj
+                .get("cost_limit_operator")
+                .and_then(|v| v.as_str())
+                .and_then(parse_operator),
             blade_limit: u8_field!("blade_limit"),
             blade_limit_operator: obj
                 .get("blade_limit_operator")

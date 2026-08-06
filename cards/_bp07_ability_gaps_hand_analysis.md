@@ -266,19 +266,19 @@ Parsed:
 
 ## Group C — Structure bugs (parser emits wrong action or drops the effect)
 
-### C1. `PL!S-bp7-009-R` 黒澤ルビィ ab#0 — gap: [lose_resource] — ❌ effect becomes `custom`
+### C1. `PL!S-bp7-009-R` 黒澤ルビィ ab#0 — gap: [lose_resource] — ✅ FIXED (parser + engine + tests)
 
 Japanese:
 > 常時：このメンバーの正面のエリアにいるコスト4以下のメンバーは、ブレードを1つ**失う**。
 
 Parsed:
 ```json
-{"cost_limit":4,"cost_limit_operator":"<=","count":1,"card_type":"member_card",
- "position":"front","action":"custom"}
+{"action":"gain_resource","sign":"negative","resource":"blade","count":1,"cost_limit":4,"cost_limit_operator":"<=","position":"front"}
 ```
-- ✅ Target filter `position:front + cost_limit<=4` parsed.
-- ❌ **"ブレードを1つ失う" is not represented** → `action:"custom"`. No negative resource, no `lose_resource`. This is a continuous 常時 modifier (opponent's front, cost≤4 member loses 1 blade while this is out), so it needs a continuous negative blade modifier, not a one-shot.
-- Engine: `gain_resource` already supports negative amounts (`effects/misc.rs:1404` `blades_to_add = if is_negative`); blade modifiers exist via `add_blade_modifier_with_trace`. **Engine can apply it once the parser emits the effect.** → Parser-only fix (see full analysis for shape).
+- ✅ **Parser fix**: Un-indented `cost_limit` / `cost_limit_operator` extraction in `parser.py` and updated `_set_lose_resource_fields` so negative blade debuffs emit `action:"gain_resource"`, `sign:"negative"`, `cost_limit:4`, `cost_limit_operator:"<="`, `position:"front"`.
+- ✅ **Deserializer fix**: Updated `EffectFilter` position deserialization in `card.rs` and `cost_limit_operator` parsing in `AbilityEffect::from_value`.
+- ✅ **Engine fix**: Updated `recalculate_constant_blade_modifiers()` in `modifiers.rs` to handle `position: "front"` (targeting opponent mirrored slot `2 - slot_idx`) and `sign: "negative"`.
+- ✅ **Tests**: 9 unit tests passing in `bp7_ruby_front_blade_test.rs`.
 
 ### C2. `PL!N-bp7-005-R` 宮下 愛 ab#0 — gap: [under_member, energy_deck, distinct_name] — ❌ choice option broken
 
@@ -457,7 +457,7 @@ Parsed:
 | B4 | PL!SP-bp7-005-R＋ 葉月 恋 ab#0 | energy_deck | ✅ | DONE — OR (appearance | energy_zone→energy_deck) + no card_type on self-appearance; 11 tests |
 | B5 | PL!N-bp7-006-R＋ 近江彼方 ab#1 | card_property | ⚠️ | condition `location:"stage"` wrong (should be preceding_moved); live-card OR lost |
 | B6 | PL!N-bp7-028-L Cooking with Love ab#0 | under_member, card_property | ⚠️ | condition `location:"stage"` wrong (should be discard); live-card AND lost |
-| C1 | PL!S-bp7-009-R 黒澤ルビィ ab#0 | lose_resource | ❌ | blade-loss → `action:"custom"` |
+| C1 | PL!S-bp7-009-R 黒澤ルビィ ab#0 | lose_resource | ✅ | FIXED — parser emits `gain_resource` sign:negative, engine handles position:front targeting |
 | C2 | PL!N-bp7-005-R 宮下 愛 ab#0 | under_member, energy_deck, distinct_name | ❌ | choice option source/destination wrong (energy_deck→under_member) |
 | C3 | PL!SP-bp7-001-R 澁谷かのん ab#1 | under_member | ❌ | baton-touch re-place → `action:"custom"` |
 | C4 | PL!N-bp7-003-R＋ 桜坂しずく ab#0 | under_member, heart_copy | ✅ | DONE — sequential move→under + heart_copy (ref_value="placed_under") |

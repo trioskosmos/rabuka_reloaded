@@ -5817,25 +5817,25 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
                 action["actions"] = sub_actions
                 action.pop("card_type", None)
                 action.pop("multiple_targets", None)
-        if (
-            "cost_limit" not in action
-            and "cost_total" not in action
-            and "cost_limit_min" not in action
-        ):
-            cl = extract_cost_limit(text)
-            if cl:
-                action["cost_limit"] = cl
-                if "cost_limit_operator" not in action:
-                    if "以下" in text:
-                        action["cost_limit_operator"] = "<="
-                    elif "以上" in text:
-                        action["cost_limit_operator"] = ">="
-                    elif "未満" in text:
-                        action["cost_limit_operator"] = "<"
-                    elif "より大きい" in text:
-                        action["cost_limit_operator"] = ">"
-                    else:
-                        action["cost_limit_operator"] = "="
+    if (
+        "cost_limit" not in action
+        and "cost_total" not in action
+        and "cost_limit_min" not in action
+    ):
+        cl = extract_cost_limit(text)
+        if cl:
+            action["cost_limit"] = cl
+            if "cost_limit_operator" not in action:
+                if "以下" in text:
+                    action["cost_limit_operator"] = "<="
+                elif "以上" in text:
+                    action["cost_limit_operator"] = ">="
+                elif "未満" in text:
+                    action["cost_limit_operator"] = "<"
+                elif "より大きい" in text:
+                    action["cost_limit_operator"] = ">"
+                else:
+                    action["cost_limit_operator"] = "="
     # OR card types for ALL action types (not just move_cards/select)
     if a not in ("move_cards", "select") and "or_card_types" not in action:
         card_type_kws = [
@@ -8704,6 +8704,10 @@ def _set_lose_resource_fields(text, result):
         result["all"] = True
     if "ライブ終了時まで" in text:
         result["duration"] = "live_end"
+    cl_op = extract_cost_limit_with_operator(text)
+    if cl_op:
+        result["cost_limit"] = cl_op[0]
+        result["cost_limit_operator"] = cl_op[1]
 
 
 _try_lose_resource = EffectPattern(

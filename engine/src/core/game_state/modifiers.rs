@@ -617,6 +617,7 @@ impl GameState {
             })
             .collect();
 
+
         let mut expected: HashMap<i16, i16> = HashMap::default();
         {
             let ctx = crate::ability::condition::ConditionContext::new(self);
@@ -633,6 +634,7 @@ impl GameState {
                     .condition
                     .as_ref()
                     .is_none_or(|c| ctx.evaluate_condition(c));
+
                 if cond_met {
                     let count = if effect.per_unit_any().unwrap_or(false) {
                         let player = if self.player1.stage.stage.contains(&cid) {
@@ -680,7 +682,61 @@ impl GameState {
                             .unwrap_or(effect.count_any().unwrap_or(1))
                             as i32
                     };
-                    *expected.entry(cid).or_insert(0) += count as i16;
+                    let sign_mult: i16 = if matches!(
+                        effect.sign_any().as_deref(),
+                        Some("negative") | Some("-")
+                    ) {
+                        -1
+                    } else {
+                        1
+                    };
+                    let delta = (count as i16) * sign_mult;
+
+                    let is_front = effect
+                        .position_any()
+                        .as_ref()
+                        .and_then(|p| p.get_position())
+                        == Some("front");
+                    let target_ids = if is_front {
+                        let (is_p1, slot_idx) = if let Some(pos) =
+                            self.player1.stage.stage.iter().position(|&x| x == cid)
+                        {
+                            (true, pos)
+                        } else if let Some(pos) =
+                            self.player2.stage.stage.iter().position(|&x| x == cid)
+                        {
+                            (false, pos)
+                        } else {
+                            (true, 999)
+                        };
+                        if slot_idx < 3 {
+                            let opp_stage = if is_p1 {
+                                &self.player2.stage.stage
+                            } else {
+                                &self.player1.stage.stage
+                            };
+                            let opp_slot = 2 - slot_idx;
+                            let opp_cid = opp_stage[opp_slot];
+                            if opp_cid != -1 {
+                                let filter = effect.filter_subset();
+                                if filter.matches(&self.card_database, opp_cid, false) {
+                                    vec![opp_cid]
+                                } else {
+                                    vec![]
+                                }
+                            } else {
+                                vec![]
+                            }
+                        } else {
+                            vec![]
+                        }
+                    } else {
+                        vec![cid]
+                    };
+
+                    for tid in target_ids {
+                        *expected.entry(tid).or_insert(0) += delta;
+                    }
                 }
             }
         }

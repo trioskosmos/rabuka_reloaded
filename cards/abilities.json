@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T16:32:42.878675",
+  "generated_at": "2026-08-06T16:38:49.443854",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "bdfb6bae",
+  "engine_commit": "e5f16537",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -21363,6 +21363,8 @@
         "sign": "negative",
         "resource": "blade",
         "count": 1,
+        "cost_limit": 4,
+        "cost_limit_operator": "<=",
         "position": "front"
       }
     },
