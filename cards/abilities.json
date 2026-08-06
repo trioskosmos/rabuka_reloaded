@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T23:02:40.319345",
+  "generated_at": "2026-08-06T23:36:26.725907",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "f75a13e3",
+  "engine_commit": "e57e3170",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -4905,8 +4905,8 @@
           "type": "movement_condition",
           "text": "自分のカードの効果によって、このメンバーがエリアを移動するか自分のエネルギー置き場にエネルギーが置かれたとき",
           "trigger_event": {
-            "type": "area_move",
-            "tense": "nonpast",
+            "type": "energy_placed",
+            "tense": "past",
             "self_effect_only": true,
             "energy_placed": true
           },
@@ -7180,12 +7180,18 @@
       "effect": {
         "text": "自分のカードの効果によって、自分のエネルギー置き場にエネルギーが置かれたとき、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る",
         "condition": {
+          "type": "movement_condition",
           "text": "自分のカードの効果によって、自分のエネルギー置き場にエネルギーが置かれたとき",
+          "trigger_event": {
+            "type": "energy_placed",
+            "tense": "past",
+            "self_effect_only": true,
+            "energy_placed": true
+          },
+          "movement": "moves",
           "target": "self",
           "location": "energy_zone",
-          "resource_type": "energy",
-          "movement": "moved",
-          "type": "comparison_condition"
+          "resource_type": "energy"
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -21566,13 +21572,17 @@
       "effect": {
         "text": "自分のエネルギー置き場にあるエネルギーがメンバーの下に置かれたとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
         "condition": {
+          "type": "movement_condition",
           "text": "自分のエネルギー置き場にあるエネルギーがメンバーの下に置かれたとき",
+          "trigger_event": {
+            "type": "energy_placed",
+            "tense": "past"
+          },
+          "movement": "moves",
           "target": "self",
           "location": "energy_zone",
           "resource_type": "energy",
-          "card_type": "member_card",
-          "movement": "moved",
-          "type": "comparison_condition"
+          "card_type": "member_card"
         },
         "source": "energy_deck",
         "destination": "energy_zone",
@@ -37565,12 +37575,18 @@
       "effect": {
         "text": "自分のカードの効果によって、自分のエネルギー置き場にエネルギーが置かれたとき、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る",
         "condition": {
+          "type": "movement_condition",
           "text": "自分のカードの効果によって、自分のエネルギー置き場にエネルギーが置かれたとき",
+          "trigger_event": {
+            "type": "energy_placed",
+            "tense": "past",
+            "self_effect_only": true,
+            "energy_placed": true
+          },
+          "movement": "moves",
           "target": "self",
           "location": "energy_zone",
-          "resource_type": "energy",
-          "movement": "moved",
-          "type": "comparison_condition"
+          "resource_type": "energy"
         },
         "action": "gain_resource",
         "resource": "blade",

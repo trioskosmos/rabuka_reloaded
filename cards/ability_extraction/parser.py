@@ -4032,11 +4032,34 @@ def _try_either_target(text):
 def _try_movement(text):
     """Area movement event: member moved between areas on stage.
     E.g. このメンバーがエリアを移動したとき (this member moved areas).
+    Also handles G17: "エネルギーが置かれたとき" (energy placed into the zone,
+    past-tense, no から/source) — an event-based auto trigger that must fire
+    only on the actual placement. e.g. "自分のカードの効果によって、自分の
+    エネルギー置き場にエネルギーが置かれたとき". Past-tense 置かれた only:
+    "置かれるたび" (each_time, hazuki PL!SP-bp4-016-N) stays a comparison_condition
+    gated by the each_time scan gate, and "から...に置かれた" (zone_change) is
+    handled by _try_zone_placement.
     """
-    if "移動した" not in text and "移動している" not in text and "移動する" not in text:
+    # G17: energy placed INTO the zone, past-tense, no source zone.
+    is_energy_placed = (
+        "エネルギー" in text and "置かれた" in text and "から" not in text
+    )
+    if not (
+        is_energy_placed
+        or "移動した" in text
+        or "移動している" in text
+        or "移動する" in text
+    ):
         return None
-    tense = "past" if ("移動した" in text or "移動している" in text) else "nonpast"
-    te_data: Dict[str, Any] = {"type": "area_move", "tense": tense}
+    tense = (
+        "past"
+        if (is_energy_placed or "移動した" in text or "移動している" in text)
+        else "nonpast"
+    )
+    te_data: Dict[str, Any] = {
+        "type": "energy_placed" if is_energy_placed else "area_move",
+        "tense": tense,
+    }
     if "たび" in text:
         te_data["recurrence"] = "each_time"
     is_future = (
@@ -4047,13 +4070,16 @@ def _try_movement(text):
         "text": text,
         "trigger_event": te_data,
         "movement": "moves"
-        if is_future
+        if (is_future or is_energy_placed)
         else None,  # placeholder, set after generic fields
     }
     _extract_generic_fields(result, text)
     # Override movement: _extract_generic_fields may set "moved" from "置かれた"
-    # patterns, but _try_movement handles area moves, not zone placements.
-    result["movement"] = "moves" if is_future else "position_change"
+    # patterns, but _try_movement handles area moves / energy placement, not
+    # generic zone placements. Energy-placed and future area moves use "moves".
+    result["movement"] = (
+        "moves" if (is_future or is_energy_placed) else "position_change"
+    )
     # Extract position (センター/左サイド/右サイド) and direction.
     # "センターエリアにいるメンバーがエリアを移動" → position=center, area_direction=from
     # "メンバーがセンターエリアに移動"               → position=center, area_direction=to

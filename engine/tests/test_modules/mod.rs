@@ -47,6 +47,7 @@ pub mod bp7_cooking_with_love_test;
 pub mod bp7_karin_dynamic_blade_wait_test;
 pub mod bp7_under_member_per_unit_blade_test;
 pub mod bp7_ren_both_trigger_test;
+pub mod bp7_ren_energy_placed_gain_blade_test;
 pub mod bp7_ruby_front_blade_test;
 pub mod bring_love_test;
 pub mod butterfly_wing_suppress_test;
