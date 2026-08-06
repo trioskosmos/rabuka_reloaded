@@ -632,7 +632,7 @@ impl GameState {
                     a.triggers.as_ref().is_some_and(|t| {
                         t.contains(crate::triggers::CONSTANT)
                     }) && a.effect.as_ref().is_some_and(|e| {
-                        e.custom_type_any() == Some("yell_source_modifier")
+                        e.action == crate::ability::enums::ActionType::ModifyYellSource
                             && e.yell_source_any().as_deref() == Some("deck_bottom")
                     })
                 });

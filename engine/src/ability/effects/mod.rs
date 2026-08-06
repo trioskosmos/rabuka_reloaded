@@ -378,6 +378,9 @@ impl AbilityResolver {
             }
             ActionType::Custom => self.execute_custom(gs, effect, action_str),
             ActionType::DoNothing => Ok(()),
+            // G8: yell-source is a 常時 modifier, applied by refresh_yell_sources
+            // during recalculate_constants — nothing to execute as a one-shot.
+            ActionType::ModifyYellSource => Ok(()),
 
             ActionType::SpecifyHeartColor => {
                 self.execute_specify_heart_color(gs, effect);

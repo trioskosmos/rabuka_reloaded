@@ -6728,9 +6728,8 @@ def _propagate(src, dst, skip_existing=False):
 
 def _try_yell_source_modifier(text):
     """エールは、デッキの上から行う代わりにデッキの下から行う — modifies where the
-    player's yell draws from. The engine has no yell-source mechanic yet, so emit a
-    typed custom (rendered from raw text) instead of misreading it as a conditional
-    alternative. `custom_type`/`yell_source` let analysis tooling find this gap."""
+    player's yell draws from. Emits a first-class modify_yell_source action with a
+    `yell_source` field the engine decodes and applies during the cheer reveal."""
     if "エール" not in text or "代わりに" not in text or "行う" not in text:
         return None
     if "デッキの上から" not in text and "デッキの下から" not in text:
@@ -6741,8 +6740,7 @@ def _try_yell_source_modifier(text):
         return None
     return {
         "text": text,
-        "action": "custom",
-        "custom_type": "yell_source_modifier",
+        "action": "modify_yell_source",
         "yell_source": "deck_bottom"
         if "デッキの下から" in text or "山札の下から" in text
         else "deck_top",

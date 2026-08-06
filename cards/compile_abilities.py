@@ -465,6 +465,7 @@ def compile_all(abilities):
         "choose_required_hearts": 13,
         "perform_yell": 13,
         "modify_yell_count": 13,
+        "modify_yell_source": 14,
         "custom": 14,
         "do_nothing": 14,
         "action_by": 14,

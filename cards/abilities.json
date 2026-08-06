@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T23:36:26.725907",
+  "generated_at": "2026-08-07T00:17:34.963502",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "e57e3170",
+  "engine_commit": "7b9a7a74",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -21512,8 +21512,7 @@
       "cost": null,
       "effect": {
         "text": "自分のエールは、デッキの上から行う代わりにデッキの下から行う",
-        "action": "custom",
-        "custom_type": "yell_source_modifier",
+        "action": "modify_yell_source",
         "yell_source": "deck_bottom"
       }
     },

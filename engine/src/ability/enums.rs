@@ -146,6 +146,7 @@ pub enum ActionType {
 
     // Cost modifications
     ModifyCost,
+    ModifyYellSource,
     SetCost,
     SetCostToUse,
 
@@ -242,6 +243,7 @@ impl ActionType {
             "modify_score" => Some(ActionType::ModifyScore),
             "modify_required_hearts" => Some(ActionType::ModifyRequiredHearts),
             "modify_cost" => Some(ActionType::ModifyCost),
+            "modify_yell_source" => Some(ActionType::ModifyYellSource),
             "set_cost" => Some(ActionType::SetCost),
             "set_card_identity" => Some(ActionType::SetCardIdentity),
             "set_cost_to_use" => Some(ActionType::SetCostToUse),
@@ -316,6 +318,7 @@ impl ActionType {
             ActionType::ModifyScore => "modify_score",
             ActionType::ModifyRequiredHearts => "modify_required_hearts",
             ActionType::ModifyCost => "modify_cost",
+            ActionType::ModifyYellSource => "modify_yell_source",
             ActionType::SetCost => "set_cost",
             ActionType::SetCardIdentity => "set_card_identity",
             ActionType::SetCostToUse => "set_cost_to_use",
@@ -388,6 +391,7 @@ impl ActionType {
             ActionType::ActivateAbility => "Activate Ability",
             ActionType::ModifyScore => "Modify Score",
             ActionType::ModifyRequiredHearts => "Modify Required Hearts",
+            ActionType::ModifyYellSource => "Modify Yell Source",
             ActionType::ModifyCost => "Modify Cost",
             ActionType::SetCost => "Set Cost",
             ActionType::SetCostToUse => "Set Cost to Use",
