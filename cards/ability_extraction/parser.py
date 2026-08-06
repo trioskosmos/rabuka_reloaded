@@ -9513,13 +9513,37 @@ _register_effect_rule(
         setter=lambda t, r: _fill_defaults(r, t),
     )
 )
+# Q266: dynamic blade-limit wait referenced to the COSTED member —
+# "元々持つブレードの数がこれによりウェイトにしたメンバーが元々持つブレードの数より2つ以上
+# 少ないメンバー1人をウェイトにする". Limit = (original blade of the member paid as the wait
+# cost) − 2, computed at resolution time. "2つ以上少ない" = at most that many fewer → <=.
+_register_effect_rule(
+    EffectPattern(
+        match_all=[
+            "これによりウェイトにしたメンバー",
+            "より",
+            "以上少ないメンバー",
+        ],
+        action="change_state",
+        defaults={
+            "state_change": "wait",
+            "count": 1,
+            "card_type": "member_card",
+            "target": "opponent",
+            "original_value": True,
+            "blade_limit_from_cost_member": True,
+            "blade_limit_offset": 2,
+            "blade_limit_operator": "<=",
+            "source": None,
+        },
+        setter=lambda t, r: _fill_defaults(r, t),
+    )
+)
 
 
 def _set_both_hand_keep_shuffle_under(t: str, r: Dict[str, Any]) -> None:
     """C6: 自分と相手はそれぞれ、手札のカードをN枚まで選び、選んだカード以外を
     シャッフルして自身のデッキの下に置く。その後、それぞれカードをN枚引く。
-
-    Emits:
       select (hand, both, count=N, max, keep_shuffle_under)  keep up to N,
               shuffle the REST under own deck (handled by the engine)
       draw   (deck -> hand, both, count=N)

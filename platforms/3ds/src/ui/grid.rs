@@ -152,8 +152,38 @@ pub fn render_card_grid(
     }
 }
 
+/// Draw a card portrait image at (x, y) with the given width/height.
 #[cfg(feature = "3ds")]
-pub fn render_card_detail(card_id: i16, card_db: &CardDatabase, scroll_y: f32) {
+pub fn draw_card_image(
+    card_no: &str,
+    atlas: &CardAtlas,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+) {
+    if let Some((atl, idx)) = atlas.lookup(card_no) {
+        let c_str = std::ffi::CString::new(atl.as_bytes()).unwrap_or_default();
+        unsafe {
+            _3ds_top_queue_card(
+                c_str.as_ptr() as *const u8,
+                *idx as i32,
+                x,
+                y,
+                w,
+                h,
+            );
+        }
+    }
+}
+
+#[cfg(feature = "3ds")]
+pub fn render_card_detail(
+    card_id: i16,
+    card_db: &CardDatabase,
+    atlas: &CardAtlas,
+    scroll_y: f32,
+) {
     if let Some(card) = card_db.get_card(card_id) {
         let total_blade = card.blade as i32;
         let score = card.score.unwrap_or(0) as i32;
@@ -186,9 +216,21 @@ pub fn render_card_detail(card_id: i16, card_db: &CardDatabase, scroll_y: f32) {
             cost,
             is_tapped: false,
         };
+
+        // Layout: 400x240 top screen. Header bar spans full width; the card
+        // portrait fills the left column (nearly the full height below the
+        // header) and the ability text sits in the right column.
+        const HEADER_H: f32 = 40.0;
+        let card_h = 240.0 - HEADER_H - 12.0; // ~188px tall
+        let card_w = card_h * 0.711; // ~134px portrait
+        let card_x = 6.0;
+        let card_y = HEADER_H + 6.0; // 46
+        let text_x = card_x + card_w + 10.0; // ~150
+        let text_w = 400.0 - text_x - 6.0; // ~244
+
         unsafe {
             _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-            _3ds_top_queue_rect(0.0, 0.0, 400.0, 40.0, COL_CARD);
+            _3ds_top_queue_rect(0.0, 0.0, 400.0, HEADER_H, COL_CARD);
             let display_name = i18n::card_display_name(&card.name, current_lang());
             _3ds_top_queue_text(
                 4.0,
@@ -212,18 +254,22 @@ pub fn render_card_detail(card_id: i16, card_db: &CardDatabase, scroll_y: f32) {
                 COL_LIGHT,
                 0.65f32,
             );
-            // Scrollable ability text area (below the 40px header)
-            _3ds_top_queue_rect(0.0, 40.0, 400.0, 200.0, COL_CARD);
-            let mut ty = 44.0 - scroll_y;
+            // Content background below the header
+            _3ds_top_queue_rect(0.0, HEADER_H, 400.0, 240.0 - HEADER_H, COL_CARD);
+            // Card portrait (left column)
+            _3ds_top_queue_rect(card_x - 2.0, card_y - 2.0, card_w + 4.0, card_h + 4.0, COL_GOLD);
+            draw_card_image(&card.card_no, atlas, card_x, card_y, card_w, card_h);
+            // Scrollable ability text (right column)
+            let mut ty = card_y - scroll_y;
             let abs: Vec<_> = card.resolved_abilities().collect();
             if abs.is_empty() {
                 let raw = card.ability_text();
                 if !raw.is_empty() {
                     let clean = raw.replace('\n', " ");
-                    let w = wrap_ability_text(&clean, 392.0, 0.65);
+                    let w = wrap_ability_text(&clean, text_w, 0.65);
                     for line in w.lines() {
                         if ty > -20.0 && ty < 240.0 {
-                            render_text_with_icons(4.0, ty, line, COL_LIGHT, 0.65);
+                            render_text_with_icons(text_x, ty, line, COL_LIGHT, 0.65);
                         }
                         ty += 18.0;
                     }
@@ -231,10 +277,10 @@ pub fn render_card_detail(card_id: i16, card_db: &CardDatabase, scroll_y: f32) {
             } else {
                 for ab in abs {
                     let ab_text = i18n::translate_ability(&ab.full_text, current_lang());
-                    let w = wrap_ability_text(&ab_text, 392.0, 0.65);
+                    let w = wrap_ability_text(&ab_text, text_w, 0.65);
                     for line in w.lines() {
                         if ty > -20.0 && ty < 240.0 {
-                            render_text_with_icons(4.0, ty, line, COL_LIGHT, 0.65);
+                            render_text_with_icons(text_x, ty, line, COL_LIGHT, 0.65);
                         }
                         ty += 18.0;
                     }
@@ -242,11 +288,12 @@ pub fn render_card_detail(card_id: i16, card_db: &CardDatabase, scroll_y: f32) {
                 }
             }
             // Scroll indicator if content extends beyond screen
+            let arrow_x = 400.0 - 18.0;
             if ty > 220.0 {
-                _3ds_top_queue_text(380.0, 225.0, COL_MED, 0.50f32, format!("v\0").as_ptr());
+                _3ds_top_queue_text(arrow_x, 225.0, COL_MED, 0.50f32, format!("v\0").as_ptr());
             }
             if scroll_y > 0.0 {
-                _3ds_top_queue_text(380.0, 42.0, COL_MED, 0.50f32, format!("^\0").as_ptr());
+                _3ds_top_queue_text(arrow_x, 42.0, COL_MED, 0.50f32, format!("^\0").as_ptr());
             }
         }
     }

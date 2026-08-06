@@ -43,21 +43,28 @@ echo [4/7] cards.bin + abilities.json ready
 
 copy /Y "%~dp0..\..\web_ui\decks\*.txt" "%~dp0romfs\decks\" >nul
 
-echo [4/7] Card images...
-dir /b "%~dp0romfs\cards\*.t3x" >nul 2>nul
-if errorlevel 1 (
-    echo [4/7] Converting card images...
-    if exist "%~dp0..\..\web_ui\img\cards_webp\*.webp" (
-        cd /d "%~dp0"
-        where python3 >nul 2>&1
+echo [4/7] Card images (incremental atlas build)...
+if exist "%~dp0..\..\web_ui\img\cards_webp\*.webp" (
+    cd /d "%~dp0"
+    where python3 >nul 2>&1
+    if !errorlevel! equ 0 (
+        python3 -c "import PIL" >nul 2>&1
         if !errorlevel! equ 0 (
-            python scripts/convert_cards.py
+            python3 scripts/convert_cards.py
         ) else (
-            echo [WARN] python3 not found - skipping card image conversion
+            echo [WARN] python3 has no Pillow - trying py...
+            where py >nul 2>&1
+            if !errorlevel! equ 0 (
+                py scripts/convert_cards.py
+            ) else (
+                echo [WARN] No python with Pillow found - skipping card image conversion
+            )
         )
+    ) else (
+        echo [WARN] python3 not found - skipping card image conversion
     )
 ) else (
-    echo [4/7] Card images already converted
+    echo [WARN] No card webp images found - skipping card image conversion
 )
 
 echo [5/7] Building 3DS binary...

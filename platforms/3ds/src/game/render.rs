@@ -16,7 +16,7 @@ use crate::lang::{current_lang, tl};
 use crate::net::mp_can_act;
 use crate::ui::card_atlas::CardAtlas;
 use crate::ui::colors::*;
-use crate::ui::grid::{render_card_detail, render_card_grid};
+use crate::ui::grid::{draw_card_image, render_card_detail, render_card_grid};
 use crate::ui::hint::render_hint_bar;
 use crate::ui::text::*;
 use crate::util::{cn_or_empty, tl_area};
@@ -428,7 +428,7 @@ pub(crate) fn render_board(
                     atlas,
                 );
             } else {
-                render_card_detail(viewing_card.unwrap(), &gs.card_database, detail_scroll_y);
+                render_card_detail(viewing_card.unwrap(), &gs.card_database, atlas, detail_scroll_y);
             }
         } else if detail_mode {
             // L pressed: show full ability text overlay
@@ -517,43 +517,52 @@ pub(crate) fn render_board(
                         let panel_end = (text_h.max(min_h) + 8.0).min(232.0);
                         let _rect_h = panel_end - 52.0;
 
+                        // Layout below the 50px game header: card portrait fills
+                        // the left column, ability text in the right column.
+                        let card_h = 240.0 - 56.0 - 10.0; // ~174px tall
+                        let card_w = card_h * 0.711; // ~124px portrait
+                        let card_x = 6.0;
+                        let card_y = 56.0;
+                        let text_x = card_x + card_w + 10.0; // ~140
+                        let text_w = 400.0 - text_x - 8.0; // ~252
+
                         unsafe {
-                            // Background for scrollable area
+                            // Background for the detail area
                             _3ds_top_queue_rect(0.0, 52.0, 400.0, 188.0, COL_CARD);
-                            // Scrollable ability text
-                            let mut ty = 86.0 - detail_scroll_y;
-                            for ab in card.resolved_abilities() {
-                                let ab_text =
-                                    i18n::translate_ability(&ab.full_text, current_lang());
-                                let w = wrap_ability_text(&ab_text, 392.0, 0.65);
-                                for line in w.lines() {
-                                    if ty > -20.0 && ty < 240.0 {
-                                        render_text_with_icons(4.0, ty, line, COL_LIGHT, 0.65);
-                                    }
-                                    ty += 18.0;
-                                }
-                                ty += 3.0;
-                            }
-                            ability_end = ty;
-                            // Header overlay on top: covers name + stats, clips scrolling text
-                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 86.0, COL_TOP_BG);
+                            // Card portrait (left column)
+                            _3ds_top_queue_rect(
+                                card_x - 2.0,
+                                card_y - 2.0,
+                                card_w + 4.0,
+                                card_h + 4.0,
+                                COL_GOLD,
+                            );
+                            draw_card_image(
+                                &card.card_no,
+                                atlas,
+                                card_x,
+                                card_y,
+                                card_w,
+                                card_h,
+                            );
+                            // Name + stats at top of right column
                             let display_name = i18n::card_display_name(&card.name, current_lang());
                             _3ds_top_queue_text(
-                                4.0,
-                                44.0,
+                                text_x,
+                                card_y - 2.0,
                                 COL_BLUE,
                                 0.80f32,
                                 format!(
                                     "[{}] {}\0",
                                     card.card_no,
-                                    wrap_text(&display_name, 392.0, 0.80)
+                                    wrap_text(&display_name, text_w, 0.80)
                                 )
                                 .as_ptr(),
                             );
                             let stats = compute_card_stats(card, cid, gs);
                             render_text_with_icons(
-                                4.0,
-                                66.0,
+                                text_x,
+                                card_y + 20.0,
                                 &card_stat_line(
                                     stats.total_blade,
                                     &stats.heart_str,
@@ -566,6 +575,41 @@ pub(crate) fn render_board(
                                 COL_LIGHT,
                                 0.65f32,
                             );
+                            // Scrollable ability text (right column)
+                            let mut ty = card_y + 40.0 - detail_scroll_y;
+                            for ab in card.resolved_abilities() {
+                                let ab_text =
+                                    i18n::translate_ability(&ab.full_text, current_lang());
+                                let w = wrap_ability_text(&ab_text, text_w, 0.65);
+                                for line in w.lines() {
+                                    if ty > -20.0 && ty < 240.0 {
+                                        render_text_with_icons(text_x, ty, line, COL_LIGHT, 0.65);
+                                    }
+                                    ty += 18.0;
+                                }
+                                ty += 3.0;
+                            }
+                            ability_end = ty;
+                            // Scroll indicators (right edge)
+                            let arrow_x = 400.0 - 18.0;
+                            if ty > 228.0 {
+                                _3ds_top_queue_text(
+                                    arrow_x,
+                                    228.0,
+                                    COL_MED,
+                                    0.50f32,
+                                    format!("v\0").as_ptr(),
+                                );
+                            }
+                            if detail_scroll_y > 0.0 {
+                                _3ds_top_queue_text(
+                                    arrow_x,
+                                    56.0,
+                                    COL_MED,
+                                    0.50f32,
+                                    format!("^\0").as_ptr(),
+                                );
+                            }
                         }
                     }
                 }

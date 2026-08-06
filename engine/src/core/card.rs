@@ -784,6 +784,9 @@ pub struct EffectFilter {
     /// Dynamic blade limit: when set, the effective blade_limit is
     /// (energy cards under the activating member) + blade_limit_offset (C5).
     pub blade_limit_from_energy_under: Option<bool>,
+    /// Dynamic blade limit referenced to the member paid as a wait cost:
+    /// effective blade_limit = (original blade of the member waited as the cost) + offset.
+    pub blade_limit_from_cost_member: Option<bool>,
     /// The addend used when `blade_limit_from_energy_under` is set (the
     /// "1を足した数" +N in the text), so the JSON makes the +N explicit.
     pub blade_limit_offset: Option<u8>,
@@ -1155,6 +1158,7 @@ impl AbilityEffect {
                 .and_then(|v| v.as_str())
                 .and_then(parse_operator),
             blade_limit_from_energy_under: bool_field!("blade_limit_from_energy_under"),
+            blade_limit_from_cost_member: bool_field!("blade_limit_from_cost_member"),
             blade_limit_offset: u8_field!("blade_limit_offset"),
             keep_shuffle_under: bool_field!("keep_shuffle_under"),
             need_heart_color: str_field!("need_heart_color"),
@@ -1500,6 +1504,7 @@ impl AbilityEffect {
 
     filter_u8_getter!(blade_limit_any, blade_limit);
     filter_bool_getter!(blade_limit_from_energy_under_any, blade_limit_from_energy_under);
+    filter_bool_getter!(blade_limit_from_cost_member_any, blade_limit_from_cost_member);
     filter_u8_getter!(blade_limit_offset_any, blade_limit_offset);
     filter_bool_getter!(keep_shuffle_under_any, keep_shuffle_under);
 

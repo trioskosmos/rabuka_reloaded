@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-07T00:17:34.963502",
+  "generated_at": "2026-08-07T04:09:39.495246",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "7b9a7a74",
+  "engine_commit": "8bc5b079",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -20598,13 +20598,16 @@
       },
       "effect": {
         "text": "相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数がこれによりウェイトにしたメンバーが元々持つ{{icon_blade.png|ブレード}}の数より2つ以上少ないメンバー1人をウェイトにする",
-        "source": "stage",
+        "action": "change_state",
         "state_change": "wait",
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state",
         "original_value": true,
+        "blade_limit_from_cost_member": true,
+        "blade_limit_offset": 2,
+        "blade_limit_operator": "<=",
+        "source": null,
         "parenthetical": [
           "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
         ]

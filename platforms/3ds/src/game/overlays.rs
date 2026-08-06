@@ -411,7 +411,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
         }
         Overlay::RevealedCards(show_self, ref cursor, view_card) => {
             if let Some(vcid) = view_card {
-                render_card_detail(vcid, &gs.card_database, 0.0);
+                render_card_detail(vcid, &gs.card_database, atlas, 0.0);
             } else {
                 let who = if show_self { tl("You") } else { tl("Opponent") };
                 let rev_hdr = tl("Revealed Cards");

@@ -174,6 +174,7 @@ pub struct GameState {
     pub baton_touch_arriving_card_ids: SmallVec<[i16; 2]>,
     pub effect_creation_counter: u8,
     pub last_state_change_wait_to_active_count: u8,
+    pub last_cost_wait_member: Option<i16>,
     pub player1_rps_choice: Option<u8>,
     pub player2_rps_choice: Option<u8>,
     pub baton_touch_replaced_member_cost: Option<u8>,
@@ -425,6 +426,7 @@ impl GameState {
             baton_touch_arriving_card_ids: SmallVec::new(),
             effect_creation_counter: 0,
             last_state_change_wait_to_active_count: 0,
+        last_cost_wait_member: None,
             player1_rps_choice: None,
             player2_rps_choice: None,
             baton_touch_replaced_member_cost: None,
@@ -637,6 +639,11 @@ impl GameState {
     /// Backward-compat: the card that last moved areas (from turn_area_movements).
     pub fn last_area_move_card_id(&self) -> Option<i16> {
         self.turn_area_movements.last().map(|m| m.moved_card_id)
+    }
+    /// The last member card that was put into wait state as an ability cost
+    /// (Q266 dynamic blade-limit reference: limit = its original blade + offset).
+    pub fn last_cost_wait_member(&self) -> Option<i16> {
+        self.last_cost_wait_member
     }
     /// Backward-compat: which player's effect caused the last area move.
     pub fn last_area_move_by_player(&self) -> Option<&str> {

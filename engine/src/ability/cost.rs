@@ -563,6 +563,7 @@ impl AbilityResolver {
                         gs.player1.stage.stage
                     );
                     gs.mods.add_orientation_modifier(card_id, "wait");
+                    gs.last_cost_wait_member = Some(card_id);
                 }
             } else {
                 let desc_ja = format!("ウェイトにするステージメンバーを{}体選択", count);
@@ -1073,6 +1074,7 @@ impl AbilityResolver {
                         for &card_id in &candidates {
                             if state_change == "wait" {
                                 gs.mods.add_orientation_modifier(card_id, "wait");
+                                gs.last_cost_wait_member = Some(card_id);
                             } else if state_change == "rest" || state_change == "rested" {
                                 gs.mods.add_orientation_modifier(card_id, "rest");
                             }
@@ -1091,6 +1093,7 @@ impl AbilityResolver {
                                 cost.target.as_deref().unwrap_or("self").to_string(),
                             ))
                             .is_reveal(true)
+                            .is_select_action(true)
                             .build(),
                         );
                         return Ok(());

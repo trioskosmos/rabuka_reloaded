@@ -1090,7 +1090,7 @@ fn deck_viewer(
             if viewing_card.is_none() {
                 render_card_grid(card_ids, offset, 5, 2, 28.0, card_db, atlas);
             } else {
-                render_card_detail(viewing_card.unwrap(), card_db, 0.0);
+                render_card_detail(viewing_card.unwrap(), card_db, atlas, 0.0);
             }
         }
         let action = card_grid_input(keys, &mut offset, viewing_card, card_ids, 5);

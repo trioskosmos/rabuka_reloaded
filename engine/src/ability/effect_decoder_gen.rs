@@ -84,6 +84,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "blade_limit" => { ek.blade_limit = bc.read_u8_value(); return Some(true); }
             "blade_limit_operator" => { ek.blade_limit_operator = bc.read_operator_value(); return Some(true); }
             "blade_limit_from_energy_under" => { ek.blade_limit_from_energy_under = bc.read_bool_value(); return Some(true); }
+            "blade_limit_from_cost_member" => { ek.blade_limit_from_cost_member = bc.read_bool_value(); return Some(true); }
             "blade_limit_offset" => { ek.blade_limit_offset = bc.read_u8_value(); return Some(true); }
             "keep_shuffle_under" => { ek.keep_shuffle_under = bc.read_bool_value(); return Some(true); }
             "need_heart_color" => { ek.need_heart_color = bc.read_arc_str_value(); return Some(true); }
@@ -217,7 +218,6 @@ pub(crate) struct EffectKindLocals {
     pub activation_condition_parsed: Option<Box<Condition>>,
     pub activation_position: Option<ArcStr>,
     pub all: Option<bool>,
-    pub requires_under_card: Option<bool>,
     pub all_regions: Option<bool>,
     pub allow_occupied_stage: Option<bool>,
     pub alternative_condition: Option<Box<Condition>>,
@@ -225,10 +225,9 @@ pub(crate) struct EffectKindLocals {
     pub alternative_effect: Option<Box<AbilityEffect>>,
     pub answers: Option<Box<Vec<String>>>,
     pub any_number: Option<bool>,
-    pub custom_type: Option<ArcStr>,
-    pub yell_source: Option<ArcStr>,
     pub baton_touch_trigger: Option<bool>,
     pub blade_limit: Option<u8>,
+    pub blade_limit_from_cost_member: Option<bool>,
     pub blade_limit_from_energy_under: Option<bool>,
     pub blade_limit_offset: Option<u8>,
     pub blade_limit_operator: Option<Operator>,
@@ -254,6 +253,7 @@ pub(crate) struct EffectKindLocals {
     pub cost_total: Option<u8>,
     pub cost_total_operator: Option<Operator>,
     pub count: Option<u8>,
+    pub custom_type: Option<ArcStr>,
     pub delayed: Option<bool>,
     pub destination: Option<ArcStr>,
     pub discard_remaining: Option<bool>,
@@ -316,17 +316,18 @@ pub(crate) struct EffectKindLocals {
     pub phase: Option<ArcStr>,
     pub picker: Option<ArcStr>,
     pub placement_order: Option<PlacementOrder>,
-    pub remainder_destination: Option<ArcStr>,
-    pub remainder_placement_order: Option<PlacementOrder>,
     pub position: Option<Box<PositionInfo>>,
     pub question: Option<ArcStr>,
     pub quoted_text: Option<Box<QuotedText>>,
     pub ref_offset: Option<i8>,
     pub ref_value: Option<ArcStr>,
+    pub remainder_destination: Option<ArcStr>,
+    pub remainder_placement_order: Option<PlacementOrder>,
     pub repeat_limit: Option<u8>,
     pub replace_all: Option<bool>,
     pub replaces_event: Option<ArcStr>,
     pub require_all_heart_colors: Option<bool>,
+    pub requires_under_card: Option<bool>,
     pub resource: Option<ArcStr>,
     pub resource_icon_count: Option<u8>,
     pub resource_on_select: Option<Box<AbilityEffect>>,
@@ -358,6 +359,7 @@ pub(crate) struct EffectKindLocals {
     pub triggers: Option<ArcStr>,
     pub use_limit: Option<u8>,
     pub value: Option<u8>,
+    pub yell_source: Option<ArcStr>,
 }
 
 /// Build an EffectFilter from the flat EffectKindLocals.
@@ -394,6 +396,7 @@ fn build_filter(ek: &EffectKindLocals) -> EffectFilter {
         blade_limit: ek.blade_limit.clone(),
         blade_limit_operator: ek.blade_limit_operator.clone(),
         blade_limit_from_energy_under: ek.blade_limit_from_energy_under.clone(),
+        blade_limit_from_cost_member: ek.blade_limit_from_cost_member.clone(),
         blade_limit_offset: ek.blade_limit_offset.clone(),
         keep_shuffle_under: ek.keep_shuffle_under.clone(),
         need_heart_color: ek.need_heart_color.clone(),

@@ -63,7 +63,25 @@ impl AbilityResolver {
         let destination = effect.destination.as_deref();
         let cost_limit_operator = effect.cost_limit_operator_any().map(|s| s.to_string());
         let characters = effect.characters_any();
-        let blade_limit: Option<u8> = if effect.blade_limit_from_energy_under_any().unwrap_or(false) {
+        let mut q266_no_target = false;
+        let blade_limit: Option<u8> = if effect.blade_limit_from_cost_member_any().unwrap_or(false) {
+            // Q266: dynamic limit = (original blade of the member paid as the wait cost) − offset.
+            // "元々持つブレードの数が…より2つ以上少ない" → limit = costed_blade − 2.
+            let base = effect.blade_limit_offset_any().unwrap_or(0) as i32;
+            let cost_member_blade = gs
+                .last_cost_wait_member()
+                .and_then(|cid| gs.card_database.get_card(cid).map(|c| c.blade))
+                .unwrap_or(0) as i32;
+            let signed = cost_member_blade - base;
+            if signed < 0 {
+                // No member can have negative blades → no legal target. Encode as
+                // "< 0" (matches nothing), since blades are >= 0.
+                q266_no_target = true;
+                Some(0)
+            } else {
+                Some(signed as u8)
+            }
+        } else if effect.blade_limit_from_energy_under_any().unwrap_or(false) {
             // C5: dynamic limit = (energy cards under the activating member) + offset.
             let base = effect.blade_limit_offset_any().unwrap_or(0) as i32;
             let under_count = gs.activating_card.map_or(0, |aid| {
@@ -80,7 +98,10 @@ impl AbilityResolver {
             effect.blade_limit_any().map(|v| v as u8)
         };
         let blade_limit_operator_binding = effect.blade_limit_operator_any();
-        let blade_limit_operator = blade_limit_operator_binding.as_deref();
+        let mut blade_limit_operator = blade_limit_operator_binding.as_deref();
+        if q266_no_target {
+            blade_limit_operator = Some("<");
+        }
         // When targeting opponent, group_names is trigger-level metadata
         // (from the wrapper's condition), not an effect filter.
         let group_filter = if target == "opponent" {
