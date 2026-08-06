@@ -157,6 +157,35 @@ pub fn ability_verdicts(game: &mut TestGame, player: &str) -> String {
     fmt(&all, 0)
 }
 
+/// Assert a condition and, ONLY on failure, print the engine's condition
+/// verdicts for the given player. Lets you drop `assert_ability!(game, "p1", …)`
+/// anywhere without having to reach for `ability_verdicts()` yourself — the
+/// verdict tree appears exactly when the test fails.
+#[macro_export]
+macro_rules! assert_ability {
+    ($game:expr, $player:expr, $cond:expr $(,)?) => {{
+        if !($cond) {
+            let __v = $crate::helpers::ability_verdicts(&mut $game, $player);
+            panic!(
+                "ability assertion failed: {}\n--- verdicts ---\n{}",
+                stringify!($cond),
+                __v
+            );
+        }
+    }};
+    ($game:expr, $player:expr, $cond:expr, $($arg:tt)+) => {{
+        if !($cond) {
+            let __v = $crate::helpers::ability_verdicts(&mut $game, $player);
+            panic!(
+                "{}\n--- verdicts ---\n{}",
+                format!($($arg)+),
+                __v
+            );
+        }
+    }};
+}
+pub(crate) use assert_ability;
+
 // ====================================================================
 // TestGame — scenario-based game state wrapper
 // ====================================================================

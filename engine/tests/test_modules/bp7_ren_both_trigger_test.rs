@@ -361,19 +361,22 @@ fn ren_verdicts_show_energy_leg_pass() {
     push_energy_zone_change(&mut game, "p1");
 
     let verdicts = ability_verdicts(&mut game, "p1");
-    assert!(
+    assert_ability!(
+        game,
+        "p1",
         verdicts.contains("[PASS] compound") && verdicts.contains("1/2 any"),
-        "OR condition should report PASS as 1-of-2 legs; got:\n{}",
-        verdicts
+        "OR condition should report PASS as 1-of-2 legs"
     );
-    assert!(
+    assert_ability!(
+        game,
+        "p1",
         verdicts.contains("[PASS] card_count_condition"),
-        "the energy zone-change leg should PASS; got:\n{}",
-        verdicts
+        "the energy zone-change leg should PASS"
     );
-    assert!(
+    assert_ability!(
+        game,
+        "p1",
         verdicts.contains("[FAIL] appearance_condition"),
-        "the appearance leg must FAIL (no real debut) — self-trigger guard works; got:\n{}",
-        verdicts
+        "the appearance leg must FAIL (no real debut) — self-trigger guard works"
     );
 }
