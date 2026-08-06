@@ -2061,8 +2061,13 @@ impl<'a> ConditionContext<'a> {
         let actual = moved_source
             .iter()
             .filter(|&&cid| {
+                // Energy is tracked as an anonymous `-1` resource for
+                // energy_zone↔energy_deck moves. Count it only when the
+                // condition is a zone-change on energy (source+dest) and skip
+                // all card-id-dependent filters (there is no real card).
                 if cid == -1 {
-                    return false;
+                    return is_new_movement
+                        && condition.get_resource_type() == Some("energy");
                 }
                 if let Some(gn) = moved_group_name {
                     if !util::card_matches_group_str(card_db, cid, Some(gn)) {

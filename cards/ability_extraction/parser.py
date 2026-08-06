@@ -3910,7 +3910,16 @@ def _try_or(text):
             p is None or p.get("type") in ("custom",) for p in parsed
         ):
             continue
-        return {"type": "or_condition", "conditions": parsed, "text": text}
+        # Aggregate each leg's trigger_event so the engine can prefilter by
+        # real event types instead of relying on an always-true leg.
+        leg_events = [p.get("trigger_event") for p in parsed if p.get("trigger_event")]
+        result = {"type": "or_condition", "conditions": parsed, "text": text}
+        if leg_events:
+            result["trigger_event"] = {
+                "type": "or",
+                "events": leg_events,
+            }
+        return result
     return None
 
 
@@ -4267,13 +4276,9 @@ def _try_appearance(text):
     cl = extract_cost_limit(text)
     if cl is not None:
         result["cost_limit"] = cl
-    # Extract card type (e.g. メンバー → member_card). Self-appearance
-    # ("このメンバーが登場"/"このカードが登場") must stay a bare appearance —
-    # the engine's self-trigger guard relies on a condition with NO card-type
-    # filter to require a real debut event.
+    # Extract card type (e.g. メンバー → member_card)
     ct = extract_card_type(text)
-    self_appearance = "このメンバー" in text or "このカード" in text
-    if ct and not self_appearance:
+    if ct:
         result["card_type"] = ct
     # Extract position (左サイド/右サイド/センター) — skip when
     # positions_characters already encodes per-position character mappings.
@@ -4912,16 +4917,10 @@ def _extract_generic_fields(condition, text):
 
     # Card type, count, operator
     ct = extract_card_type(text)
-    # Self-appearance ("このメンバーが登場"/"このカードが登場") must stay a
-    # bare appearance — the engine's self-trigger guard relies on a condition
-    # with NO card-type filter to require a real debut event.
-    self_appearance = (
-        condition.get("type") == "appearance_condition"
-        and ("このメンバー" in text or "このカード" in text)
-    )
-    if self_appearance:
-        condition.pop("card_type", None)
-    elif ct:
+    # Self-appearance ("このメンバーが登場"/"このカードが登場") card_type is
+    # stripped centrally by _strip_self_appearance_card_type in
+    # process_abilities — do not add per-site guards here.
+    if ct:
         condition["card_type"] = ct
     cnt = extract_count(text)
     if cnt is not None:
@@ -11177,6 +11176,29 @@ def _process_post_fixes(data: Dict[str, Any], fix_stats: Dict[str, int]) -> None
     _validate_semantic(data["unique_abilities"])
 
 
+# Patterns whose appearance condition refers to the card's OWN debut. A
+# self-appearance must stay a bare appearance with NO card_type filter, because
+# the engine's self-trigger guard uses "card_type is absent" to require a real
+# debut event. This is the SINGLE source of truth for that rule: it is applied
+# once, over the whole effect tree, at the end of parsing.
+_SELF_APPEARANCE_PATTERNS = ("このメンバーが登場", "このカードが登場")
+
+
+def _strip_self_appearance_card_type(node):
+    """Walk the parsed tree and remove `card_type` from any self-appearance
+    condition. Applied to every ability's effect as a final normalization pass."""
+    if isinstance(node, dict):
+        if node.get("type") == "appearance_condition":
+            text = node.get("text", "")
+            if any(p in text for p in _SELF_APPEARANCE_PATTERNS):
+                node.pop("card_type", None)
+        for value in node.values():
+            _strip_self_appearance_card_type(value)
+    elif isinstance(node, list):
+        for item in node:
+            _strip_self_appearance_card_type(item)
+
+
 def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     """Post-process already-parsed abilities: infer actions, apply targeted fixes."""
 
@@ -11203,6 +11225,12 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     for ability in data["unique_abilities"]:
         _process_pre_fix(ability, fix_stats)
     _process_post_fixes(data, fix_stats)
+    # Final invariant pass: strip card_type from self-appearance conditions
+    # across every ability (single source of truth for this rule).
+    for ability in data["unique_abilities"]:
+        eff = ability.get("effect")
+        if isinstance(eff, dict):
+            _strip_self_appearance_card_type(eff)
     return data
 
 

@@ -69,6 +69,94 @@ pub fn card_id(db: &CardDatabase, card_no: &str) -> i16 {
         .unwrap_or_else(|| panic!("Card {card_no} not found in database"))
 }
 
+/// Push an energy_zone → energy_deck movement event, the trigger for
+/// "…エネルギーがエネルギー置き場からエネルギーデッキに置かれたとき".
+/// Uses the `-1` anonymous energy resource placeholder; the engine accepts it
+/// for energy zone-change conditions (see resolve_moved_cards_source).
+pub fn push_energy_zone_change(game: &mut TestGame, player: &str) {
+    game.state
+        .push_movement_event(-1, "energy_zone", "energy_deck", None, player, true);
+}
+
+/// Enable the engine's condition-verdict logger, run a TAS scan, and return a
+/// human-readable tree of every condition verdict. Useful for debugging why an
+/// ability did (or didn't) fire without editing engine source.
+pub fn ability_verdicts(game: &mut TestGame, player: &str) -> String {
+    use rabuka_engine::ability::debug::set_debug;
+    use rabuka_engine::ability::log::{
+        clear_verdicts, drain_verdicts, AbilityLogItem,
+    };
+
+    fn fmt(items: &[AbilityLogItem], indent: usize) -> String {
+        let mut out = String::new();
+        for it in items {
+            match it {
+                AbilityLogItem::Condition {
+                    condition_type,
+                    expectation,
+                    actual,
+                    passed,
+                    children,
+                    text,
+                } => {
+                    out.push_str(&"  ".repeat(indent));
+                    out.push_str(&format!(
+                        "[{}] {} => {} ({} / {}?)\n",
+                        if *passed { "PASS" } else { "FAIL" },
+                        condition_type,
+                        actual,
+                        expectation,
+                        text
+                    ));
+                    out.push_str(&fmt(children, indent + 1));
+                }
+                AbilityLogItem::Cost {
+                    text,
+                    expectation,
+                    actual,
+                    passed,
+                    optional,
+                } => {
+                    out.push_str(&"  ".repeat(indent));
+                    out.push_str(&format!(
+                        "[{}] cost '{}' {} vs {} (optional={})\n",
+                        if *passed { "PASS" } else { "FAIL" },
+                        text,
+                        actual,
+                        expectation,
+                        optional
+                    ));
+                }
+                AbilityLogItem::Effect { action, details, .. } => {
+                    out.push_str(&"  ".repeat(indent));
+                    out.push_str(&format!("[EFFECT] {} — {}\n", action, details));
+                }
+            }
+        }
+        out
+    }
+
+    set_debug(true);
+    clear_verdicts();
+
+    let pid = if player == "p1" || player == &game.state.player1.id {
+        game.state.player1.id.clone()
+    } else {
+        game.state.player2.id.clone()
+    };
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    // Capture scan-time condition verdicts BEFORE the resolver consumes the
+    // buffer during effect processing.
+    let scan_verdicts = drain_verdicts();
+    game.state.process_pending_auto_abilities(&pid);
+    game.drain_auto_ability_choices();
+    // Capture resolution-time verdicts (effects re-evaluate can_activate_effect).
+    let mut all = scan_verdicts;
+    all.extend(drain_verdicts());
+    set_debug(false);
+    fmt(&all, 0)
+}
+
 // ====================================================================
 // TestGame — scenario-based game state wrapper
 // ====================================================================

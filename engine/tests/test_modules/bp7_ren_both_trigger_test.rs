@@ -102,12 +102,9 @@ fn ren_energy_to_deck_triggers_energy_place() {
     let deck_before = game.state.player1.energy_deck.cards.len();
     let wait_before = wait_energy_count(&game);
 
-    // Energy moved from the energy zone to the energy deck. The engine records
-    // energy moves with a real card id (move_cards.rs / effects/state.rs), so
-    // push the id of an energy card that is actually in the deck.
-    let moved = game.state.player1.energy_deck.cards[0];
-    game.state
-        .push_movement_event(moved, "energy_zone", "energy_deck", None, "p1", true);
+    // Energy moved from the energy zone to the energy deck (the -1 anonymous
+    // energy resource placeholder the engine accepts for zone-change conditions).
+    push_energy_zone_change(&mut game, "p1");
     trigger_auto(&mut game);
 
     let deck_after = game.state.player1.energy_deck.cards.len();
@@ -141,9 +138,7 @@ fn ren_placed_energy_is_wait_not_active() {
     let active_before = game.state.player1.energy_zone.active_count();
     let total_before = game.state.player1.energy_zone.cards.len();
 
-    let moved = game.state.player1.energy_deck.cards[0];
-    game.state
-        .push_movement_event(moved, "energy_zone", "energy_deck", None, "p1", true);
+    push_energy_zone_change(&mut game, "p1");
     trigger_auto(&mut game);
 
     assert_eq!(
@@ -172,9 +167,7 @@ fn ren_once_per_turn_when_both_triggers() {
     let deck_before = game.state.player1.energy_deck.cards.len();
 
     // First trigger: energy_zone → energy_deck.
-    let moved = game.state.player1.energy_deck.cards[0];
-    game.state
-        .push_movement_event(moved, "energy_zone", "energy_deck", None, "p1", true);
+    push_energy_zone_change(&mut game, "p1");
     trigger_auto(&mut game);
 
     let deck_after_first = game.state.player1.energy_deck.cards.len();
@@ -187,9 +180,8 @@ fn ren_once_per_turn_when_both_triggers() {
     // Second trigger in the same turn: appearance (via a debut record) + another
     // energy_zone → energy_deck event. The ターン1回 gate must block a second fire.
     game.state.record_card_appearance(ren, "stage");
-    let moved2 = game.state.player1.energy_deck.cards[0];
-    game.state
-        .push_movement_event(moved2, "energy_zone", "energy_deck", None, "p1", true);
+    push_energy_zone_change(&mut game, "p1");
+    trigger_auto(&mut game);
     trigger_auto(&mut game);
 
     assert_eq!(
@@ -259,10 +251,8 @@ fn ren_opponent_energy_move_does_not_trigger() {
 
     let deck_before = game.state.player1.energy_deck.cards.len();
 
-    let moved = game.state.player1.energy_deck.cards[0];
     // cause_player_id "p2" → opponent energy move.
-    game.state
-        .push_movement_event(moved, "energy_zone", "energy_deck", None, "p2", true);
+    push_energy_zone_change(&mut game, "p2");
     trigger_auto(&mut game);
 
     assert_eq!(
@@ -312,13 +302,9 @@ fn ren_multiple_energy_moves_single_fire() {
     let deck_before = game.state.player1.energy_deck.cards.len();
     let wait_before = wait_energy_count(&game);
 
-    // Two distinct energy cards moved zone → deck in one batch.
-    let moved1 = game.state.player1.energy_deck.cards[0];
-    let moved2 = game.state.player1.energy_deck.cards[1];
-    game.state
-        .push_movement_event(moved1, "energy_zone", "energy_deck", None, "p1", true);
-    game.state
-        .push_movement_event(moved2, "energy_zone", "energy_deck", None, "p1", true);
+    // Two energy cards moved zone → deck in one batch.
+    push_energy_zone_change(&mut game, "p1");
+    push_energy_zone_change(&mut game, "p1");
     trigger_auto(&mut game);
 
     // Effect places exactly 1 card from the energy deck.
@@ -348,15 +334,46 @@ fn ren_wrong_source_energy_move_does_not_trigger() {
 
     let deck_before = game.state.player1.energy_deck.cards.len();
 
-    let moved = game.state.player1.energy_deck.cards[0];
     // Source is discard/waitroom, not energy_zone → condition must not match.
     game.state
-        .push_movement_event(moved, "waitroom", "energy_deck", None, "p1", true);
+        .push_movement_event(-1, "waitroom", "energy_deck", None, "p1", true);
     trigger_auto(&mut game);
 
     assert_eq!(
         game.state.player1.energy_deck.cards.len(),
         deck_before,
         "energy_zone→energy_deck source is required; waitroom→energy_deck must not fire"
+    );
+}
+
+/// The ability_verdicts helper surfaces WHY a trigger fires, so debugging a
+/// tricky ability doesn't require editing engine source. The energy leg must
+/// report PASS when an energy_zone→energy_deck event occurred.
+#[test]
+fn ren_verdicts_show_energy_leg_pass() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let ren = game.id("PL!SP-bp7-005-R＋");
+    game.state.player1.stage.stage = [-1, ren, -1];
+    seed_energy_deck(&mut game, 5);
+
+    push_energy_zone_change(&mut game, "p1");
+
+    let verdicts = ability_verdicts(&mut game, "p1");
+    assert!(
+        verdicts.contains("[PASS] compound") && verdicts.contains("1/2 any"),
+        "OR condition should report PASS as 1-of-2 legs; got:\n{}",
+        verdicts
+    );
+    assert!(
+        verdicts.contains("[PASS] card_count_condition"),
+        "the energy zone-change leg should PASS; got:\n{}",
+        verdicts
+    );
+    assert!(
+        verdicts.contains("[FAIL] appearance_condition"),
+        "the appearance leg must FAIL (no real debut) — self-trigger guard works; got:\n{}",
+        verdicts
     );
 }

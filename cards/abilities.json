@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T13:28:59.263351",
+  "generated_at": "2026-08-06T14:23:10.696737",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "51bfdc1a",
+  "engine_commit": "b17a600a",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -7072,7 +7072,21 @@
               "destination": "energy_deck"
             }
           ],
-          "text": "このメンバーが登場するか、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれたとき"
+          "text": "このメンバーが登場するか、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれたとき",
+          "trigger_event": {
+            "type": "or",
+            "events": [
+              {
+                "type": "appearance",
+                "location": "stage"
+              },
+              {
+                "type": "zone_change",
+                "source": "energy_zone",
+                "destination": "energy_deck"
+              }
+            ]
+          }
         },
         "action": "sequential",
         "actions": [
@@ -15027,7 +15041,8 @@
               "group_names": [
                 "Printemps"
               ],
-              "baton_touch_trigger": true
+              "baton_touch_trigger": true,
+              "card_type": "member_card"
             },
             "duration": "unless"
           }
@@ -16954,7 +16969,8 @@
           "location": "stage",
           "exclude_self": true,
           "target": "self",
-          "cost_limit": 11
+          "cost_limit": 11,
+          "card_type": "member_card"
         },
         "source": "energy_deck",
         "destination": "energy_zone",
@@ -23313,6 +23329,16 @@
             }
           ],
           "text": "自分のステージに、このメンバーか、ほかのメンバーがバトンタッチして登場したとき",
+          "trigger_event": {
+            "type": "or",
+            "events": [
+              {
+                "type": "baton_touch",
+                "tense": "past",
+                "location": "stage"
+              }
+            ]
+          },
           "exclude_self": true,
           "baton_touch_trigger": true
         },
@@ -30696,6 +30722,15 @@
             }
           ],
           "text": "エールにより公開された自分のカードの中にライブカードが2枚以上あるか、自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち合計5種類以上あるか、このターンに自分のステージにいるメンバーがエリアを移動している場合",
+          "trigger_event": {
+            "type": "or",
+            "events": [
+              {
+                "type": "temporal",
+                "event_type": "has_moved"
+              }
+            ]
+          },
           "aggregate": "total"
         },
         "action": "modify_score",
@@ -33734,7 +33769,8 @@
             "type": "appearance",
             "location": "stage"
           },
-          "location": "stage"
+          "location": "stage",
+          "card_type": "member_card"
         },
         "action": "sequential",
         "actions": [
