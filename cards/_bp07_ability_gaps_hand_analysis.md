@@ -238,23 +238,29 @@ Parsed:
 - ❌ **The OR branch "ライブカード**か**…メンバーカード" is lost** — only `card_type:member_card` survived; the "ライブカード" alternative is gone.
 - Fix: condition source → preceding_moved; card-type check must be an OR of live_card / member_card(no blade heart).
 
-### B6. `PL!N-bp7-028-L` Cooking with Love ab#0 — gap: [under_member, card_property] — ⚠️ wrong condition location, OR branch lost
+### B6. `PL!N-bp7-028-L` Cooking with Love ab#0 — gap: [under_member, card_property] — ✅ FIXED (parser + engine)
 
 Japanese:
 > ライブ開始時：自分の控え室に『虹ヶ咲』のライブカードと、ブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合、自分の控え室にあるすべてのカードをシャッフルし、デッキの下に置いてもよい。そうしたとき、…すべての『虹ヶ咲』のメンバーは heart01を得る。
 
 Parsed:
 ```json
-{"condition":{"type":"location_condition","card_type":"member_card","location":"stage",
-  "negation":true,"card_property":"has_blade_heart","group_names":["虹ヶ咲"],"target":"self"},
- "action":"gain_resource","resource":"heart","heart_colors":["heart01"],
- "all":true,"duration":"live_end","shuffle":true}
+{"action":"conditional_on_optional",
+ "condition":{"type":"compound","operator":"and","conditions":[
+   {"type":"card_count_condition","card_type":"live_card","location":"discard","group_names":["虹ヶ咲"],"count":1,"operator":">=","target":"self"},
+   {"type":"card_count_condition","card_type":"member_card","location":"discard","card_property":"has_blade_heart","negation":true,"group_names":["虹ヶ咲"],"count":1,"operator":">=","target":"self"}
+ ]},
+ "optional_action":{"action":"move_cards","source":"discard","destination":"deck_bottom","all":true,"shuffle":true,"target":"self"},
+ "conditional_action":{"action":"sequential","actions":[
+   {"action":"move_cards","source":"discard","destination":"deck_bottom","all":true,"shuffle":true,"target":"self"},
+   {"action":"gain_resource","resource":"heart","heart_colors":["heart01"],"card_type":"member","all":true,"duration":"live_end","group_names":["虹ヶ咲"],"target":"self"}
+ ]},
+ "conditional_negation":false}
 ```
 - ✅ `card_property:has_blade_heart + negation`; `shuffle:true`; `gain_resource{heart01, all, live_end}`.
-- ❌ **`location:"stage"` is wrong** — the text says "自分の控え室に…ある場合" (in **discard**), not stage.
-- ❌ **"ライブカード**と**…メンバーカード" AND-branch is collapsed to `card_type:member_card` only** — the live-card requirement is lost.
+- ✅ **Fixed**: condition now checks **discard** (控え室), as an **AND** of (虹ヶ咲 live card present) + (虹ヶ咲 member **without** blade heart present), via `compound`/`and` of two `card_count_condition`s. The してもよい gate is a `conditional_on_optional` (Skip/Pay); accepting runs the sequential [shuffle all discard → deck bottom, all 虹ヶ咲 members gain heart01].
 - `under_member` flag: no メンバーの下 anywhere in the text → spurious.
-- Fix: condition location → discard; represent the compound (live card present AND member card present without blade heart).
+- Engine fixes: `execute_gain_resource` no longer hijacks a multi-target gain (has `group_names`/`all`) onto the single activating card — it routes to the computed `heart_targets`. Parser: `_walk_extract_heart_colors` no longer inherits parent-context heart colors onto blanket `all:true` `move_cards`, and `_clean_action_list` doesn't propagate `heart_colors` onto plain `move_cards`. Tests: `bp7_cooking_with_love_test.rs` (`cooking_*`).
 
 ---
 

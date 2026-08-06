@@ -1751,7 +1751,9 @@ impl AbilityResolver {
                     && effect.source_any().is_none()
                     && effect.card_type_any().is_none()
                     && !effect.target_from_selection_any().unwrap_or(false)
-                    && !effect.multiple_targets_any().unwrap_or(false))
+                    && !effect.multiple_targets_any().unwrap_or(false)
+                    && effect.group_names_any().map_or(true, |g| g.is_empty())
+                    && !effect.all_any().unwrap_or(false))
             {
                 if let Some(card_id) = activating_card_id {
                     self.apply_heart_to_card(

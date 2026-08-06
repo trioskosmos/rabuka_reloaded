@@ -4822,6 +4822,87 @@ def _try_placed_discard_live_or_member(text):
 _condition_registry.register(1, "placed_discard_live_or_member", _try_placed_discard_live_or_member)
 
 
+def _try_discard_live_and_member_optional(text):
+    """B6 Cooking with Love ab#0:
+    控え室に『虹ヶ咲』のライブカードと、ブレードハートを持たない『虹ヶ咲』の
+    メンバーカードがある場合、自分の控え室にあるすべてのカードをシャッフルし、
+    デッキの下に置いてもよい。そうしたとき、ライブ終了時まで、自分のステージに
+    いるすべての『虹ヶ咲』のメンバーはheart01を得る。
+
+    AND-condition (live card present AND member-without-blade-heart present in
+    DISCARD) gates a してもよい shuffle-to-deck-bottom; on acceptance all group
+    members on stage gain heart01. Returns a conditional_on_optional whose
+    conditional_action (the "accepted" branch) is the sequential [shuffle, heart].
+    """
+    if "控え室" not in text or "ライブカードと" not in text or "持たない" not in text:
+        return None
+    if "メンバーカードがある場合" not in text or "デッキの下に置いてもよい" not in text:
+        return None
+    if "そうしたとき" not in text:
+        return None
+    groups = list(dict.fromkeys(extract_group_names(text)))
+    if not groups:
+        return None
+
+    cond_live = {
+        "type": "card_count_condition",
+        "card_type": "live_card",
+        "location": "discard",
+        "group_names": groups,
+        "count": 1,
+        "operator": ">=",
+        "target": "self",
+        "text": "控え室にグループのライブカードがある場合",
+    }
+    cond_member = {
+        "type": "card_count_condition",
+        "card_type": "member_card",
+        "location": "discard",
+        "card_property": "has_blade_heart",
+        "negation": True,
+        "group_names": groups,
+        "count": 1,
+        "operator": ">=",
+        "target": "self",
+        "text": "ブレードハートを持たないグループのメンバーカードがある場合",
+    }
+    condition = {
+        "type": "compound",
+        "operator": "and",
+        "conditions": [cond_live, cond_member],
+        "text": "控え室にグループのライブカードとブレードハートを持たないグループのメンバーカードがある場合",
+    }
+
+    shuffle = {
+        "action": "move_cards",
+        "source": "discard",
+        "destination": "deck_bottom",
+        "all": True,
+        "shuffle": True,
+        "target": "self",
+        "text": "自分の控え室にあるすべてのカードをシャッフルし、デッキの下に置いてもよい",
+    }
+    heart = {
+        "action": "gain_resource",
+        "resource": "heart",
+        "heart_colors": ["heart01"],
+        "card_type": "member",
+        "all": True,
+        "duration": "live_end",
+        "group_names": groups,
+        "target": "self",
+        "text": "ライブ終了時まで、自分のステージにいるすべてのグループのメンバーはheart01を得る",
+    }
+    return {
+        "text": text,
+        "action": "conditional_on_optional",
+        "condition": condition,
+        "optional_action": shuffle,
+        "conditional_action": {"action": "sequential", "actions": [shuffle, heart]},
+        "conditional_negation": False,
+    }
+
+
 def _extract_generic_fields(condition, text):
     """Extract all generic fields from text into condition dict (no early return)."""
     # Character names: 「A」か「B」か「C」がいる, 「A」と「B」がいる,
@@ -9067,6 +9148,7 @@ _EFFECT_HANDLERS = [
     _try_answer_choice,  # 回答がXの場合 (answer-based choice)
     _try_each_time,  # Xたび (each-time trigger + effect)
     # Tier 2: Conditional/optional effect shapes
+    _try_discard_live_and_member_optional,  # B6: 控え室にライブカードとmember無ブレードがある場合→シャッフルデッキ下・そうしたときheart01
     _try_unless_effect,  # しないかぎり (unless-pay)
     _try_opponent_action,  # 相手は... (opponent action)
     _try_opponent_after_conditional,  # 相手はX場合、Y (opponent conditional)
@@ -9334,6 +9416,19 @@ def _clean_action_list(actions, parent_effect=None, parent_text=""):
                         # (the heart color was selected by a previous select action)
                         if f == "heart_colors" and sub.get("action") == "gain_resource":
                             continue
+                        # Don't propagate heart_colors to move_cards sub-actions
+                        # unless the sub-action's own text references a heart color.
+                        # heart_colors on a move filters targets by heart color,
+                        # which breaks generic shuffle/placement moves (e.g. B6
+                        # "控え室のすべてのカードをシャッフルし、デッキの下に置く").
+                        if f == "heart_colors" and sub.get("action") == "move_cards":
+                            sub_text = sub.get("text", "")
+                            if not (
+                                "heart" in sub_text
+                                or "ハート" in sub_text
+                                or "色" in sub_text
+                            ):
+                                continue
                         sub[f] = parent_effect[f]
         # Propagate card_type from parent to sub-actions that don't have it
         pt = parent_effect.get("card_type")
@@ -9535,10 +9630,14 @@ def _walk_extract_heart_colors(d, d_text, ctx_text):
             # Check own text first, then parent context
             search_text = d_text or ""
             # Actions with explicit heart_color (e.g. from character_effects)
-            # should not inherit aggregate heart_colors from parent context
+            # should not inherit aggregate heart_colors from parent context.
+            # Blanket moves (all:true — e.g. "控え室のすべてのカードをシャッフルし
+            # デッキの下に置く") move EVERY card and must never inherit heart_colors
+            # from a parent's gain text, or the engine filters them to one color.
             if not re.search(r"heart_\d+", search_text) and ctx_text:
                 if not d.get("heart_color"):
-                    search_text = ctx_text
+                    if not (d.get("action") == "move_cards" and d.get("all")):
+                        search_text = ctx_text
         hc = list(
             dict.fromkeys(
                 f"heart{m.zfill(2)}" for m in re.findall(r"heart_(\d+)", search_text)

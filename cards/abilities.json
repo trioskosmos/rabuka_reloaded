@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T14:45:13.519805",
+  "generated_at": "2026-08-06T16:27:30.592843",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "7bed66d1",
+  "engine_commit": "34a1a5e5",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -5842,10 +5842,6 @@
             "text": "自分のライブカード置き場にカードが2枚以上ある場合、その中から{{live_start.png|ライブ開始時}}能力を持たない『Aqours』のライブカードを1枚選び、デッキの一番上に置いてもよい。そうした場合、ライブ終了時まで、{{heart_02.png|heart02}}と{{heart_04.png|heart04}}を得る",
             "group_names": [
               "Aqours"
-            ],
-            "heart_colors": [
-              "heart02",
-              "heart04"
             ],
             "duration": "live_end"
           },
@@ -37072,34 +37068,94 @@
       "cost": null,
       "effect": {
         "text": "自分の控え室に『虹ヶ咲』のライブカードと、ブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合、自分の控え室にあるすべてのカードをシャッフルし、デッキの下に置いてもよい。そうしたとき、ライブ終了時まで、自分のステージにいるすべての『虹ヶ咲』のメンバーは{{heart_01.png|heart01}}を得る",
+        "action": "conditional_on_optional",
         "condition": {
-          "type": "location_condition",
-          "card_type": "member_card",
-          "location": "stage",
-          "text": "自分の控え室に『虹ヶ咲』のライブカードと、ブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合",
-          "negation": true,
-          "card_property": "has_blade_heart",
-          "heart_colors": [
-            "heart01"
+          "type": "compound",
+          "operator": "and",
+          "conditions": [
+            {
+              "type": "card_count_condition",
+              "card_type": "live_card",
+              "location": "discard",
+              "group_names": [
+                "虹ヶ咲"
+              ],
+              "count": 1,
+              "operator": ">=",
+              "target": "self",
+              "text": "控え室にグループのライブカードがある場合"
+            },
+            {
+              "type": "card_count_condition",
+              "card_type": "member_card",
+              "location": "discard",
+              "card_property": "has_blade_heart",
+              "negation": true,
+              "group_names": [
+                "虹ヶ咲"
+              ],
+              "count": 1,
+              "operator": ">=",
+              "target": "self",
+              "text": "ブレードハートを持たないグループのメンバーカードがある場合"
+            }
           ],
+          "text": "控え室にグループのライブカードとブレードハートを持たないグループのメンバーカードがある場合"
+        },
+        "optional_action": {
+          "action": "move_cards",
+          "source": "discard",
+          "destination": "deck_bottom",
+          "all": true,
+          "shuffle": true,
+          "target": "self",
+          "text": "自分の控え室にあるすべてのカードをシャッフルし、デッキの下に置いてもよい"
+        },
+        "conditional_action": {
+          "action": "sequential",
+          "actions": [
+            {
+              "action": "move_cards",
+              "source": "discard",
+              "destination": "deck_bottom",
+              "all": true,
+              "shuffle": true,
+              "target": "self",
+              "text": "自分の控え室にあるすべてのカードをシャッフルし、デッキの下に置いてもよい"
+            },
+            {
+              "action": "gain_resource",
+              "resource": "heart",
+              "heart_colors": [
+                "heart01"
+              ],
+              "card_type": "member",
+              "all": true,
+              "duration": "live_end",
+              "group_names": [
+                "虹ヶ咲"
+              ],
+              "target": "self",
+              "text": "ライブ終了時まで、自分のステージにいるすべてのグループのメンバーはheart01を得る",
+              "shuffle": true
+            }
+          ],
+          "text": "自分の控え室に『虹ヶ咲』のライブカードと、ブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合、自分の控え室にあるすべてのカードをシャッフルし、デッキの下に置いてもよい。そうしたとき、ライブ終了時まで、自分のステージにいるすべての『虹ヶ咲』のメンバーは{{heart_01.png|heart01}}を得る",
           "group_names": [
             "虹ヶ咲"
           ],
-          "target": "self"
+          "shuffle": true,
+          "all": true
         },
-        "card_type": "member_card",
-        "target": "self",
+        "conditional_negation": false,
         "group_names": [
           "虹ヶ咲"
         ],
-        "action": "gain_resource",
-        "resource": "heart",
+        "shuffle": true,
+        "all": true,
         "heart_colors": [
           "heart01"
-        ],
-        "all": true,
-        "duration": "live_end",
-        "shuffle": true
+        ]
       }
     },
     {
