@@ -720,12 +720,18 @@ Fix: bind the cost's moved-card count (and energy-difference) to real references
   now `move_cards{source:"live_card_zone", destination:"hand", self_target:true, card_type:"live_card", count:1}` (was `custom`).
 
 
-### CLEAN-G13. Optional add-to-hand action missing (Like a Treasure) — ✅ FIXED (parser)
+### CLEAN-G13. Optional add-to-hand action missing (Like a Treasure) — ✅ FIXED (parser + engine, 9 gameplay tests)
 
 - D18 `PL!N-bp7-031-L` Like a Treasure ab#1 — "それらのカードの中から『虹ヶ咲』の**ライブカードを1枚手札に加えてもよい**。そうしたとき、このカードのスコアを＋１する。" →
   now `conditional_on_optional{optional_action: move_cards{source:"those_cards", destination:"hand", card_type:"live_card", group_names:["虹ヶ咲"], count:1}, conditional_action: sequential[move_to_hand, modify_score{+1}]}` (was only a `modify_score` — the move to hand was absent).
 - **Parser**: new `_try_those_cards_add_hand_optional` handler (Tier 2) emits the conditional_on_optional for "それらのカードの中から…手札に加えてもよい。そうしたとき、…".
-- **Tests**: `bp7_like_a_treasure_optional_test.rs` (3 structure tests: conditional_on_optional, optional_action moves a 虹ヶ咲 live card to hand, accepted branch = move then +1 score).
+- **Engine refactor** (2026-08-06): `source:"those_cards"` was silently resolving from the **whole discard pile** instead of the cards that actually moved. Now it:
+  - resolves only the explicit `trigger_moved_cards` captured on the queue entry at enqueue time;
+  - when the trigger moved cards but **none matched** the filters, moves **nothing** (returns an empty move) — it no longer grabs a pre-existing qualifying card that wasn't part of the trigger batch (fixed the "those cards" semantic);
+  - still falls through to the historic discard-pile "pick card" resolution when **no** `trigger_moved_cards` was recorded (Q252 / Riko legacy path preserved).
+- **Engine**: `condition/card.rs` — a `Location` condition with `destination` set but `source` None is now a **movement** condition (`is_new_movement`), and an empty source matches any source. This is what made G13's each_time ("a card is placed into your discard by a live-success ability") actually fire — it was parsed with `destination:discard` but `source:None`, so it never matched any deck→discard movement.
+- **Engine**: added `AbilityResolver.last_move_moved_any`; a `modify_score` step that directly follows a `those_cards`→hand move only applies when the move **actually added a card** ("そうしたとき" = +1 only when you add).
+- **Tests**: `bp7_like_a_treasure_optional_test.rs` — now **9 real-gameplay each_time edge cases** (was 3 JSON-shape tests): accept → hand + exactly +1 score; skip → nothing + 0; no 虹ヶ咲 live card → nothing + 0; multiple 虹ヶ咲 live → exactly ONE + +1; duplicate copies → one; turn-limit (ターン1回) → second mill offers nothing; **pre-existing 虹ヶ咲 live card already in waitroom (not part of the mill) → NOT added**; a 虹ヶ咲 MEMBER (non-live) card → not added (card_type filter); no movement at all → does not fire. The `assert_ability!` verdict helper is used on failure.
 
 
 ### CLEAN-G14. Blade-limit filter misparsed as a resource gain (Fire Bird) — ✅ FIXED
@@ -767,7 +773,7 @@ Fixed (parser + engine):
 - D21 `PL!SP-bp7-028-L` 未来の音が聴こえる ab#0 — "自分の控え室にある『Liella!』のメンバーカードを**9枚選び、シャッフルし、デッキの一番下に置いてもよい。そうしたとき、**…すべてのメンバーはブレードを得る。" →
   now `conditional_on_optional{optional_action: move_cards{source:"discard", destination:"deck_bottom", count:9, card_type:"member_card", group_names:["Liella!"], shuffle:true, placement_order:"any_order"}, conditional_action: sequential[move_to_bottom, gain_resource{blade, all}]}` (was a `group_condition{shuffle:true,count:9}` + `gain_resource` — the move never actually happened).
 - **Parser**: new `_try_discard_shuffle_to_bottom_optional` handler (Tier 2) emits the conditional_on_optional.
-- **Tests**: `bp7_mirai_no_oto_optional_test.rs` (3 structure tests: conditional_on_optional, optional action shuffles 9 Liella! discard→deck_bottom in any order, accepted branch = move then blade gain).
+- **Tests**: `bp7_mirai_no_oto_optional_test.rs` — **5 real-gameplay** edge cases (was 3 JSON-shape tests): accept → 9 Liella! discard→deck_bottom in any order + blade gain; skip → nothing; too few Liella! cards → nothing; mixed Liella!/non-Liella! discard → only Liella!; turn-limit / no-optional. Driven through the real TAS scan, not JSON inspection.
 
 
 ### CLEAN-G17. Trigger "エネルギーがメンバーの下に置かれたとき" under-parsed
@@ -886,13 +892,33 @@ Fixed (parser + engine):
 - So the regex analyzer's "clean/needs_work" split was **not** meaningful for
   correctness: 25 of the 63 "clean" abilities are actually broken.
 
+## Status as of 2026-08-06
+
+**Done so far (with tests):**
+- Flagged set: **B1, B2, B4, B6, C1–C9** (13 / 15).
+- Clean set: **CLEAN-G1, G2, G3, G5, G10, G12, G13, G14, G15, G16, G18, G19** (12 / 19 groups).
+
+**Remaining to fix (9 items):**
+| Item | Defect |
+|---|---|
+| B3 `PL!SP-bp7-001-R` 澁谷かのん ab#0 | condition missing `location:under_member` |
+| B5 `PL!N-bp7-006-R＋` 近江彼方 ab#1 | condition `location:"stage"` wrong (should be preceding_moved); live-card OR lost |
+| CLEAN-G4 `PL!S-bp7-003-R＋` 松浦果南 ab#1 | option1 ウェイトしない → `custom` (no protection primitive) |
+| CLEAN-G6 `PL!N-bp7-007-R＋` 優木せつ菜 ab#1 + `PL!N-bp7-026-L` Just Believe!!! ab#0 | unresolvable `dynamic_count` ("その差") |
+| CLEAN-G7 `PL!N-bp7-011-R＋` ミア・テイラー ab#0 | optional discard-cost + そうしたとき structure dropped |
+| CLEAN-G8 `PL!S-bp7-022-L` 恋になりたいAQUARIUM ab#0 | yell-from-bottom → both branches `custom` |
+| CLEAN-G9 `PL!S-bp7-012-N` 松浦果南 ab#0 | formation-change action dropped |
+| CLEAN-G11 `PL!N-bp7-027-L` オードリー ab#0 | "more blade than all others" max-comparison missing |
+| CLEAN-G17 `PL!SP-bp7-016-N` 葉月 恋 ab#0 + `PL!SP-bp7-005-R＋` 葉月 恋 ab#1 | energy-placed trigger modeled as comparison, not `zone_change` |
+
 ## Recommended order (updated)
 
-1. Group B (B1–B6) — smallest field-gap fixes. **B1, B2 DONE (2026-08-05).**
+1. Group B (B1–B6) — smallest field-gap fixes. **B1, B2, B4, B6 DONE (2026-08-05).**
 2. **CLEAN-G1** (6 abilities) — recurring `source:"hand"`→`deck_bottom`. **DONE (2026-08-05): parser + engine DeckBottom draw branch + optional-pay routing; tests in `bp7_deck_bottom_source_test.rs`.**
 3. **C4** (桜坂しずく ab#0) — under-member move + heart-copy. **DONE (2026-08-05): `_try_place_under_heart_copy` + `heart_copy` modifier; tests in `bp7_heart_copy_test.rs`.**
 4. CLEAN-G5 + D20 (4 abilities) — character-name conditions (`characters` array). **CLEAN-G5 DONE (2026-08-05): parser character extraction + `preceding_moved` condition/move source; tests in `bp7_character_name_condition_test.rs`. D20 (国木田花丸&優木せつ菜&嵐千砂都 triple-name cost) DONE (2026-08-05): compound 1-of-each + cost set-override; tests in `ll_bp7_001_triple_member_test.rs`.**
-5. Group C parser-only (C1, C2, C5–C9).
-6. CLEAN-G2/G3/G4/G8/G9/G10/G11/G12/G13/G16/D27 (one-off structure fixes).
-7. CLEAN-G6/G7/G14/G15/D26 (structure + dynamic-count/cost restructuring).
-8. C3 + CLEAN-G17 (overlap / trigger-modeling) last, engine-aware.
+5. Group C parser-only (C1, C2, C5–C9). **All DONE (2026-08-05/06).**
+6. **CLEAN-G13** (Like a Treasure ab#1). **DONE (2026-08-06): parser + engine `those_cards`/movement-condition/score-gate refactor; 9 real-gameplay tests in `bp7_like_a_treasure_optional_test.rs`.**
+7. **CLEAN-G16/G18** (未来の音 / エマ color-diversity). **DONE — JSON-shape tests replaced with real gameplay edge cases (5 each).**
+8. Next: CLEAN-G2/G3/G10/G12/G14/G15/G19 already DONE; remaining one-off fixes are **B3, B5, G4, G6, G7, G8, G9, G11, G17 (9 items)**.
+9. C3 + CLEAN-G17 (overlap / trigger-modeling) — the trigger-modeling half of G17 remains; C3 done.
