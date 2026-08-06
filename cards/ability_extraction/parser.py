@@ -8037,6 +8037,9 @@ def _try_conditional_sequential(text):
     if fa.get("action") == "select" and ("置く" in fp or "置いて" in fp):
         if "デッキの一番上" in fp:
             fa["destination"] = "deck_top"
+        elif "デッキの下" in fp:
+            fa["destination"] = "deck_bottom"
+            fa.setdefault("placement_order", "any_order")
         if fa.get("destination"):
             move_step = {
                 "action": "move_cards",
@@ -8044,6 +8047,7 @@ def _try_conditional_sequential(text):
                 "destination": fa.pop("destination"),
                 "count": 0,
                 "all": True,
+                "target": fa.get("target", "self"),
             }
 
     # NOTE: Returning `conditional_on_optional` would be semantically cleaner

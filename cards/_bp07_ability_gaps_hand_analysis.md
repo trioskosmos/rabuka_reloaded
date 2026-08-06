@@ -419,23 +419,24 @@ Parsed (fixed):
 - ✅ **Engine**: added `remainder_destination` / `remainder_placement_order` effect fields (decoder + `EffectFilter` + getters) and made `handle_select_cards_looked_at` honor `remainder_destination` when placing the remaining cards. This also activates the previously-latent `deck_top`-remainder pattern.
 - Tests: `bp7_mari_look_top_split_test.rs`.
 
-### C9. `PL!HS-PR-035-PR` 百生吟子 ab#0 — gap: [placement_order] — ❌ "相手のデッキの下に置く" parsed as select
+### C9. `PL!HS-PR-035-PR` 百生吟子 ab#0 — gap: [placement_order] — ✅ FIXED (parser)
 
 Japanese:
 > 登場：相手の控え室にあるメンバーカードを3枚選び、相手のデッキの下に好きな順番で置いてもよい。そうした場合、相手のステージにいる元々持つブレードの数が3つ以下のメンバー1人をウェイトにする。
 
-Parsed:
+Parsed (fixed):
 ```json
 "action":"sequential","actions":[
   {"action":"select","source":"discard","count":3,"card_type":"member_card",
-   "target":"opponent","optional":true,"placement_order":"any_order"},   // ❌ select, no destination
-  {"action":"change_state","source":"selected_cards","state_change":"wait","count":1,
+   "target":"opponent","optional":true,"placement_order":"any_order"},
+  {"action":"move_cards","source":"selected_cards","destination":"deck_bottom",
+   "count":0,"all":true,"target":"opponent"},
+  {"action":"change_state","state_change":"wait","count":1,
    "card_type":"member_card","target":"opponent","original_value":true,
    "blade_limit":3,"blade_limit_operator":"<="}]}
 ```
-- ✅ `placement_order:any_order` present; ✅ wait effect with `blade_limit:3, <=`.
-- ❌ **First step is `action:"select"` with no destination** — it should be a `move_cards` to opponent's `deck_bottom`. Selecting from discard ≠ placing them under the opponent's deck.
-- Fix: step 1 → `move_cards{source:discard, destination:deck_bottom, target:opponent, count:3, optional, placement_order:any_order}`.
+- ✅ **Fixed**: the parser now inserts a `move_cards{source:selected_cards, destination:deck_bottom, target:opponent, all:true}` step after the `select` for "デッキの下に好きな順番で置いてもよい" (previously it only handled "デッキの一番上"). Also the move step now carries the select's `target` (was None, so the engine looked in the wrong player's discard).
+- Tests: `bp7_ginko_select_discard_deck_bottom_test.rs` (3 opponent-discard cards → opponent deck bottom).
 
 ---
 

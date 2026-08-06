@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T17:51:55.644092",
+  "generated_at": "2026-08-06T18:09:20.873799",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "27f8db5b",
+  "engine_commit": "b1d5dcfc",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -5836,6 +5836,7 @@
             "source": "selected_cards",
             "destination": "deck_top",
             "all": true,
+            "target": "self",
             "text": "自分のライブカード置き場にカードが2枚以上ある場合、その中から{{live_start.png|ライブ開始時}}能力を持たない『Aqours』のライブカードを1枚選び、デッキの一番上に置いてもよい。そうした場合、ライブ終了時まで、{{heart_02.png|heart02}}と{{heart_04.png|heart04}}を得る",
             "group_names": [
               "Aqours"
@@ -23795,6 +23796,15 @@
             "target": "opponent",
             "optional": true,
             "action": "select"
+          },
+          {
+            "action": "move_cards",
+            "source": "selected_cards",
+            "destination": "deck_bottom",
+            "all": true,
+            "target": "opponent",
+            "text": "相手の控え室にあるメンバーカードを3枚選び、相手のデッキの下に好きな順番で置いてもよい。そうした場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする",
+            "original_value": true
           },
           {
             "text": "相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする",
