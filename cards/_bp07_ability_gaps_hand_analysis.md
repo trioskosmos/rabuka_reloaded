@@ -625,21 +625,18 @@ Fixed (parser + engine + tests):
 - All 10 deck_bottom source nodes in the DB verified legitimate (7 move→discard,
   2 look_at, 1 yell-source). No unintended re-parses.
 
-### CLEAN-G2. `destination: null` on "…の下に置く" (member-under placement)
+### CLEAN-G2. `destination: null` on "…の下に置く" (member-under placement) — ✅ FIXED
 
 - D1 `PL!S-bp7-005-R＋` 渡辺 曜 ab#0 — "自分の控え室にあるメンバーカード1枚を、自分のステージにいるメンバー1人の**下に置く**" →
-  `move_cards{source:"discard", destination:null}` (line 6351). Should be `destination:"under_member"`.
+  now `move_cards{source:"discard", destination:"under_member", target:"self", count:1}` (was `destination:null`).
 
-Same class as C2 (choice-subtree) but here at top level — so the fix is a plain
-`move_cards` under-member rule, not only a choice-option rule.
-
-### CLEAN-G3. gain_resource missing the "メンバーカードが下に置かれている" condition
+### CLEAN-G3. gain_resource missing the "メンバーカードが下に置かれている" condition — ✅ FIXED (parser + engine)
 
 - D2 `PL!S-bp7-005-R＋` 渡辺 曜 ab#1 — "自分のステージにいる、**メンバーカードが下に置かれている**『Aqours』のメンバーは、ブレードを得る" →
-  `gain_resource{blade, self, Aqours}` with **no condition at all** (line 6368). The
-  "has a member card underneath" filter is dropped, so the blade is granted
-  unconditionally to all Aqours members. Needs a `condition{location:under_member}`-style
-  gate (same field gap as B1/B2 but the *subject* filter, not the per-unit source).
+  now `gain_resource{blade, count:1, all:true, group_names:[Aqours], requires_under_card:true}`.
+- **Parser**: `_mark_under_card_gain` (from `_normalize_effect_tree`) sets `all:true` + `requires_under_card:true` on a gain whose text says "メンバーカードが下に置かれている…メンバーは…を得る".
+- **Engine**: added `requires_under_card` effect field (decoder + `EffectFilter` + getter). `recalculate_constant_blade_modifiers` now resolves `all:true` gains to every matching group member on the ability card's side, and — when `requires_under_card` — only those with a MEMBER card underneath (energy doesn't count).
+- **Tests**: `bp7_watanabe_under_card_blade_test.rs` (6 cases: member-under → blade, no-under → none, energy-under → none, non-Aqours → none, self → none, two hosts both gain).
 
 ### CLEAN-G4. Protection / "ウェイトしない" → `custom`
 

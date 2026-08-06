@@ -10073,6 +10073,17 @@ def _walk(d, full_text, original_text, ctx_text=None):
     return d
 
 
+def _mark_under_card_gain(effect, text):
+    """CLEAN-G3: '…メンバーカードが下に置かれている『X』のメンバーは、…を得る' —
+    a constant gain whose subject is only members that HAVE a member card under
+    them. Mark it all-targeting + requires_under_card so the engine filters."""
+    if not isinstance(effect, dict):
+        return
+    if "メンバーカードが下に置かれている" in text and effect.get("action") == "gain_resource":
+        effect["all"] = True
+        effect["requires_under_card"] = True
+
+
 def _normalize_effect_tree(effect, original_text=None):
     if not effect or not isinstance(effect, dict):
         return effect
@@ -10082,6 +10093,8 @@ def _normalize_effect_tree(effect, original_text=None):
     _enrich_gain_abilities(effect)
     _enrich_characters(effect)
     _clean_gain_resource(effect)
+    src = original_text or effect.get("text", "") or ""
+    _mark_under_card_gain(effect, src)
     # "『X』のメンバーからバトンタッチして登場した場合" — the baton-touch source group
     # is a GATING CONDITION, not a target filter on the action steps. Attach it as
     # the effect's condition and strip the leaked baton_touch_trigger/group_names off

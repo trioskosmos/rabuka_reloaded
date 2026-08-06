@@ -730,6 +730,37 @@ impl GameState {
                         } else {
                             vec![]
                         }
+                    } else if effect.all_any().unwrap_or(false) {
+                        // Grant to ALL matching stage members on the ability card's
+                        // side. Optionally restricted to members that have a member
+                        // card underneath (requires_under_card, CLEAN-G3).
+                        let player = if self.player1.stage.stage.contains(&cid) {
+                            &self.player1
+                        } else {
+                            &self.player2
+                        };
+                        let filter = effect.filter_subset();
+                        let need_under = effect.requires_under_card_any().unwrap_or(false);
+                        let mut targets: Vec<i16> = Vec::new();
+                        for (slot, &mid) in player.stage.stage.iter().enumerate() {
+                            if mid == -1 || !filter.matches(&self.card_database, mid, true) {
+                                continue;
+                            }
+                            if need_under {
+                                let has_member_under = player.stage.under_cards[slot]
+                                    .iter()
+                                    .any(|&u| {
+                                        self.card_database
+                                            .get_card(u)
+                                            .map_or(false, |c| c.is_member())
+                                    });
+                                if !has_member_under {
+                                    continue;
+                                }
+                            }
+                            targets.push(mid);
+                        }
+                        targets
                     } else {
                         vec![cid]
                     };

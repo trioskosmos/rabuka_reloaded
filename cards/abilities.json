@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T18:09:20.873799",
+  "generated_at": "2026-08-06T18:21:44.805333",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "b1d5dcfc",
+  "engine_commit": "1ab1f216",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -6376,7 +6376,9 @@
         ],
         "action": "gain_resource",
         "resource": "blade",
-        "count": 1
+        "count": 1,
+        "all": true,
+        "requires_under_card": true
       }
     },
     {

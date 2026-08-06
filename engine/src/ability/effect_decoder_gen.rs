@@ -124,6 +124,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "per_unit_location" => { ek.per_unit_location = bc.read_arc_str_value(); return Some(true); }
             "card_names" => { ek.card_names = bc.read_str_vec_value(); return Some(true); }
             "all" => { ek.all = bc.read_bool_value(); return Some(true); }
+            "requires_under_card" => { ek.requires_under_card = bc.read_bool_value(); return Some(true); }
             "cost_total" => { ek.cost_total = bc.read_u8_value(); return Some(true); }
             "cost_total_operator" => { ek.cost_total_operator = bc.read_operator_value(); return Some(true); }
             "activation_condition_parsed" => { ek.activation_condition_parsed = bc.read_condition_value(); return Some(true); }
@@ -214,6 +215,7 @@ pub(crate) struct EffectKindLocals {
     pub activation_condition_parsed: Option<Box<Condition>>,
     pub activation_position: Option<ArcStr>,
     pub all: Option<bool>,
+    pub requires_under_card: Option<bool>,
     pub all_regions: Option<bool>,
     pub allow_occupied_stage: Option<bool>,
     pub alternative_condition: Option<Box<Condition>>,
@@ -428,6 +430,7 @@ fn build_filter(ek: &EffectKindLocals) -> EffectFilter {
         per_unit_location: ek.per_unit_location.clone(),
         card_names: ek.card_names.clone(),
         all: ek.all.clone(),
+        requires_under_card: ek.requires_under_card.clone(),
         optional: ek.optional.clone(),
         cost_total: ek.cost_total.clone(),
         cost_total_operator: ek.cost_total_operator.clone(),

@@ -828,6 +828,7 @@ pub struct EffectFilter {
     pub per_unit_location: Option<ArcStr>,
     pub card_names: Box<Vec<String>>,
     pub all: Option<bool>,
+    pub requires_under_card: Option<bool>,
     pub optional: Option<bool>,
     pub cost_total: Option<u8>,
     pub cost_total_operator: Option<Operator>,
@@ -1201,6 +1202,7 @@ impl AbilityEffect {
             per_unit_location: str_field!("per_unit_location"),
             card_names: str_vec_field!("card_names").unwrap_or_default(),
             all: bool_field!("all"),
+            requires_under_card: bool_field!("requires_under_card"),
             optional: bool_field!("optional"),
             cost_total: u8_field!("cost_total"),
             cost_total_operator: None,
@@ -1470,6 +1472,7 @@ impl AbilityEffect {
     filter_str_getter!(activation_position_any, activation_position);
 
     filter_bool_getter!(all_any, all);
+    filter_bool_getter!(requires_under_card_any, requires_under_card);
 
     filter_bool_getter!(all_regions_any, all_regions);
 
