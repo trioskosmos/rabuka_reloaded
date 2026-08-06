@@ -51,6 +51,49 @@ fn baton_touch_dia(game: &mut TestGame) -> i16 {
     dia
 }
 
+/// Gate check: the ability only fires when baton-touching FROM an 『Aqours』 member.
+/// Baton-touching over a NON-Aqours member (μ's 高坂穂乃果) must NOT trigger the
+/// keep-3-shuffle-rest / draw-3.
+#[test]
+fn c6_non_aqours_baton_touch_does_not_fire() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    seed_decks(&mut game);
+    fill_hands(&mut game, 4);
+    let p1_hand_before = game.state.player1.hand.cards.len();
+    let p2_hand_before = game.state.player2.hand.cards.len();
+    let p1_deck_before = game.state.player1.main_deck.cards.len();
+
+    // 高坂穂乃果 (μ's, NOT Aqours) occupies center; Dia baton-touches over her.
+    game.give_energy(10);
+    let honoka = game.id("PL!-sd1-010-SD");
+    game.add_to_stage(MemberArea::Center, honoka);
+    let dia = game.id("PL!S-bp7-004-P");
+    game.state.player1.hand.cards.push(dia);
+    game.play_to_stage(dia, MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // No draw, no hand reorder: hands and deck are unchanged.
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        p1_hand_before,
+        "P1 hand must be unchanged when baton-touch source is not Aqours"
+    );
+    assert_eq!(
+        game.state.player2.hand.cards.len(),
+        p2_hand_before,
+        "P2 hand must be unchanged when baton-touch source is not Aqours"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        p1_deck_before,
+        "P1 deck must be unchanged when baton-touch source is not Aqours"
+    );
+}
+
 /// Drive both players through the keep-N-shuffle-rest: each player keeps the
 /// given hand indices on their FIRST hand choice; every subsequent hand choice
 /// (a "select more" re-prompt) is skipped so the player keeps exactly those.

@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T17:08:22.907655",
+  "generated_at": "2026-08-06T17:33:52.998621",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "60859c57",
+  "engine_commit": "f39ffbdc",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -2173,9 +2173,6 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "group_names": [
-          "蓮ノ空"
-        ],
         "action": "move_cards",
         "baton_touch_trigger": true
       }
@@ -21152,9 +21149,6 @@
             "keep_shuffle_under": true,
             "target": "both",
             "multiple_targets": true,
-            "group_names": [
-              "Aqours"
-            ],
             "shuffle": true,
             "baton_touch_trigger": true
           },
@@ -21166,17 +21160,26 @@
             "count": 3,
             "target": "both",
             "multiple_targets": true,
-            "group_names": [
-              "Aqours"
-            ],
             "shuffle": true,
             "baton_touch_trigger": true
           }
         ],
-        "group_names": [
-          "Aqours"
-        ],
-        "shuffle": true
+        "shuffle": true,
+        "condition": {
+          "type": "movement_condition",
+          "movement": "baton_touch",
+          "target": "self",
+          "baton_touch_trigger": true,
+          "group_names": [
+            "Aqours"
+          ],
+          "text": "『Aqours』のメンバーからバトンタッチして登場した場合",
+          "trigger_event": {
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage"
+          }
+        }
       }
     },
     {

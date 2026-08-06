@@ -352,7 +352,7 @@ Parsed (fixed):
 - ✅ Engine correctly computes the dynamic limit `energy_under(this member) + 1` (after the cost) and compares each opponent's ORIGINAL blade.
 - ✅ Tests: `bp7_karin_wait_blade_limit_test.rs` (`karin_*`) — asserts the cost places energy under 朝香果林, a blade-1 member is waited at limit 2, a blade-4 member is not, and (dynamic proof) a blade-4 member IS waited when pre-seeded energy raises the limit to 5.
 
-### C6. `PL!S-bp7-004-R` 黒澤ダイヤ ab#0 — gap: [under_member, baton_touch, both_targets] — ❌ target mis-parsed, "選んだカード以外" lost
+### C6. `PL!S-bp7-004-R` 黒澤ダイヤ ab#0 — gap: [under_member, baton_touch, both_targets] — ✅ FIXED (parser + engine)
 
 Japanese:
 > 登場：『Aqours』のメンバーからバトンタッチして登場した場合、自分と相手はそれぞれ、自身の手札のカードを3枚まで選び、選んだカード以外のカードをシャッフルし、自身のデッキの下に置く。その後、自分と相手はそれぞれカードを3枚引く。
@@ -375,6 +375,12 @@ Parsed (abridged):
 - ❌ **"選んだカード以外のカード" (cards *other than* the selected up-to-3) is not expressed** — the parser just shuffles hand with `max:3` and then moves 1; the "keep 3 chosen, shuffle+put the rest under deck" semantics are not captured.
 - `under_member` flag: no メンバーの下 in the text → spurious.
 - Fix: the two players each select up to 3 hand cards; shuffle the *remaining* hand to deck bottom; then both draw 3. Needs a selection-then-move-excluding-selected structure.
+
+**FIXED (parser + engine):**
+- Parser: the "『X』のメンバーからバトンタッチして登場した場合" gate was being dropped (the extract pipeline uses `parse_effect`/`_normalize_effect_tree`, not `parse_ability`). Added `_attach_baton_touch_from_group_condition` (called from `_normalize_effect_tree`) which attaches the `movement_condition{baton_touch, baton_touch_trigger, group_names:[X]}` as the effect's condition and strips the leaked `baton_touch_trigger`/`group_names` off the action steps (they are a gate, not a target filter).
+- Engine: the baton_touch condition's `group_names` now reach the resolver (was decoding to None before because the strip removed them from the condition); the gate correctly rejects a baton-touch source whose group isn't 『Aqours』.
+- The keep-≤3/shuffle-rest-under/draw-3 both-player structure is `select{keep_shuffle_under, max, target:both}` + `draw_card{3, both}`.
+- Tests: `bp7_dia_both_hand_reorder_test.rs` (`c6_*`) — incl. new `c6_non_aqours_baton_touch_does_not_fire` (source-group gate).
 
 ### C7. `PL!S-bp7-004-R` 黒澤ダイヤ ab#1 — gap: [under_member, placement_order] — ⚠️/❌ look source + rest placement wrong
 

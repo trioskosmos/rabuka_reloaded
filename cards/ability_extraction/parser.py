@@ -858,6 +858,42 @@ def extract_phase_gate(text: str) -> Tuple[Optional[Dict[str, Any]], str]:
     return gate, remaining
 
 
+def _attach_baton_touch_from_group_condition(effect, triggerless_text):
+    """Attach the baton-touch-source-group gate condition for "『X』のメンバーから
+    バトンタッチして登場した場合", and strip the leaked baton_touch_trigger/group_names
+    off the effect and every action step (they are a gate, not a target filter)."""
+    gm = re.search(r"『([^』]+)』のメンバーからバトンタッチして登場した場合", triggerless_text)
+    if not gm:
+        return
+    groups = [gm.group(1)]
+    cond = {
+        "type": "movement_condition",
+        "movement": "baton_touch",
+        "target": "self",
+        "baton_touch_trigger": True,
+        "group_names": groups,
+        "text": gm.group(0),
+        "trigger_event": {"type": "baton_touch", "tense": "past", "location": "stage"},
+    }
+    if not isinstance(effect, dict):
+        return
+    if not effect.get("condition"):
+        effect["condition"] = cond
+
+    def _strip(node):
+        if isinstance(node, dict):
+            if "action" in node:
+                node.pop("baton_touch_trigger", None)
+                node.pop("group_names", None)
+            for v in node.values():
+                _strip(v)
+        elif isinstance(node, list):
+            for item in node:
+                _strip(item)
+
+    _strip(effect)
+
+
 def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     """Parse a complete ability text."""
     triggerless_text = normalize(triggerless_text.strip())
@@ -10016,6 +10052,13 @@ def _normalize_effect_tree(effect, original_text=None):
     _enrich_gain_abilities(effect)
     _enrich_characters(effect)
     _clean_gain_resource(effect)
+    # "『X』のメンバーからバトンタッチして登場した場合" — the baton-touch source group
+    # is a GATING CONDITION, not a target filter on the action steps. Attach it as
+    # the effect's condition and strip the leaked baton_touch_trigger/group_names off
+    # the effect + every action step (they would otherwise filter the actions' targets).
+    src = original_text or effect.get("text", "") or ""
+    if "からバトンタッチして登場した場合" in src:
+        _attach_baton_touch_from_group_condition(effect, src)
     return effect
 
 
