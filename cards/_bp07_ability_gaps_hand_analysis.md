@@ -400,23 +400,24 @@ Parsed (fixed):
 - ✅ **Engine**: `execute_look_at` now handles `Zone::DeckBottom` by DRAINING the bottom N cards from the deck (previously it fell into the generic `zone_cards` copy branch, leaving the cards in the deck and duplicating them). Kept cards go back on the deck bottom, the rest to the waitroom.
 - Tests: `bp7_dia_look_bottom_select_test.rs`.
 
-### C8. `PL!S-bp7-008-R` 小原鞠莉 ab#0 — gap: [under_member, placement_order] — ❌ "残りをデッキの下" parsed as discard
+### C8. `PL!S-bp7-008-R` 小原鞠莉 ab#0 — gap: [under_member, placement_order] — ✅ FIXED (parser + engine)
 
 Japanese:
 > 登場：自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを**好きな順番でデッキの下**に置く。
 
-Parsed:
+Parsed (fixed):
 ```json
 {"action":"look_and_select",
  "look_action":{"action":"look_at","source":"deck_top","count":3,"target":"self"},
- "select_action":{"action":"select_cards","discard_remaining":true,
-   "destination":"deck_top","reveal":false,
+ "select_action":{"action":"select_cards",
+   "destination":"deck_top","placement_order":"any_order","any_number":true,
+   "reveal":false,
+   "remainder_destination":"deck_bottom","remainder_placement_order":"any_order",
    "text":"好きな枚数を好きな順番でデッキの上に置き、残りを好きな順番でデッキの下に置く"}}
 ```
-- ✅ look from `deck_top`, selected → `deck_top`.
-- ❌ **"残りを好きな順番でデッキの下に置く" is parsed as `discard_remaining:true`** — the discard zone is wrong; remaining must go to **deck_bottom** in chosen order, not to the discard. There's no `placement_order` on the discard_remaining either.
-- `under_member` flag spurious.
-- Fix: select_action needs `destination:deck_top` (any_order) for selected AND `deck_bottom` (any_order) for remaining — the current `look_and_select` schema only supports one destination + discard_remaining.
+- ✅ **Fixed**: `select_action` now carries `destination:deck_top` (any_order) for the selected cards AND `remainder_destination:deck_bottom` (any_order) for the rest — the rest goes to the deck bottom, NOT the discard.
+- ✅ **Engine**: added `remainder_destination` / `remainder_placement_order` effect fields (decoder + `EffectFilter` + getters) and made `handle_select_cards_looked_at` honor `remainder_destination` when placing the remaining cards. This also activates the previously-latent `deck_top`-remainder pattern.
+- Tests: `bp7_mari_look_top_split_test.rs`.
 
 ### C9. `PL!HS-PR-035-PR` 百生吟子 ab#0 — gap: [placement_order] — ❌ "相手のデッキの下に置く" parsed as select
 

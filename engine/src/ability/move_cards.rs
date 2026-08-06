@@ -2872,18 +2872,32 @@ impl AbilityResolver {
         }
 
         let player = gs.resolve_target_player_mut(&target);
-        let dest_zone = if discard_remaining {
-            Zone::Discard.to_str()
+        // If the effect specifies where the REMAINING (unselected) looked-at cards
+        // go (e.g. "残りを好きな順番でデッキの下に置く" → deck_bottom), honor that.
+        // Otherwise fall back to discard_remaining (discard) or deck top.
+        let remainder_dest = select_action
+            .as_ref()
+            .and_then(|sa| sa.remainder_destination_any())
+            .map(|s| s.to_string())
+            .or_else(|| current.and_then(|c| c.remainder_destination_any()).map(|s| s.to_string()));
+        let remainder_order = select_action
+            .as_ref()
+            .and_then(|sa| sa.remainder_placement_order_any())
+            .or_else(|| current.and_then(|c| c.remainder_placement_order_any()));
+        let dest_zone = if let Some(rd) = remainder_dest {
+            rd
+        } else if discard_remaining {
+            Zone::Discard.to_str().to_string()
         } else {
-            Zone::DeckTop.to_str()
+            Zone::DeckTop.to_str().to_string()
         };
         for &card_id in &remaining_cards {
-            util::place_card_in_zone(player, card_id, dest_zone, None, false, 1);
+            util::place_card_in_zone(player, card_id, &dest_zone, None, false, 1);
         }
         if discard_remaining {
             // Track the discarded cards so each_time watchers (e.g. Hazuki Ren ab#1)
             // can react to them as a single batch discard event.
-            self.finalize_card_movement(gs, &remaining_cards, dest_zone, "deck_top", &None, None);
+            self.finalize_card_movement(gs, &remaining_cards, &dest_zone, "deck_top", &None, None);
         }
 
         // Clear the stale looked_at choice now that all cards have been

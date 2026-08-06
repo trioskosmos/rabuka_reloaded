@@ -146,6 +146,8 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "per_group" => { ek.per_group = bc.read_bool_value(); return Some(true); }
             "per_group_count" => { ek.per_group_count = bc.read_u8_value(); return Some(true); }
             "placement_order" => { ek.placement_order = bc.read_placement_order_value(); return Some(true); }
+            "remainder_destination" => { ek.remainder_destination = bc.read_arc_str_value(); return Some(true); }
+            "remainder_placement_order" => { ek.remainder_placement_order = bc.read_placement_order_value(); return Some(true); }
             "or_card_types" => { ek.or_card_types = bc.read_opt_str_vec_value(); return Some(true); }
             "exclude_heart_colors" => { ek.exclude_heart_colors = bc.read_opt_str_vec_value(); return Some(true); }
             "cost_from_revealed" => { ek.cost_from_revealed = bc.read_bool_value(); return Some(true); }
@@ -308,6 +310,8 @@ pub(crate) struct EffectKindLocals {
     pub phase: Option<ArcStr>,
     pub picker: Option<ArcStr>,
     pub placement_order: Option<PlacementOrder>,
+    pub remainder_destination: Option<ArcStr>,
+    pub remainder_placement_order: Option<PlacementOrder>,
     pub position: Option<Box<PositionInfo>>,
     pub question: Option<ArcStr>,
     pub quoted_text: Option<Box<QuotedText>>,
@@ -447,6 +451,8 @@ fn build_filter(ek: &EffectKindLocals) -> EffectFilter {
         per_group: ek.per_group.clone(),
         per_group_count: ek.per_group_count.clone(),
         placement_order: ek.placement_order.clone(),
+        remainder_destination: ek.remainder_destination.clone(),
+        remainder_placement_order: ek.remainder_placement_order.clone(),
         or_card_types: ek.or_card_types.clone(),
         exclude_heart_colors: ek.exclude_heart_colors.clone(),
         cost_from_revealed: ek.cost_from_revealed.clone(),

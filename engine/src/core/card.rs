@@ -851,6 +851,8 @@ pub struct EffectFilter {
     pub per_group: Option<bool>,
     pub per_group_count: Option<u8>,
     pub placement_order: Option<PlacementOrder>,
+    pub remainder_destination: Option<ArcStr>,
+    pub remainder_placement_order: Option<PlacementOrder>,
     pub or_card_types: Option<Box<Vec<String>>>,
     pub exclude_heart_colors: Option<Box<Vec<String>>>,
     pub cost_from_revealed: Option<bool>,
@@ -1222,6 +1224,8 @@ impl AbilityEffect {
             per_group: bool_field!("per_group"),
             per_group_count: u8_field!("per_group_count"),
             placement_order: None,
+            remainder_destination: None,
+            remainder_placement_order: None,
             or_card_types: opt_str_vec_field!("or_card_types"),
             exclude_heart_colors: opt_str_vec_field!("exclude_heart_colors"),
             cost_from_revealed: bool_field!("cost_from_revealed"),
@@ -1683,6 +1687,8 @@ impl AbilityEffect {
     filter_str_getter!(per_unit_type_any, per_unit_type);
 
     filter_copy_getter!(placement_order_any, PlacementOrder, placement_order);
+    filter_str_getter!(remainder_destination_any, remainder_destination);
+    filter_copy_getter!(remainder_placement_order_any, PlacementOrder, remainder_placement_order);
 
     pub fn position_any(&self) -> Option<&PositionInfo> {
         self.kind.as_deref()?.filter()?.position.as_deref()

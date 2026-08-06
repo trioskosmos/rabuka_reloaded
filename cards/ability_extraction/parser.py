@@ -7327,6 +7327,21 @@ def _build_look_select_actions_inner(select_text):
         result["reveal"] = False
         return result
 
+    # C8: any number → deck_top (any order), rest → deck_BOTTOM (any order).
+    # e.g. 小原鞠莉 ab#0 "…デッキの上に置き、残りを好きな順番でデッキの下に置く".
+    if (
+        "好きな枚数を好きな順番でデッキの上に置き" in select_text
+        and "残りを好きな順番でデッキの下に置く" in select_text
+    ):
+        result["destination"] = "deck_top"
+        result["placement_order"] = "any_order"
+        result["any_number"] = True
+        result["reveal"] = False
+        result.pop("discard_remaining", None)
+        result["remainder_destination"] = "deck_bottom"
+        result["remainder_placement_order"] = "any_order"
+        return result
+
     # Issue 12: Pattern: hand + deck_top remainder (e.g. "1枚を手札に加え、残りをデッキの上に戻す")
     if "手札に加え" in select_text and "残りをデッキの上" in select_text:
         result["destination"] = "hand"

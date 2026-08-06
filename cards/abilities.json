@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-06T17:40:12.176702",
+  "generated_at": "2026-08-06T17:51:55.644092",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "f5a51678",
+  "engine_commit": "27f8db5b",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -21294,10 +21294,13 @@
         },
         "select_action": {
           "action": "select_cards",
-          "discard_remaining": true,
           "text": "好きな枚数を好きな順番でデッキの上に置き、残りを好きな順番でデッキの下に置く",
+          "destination": "deck_top",
+          "placement_order": "any_order",
+          "any_number": true,
           "reveal": false,
-          "destination": "deck_top"
+          "remainder_destination": "deck_bottom",
+          "remainder_placement_order": "any_order"
         }
       }
     },
