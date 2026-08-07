@@ -1847,7 +1847,6 @@ impl<'a> ConditionContext<'a> {
         if !hc.is_empty() {
             let target = condition.get_target().unwrap_or("self");
             let player = self.resolve_condition_player(target);
-            let card_db = &self.game_state.card_database;
             let group_name = condition
                 .get_group_names()
                 .and_then(|gn| gn.first().map(|s| s.as_str()));
@@ -1867,40 +1866,16 @@ impl<'a> ConditionContext<'a> {
                 .iter()
                 .map(|s| crate::card::parse_heart_color(s))
                 .collect();
-            let mut present = HashSet::<HeartColor>::default();
-            for &cid in &source_cards {
-                if cid == -1 {
-                    continue;
-                }
-                if !crate::ability::util::card_matches_group_str(card_db, cid, group_name) {
-                    continue;
-                }
-                if let Some(ref ct) = condition.get_card_type() {
-                    if !crate::ability::util::card_matches_type(card_db, cid, Some(ct)) {
-                        continue;
-                    }
-                }
-                if let Some(card) = card_db.get_card(cid) {
-                    let is_blade = condition.get_heart_source() == Some("blade");
-                    if !is_blade {
-                        if let Some(ref bh) = card.base_heart {
-                            for color in bh.hearts.keys() {
-                                if required_colors.contains(color) {
-                                    present.insert(*color);
-                                }
-                            }
-                        }
-                    }
-                    if let Some(ref bld) = card.blade_heart {
-                        for color in bld.hearts.keys() {
-                            if required_colors.contains(color) {
-                                present.insert(*color);
-                            }
-                        }
-                    }
-                }
-            }
-            return present.len() >= required_colors.len();
+            let is_blade = condition.get_heart_source() == Some("blade");
+            let card_type = condition.get_card_type().map(|ct| ct.as_str());
+            let present = self.count_distinct_heart_types(
+                &source_cards,
+                &required_colors,
+                is_blade,
+                group_name,
+                card_type,
+            );
+            return present >= required_colors.len();
         }
         // When multiple group_names are specified, check EACH group has at least `count` members
         if let Some(groups) = condition.get_group_names() {
@@ -2291,6 +2266,59 @@ impl<'a> ConditionContext<'a> {
         result
     }
 
+    /// Count DISTINCT heart-color types present across `cards`, gated on
+    /// `is_blade` (Q271: blade-hearts are NOT heart colors — a base-heart count
+    /// ignores blade-hearts, and a blade-heart count ignores base hearts).
+    /// Shared by the RevealedCards and Stage "types" branches of
+    /// `resolve_zone_card_count` (previously copy-pasted, one copy hiding the bug).
+    fn count_distinct_heart_types(
+        &self,
+        cards: &[i16],
+        required_colors: &[crate::card::HeartColor],
+        is_blade: bool,
+        group_name: Option<&str>,
+        card_type: Option<&str>,
+    ) -> usize {
+        let card_db = &self.game_state.card_database;
+        let mut present = HashSet::<HeartColor>::default();
+        for &cid in cards {
+            if cid == -1 {
+                continue;
+            }
+            if let Some(gn) = group_name {
+                if !util::card_matches_group_str(card_db, cid, Some(gn)) {
+                    continue;
+                }
+            }
+            if let Some(ct) = card_type {
+                if !util::card_matches_type(card_db, cid, Some(ct)) {
+                    continue;
+                }
+            }
+            if let Some(card) = card_db.get_card(cid) {
+                if !is_blade {
+                    if let Some(ref bh) = card.base_heart {
+                        for color in bh.hearts.keys() {
+                            if required_colors.contains(color) {
+                                present.insert(*color);
+                            }
+                        }
+                    }
+                }
+                if is_blade {
+                    if let Some(ref bld) = card.blade_heart {
+                        for color in bld.hearts.keys() {
+                            if required_colors.contains(color) {
+                                present.insert(*color);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        present.len()
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn resolve_zone_card_count(
         &self,
@@ -2338,46 +2366,21 @@ impl<'a> ConditionContext<'a> {
                         .iter()
                         .map(|s| crate::card::parse_heart_color(s))
                         .collect();
-                    let mut present = HashSet::<HeartColor>::default();
                     let is_blade = condition.get_heart_source() == Some("blade");
-                    for &cid in &self.game_state.revealed_cards {
-                        if cid == -1 {
-                            continue;
-                        }
-                        if let Some(card) = card_db.get_card(cid) {
-                            // Q271: blade-hearts are NOT heart colors. When the
-                            // condition counts base-heart types (heart_source is not
-                            // "blade"), only base hearts contribute; a blade-heart
-                            // condition counts only blade hearts.
-                            if !is_blade {
-                                if let Some(ref bh) = card.base_heart {
-                                    for color in bh.hearts.keys() {
-                                        if required_colors.contains(color) {
-                                            present.insert(*color);
-                                        }
-                                    }
-                                }
-                            }
-                            if is_blade {
-                                if let Some(ref bld) = card.blade_heart {
-                                    for color in bld.hearts.keys() {
-                                        if required_colors.contains(color) {
-                                            present.insert(*color);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    let actual = present.len();
+                    let actual = self.count_distinct_heart_types(
+                        &self.game_state.revealed_cards,
+                        &required_colors,
+                        is_blade,
+                        None,
+                        None,
+                    );
                     log::debug!(
-                        "[REVEALED_TYPES] heart_source={:?} required={:?} present={:?} count={}",
+                        "[REVEALED_TYPES] heart_source={:?} required={:?} count={}",
                         condition.get_heart_source(),
                         required_colors,
-                        present,
                         actual,
                     );
-                    actual as usize
+                    actual
                 } else {
                     count_filtered(&self.game_state.revealed_cards, card_type)
                 }
@@ -2461,32 +2464,14 @@ impl<'a> ConditionContext<'a> {
                         .iter()
                         .map(|s| crate::card::parse_heart_color(s))
                         .collect();
-                    let mut present = HashSet::<HeartColor>::default();
                     let is_blade = condition.get_heart_source() == Some("blade");
-                    for &cid in &stage_cards {
-                        if cid == -1 {
-                            continue;
-                        }
-                        if let Some(card) = card_db.get_card(cid) {
-                            if !is_blade {
-                                if let Some(ref bh) = card.base_heart {
-                                    for color in bh.hearts.keys() {
-                                        if required_colors.contains(color) {
-                                            present.insert(*color);
-                                        }
-                                    }
-                                }
-                            }
-                            if let Some(ref bld) = card.blade_heart {
-                                for color in bld.hearts.keys() {
-                                    if required_colors.contains(color) {
-                                        present.insert(*color);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    present.len()
+                    self.count_distinct_heart_types(
+                        &stage_cards,
+                        &required_colors,
+                        is_blade,
+                        None,
+                        None,
+                    )
                 } else {
                     count_filtered(&stage_cards, card_type)
                 }
