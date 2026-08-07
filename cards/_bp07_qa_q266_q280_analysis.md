@@ -164,7 +164,7 @@ cards (except Fire Bird) have no gameplay test.
 | Q272 | PL!N-bp7-026 Just Believe | no-repeat select | 笨・`bp7_q272_just_believe_test` |
 | Q273 | PL!S-bp7-005 貂｡霎ｺ譖・| activated 逋ｻ蝣ｴ ability pays cost | 笨・`bp7_q273_watanabe_cost_test` |
 | Q274 | PL!S-bp7-003 譚ｾ豬ｦ譫懷漉 | wait-immune member still selectable | 笨・`bp7_q274_immune_still_selectable_test` |
-| Q275 | PL!S-bp7-003 譚ｾ豬ｦ譫懷漉 | not a legal forced-wait choice | **gap** |
+| Q275 | PL!S-bp7-003 譚ｾ豬｡譫懷漉 | not a legal forced-wait choice | 手・`bp7_q275_forcepick_wait_test` |
 | Q276 | PL!N-bp7-030 Cheer Mode | return-to-hand beats success zone | partial |
 | Q278 | PL!N-bp7-003 譯懷揩縺励★縺・| joint card = 2 blades | **gap (engine)** |
 | Q279 | PL!N-bp7-003 譯懷揩縺励★縺・| joint card 竕 extra distinct name | **gap (engine)** |

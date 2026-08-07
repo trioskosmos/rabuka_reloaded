@@ -372,6 +372,25 @@ impl AbilityResolver {
                 }
             }
 
+            // Q275: when an effect makes the TARGET player select members of their OWN
+            // stage to be waited (e.g. セラス "action_by: opponent" — "相手は、自分の
+            // ステージのアクティブなメンバーをウェイトにする"), a member that is
+            // wait-immune against the effect's controller is NOT a legal choice. Exclude
+            // it from the offered candidates so the sacrificing player must pick a
+            // waitable member. This is the inverse of Q274 (opponent freely picking a
+            // victim): there `action_by` is self and the member stays selectable, with
+            // the wait suppressed only at application time below.
+            if state_change == "wait"
+                && matches!(effect.action_by_any(), Some("opponent"))
+            {
+                let controller = gs.ability_master_id();
+                candidates.retain(|(_, cid)| {
+                    !gs.wait_immune_members.iter().any(|(m, owner)| {
+                        *m == *cid && controller.as_deref().is_some_and(|c| c != owner)
+                    })
+                });
+            }
+
             if candidates.is_empty() {
                 let has_energy_in_text =
                     effect.text.contains("エネルギー") || effect.text.contains("energy");
