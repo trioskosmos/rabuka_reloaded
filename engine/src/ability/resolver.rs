@@ -1061,15 +1061,6 @@ impl AbilityResolver {
         util::card_matches_type(&gs.card_database, card_id, card_type_filter)
     }
 
-    pub fn card_matches_group(
-        &self,
-        gs: &mut GameState,
-        card_id: i16,
-        group_filter: Option<&String>,
-    ) -> bool {
-        util::card_matches_group(&gs.card_database, card_id, group_filter)
-    }
-
     pub fn card_matches_cost_limit(
         &self,
         gs: &mut GameState,

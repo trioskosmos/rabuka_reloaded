@@ -357,10 +357,10 @@ impl<'a> ConditionContext<'a> {
                         || condition.get_card_type().is_some()
                         || condition.get_characters().is_some_and(|c| !c.is_empty());
                     let check_orientation = |cid: i16| -> bool {
-                        self.game_state
-                            .mods
-                            .get_orientation_modifier(cid)
-                            .map_or(state == "active", |o| o == state)
+                        crate::ability::util::orientation_matches_state(
+                            self.game_state.mods.get_orientation_modifier(cid),
+                            state,
+                        )
                     };
                     if has_filter {
                         stage_cards.iter().any(|&cid| {

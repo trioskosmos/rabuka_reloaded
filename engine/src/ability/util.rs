@@ -406,18 +406,12 @@ pub fn card_matches_type(
     }
 }
 
-pub fn card_matches_group(
-    card_db: &CardDatabase,
-    card_id: i16,
-    group_filter: Option<&String>,
-) -> bool {
-    match group_filter {
-        Some(group_name) => card_db
-            .get_card(card_id)
-            .map(|c| c.group.as_ref() == group_name.as_str())
-            .unwrap_or(false),
-        None => true,
-    }
+/// Whether a card whose current orientation modifier is `orientation` matches a
+/// requested `state` ("active"/"wait"/"rest"). Cards with no modifier are
+/// treated as active (the default orientation).
+#[inline]
+pub fn orientation_matches_state(orientation: Option<&str>, state: &str) -> bool {
+    orientation.map_or(state == "active", |o| o == state)
 }
 
 /// Like `card_matches_group_str` but returns a vec of (reason, result) pairs
@@ -1674,13 +1668,7 @@ pub fn filter_distinct(
     skip_empty: bool,
 ) -> Vec<usize> {
     let ids: Vec<usize> = matching_indices(cards, db, filter, skip_empty);
-    let distinct = match filter.distinct {
-        Some(DistinctType::CardName) | Some(DistinctType::True) | Some(DistinctType::Distinct) => {
-            true
-        }
-        _ => return ids,
-    };
-    if !distinct {
+    if !distinct_should_dedupe(filter.distinct) {
         return ids;
     }
     let mut seen: HashSet<String> = HashSet::default();
@@ -2209,9 +2197,10 @@ pub fn resolve_per_unit_count(
         if is_stage {
             if let Some(state) = state_filter {
                 cards.retain(|&cid| {
-                    orientation_modifiers
-                        .get(&cid)
-                        .map_or(state == "active", |o| o.as_str() == state)
+                    orientation_matches_state(
+                        orientation_modifiers.get(&cid).map(|o| o.as_str()),
+                        state,
+                    )
                 });
             }
         }
@@ -2234,16 +2223,20 @@ pub fn resolve_per_unit_count(
 
 // ============== DISTINCT FILTERING ==============
 
+#[inline]
+fn distinct_should_dedupe(distinct: Option<DistinctType>) -> bool {
+    matches!(
+        distinct,
+        Some(DistinctType::CardName) | Some(DistinctType::True) | Some(DistinctType::Distinct)
+    )
+}
+
 pub fn apply_distinct_filter(
     cards: &[i16],
     distinct: Option<DistinctType>,
     card_db: &CardDatabase,
 ) -> Vec<i16> {
-    let should = matches!(
-        distinct,
-        Some(DistinctType::CardName) | Some(DistinctType::True) | Some(DistinctType::Distinct)
-    );
-    if !should {
+    if !distinct_should_dedupe(distinct) {
         return cards.to_vec();
     }
     let mut seen = HashSet::<String>::default();

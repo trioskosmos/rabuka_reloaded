@@ -790,10 +790,10 @@ impl<'a> ConditionContext<'a> {
                     let matching = stage_cards
                         .iter()
                         .filter(|&&cid| {
-                            self.game_state
-                                .mods
-                                .get_orientation_modifier(cid)
-                                .map_or(state == "active", |o| o == state)
+                            crate::ability::util::orientation_matches_state(
+                                self.game_state.mods.get_orientation_modifier(cid),
+                                state,
+                            )
                         })
                         .count();
                     format!(
