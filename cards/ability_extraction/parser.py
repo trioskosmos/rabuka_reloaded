@@ -516,6 +516,39 @@ def extract_name_exclusions(text):
     return includes, excludes
 
 
+def _split_include_exclude_chars(text):
+    """Split「name」markers into (include_chars, exclude_chars) lists.
+
+    A name is treated as excluded when the three characters following its
+    closing「are「以外」.
+    """
+    names = re.findall(r"「([^」]+)」", text)
+    include_chars = []
+    exclude_chars = []
+    for name in names:
+        idx = text.find(f"「{name}」")
+        if idx >= 0:
+            after = text[idx + len(f"「{name}」") : idx + len(f"「{name}」") + 3]
+            if after.startswith("以外"):
+                exclude_chars.append(name)
+            else:
+                include_chars.append(name)
+    return include_chars, exclude_chars
+
+
+_ICON_SUB_RE = re.compile(r"\{\{([^|]+)\|([^}]+)\}\}")
+
+
+def _strip_icon_annotations(text):
+    """Turn {{icon|label}} markers into 【label】 and drop「」brackets."""
+    return _ICON_SUB_RE.sub(r"【\2】", text).replace("「", "").replace("」", "").strip()
+
+
+def _has_shuffle(text):
+    """Detect a shuffle instruction in `text`."""
+    return "シャッフル" in text
+
+
 def extract_cost_operator(text):
     """Extract cost comparison operator from Japanese text.
     Returns operator string like '<=', '>=', '<', '>', '=' or None.
@@ -716,9 +749,8 @@ def _extract_basic_cost_fields(cost, text):
         cost["group_reference"] = "same_group_name"
     if extract_optional(text):
         cost["optional"] = True
-    if "シャッフルする" in text or "シャッフルして" in text:
+    if _has_shuffle(text):
         cost["shuffle"] = True
-    # Baton touch
     if "バトンタッチ" in text:
         qm = re.search(r"「([^」]+)」からバトンタッチ", text)
         if qm:
@@ -750,17 +782,7 @@ def _extract_basic_cost_fields(cost, text):
         if re.search(r"このメンバー[をが]", text):
             cost["self_cost"] = True
     # Card names from 「」 — detect exclusion patterns (「name」以外)
-    name_matches = re.findall(r"「([^」]+)」", text)
-    include_chars = []
-    exclude_chars = []
-    for name in name_matches:
-        idx = text.find(f"「{name}」")
-        if idx >= 0:
-            after = text[idx + len(f"「{name}」") : idx + len(f"「{name}」") + 3]
-            if after.startswith("以外"):
-                exclude_chars.append(name)
-            else:
-                include_chars.append(name)
+    include_chars, exclude_chars = _split_include_exclude_chars(text)
     if include_chars:
         cost["characters"] = include_chars
     if exclude_chars:
@@ -1248,19 +1270,9 @@ def parse_cost(text: str) -> Dict[str, Any]:
         src = extract_source(text)
         if src:
             cost["source"] = src
-    if "シャッフルする" in text or "シャッフルして" in text or "シャッフルし" in text:
+    if _has_shuffle(text):
         cost["shuffle"] = True
-    names = re.findall(r"「([^」]+)」", text)
-    include_chars = []
-    exclude_chars = []
-    for name in names:
-        idx = text.find(f"「{name}」")
-        if idx >= 0:
-            after = text[idx + len(f"「{name}」") : idx + len(f"「{name}」") + 3]
-            if after.startswith("以外"):
-                exclude_chars.append(name)
-            else:
-                include_chars.append(name)
+    include_chars, exclude_chars = _split_include_exclude_chars(text)
     if include_chars:
         cost["characters"] = include_chars
     if exclude_chars:
@@ -1796,9 +1808,7 @@ def _register_action(cond, act=None, setter=None):
 
 
 _register_action(
-    lambda t: "シャッフルする" in t
-    or "シャッフルして" in t
-    or ("シャッフルし" in t and "、" in t),
+    lambda t: _has_shuffle(t),
     "shuffle",
     lambda t, a: a.update({"target": "deck" if "デッキ" in t else "energy_deck"}),
 )
@@ -2484,13 +2494,10 @@ _register_action(
     "gain_ability",
     lambda t, a: a.update(
         {
-            "ability_gain": re.sub(r"\{\{([^|]+)\|([^}]+)\}\}", r"【\2】", t)
+            "ability_gain": _strip_icon_annotations(t)
             .replace("を失う", "")
             .replace("を得る", "")
             .replace("をえる", "")
-            .replace("「", "")
-            .replace("」", "")
-            .strip()
         }
     )
     if a.get("ability_gain") is None
@@ -2929,16 +2936,7 @@ def parse_action(text: str) -> Dict[str, Any]:
                 )
                 if trigger_match:
                     action["ability_gain_trigger"] = trigger_match.group(1)
-                action["ability_gain"] = (
-                    re.sub(
-                        r"\{\{([^|]+)\|([^}]+)\}\}",
-                        r"【\2】",
-                        categorized["abilities"][0],
-                    )
-                    .replace("「", "")
-                    .replace("」", "")
-                    .strip()
-                )
+                action["ability_gain"] = _strip_icon_annotations(categorized["abilities"][0])
             elif categorized["characters"]:
                 # These are likely character names or card names
                 # Convert to QuotedText struct format (text, quoted_type)
