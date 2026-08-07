@@ -104,7 +104,10 @@ specific rule described. `partial` = some adjacent mechanic is tested but the QA
 > 繝ｩ繧､繝匁・蜉滓凾・壹％縺ｮ繧ｫ繝ｼ繝峨ｒ繝ｩ繧､繝悶き繝ｼ繝臥ｽｮ縺榊ｴ縺九ｉ謇区惆縺ｫ謌ｻ縺吶ゅ◎縺ｮ蠕後∵焔譛ｭ繧・譫壽而縺亥ｮ､縺ｫ鄂ｮ縺上・- **QA rule**: winning a live with only this card still forces it back to hand (ab#1 is
   mandatory), so it cannot be left in the success live-card zone.
 - **Status**: `blade_heart_colorless_test.rs` references `PL!N-bp7-030` (colorless/blade-heart
-  scope). The success-zone-vs-return-to-hand edge: **partial**.
+  scope). The success-zone-vs-return-to-hand edge: **engine-confirmed** — LiveSuccess abilities
+  resolve (ab#1 returns Cheer Mode to hand) before `move_live_to_success_and_handle_wins`, so the
+  card is no longer in the live zone and is never placed in the success zone. Covered by
+  `bp7_q276_cheer_mode_return_hand_test`.
 
 ## Q278 / Q279 窶・譯懷揩縺励★縺・PL!N-bp7-003-R・・ab#1 (繝ｩ繧､繝夜幕蟋区凾)
 > 繝ｩ繧､繝夜幕蟋区凾・壹Λ繧､繝也ｵゆｺ・凾縺ｾ縺ｧ縲√％縺ｮ繝｡繝ｳ繝舌・縺ｮ荳九↓鄂ｮ縺九ｌ縺ｦ縺・ｋ蜷榊燕縺ｮ逡ｰ縺ｪ繧九Γ繝ｳ繝舌・繧ｫ繝ｼ繝・譫壹↓縺､縺阪√ヶ繝ｬ繝ｼ繝峨ｒ蠕励ｋ縲・- **Q278 rule**: under cards = 荳雁次豁ｩ螟｢ `PL!N-bp1-001-R` + 荳雁次豁ｩ螟｢&貔∬ｰｷ縺九・繧・譌･驥惹ｸ玖干蟶・  `LL-bp1-001-R・義 竊・**2 blades**.
@@ -165,7 +168,7 @@ cards (except Fire Bird) have no gameplay test.
 | Q273 | PL!S-bp7-005 貂｡霎ｺ譖・| activated 逋ｻ蝣ｴ ability pays cost | 笨・`bp7_q273_watanabe_cost_test` |
 | Q274 | PL!S-bp7-003 譚ｾ豬ｦ譫懷漉 | wait-immune member still selectable | 笨・`bp7_q274_immune_still_selectable_test` |
 | Q275 | PL!S-bp7-003 譚ｾ豬｡譫懷漉 | not a legal forced-wait choice | 手・`bp7_q275_forcepick_wait_test` |
-| Q276 | PL!N-bp7-030 Cheer Mode | return-to-hand beats success zone | partial |
+| Q276 | PL!N-bp7-030 Cheer Mode | return-to-hand beats success zone | 手・`bp7_q276_cheer_mode_return_hand_test` |
 | Q278 | PL!N-bp7-003 譯懷揩縺励★縺・| joint card = 2 blades | **gap (engine)** |
 | Q279 | PL!N-bp7-003 譯懷揩縺励★縺・| joint card 竕 extra distinct name | **gap (engine)** |
 | Q280 | PL!SP-bp7-007 邀ｳ螂ｳ繝｡繧､ | do-not-activate persists | **gap** |
