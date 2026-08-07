@@ -2600,9 +2600,8 @@ def _blade_icon_is_target_filter(text: str) -> bool:
 
 def parse_action(text: str) -> Dict[str, Any]:
     """Parse an action text."""
-    # Check for optional draw action "カードを1枚引いてもよい" - CHECK THIS FIRST
-    if "カードを1枚引いてもよい" in text:
-        return {"text": text, "action": "draw_card", "count": 1, "optional": True}
+    # (The "カードを1枚引いてもよい" optional-draw phrase is handled by the
+    # _ACTION_RULES registry dispatch below; no dedicated early-return needed.)
 
     # Strip parenthetical notes first (before any other processing)
     text = strip_parenthetical(text)

@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-07T06:40:05.462646",
+  "generated_at": "2026-08-07T14:05:39.561910",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "4a4c279e",
+  "engine_commit": "dfff7924",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -31792,9 +31792,11 @@
         "actions": [
           {
             "text": "カードを1枚引いてもよい。",
-            "action": "draw_card",
             "count": 1,
-            "optional": true
+            "optional": true,
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand"
           },
           {
             "text": "手札2枚を好きな順番でデッキの上に置く",
