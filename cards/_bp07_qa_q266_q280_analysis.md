@@ -1,4 +1,4 @@
-﻿# BP07 QA entries Q266窶轍280 窶・analysis & test coverage
+# BP07 QA entries Q266窶轍280 窶・analysis & test coverage
 
 Source of truth: `cards/qa_data.json` (entries Q266窶轍280, dated 2026.06.26 / 2026.08.05).
 Card ability texts: `cards/cards.json` (`ability` field). Parser output / per-ability decoding:
@@ -95,8 +95,10 @@ specific rule described. `partial` = some adjacent mechanic is tested but the QA
   wait effect (selection is allowed; the wait simply doesn't apply). Cannot-immune 竕 cannot-select.
 - **Q275 rule**: when an effect forces *you* to wait a member (e.g. 繧ｻ繝ｩ繧ｹ譟ｳ逕ｰ繝ｪ繝ｪ繧ｨ繝ｳ繝輔ぉ繝ｫ繝・  PL!HS-bp6-007-R), a wait-immune member is NOT a legal choice 窶・you must pick a waitable member.
 - **Status**: `bp7_kanan_wait_immunity_test.rs` + `bp7_wait_immunity_helpers.rs` (G4) cover the
-  immunity blocking an opponent's wait. The Q274 (still selectable) and Q275 (not legal choice
-  for your own forced wait) selection edges: **gap**.
+  immunity blocking an opponent's wait. Q274 (still selectable) now 笨・covered by
+  `bp7_q274_immune_still_selectable_test.rs` (3 tests): the wait-immune member is STILL
+  offered in the opponent's wait-target choice and, when selected, simply isn't waited
+  (selected-immune → stays active; non-immune pick → waited; no-immunity control → waited).
 
 ## Q276 窶・Cheer Mode PL!N-bp7-030-L ab#1 (繝ｩ繧､繝匁・蜉滓凾)
 > 繝ｩ繧､繝匁・蜉滓凾・壹％縺ｮ繧ｫ繝ｼ繝峨ｒ繝ｩ繧､繝悶き繝ｼ繝臥ｽｮ縺榊ｴ縺九ｉ謇区惆縺ｫ謌ｻ縺吶ゅ◎縺ｮ蠕後∵焔譛ｭ繧・譫壽而縺亥ｮ､縺ｫ鄂ｮ縺上・- **QA rule**: winning a live with only this card still forces it back to hand (ab#1 is
@@ -161,7 +163,7 @@ cards (except Fire Bird) have no gameplay test.
 | Q271 | PL!N-bp7-025 Colorful Dreams | blade-heart 竕 heart color (score) | 笨・`bp7_q271_colorful_dreams_test` |
 | Q272 | PL!N-bp7-026 Just Believe | no-repeat select | 笨・`bp7_q272_just_believe_test` |
 | Q273 | PL!S-bp7-005 貂｡霎ｺ譖・| activated 逋ｻ蝣ｴ ability pays cost | 笨・`bp7_q273_watanabe_cost_test` |
-| Q274 | PL!S-bp7-003 譚ｾ豬ｦ譫懷漉 | wait-immune member still selectable | **gap** |
+| Q274 | PL!S-bp7-003 譚ｾ豬ｦ譫懷漉 | wait-immune member still selectable | 笨・`bp7_q274_immune_still_selectable_test` |
 | Q275 | PL!S-bp7-003 譚ｾ豬ｦ譫懷漉 | not a legal forced-wait choice | **gap** |
 | Q276 | PL!N-bp7-030 Cheer Mode | return-to-hand beats success zone | partial |
 | Q278 | PL!N-bp7-003 譯懷揩縺励★縺・| joint card = 2 blades | **gap (engine)** |
