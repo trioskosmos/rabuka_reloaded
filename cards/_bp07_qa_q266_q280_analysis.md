@@ -114,12 +114,16 @@ specific rule described. `partial` = some adjacent mechanic is tested but the QA
 - **Q279 rule**: under cards = 荳雁次豁ｩ螟｢ + 貔∬ｰｷ縺九・繧・+ 譌･驥惹ｸ玖干蟶・+ the `LL-bp1-001-R・義 joint
   card 竊・**3 blades**. The joint card does NOT add a 4th distinct name slot when its constituent
   names are already present.
-- **Status**: `bp7_under_member_per_unit_blade_test.rs` (B1) covers per-distinct-name blade under
-  member with single-name cards (dedup by card_name via
-  `apply_distinct_filter` 竊・`DistinctType::CardName`, `engine/src/ability/util.rs:2237`).
-  The **joint-card (multi-name) counting** edge (Q278/279) is **gap** and likely needs engine
-  work: `apply_distinct_filter` dedups by full card name string, so the joint card would count
-  as a distinct name in Q279 (giving 4), not 3.
+- **Status**: 笨・`bp7_q278_q279_joint_blade_test.rs`.
+  - Q278 exact: under = 荳雁次豁ｩ螟｢ `PL!N-bp1-001-R` + joint `LL-bp1-001-R・義 竊・**2 blades**.
+  - Q279 exact: under = 荳雁次豁ｩ螟｢ + 貔貔∬ｰｷ縺九・繧・+ 譌･驥惹ｸ玖干蟶・ + the joint 竊・**3 blades**.
+  - Engine: new joint-aware counter `count_distinct_member_name_units`
+    (`engine/src/ability/util.rs:2270`): ordinary cards dedupe by `normalize_name`; a joint
+    (multi-name `A&B&C`) card contributes ONE unit only when it introduces a name NOT already
+    present as a single-name card. Wired into the per-unit counts at
+    `util.rs:1642` (`count_matching_distinct`) and `effects/state.rs:52`.
+  - Tests: exact Q278, exact Q279, singles-only control (3), partial coverage (歩下+かのん+joint
+    =3), joint alone (=1), duplicate singles dedupe (=2), empty under (=0).
 
 ## Q280 窶・邀ｳ螂ｳ繝｡繧､ PL!SP-bp7-007-R・・ab#1 (繝ｩ繧､繝匁・蜉滓凾)
 > 繝ｩ繧､繝匁・蜉滓凾・夊・蛻・・繧ｨ繝阪Ν繧ｮ繝ｼ繝・ャ繧ｭ縺九ｉ縲√お繝阪Ν繧ｮ繝ｼ繧ｫ繝ｼ繝峨ｒ2譫壹え繧ｧ繧､繝育憾諷九〒鄂ｮ縺上ゅ◎繧後ｉ縺ｮ繧ｨ繝阪Ν繧ｮ繝ｼ繧ｫ繝ｼ繝峨・縲∵ｬ｡縺ｮ繧ｿ繝ｼ繝ｳ縺ｮ繧｢繧ｯ繝・ぅ繝悶ヵ繧ｧ繧､繧ｺ縺ｫ繧｢繧ｯ繝・ぅ繝悶＠縺ｪ縺・・- **QA rule**: an energy whose "do-not-activate" (繧｢繧ｯ繝・ぅ繝悶＠縺ｪ縺・ is in force stays non-activating
@@ -169,8 +173,8 @@ cards (except Fire Bird) have no gameplay test.
 | Q274 | PL!S-bp7-003 譚ｾ豬ｦ譫懷漉 | wait-immune member still selectable | 笨・`bp7_q274_immune_still_selectable_test` |
 | Q275 | PL!S-bp7-003 譚ｾ豬｡譫懷漉 | not a legal forced-wait choice | 手・`bp7_q275_forcepick_wait_test` |
 | Q276 | PL!N-bp7-030 Cheer Mode | return-to-hand beats success zone | 手・`bp7_q276_cheer_mode_return_hand_test` |
-| Q278 | PL!N-bp7-003 譯懷揩縺励★縺・| joint card = 2 blades | **gap (engine)** |
-| Q279 | PL!N-bp7-003 譯懷揩縺励★縺・| joint card 竕 extra distinct name | **gap (engine)** |
+| Q278 | PL!N-bp7-003 譯懷揩縺励★縺・| joint card = 2 blades | 手・`bp7_q278_q279_joint_blade_test` |
+| Q279 | PL!N-bp7-003 譯懷揩縺励★縺・| joint card 竕 extra distinct name | 手・`bp7_q278_q279_joint_blade_test` |
 | Q280 | PL!SP-bp7-007 邀ｳ螂ｳ繝｡繧､ | do-not-activate persists | **gap** |
 
 Plus the 8 PL!N-sd2 cards (rows 55窶・3) marked 笨・parser-only that have **no gameplay test**.

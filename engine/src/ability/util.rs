@@ -1635,7 +1635,14 @@ pub fn count_matching_distinct(
         .filter(|&&id| filter.matches(db, id, skip_empty))
         .copied()
         .collect();
-    apply_distinct_filter(&matching, filter.distinct, db).len() as u8
+    // Joint-aware count for "名前の異なるカード" mechanics (Q278/Q279): ordinary cards
+    // dedupe by name, and a joint (multi-name) card contributes one unit only when it
+    // introduces a name not already present as a single-name card.
+    if matches!(filter.distinct, Some(DistinctType::CardName)) {
+        count_distinct_member_name_units(&matching, db) as u8
+    } else {
+        apply_distinct_filter(&matching, filter.distinct, db).len() as u8
+    }
 }
 
 /// Map a stage position string to its array index (0=left, 1=center, 2=right).
@@ -2250,6 +2257,40 @@ pub fn apply_distinct_filter(
         })
         .copied()
         .collect()
+}
+
+/// Count of distinct names among member cards for a "名前の異なるメンバーカード1枚につき"
+/// (per different-named member card) effect, handling JOINT (多種統合, name "A&B&C")
+/// cards correctly. Matches official rulings Q278/Q279:
+///   - each ordinary single-name card contributes its name once (dedup);
+///   - a joint (multi-name) card ("A&...") adds one additional unit ONLY when it
+///     introduces at least one name not already present as a single-name card.
+///   Q278 (歩 + joint{歩,かのん,花帆}) = 2; Q279 (歩+かのん+花帆 + same joint) = 3,
+///   because the joint's constituent names are already present as standalones.
+pub fn count_distinct_member_name_units(cards: &[i16], card_db: &CardDatabase) -> usize {
+    let mut single_names: HashSet<String> = HashSet::default();
+    let mut joints: Vec<i16> = Vec::new();
+    for &id in cards {
+        let Some(card) = card_db.get_card(id) else { continue };
+        let raw = card.name.trim();
+        if raw.contains('&') {
+            joints.push(id);
+        } else {
+            single_names.insert(CardDatabase::normalize_name(&card.name));
+        }
+    }
+    let mut count = single_names.len();
+    for id in joints {
+        let Some(card) = card_db.get_card(id) else { continue };
+        let has_new = card
+            .name
+            .split('&')
+            .any(|part| !single_names.contains(&CardDatabase::normalize_name(part)));
+        if has_new {
+            count += 1;
+        }
+    }
+    count
 }
 
 // ============== ZONE CARD COUNT ==============

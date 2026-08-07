@@ -18,6 +18,7 @@ pub mod baton_touch_restriction_combination_test;
 pub mod baton_touch_test;
 pub mod blade_heart_colorless_test;
 pub mod bp7_q276_cheer_mode_return_hand_test;
+pub mod bp7_q278_q279_joint_blade_test;
 pub mod blade_heart_types_test;
 pub mod blade_per_discard_test;
 pub mod bloom_hs_test;

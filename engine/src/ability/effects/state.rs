@@ -49,9 +49,18 @@ impl AbilityResolver {
                 .filter(|&&cid| per_unit_filter.matches(&gs.card_database, cid, false))
                 .copied()
                 .collect();
-            let matched_count =
+            let matched_count = if matches!(
+                effect.distinct_any(),
+                Some(crate::card::DistinctType::CardName)
+            ) {
+                // Joint-aware distinct-name count (Q278/Q279): ordinary cards dedupe by
+                // name; a joint (multi-name) card adds one unit if it introduces a name
+                // not already present as a single-name card.
+                util::count_distinct_member_name_units(&matching, &gs.card_database) as u8
+            } else {
                 util::apply_distinct_filter(&matching, effect.distinct_any(), &gs.card_database)
-                    .len() as u8;
+                    .len() as u8
+            };
             let per_unit_cnt = effect.per_unit_count_any().unwrap_or(1) as u8;
             count = (matched_count / per_unit_cnt) * count.max(1);
             group_name = None;
