@@ -5,17 +5,7 @@ use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
-use rabuka_engine::zones::MemberArea;
 use std::sync::Arc;
-
-fn parse_stage_area(s: &str) -> Option<MemberArea> {
-    match s {
-        "left" => Some(MemberArea::LeftSide),
-        "center" => Some(MemberArea::Center),
-        "right" => Some(MemberArea::RightSide),
-        _ => None,
-    }
-}
 
 fn run_game_to_completion(gs: &mut GameState, _trace: bool) -> u64 {
     let mut actions = 0u64;
@@ -66,7 +56,7 @@ fn run_game_to_completion(gs: &mut GameState, _trace: bool) -> u64 {
             action
                 .parameters
                 .as_ref()
-                .and_then(|p| p.stage_area.as_deref().and_then(parse_stage_area)),
+                .and_then(|p| p.stage_area.as_deref().and_then(|s| s.parse().ok())),
             action.parameters.as_ref().and_then(|p| p.use_baton_touch),
         );
         actions += 1;

@@ -124,7 +124,7 @@ fn main() {
                 params.as_ref().and_then(|p| p.card_indices.clone()),
                 params
                     .as_ref()
-                    .and_then(|p| p.stage_area.as_deref().and_then(parse_area)),
+                    .and_then(|p| p.stage_area.as_deref().and_then(|s| s.parse().ok())),
                 params.as_ref().and_then(|p| p.use_baton_touch),
             );
             game_setup::settle_single_player_state(&mut gs);
@@ -190,14 +190,5 @@ impl Example {
             my_stage: gs.player1.stage.stage,
             opp_stage: gs.player2.stage.stage,
         }
-    }
-}
-
-fn parse_area(s: &str) -> Option<rabuka_engine::zones::MemberArea> {
-    match s {
-        "left" => Some(rabuka_engine::zones::MemberArea::LeftSide),
-        "center" => Some(rabuka_engine::zones::MemberArea::Center),
-        "right" => Some(rabuka_engine::zones::MemberArea::RightSide),
-        _ => None,
     }
 }

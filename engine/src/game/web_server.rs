@@ -2695,34 +2695,9 @@ fn serialize_p1_state(gs: &GameState) -> Vec<u8> {
     buf
 }
 fn action_type_to_idx(at: Option<&str>) -> u8 {
-    match at {
-        Some("pass") => 0,
-        Some("rock_choice") => 1,
-        Some("paper_choice") => 2,
-        Some("scissors_choice") => 3,
-        Some("choose_first_attacker") => 4,
-        Some("choose_second_attacker") => 5,
-        Some("mulligan_header") => 6,
-        Some("select_mulligan") => 7,
-        Some("confirm_mulligan") => 8,
-        Some("skip_mulligan") => 9,
-        Some("live_card_header") => 10,
-        Some("select_live_card") => 11,
-        Some("confirm_live_card_set") => 12,
-        Some("skip_live_card_set") => 13,
-        Some("play_member_to_stage") => 14,
-        Some("use_ability") => 15,
-        Some("set_live_card") => 16,
-        Some("finish_live_card_set") => 17,
-        Some("decision") => 18,
-        Some("select_card") => 19,
-        Some("select_skip") => 20,
-        Some("choose_option") => 21,
-        Some("select_position") => 22,
-        Some("energy_charge") => 23,
-        Some("pass_remaining") => 24,
-        _ => 0,
-    }
+    at.and_then(|s| s.parse::<crate::game_setup::ActionType>().ok())
+        .map(|t| crate::bot::encoding::action_type_index(&t))
+        .unwrap_or(0)
 }
 
 pub async fn run_web_server() -> std::io::Result<()> {
@@ -2846,37 +2821,6 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
             buf.extend_from_slice(&c.to_le_bytes());
         }
         buf
-    }
-
-    fn action_type_to_idx(at: Option<&str>) -> u8 {
-        match at {
-            Some("pass") => 0,
-            Some("rock_choice") => 1,
-            Some("paper_choice") => 2,
-            Some("scissors_choice") => 3,
-            Some("choose_first_attacker") => 4,
-            Some("choose_second_attacker") => 5,
-            Some("mulligan_header") => 6,
-            Some("select_mulligan") => 7,
-            Some("confirm_mulligan") => 8,
-            Some("skip_mulligan") => 9,
-            Some("live_card_header") => 10,
-            Some("select_live_card") => 11,
-            Some("confirm_live_card_set") => 12,
-            Some("skip_live_card_set") => 13,
-            Some("play_member_to_stage") => 14,
-            Some("use_ability") => 15,
-            Some("set_live_card") => 16,
-            Some("finish_live_card_set") => 17,
-            Some("decision") => 18,
-            Some("select_card") => 19,
-            Some("select_skip") => 20,
-            Some("choose_option") => 21,
-            Some("select_position") => 22,
-            Some("energy_charge") => 23,
-            Some("pass_remaining") => 24,
-            _ => 0,
-        }
     }
 
     // Need to also add recording fields to room construction
