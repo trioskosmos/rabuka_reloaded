@@ -485,14 +485,6 @@ impl GameModifiers {
             > 0
     }
 
-    /// Decrement all delayed_cannot_active counters by 1. Removes entries that reach 0.
-    pub fn tick_delayed_cannot_active(&mut self) {
-        self.delayed_cannot_active.retain(|_, count| {
-            *count = count.saturating_sub(1);
-            *count > 0
-        });
-    }
-
     /// Q280: Owner-scoped tick — decrement delayed_cannot_active counters ONLY for
     /// cards currently owned by `owned` (the active turn player). Flags belonging to
     /// other players are left untouched so they persist until that player's own next

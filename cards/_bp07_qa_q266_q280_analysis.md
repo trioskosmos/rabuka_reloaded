@@ -1,4 +1,4 @@
-# BP07 QA entries Q266窶轍280 窶・analysis & test coverage
+﻿# BP07 QA entries Q266窶轍280 窶・analysis & test coverage
 
 Source of truth: `cards/qa_data.json` (entries Q266窶轍280, dated 2026.06.26 / 2026.08.05).
 Card ability texts: `cards/cards.json` (`ability` field). Parser output / per-ability decoding:
@@ -158,13 +158,13 @@ NOT gameplay-test coverage. Coverage status of those sd2 cards in
 |------|---------|-----------|---------------------|
 | PL!N-sd2-026-P Fire Bird ab#0 | blade竕･4 竊・heart02ﾃ・ | 笨・(CLEAN-G14) | `bp7_fire_bird_blade_gain_test.rs` |
 | PL!N-sd2-001-SD2 荳雁次豁ｩ螟｢ ab#0 | E2 竊・陌ｹ繝ｶ蜥ｲ live to hand | 笨・(E2) | referenced in `bp7_audrey_blade_max_test.rs` |
-| PL!N-sd2-006-SD2 霑第ｱ溷ｽｼ譁ｹ ab#0 | wait 陌ｹ繝ｶ蜥ｲ 竊・blade2 | 笨・| **no test** (gap) |
-| PL!N-sd2-010-SD2 荳芽飴譬槫ｭ・ab#0/1 | draw2 / wait竊壇iscard竊誕ctive+blade2 | 笨・| **no test** (gap) |
-| PL!N-sd2-013-SD2 荳雁次豁ｩ螟｢ ab#0 | 陌ｹ繝ｶ蜥ｲ only 竊・opp blade竕､2 wait | 笨・| **no test** (gap) |
-| PL!N-sd2-015-SD2 譯懷揩縺励★縺・ab#0 | wait + discard 竊・draw | 笨・| **no test** (gap) |
-| PL!N-sd2-017-SD2 螳ｮ荳区・ ab#0 | E optional 竊・active 1 | 笨・| **no test** (gap) |
-| PL!N-sd2-019-SD2 蜆ｪ譛ｨ縺帙▽闖・ab#0/1 | heart05 / opp cost竕､2 wait | 笨・| **no test** (gap) |
-| PL!N-sd2-021-SD2 螟ｩ邇句ｯｺ迺・･・ab#0 | opp cost竕､4 wait | 笨・| **no test** (gap) |
+| PL!N-sd2-006-SD2 霑第ｱ溷ｽｼ譁ｹ ab#0 | wait 陌ｹ繝ｶ蜥ｲ 竊・blade2 | 笨・| covered bp7_sd2_gap_test |
+| PL!N-sd2-010-SD2 荳芽飴譬槫ｭ・ab#0/1 | draw2 / wait竊壇iscard竊誕ctive+blade2 | 笨・| covered bp7_sd2_gap_test |
+| PL!N-sd2-013-SD2 荳雁次豁ｩ螟｢ ab#0 | 陌ｹ繝ｶ蜥ｲ only 竊・opp blade竕､2 wait | 笨・| covered bp7_sd2_gap_test |
+| PL!N-sd2-015-SD2 譯懷揩縺励★縺・ab#0 | wait + discard 竊・draw | 笨・| covered bp7_sd2_gap_test |
+| PL!N-sd2-017-SD2 螳ｮ荳区・ ab#0 | E optional 竊・active 1 | 笨・| covered bp7_sd2_gap_test |
+| PL!N-sd2-019-SD2 蜆ｪ譛ｨ縺帙▽闖・ab#0/1 | heart05 / opp cost竕､2 wait | 笨・| covered bp7_sd2_gap_test |
+| PL!N-sd2-021-SD2 螟ｩ邇句ｯｺ迺・･・ab#0 | opp cost竕､4 wait | 笨・| covered bp7_sd2_gap_test |
 
 So the 笨・verdicts in `_bp07_ability_gaps_hand_analysis.md` are NOT test coverage 窶・those sd2
 cards (except Fire Bird) have no gameplay test.
