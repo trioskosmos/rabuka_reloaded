@@ -123,13 +123,27 @@ impl super::TurnEngine {
                         })
                         .collect();
                     tdbg!("PHASE_ACTIVE:3 wait_activate {} cards", to_activate.len());
+                    // Q280: capture per-card flags for THIS turn player's own cards and
+                    // which energy cards must stay inactive, BEFORE the mutable phase work
+                    // below so `turn_player`'s immutable borrow does not span them.
+                    let excluded_energy = turn_player
+                        .energy_zone
+                        .cards
+                        .iter()
+                        .filter(|&&c| game_state.mods.is_delayed_cannot_active(c))
+                        .count();
+                    let owned: crate::HashSet<i16> = turn_player.all_card_ids().into_iter().collect();
                     for &cid in &to_activate {
                         game_state.mods.add_orientation_modifier(cid, "active");
                     }
-                    tdbg!("PHASE_ACTIVE:4 wait activated");
-                    game_state.mods.tick_delayed_cannot_active();
-                    tdbg!("PHASE_ACTIVE:5 tick_delayed OK");
-                    game_state.active_player_mut().activate_all_energy();
+tdbg!("PHASE_ACTIVE:4 wait activated");
+                    // Q280: tick delayed cannot-active flags for THIS turn player's own
+                    // cards only. An opponent's intervening active phase must NOT clear
+                    // a "次のターンのアクティブフェイズにアクティブしない" flag.
+                    game_state.mods.tick_delayed_cannot_active_for(&owned);
+                    game_state
+                        .active_player_mut()
+                        .activate_all_energy_exclude(excluded_energy);
                     tdbg!("PHASE_ACTIVE:6 activate_all_energy OK");
                     // Orientation + energy activation changed → constant outputs stale.
                     game_state.mark_constants_dirty();

@@ -129,7 +129,21 @@ specific rule described. `partial` = some adjacent mechanic is tested but the QA
 > 繝ｩ繧､繝匁・蜉滓凾・夊・蛻・・繧ｨ繝阪Ν繧ｮ繝ｼ繝・ャ繧ｭ縺九ｉ縲√お繝阪Ν繧ｮ繝ｼ繧ｫ繝ｼ繝峨ｒ2譫壹え繧ｧ繧､繝育憾諷九〒鄂ｮ縺上ゅ◎繧後ｉ縺ｮ繧ｨ繝阪Ν繧ｮ繝ｼ繧ｫ繝ｼ繝峨・縲∵ｬ｡縺ｮ繧ｿ繝ｼ繝ｳ縺ｮ繧｢繧ｯ繝・ぅ繝悶ヵ繧ｧ繧､繧ｺ縺ｫ繧｢繧ｯ繝・ぅ繝悶＠縺ｪ縺・・- **QA rule**: an energy whose "do-not-activate" (繧｢繧ｯ繝・ぅ繝悶＠縺ｪ縺・ is in force stays non-activating
   next turn even if it was moved / a live-success ability tried to activate it; the
   do-not-activate effect persists until its end condition.
-- **Status**: **gap**. No test references `PL!SP-bp7-007`.
+- **Status**: 手・`bp7_q280_energy_do_not_activate_test`.
+  - The "次のターンにアクティブしない" flag is a `restriction` (`restriction_type:"cannot_active"`,
+    `delayed:true`) that the engine records via `mods.delayed_cannot_active` (per card).
+  - Fix 1 (`effects/misc.rs`): the flag was keyed to `gs.activating_card` (the member who owns
+    the ability) — now it is keyed to the **placed energy cards** (`gs.recently_moved_cards`),
+    falling back to the member only for member-restrictions with no moved target.
+  - Fix 2 (`player.rs` 銚earns energy activation is an aggregate `active_energy_count`, so a
+    flagged energy must be subtracted; new `activate_all_energy_exclude`).
+  - Fix 3 (`game_modifiers.rs`, `phases.rs`): the flag was ticked globally at every player's
+    active phase, so the owner's flag would clear on the opponent's intervening turn. New
+    owner-scoped `tick_delayed_cannot_active_for` + `Player::all_card_ids`; the Active phase
+    ticks only the turn player's flags and excludes their flagged energy from activation.
+  - Tests: (1) live-success places 2 wait energy and flags them, not the member; (2) the
+    owner's Active phase does not activate the flagged energy; (3) an opponent's Active phase
+    does not clear the owner's flag (persists through the opponent turn, per Q280).
 
 ---
 
@@ -175,6 +189,6 @@ cards (except Fire Bird) have no gameplay test.
 | Q276 | PL!N-bp7-030 Cheer Mode | return-to-hand beats success zone | 手・`bp7_q276_cheer_mode_return_hand_test` |
 | Q278 | PL!N-bp7-003 譯懷揩縺励★縺・| joint card = 2 blades | 手・`bp7_q278_q279_joint_blade_test` |
 | Q279 | PL!N-bp7-003 譯懷揩縺励★縺・| joint card 竕 extra distinct name | 手・`bp7_q278_q279_joint_blade_test` |
-| Q280 | PL!SP-bp7-007 邀ｳ螂ｳ繝｡繧､ | do-not-activate persists | **gap** |
+| Q280 | PL!SP-bp7-007 邀ｳ螂ｳ繝｡繧､ | do-not-activate persists | 手・`bp7_q280_energy_do_not_activate_test` |
 
 Plus the 8 PL!N-sd2 cards (rows 55窶・3) marked 笨・parser-only that have **no gameplay test**.

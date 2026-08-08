@@ -3639,8 +3639,19 @@ impl AbilityResolver {
         {
             if delayed {
                 // Per-card "next turn only" cannot_active flag.
-                // Only blocks the activating card, not the whole player.
-                if let Some(card_id) = gs.activating_card {
+                // Q280: the restriction's "それらのエネルギーカード" refers to the cards
+                // this ability just moved (e.g. energy placed in wait), NOT the card
+                // that owns the ability. Key the flag on the recently-moved cards so
+                // it survives being later activated/waited by other effects.
+                // Fall back to the activating card for member "次のターンにアクティブしない"
+                // restrictions where the target is the ability's own member.
+                if let Some(moved) = gs.recently_moved_cards.as_ref() {
+                    for &cid in moved.iter() {
+                        if cid != -1 {
+                            gs.mods.add_delayed_cannot_active(cid, 1);
+                        }
+                    }
+                } else if let Some(card_id) = gs.activating_card {
                     gs.mods.add_delayed_cannot_active(card_id, 1);
                 }
             } else {

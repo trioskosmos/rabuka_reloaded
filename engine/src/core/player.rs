@@ -514,6 +514,39 @@ impl Player {
         // For now, this is a no-op as orientation is tracked differently
     }
 
+    /// Q280: activate all energy IN WAIT except `excluded` cards that carry a
+    /// "このエネルギーは次のターンのアクティブフェイズにアクティブしない" flag.
+    /// Energy activation is tracked as an aggregate `active_energy_count`, so the
+    /// flagged cards are subtracted from the count instead of being keyed per card.
+    pub fn activate_all_energy_exclude(&mut self, excluded: usize) {
+        let total = self.energy_zone.cards.len() as u8;
+        self.energy_zone.active_energy_count = total.saturating_sub(excluded as u8);
+    }
+
+    /// IDs of every card this player currently owns across all zones. Used to scope
+    /// owner-specific delayed effects (e.g. "next turn" energy do-not-activate flags)
+    /// so an opponent's intervening active phase cannot clear them early.
+    pub fn all_card_ids(&self) -> SmallVec<[i16; 64]> {
+        let mut out: SmallVec<[i16; 64]> = SmallVec::new();
+        out.extend(self.main_deck.cards.iter().copied());
+        out.extend(self.hand.cards.iter().copied());
+        out.extend(self.energy_zone.cards.iter().copied());
+        out.extend(self.energy_deck.cards.iter().copied());
+        out.extend(self.waitroom.cards.iter().copied());
+        out.extend(self.live_card_zone.cards.iter().copied());
+        out.extend(self.success_live_card_zone.cards.iter().copied());
+        out.extend(self.exclusion_zone.cards.iter().copied());
+        for &cid in self.stage.stage.iter() {
+            if cid != -1 {
+                out.push(cid);
+            }
+        }
+        for stack in self.stage.under_cards.iter() {
+            out.extend(stack.iter().copied());
+        }
+        out
+    }
+
     pub fn draw_card(&mut self) -> Option<i16> {
         // Rule 8.1: Draw Phase - Active player draws 1 card from main deck to hand
         self.main_deck.draw().inspect(|&card_id| {
