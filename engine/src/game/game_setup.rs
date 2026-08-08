@@ -328,6 +328,23 @@ pub fn is_automatic_phase(game_state: &GameState) -> bool {
     )
 }
 
+/// Advance exactly one automatic phase (no pending choice), returning true if
+/// it did. Semantics identical to the inline `if !has_pending_choice { match
+/// phase { auto => advance; continue } }` blocks each engine bin used to carry.
+pub fn auto_advance_one(game_state: &mut GameState) -> bool {
+    if game_state.has_pending_choice()
+        || game_state.game_result != crate::game_state::GameResult::Ongoing
+    {
+        return false;
+    }
+    if is_automatic_phase(game_state) {
+        crate::turn::TurnEngine::advance_phase(game_state);
+        true
+    } else {
+        false
+    }
+}
+
 /// Returns true for the live-card-set phases (user must act, but it's a distinct
 /// kind of "must stop" from a normal human-decision phase).
 pub fn is_live_card_set_phase(game_state: &GameState) -> bool {

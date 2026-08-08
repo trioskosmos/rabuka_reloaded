@@ -113,19 +113,8 @@ fn main() {
             println!("  Phase: {:?}", gs.current_phase);
         }
 
-        if !gs.has_pending_choice() {
-            match gs.current_phase {
-                Phase::Active
-                | Phase::Energy
-                | Phase::Draw
-                | Phase::FirstAttackerPerformance
-                | Phase::SecondAttackerPerformance
-                | Phase::LiveVictoryDetermination => {
-                    TurnEngine::advance_phase(&mut gs);
-                    continue;
-                }
-                _ => {}
-            }
+        if game_setup::auto_advance_one(&mut gs) {
+            continue;
         }
 
         let acts = game_setup::generate_possible_actions(&gs);

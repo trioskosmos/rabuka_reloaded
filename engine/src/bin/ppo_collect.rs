@@ -107,19 +107,8 @@ fn main() {
             }
 
             // Auto-advance phases that need no player choice
-            if !gs.has_pending_choice() {
-                match gs.current_phase {
-                    Phase::Active
-                    | Phase::Energy
-                    | Phase::Draw
-                    | Phase::FirstAttackerPerformance
-                    | Phase::SecondAttackerPerformance
-                    | Phase::LiveVictoryDetermination => {
-                        TurnEngine::advance_phase(&mut gs);
-                        continue;
-                    }
-                    _ => {}
-                }
+            if game_setup::auto_advance_one(&mut gs) {
+                continue;
             }
 
             let actions = game_setup::generate_possible_actions(&gs);

@@ -2,7 +2,7 @@ use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
 use rabuka_engine::deck_parser;
 use rabuka_engine::game_setup;
-use rabuka_engine::game_state::{GameResult, GameState, Phase};
+use rabuka_engine::game_state::{GameResult, GameState};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
@@ -42,19 +42,8 @@ fn run_game_to_completion(gs: &mut GameState, _trace: bool) -> u64 {
         // If there's a pending choice, let the bot resolve it before auto-advancing.
         // (Otherwise a LiveSuccess ability that creates a choice during
         // LiveVictoryDetermination leaves it orphaned forever.)
-        if !gs.has_pending_choice() {
-            match gs.current_phase {
-                Phase::Active
-                | Phase::Energy
-                | Phase::Draw
-                | Phase::FirstAttackerPerformance
-                | Phase::SecondAttackerPerformance
-                | Phase::LiveVictoryDetermination => {
-                    TurnEngine::advance_phase(gs);
-                    continue;
-                }
-                _ => {}
-            }
+        if game_setup::auto_advance_one(gs) {
+            continue;
         }
 
         let action_list = game_setup::generate_possible_actions(gs);

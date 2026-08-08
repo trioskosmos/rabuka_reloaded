@@ -2,7 +2,7 @@ use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup;
-use rabuka_engine::game_state::{GameResult, GameState, Phase};
+use rabuka_engine::game_state::{GameResult, GameState};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
 use std::sync::Arc;
@@ -72,20 +72,9 @@ fn main() {
             phase_count = 0;
         }
 
-        if !gs.has_pending_choice() {
-            match phase {
-                Phase::Active
-                | Phase::Energy
-                | Phase::Draw
-                | Phase::FirstAttackerPerformance
-                | Phase::SecondAttackerPerformance
-                | Phase::LiveVictoryDetermination => {
-                    println!("  {pid} auto: {phase:?}");
-                    TurnEngine::advance_phase(&mut gs);
-                    continue;
-                }
-                _ => {}
-            }
+        if game_setup::auto_advance_one(&mut gs) {
+            println!("  {pid} auto: {phase:?}");
+            continue;
         }
 
         let actions = game_setup::generate_possible_actions(&gs);

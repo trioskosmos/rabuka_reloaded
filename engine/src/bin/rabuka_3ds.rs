@@ -20,7 +20,7 @@ fn main() {
         }
     };
 
-    let mut card_database = Arc::new(rabuka_engine::card::CardDatabase::load_or_create(cards));
+    let card_database = Arc::new(rabuka_engine::card::CardDatabase::load_or_create(cards));
 
     let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
         Ok(d) => d,
