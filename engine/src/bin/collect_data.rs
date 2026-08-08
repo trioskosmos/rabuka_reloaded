@@ -5,7 +5,7 @@ use std::sync::Arc;
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
 use rabuka_engine::deck_parser::DeckParser;
-use rabuka_engine::game_setup::{self, ActionType};
+use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
@@ -192,33 +192,7 @@ impl Example {
             .as_ref()
             .and_then(|p| p.card_id)
             .unwrap_or(0);
-        let at = match action.action_type {
-            ActionType::Pass => 0,
-            ActionType::RockChoice => 1,
-            ActionType::PaperChoice => 2,
-            ActionType::ScissorsChoice => 3,
-            ActionType::ChooseFirstAttacker => 4,
-            ActionType::ChooseSecondAttacker => 5,
-            ActionType::MulliganHeader => 6,
-            ActionType::SelectMulligan => 7,
-            ActionType::ConfirmMulligan => 8,
-            ActionType::SkipMulligan => 9,
-            ActionType::LiveCardHeader => 10,
-            ActionType::SelectLiveCard => 11,
-            ActionType::ConfirmLiveCardSet => 12,
-            ActionType::SkipLiveCardSet => 13,
-            ActionType::PlayMemberToStage => 14,
-            ActionType::UseAbility => 15,
-            ActionType::SetLiveCard => 16,
-            ActionType::FinishLiveCardSet => 17,
-            ActionType::ChoiceDecision => 18,
-            ActionType::ChoiceSelect => 19,
-            ActionType::ChoiceSkip => 20,
-            ActionType::ChoiceOption => 21,
-            ActionType::ChoicePosition => 22,
-            ActionType::EnergyCharge => 23,
-            ActionType::PassRemaining => 24,
-        };
+        let at = rabuka_engine::bot::encoding::action_type_index(&action.action_type);
         Self {
             state: State::capture(gs),
             action_card_id,

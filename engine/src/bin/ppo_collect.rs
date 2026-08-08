@@ -285,33 +285,7 @@ fn execute_action(gs: &mut GameState, action: &rabuka_engine::game_setup::Action
 }
 
 fn action_type_idx(t: &ActionType) -> u8 {
-    match t {
-        ActionType::Pass => 0,
-        ActionType::RockChoice => 1,
-        ActionType::PaperChoice => 2,
-        ActionType::ScissorsChoice => 3,
-        ActionType::ChooseFirstAttacker => 4,
-        ActionType::ChooseSecondAttacker => 5,
-        ActionType::MulliganHeader => 6,
-        ActionType::SelectMulligan => 7,
-        ActionType::ConfirmMulligan => 8,
-        ActionType::SkipMulligan => 9,
-        ActionType::LiveCardHeader => 10,
-        ActionType::SelectLiveCard => 11,
-        ActionType::ConfirmLiveCardSet => 12,
-        ActionType::SkipLiveCardSet => 13,
-        ActionType::PlayMemberToStage => 14,
-        ActionType::UseAbility => 15,
-        ActionType::SetLiveCard => 16,
-        ActionType::FinishLiveCardSet => 17,
-        ActionType::ChoiceDecision => 18,
-        ActionType::ChoiceSelect => 19,
-        ActionType::ChoiceSkip => 20,
-        ActionType::ChoiceOption => 21,
-        ActionType::ChoicePosition => 22,
-        ActionType::EnergyCharge => 23,
-        ActionType::PassRemaining => 24,
-    }
+    rabuka_engine::bot::encoding::action_type_index(t)
 }
 
 fn softmax(logits: &[f32]) -> Vec<f32> {
