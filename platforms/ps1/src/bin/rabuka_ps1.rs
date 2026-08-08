@@ -3,21 +3,12 @@
 
 extern crate alloc;
 
-use alloc::string::{String, ToString};
-// PS1 (MIPS-I) has no atomics: the engine's compat Arc is alloc::rc::Rc here.
-use alloc::rc::Rc as Arc;
 use alloc::vec::Vec;
 
 use rabuka_engine::card::Card;
-use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader::CardLoader;
-use rabuka_engine::game::deck_builder::DeckBuilder;
 use rabuka_engine::game::platform_ui;
-use rabuka_engine::game_setup;
-use rabuka_engine::game_state::{GameResult, GameState};
-use rabuka_engine::player::Player;
 use rabuka_engine::rng;
-use rabuka_engine::turn::TurnEngine;
 
 use rabuka_ps1::decks_baked::DECKS;
 use rabuka_ps1::display::Display;
@@ -82,147 +73,16 @@ fn main() {
     let mut input = Input::new();
     rng::seed(0x5EED);
 
-    display.clear();
-    display.println("Rabuka PS1");
-    display.swap_buffers();
-
-    let modes = ["VS AI", "2 Player", "AI vs AI"];
-    let mode_idx = {
-        let mut ui = Ps1Ui {
-            display: &mut display,
-            input: &mut input,
-        };
-        platform_ui::select(&mut ui, &modes, "Mode")
-    };
-    let vs_ai = mode_idx == 0;
-    let ai_vs_ai = mode_idx == 2;
-
     let decks = DECKS;
-    let deck_names: Vec<&str> = decks.iter().map(|d| d.name).collect();
+    let names: Vec<&str> = decks.iter().map(|d| d.name).collect();
 
-    let deck1_idx = {
-        let mut ui = Ps1Ui {
-            display: &mut display,
-            input: &mut input,
-        };
-        platform_ui::select(&mut ui, &deck_names, "Your Deck")
+    let ui = Ps1Ui {
+        display: &mut display,
+        input: &mut input,
     };
-    let deck2_idx = if vs_ai || ai_vs_ai {
-        rng::rand_range(decks.len())
-    } else {
-        let mut ui = Ps1Ui {
-            display: &mut display,
-            input: &mut input,
-        };
-        platform_ui::select(&mut ui, &deck_names, "P2 Deck")
-    };
-
-    display.clear();
-    display.println("Loading cards...");
-    display.swap_buffers();
-    let all_cards = load_deck_cards(decks, deck1_idx, deck2_idx);
-
-    display.println("Building DB...");
-    display.swap_buffers();
-    let mut db = Arc::new(CardDatabase::load_or_create(all_cards));
-
-    display.println("Building decks...");
-    display.swap_buffers();
-    let nums1: Vec<String> = decks[deck1_idx]
-        .cards
-        .iter()
-        .map(|c| c.to_string())
-        .collect();
-    let nums2: Vec<String> = decks[deck2_idx]
-        .cards
-        .iter()
-        .map(|c| c.to_string())
-        .collect();
-
-    let mut pd1 = DeckBuilder::build_deck_from_database(&mut db, nums1).expect("build P1 deck");
-    let mut pd2 = DeckBuilder::build_deck_from_database(&mut db, nums2).expect("build P2 deck");
-    DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
-    DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
-    pd1.shuffle_main_deck();
-    pd1.shuffle_energy_deck();
-    pd2.shuffle_main_deck();
-    pd2.shuffle_energy_deck();
-
-    let mut p1 = Player::new("p1".into(), "Player 1".into(), true);
-    p1.set_main_deck(pd1.main_deck);
-    p1.set_energy_deck(pd1.energy_deck);
-    let mut p2 = Player::new("p2".into(), "Player 2".into(), false);
-    p2.set_main_deck(pd2.main_deck);
-    p2.set_energy_deck(pd2.energy_deck);
-
-    display.println("Setup...");
-    display.swap_buffers();
-    let mut gs = GameState::new(p1, p2, db);
-    game_setup::setup_game(&mut gs);
-
-    loop {
-        TurnEngine::check_victory_condition(&mut gs);
-        if gs.game_result != GameResult::Ongoing {
-            let mut ui = Ps1Ui {
-                display: &mut display,
-                input: &mut input,
-            };
-            platform_ui::show_result(&mut ui, &gs);
-            break;
-        }
-        game_setup::settle_auto(&mut gs);
-        if gs.game_result != GameResult::Ongoing {
-            let mut ui = Ps1Ui {
-                display: &mut display,
-                input: &mut input,
-            };
-            platform_ui::show_result(&mut ui, &gs);
-            break;
-        }
-        if gs.is_loop_detected() {
-            let mut ui = Ps1Ui {
-                display: &mut display,
-                input: &mut input,
-            };
-            platform_ui::show_result(&mut ui, &gs);
-            break;
-        }
-
-        let actions = game_setup::generate_possible_actions(&gs);
-        if actions.is_empty() {
-            TurnEngine::advance_phase(&mut gs);
-            gs.reset_loop_detection();
-            continue;
-        }
-
-        if gs.has_pending_choice() {
-            let mut ui = Ps1Ui {
-                display: &mut display,
-                input: &mut input,
-            };
-            if !platform_ui::handle_choice(&mut ui, &mut gs) {
-                break;
-            }
-            gs.reset_loop_detection();
-            continue;
-        }
-
-        let is_ai = ai_vs_ai || (vs_ai && gs.active_player().id != gs.player1.id);
-        let ok = if is_ai {
-            platform_ui::ai_turn(&mut gs, &actions)
-        } else {
-            let mut ui = Ps1Ui {
-                display: &mut display,
-                input: &mut input,
-            };
-            platform_ui::human_turn(&mut ui, &mut gs, &actions)
-        };
-        if !ok {
-            break;
-        }
-        gs.reset_loop_detection();
-        game_setup::settle_auto(&mut gs);
-    }
+    platform_ui::run_embedded_game(ui, &names, |i| decks[i].cards, |a, b| {
+        load_deck_cards(decks, a, b)
+    });
 
     loop {
         display.swap_buffers();
