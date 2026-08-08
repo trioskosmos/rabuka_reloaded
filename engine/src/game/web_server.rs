@@ -2807,24 +2807,7 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
     }
 
     // Recording helpers
-    fn serialize_p1_state(gs: &GameState) -> Vec<u8> {
-        let mut buf = Vec::new();
-        let hand = &gs.player1.hand.cards;
-        buf.push(hand.len() as u8);
-        for &c in hand.iter() {
-            buf.extend_from_slice(&c.to_le_bytes());
-        }
-        for &c in &gs.player1.stage.stage {
-            buf.extend_from_slice(&c.to_le_bytes());
-        }
-        for &c in &gs.player2.stage.stage {
-            buf.extend_from_slice(&c.to_le_bytes());
-        }
-        buf
-    }
-
     // Need to also add recording fields to room construction
-    // and a way to enable recording
 
     HttpServer::new(move || {
         let cors = Cors::permissive();
