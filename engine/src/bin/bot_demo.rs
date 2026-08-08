@@ -4,7 +4,6 @@ use std::sync::Arc;
 use rabuka_engine::bot::Bot;
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
-use rabuka_engine::deck_builder;
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
@@ -20,24 +19,8 @@ fn main() {
     let deck = DeckParser::parse_deck_file(deck_path).unwrap();
     let card_numbers = DeckParser::deck_list_to_card_numbers(&deck);
 
-    let mut t1 = deck_builder::DeckBuilder::build_deck_from_database(
-        &mut Arc::clone(&card_database),
-        card_numbers.clone(),
-    )
-    .unwrap();
-    let mut t2 = deck_builder::DeckBuilder::build_deck_from_database(
-        &mut Arc::clone(&card_database),
-        card_numbers.clone(),
-    )
-    .unwrap();
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut t1,
-        &mut Arc::clone(&card_database),
-    );
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut t2,
-        &mut Arc::clone(&card_database),
-    );
+    let (t1, t2) =
+        game_setup::build_two_decks(&card_database, &card_numbers, &card_numbers).unwrap();
 
     let mut bot = Bot::new(Arc::clone(&card_database), 0, &card_numbers, &card_numbers);
     let weights_path = std::env::args()
@@ -174,7 +157,7 @@ fn main() {
 
     let elapsed = start.elapsed().as_secs_f64();
     println!(
-        "\n{} games — P1 {} P2 {} Draw {} ({} moves, {:.0}/s, bot_moves={})",
+        "\n{} games  EP1 {} P2 {} Draw {} ({} moves, {:.0}/s, bot_moves={})",
         NUM_GAMES,
         p1_wins,
         p2_wins,

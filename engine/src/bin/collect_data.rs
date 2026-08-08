@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
-use rabuka_engine::deck_builder;
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup::{self, ActionType};
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
@@ -28,22 +27,8 @@ fn main() {
         .nth(2)
         .unwrap_or_else(|| "../train_data.bin".into());
 
-    let mut t1 = deck_builder::DeckBuilder::build_deck_from_database(
-        &mut Arc::clone(&db),
-        card_numbers.clone(),
-    )
-    .unwrap();
-    let mut t2 =
-        deck_builder::DeckBuilder::build_deck_from_database(&mut Arc::clone(&db), card_numbers)
-            .unwrap();
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut t1,
-        &mut Arc::clone(&db),
-    );
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut t2,
-        &mut Arc::clone(&db),
-    );
+    let (t1, t2) =
+        game_setup::build_two_decks(&db, &card_numbers, &card_numbers).unwrap();
 
     let mut out = File::create(&out_path).unwrap();
     let mut total: u64 = 0;

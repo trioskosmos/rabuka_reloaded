@@ -6,7 +6,6 @@ use std::sync::Arc;
 use rabuka_engine::bot::Bot;
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
-use rabuka_engine::deck_builder;
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
@@ -25,20 +24,8 @@ fn main() {
     let cn1 = card_numbers.clone();
     let cn2 = card_numbers.clone();
 
-    let mut t1 =
-        deck_builder::DeckBuilder::build_deck_from_database(&mut Arc::clone(&card_database), cn1)
-            .expect("p1 deck");
-    let mut t2 =
-        deck_builder::DeckBuilder::build_deck_from_database(&mut Arc::clone(&card_database), cn2)
-            .expect("p2 deck");
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut t1,
-        &mut Arc::clone(&card_database),
-    );
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut t2,
-        &mut Arc::clone(&card_database),
-    );
+    let (t1, t2) =
+        game_setup::build_two_decks(&card_database, &cn1, &cn2).expect("p1/p2 decks");
 
     let num_games: u32 = std::env::args()
         .nth(1)
@@ -128,7 +115,7 @@ fn main() {
 
             let action = if let Some(ref _b) = bot {
                 if gs.active_player().id == "player1" && gs.current_phase == Phase::Main {
-                    // Use the smart heuristic — no clones, no NN
+                    // Use the smart heuristic  Eno clones, no NN
                     let heuristic =
                         rabuka_engine::bot::evaluation::pick_rollout_action(&actions, &gs);
                     // We record the state for training; the action choice is NOT random

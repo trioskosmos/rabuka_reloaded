@@ -288,6 +288,25 @@ pub struct DoubleBatonPair {
     pub cost: u8,           // Effective cost after both cost reductions
 }
 
+/// Build two (unshuffled) deck templates from card-number lists, with default
+/// energy cards added.
+/// Every engine bin previously inlined this same 6-step block; callers clone + shuffle
+/// templates per game as needed.
+pub fn build_two_decks(
+    db: &crate::compat::Arc<crate::card::CardDatabase>,
+    n1: &[String],
+    n2: &[String],
+) -> Result<(crate::deck_builder::Deck, crate::deck_builder::Deck), String> {
+    use crate::deck_builder::DeckBuilder;
+    let mut t1 = DeckBuilder::build_deck_from_database(&mut crate::compat::Arc::clone(db), n1.to_vec())
+        .map_err(|e| format!("P1 deck: {e}"))?;
+    let mut t2 = DeckBuilder::build_deck_from_database(&mut crate::compat::Arc::clone(db), n2.to_vec())
+        .map_err(|e| format!("P2 deck: {e}"))?;
+    DeckBuilder::add_default_energy_cards_from_database(&mut t1, &mut crate::compat::Arc::clone(db)).ok();
+    DeckBuilder::add_default_energy_cards_from_database(&mut t2, &mut crate::compat::Arc::clone(db)).ok();
+    Ok((t1, t2))
+}
+
 pub fn setup_game(game_state: &mut GameState) {
     // Rule 6.2: Pre-Game Procedure
     // Rule 6.2.1.7: Each player moves top 3 cards of energy deck to energy zone

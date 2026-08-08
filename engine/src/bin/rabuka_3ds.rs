@@ -1,5 +1,4 @@
 use rabuka_engine::card_loader;
-use rabuka_engine::deck_builder;
 use rabuka_engine::deck_parser;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state as game_state_mod;
@@ -43,44 +42,22 @@ fn main() {
     let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck1);
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck2);
 
-    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(
-        &mut card_database,
-        card_numbers1,
-    ) {
-        Ok(mut d) => {
-            d.shuffle_main_deck();
-            d.shuffle_energy_deck();
-            d
+    let player1_deck;
+    let player2_deck;
+    match game_setup::build_two_decks(&card_database, &card_numbers1, &card_numbers2) {
+        Ok((mut d1, mut d2)) => {
+            d1.shuffle_main_deck();
+            d1.shuffle_energy_deck();
+            d2.shuffle_main_deck();
+            d2.shuffle_energy_deck();
+            player1_deck = d1;
+            player2_deck = d2;
         }
         Err(e) => {
-            eprintln!("Failed to build deck1: {}", e);
+            eprintln!("Failed to build decks: {}", e);
             return;
         }
-    };
-
-    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(
-        &mut card_database,
-        card_numbers2,
-    ) {
-        Ok(mut d) => {
-            d.shuffle_main_deck();
-            d.shuffle_energy_deck();
-            d
-        }
-        Err(e) => {
-            eprintln!("Failed to build deck2: {}", e);
-            return;
-        }
-    };
-
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut player1_deck,
-        &mut card_database,
-    );
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut player2_deck,
-        &mut card_database,
-    );
+    }
 
     let mut p1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
     let mut p2 = Player::new("p2".to_string(), "Player 2".to_string(), false);

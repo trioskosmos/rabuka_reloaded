@@ -1,6 +1,5 @@
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
-use rabuka_engine::deck_builder;
 use rabuka_engine::deck_parser;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
@@ -123,24 +122,8 @@ fn main() {
     let deck = &deck_lists[0];
     let card_numbers = deck_parser::DeckParser::deck_list_to_card_numbers(deck);
 
-    let mut p1_template = deck_builder::DeckBuilder::build_deck_from_database(
-        &mut Arc::clone(&card_database),
-        card_numbers.clone(),
-    )
-    .expect("Failed to build P1 deck");
-    let mut p2_template = deck_builder::DeckBuilder::build_deck_from_database(
-        &mut Arc::clone(&card_database),
-        card_numbers,
-    )
-    .expect("Failed to build P2 deck");
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut p1_template,
-        &mut Arc::clone(&card_database),
-    );
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut p2_template,
-        &mut Arc::clone(&card_database),
-    );
+    let (p1_template, p2_template) = game_setup::build_two_decks(&card_database, &card_numbers, &card_numbers)
+        .expect("Failed to build decks");
 
     let mut total_actions = 0u64;
     let mut outcomes: std::collections::HashMap<String, u8> = std::collections::HashMap::default();

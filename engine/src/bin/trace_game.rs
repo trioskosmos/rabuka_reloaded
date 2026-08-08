@@ -1,6 +1,5 @@
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
-use rabuka_engine::deck_builder;
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
@@ -18,22 +17,8 @@ fn main() {
     let deck = DeckParser::parse_deck_file(deck_path).unwrap();
     let card_numbers = DeckParser::deck_list_to_card_numbers(&deck);
 
-    let cn = card_numbers.clone();
-    let mut t1 =
-        deck_builder::DeckBuilder::build_deck_from_database(&mut Arc::clone(&card_database), cn)
-            .unwrap();
-    let cn2 = card_numbers.clone();
-    let mut t2 =
-        deck_builder::DeckBuilder::build_deck_from_database(&mut Arc::clone(&card_database), cn2)
-            .unwrap();
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut t1,
-        &mut Arc::clone(&card_database),
-    );
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut t2,
-        &mut Arc::clone(&card_database),
-    );
+    let (t1, t2) =
+        game_setup::build_two_decks(&card_database, &card_numbers, &card_numbers).unwrap();
 
     let mut d1 = t1.clone();
     d1.shuffle_main_deck();

@@ -7,7 +7,6 @@ use rabuka_engine::bot::neural::PolicyNet;
 use rabuka_engine::bot::PublicObservation;
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
-use rabuka_engine::deck_builder;
 use rabuka_engine::deck_builder::Deck;
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup::{self, ActionType};
@@ -52,27 +51,11 @@ fn main() {
         network.load_weights(wp).expect("load weights");
         eprintln!("Loaded weights from {}", wp);
     } else {
-        eprintln!("No weights — random policy");
+        eprintln!("No weights  Erandom policy");
     }
 
-    let mut t1 = deck_builder::DeckBuilder::build_deck_from_database(
-        &mut Arc::clone(&db),
-        card_numbers.clone(),
-    )
-    .unwrap();
-    let mut t2 = deck_builder::DeckBuilder::build_deck_from_database(
-        &mut Arc::clone(&db),
-        card_numbers.clone(),
-    )
-    .unwrap();
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut t1,
-        &mut Arc::clone(&db),
-    );
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut t2,
-        &mut Arc::clone(&db),
-    );
+    let (mut t1, mut t2) =
+        game_setup::build_two_decks(&db, &card_numbers, &card_numbers).unwrap();
 
     let mut out = File::create(&out_path).expect("create output");
     let state_dim = EncodedState::state_dim();
