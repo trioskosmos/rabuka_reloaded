@@ -39,6 +39,19 @@ use crate::zones::MemberArea;
 use crate::Arc;
 use crate::HashSet;
 
+/// Collapse a set of offered option labels + skip flag into a single signature
+/// string, used to detect "the same offer re-presented" and dedup `choice_offered`
+/// structured entries.
+fn choice_offer_sig(offered: &[String], skip_allowed: bool) -> String {
+    use std::fmt::Write;
+    let mut sig = String::new();
+    let _ = write!(sig, "skip={};", skip_allowed);
+    for (i, o) in offered.iter().enumerate() {
+        let _ = write!(sig, "[{}]{}", i, o);
+    }
+    sig
+}
+
 #[derive(Clone, Debug)]
 pub struct AbilityResolver {
     pub pending_choice: Option<Choice>,
@@ -99,6 +112,10 @@ pub struct AbilityResolver {
     /// Formation change plan: (member_id, chosen_destination) pairs accumulated
     /// across sequential choices.  All swaps execute as a batch at the end.
     pub formation_plan: SmallVec<[(i16, String); 2]>,
+    /// Signature of the last `choice_offered` structured entry emitted, so the
+    /// same pending choice re-stored (re-prompt, auto-ability interleave) is not
+    /// re-logged as a fresh offer. `None` = never offered yet.
+    pub last_offered_sig: Option<String>,
 }
 
 impl AbilityResolver {
@@ -135,6 +152,7 @@ impl AbilityResolver {
             log_items: Vec::new(),
             formation_plan: SmallVec::new(),
             last_move_moved_any: None,
+            last_offered_sig: None,
         }
     }
 
@@ -446,6 +464,18 @@ impl AbilityResolver {
     pub(crate) fn store_pending_choice(&mut self, gs: &mut GameState) {
         gs.ability_queue.snapshot_requested = true;
         if let Some(ref choice) = self.pending_choice {
+            // Record a `choice_offered` structured entry at presentation time so
+            // the log captures what options were actually shown (before the
+            // game state may shift ahead of the player's eventual resolution).
+            // Dedup: re-storing the SAME pending choice (re-prompt, or an
+            // auto-ability processed in between) must not emit a second, identical
+            // offer block. Only a genuinely different presentation is a new offer.
+            let offered = gs.choice_offered_labels(choice);
+            let sig = choice_offer_sig(&offered, choice.allow_skip());
+            if self.last_offered_sig.as_deref() != Some(sig.as_str()) {
+                gs.push_choice_offered(choice);
+                self.last_offered_sig = Some(sig);
+            }
             // Always-on debug: log every pending choice (ABILITY_DEBUG is set true in tests)
             if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
                 match choice {
@@ -580,24 +610,8 @@ impl AbilityResolver {
             .as_ref()
             .and_then(|a| a.triggers.as_deref())
             .unwrap_or("?");
-        // Normalize trigger string to match trigger_evaluation metadata format.
-        // ability.triggers is the raw text from cards.json (e.g. "登場", "live_success"),
-        // but the trigger_evaluation entry stores a canonical English key (e.g. "debut", "live_success").
-        let trigger_str = match raw_trigger {
-            s if s.contains(crate::triggers::DEBUT) || s.contains(crate::triggers::DEBUT_EN) => {
-                "debut"
-            }
-            s if s.contains(crate::triggers::LIVE_START) => "live_start",
-            s if s.contains(crate::triggers::LIVE_SUCCESS)
-                || s.contains(crate::triggers::LIVE_SUCCESS_EN) =>
-            {
-                "live_success"
-            }
-            s if s.contains(crate::triggers::ACTIVATION) => "activation",
-            s if s.contains(crate::triggers::CONSTANT) => "constant",
-            s if s.contains(crate::triggers::AUTO) => "auto",
-            _ => raw_trigger,
-        };
+        // Canonical trigger key (shared with triggers.rs scan + negated-skip).
+        let trigger_str = crate::triggers::canonical_trigger(raw_trigger);
         let ability_text = self
             .current_ability
             .as_ref()
@@ -613,6 +627,7 @@ impl AbilityResolver {
             .collect();
         let meta = crate::core::types::LogMetadata::AbilityResolution {
             result: result.to_string(),
+            trigger: trigger_str.clone(),
             #[cfg(feature = "serde_support")]
             items: items_json.clone(),
             ability_text: ability_text.clone(),
@@ -628,7 +643,7 @@ impl AbilityResolver {
         if !crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             return;
         }
-        gs.push_structured_log(LogEntry {
+        let fallback_entry = LogEntry {
             text: log_text,
             turn: gs.turn_number,
             player_label: pp.clone(),
@@ -636,63 +651,26 @@ impl AbilityResolver {
             source_card_name: Some(card_name),
             category: "ability_resolution".to_string(),
             metadata: Some(meta),
-        });
-
-        // Update the matching trigger_evaluation entry with the resolution result.
-        // Match on (source_card_id, turn, ability_index, trigger_str) to distinguish
-        // multiple abilities on the same card with the same trigger type.
+        };
+        // Commit to the matching trigger_evaluation entry (or push standalone).
         // Use the resolver's stored index (not the queue's current entry) because
         // the queue entry may have changed during effect execution.
-        let ability_index = self.current_ability_index;
-        if let Some(cid) = card_id {
-            for entry in gs.structured_log.iter_mut().rev() {
-                if entry.category != "trigger_evaluation" {
-                    continue;
-                }
-                if entry.source_card_id != Some(cid) {
-                    continue;
-                }
-                if entry.turn != gs.turn_number {
-                    continue;
-                }
-                let trigger_match = match entry.metadata.as_ref() {
-                    Some(crate::core::types::LogMetadata::TriggerEvaluation {
-                        trigger, ..
-                    }) => trigger == trigger_str,
-                    _ => false,
-                };
-                if !trigger_match {
-                    continue;
-                }
-                let eval_idx = match entry.metadata.as_ref() {
-                    Some(crate::core::types::LogMetadata::TriggerEvaluation {
-                        ability_index,
-                        ..
-                    }) => Some(*ability_index),
-                    _ => None,
-                };
-                if let Some(ai) = ability_index {
-                    if let Some(ei) = eval_idx {
-                        if ai != ei {
-                            continue;
-                        }
-                    }
-                }
-                // Found the matching entry — update its metadata
-                if let Some(ref mut meta) = entry.metadata {
-                    *meta = crate::core::types::LogMetadata::AbilityResolution {
-                        result: result.to_string(),
-                        #[cfg(feature = "serde_support")]
-                        items: items_json.clone(),
-                        ability_text: ability_text.clone(),
-                        zone: String::new(),
-                        error: None,
-                        resolved: Some(true),
-                    };
-                }
-                break;
-            }
-        }
+        gs.commit_or_push_structured(
+            card_id,
+            &trigger_str,
+            self.current_ability_index,
+            crate::core::types::LogMetadata::AbilityResolution {
+                result: result.to_string(),
+                trigger: trigger_str.clone(),
+                #[cfg(feature = "serde_support")]
+                items: items_json.clone(),
+                ability_text: ability_text.clone(),
+                zone: zone.clone(),
+                error: error.map(|e| e.to_string()),
+                resolved: Some(true),
+            },
+            fallback_entry,
+        );
     }
 
     pub fn resolve_ability(

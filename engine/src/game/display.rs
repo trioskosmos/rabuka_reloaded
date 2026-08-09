@@ -2,7 +2,7 @@ use crate::ability::debug::AbDebug;
 use crate::ability_queue::QueueState;
 use crate::card::CardDatabase;
 use crate::card::HeartColor;
-use crate::game_state::GameState;
+use crate::game_state::{GameState, LOG_BOUND_RULE, LOG_BOUND_STRUCTURED};
 use crate::player::Player;
 use crate::types::PerformanceSnapshot;
 use crate::zones::Orientation;
@@ -1312,15 +1312,15 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     let mut rule_log = game_state.rule_log.clone();
     AbDebug::flush_to_rule_log(&mut rule_log);
     // Cap rule_log to prevent unbounded growth
-    if rule_log.len() > 500 {
-        rule_log.drain(0..rule_log.len() - 500);
+    if rule_log.len() > LOG_BOUND_RULE {
+        rule_log.drain(0..rule_log.len() - LOG_BOUND_RULE);
     }
 
     // Structured log for rich UI rendering
     let mut structured_log = game_state.structured_log.clone();
     AbDebug::flush_to_structured_log(&mut structured_log, game_state.turn_number);
-    if structured_log.len() > 500 {
-        structured_log.drain(0..structured_log.len() - 500);
+    if structured_log.len() > LOG_BOUND_STRUCTURED {
+        structured_log.drain(0..structured_log.len() - LOG_BOUND_STRUCTURED);
     }
 
     // Build performance results (grouped by player_id)

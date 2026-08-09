@@ -24,6 +24,28 @@ pub const BATON_TOUCH: &str = "baton touch";
 pub const DEBUT_EN: &str = "Debut";
 pub const LIVE_SUCCESS_EN: &str = "live_success";
 
+/// Canonical English trigger key recorded in structured-log metadata and used to
+/// match a `trigger_evaluation` entry against its eventual `ability_resolution`.
+/// Kept in one place so trigger-scan, resolver, and negated-skip all agree.
+pub fn canonical_trigger(raw: &str) -> String {
+    let key = if raw.contains(DEBUT) || raw.contains(DEBUT_EN) {
+        "debut"
+    } else if raw.contains(LIVE_START) {
+        "live_start"
+    } else if raw.contains(LIVE_SUCCESS) || raw.contains(LIVE_SUCCESS_EN) {
+        "live_success"
+    } else if raw.contains(ACTIVATION) {
+        "activation"
+    } else if raw.contains(CONSTANT) {
+        "constant"
+    } else if raw.contains(AUTO) {
+        "auto"
+    } else {
+        "unknown"
+    };
+    key.to_string()
+}
+
 // Jidou auto trigger types parsed from abilities.json (17 sub-types):
 // The TAS scan catches all of them via standard condition evaluation.
 //

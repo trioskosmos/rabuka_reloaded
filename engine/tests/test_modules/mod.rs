@@ -406,3 +406,7 @@ pub mod wonder_zone_max_repeats_test;
 
 // 蟷ｳ螳牙錐縺吶∩繧・(PL!SP-bp2-004-R) 窶・constant: center has highest cost 竊・heart03
 pub mod sumire_bp2_center_cost_test;
+
+// Rule/ability structured logging: bounded buffers, no "pending" residue after
+// resolution, and ChoiceOffered/ChoiceResolved capture.
+pub mod logging_test;

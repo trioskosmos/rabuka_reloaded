@@ -1374,18 +1374,14 @@ impl super::resolver::AbilityResolver {
             gs.push_revealed_card(cid, source, false, owner, "ability");
         }
         if !revealed_card_ids.is_empty() {
-            let names: Vec<String> = revealed_card_ids
-                .iter()
-                .filter_map(|id| gs.card_database.get_card(*id))
-                .map(|c| c.name.to_string())
-                .collect();
             let player_label =
                 super::util::target_player_label(&target, gs.ability_master_id().as_deref());
+            let turn = gs.turn_number;
             gs.push_rule_log(format!(
-                "[Turn {}] {} [[log_reveal_hand]]: {}",
-                gs.turn_number,
+                "[Turn {}] {} [[log_reveal_hand:n={}]]",
+                turn,
                 player_label,
-                names.join(", ")
+                revealed_card_ids.len()
             ));
         }
         if !effect_started {

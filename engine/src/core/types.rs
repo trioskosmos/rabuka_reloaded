@@ -917,6 +917,11 @@ pub enum LogMetadata {
     },
     AbilityResolution {
         result: String,
+        /// Canonical trigger key (debut/live_start/live_success/activation/
+        /// constant/auto) so the web renderer can still identify the trigger even
+        /// after the trigger_evaluation entry is committed in place as a
+        /// resolution.
+        trigger: String,
         #[cfg(feature = "serde_support")]
         #[cfg_attr(
             feature = "serde_support",
@@ -936,12 +941,29 @@ pub enum LogMetadata {
         )]
         resolved: Option<bool>,
     },
+    /// A player-facing choice was offered. `offered` holds the legal options
+    /// (card names, option labels, heart colors, etc.). Consumed by a later
+    /// `ChoiceResolved` entry or directly closed when skipped.
+    ChoiceOffered {
+        offered: Vec<String>,
+        skip_allowed: bool,
+    },
+    /// The resolved outcome of a previously-offered choice: what the player
+    /// actually picked (`chosen`) and whether they skipped. Only the number of
+    /// offered options is stored — the full offered array lives in the
+    /// preceding `ChoiceOffered` entry, so a `ChoiceResolved` entry stays compact.
+    ChoiceResolved {
+        offered_count: usize,
+        chosen: Vec<String>,
+        skipped: bool,
+    },
 }
 
 impl Default for LogMetadata {
     fn default() -> Self {
         LogMetadata::AbilityResolution {
             result: String::new(),
+            trigger: String::new(),
             #[cfg(feature = "serde_support")]
             items: Vec::new(),
             ability_text: String::new(),

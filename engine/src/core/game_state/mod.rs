@@ -15,6 +15,13 @@ use alloc::{
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
+/// Bound on plain-text rule log lines kept per state. Oldest lines are dropped
+/// first so a long match cannot grow the buffer without limit.
+pub const LOG_BOUND_RULE: usize = 500;
+/// Bound on structured log entries kept per state. Oldest entries are dropped
+/// first; the UI renders the newest window of game events.
+pub const LOG_BOUND_STRUCTURED: usize = 500;
+
 /// Tracking metadata for a single revealed card, kept in lockstep with the
 /// `revealed_cards` / `revealed_cost_cards` id vectors. Consolidates the four
 /// parallel `Vec` columns into one struct for better locality and fewer
@@ -869,27 +876,283 @@ impl GameState {
         }
     }
 
-    /// Push a line to the rule log. When `compact_state` is enabled, capped at 50.
+    /// Commit an ability resolution to the structured log deterministically.
+    ///
+    /// Finds the NEWEST matching `trigger_evaluation` entry for this
+    /// `(card_id, trigger_str, ability_index)` and overwrites its metadata in
+    /// place (single entry — no orphaned "pending" copy). Unlike the old logic
+    /// this does NOT require `entry.turn == current turn`, so abilities that
+    /// resolve across a turn boundary commit correctly. If no matching trigger
+    /// entry exists (e.g. constant/activation abilities with no scan entry),
+    /// falls back to pushing the supplied `fallback_entry`.
+    pub fn commit_or_push_structured(
+        &mut self,
+        card_id: Option<i16>,
+        trigger_str: &str,
+        ability_index: Option<usize>,
+        meta: crate::core::types::LogMetadata,
+        fallback_entry: crate::types::LogEntry,
+    ) {
+        if let Some(cid) = card_id {
+            for entry in self.structured_log.iter_mut().rev() {
+                if entry.category != "trigger_evaluation" {
+                    continue;
+                }
+                if entry.source_card_id != Some(cid) {
+                    continue;
+                }
+                let (t, ei) = match &entry.metadata {
+                    Some(crate::core::types::LogMetadata::TriggerEvaluation {
+                        trigger,
+                        ability_index,
+                        ..
+                    }) => (trigger.as_str(), Some(*ability_index)),
+                    _ => continue,
+                };
+                if t != trigger_str {
+                    continue;
+                }
+                if let (Some(ai), Some(ei)) = (ability_index, ei) {
+                    if ai != ei {
+                        continue;
+                    }
+                }
+                // Found the newest matching trigger — commit in place. Replace
+                // the text too so downstream consumers (e.g. tests probing for
+                // "trigger_debut") see the resolution line, not the scan line.
+                entry.metadata = Some(meta);
+                entry.text = fallback_entry.text;
+                return;
+            }
+        }
+        // No matching pending trigger (or no card id): push a standalone entry.
+        self.push_structured_log(fallback_entry);
+    }
+
+    /// Whether a zone is 非公開領域 (private / hidden): its card *identities*
+    /// must never appear in a shared log. Per rules 4.8 (main deck), 4.9
+    /// (energy deck) and 4.11 (hand). 公開領域 (stage, live zone, energy zone,
+    /// success zone, waitroom/discard, revealed, etc.) are public.
+    pub fn zone_is_private(&self, zone: &str) -> bool {
+        matches!(
+            zone,
+            "hand" | "deck" | "deck_top" | "deck_bottom" | "main_deck" | "energy_deck"
+        )
+    }
+
+    /// Resolve a card index to a readable label, checking either player.
+    /// Returns the card NAME only for public (公開領域) zones. For private zones
+    /// a neutral placeholder is returned so shared logs never leak identities.
+    pub fn resolve_index_any_player(&self, zone: &str, idx: usize) -> String {
+        if self.zone_is_private(zone) {
+            return format!("#{idx}");
+        }
+        let p1 = self.resolve_card(&self.player1, zone, idx);
+        if p1 != format!("#{idx}") {
+            return p1;
+        }
+        self.resolve_card(&self.player2, zone, idx)
+    }
+
+    fn resolve_card(&self, player: &crate::player::Player, zone: &str, idx: usize) -> String {
+        use crate::ability::util::resolve_indices_to_ids;
+        let ids = resolve_indices_to_ids(player, zone, &[idx]);
+        ids.first()
+            .and_then(|&cid| self.card_database.get_card(cid))
+            .map(|c| c.name.as_ref().to_string())
+            .unwrap_or_else(|| format!("#{idx}"))
+    }
+
+    /// Human-readable labels for the options offered by a choice, resolving any
+    /// card indices to real card names where possible.
+    pub fn choice_offered_labels(&self, choice: &crate::ability::types::Choice) -> Vec<String> {
+        use crate::ability::types::Choice as C;
+        match choice {
+            C::SelectCard {
+                zone,
+                count,
+                description,
+                card_type,
+                filtered_indices,
+                ..
+            } => {
+                let mut out = vec![format!("[{zone}] select {count} card(s): {description}")];
+                if let Some(ct) = card_type {
+                    out.push(format!("  type: {ct}"));
+                }
+                if let Some(fi) = filtered_indices {
+                    for &idx in fi {
+                        out.push(format!("  - {}", self.resolve_index_any_player(zone, idx)));
+                    }
+                }
+                if filtered_indices.is_none() {
+                    out.push(format!("  - candidates from {zone}"));
+                }
+                out
+            }
+            C::SelectTarget {
+                description,
+                options,
+                allow_skip,
+                ..
+            } => {
+                let mut out = vec![description.clone()];
+                if let Some(opts) = options {
+                    out.extend(opts.iter().map(|o| format!("  - {o}")));
+                }
+                out.push(format!("  (skip_allowed={allow_skip})"));
+                out
+            }
+            C::SelectPosition {
+                description,
+                allow_skip,
+                ..
+            } => vec![
+                format!("{description} (left/center/right)"),
+                format!("  (skip allowed={allow_skip})"),
+            ],
+            C::SelectHeartColor { count, options, .. } => {
+                let mut out = vec![format!("select {count} heart color(s)")];
+                out.extend(options.iter().map(|o| format!("  - {o}")));
+                out
+            }
+            C::SelectHeartType { count, options, .. } => {
+                let mut out = vec![format!("select {count} heart type(s)")];
+                out.extend(options.iter().map(|o| format!("  - {o}")));
+                out
+            }
+            C::SelectAutoAbility {
+                options, description, ..
+            } => {
+                let mut out = vec![description.clone()];
+                for o in options {
+                    out.push(format!("  - {} ({})", o.card_name, o.ability_text));
+                }
+                out
+            }
+            C::SelectLiveSuccess {
+                options, description, ..
+            } => {
+                let mut out = vec![description.clone()];
+                for o in options {
+                    out.push(format!("  - {}", o.card_name));
+                }
+                out
+            }
+        }
+    }
+
+    /// Push a `choice_offered` structured entry capturing the options presented
+    /// to the player at the moment the choice is stored/committed. Provides the
+    /// "offered" half of the offer→resolve pairing in the log.
+    pub fn push_choice_offered(&mut self, choice: &crate::ability::types::Choice) {
+        let offered = self.choice_offered_labels(choice);
+        let skip_allowed = choice.allow_skip();
+        let entry = crate::types::LogEntry {
+            text: format!(
+                "[choice] offered: {} option(s){}",
+                offered.len(),
+                if skip_allowed { " (skip allowed)" } else { "" }
+            ),
+            turn: self.turn_number,
+            player_label: self.player_prefix(),
+            source_card_id: self.activating_card,
+            source_card_name: self
+                .activating_card
+                .and_then(|id| self.card_database.get_card(id))
+                .map(|c| c.name.as_ref().to_string()),
+            category: "choice_offered".to_string(),
+            metadata: Some(crate::core::types::LogMetadata::ChoiceOffered {
+                offered,
+                skip_allowed,
+            }),
+        };
+        self.push_structured_log(entry);
+    }
+
+    /// Push a `choice_resolved` structured entry capturing what was offered and
+    /// what the player actually picked.
+    pub fn push_choice_resolved(
+        &mut self,
+        choice: &crate::ability::types::Choice,
+        chosen: Vec<String>,
+        skipped: bool,
+    ) {
+        let offered_count = self.choice_offered_labels(choice).len();
+        let chosen_final = if skipped {
+            vec!["skip".to_string()]
+        } else {
+            chosen
+        };
+        let entry = crate::types::LogEntry {
+            text: format!(
+                "[choice] resolved: offered {} option(s), picked {}",
+                offered_count,
+                chosen_final.join(", ")
+            ),
+            turn: self.turn_number,
+            player_label: self.player_prefix(),
+            source_card_id: self.activating_card,
+            source_card_name: self
+                .activating_card
+                .and_then(|id| self.card_database.get_card(id))
+                .map(|c| c.name.as_ref().to_string()),
+            category: "choice_resolved".to_string(),
+            metadata: Some(crate::core::types::LogMetadata::ChoiceResolved {
+                offered_count,
+                chosen: chosen_final.clone(),
+                skipped,
+            }),
+        };
+        self.push_structured_log(entry);
+        // Also emit a plain-text line so text-only log consumers (e.g. the 3DS
+        // game log history) surface the choice result without structured data.
+        self.push_rule_log(format!(
+            "[choice] resolved: offered {} option(s), picked {}",
+            offered_count,
+            chosen_final.join(", ")
+        ));
+    }
+
+    /// Push a line to the rule log. Bounded to a fixed window so memory can't
+    /// grow unbounded during a long match.
     pub fn push_rule_log(&mut self, text: String) {
         Self::push_rule_log_to(&mut self.rule_log, text);
     }
 
-    /// Push an entry to the structured log. When `compact_state` is enabled, capped at 20.
+    /// Push an entry to the structured log. Bounded to a fixed window (see
+    /// `LOG_BOUND_STRUCTURED`); the newest entries are kept.
     pub fn push_structured_log(&mut self, entry: crate::types::LogEntry) {
         Self::push_structured_log_to(&mut self.structured_log, entry);
     }
 
-    /// Field-level helper: push to a rule log Vec.
+    /// Field-level helper: push to a rule log Vec, keeping only the newest
+    /// `LOG_BOUND_RULE` lines.
     pub fn push_rule_log_to(log: &mut Vec<String>, text: String) {
         log.push(text);
+        Self::truncate_rule_log(log);
     }
 
-    /// Field-level helper: push to a structured log Vec.
+    /// Field-level helper: push to a structured log Vec, keeping only the newest
+    /// `LOG_BOUND_STRUCTURED` entries.
     pub fn push_structured_log_to(
         log: &mut Vec<crate::types::LogEntry>,
         entry: crate::types::LogEntry,
     ) {
         log.push(entry);
+        Self::truncate_structured_log(log);
+    }
+
+    fn truncate_rule_log(log: &mut Vec<String>) {
+        if log.len() > LOG_BOUND_RULE {
+            log.drain(0..log.len() - LOG_BOUND_RULE);
+        }
+    }
+
+    fn truncate_structured_log(log: &mut Vec<crate::types::LogEntry>) {
+        if log.len() > LOG_BOUND_STRUCTURED {
+            log.drain(0..log.len() - LOG_BOUND_STRUCTURED);
+        }
     }
 
     /// Push a performance snapshot.

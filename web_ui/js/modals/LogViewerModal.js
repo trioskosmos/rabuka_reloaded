@@ -94,6 +94,53 @@ export const LogViewerModal = {
         // Group logs
         let groupedLogs = [];
 
+        // Surface structured choice events (offered vs chosen) plus ability
+        // resolutions as standalone entries so they appear in the viewer even
+        // before turn_history is populated.
+        const structLog = state.structured_log || [];
+        structLog.forEach(ev => {
+            if (!ev) return;
+            const cat = ev.category || '';
+            if (cat === 'choice_resolved' || cat === 'choice_offered') {
+                const meta = ev.metadata || {};
+                const picked = (meta.chosen || []).join(', ');
+                const isResolved = cat === 'choice_resolved';
+                // Offered options are listed only on the `choice_offered` entry;
+                // a `choice_resolved` entry carries just offered_count + chosen.
+                const offeredCount = isResolved
+                    ? (meta.offered_count ?? (meta.offered || []).length)
+                    : (meta.offered || []).length;
+                groupedLogs.push({
+                    entry: ev.text || '',
+                    body: `${ev.text || ''}${picked ? ' → ' + picked : ''}`,
+                    turnNumber: ev.turn || 0,
+                    isStandalone: true,
+                    isChoice: true,
+                    ev,
+                    offeredCount,
+                    picked
+                });
+            } else if (cat === 'ability_resolution' || cat === 'trigger_evaluation') {
+                // Committed resolution metadata lacks `ability_index` (that's
+                // trigger-scan-only) and the choice fields; `resolved` is omitted
+                // from JSON when None so it can't be relied on.
+                if (ev.metadata && typeof ev.metadata === 'object'
+                    && !('ability_index' in ev.metadata)
+                    && !('chosen' in ev.metadata)
+                    && !('offered' in ev.metadata)
+                    && !('offered_count' in ev.metadata)) {
+                    groupedLogs.push({
+                        entry: ev.text || '',
+                        body: ev.text || '',
+                        turnNumber: ev.turn || 0,
+                        isStandalone: true,
+                        isResolution: true,
+                        ev
+                    });
+                }
+            }
+        });
+
         if (structured && structured.length > 0) {
             // Prefer structured turn_history when available (no execution grouping yet)
             structured.forEach(ev => {
@@ -280,6 +327,31 @@ export const LogViewerModal = {
     },
 
     createStandaloneEntry: (group, currentLang, showFriendlyAbilities) => {
+        if (group.isChoice) {
+            const div = document.createElement('div');
+            div.className = 'log-viewer-standalone log-entry-choice';
+            const meta = group.ev?.metadata || {};
+            const hasOffered = Array.isArray(meta.offered) && meta.offered.length > 0;
+            const offeredList = hasOffered
+                ? meta.offered.slice(0, 12)
+                    .map(o => '<div class="log-viewer-choice-offer">' + Tooltips.enrichAbilityText(String(o)) + '</div>')
+                    .join('')
+                : '';
+            const more = hasOffered && meta.offered.length > 12 ? `<div class="log-viewer-choice-more">… +${meta.offered.length - 12} more</div>` : '';
+            div.innerHTML = `
+                <div class="log-viewer-turn-badge">T${group.turnNumber}</div>
+                <div class="log-viewer-content">
+                    <div class="log-viewer-choice-head">${group.body || ''}</div>
+                    ${hasOffered ? `<div class="log-viewer-choice-box">
+                        <div class="log-viewer-choice-label">Offered</div>
+                        <ul class="log-viewer-choice-options">${offeredList}</ul>
+                        ${more}
+                    </div>` : ''}
+                    <div class="log-viewer-choice-picked">${i18n.t('chosen') || 'Chosen'}: <strong>${group.picked || (meta.skipped ? 'skip' : '—')}</strong></div>
+                </div>
+            `;
+            return div;
+        }
         const div = document.createElement('div');
         div.className = 'log-viewer-standalone log-entry-effect';
 

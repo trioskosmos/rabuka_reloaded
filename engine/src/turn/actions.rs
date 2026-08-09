@@ -363,6 +363,148 @@ impl super::TurnEngine {
         Ok(())
     }
 
+    /// Best-effort labels for what the player picked, resolving card indices to
+    /// card names where possible. Mirrors the decision logic in
+    /// `build_choice_result` without mutating game state.
+    fn profile_chosen_labels(
+        game_state: &GameState,
+        choice: &crate::ability::types::Choice,
+        card_id: Option<i16>,
+        card_indices: Option<&[usize]>,
+    ) -> Vec<String> {
+        use crate::ability::types::Choice as C;
+        match choice {
+            C::SelectCard { zone, .. } => {
+                let idxs = card_indices
+                    .map(|v| v.to_vec())
+                    .or_else(|| card_id.map(|id| vec![id as usize]))
+                    .unwrap_or_default();
+                if idxs.is_empty() {
+                    vec!["(none)".to_string()]
+                } else {
+                    let name = |i: usize| game_state.resolve_index_any_player(zone, i);
+                    idxs.iter().map(|&i| name(i)).collect()
+                }
+            }
+            C::SelectTarget {
+                options, target, ..
+            } => {
+                let chosen = match card_id {
+                    Some(-1) => Some("skip".to_string()),
+                    Some(id) if target != "choice"
+                        && target != "choice_string"
+                        && target != "conditional_optional" =>
+                    {
+                        // Use the option text when it's a labelled option.
+                        if let Some(ref o) = options {
+                            if id >= 0 && (id as usize) < o.len() {
+                                Some(o[id as usize].clone())
+                            } else {
+                                Some(id.to_string())
+                            }
+                        } else {
+                            Some(id.to_string())
+                        }
+                    }
+                    Some(id) => Some(id.to_string()),
+                    None if card_indices.map_or(true, |v| v.is_empty()) => {
+                        None // may be skipped; handled by skip flag
+                    }
+                    None => card_indices
+                        .and_then(|v| v.first())
+                        .and_then(|&i| options.as_ref().and_then(|o| o.get(i).cloned())),
+                };
+                chosen.map(|s| vec![s]).unwrap_or_default()
+            }
+            C::SelectPosition { .. } => card_id
+                .map(|id| {
+                    vec![match id {
+                        0 => "left".to_string(),
+                        1 => "center".to_string(),
+                        2 => "right".to_string(),
+                        _ => "center".to_string(),
+                    }]
+                })
+                .unwrap_or_default(),
+            C::SelectHeartColor { options, .. } | C::SelectHeartType { options, .. } => card_id
+                .map(|id| {
+                    let idx = id as usize;
+                    if idx < options.len() {
+                        vec![options[idx].clone()]
+                    } else {
+                        vec!["heart00".to_string()]
+                    }
+                })
+                .or_else(|| {
+                    card_indices.and_then(|v| v.first().copied()).map(|idx| {
+                        if idx < options.len() {
+                            vec![options[idx].clone()]
+                        } else {
+                            vec!["heart00".to_string()]
+                        }
+                    })
+                })
+                .unwrap_or_default(),
+            C::SelectAutoAbility { options, .. } => card_id
+                .map(|id| {
+                    let idx = id as usize;
+                    if idx < options.len() {
+                        vec![options[idx].card_name.clone()]
+                    } else {
+                        vec![format!("#{id}")]
+                    }
+                })
+                .unwrap_or_default(),
+            C::SelectLiveSuccess { options, .. } => {
+                let idx = card_indices
+                    .and_then(|v| v.first().copied())
+                    .or_else(|| card_id.map(|id| id as usize))
+                    .unwrap_or(0);
+                if idx < options.len() {
+                    vec![options[idx].card_name.clone()]
+                } else {
+                    vec![format!("#{idx}")]
+                }
+            }
+        }
+    }
+
+    /// Whether the raw resume inputs map to a "skip" outcome.
+    fn profile_choice_is_skip(
+        choice: &crate::ability::types::Choice,
+        card_id: Option<i16>,
+        card_indices: Option<&[usize]>,
+    ) -> bool {
+        use crate::ability::types::Choice as C;
+        match choice {
+            C::SelectCard { .. } => {
+                card_indices.is_some_and(|v| v.is_empty())
+                    || (card_indices.is_none() && card_id.is_none())
+            }
+            C::SelectTarget {
+                target,
+                allow_skip,
+                ..
+            } => {
+                if !allow_skip {
+                    return false;
+                }
+                match target.as_str() {
+                    "primary|alternative" => return card_id == Some(2),
+                    "pay_optional_cost:skip_optional_cost" => return card_id == Some(2),
+                    "choice" | "choice_string" | "conditional_optional" => {
+                        return card_id.is_none()
+                            && card_indices.map_or(true, |v| v.is_empty())
+                    }
+                    _ => card_id == Some(-1),
+                }
+            }
+            C::SelectPosition { allow_skip, .. } => *allow_skip && card_id.is_none(),
+            C::SelectHeartColor { .. } | C::SelectHeartType { .. } => false,
+            C::SelectAutoAbility { .. } | C::SelectLiveSuccess { .. } => false,
+        }
+    }
+
     pub fn resume_with_choice(
         game_state: &mut GameState,
         card_id: Option<i16>,
@@ -370,6 +512,13 @@ impl super::TurnEngine {
     ) -> Result<(), String> {
         let pending = game_state.ability_queue.is_waiting_for_choice().cloned();
         let choice = pending.ok_or("No pending choice to resume")?;
+
+        // Record a structured `choice_resolved` entry: what was offered vs chosen.
+        game_state.push_choice_resolved(
+            &choice,
+            Self::profile_chosen_labels(game_state, &choice, card_id, card_indices.as_deref()),
+            Self::profile_choice_is_skip(&choice, card_id, card_indices.as_deref()),
+        );
 
         let ci = card_indices.clone();
         // Handle non-ability choices early (live success, etc.)

@@ -1319,23 +1319,8 @@ impl GameState {
                 .unwrap_or_default();
             let pp = self.player_prefix();
             let trigger_str = match ability.triggers.as_deref() {
-                Some(t)
-                    if t.contains(crate::triggers::DEBUT)
-                        || t.contains(crate::triggers::DEBUT_EN) =>
-                {
-                    "debut"
-                }
-                Some(t) if t.contains(crate::triggers::LIVE_START) => "live_start",
-                Some(t)
-                    if t.contains(crate::triggers::LIVE_SUCCESS)
-                        || t.contains(crate::triggers::LIVE_SUCCESS_EN) =>
-                {
-                    "live_success"
-                }
-                Some(t) if t.contains(crate::triggers::ACTIVATION) => "activation",
-                Some(t) if t.contains(crate::triggers::CONSTANT) => "constant",
-                Some(t) if t.contains(crate::triggers::AUTO) => "auto",
-                _ => "unknown",
+                Some(raw) => crate::triggers::canonical_trigger(raw),
+                None => "unknown".to_string(),
             };
             let ability_text = ability.full_text.clone();
             let zone = card_id
@@ -1359,9 +1344,12 @@ impl GameState {
             );
             self.push_rule_log(log_text.clone());
             if !crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
+                self.ability_queue.complete_current();
+                self.activating_card = None;
+                self.activating_ability_index = None;
                 return;
             }
-            self.push_structured_log(crate::types::LogEntry {
+            let fallback_entry = crate::types::LogEntry {
                 text: log_text,
                 turn: self.turn_number,
                 player_label: pp.clone(),
@@ -1370,63 +1358,32 @@ impl GameState {
                 category: "ability_resolution".to_string(),
                 metadata: Some(crate::core::types::LogMetadata::AbilityResolution {
                     result: "skipped".to_string(),
+                    trigger: trigger_str.clone(),
+                    #[cfg(feature = "serde_support")]
+                    items: Vec::new(),
+                    ability_text: ability_text.to_string(),
+                    zone: zone.to_string(),
+                    error: Some("cards".to_string()),
+                    resolved: Some(false),
+                }),
+            };
+            // Commit to the matching trigger_evaluation entry, or push standalone.
+            self.commit_or_push_structured(
+                card_id,
+                &trigger_str,
+                Some(ability_index),
+                crate::core::types::LogMetadata::AbilityResolution {
+                    result: "skipped".to_string(),
+                    trigger: trigger_str.clone(),
                     #[cfg(feature = "serde_support")]
                     items: Vec::new(),
                     ability_text: ability_text.to_string(),
                     zone: zone.to_string(),
                     error: Some("card negated".to_string()),
-                    resolved: None,
-                }),
-            });
-            // Update matching trigger_evaluation entry
-            let ability_index = ability_index;
-            if let Some(cid) = card_id {
-                for entry in self.structured_log.iter_mut().rev() {
-                    if entry.category != "trigger_evaluation" {
-                        continue;
-                    }
-                    if entry.source_card_id != Some(cid) {
-                        continue;
-                    }
-                    if entry.turn != self.turn_number {
-                        continue;
-                    }
-                    let trigger_match = match entry.metadata.as_ref() {
-                        Some(crate::core::types::LogMetadata::TriggerEvaluation {
-                            trigger,
-                            ..
-                        }) => trigger == trigger_str,
-                        _ => false,
-                    };
-                    if !trigger_match {
-                        continue;
-                    }
-                    let eval_idx = match entry.metadata.as_ref() {
-                        Some(crate::core::types::LogMetadata::TriggerEvaluation {
-                            ability_index,
-                            ..
-                        }) => Some(*ability_index),
-                        _ => None,
-                    };
-                    if let Some(ei) = eval_idx {
-                        if ability_index != ei {
-                            continue;
-                        }
-                    }
-                    if let Some(ref mut meta) = entry.metadata {
-                        *meta = crate::core::types::LogMetadata::AbilityResolution {
-                            result: "skipped".to_string(),
-                            #[cfg(feature = "serde_support")]
-                            items: Vec::new(),
-                            ability_text: ability_text.clone(),
-                            zone: String::new(),
-                            error: None,
-                            resolved: Some(true),
-                        };
-                    }
-                    break;
-                }
-            }
+                    resolved: Some(false),
+                },
+                fallback_entry,
+            );
             self.ability_queue.complete_current();
             self.activating_card = None;
             self.activating_ability_index = None;

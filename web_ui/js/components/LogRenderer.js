@@ -16,6 +16,23 @@ const Phase = {
     LIVE_SET: 8, PERFORMANCE_P1: 9, PERFORMANCE_P2: 10, LIVE_RESULT: 11
 };
 
+// A structured entry is an ability resolution (as opposed to a pending trigger
+// scan or a choice record) once its metadata has been committed in place.
+// Reliable marker: AbilityResolution metadata carries neither `ability_index`
+// (only TriggerEvaluation has it) nor a choice-specific `chosen`/`offered`/
+// `offered_count`/`skip_allowed` field. `resolved` is intentionally NOT relied
+// on: it is an Option that is omitted from JSON when None, so it cannot
+// distinguish states.
+function structEntryIsResolution(entry) {
+    const meta = entry && entry.metadata;
+    if (!meta || typeof meta !== 'object') return false;
+    return !('ability_index' in meta)
+        && !('chosen' in meta)
+        && !('offered' in meta)
+        && !('offered_count' in meta)
+        && !('skip_allowed' in meta);
+}
+
 export const LogRenderer = {
     renderRuleLog: (containerId = 'rule-log') => {
         const ruleLogEl = document.getElementById(containerId);
@@ -311,10 +328,11 @@ export const LogRenderer = {
         flushAbGroup();
         flushSnapshot();
 
-        // Merge ability_resolution and trigger_evaluation entries with rule_log groups
-        // in turn-descending order (newest turn first), preserving original order within each turn.
+        // Merge structured entries with rule_log groups in turn-descending
+        // order (newest turn first), preserving original order within each turn.
+        const STRUCT = ['ability_resolution', 'trigger_evaluation', 'choice_offered', 'choice_resolved'];
         const structEntries = (state.structured_log || []).filter(
-            e => (e.category === 'ability_resolution' || e.category === 'trigger_evaluation') && e.metadata
+            e => STRUCT.includes(e.category) && e.metadata
         );
         const merged = [];
         groupedLogs.forEach((g, idx) => {
@@ -327,25 +345,30 @@ export const LogRenderer = {
         merged.sort((a, b) => b.turn - a.turn || a.order - b.order);
 
         merged.forEach(entry => {
-            if (entry.type === 'rule') {
-                const g = entry.data;
-                if (g.type === 'snapshot') {
-                    section.appendChild(LogRenderer.createSnapshotBlock(g, currentLang, showFriendlyAbilities));
-                } else if (g.type === 'ability_debug') {
-                    section.appendChild(LogRenderer.createAbilityDebugBlock(g, currentLang, showFriendlyAbilities));
-                } else if (g.entries) {
-                    section.appendChild(LogRenderer.createGroupedLogBlock(g, currentLang, showFriendlyAbilities));
-                } else {
-                    section.appendChild(LogRenderer.createStandaloneLogEntry(g, currentLang, showFriendlyAbilities));
+                if (entry.type === 'rule') {
+                    const g = entry.data;
+                    if (g.type === 'snapshot') {
+                        section.appendChild(LogRenderer.createSnapshotBlock(g, currentLang, showFriendlyAbilities));
+                    } else if (g.type === 'ability_debug') {
+                        section.appendChild(LogRenderer.createAbilityDebugBlock(g, currentLang, showFriendlyAbilities));
+                    } else if (g.entries) {
+                        section.appendChild(LogRenderer.createGroupedLogBlock(g, currentLang, showFriendlyAbilities));
+                    } else {
+                        section.appendChild(LogRenderer.createStandaloneLogEntry(g, currentLang, showFriendlyAbilities));
+                    }
+                } else if (structEntryIsResolution(entry.data)) {
+                    // Committed in place: category may still be trigger_evaluation,
+                    // but metadata is now an AbilityResolution — render as resolved.
+                    const block = LogRenderer.createAbilityResolutionBlock(entry.data, currentLang, showFriendlyAbilities);
+                    if (block) section.appendChild(block);
+                } else if (entry.type === 'trigger_evaluation') {
+                    const block = LogRenderer.createTriggerEvaluationBlock(entry.data, currentLang, showFriendlyAbilities);
+                    if (block) section.appendChild(block);
+                } else if (entry.type === 'choice_resolved' || entry.type === 'choice_offered') {
+                    const block = LogRenderer.createChoiceBlock(entry.data, currentLang, showFriendlyAbilities);
+                    if (block) section.appendChild(block);
                 }
-            } else if (entry.type === 'ability_resolution') {
-                const block = LogRenderer.createAbilityResolutionBlock(entry.data, currentLang, showFriendlyAbilities);
-                if (block) section.appendChild(block);
-            } else if (entry.type === 'trigger_evaluation') {
-                const block = LogRenderer.createTriggerEvaluationBlock(entry.data, currentLang, showFriendlyAbilities);
-                if (block) section.appendChild(block);
-            }
-        });
+            });
 
         PerformanceMonitor.recordEntryCount(merged.length);
         return section;
@@ -411,6 +434,60 @@ export const LogRenderer = {
             headerDiv.querySelector('.log-group-toggle').textContent = isHidden ? '▼' : '▶';
         };
 
+        return blockDiv;
+    },
+
+    createChoiceBlock: (entry, currentLang, showFriendlyAbilities) => {
+        const meta = entry.metadata || {};
+        const isResolved = entry.category === 'choice_resolved';
+        const blockDiv = document.createElement('div');
+        blockDiv.className = 'log-group-block choice-resolved-block';
+
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'log-entry ability group-header';
+        headerDiv.innerHTML = `
+            <div class="log-entry-icon"></div>
+            <div class="log-entry-content">
+                <span class="ability-visual">⚖</span>
+                <strong>${i18n.t(isResolved ? 'choice_resolved' : 'choice_offered') || (isResolved ? 'Choice Resolved' : 'Choice Offered')}</strong>
+                ${isResolved ? `<span class="choice-result">${meta.skipped ? '⤼ skip' : (meta.offered_count !== undefined ? `pick of ${meta.offered_count}` : '')}</span>` : ''}
+            </div>
+            <div class="log-group-toggle">▼</div>
+        `;
+        blockDiv.appendChild(headerDiv);
+
+        const detailsContainer = document.createElement('div');
+        detailsContainer.className = 'log-group-details';
+
+        const offered = meta.offered || [];
+        if (offered.length) {
+            const box = document.createElement('div');
+            box.className = 'log-choice-box';
+            const label = document.createElement('div');
+            label.className = 'log-choice-label';
+            label.textContent = i18n.t('offered') || 'Offered:';
+            box.appendChild(label);
+            const ul = document.createElement('ul');
+            ul.className = 'log-choice-options';
+            offered.slice(0, 12).forEach(o => {
+                const li = document.createElement('li');
+                li.className = 'log-choice-option';
+                li.innerHTML = Tooltips.enrichAbilityText(String(o));
+                ul.appendChild(li);
+            });
+            box.appendChild(ul);
+            detailsContainer.appendChild(box);
+        }
+
+        if (isResolved) {
+            const chosenRow = document.createElement('div');
+            chosenRow.className = 'log-choice-picked';
+            const chosen = (meta.chosen || []).join(', ');
+            chosenRow.innerHTML = `<strong>${i18n.t('chosen') || 'Chosen'}:</strong> ${chosen || (meta.skipped ? 'skip' : '—')}`;
+            detailsContainer.appendChild(chosenRow);
+        }
+
+        blockDiv.appendChild(detailsContainer);
         return blockDiv;
     },
 

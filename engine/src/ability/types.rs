@@ -227,6 +227,18 @@ impl Choice {
             | Choice::SelectLiveSuccess { description_ja, .. } => description_ja.as_deref(),
         }
     }
+
+    /// Whether this choice may be skipped by the player.
+    pub fn allow_skip(&self) -> bool {
+        match self {
+            Choice::SelectCard { allow_skip, .. }
+            | Choice::SelectTarget { allow_skip, .. }
+            | Choice::SelectPosition { allow_skip, .. } => *allow_skip,
+            // Heart color/type, auto-ability and live-success selections default
+            // to non-skippable.
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

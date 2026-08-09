@@ -94,7 +94,7 @@ fn parse_stage_area(s: &str) -> Option<MemberArea> {
 
 fn run_game_to_completion(gs: &mut GameState) -> u64 {
     let mut actions = 0u64;
-    let mut last_turn = 0u32;
+    let mut last_turn = 0u8;
     let mut stuck = 0u32;
 
     for _ in 0..2000 {
