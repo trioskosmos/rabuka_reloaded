@@ -9,7 +9,6 @@ use rabuka_engine::card_loader;
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
-use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
 
 fn main() {
@@ -50,22 +49,15 @@ fn main() {
     let mut draws = 0u32;
 
     for game_idx in 0..num_games {
-        let mut d1 = t1.clone();
-        let mut d2 = t2.clone();
-        d1.shuffle_main_deck();
-        d1.shuffle_energy_deck();
-        d2.shuffle_main_deck();
-        d2.shuffle_energy_deck();
-
-        let mut p1 = Player::new("p1".into(), "P1".into(), true);
-        let mut p2 = Player::new("p2".into(), "P2".into(), false);
-        p1.set_main_deck(d1.main_deck);
-        p1.set_energy_deck(d1.energy_deck);
-        p2.set_main_deck(d2.main_deck);
-        p2.set_energy_deck(d2.energy_deck);
-
-        let mut gs = GameState::new(p1, p2, Arc::clone(&card_database));
-        game_setup::setup_game(&mut gs);
+        let mut gs = rabuka_engine::bin_common::deal_game(
+            &card_database,
+            &t1,
+            &t2,
+            "p1",
+            "P1",
+            "p2",
+            "P2",
+        );
 
         let mut examples: Vec<Example> = Vec::with_capacity(200);
         let mut step_count = 0u32;
@@ -104,7 +96,7 @@ fn main() {
 
             let action = if let Some(ref _b) = bot {
                 if gs.active_player().id == "player1" && gs.current_phase == Phase::Main {
-                    // Use the smart heuristic  Eno clones, no NN
+                    // Use the smart heuristic 窶・no clones, no NN
                     let heuristic =
                         rabuka_engine::bot::evaluation::pick_rollout_action(&actions, &gs);
                     // We record the state for training; the action choice is NOT random
@@ -116,18 +108,7 @@ fn main() {
                 actions[rand::thread_rng().gen_range(0..actions.len())].clone()
             };
 
-            let params = action.parameters.clone();
-            let _ = TurnEngine::execute_main_phase_action(
-                &mut gs,
-                &action.action_type,
-                params.as_ref().and_then(|p| p.card_id),
-                params.as_ref().and_then(|p| p.card_indices.clone()),
-                params
-                    .as_ref()
-                    .and_then(|p| p.stage_area.as_deref().and_then(|s| s.parse().ok())),
-                params.as_ref().and_then(|p| p.use_baton_touch),
-            );
-            game_setup::settle_single_player_state(&mut gs);
+            let _ = rabuka_engine::bin_common::execute_and_settle(&mut gs, &action);
         }
 
         let p1z = gs.player1.success_live_card_zone.cards.len();
@@ -162,7 +143,7 @@ fn main() {
 
         if game_idx % 50 == 0 || game_idx == num_games - 1 || p1z >= 3 || p2z >= 3 {
             eprintln!(
-                "Game {}: success {}–{} (examples={}, total={})",
+                "Game {}: success {}-{} (examples={}, total={})",
                 game_idx + 1,
                 p1z,
                 p2z,

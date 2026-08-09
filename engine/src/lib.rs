@@ -48,6 +48,10 @@ pub mod decks_cards_gen;
 #[cfg(not(feature = "no_std"))]
 pub mod bot;
 
+// Shared orchestration helpers for the std-only engine binaries
+#[cfg(not(feature = "no_std"))]
+pub mod bin_common;
+
 // Game logic modules
 pub mod game;
 pub use game::deck_builder;

@@ -11,7 +11,6 @@ use rabuka_engine::deck_builder::Deck;
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup::{self, ActionType};
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
-use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
 use rand::Rng;
 
@@ -51,7 +50,7 @@ fn main() {
         network.load_weights(wp).expect("load weights");
         eprintln!("Loaded weights from {}", wp);
     } else {
-        eprintln!("No weights  Erandom policy");
+        eprintln!("No weights 窶・random policy");
     }
 
     let (mut t1, mut t2) =
@@ -249,39 +248,12 @@ fn main() {
     eprintln!("Trajectories written to {}", out_path);
 }
 
-fn setup_game(db: &Arc<CardDatabase>, t1: &mut Deck, t2: &mut Deck) -> GameState {
-    let mut d1 = t1.clone();
-    d1.shuffle_main_deck();
-    d1.shuffle_energy_deck();
-    let mut d2 = t2.clone();
-    d2.shuffle_main_deck();
-    d2.shuffle_energy_deck();
-
-    let mut p1 = Player::new("p1".into(), "P1".into(), true);
-    let mut p2 = Player::new("p2".into(), "P2".into(), false);
-    p1.set_main_deck(d1.main_deck);
-    p1.set_energy_deck(d1.energy_deck);
-    p2.set_main_deck(d2.main_deck);
-    p2.set_energy_deck(d2.energy_deck);
-
-    let mut gs = GameState::new(p1, p2, Arc::clone(db));
-    game_setup::setup_game(&mut gs);
-    gs
+fn setup_game(db: &Arc<CardDatabase>, t1: &Deck, t2: &Deck) -> GameState {
+    rabuka_engine::bin_common::deal_game(db, t1, t2, "p1", "P1", "p2", "P2")
 }
 
 fn execute_action(gs: &mut GameState, action: &rabuka_engine::game_setup::Action) {
-    let params = action.parameters.clone();
-    let _ = TurnEngine::execute_main_phase_action(
-        gs,
-        &action.action_type,
-        params.as_ref().and_then(|p| p.card_id),
-        params.as_ref().and_then(|p| p.card_indices.clone()),
-        params
-            .as_ref()
-            .and_then(|p| p.stage_area.as_deref().and_then(|s| s.parse().ok())),
-        params.as_ref().and_then(|p| p.use_baton_touch),
-    );
-    game_setup::settle_single_player_state(gs);
+    let _ = rabuka_engine::bin_common::execute_and_settle(gs, action);
 }
 
 fn action_type_idx(t: &ActionType) -> u8 {

@@ -3,7 +3,6 @@ use rabuka_engine::card_loader;
 use rabuka_engine::deck_parser;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState};
-use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
 use std::sync::Arc;
 
@@ -109,22 +108,15 @@ fn main() {
     let mut p1_first_count = 0u32;
     let num_games = 5000;
     for _ in 0..num_games {
-        let mut p1_deck = p1_template.clone();
-        let mut p2_deck = p2_template.clone();
-        p1_deck.shuffle_main_deck();
-        p1_deck.shuffle_energy_deck();
-        p2_deck.shuffle_main_deck();
-        p2_deck.shuffle_energy_deck();
-
-        let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-        let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
-        player1.set_main_deck(p1_deck.main_deck);
-        player1.set_energy_deck(p1_deck.energy_deck);
-        player2.set_main_deck(p2_deck.main_deck);
-        player2.set_energy_deck(p2_deck.energy_deck);
-
-        let mut gs = GameState::new(player1, player2, Arc::clone(&card_database));
-        game_setup::setup_game(&mut gs);
+        let mut gs = rabuka_engine::bin_common::deal_game(
+            &card_database,
+            &p1_template,
+            &p2_template,
+            "player1",
+            "Player 1",
+            "player2",
+            "Player 2",
+        );
         total_actions += run_game_to_completion(&mut gs, false);
         // Record who is first attacker at game end
         if gs.player1.is_first_attacker {

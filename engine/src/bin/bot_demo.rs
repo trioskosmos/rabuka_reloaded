@@ -6,8 +6,7 @@ use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup;
-use rabuka_engine::game_state::{GameResult, GameState, Phase};
-use rabuka_engine::player::Player;
+use rabuka_engine::game_state::{GameResult, Phase};
 use rabuka_engine::turn::TurnEngine;
 
 fn main() {
@@ -39,22 +38,15 @@ fn main() {
     let start = std::time::Instant::now();
 
     for game_idx in 0..NUM_GAMES {
-        let mut d1 = t1.clone();
-        d1.shuffle_main_deck();
-        d1.shuffle_energy_deck();
-        let mut d2 = t2.clone();
-        d2.shuffle_main_deck();
-        d2.shuffle_energy_deck();
-
-        let mut p1 = Player::new("player1".into(), "P1".into(), true);
-        let mut p2 = Player::new("player2".into(), "P2".into(), false);
-        p1.set_main_deck(d1.main_deck);
-        p1.set_energy_deck(d1.energy_deck);
-        p2.set_main_deck(d2.main_deck);
-        p2.set_energy_deck(d2.energy_deck);
-
-        let mut gs = GameState::new(p1, p2, Arc::clone(&card_database));
-        game_setup::setup_game(&mut gs);
+        let mut gs = rabuka_engine::bin_common::deal_game(
+            &card_database,
+            &t1,
+            &t2,
+            "player1",
+            "P1",
+            "player2",
+            "P2",
+        );
 
         let mut stuck = 0u32;
         let mut last_turn = 0u8;
@@ -118,35 +110,20 @@ fn main() {
                 actions[fastrand(0, actions.len())].clone()
             };
 
-            let params = action.parameters.clone();
-            let _ = TurnEngine::execute_main_phase_action(
-                &mut gs,
-                &action.action_type,
-                params.as_ref().and_then(|p| p.card_id),
-                params.as_ref().and_then(|p| p.card_indices.clone()),
-                params
-                    .as_ref()
-                    .and_then(|p| p.stage_area.as_deref().and_then(|s| s.parse().ok())),
-                params.as_ref().and_then(|p| p.use_baton_touch),
-            );
-            game_setup::settle_single_player_state(&mut gs);
+            let _ = rabuka_engine::bin_common::execute_and_settle(&mut gs, &action);
             total_actions += 1;
         }
 
-        let p1z = gs.player1.success_live_card_zone.cards.len();
-        let p2z = gs.player2.success_live_card_zone.cards.len();
-        if p1z >= 3 && p2z <= 2 {
-            p1_wins += 1;
-        } else if p2z >= 3 && p1z <= 2 {
-            p2_wins += 1;
-        } else {
-            draws += 1;
+        match rabuka_engine::bin_common::classify_winner(&gs) {
+            rabuka_engine::bin_common::GameOutcome::P1Win => p1_wins += 1,
+            rabuka_engine::bin_common::GameOutcome::P2Win => p2_wins += 1,
+            _ => draws += 1,
         }
     }
 
     let elapsed = start.elapsed().as_secs_f64();
     println!(
-        "\n{} games  EP1 {} P2 {} Draw {} ({} moves, {:.0}/s, bot_moves={})",
+        "\n{} games 遯ｶ繝ｻP1 {} P2 {} Draw {} ({} moves, {:.0}/s, bot_moves={})",
         NUM_GAMES,
         p1_wins,
         p2_wins,
