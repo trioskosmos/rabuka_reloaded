@@ -4,15 +4,15 @@ use agb::display::font::{Font, Layout, LayoutSettings, ObjectTextRenderer};
 use agb::display::object::{Object, Size};
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Rgb15};
 
-static FONT: Font = agb::include_font!("assets/pixelated.ttf", 10);
+static FONT: Font = agb::include_font!("assets/NotoSubset.otf", 10);
 
 /// Hard ceiling on the number of letter-group sprites in a single screen.
 ///
 /// Each letter group is one OAM object, and the GBA OAM only holds 128 objects;
 /// `Object::show` silently drops anything beyond 128, which showed up as missing
 /// / garbled text (visual artefacts) on long screens. We cap well under the OAM
-/// limit. (Each 16x16 sprite also costs 4 VRAM tiles, so 120 groups * 4 = 480
-/// tiles, far under the 1024-tile sprite budget — both caps are satisfied.)
+/// limit. (Each 32x16 sprite costs 8 VRAM tiles, so 120 groups * 8 = 960 tiles,
+/// under the 1024-tile sprite budget.)
 const MAX_GROUPS: usize = 120;
 
 /// Text display on the GBA (via agb). Text is accumulated into a buffer and
@@ -38,11 +38,13 @@ impl<'a> Display<'a> {
             palette[1] = Rgb15::WHITE;
             Palette16::new(palette)
         };
-        // Small 16x16 sprites (4 VRAM tiles each) so any single allocation
-        // always fits and groups stay within the sprite bounds (the default
-        // max_group_width is 16). This is the proven object-text size used by
-        // the real agb examples/games.
-        let text_renderer = ObjectTextRenderer::new((&PALETTE).into(), Size::S16x16);
+        // Wide 32x16 sprites so each object packs ~3 characters (agb's
+        // max_group_width is measured in pixels; the default 16 with 16x16
+        // sprites made every character its own OAM object, so text screens blew
+        // past the 128-object OAM cap -> dropped objects (artefacts) and slow
+        // re-renders on cursor moves). Group width 32 matches the 32px sprite;
+        // max_line_length wraps long lines instead of running off the screen.
+        let text_renderer = ObjectTextRenderer::new((&PALETTE).into(), Size::S32x16);
         Display {
             gfx,
             buf: String::new(),
@@ -83,7 +85,9 @@ impl<'a> Display<'a> {
         drop(self.gfx.frame());
         let mut frame = self.gfx.frame();
 
-        let settings = LayoutSettings::new();
+        let settings = LayoutSettings::new()
+            .with_max_group_width(32)
+            .with_max_line_length(220);
         let layout = Layout::new(&self.buf, &FONT, &settings);
 
         // Reuse the existing Vec so a screen change doesn't allocate a fresh
