@@ -4,7 +4,7 @@ use agb::display::font::{Font, Layout, LayoutSettings, ObjectTextRenderer};
 use agb::display::object::{Object, Size};
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Rgb15};
 
-static FONT: Font = agb::include_font!("assets/pixelated.ttf", 10);
+static FONT: Font = agb::include_font!("assets/MPLUS1p.ttf", 10);
 
 /// Text display on the GBA (via agb). Text is accumulated into a buffer and
 /// rendered as sprites (objects) when `swap_buffers` is called.
