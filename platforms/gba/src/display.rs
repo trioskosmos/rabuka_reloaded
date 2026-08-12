@@ -4,7 +4,7 @@ use agb::display::font::{Font, Layout, LayoutSettings, ObjectTextRenderer};
 use agb::display::object::{Object, Size};
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Rgb15};
 
-static FONT: Font = agb::include_font!("assets/MPLUS1p.ttf", 10);
+static FONT: Font = agb::include_font!("assets/PixelMplus12.ttf", 12);
 
 /// Text display on the GBA (via agb). Text is accumulated into a buffer and
 /// rendered as sprites (objects) when `swap_buffers` is called.
@@ -74,7 +74,7 @@ impl<'a> Display<'a> {
         drop(self.gfx.frame());
         let mut frame = self.gfx.frame();
 
-        let settings = LayoutSettings::new();
+        let settings = LayoutSettings::new().with_max_line_length(230);
         let layout = Layout::new(&self.buf, &FONT, &settings);
 
         let mut new_objects = Vec::new();

@@ -79,7 +79,7 @@ pub fn show_result(ui: &mut dyn PlatformUi, gs: &GameState) {
 pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
     let mut sel: usize = 0;
     let mut scroll: usize = 0;
-    const VIS: usize = 14;
+    const VIS: usize = 10;
     loop {
         if sel < scroll {
             scroll = sel;
@@ -128,7 +128,7 @@ pub fn menu_select(
     };
     let mut sel: usize = 0;
     let mut scroll: usize = 0;
-    const VIS: usize = 14;
+    const VIS: usize = 10;
     loop {
         if sel < scroll {
             scroll = sel;
