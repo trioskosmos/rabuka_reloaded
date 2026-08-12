@@ -4,16 +4,16 @@ use agb::display::font::{Font, Layout, LayoutSettings, ObjectTextRenderer};
 use agb::display::object::{Object, Size};
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Rgb15};
 
-static FONT: Font = agb::include_font!("assets/NotoSubset.otf", 8);
+static FONT: Font = agb::include_font!("assets/NotoSubset.otf", 10);
 
 /// Hard ceiling on the number of letter-group sprites in a single screen.
 ///
 /// Each letter group is one OAM object, and the GBA OAM only holds 128 objects;
 /// `Object::show` silently drops anything beyond 128, which showed up as missing
 /// / garbled text (visual artefacts) on long screens. We cap well under the OAM
-/// limit. (Each 32x16 sprite costs 8 VRAM tiles, so 120 groups * 8 = 960 tiles,
+/// limit. (Each 32x32 sprite costs 16 VRAM tiles, so 60 groups * 16 = 960 tiles,
 /// under the 1024-tile sprite budget.)
-const MAX_GROUPS: usize = 120;
+const MAX_GROUPS: usize = 60;
 
 /// Text display on the GBA (via agb). Text is accumulated into a buffer and
 /// rendered as sprites (objects) when `swap_buffers` is called.
@@ -38,13 +38,14 @@ impl<'a> Display<'a> {
             palette[1] = Rgb15::WHITE;
             Palette16::new(palette)
         };
-        // Wide 32x16 sprites so each object packs ~3 characters (agb's
-        // max_group_width is measured in pixels; the default 16 with 16x16
-        // sprites made every character its own OAM object, so text screens blew
-        // past the 128-object OAM cap -> dropped objects (artefacts) and slow
-        // re-renders on cursor moves). Group width 32 matches the 32px sprite;
-        // max_line_length wraps long lines instead of running off the screen.
-        let text_renderer = ObjectTextRenderer::new((&PALETTE).into(), Size::S32x16);
+        // Wide/tall 32x32 sprites so each object packs ~3 characters at the
+        // readable 10px size (agb's max_group_width is in pixels; the old
+        // 16x16/default-16 made every character its own OAM object -> ~200
+        // objects/screen exceeded the 128-object OAM cap (artefacts) and slow
+        // re-renders). 32px tall also fits the taller Japanese glyphs without
+        // the sprite-height set_pixel panic. Group width 32 matches the sprite;
+        // max_line_length wraps long lines instead of running off-screen.
+        let text_renderer = ObjectTextRenderer::new((&PALETTE).into(), Size::S32x32);
         Display {
             gfx,
             buf: String::new(),
