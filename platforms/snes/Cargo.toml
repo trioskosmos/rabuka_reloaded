@@ -1,0 +1,33 @@
+[package]
+name = "rabuka_snes"
+version = "0.1.0"
+authors = ["Rabuka Reloaded"]
+edition = "2021"
+description = "Rabuka Reloaded for the SNES (via rust-mos / llvm-mos mosw65816)"
+build = "build.rs"
+
+# Standalone (not part of the repo root workspace) — the snes build uses a
+# custom rust-mos toolchain + target, incompatible with the host workspace.
+[workspace]
+
+[dependencies]
+rabuka_engine = { path = "../../engine", default-features = false, features = ["snes"] }
+
+# smallvec's impl_array! emits [T; 0x10000]... which overflow a 16-bit usize and
+# collide with [T; 0] on the 65816. Use a vendored copy with those sizes
+# cfg-gated off on target_pointer_width="16". Scoped to THIS crate (standalone,
+# not a workspace member) so no other port is affected.
+[patch.crates-io]
+smallvec = { path = "vendor/smallvec" }
+
+[profile.dev]
+opt-level = 3
+debug = true
+
+[profile.dev.build-override]
+opt-level = 3
+
+[profile.release]
+opt-level = 2
+lto = "fat"
+debug = false

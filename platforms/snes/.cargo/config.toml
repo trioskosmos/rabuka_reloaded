@@ -1,0 +1,16 @@
+[build]
+# SNES is a custom rust-mos target spec, not a built-in rustc triple. It is
+# committed as `targets/mos-snes-none.json` and referenced by file path.
+target = "targets/mos-snes-none.json"
+
+[target.mos-snes-none]
+# rust-mos (a rustc fork based on llvm-mos) is installed via prebuilt release
+# tarballs + `rustup toolchain link mos <dir>`, OR the `mrkits/rust-mos` Docker
+# image. Build on WSL2/Ubuntu x86_64 (NOT Windows-native; llvm-mos is Linux-first).
+#
+# The rustflags are placeholders and MUST be confirmed against the rust-mos SDK
+# (llvm-mos-sdk `snes` platform: mos-snes-clang + crt0) and the LoROM linker
+# script (lorom.ld). See kassane/rust-mos-examples for the reference setup.
+rustflags = [
+    "-Ctarget-cpu=mosw65816",
+]
