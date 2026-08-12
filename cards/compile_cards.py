@@ -219,6 +219,10 @@ def generate_cards_gen(
 // an interned string table.  Cards can be decoded on demand from the
 // blob, enabling ROM-based storage and per-deck-card RAM loading.
 
+/// The full 600KB card database (all cards). The 16-bit `snes` target cannot
+/// represent a single >64KB object and uses per-deck blobs instead, so this is
+/// excluded there.
+#[cfg(not(feature = "snes"))]
 pub const CARD_BLOB: &[u8] = &[
 {chr(10).join(hex_lines)}
 ];

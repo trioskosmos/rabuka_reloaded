@@ -44,10 +44,18 @@ impl CardLoader {
     /// This is the single entry point that all ports should use.
     /// Under `compact_card_data`, decodes from the embedded blob instead (zero serde).
     pub fn load_cards_from_strs(cards_json: &str) -> Result<Vec<Card>, String> {
-        #[cfg(feature = "compact_card_data")]
+        #[cfg(all(feature = "compact_card_data", not(feature = "snes")))]
         {
             let _ = cards_json;
             return Ok(Self::load_all_cards_from_blob());
+        }
+        #[cfg(feature = "snes")]
+        {
+            // SNES loads per-deck card blobs (see deck_parser::load_two_decks),
+            // not the full embedded CARD_BLOB. This full-database loader is
+            // unavailable there.
+            let _ = cards_json;
+            return Err("load_cards_from_strs is not available on the snes target".to_string());
         }
         #[cfg(all(not(feature = "compact_card_data"), feature = "serde_support"))]
         {
@@ -85,7 +93,7 @@ impl CardLoader {
     /// Requires the `compact_card_data` feature. Decodes every card in the blob and
     /// attaches ability references — a drop-in replacement for the JSON loader, verified
     /// by `card_binary::tests::test_blob_matches_json` (2280/2280 cards).
-    #[cfg(feature = "compact_card_data")]
+    #[cfg(all(feature = "compact_card_data", not(feature = "snes")))]
     pub fn load_all_cards_from_blob() -> Vec<Card> {
         let mut cards: Vec<Card> = Vec::new();
         let num_cards = crate::core::card_binary::blob_card_count();

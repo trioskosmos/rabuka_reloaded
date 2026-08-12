@@ -1,27 +1,40 @@
 use alloc::{string::String, vec::Vec};
 
-use agb::display::font::{
-    Font, Layout, LayoutSettings, RegularBackgroundTextRenderer,
+use agb::display::font::{Font, Layout, LayoutSettings};
+use agb::display::tiled::{
+    RegularBackground, RegularBackgroundSize, TileEffect, TileFormat, TileSet, TileSetting,
 };
-use agb::display::tiled::{RegularBackground, RegularBackgroundSize, TileFormat};
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Priority, Rgb15};
 
 static FONT: Font = agb::include_font!("assets/NotoSubset.otf", 12);
 
-/// Text display on the GBA via a tiled background font.
+/// Glyph cell size in pixels (each glyph occupies a CELLxCELL block of 8x8
+/// tiles). 16px holds a readable 12px font and fullwidth Japanese.
+const CELL: usize = 16;
+const TILE: usize = 8;
+const TILES_PER_GLYPH: usize = 4; // 2x2 tiles per glyph
+/// Max unique glyphs per screen. Each uses 4 tiles; 120*4 = 480 tiles fits the
+/// ~512-tile background VRAM budget (and is freed when the bg is recreated).
+const MAX_GLYPHS: usize = 120;
+/// Cells that fit on the 240x160 screen at 16px.
+const COLS: usize = 15;
+const ROWS: usize = 10;
+
+#[repr(align(4))]
+struct TileBuf([u8; MAX_GLYPHS * TILES_PER_GLYPH * 32]);
+static mut TILE_DATA: TileBuf = TileBuf([0; MAX_GLYPHS * TILES_PER_GLYPH * 32]);
+
+/// Tile-sharing text renderer on a tiled background.
 ///
-/// This is the approach real (including Japanese) GBA games use for text: a
-/// tiled background layer with a shared glyph tile set written into a tile map.
-/// Unlike the sprite/object renderer it has no 128-object cap (so a whole
-/// screen of text renders) and updates are cheap tile-map writes (so dpad
-/// cursor moves are fast, not re-creating hundreds of sprite objects).
-///
-/// We use agb's `RegularBackgroundTextRenderer` and recreate it (plus the
-/// background) on every screen change. Its `DynamicTile16`s free their VRAM
-/// when dropped, so old screens don't accumulate in VRAM.
+/// Real (including Japanese) GBA games render text this way: rasterize each
+/// unique glyph once into shared 8x8 tiles, then point the tile map at them via
+/// `set_tile` (which dedups identical tiles in VRAM). This avoids the
+/// sprite/object renderer's 128-object cap (whole screens fit) and the
+/// per-glyph DynamicTile16 renderer's VRAM exhaustion (glyphs are shared, and
+/// the background is recreated each screen so its tiles free on drop). Cursor
+/// moves only rewrite tile-map entries, so navigation is fast.
 pub struct Display<'a> {
     gfx: Graphics<'a>,
-    bg: RegularBackground,
     buf: String,
     last: String,
 }
@@ -36,11 +49,6 @@ impl<'a> Display<'a> {
         gfx.set_background_palette(0, &PALETTE);
         Display {
             gfx,
-            bg: RegularBackground::new(
-                Priority::P0,
-                RegularBackgroundSize::Background32x32,
-                TileFormat::FourBpp,
-            ),
             buf: String::new(),
             last: String::new(),
         }
@@ -56,36 +64,126 @@ impl<'a> Display<'a> {
     }
 
     pub fn swap_buffers(&mut self) {
-        // The engine re-renders the same (unchanged) buffer every frame in its
-        // input loops. If nothing changed, skip entirely.
         if self.buf == self.last {
             return;
         }
         self.last = self.buf.clone();
 
-        // Recreate the background + renderer so any previous screen's dynamic
-        // tiles are freed from VRAM before we draw the new screen.
+        // 1. Collect the unique characters on this screen.
+        let mut glyphs: Vec<(char, usize)> = Vec::new();
+        for ch in self.buf.chars() {
+            if ch == '\n' {
+                continue;
+            }
+            if !glyphs.iter().any(|(c, _)| *c == ch) {
+                glyphs.push((ch, glyphs.len()));
+                if glyphs.len() >= MAX_GLYPHS {
+                    break;
+                }
+            }
+        }
+
+        // 2. Rasterize each glyph into the shared static tile buffer.
+        unsafe {
+            for (ch, gidx) in glyphs.iter() {
+                let bmp = rasterize_glyph(*ch);
+                let base = gidx * TILES_PER_GLYPH * 32;
+                for ty in 0..2usize {
+                    for tx in 0..2usize {
+                        let tile = pack_tile(&bmp, tx, ty);
+                        let dst = base + (ty * 2 + tx) * 32;
+                        TILE_DATA.0[dst..dst + 32].copy_from_slice(&tile);
+                    }
+                }
+            }
+        }
+        let tile_bytes = glyphs.len() * TILES_PER_GLYPH * 32;
+        let tileset = unsafe { TileSet::new(&TILE_DATA.0[..tile_bytes], TileFormat::FourBpp) };
+
+        // 3. Build a fresh background and fill the tile map.
         let mut bg = RegularBackground::new(
             Priority::P0,
             RegularBackgroundSize::Background32x32,
             TileFormat::FourBpp,
         );
-        let settings = LayoutSettings::new().with_max_line_length(230);
-        let layout = Layout::new(&self.buf, &FONT, &settings);
-
-        let mut text_renderer = RegularBackgroundTextRenderer::new((4, 2), 0);
-        for group in layout {
-            text_renderer.show(&mut bg, &group);
+        let mut cx = 0usize;
+        let mut cy = 0usize;
+        for ch in self.buf.chars() {
+            if cy >= ROWS {
+                break;
+            }
+            if ch == '\n' {
+                cx = 0;
+                cy += 1;
+                continue;
+            }
+            if cx >= COLS {
+                cx = 0;
+                cy += 1;
+                continue;
+            }
+            let gidx = glyphs
+                .iter()
+                .find(|(c, _)| *c == ch)
+                .map(|(_, i)| *i)
+                .unwrap_or(0);
+            set_cell(&mut bg, &tileset, cx, cy, gidx);
+            cx += 1;
         }
-        self.bg = bg;
 
         let mut frame = self.gfx.frame();
-        self.bg.show(&mut frame);
+        bg.show(&mut frame);
         frame.commit();
     }
 
-    /// Wait for the next VBlank without swapping buffers.
     pub fn wait(&mut self) {
         busy_wait_for_vblank();
     }
+}
+
+fn set_cell(bg: &mut RegularBackground, ts: &TileSet, cx: usize, cy: usize, gidx: usize) {
+    let b = gidx * TILES_PER_GLYPH;
+    let px = cx * 2;
+    let py = cy * 2;
+    let e = TileEffect::new(false, false, 0);
+    bg.set_tile((px, py), ts, TileSetting::new(b as u16, e));
+    bg.set_tile((px + 1, py), ts, TileSetting::new((b + 1) as u16, e));
+    bg.set_tile((px, py + 1), ts, TileSetting::new((b + 2) as u16, e));
+    bg.set_tile((px + 1, py + 1), ts, TileSetting::new((b + 3) as u16, e));
+}
+
+/// Rasterize a single character into a CELLxCELL palette-index bitmap
+/// (0 = transparent, 1 = foreground/white).
+fn rasterize_glyph(ch: char) -> [u8; CELL * CELL] {
+    let mut bmp = [0u8; CELL * CELL];
+    let mut sbuf = [0u8; 4];
+    let txt = ch.encode_utf8(&mut sbuf);
+    let layout = Layout::new(txt, &FONT, &LayoutSettings::new());
+    for group in layout {
+        for (pos, pal) in group.pixels() {
+            let x = pos.x as i32;
+            let y = pos.y as i32;
+            // Small vertical offset so the glyph sits inside the 16px cell.
+            let y = y + 2;
+            if x >= 0 && y >= 0 && (x as usize) < CELL && (y as usize) < CELL && pal != 0 {
+                bmp[(y as usize) * CELL + (x as usize)] = 1;
+            }
+        }
+    }
+    bmp
+}
+
+/// Pack an 8x8 sub-tile of the glyph bitmap into GBA 4bpp tile bytes (32 bytes).
+fn pack_tile(bmp: &[u8; CELL * CELL], tx: usize, ty: usize) -> [u8; 32] {
+    let mut tile = [0u8; 32];
+    for r in 0..TILE {
+        for c in 0..TILE {
+            let src = (ty * TILE + r) * CELL + (tx * TILE + c);
+            let val = bmp[src] & 0xF;
+            let byte = r * 4 + c / 2;
+            let shift = if c % 2 == 0 { 4 } else { 0 };
+            tile[byte] |= val << shift;
+        }
+    }
+    tile
 }

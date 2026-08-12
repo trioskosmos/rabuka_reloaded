@@ -1,6 +1,8 @@
 use super::card::{BaseHeart, BladeHeart, Card, CardType, HeartColor, HeartMap, SpecialHeart};
 #[cfg(not(feature = "external_card_data"))]
-use super::cards_gen::{CARD_BLOB, CARD_STRINGS};
+use super::cards_gen::CARD_STRINGS;
+#[cfg(all(not(feature = "external_card_data"), not(feature = "snes")))]
+use super::cards_gen::CARD_BLOB;
 
 // PS1: the card blob is loaded from the CD at runtime (2MB RAM can't hold it
 // baked). The platform fills these before decoding; the embedded const is not
@@ -12,6 +14,7 @@ pub static mut EXTERN_CARD_BLOB_LEN: usize = 0;
 
 /// The active card blob: the embedded const, or the runtime-loaded buffer.
 #[inline]
+#[cfg(not(feature = "snes"))]
 fn blob() -> &'static [u8] {
     #[cfg(feature = "external_card_data")]
     unsafe {
@@ -35,6 +38,7 @@ const MAGIC: &[u8; 4] = b"CARD";
 /// Parse the CARD_BLOB header and return (num_cards, strtab_len, strtab_start, length_start, data_start).
 /// Header: magic(4) + num_cards(u16) + strtab_len(u32). Then strtab, then a u8
 /// per-card length table, then card data. Card starts are prefix sums of lengths.
+#[cfg(not(feature = "snes"))]
 fn parse_header() -> Option<(u32, u32, usize, usize, usize)> {
     if blob().len() < 10 || &blob()[0..4] != MAGIC {
         return None;
@@ -55,6 +59,7 @@ fn parse_header() -> Option<(u32, u32, usize, usize, usize)> {
 
 /// Get the byte offset of card `idx`'s data within CARD_BLOB.
 /// O(n) prefix-sum over the u8 length table — cheap (cards are 25-41 bytes).
+#[cfg(not(feature = "snes"))]
 fn card_data_offset(idx: usize) -> Option<usize> {
     let (num_cards, _strtab_len, _strtab_start, length_start, data_start) = parse_header()?;
     if idx >= num_cards as usize {
@@ -258,6 +263,7 @@ fn decode_card_from_record(rec: &[u8], strtab: &[u8]) -> Option<Card> {
 }
 
 /// Decode a single card from the active blob (embedded const or runtime buffer).
+#[cfg(not(feature = "snes"))]
 pub fn decode_card_from_blob(idx: usize) -> Option<Card> {
     let offset = card_data_offset(idx)?;
     let data = &blob()[offset..];
@@ -352,6 +358,7 @@ fn color_from_u8(v: u8) -> HeartColor {
 
 /// Build a CardDatabase containing only the specified subset of cards.
 /// Reads each card from the CARD_BLOB by index, decodes it, and assigns a sequential ID.
+#[cfg(not(feature = "snes"))]
 pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
     let mut cards: HashMap<i16, super::card::Card> = HashMap::default();
     let mut card_no_to_id: HashMap<String, i16> = HashMap::default();
@@ -376,12 +383,14 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
 }
 
 /// Number of cards stored in the embedded CARD_BLOB.
+#[cfg(not(feature = "snes"))]
 pub fn blob_card_count() -> usize {
     parse_header().map(|(n, ..)| n as usize).unwrap_or(0)
 }
 
 /// Find the blob index of a card by its `card_no`.
 /// Linear scan — use sparingly. For GBA, pre-resolve deck card indices at boot.
+#[cfg(not(feature = "snes"))]
 pub fn find_card_index_by_no(card_no: &str) -> Option<usize> {
     let (_num_cards, _strtab_len, _strtab_start, _length_start, _data_start) = parse_header()?;
     #[cfg(feature = "external_card_data")]

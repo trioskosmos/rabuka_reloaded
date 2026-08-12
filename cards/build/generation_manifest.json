@@ -1,7 +1,7 @@
 {
   "schema": "compiled_abilities.v1",
   "compiler": "cards/compile_abilities.py",
-  "engine_commit": "9f467464",
+  "engine_commit": "d92487a4",
   "input": {
     "source": "cards/abilities.json",
     "sha256": "357707460df27b68",

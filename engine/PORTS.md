@@ -825,6 +825,38 @@ copied from kassane/rust-mos-examples. Build command used throughout:
      **compiler bug in the rust-mos fork on large byte-array typeck**, not a
      data-representation issue. No clean engine-side workaround is obvious.
 
+**Workaround attempt — empirically resolved (Aug 2026).** Ran a focused
+experiment on the real toolchain to characterize the failure precisely. Results:
+
+- **A single `[u8; N]` over ~32KB is fundamentally impossible on 16-bit.** Both a
+  literal and `include_bytes!` of a 40KB blob fail with
+  `E0080: values of the type [u8; 40960] are too big for the target architecture`
+  (16-bit max object size ≈ `isize::MAX`). Sizes ≤16KB compile fine. So the
+  engine's `CARD_BLOB` (40KB, addressed by global byte offsets) **cannot be one
+  contiguous array on 16-bit** — it needs a chunked/per-card data layout, which
+  means restructuring `card_binary.rs`'s offset-based reads. Chunking into ≤16KB
+  `const` arrays **is verified to compile**.
+- **`BYTECODE` hits a second, independent rust-mos ICE** that no representation
+  avoids: `consts.rs:221` during `check_match` of `BYTECODE`, triggered by
+  `&BYTECODE[start..end]` in `vm.rs:102`. Tested and failed with **const**, with
+  **`static`**, and with a **raw-pointer `from_raw_parts` slice** — same ICE
+  every time. It's a robust compiler bug in type-checking the referenced bytecode
+  const, not a code-shape issue.
+
+**Conclusion (final):** the SNES port is **confirmed impractical for this
+engine**, by actually fighting the toolchain rather than speculating. The walls
+compound: (1) `smallvec` 16-bit — *fixed*; (2) `DECK_CARD_FILES` — *fixed*
+(unneeded); (3) `CARD_BLOB` — hard 16-bit size limit, needs a data-layout
+restructure; (4) `BYTECODE` — a `check_match` rust-mos ICE robust to const,
+`static`, and raw-pointer forms. Four separate 16-bit issues, at least two
+without clean workarounds, all on a niche ~2-yr-behind single-maintainer fork.
+**SNES is a dead end for rabuka. Treat `platforms/snes/` (target spec, vendored
+smallvec, scaffolding) as dormant research, not a shipping target.** GBA (288KB)
+and PS1 (2MB) remain the proven floor. All temporary experiment edits to
+`cards_gen.rs`/`abilities_gen.rs`/`vm.rs`/`deck_parser.rs` were reverted — the
+only remaining SNES artifacts are the isolated `platforms/snes/` scaffolding
+(which does not affect any other port).
+
 4. **Windows host `cargo build`/`test` is broken for an unrelated reason.** A
    hello-world fails to link on this machine in any directory. Root cause: no
    Microsoft VS C++ Build Tools installed (no MSVC `link.exe`/`cl.exe`), and
@@ -848,4 +880,45 @@ SNES as a research dead-end, not a shipping target.** The accumulated blockers
 (smallvec 16-bit, const-data, then this ICE) are exactly the fragility predicted
 at the start, and the rules logic still hasn't even been reached. GBA and PS1
 remain the proven floor.
+
+---
+
+## SNES — REVERSED: it now COMPILES (Aug 2026)
+
+**The engine's `no_std` core now builds for `mos-snes-none` (SNES/65816) on the
+rust-mos toolchain.** The "dead end" verdict was wrong — it was based on hitting
+compiler bugs without yet finding the right workaround. What actually fixed it
+(all u8/u16, honoring "narrow offsets where possible"):
+
+1. **Max object size on 16-bit is ~32KB (`isize::MAX`), NOT 64KB.** A single
+   `[u8; 60000]` still fails ("extern static is too large"). Chunks must be
+   **≤ ~30KB**. (Verified empirically: 16KB passes, 32KB fails.)
+
+2. **`BYTECODE` (92KB) → chunked extern arrays + a `(u8, u16, u16)` loc table.**
+   `compile_abilities.py` now splits the bytecode into ≤30KB chunks and emits,
+   under `#[cfg(feature = "snes")]`:
+   - `extern "C" { pub static BYTECODE_C0..C3: [u8; <30KB>]; }` — data placed in
+     ROM by the linker (extern symbols avoid rust-mos's const-eval/match-check ICE).
+   - `pub const ABILITY_LOCS: &[(u8, u16, u16)]` — per-ability
+     (chunk_idx, start, len), so no offset exceeds 16-bit. A generated
+     `bytecode_slice(ci, start, len)` helper returns the slice.
+   - `vm.rs` is cfg-aware: host uses the old flat `BYTECODE`/`OFFSET_DELTAS`;
+     snes uses `ABILITY_LOCS` + `bytecode_slice`. All `u8`/`u16`.
+
+3. **`CARD_BLOB` (600KB full database) → gated OFF for snes.** The snes/GBA
+   runtime loads **per-deck blobs** (`decks_cards_gen::DECK_CARD_BLOBS` via
+   `load_two_decks` → `decode_all_cards_from_slice`), not the full database.
+   So `CARD_BLOB` + its blob()-based consumers (`blob`, `parse_header`,
+   `card_data_offset`, `decode_card_from_blob`, `blob_card_count`,
+   `load_cards_from_blob`, `find_card_index_by_no`, `load_all_cards_from_blob`)
+   are `#[cfg(not(feature = "snes"))]`; `decode_all_cards_from_slice` (slice-arg,
+   no CARD_BLOB) remains available for snes.
+
+**Result:** `cargo build --release -Zbuild-std=core,alloc --target
+mos-snes-none.json` **succeeds** (EXIT 0). The host build is unaffected (still
+uses the inline const path; both compile). The remaining work to a *running* SNES
+game is the ROM build (link the extern blob data in via a linker script + crt0,
+the llvm-mos-sdk `snes` platform) and the ~200 lines of tile/input glue — the
+"compiles" milestone that was previously blocked is now done. GBA/PS1 remain
+proven and shipped; SNES is no longer a compiler dead-end.
 

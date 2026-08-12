@@ -1,4 +1,7 @@
+#[cfg(not(feature = "snes"))]
 use super::abilities_gen::{BYTECODE, NUM_ABILITIES, OFFSET_DELTAS, STRINGS};
+#[cfg(feature = "snes")]
+use super::abilities_gen::{ABILITY_LOCS, NUM_ABILITIES, STRINGS, bytecode_slice};
 use super::enums::EffectState;
 use crate::ability::enums::ActionType;
 #[cfg_attr(not(feature = "debug_conditions"), allow(unused_imports))]
@@ -83,6 +86,7 @@ pub fn ability_count() -> usize {
 /// Rebuilt from `OFFSET_DELTAS` (per-ability slice lengths) as a running
 /// prefix sum. Ability indexes are small and lookups are rare (decode is
 /// lazy/on-demand), so the linear walk is negligible.
+#[cfg(not(feature = "snes"))]
 fn offset_of(idx: usize) -> usize {
     OFFSET_DELTAS[..idx].iter().map(|&d| d as usize).sum()
 }
@@ -94,12 +98,27 @@ pub fn get_ability(idx: usize) -> Result<Ability, DecodeError> {
             max: NUM_ABILITIES,
         });
     }
-    let start = offset_of(idx);
-    let end = start + OFFSET_DELTAS[idx] as usize;
-    if start >= end {
-        return Ok(Ability::default());
-    }
-    let slice = &BYTECODE[start..end];
+    #[cfg(not(feature = "snes"))]
+    let (slice, start, end) = {
+        let start = offset_of(idx);
+        let end = start + OFFSET_DELTAS[idx] as usize;
+        if start >= end {
+            return Ok(Ability::default());
+        }
+        (&BYTECODE[start..end], start, end)
+    };
+    #[cfg(feature = "snes")]
+    let (slice, start, end) = {
+        let (ci, start, len) = ABILITY_LOCS[idx];
+        if len == 0 {
+            return Ok(Ability::default());
+        }
+        (
+            bytecode_slice(ci, start as usize, len as usize),
+            start as usize,
+            (start + len) as usize,
+        )
+    };
     let mut bc = BcReader::new(slice);
     if let Some(ability) = decode_ability(&mut bc) {
         return Ok(ability);
