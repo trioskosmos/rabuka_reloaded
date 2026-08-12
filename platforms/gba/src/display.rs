@@ -4,16 +4,7 @@ use agb::display::font::{Font, Layout, LayoutSettings, ObjectTextRenderer};
 use agb::display::object::{Object, Size};
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Rgb15};
 
-static FONT: Font = agb::include_font!("assets/NotoSubset.otf", 10);
-
-/// Hard ceiling on the number of letter-group sprites in a single screen.
-///
-/// Each letter group is one OAM object, and the GBA OAM only holds 128 objects;
-/// `Object::show` silently drops anything beyond 128, which showed up as missing
-/// / garbled text (visual artefacts) on long screens. We cap well under the OAM
-/// limit. (Each 32x32 sprite costs 16 VRAM tiles, so 60 groups * 16 = 960 tiles,
-/// under the 1024-tile sprite budget.)
-const MAX_GROUPS: usize = 60;
+static FONT: Font = agb::include_font!("assets/pixelated.ttf", 10);
 
 /// Text display on the GBA (via agb). Text is accumulated into a buffer and
 /// rendered as sprites (objects) when `swap_buffers` is called.
@@ -38,14 +29,11 @@ impl<'a> Display<'a> {
             palette[1] = Rgb15::WHITE;
             Palette16::new(palette)
         };
-        // Wide/tall 32x32 sprites so each object packs ~3 characters at the
-        // readable 10px size (agb's max_group_width is in pixels; the old
-        // 16x16/default-16 made every character its own OAM object -> ~200
-        // objects/screen exceeded the 128-object OAM cap (artefacts) and slow
-        // re-renders). 32px tall also fits the taller Japanese glyphs without
-        // the sprite-height set_pixel panic. Group width 32 matches the sprite;
-        // max_line_length wraps long lines instead of running off-screen.
-        let text_renderer = ObjectTextRenderer::new((&PALETTE).into(), Size::S32x32);
+        // Small 16x16 sprites (4 VRAM tiles each) so any single allocation
+        // always fits and groups stay within the sprite bounds (the default
+        // max_group_width is 16). This is the proven object-text size used by
+        // the real agb examples/games.
+        let text_renderer = ObjectTextRenderer::new((&PALETTE).into(), Size::S16x16);
         Display {
             gfx,
             buf: String::new(),
@@ -86,19 +74,16 @@ impl<'a> Display<'a> {
         drop(self.gfx.frame());
         let mut frame = self.gfx.frame();
 
-        let settings = LayoutSettings::new()
-            .with_max_group_width(32)
-            .with_max_line_length(220);
+        let settings = LayoutSettings::new();
         let layout = Layout::new(&self.buf, &FONT, &settings);
 
-        // Reuse the existing Vec so a screen change doesn't allocate a fresh
-        // buffer. `MAX_GROUPS` keeps us under both the 128-object OAM cap and
-        // the 1024-tile sprite budget, so no groups are silently dropped and no
-        // sprite tiles are over-allocated.
-        self.text_objects = layout
-            .take(MAX_GROUPS)
-            .map(|group| self.text_renderer.show(&group, (4, 2)))
-            .collect();
+        let mut new_objects = Vec::new();
+        // Safety cap: each 16x16 sprite costs 4 tiles; the sprite allocator has
+        // 1024 tiles, so a single screen must stay well under 256 groups.
+        for group in layout.take(240) {
+            new_objects.push(self.text_renderer.show(&group, (4, 2)));
+        }
+        self.text_objects = new_objects;
 
         for object in &self.text_objects {
             object.show(&mut frame);
