@@ -1278,7 +1278,8 @@ impl GameState {
         // watcher re-queued by its own effect's movement) must never spin forever.
         // Abort resolution past an absurd number of calls instead of hanging or
         // overflowing a counter.
-        use core::sync::atomic::{AtomicU32, Ordering};
+        use crate::compat::atomic::AtomicU32;
+        use core::sync::atomic::Ordering;
         static PCA_CALLS: AtomicU32 = AtomicU32::new(0);
         if PCA_CALLS.fetch_add(1, Ordering::Relaxed) > 200_000 {
             log::error!(

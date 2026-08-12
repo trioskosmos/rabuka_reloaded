@@ -60,3 +60,36 @@ pub(crate) use std::collections::BTreeMap;
 pub(crate) use alloc::collections::VecDeque;
 #[cfg(not(feature = "no_std"))]
 pub(crate) use std::collections::VecDeque;
+
+/// Atomic counter for the defensive runaway-loop guards.
+///
+/// `core::sync::atomic::AtomicU32` does not exist on targets without 32-bit
+/// atomics (GBA ARMv4T, PS1 MIPS-I). Those ports are single-threaded, so a
+/// `Cell`-based counter with a relaxed `fetch_add` is a drop-in replacement.
+/// (`Ordering` always exists and is used unchanged from `core`.) On targets
+/// with atomics (including host builds) it resolves to `core`'s `AtomicU32`.
+pub(crate) mod atomic {
+    #[cfg(target_has_atomic = "32")]
+    pub use core::sync::atomic::AtomicU32;
+
+    #[cfg(not(target_has_atomic = "32"))]
+    #[derive(Debug)]
+    pub struct AtomicU32(core::cell::Cell<u32>);
+
+    #[cfg(not(target_has_atomic = "32"))]
+    impl AtomicU32 {
+        pub const fn new(v: u32) -> Self {
+            AtomicU32(core::cell::Cell::new(v))
+        }
+        pub fn fetch_add(&self, v: u32, _order: core::sync::atomic::Ordering) -> u32 {
+            let cur = self.0.get();
+            self.0.set(cur.wrapping_add(v));
+            cur
+        }
+    }
+
+    // Console ports are single-threaded; the counter is only ever touched from
+    // the single game thread, so exposing it as Sync is safe.
+    #[cfg(not(target_has_atomic = "32"))]
+    unsafe impl Sync for AtomicU32 {}
+}

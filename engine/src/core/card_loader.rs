@@ -18,7 +18,7 @@ use std::vec::Vec;
 use crate::ability::abilities_gen::{CARD_ABILITY_PAIRS, STRINGS};
 use crate::ability::ability_store::AbilityRef;
 use crate::card::Card;
-use crate::HashMap;
+use crate::{HashMap, HashSet};
 
 pub struct CardLoader;
 
@@ -102,9 +102,35 @@ impl CardLoader {
     /// No abilities are decoded here — just u16 indices stored on each card.
     /// Abilities are decoded lazily on first access via AbilityRef::deref().
     pub fn attach_abilities(cards: &mut [Card]) {
-        let ability_map = Self::build_abilities_map_shared();
+        if cards.is_empty() {
+            return;
+        }
+        // Only build the map entries for the card numbers actually present in
+        // `cards`. A deck loads a handful of cards (~40), but the full shared
+        // map covers all ~2280 cards — building it every attach spikes RAM on
+        // console ports (a ~190KB transient on 64-bit hosts). We do a single
+        // pass over the flat CARD_ABILITY_PAIRS and keep only wanted cards.
+        let mut wanted: HashSet<String> = HashSet::default();
+        for card in cards.iter() {
+            wanted.insert(card.card_no.to_string());
+        }
+        let mut map: HashMap<String, Vec<AbilityRef>> = HashMap::default();
+        let mut i = 0;
+        while i + 1 < CARD_ABILITY_PAIRS.len() {
+            let str_idx = CARD_ABILITY_PAIRS[i] as usize;
+            let ability_idx = CARD_ABILITY_PAIRS[i + 1];
+            if str_idx < STRINGS.len() {
+                let card_no = STRINGS[str_idx];
+                if wanted.contains(card_no) {
+                    map.entry(card_no.to_string())
+                        .or_default()
+                        .push(AbilityRef::index(ability_idx));
+                }
+            }
+            i += 2;
+        }
         for card in cards.iter_mut() {
-            if let Some(card_abilities) = ability_map.get(card.card_no.as_ref()) {
+            if let Some(card_abilities) = map.get(card.card_no.as_ref()) {
                 card.abilities = card_abilities.to_vec();
             }
         }

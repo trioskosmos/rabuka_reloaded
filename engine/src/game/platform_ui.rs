@@ -538,7 +538,16 @@ pub fn run_match<U: PlatformUi>(
             continue;
         }
 
+        // In VsAi the human only plays P1. During RPS, `active_player()` stays the
+        // first attacker (P1) for the whole hand, so the AI never gets a turn and
+        // the match soft-locks waiting for a P2 RPS choice. The engine routes RPS
+        // picks positionally (1st act -> P1, 2nd act -> P2), so once P1 has chosen,
+        // the next RPS pick is P2's and must be taken by the AI.
+        let rps_ai_turn = matches!(mode, MatchMode::VsAi)
+            && gs.current_phase == crate::game_state::Phase::RockPaperScissors
+            && gs.player1_rps_choice.is_some();
         let is_ai = matches!(mode, MatchMode::AiVsAi)
+            || rps_ai_turn
             || (matches!(mode, MatchMode::VsAi) && gs.active_player().id != gs.player1.id);
         let ok = if is_ai {
             ai_turn(&mut gs, &acts)

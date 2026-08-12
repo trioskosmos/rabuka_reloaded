@@ -17,9 +17,25 @@ use smallvec::SmallVec;
 
 /// Bound on plain-text rule log lines kept per state. Oldest lines are dropped
 /// first so a long match cannot grow the buffer without limit.
+///
+/// The GBA is text-only and never renders a log-history screen, so it must not
+/// accumulate a log buffer in RAM at all — the log pushes would otherwise
+/// reserve ~116KB just to hold strings that are never shown. Bounds are 0 there
+/// (each push is immediately dropped). Other console targets keep a small
+/// window; desktop keeps the full history.
+#[cfg(feature = "gba")]
+pub const LOG_BOUND_RULE: usize = 0;
+#[cfg(all(feature = "compact_state", not(feature = "gba")))]
+pub const LOG_BOUND_RULE: usize = 60;
+#[cfg(not(feature = "compact_state"))]
 pub const LOG_BOUND_RULE: usize = 500;
 /// Bound on structured log entries kept per state. Oldest entries are dropped
 /// first; the UI renders the newest window of game events.
+#[cfg(feature = "gba")]
+pub const LOG_BOUND_STRUCTURED: usize = 0;
+#[cfg(all(feature = "compact_state", not(feature = "gba")))]
+pub const LOG_BOUND_STRUCTURED: usize = 60;
+#[cfg(not(feature = "compact_state"))]
 pub const LOG_BOUND_STRUCTURED: usize = 500;
 
 /// Tracking metadata for a single revealed card, kept in lockstep with the

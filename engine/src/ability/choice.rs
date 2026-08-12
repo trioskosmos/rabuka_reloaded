@@ -2968,7 +2968,8 @@ impl super::resolver::AbilityResolver {
     ) -> Result<(), String> {
         // Safety timeout: a runaway optional-cost re-trigger loop (see the
         // each_time watcher fix) must abort rather than hang forever.
-        use core::sync::atomic::{AtomicU32, Ordering};
+        use crate::compat::atomic::AtomicU32;
+        use core::sync::atomic::Ordering;
         static CHOICE_CALLS: AtomicU32 = AtomicU32::new(0);
         if CHOICE_CALLS.fetch_add(1, Ordering::Relaxed) > 200_000 {
             log::error!(

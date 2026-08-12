@@ -6,6 +6,15 @@ use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Rgb15};
 
 static FONT: Font = agb::include_font!("assets/pixelated.ttf", 10);
 
+/// Hard ceiling on the number of letter-group sprites in a single screen.
+///
+/// Each letter group is one OAM object, and the GBA OAM only holds 128 objects;
+/// `Object::show` silently drops anything beyond 128, which showed up as missing
+/// / garbled text (visual artefacts) on long screens. We cap well under the OAM
+/// limit. (Each 16x16 sprite also costs 4 VRAM tiles, so 120 groups * 4 = 480
+/// tiles, far under the 1024-tile sprite budget — both caps are satisfied.)
+const MAX_GROUPS: usize = 120;
+
 /// Text display on the GBA (via agb). Text is accumulated into a buffer and
 /// rendered as sprites (objects) when `swap_buffers` is called.
 ///
@@ -66,9 +75,10 @@ impl<'a> Display<'a> {
         // screen's objects. `gfx.frame()` only moves the previous frame's
         // sprite clones into a "previous" slot; a SECOND `gfx.frame()` call is
         // what actually drops and deallocates them. Calling it twice guarantees
-        // the old buffers are free before we allocate the new ones, so a big
-        // screen never momentarily co-exists with the previous one (which would
-        // overflow the 32KB sprite VRAM during re-render).
+        // the old buffers are free (and the OAM is cleared) before we allocate
+        // the new ones, so a big screen never momentarily co-exists with the
+        // previous one (which would overflow the 32KB sprite VRAM during
+        // re-render).
         self.text_objects.clear();
         drop(self.gfx.frame());
         let mut frame = self.gfx.frame();
@@ -76,13 +86,14 @@ impl<'a> Display<'a> {
         let settings = LayoutSettings::new();
         let layout = Layout::new(&self.buf, &FONT, &settings);
 
-        let mut new_objects = Vec::new();
-        // Safety cap: each 16x16 sprite costs 4 tiles; the sprite allocator has
-        // 1024 tiles, so a single screen must stay well under 256 groups.
-        for group in layout.take(240) {
-            new_objects.push(self.text_renderer.show(&group, (4, 2)));
-        }
-        self.text_objects = new_objects;
+        // Reuse the existing Vec so a screen change doesn't allocate a fresh
+        // buffer. `MAX_GROUPS` keeps us under both the 128-object OAM cap and
+        // the 1024-tile sprite budget, so no groups are silently dropped and no
+        // sprite tiles are over-allocated.
+        self.text_objects = layout
+            .take(MAX_GROUPS)
+            .map(|group| self.text_renderer.show(&group, (4, 2)))
+            .collect();
 
         for object in &self.text_objects {
             object.show(&mut frame);
