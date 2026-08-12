@@ -4,7 +4,7 @@ use agb::display::font::{Font, Layout, LayoutSettings, ObjectTextRenderer};
 use agb::display::object::{Object, Size};
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Rgb15};
 
-static FONT: Font = agb::include_font!("assets/NotoSubset.otf", 10);
+static FONT: Font = agb::include_font!("assets/NotoSubset.otf", 8);
 
 /// Hard ceiling on the number of letter-group sprites in a single screen.
 ///
