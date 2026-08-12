@@ -4,7 +4,7 @@ use agb::display::font::{Font, Layout, LayoutSettings, ObjectTextRenderer};
 use agb::display::object::{Object, Size};
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Rgb15};
 
-static FONT: Font = agb::include_font!("assets/PixelMplus12.ttf", 12);
+static FONT: Font = agb::include_font!("assets/NotoSubset.otf", 10);
 
 /// Text display on the GBA (via agb). Text is accumulated into a buffer and
 /// rendered as sprites (objects) when `swap_buffers` is called.
@@ -29,12 +29,10 @@ impl<'a> Display<'a> {
             palette[1] = Rgb15::WHITE;
             Palette16::new(palette)
         };
-        // Proven object-text config from the real agb games (the-dungeon-
-        // puzzlers-lament): S32x16 sprites paired with max_group_width(32) and a
-        // 12px pixel font. Group width is measured in pixels, so 32px = ~3 chars
-        // per object (the default 16 with 16x16 sprites made EVERY character its
-        // own object -> ~200 objects/screen, slow re-renders and artefacts).
-        let text_renderer = ObjectTextRenderer::new((&PALETTE).into(), Size::S32x16);
+        // Noto glyphs are taller than 16px even at small sizes, so use tall
+        // S32x32 sprites (32px tall) to avoid the set_pixel height panic, and
+        // pack ~3 chars/group with max_group_width(32).
+        let text_renderer = ObjectTextRenderer::new((&PALETTE).into(), Size::S32x32);
         Display {
             gfx,
             buf: String::new(),
@@ -81,8 +79,8 @@ impl<'a> Display<'a> {
         let layout = Layout::new(&self.buf, &FONT, &settings);
 
         let mut new_objects = Vec::new();
-        // Each S32x16 sprite costs 8 VRAM tiles; 120 groups * 8 = 960 < 1024.
-        for group in layout.take(120) {
+        // Each S32x32 sprite costs 16 VRAM tiles; 60 groups * 16 = 960 < 1024.
+        for group in layout.take(60) {
             new_objects.push(self.text_renderer.show(&group, (4, 2)));
         }
         self.text_objects = new_objects;
