@@ -1,9 +1,9 @@
 use core::ptr;
 
-// Text screen buffer: 1-bpp bitmap rendered by the object processor (draw_test
-// path). Must be < $10000 so MakeOBL's address encoding fits the OP address
-// field. The 68000 stub builds the object list pointing here.
-pub const TEXT_SCREEN: usize = 0x0000_9000;
+// Text screen buffer: 1-bpp bitmap rendered by the object processor. Must be
+// in DRAM that doesn't overlap the Rust program's .data/.bss (0x4000..0x30C00)
+// or heap (0x60000+). 0x42000 matches the OP bitmap object in rabuka_boot/boot.c.
+pub const TEXT_SCREEN: usize = 0x0004_2000;
 pub const MAX_X: usize = 320;
 pub const MAX_Y: usize = 240;
 const BYTES_PER_ROW: usize = MAX_X / 8; // 40
@@ -28,13 +28,15 @@ impl Display {
     }
 
     // Set up the colour lookup table: black background, white text.
+    // 1-bpp OP uses index 0: bit0 -> CLUT[0]=black (bg), bit1 -> CLUT[1]=white (text).
     fn init_clut(&self) {
         for i in 0..256 {
             unsafe { ptr::write_volatile(CLUT.add(i), 0x0000); }
         }
-        // draw_test uses index 127 for the text screen; set a wide white band.
-        for i in 0..256 {
-            unsafe { ptr::write_volatile(CLUT.add(i), 0xFFFF); }
+        // index 0 = background (black), index 1 = text (white)
+        unsafe {
+            ptr::write_volatile(CLUT.add(0), 0x0000);
+            ptr::write_volatile(CLUT.add(1), 0xFFFF);
         }
     }
 

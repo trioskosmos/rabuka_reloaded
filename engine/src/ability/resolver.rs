@@ -43,6 +43,9 @@ use crate::HashSet;
 /// string, used to detect "the same offer re-presented" and dedup `choice_offered`
 /// structured entries.
 fn choice_offer_sig(offered: &[String], skip_allowed: bool) -> String {
+    #[cfg(feature = "no_std")]
+    use core::fmt::Write;
+    #[cfg(not(feature = "no_std"))]
     use std::fmt::Write;
     let mut sig = String::new();
     let _ = write!(sig, "skip={};", skip_allowed);
@@ -78,7 +81,7 @@ pub struct AbilityResolver {
     /// The hand POSITIONS each player chose to KEEP (per keep-shuffle phase).
     /// Stored as positions, not card ids, because a hand can hold multiple
     /// copies of the same card id (e.g. test fillers).
-    pub keep_shuffle_selected: SmallVec<[usize; 8]>,
+    pub keep_shuffle_selected: SmallVec<[u8; 8]>,
     pub spawn_context: EffectSpawnContext,
     pub sub_choice_created: bool,
     /// Snapshot of `selected_cards.len()` taken when a choice is created

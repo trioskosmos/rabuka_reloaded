@@ -157,7 +157,7 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
 </div>
 </div>
 
-<!-- Toast notification -->
+<!-- Card detail tooltip (positioned fixed, filled by showTooltip) -->`n<div id="tooltip"></div>`n`n<!-- Toast notification -->
 <div id="toast"></div>
 
 <!-- QR Code Modal -->
@@ -192,7 +192,7 @@ async function loadCbLang(lang) {
       if (ui[key]) el.placeholder = ui[key];
     });
     const btn = document.getElementById('lang-btn-cb');
-    if (btn) btn.textContent = lang === 'jp' ? 'English' : '日本語';
+    if (btn) btn.textContent = lang === 'jp' ? 'English' : '日本誁E;
   } catch (err) {
     console.warn('loadCbLang:', err);
   }
@@ -441,7 +441,7 @@ function renderCards(cards) {
 
     const tBadge = document.createElement('div');
     tBadge.className = 'type-badge';
-    const typeMap = { 'メンバー': 'M', 'ライブ': 'L', 'エネルギー': 'E' };
+    const typeMap = { 'メンバ�E': 'M', 'ライチE: 'L', 'エネルギー': 'E' };
     tBadge.textContent = typeMap[card.type] || card.type;
 
     div.appendChild(img);
@@ -563,7 +563,7 @@ function populateFilters() {
   const sorted = (set) => ['All', ...[...set].sort()];
 
   let html = '';
-  html += buildBtnGroup('type', 'Type', null, ['All', 'メンバー', 'ライブ', 'エネルギー']);
+  html += buildBtnGroup('type', 'Type', null, ['All', 'メンバ�E', 'ライチE, 'エネルギー']);
   html += buildSelect('series', 'Series', null, sorted(seriesSet));
   html += buildSelect('unit', 'Unit', null, sorted(unitSet));
   html += buildSelect('rarity', 'Rarity', null, sorted(raritySet));
@@ -661,7 +661,7 @@ function getBaseCardNo(cardNo) {
   return i > 0 ? cardNo.slice(0, i) : cardNo;
 }
 
-// Rabuka Point System (ラブカポイントシステム)
+// Rabuka Point System (ラブカポイントシスチE��)
 // Updated 2026-04-03: total points of point-assigned cards in deck must be ≤ 9
 const POINT_MAP = {
   'PL!N-bp1-003': 4,
@@ -903,7 +903,7 @@ const DECK_CHECKS = [
       const detail = violations.length === 0
         ? 'No point-assigned cards in deck. Passes automatically.'
         : `${violations.length} card type(s) with points. Total: ${v}/9. ` +
-          violations.map(p => `${p.base} (${p.pt}pt × ${p.qty})`).join(', ');
+          violations.map(p => `${p.base} (${p.pt}pt ÁE${p.qty})`).join(', ');
       return { pass: v <= 9, current: `${v}/9 points`, detail };
     }
   },
@@ -916,8 +916,8 @@ function validateDeck() {
   for (const entry of deckState.cards.values()) {
     const q = entry.qty;
     switch (entry.card.type) {
-      case 'メンバー': memberCount += q; break;
-      case 'ライブ': liveCount += q; totalScore += (entry.card.score || 0) * q; break;
+      case 'メンバ�E': memberCount += q; break;
+      case 'ライチE: liveCount += q; totalScore += (entry.card.score || 0) * q; break;
       case 'エネルギー': energyCount += q; break;
     }
     const base = getBaseCardNo(entry.card.card_no);
@@ -974,13 +974,13 @@ function renderDeckList() {
   const totalEl = document.getElementById('deck-total');
   if (!totalEl) return;
   const entries = [...deckState.cards.entries()].sort((a, b) => {
-    const order = { 'メンバー': 0, 'ライブ': 1, 'エネルギー': 2 };
+    const order = { 'メンバ�E': 0, 'ライチE: 1, 'エネルギー': 2 };
     const ta = order[a[1].card.type] || 9, tb = order[b[1].card.type] || 9;
     return ta - tb || a[0].localeCompare(b[0]);
   });
   let total = 0;
   let html = '';
-  const typeShort = { 'メンバー': 'M', 'ライブ': 'L', 'エネルギー': 'E' };
+  const typeShort = { 'メンバ�E': 'M', 'ライチE: 'L', 'エネルギー': 'E' };
   const baseQty = new Map();
   for (const [, e] of entries) {
     const base = getBaseCardNo(e.card.card_no);
@@ -990,7 +990,7 @@ function renderDeckList() {
     total += entry.qty;
     const base = getBaseCardNo(cardNo);
     const over = baseQty.get(base) > 4 ? '\u26A0\uFE0F' : '';
-    const scoreInfo = entry.card.type === 'ライブ' && entry.card.score != null ? ` S:${entry.card.score}` : '';
+    const scoreInfo = entry.card.type === 'ライチE && entry.card.score != null ? ` S:${entry.card.score}` : '';
     const pt = POINT_MAP[getBaseCardNo(cardNo)];
     const ptBadge = pt ? `<span class="dc-pt">${pt}pt</span>` : '';
     html += `<div class="deck-card-row" data-card="${cardNo}">
@@ -1130,7 +1130,7 @@ function qrDictLookup(index) {
 
 // Show QR code for current deck (binary index format)
 // Encodes deck as compact binary instead of "card_no x qty\n..." plain text.
-// A 30-line deck goes from ~580 bytes → ~91 bytes raw binary, then base64 for QR safety.
+// A 30-line deck goes from ~580 bytes ↁE~91 bytes raw binary, then base64 for QR safety.
 function showQR() {
   if (deckState.cards.size === 0) { toast('Deck is empty'); return; }
   const name = document.getElementById('deck-name').value || 'deck';

@@ -841,7 +841,7 @@ pub struct EffectFilter {
     pub repeat_limit: Option<u8>,
     pub ability_filter: Option<AbilityFilter>,
     pub multiple_targets: Option<bool>,
-    pub operation: Option<ArcStr>,
+    pub operation: Option<Operation>,
     pub options: Option<Box<Vec<Box<AbilityEffect>>>>,
     pub name_constraint: Option<ArcStr>,
     pub name_constraint_source: Option<ArcStr>,
@@ -1104,7 +1104,8 @@ impl AbilityEffect {
             };
         }
 
-        let filter = || EffectFilter {
+        let filter = || {
+            let f = EffectFilter {
             card_type: None,
             exclude_self: bool_field!("exclude_self"),
             same_name: bool_field!("same_name"),
@@ -1218,7 +1219,10 @@ impl AbilityEffect {
             repeat_limit: u8_field!("repeat_limit"),
             ability_filter: None,
             multiple_targets: bool_field!("multiple_targets"),
-            operation: str_field!("operation"),
+            operation: obj
+                .get("operation")
+                .and_then(|v| v.as_str())
+                .and_then(parse_operation),
             options: None,
             name_constraint: str_field!("name_constraint"),
             name_constraint_source: str_field!("name_constraint_source"),
@@ -1294,6 +1298,12 @@ impl AbilityEffect {
             ref_offset: i8_field!("ref_offset"),
             id: str_field!("id"),
             opponent_action: effect_field!("opponent_action"),
+            };
+            if f == EffectFilter::default() {
+                None
+            } else {
+                Some(Box::new(f))
+            }
         };
 
         let a = action.to_lowercase();
@@ -1306,14 +1316,14 @@ impl AbilityEffect {
             | "shuffle"
             | "play_baton_touch"
             | "double_baton_touch" => EffectKind::MoveCards {
-                filter: Some(Box::new(filter())),
+                filter: filter(),
             },
             "draw" | "draw_card" | "draw_until_count" => EffectKind::DrawCards {
-                filter: Some(Box::new(filter())),
+                filter: filter(),
             },
             "select" | "select_cards" | "select_number" | "choose_target_player" => {
                 EffectKind::SelectTarget {
-                    filter: Some(Box::new(filter())),
+                    filter: filter(),
                 }
             }
             "look"
@@ -1324,22 +1334,22 @@ impl AbilityEffect {
             | "reveal_until_live_card"
             | "reveal_until_chosen_card"
             | "look_and_select" => EffectKind::LookReveal {
-                filter: Some(Box::new(filter())),
+                filter: filter(),
             },
             "modify_score" => EffectKind::ModifyScore {
-                filter: Some(Box::new(filter())),
+                filter: filter(),
             },
             "modify_required_hearts"
             | "modify_required_hearts_global"
             | "modify_required_hearts_success" => EffectKind::ModifyHearts {
-                filter: Some(Box::new(filter())),
+                filter: filter(),
             },
             "gain_resource" | "pay_energy" => EffectKind::GainResource {
-                filter: Some(Box::new(filter())),
+                filter: filter(),
             },
             "change_state" | "set_card_identity" | "set_card_identity_all_regions" => {
                 EffectKind::ChangeState {
-                    filter: Some(Box::new(filter())),
+                    filter: filter(),
                 }
             }
             "gain_ability"
@@ -1347,7 +1357,7 @@ impl AbilityEffect {
             | "invalidate_ability"
             | "suppress_ability_trigger"
             | "activate_ability" => EffectKind::AbilityOp {
-                filter: Some(Box::new(filter())),
+                filter: filter(),
             },
             "sequential"
             | "choice"
@@ -1355,17 +1365,17 @@ impl AbilityEffect {
             | "conditional_alternative"
             | "conditional_on_optional"
             | "conditional_on_result" => EffectKind::CompoundEffect {
-                filter: Some(Box::new(filter())),
+                filter: filter(),
             },
             "restriction"
             | "activation_restriction"
             | "modify_limit"
             | "all_blade_timing"
             | "reduce_live_card_set_limit" => EffectKind::RestrictionOp {
-                filter: Some(Box::new(filter())),
+                filter: filter(),
             },
             "position_change" | "rotation" => EffectKind::PositionOp {
-                filter: Some(Box::new(filter())),
+                filter: filter(),
             },
             "set_cost"
             | "set_cost_to_use"
@@ -1378,13 +1388,13 @@ impl AbilityEffect {
             | "choose_required_hearts"
             | "perform_yell"
             | "modify_yell_count" => EffectKind::MiscOp {
-                filter: Some(Box::new(filter())),
+                filter: filter(),
             },
             "custom" | "do_nothing" | "action_by" | "opponent_action" => EffectKind::CustomOp {
-                filter: Some(Box::new(filter())),
+                filter: filter(),
             },
             "" => EffectKind::SelectTarget {
-                filter: Some(Box::new(filter())),
+                filter: filter(),
             },
             _ => return None,
         })
@@ -1659,7 +1669,13 @@ impl AbilityEffect {
 
     filter_bool_getter!(negation_any, negation);
 
-    filter_str_getter!(operation_any, operation);
+    pub fn operation_any(&self) -> Option<&'static str> {
+        self.kind
+            .as_deref()?
+            .filter()?
+            .operation
+            .map(|op| op.as_str())
+    }
 
     filter_bool_getter!(optional_any, optional);
 
@@ -2276,6 +2292,50 @@ pub(crate) fn parse_operator(s: &str) -> Option<Operator> {
 }
 
 impl_deref_str!(Operator);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+pub enum Operation {
+    #[cfg_attr(feature = "serde_support", serde(rename = "add"))]
+    Add,
+    #[cfg_attr(feature = "serde_support", serde(rename = "decrease"))]
+    Decrease,
+    #[cfg_attr(feature = "serde_support", serde(rename = "increase"))]
+    Increase,
+    #[cfg_attr(feature = "serde_support", serde(rename = "remove"))]
+    Remove,
+    #[cfg_attr(feature = "serde_support", serde(rename = "set"))]
+    Set,
+    #[cfg_attr(feature = "serde_support", serde(rename = "subtract"))]
+    Subtract,
+}
+
+impl Operation {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Operation::Add => "add",
+            Operation::Decrease => "decrease",
+            Operation::Increase => "increase",
+            Operation::Remove => "remove",
+            Operation::Set => "set",
+            Operation::Subtract => "subtract",
+        }
+    }
+}
+
+pub(crate) fn parse_operation(s: &str) -> Option<Operation> {
+    Some(match s {
+        "add" => Operation::Add,
+        "decrease" => Operation::Decrease,
+        "increase" => Operation::Increase,
+        "remove" => Operation::Remove,
+        "set" => Operation::Set,
+        "subtract" => Operation::Subtract,
+        _ => return None,
+    })
+}
+
+impl_deref_str!(Operation);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]

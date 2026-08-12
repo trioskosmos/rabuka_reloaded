@@ -807,7 +807,7 @@ pub struct EffectSpawnContext {
     pub target: Option<String>,
     pub destination: Option<String>,
     pub source: Option<String>,
-    pub position: Option<usize>,
+    pub position: Option<u8>,
 }
 
 // ====================================================================

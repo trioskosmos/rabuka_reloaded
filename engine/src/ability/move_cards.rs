@@ -1610,9 +1610,9 @@ impl AbilityResolver {
         self.spawn_context.destination = effect.destination.clone().map(|s| s.to_string());
         self.spawn_context.source = effect.source_any().map(|s| s.to_string());
         self.spawn_context.position = effect.position_any().and_then(|p| match p {
-            crate::card::PositionInfo::String(s) => s.parse::<usize>().ok(),
+            crate::card::PositionInfo::String(s) => s.parse::<u8>().ok(),
             crate::card::PositionInfo::Struct { position, .. } => {
-                position.as_ref().and_then(|s| s.parse::<usize>().ok())
+                position.as_ref().and_then(|s| s.parse::<u8>().ok())
             }
         });
 
@@ -2447,9 +2447,9 @@ impl AbilityResolver {
                             .entry_effect()
                             .and_then(|ef| {
                                 ef.position_any().as_ref().and_then(|p| match p {
-                                    crate::card::PositionInfo::String(s) => s.parse::<usize>().ok(),
+                                    crate::card::PositionInfo::String(s) => s.parse::<u8>().ok(),
                                     crate::card::PositionInfo::Struct { position, .. } => {
-                                        position.as_ref().and_then(|s| s.parse::<usize>().ok())
+                                        position.as_ref().and_then(|s| s.parse::<u8>().ok())
                                     }
                                 })
                             })
@@ -2458,7 +2458,7 @@ impl AbilityResolver {
                         let player = gs.resolve_target_player_mut(&target);
                         for &cid in &card_ids {
                             if let Some(pos) = deck_pos {
-                                let clamped = pos.min(player.main_deck.cards.len());
+                                let clamped = (pos as usize).min(player.main_deck.cards.len());
                                 player.main_deck.cards.insert(clamped, cid);
                             } else {
                                 util::place_card_in_zone(player, cid, dest, None, false, 1);

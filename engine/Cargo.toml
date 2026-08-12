@@ -51,6 +51,10 @@ ds = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "com
 ps1 = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state", "external_card_data"]
 # GBA target: no_std + alloc via agb (baked deck blobs from the engine)
 gba = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
+# SNES target: no_std + alloc via rust-mos (mosw65816). Mirrors gba; the SNES
+# can read card/bytecode data from ROM (LoROM up to 4MB) so the compact + baked
+# data pipeline applies. Not yet buildable here (rust-mos not installed).
+snes = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
 # Dreamcast target: no_std + alloc via KallistiOS + rustc_codegen_gcc
 dc = ["no_std", "debug_conditions", "bytecode_abilities", "compact_card_data"]
 # Wii target: no_std + alloc via devkitPPC + libogc

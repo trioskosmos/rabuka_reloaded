@@ -47,9 +47,15 @@ Everything below is sorted oldest-first within each tier.
 | m68k | Genesis, Neo Geo, Jaguar | Yes |
 | SH-4 | **Dreamcast** | **No** |
 | SH-2 | **Saturn** | **No** |
-| 65816 | SNES | **No** |
-| 6502 | NES, C64, Lynx | **No** |
-| Z80 | MSX, Master System, GG, Spectrum | **No** |
+| 65816 | SNES | **Fork** (`llvm-mos`) |
+| 6502 | NES, C64, Lynx | **Fork** (`llvm-mos`) |
+| Z80 | MSX, Master System, GG, Spectrum | **Fork** (`llvm-z80` / `rust-gb`) |
+
+\* The "No" entries are no longer strictly true — community LLVM **forks** now
+exist for 65816/6502 (`llvm-mos`) and Z80 (`llvm-z80` / cranelift). They are
+not mainline LLVM (no official rustc tier), and the compile-time cost is
+absurd (see the 8-bit tier section below), so the RAM verdicts below are
+unchanged. Detail in the [research section](#tier-7-the-research-below-8-bit-nes-snes-master-system).
 | HuC6280 | TurboGrafx-16 | **No** |
 | TLCS-900 | Neo Geo Pocket | **No** |
 | V30MZ (x86-16) | WonderSwan | **No** |
@@ -62,7 +68,7 @@ NES (6502), and all Z80-based machines are dead on arrival.
 
 With the **bytecode-compiled** approach, the engine needs roughly:
 - **Card data**: ~40KB (packed binary — no serde, no heap allocations)
-- **Code**: ~600KB-1MB (ability VM is ~500 LOC instead of 179k LOC of serde structs)
+- **Code**: ~600KB-1MB (ability VM `vm.rs` is ~1,443 LOC instead of 179k LOC of serde structs)
 - **Game state + heap + stack**: ~300KB
 - **Realistic minimum** (bytecode): **~1MB**
 - **Realistic minimum** (current JSON interpreter): **~4MB**
@@ -334,11 +340,11 @@ Total:                          ~770 lines
 
 **Path B: Target has 1-4MB RAM (PS1, N64, DS, Dreamcast)**
 Bytecode VM required (replaces JSON interpreter, eliminates serde).
-The VM itself is ~500 LOC — a one-time cost that then unlocks every
+The VM itself is ~1,443 LOC — a one-time cost that then unlocks every
 low-RAM target.
 ```
 Build-time compiler:            ~300 lines (compile_abilities.py)
-Ability VM runtime:             ~500 lines (vm.rs)
+Ability VM runtime:             ~1,443 lines (vm.rs)
 Platform binary (display,       ~200 lines
   input, allocator, RNG)
 Engine no_std migration:        ~200 lines (remove serde gates)
@@ -359,7 +365,7 @@ The cards are the same.
 The 3DS (2011) is proven. The Vita (2011) would be the easiest
 next port — same era, more RAM, official target, full std.
 
-The **bytecode VM** is the key unlock: it's a one-time ~800 line
+The **bytecode VM** is the key unlock: it's a one-time ~1,443 line
 investment that takes PS1 from impossible to comfortable, N64 and DS
 from borderline to comfortable, and Dreamcast from unreachable to
 reachable (via `rustc_codegen_gcc`).
@@ -480,4 +486,366 @@ in mGBA. The "impossible 288KB" target was reached via `agb` + the engine's
 - GBA OAM = 128 objects max, sprite VRAM = 1024 4bpp tiles; screens capped at
   240 groups (16×16 sprites, 4 tiles each).
 - Needs a longer soak test on real hardware.
+
+---
+
+## Tier 7: The research — below 8-bit (NES, SNES, Master System / Game Gear)
+
+We went as low as PS1 (2MB) and GBA (288KB). What exists for *even weaker*
+hardware? Two very different answers get conflated under "Rust on":
+
+- **(a) Actually compiling Rust source** to the CPU — requires an LLVM/GCC
+  backend for that ISA. Hard, resource-hungry, mostly proof-of-concept.
+- **(b) Rust-based/DSL tooling** that hand-emits machine code — a Rust crate
+  acting as an assembler/codegen, not real compiled Rust.
+
+The three machines in this tier map to different situations.
+
+### Real-Rust options now exist (LLVM forks) — but check the fine print
+
+The blanket "no LLVM backend" verdict in Gate 1 is out of date. Three
+community forks fill the gap:
+
+| Tool | CPU | Consoles | Frontends | Caveats |
+|---|---|---|---|---|
+| **`llvm-mos`** | 6502 / 65c02 (+ `mosw65816` subtarget) | NES, C64, Lynx; SNES¹ | C, C++, **Zig**; Rust via separate **`rust-mos`²** | Latches C/C++/Zig. **No native 65816 codegen** |
+| **`llvm-z80`** (backing `rust-gb`) | Z80 / SM83 | GB, **Master System, Game Gear**, MSX, Spectrum | Rust (via `rust-z80` fork) | WIP; real-Rust compile cost absurd |
+| **`cranelift-z80`** | Z80 / SM83 | same | Rust (bespoke backend) | Early stage |
+
+¹ **SNES caveat (`mosw65816`):** llvm-mos accepts a `mosw65816` subtarget and
+has a full 65816 assembler/`lld`, so real `.sfc` (LoROM) ROMs *can* be built via
+Zig (`zig-mos-examples` ships a Celeste demake). But it still **emits 8-bit
+6502-style machine code** — 16-bit register codegen, 24-bit addressing, and
+banking are all **open issues** (llvm-mos #32/#319/#320/#321). You get 6502 code
+running on the 65816 in 8-bit mode, **not** a native 816 compile.
+
+² **Rust frontend caveat (`rust-mos`):** the Rust path is a **separate rustc
+fork** (mrk-its/rust-mos), not part of llvm-mos. Working, real code builds for
+6502 exist. But it is **stale — ~2 years behind upstream** (Rust 1.77 era, no
+substantive commits since early 2024). So "SNES is the most promising real-Rust
+target" is **wrong today**: the Rust frontend is dormant and even C/Zig only get
+8-bit codegen on the 65816.
+
+### The honest cost of real Rust on 8-bit
+
+A genuine Rust→Z80 compiler **works**, but it's not viable for real games
+(tinycomputers.io, Dec 2025): compiling Rust's `core` for a Z80 peaked at
+**~169 GB of RAM** on a 252GB/64-core server, taking 45min for LLVM + 11min for
+stage-1 rustc + an unreasonably long `compiler_builtins` pass. The generated
+code is decent, but `core`-based binaries exceed most 8-bit systems' capacity.
+Java achievements: it's a research/demo path, not a production one.
+
+### Per-console verdict
+
+**SNES (Ricoh 5A22 / 65C816, 128KB + 64KB VRAM)**
+- Real-Rust path exists **on paper** (`rust-mos` → `mosw65816`) but is stale
+  (~2 years behind upstream rustc) and only produces **8-bit 6502-style code**,
+  not native 65816. A working SNES homebrew path is documented via **Zig**
+  (`zig-mos-examples`) instead of Rust.
+- **R65** (r65.dev) — separate project, "hardware-transparent programming for
+  the SNES/65816" with **Rust-inspired** syntax (type-safe registers, bank
+  boundaries, first-class processor modes) — not actual Rust, more a 65816 DSL.
+- Rest of the ecosystem is C/asm: PVSnesLib + `816-tcc`, `ca65`/`wla-65816`.
+- **Verdict: ~128KB RAM + no native-816 codegen → dead for a card game.** Even
+  the "real-Rust" route is a stale fork emitting 8-bit code.
+
+**NES (Ricoh 2A03 / 6502, 2KB work RAM)**
+- `llvm-mos` is the real-Rust route but nothing turnkey exists ("first Rust
+  compiled to 8-bit 6502" is still just a PoC).
+- **Millfork** — middle-level language for 6502/Z80, pragmatic middle ground.
+- **`nessemble-rs`** — a 6502 assembler **written in Rust** (Rust-based tooling,
+  not Rust code). Plus the C/asm stack: cc65, KickC, NESFab, asm6.
+- **Verdict: 2KB RAM is not a real computer.** Dead for a card game, full stop.
+
+**Master System / Game Gear (Zilog Z80, 8KB)**
+- Key insight: the GB's SM83 **is Z80-family**, so this reuses the same backend
+  as `rust-gb`/`llvm-z80`. SMS/GG use a true Z80; `WLA-DX` assembles for them.
+- **`retroshield-z80-workbench`** (crate, 2025) — a Rust DSL that emits Z80
+  machine code via a fluent `ld_a()`/`call()` API, auto-resolving labels.
+  Powers real retro apps (a dBASE clone, a WordStar editor, a spreadsheet).
+- **Verdict: same 8KB RAM problem → dead for a card game.** Best real-Rust
+  tooling of the three, worst payoff.
+
+### "Is anything in the engine too advanced?" — No. It's infrastructure, not capability
+
+A close look at the real dependency surface shows nothing in the game logic is
+untranslatable. The engine already routes around the genuinely hard hardware
+constraints via its feature flags + compat layer, and those exact mechanisms
+were proven on the weaker GBA:
+
+**Dependency reality check (what a no_std SNES build actually compiles):**
+- The critical runtime deps are **small and old and no_std-capable**: `log
+  =0.4.22`, `smallvec =1.11`, `hashbrown =0.14`. `serde`/`serde_json`/`rand`/
+  actix/tokio are all `optional` and off for console targets.
+- Collections are standard `alloc`: `BTreeMap`, `VecDeque`, `Box`, `String`,
+  `Vec`, `Rc`, `Arc`. Nothing exotic.
+- **`arcstr` is a red herring** — it's not a dependency (only appears as
+  variable names in `cards/generate_effect_decoder.py`). The engine's string
+  type is its **own** `struct ArcStr(pub Arc<str>)` (`engine/src/core/types.rs`),
+  and `engine/src/compat.rs` routes `Arc → Rc` when `target_has_atomic = "ptr"`
+  is false. The 6502 has no atomics → same `Rc` fallback as GBA's ARMv4T. This
+  specific worry is already solved infrastructure.
+
+**So what's actually complicated? Three concrete frictions, none about Rust's
+expressiveness:**
+
+1. **The frozen `core`/`alloc` sysroot, not the crates.** 65816 isn't an
+   official rustc target — `rust-mos` ships its *own patched* `core`/`alloc`,
+   which is the part stuck at ~Rust 1.77. The risky surface is `alloc`
+   **formatting**: `ToString`, `Display`, `format!`, `String::with_capacity`.
+   `core::fmt` is notorious for huge code / compiler ICEs on LLVM's 8-bit
+   backend (256-byte HW stack, no native 16-bit registers). That's the "slow
+   but functional" caveat in practice.
+
+2. **`hashbrown 0.14` as the `HashMap`** (`crate::HashMap = hashbrown::HashMap`)
+   is the biggest allocation-heavy chunk and the most sensitive to both the
+   sysroot and code size. A fit problem, not a logic problem.
+
+3. **Version drift + tooling mismatch.** The engine pins exact versions
+   (`=0.4.22`, `=1.0.228`, `hashbrown 0.14`), but rust-mos builds Xargo-style
+   against a frozen 1.77-era libstd (not modern `cargo -Z build-std`), and the
+   2026 registry resolves newer transitive deps than a 1.77 rustc accepts.
+   Getting the lockfile to resolve on the old toolchain is fiddly.
+
+**Bottom line of this analysis:** a SNES port is blocked by "the only toolchain
+that can target 65816 is 2 years behind, ships its own standard library, and
+that library's allocation/formatting is the exact part 8-bit LLVM codegen
+handles worst" — **not** by the engine doing anything untranslatable.
+
+### Bottom line for rabuka
+
+The 8/16-bit tier stays **dead for a card game engine regardless of toolchain** —
+the RAM floor (~150KB for the bytecode interpreter; NES=2KB, SMS/GG=8KB,
+SNES=128KB) kills it. Nothing here changed the portability horizon. What the
+research *did* update:
+
+1. **Gate 1 is softer than documented** — LLVM forks now exist for 65816,
+   6502, and Z80, so SNES/Master System are no longer *language*-blocked. For
+   the SNES the RAM is *not* the wall either (128KB + ROM-backed read-only
+   data would fit a card game) — the wall is **toolchain fragility**, not RAM.
+2. Real Rust on 8-bit is possible but **frail**: the only Rust route on the
+   6502 family is the stale `rust-mos` rustc fork (~Rust 1.77), and llvm-mos
+   has **no native 65816 codegen** (SNES builds come out as 8-bit 6502 code).
+   On Z80 it costs ~169GB RAM to build and oversizes binaries.
+3. The productive niche is Rust **codegen/DSL** tooling (retroshield,
+   nessemble, Millfork), not true Rust compilation.
+
+**GBA remains the floor for a playable rabuka port.** Everything smaller is
+a demo/hobbyist novelty, not a real target.
+
+---
+
+## SNES — the path forward (Aug 2026)
+
+### The C-rewrite idea is dead. Real numbers.
+
+A "just rewrite the rules in C" approach was floated. Measured source says no:
+
+- **`vm.rs` (the ability interpreter): 1,443 LOC** — not 500 as earlier claimed
+  (fixed above).
+- **Hand-written rules/logic core** (`turn/`, `ability/`, `core/card.rs`,
+  `core/game_state/`): roughly **25-40K LOC**. e.g. `live.rs` 2,562,
+  `choice.rs` 3,122, `move_cards.rs` 3,012, `card.rs` 3,343, `modifiers.rs`
+  1,689, `abilities.rs` 2,585.
+- **~95,000 total** engine `.rs` lines — but most is generated *data*
+  (`cards_gen.rs` 25K, `abilities_gen.rs` 3.8K) already compiled to binary
+  blobs by `compact_card_data`/`bytecode_abilities`, so it is NOT part of a port.
+- There's a whole `qa_test_suite.rs` (2,059 LOC) for regression coverage.
+
+Re-expressing even the rules core in C = **tens of thousands of lines**, then
+re-testing every ability and edge case. Months of work with a huge bug surface,
+for the least-powerful target we'd ever ship. **Not worth it. C is out.**
+
+### Consequence: rust-mos is the *only* path
+
+The engine's architecture (bytecode abilities + baked data blobs + `Rc`-for-
+strings via `compat.rs`) is already designed to run on weak no-atomics targets —
+proven on GBA. So the ONLY way to get "working on SNES" without a rewrite is to
+**compile the actual Rust engine with `rust-mos`**. Phase 0 is no longer an
+optional cheap experiment — it's the whole bet.
+
+```
+Phase 0  Feasibility gate: does rust-mos build the engine's
+         no_std + bytecode_abilities + compact_* core for mosw65816?
+         Expected wall: alloc formatting (ToString/Display/format!)
+         ICEs or blows up on the 8-bit backend. (Dependency resolution
+         is NOT a wall — see audit below.)
+         Pass  → everything below is plumbing (GBA-style port).
+         Fail  → SNES is genuinely not worth doing (possible, but
+                 disproportionate). 
+Phase 1  If pass: strip formatting/Display (SNES display is tiles,
+         not console text), pin deps to the rust-mos sysroot,
+         get a "hello" .sfc via the mos-snes-none target + llvm-mos lld.
+Phase 2  Runtime glue (~200-400 C/asm lines): Mode 0/1 tile engine,
+         controller poll, Rc strings, ROM-backed card data.
+Phase 3  If Phase 0 fails: STOP. No C rewrite.
+```
+
+**Toolchain — installable, and WSL works (this section corrects an earlier
+overblown estimate):**
+
+- rust-mos is a separate rustc fork, but it ships **prebuilt binaries** — no
+  from-source compiler build required. It publishes GitHub release tarballs
+  (`rust-mos-ubuntu-24.04`, `rust-mos-linux`, version **1.87.0-dev**,
+  `x86_64-unknown-linux-gnu`) and Docker images `mrkits/rust-mos`
+  (`latest`/`stable`) + `mrkits/llvm-mos`.
+- Install a tarball by extracting and `rustup toolchain link mos <dir>`, then
+  `cargo +mos`. A from-source build (`llvm-mos` + `llvm-mos-sdk` + `x.py
+  stage-1`) is only ~2-4h / ~16GB RAM / ~35GB disk if you prefer — a normal
+  machine, **not** the 169GB Z80 scenario (that figure was a hand-rolled Z80
+  backend; llvm-mos is mature and packaged).
+- **WSL/Ubuntu x86_64 is the right place to do this** — rust-mos targets
+  `x86_64-unknown-linux-gnu`. Use the **WSL2 Linux filesystem**, not `/mnt/c`,
+  for the build/output. (Windows-native rust-mos/llvm-mos is not really
+  supported; the llvm-mos README flags Windows `core.autocrlf` breaking
+  verification. WSL sidesteps this.)
+- **SNES is a custom target, not built-in:** rust-mos ships only `mos-unknown-none`.
+  The `mos-snes-none.json` spec is user-supplied (`arch:mos`, `cpu:mosw65816`,
+  `vendor:snes`, `requires-lto:true`, `linker:mos-common-clang`) and needs
+  llvm-mos-sdk's `snes` platform (crt0/`mos-snes-clang`) + custom linker scripts
+  (`lorom.ld`/`fastrom.ld`) + a `build.rs`. `kassane/rust-mos-examples` is the
+  reference and uses a newer fork (~1.98-dev).
+- See `platforms/snes/` (drafted) for the scaffolding.
+
+### Dependency audit vs rust-mos (Rust ~1.87 prebuilt) — good news
+
+The feared "dependency wall" mostly evaporates. The SNES `no_std` core's dep
+tree is tiny and old:
+
+- Critical deps (all with `default-features = false`): `log =0.4.22`,
+  `smallvec =1.11`, `hashbrown =0.14.5`.
+- All three are **leaf crates in this config — zero transitive deps**
+  (hashbrown/smallvec/log pull in nothing with default features off and the
+  `serde`/`alloc` features disabled).
+- **MSRVs all ≤ 1.60**, far below the rust-mos toolchain (~1.87 prebuilt):
+  hashbrown 0.14 = 1.56, smallvec 1.11 = 1.36, log 0.4.22 = 1.60. The engine's
+  `edition = "2021"` needs 1.56+. `serde`/`serde_json`/`rand`/actix/tokio are
+  all `optional` and off for `snes`.
+
+**Conclusion:** dependency *resolution* is NOT the blocker — it resolves fine on
+the rust-mos toolchain. The two real remaining risks are (1) `alloc` formatting
+(`ToString`/`Display`/`format!`) against llvm-mos's 8-bit codegen, and (2)
+getting the SNES `mos-snes-none` custom target + SDK crt0/linker wired. If Phase
+0 fails, it'll be on codegen, not on the lockfile.
+
+### Real-world adoption — evidence it works, and where it's thin (Aug 2026)
+
+Verified from the source (not theory): the toolchain **does** produce working
+ROMs, but real-world usage is small and clustered, and **SNES is its least-trodden
+corner**.
+
+**Proof the pipeline works end-to-end:**
+- `kassane/rust-mos-examples` (8 commits, CI) builds a real `demo-snes` →
+  `target/mos-snes-none/release/snes-hello.sfc` (LoROM) via a documented one-liner
+  (`cargo build --target targets/mos-snes-none.json -Zbuild-std ...`). It ships
+  `chr/` graphics + `lorom.ld`/`fastrom.ld` + `build.rs`, so it renders actual
+  tiles. Same toolchain builds NES/C64/MEGA65/sim targets.
+- `mlund/mos-hardware` (53 stars, 285 commits, active) — Rust register/graphics
+  crate for C64/MEGA65/Commander X16 with working demos (plasma, raster IRQ,
+  sprites, SID sound). **The strongest evidence rust-mos can do real graphics** —
+  but C64, not SNES.
+- `mrk-its/llvm-mos-ferris-demo` (Atari 800 factorial PoC), `a800xl-utils`,
+  `rust-mos-hello-world`, `retro-display` — the rest of the small ecosystem.
+
+**Where it's thin — SNES specifically:**
+- `mos-snes-none` returns **zero** GitHub code-search hits. **Rust→SNES exists only
+  as kassane's single `demo-snes`.** It's an experiment, not a scene.
+- The *shipping* SNES homebrew on the llvm-mos backend is **C** (Celeste SNES
+  demake, SNESDEV-2025) and **Zig** (`kassane/zig-mos` SNES SDK with crt0 +
+  LoROM/HiROM + real `.sfc` demos). **Rust is the least-developed of the four
+  frontends for 65816.**
+- rust-mos issue tracker confirms real codegen sharp edges: #29 **128-bit div ICE**
+  (`LLVM ERROR: unable to legalize instruction: (s128) = G_UDIV`), #32 "excessively
+  large loops", #27 wrong float→int casts, #35 `c_uint` 16→32-bit ABI drift.
+
+**Bottom line for the bet:** "does it produce a working SNES ROM" = **proven**.
+"does it compile a large, allocation-heavy card-game engine" = **genuinely
+unproven** — no one has built anything near that scale on rust-mos, and the known
+codegen bugs would plausibly bite a 95K-line engine. That is exactly what Phase 0
+(a cheap feasibility build) exists to resolve. The evidence says the foundation is
+solid; the "compiles the card game" claim is an open experiment, not a sure thing.
+
+### Phase 0 result — RUN ON REAL TOOLCHAIN (Aug 2026)
+
+Actually executed on WSL (Ubuntu 26.04, 12 cores, 3GB RAM) using the kassane
+**rust-mos 1.98-dev** x86_64 prebuilt tarball (`rustup`-free: direct
+`rustc`/`cargo` from the extracted dir) + the authoritative `mos-snes-none.json`
+copied from kassane/rust-mos-examples. Build command used throughout:
+`cargo build -Zbuild-std=core,alloc -Zbuild-std-features=compiler-builtins-mem
+-Zunstable-options -Zjson-target-spec --target mos-snes-none.json`.
+
+**What passed:**
+- rust-mos installs & runs on WSL as-is. No Docker, no from-source build.
+- A minimal `no_std` crate (u16 loop + `copy_nonoverlapping`) codegen'd for
+  `mos-snes-none` in **~21s** (core+alloc+compiler_builtins). Toolchain + target +
+  `-Zbuild-std` all work; no OOM at 3GB RAM (`-j4`).
+- Building the **engine's `no_std` core in `--release`** got past `core`/`alloc`/
+  `compiler_builtins` and resolved the real deps (log 0.4.22, smallvec, hashbrown
+  0.14.5) — the dependency-resolution worry is confirmed dead.
+
+**What blocks (both were predicted, now confirmed empirically):**
+
+1. **Debug builds cannot work — must build `--release`.** A non-`--release` build
+   hits the **128-bit division ICE** in `core::fmt::num::exp_u128` and a float
+   `G_FPTRUNC s32` error in `compiler_builtins` (rust-mos #29). Optimization
+   dead-code-eliminates those float/format paths, so `--release` succeeds. This
+   is exactly why every kassane demo builds `--release` only.
+
+2. **`smallvec` is fundamentally incompatible with 16-bit `usize`** — its
+   `impl_array!` generates `[T; 0x10_0000]`, which on a 16-bit pointer wraps to
+   `[T; 0]`, colliding with the size-0 `Array` impl (`error[E0119]`). Fails
+   identically on **both smallvec 1.11.0 and 1.15.2** (all versions). The engine
+   uses `SmallVec` in ~12 files (dozens of sites), so a per-site `Vec` swap was
+   rejected as too invasive.
+
+   **Fix applied (verified):** vendored smallvec 1.15.2 to
+   `platforms/snes/vendor/smallvec/` and split `impl_array!` so sizes `>= 0x10000`
+   (all multiples of 65536 → wrap to 0) are gated behind
+   `#[cfg(not(target_pointer_width = "16"))]`. On 32/64-bit targets the impls are
+   byte-identical, so no other port changes. Wired via a scoped
+   `[patch.crates-io] smallvec = { path = "vendor/smallvec" }` in
+   `platforms/snes/Cargo.toml` (snes is standalone, not a workspace member →
+   **zero effect on other engines**). After this, smallvec compiles and the build
+   reaches the engine's own code.
+
+3. **Engine const-data ICE (new, discovered by running) — rust-mos compiler bug.**
+   Two distinct data problems, one fixed, one not:
+   - **`DECK_CARD_FILES` (fixed):** `pub const DECK_CARD_FILES: &[&str]` at
+     `deck_parser.rs:80` is 16 × `include_str!` of the baked **deck JSONs** (each
+     >64KB, so a `&str` can't exist on 16-bit `usize`). It's only used by the
+     serde/JSON path, which `snes` disables — **the SNES port doesn't need it.**
+     Gated behind `#[cfg(feature = "serde_support")]`; the `E0080: slice is
+     bigger than largest supported object` cleared.
+   - **`CARD_BLOB` / `BYTECODE` (NOT fixed — genuine rust-mos ICE):** these ARE
+     the needed compact card + ability data (`core/cards_gen.rs`,
+     `ability/abilities_gen.rs`). rust-mos crashes with
+     `thread 'rustc' panicked at .../consts.rs:221: called Option::unwrap() on a
+     None value` while `typeck`-ing these large inline `const &[u8]` literals.
+     A `const` → `static` experiment did **not** clear it (same ICE) — so it's a
+     **compiler bug in the rust-mos fork on large byte-array typeck**, not a
+     data-representation issue. No clean engine-side workaround is obvious.
+
+4. **Windows host `cargo build`/`test` is broken for an unrelated reason.** A
+   hello-world fails to link on this machine in any directory. Root cause: no
+   Microsoft VS C++ Build Tools installed (no MSVC `link.exe`/`cl.exe`), and
+   devkitPro's MSYS2 `link.exe` (`c:\devkitPro\msys2\usr\bin\link.exe`) — the
+   Unix hard-link utility, not a linker — shadows the missing MSVC one on PATH.
+   So the `x86_64-pc-windows-msvc` host target can't link at all. `cargo clean`
+   is unrelated (confirmed). Fix: install MSVC C++ Build Tools, or switch to
+   `x86_64-pc-windows-gnu` + MinGW. This does **not** affect the SNES work, which
+   builds in WSL with rust-mos/lld.
+
+**Phase 0 verdict (final):** the toolchain is real and works on WSL; core/alloc
+codegen fine in release; deps resolve; **smallvec is fixed** (vendored +
+cfg-gated); the **unneeded `DECK_CARD_FILES` is gated out**. But the engine still
+does **not** compile for 65816, and the remaining blocker is a **genuine rust-mos
+compiler ICE** on the large `CARD_BLOB`/`BYTECODE` byte tables (the data we
+actually need). The `const`→`static` workaround failed, so this looks like a real
+bug in a niche, ~2-years-behind, single-maintainer compiler fork — possibly with
+a workaround (split the blobs smaller, or try a different rust-mos version), but
+with no guarantee, and no one likely to fix the compiler. **Recommendation: treat
+SNES as a research dead-end, not a shipping target.** The accumulated blockers
+(smallvec 16-bit, const-data, then this ICE) are exactly the fragility predicted
+at the start, and the rules logic still hasn't even been reached. GBA and PS1
+remain the proven floor.
 

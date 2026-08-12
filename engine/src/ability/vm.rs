@@ -1,4 +1,4 @@
-use super::abilities_gen::{BYTECODE, NUM_ABILITIES, OFFSETS, STRINGS};
+use super::abilities_gen::{BYTECODE, NUM_ABILITIES, OFFSET_DELTAS, STRINGS};
 use super::enums::EffectState;
 use crate::ability::enums::ActionType;
 #[cfg_attr(not(feature = "debug_conditions"), allow(unused_imports))]
@@ -6,7 +6,8 @@ use crate::card::{
     ek_box_new, Ability, AbilityCost, AbilityEffect, AbilityFilter, AbilityFilterBranch,
     CardProperty, CardState, CardType, ComparisonTarget, ComparisonType, Condition,
     ConditionCardType, DistinctType, DynamicCount, EffectFilter, EffectKind,
-    LocationSubChecks, Operator, PlacementOrder, PositionCharacter, PositionInfo, QuotedText,
+    LocationSubChecks, Operator, Operation, PlacementOrder, PositionCharacter, PositionInfo,
+    QuotedText,
 };
 use crate::core::types::ArcStr;
 
@@ -78,6 +79,14 @@ pub fn ability_count() -> usize {
 /// # RAM savings
 /// Before: All 800 abilities decoded eagerly at load = ~2.8MB
 /// After: Only ~30-45 abilities triggered per game decoded = ~120KB
+/// Absolute byte offset of `unique_abilities[idx]` within `BYTECODE`.
+/// Rebuilt from `OFFSET_DELTAS` (per-ability slice lengths) as a running
+/// prefix sum. Ability indexes are small and lookups are rare (decode is
+/// lazy/on-demand), so the linear walk is negligible.
+fn offset_of(idx: usize) -> usize {
+    OFFSET_DELTAS[..idx].iter().map(|&d| d as usize).sum()
+}
+
 pub fn get_ability(idx: usize) -> Result<Ability, DecodeError> {
     if idx >= NUM_ABILITIES {
         return Err(DecodeError::IndexOutOfRange {
@@ -85,8 +94,8 @@ pub fn get_ability(idx: usize) -> Result<Ability, DecodeError> {
             max: NUM_ABILITIES,
         });
     }
-    let start = OFFSETS[idx] as usize;
-    let end = OFFSETS[idx + 1] as usize;
+    let start = offset_of(idx);
+    let end = start + OFFSET_DELTAS[idx] as usize;
     if start >= end {
         return Ok(Ability::default());
     }
@@ -308,6 +317,21 @@ impl<'a> BcReader<'a> {
                     "=" | "==" => Some(crate::card::Operator::Eq),
                     _ => None,
                 }
+            }
+            _ => None,
+        }
+    }
+
+    fn read_operation_value(&mut self) -> Option<crate::card::Operation> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_STR => {
+                let idx = self.read_idx()?;
+                if idx >= STRINGS.len() {
+                    return None;
+                }
+                crate::card::parse_operation(STRINGS[idx])
             }
             _ => None,
         }

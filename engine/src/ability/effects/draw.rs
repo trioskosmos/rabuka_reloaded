@@ -290,7 +290,7 @@ impl AbilityResolver {
         let player = gs.resolve_target_player_mut(player_target);
         // Remove the non-selected cards (the hand equals the snapshot here).
         for (idx, cid) in hand_snapshot.iter().enumerate() {
-            if !kept_positions.contains(&idx) {
+            if !kept_positions.contains(&(idx as u8)) {
                 if let Some(pos) = player.hand.cards.iter().position(|c| c == cid) {
                     player.hand.cards.remove(pos);
                 }
@@ -301,7 +301,7 @@ impl AbilityResolver {
         let mut to_move: Vec<i16> = hand_snapshot
             .iter()
             .enumerate()
-            .filter(|(idx, _)| !kept_positions.contains(idx))
+            .filter(|(idx, _)| !kept_positions.contains(&(*idx as u8)))
             .map(|(_, cid)| *cid)
             .collect();
         crate::rng::shuffle_slice(&mut to_move);

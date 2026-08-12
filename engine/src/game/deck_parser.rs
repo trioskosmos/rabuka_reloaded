@@ -77,6 +77,7 @@ pub fn load_two_decks(deck1_idx: usize, deck2_idx: usize) -> Vec<crate::card::Ca
 
 pub struct DeckParser;
 
+#[cfg(feature = "serde_support")]
 pub const DECK_CARD_FILES: &[&str] = &[
     include_str!("../../baked/deck_0_cards.json"),
     include_str!("../../baked/deck_1_cards.json"),

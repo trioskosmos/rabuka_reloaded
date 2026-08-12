@@ -134,7 +134,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "repeat_limit" => { ek.repeat_limit = bc.read_u8_value(); return Some(true); }
             "ability_filter" => { ek.ability_filter = bc.read_ability_filter_value(); return Some(true); }
             "multiple_targets" => { ek.multiple_targets = bc.read_bool_value(); return Some(true); }
-            "operation" => { ek.operation = bc.read_arc_str_value(); return Some(true); }
+            "operation" => { ek.operation = bc.read_operation_value(); return Some(true); }
             "options" => { ek.options = bc.read_effect_vec_boxed_value(); return Some(true); }
             "name_constraint" => { ek.name_constraint = bc.read_arc_str_value(); return Some(true); }
             "name_constraint_source" => { ek.name_constraint_source = bc.read_arc_str_value(); return Some(true); }
@@ -294,7 +294,7 @@ pub(crate) struct EffectKindLocals {
     pub need_heart_total: Option<u8>,
     pub negation: Option<bool>,
     pub non_stackable: Option<bool>,
-    pub operation: Option<ArcStr>,
+    pub operation: Option<Operation>,
     pub opponent_action: Option<Box<AbilityEffect>>,
     pub option: Option<ArcStr>,
     pub optional: Option<bool>,
@@ -363,8 +363,10 @@ pub(crate) struct EffectKindLocals {
 }
 
 /// Build an EffectFilter from the flat EffectKindLocals.
-fn build_filter(ek: &EffectKindLocals) -> EffectFilter {
-    EffectFilter {
+/// Lazily allocates: returns None when every filter field is empty,
+/// so effects that carry no targeting/filter data pay no heap box.
+fn build_filter(ek: &EffectKindLocals) -> Option<Box<EffectFilter>> {
+    let f = EffectFilter {
         card_type: ek.card_type.clone(),
         exclude_self: ek.exclude_self.clone(),
         same_name: ek.same_name.clone(),
@@ -516,89 +518,94 @@ fn build_filter(ek: &EffectKindLocals) -> EffectFilter {
         ref_offset: ek.ref_offset.clone(),
         id: ek.id.clone(),
         opponent_action: ek.opponent_action.clone(),
+    };
+    if f == EffectFilter::default() {
+        None
+    } else {
+        Some(Box::new(f))
     }
 }
 
 fn build_abilityop(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::AbilityOp {
-        filter: Some(Box::new(build_filter(ek))),
+        filter: build_filter(ek),
     }
 }
 
 fn build_changestate(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::ChangeState {
-        filter: Some(Box::new(build_filter(ek))),
+        filter: build_filter(ek),
     }
 }
 
 fn build_compoundeffect(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::CompoundEffect {
-        filter: Some(Box::new(build_filter(ek))),
+        filter: build_filter(ek),
     }
 }
 
 fn build_customop(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::CustomOp {
-        filter: Some(Box::new(build_filter(ek))),
+        filter: build_filter(ek),
     }
 }
 
 fn build_drawcards(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::DrawCards {
-        filter: Some(Box::new(build_filter(ek))),
+        filter: build_filter(ek),
     }
 }
 
 fn build_gainresource(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::GainResource {
-        filter: Some(Box::new(build_filter(ek))),
+        filter: build_filter(ek),
     }
 }
 
 fn build_lookreveal(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::LookReveal {
-        filter: Some(Box::new(build_filter(ek))),
+        filter: build_filter(ek),
     }
 }
 
 fn build_miscop(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::MiscOp {
-        filter: Some(Box::new(build_filter(ek))),
+        filter: build_filter(ek),
     }
 }
 
 fn build_modifyhearts(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::ModifyHearts {
-        filter: Some(Box::new(build_filter(ek))),
+        filter: build_filter(ek),
     }
 }
 
 fn build_modifyscore(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::ModifyScore {
-        filter: Some(Box::new(build_filter(ek))),
+        filter: build_filter(ek),
     }
 }
 
 fn build_movecards(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::MoveCards {
-        filter: Some(Box::new(build_filter(ek))),
+        filter: build_filter(ek),
     }
 }
 
 fn build_positionop(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::PositionOp {
-        filter: Some(Box::new(build_filter(ek))),
+        filter: build_filter(ek),
     }
 }
 
 fn build_restrictionop(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::RestrictionOp {
-        filter: Some(Box::new(build_filter(ek))),
+        filter: build_filter(ek),
     }
 }
 
 fn build_selecttarget(ek: &EffectKindLocals) -> EffectKind {
     EffectKind::SelectTarget {
-        filter: Some(Box::new(build_filter(ek))),
+        filter: build_filter(ek),
     }
 }

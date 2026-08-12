@@ -74,13 +74,17 @@ fn main(mut gba: agb::Gba) -> ! {
     let decks = DECKS;
     let names: Vec<&str> = decks.iter().map(|d| d.name).collect();
 
-    let ui = GbaUi {
-        display: &mut display,
-        input: &mut input,
-    };
-    platform_ui::run_embedded_game(ui, &names, |i| decks[i].cards, |a, b| {
-        load_deck_cards(decks, a, b)
-    });
-
-    loop {}
+    // Run the whole flow (mode select -> deck select -> match) forever. If a
+    // match ends early (e.g. the player presses B to pass at the RPS screen, or
+    // a game result is reached), restart cleanly at the mode select instead of
+    // dropping into a frozen black screen.
+    loop {
+        let ui = GbaUi {
+            display: &mut display,
+            input: &mut input,
+        };
+        platform_ui::run_embedded_game(ui, &names, |i| decks[i].cards, |a, b| {
+            load_deck_cards(decks, a, b)
+        });
+    }
 }

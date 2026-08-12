@@ -1050,13 +1050,14 @@ impl super::resolver::AbilityResolver {
             // Record the chosen hand POSITIONS to keep (hand is unchanged during
             // selection, so these absolute positions map onto the snapshot).
             for &idx in hand_idx.iter() {
+                let idx = idx as u8;
                 if !self.keep_shuffle_selected.contains(&idx) {
                     self.keep_shuffle_selected.push(idx);
                 }
             }
             let count = self.keep_shuffle_under_count as usize;
             let available_idxs: Vec<usize> = (0..hand_cards.len())
-                .filter(|i| !self.keep_shuffle_selected.contains(i))
+                .filter(|i| !self.keep_shuffle_selected.contains(&(*i as u8)))
                 .collect();
             if hand_idx.len() < count && !hand_idx.is_empty() && !available_idxs.is_empty() {
                 // Still selecting (up to N) and more cards remain: re-prompt for

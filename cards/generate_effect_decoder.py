@@ -26,6 +26,7 @@ READER_MAP = {
     "Option<PlacementOrder>": "bc.read_placement_order_value()",
     "Option<Box<QuotedText>>": "bc.read_quoted_text_value()",
     "Option<Operator>": "bc.read_operator_value()",
+    "Option<Operation>": "bc.read_operation_value()",
     "Option<Box<Vec<String>>>": "bc.read_opt_str_vec_value()",
     "Box<Vec<String>>": "bc.read_str_vec_value()",
     "Option<Box<Condition>>": "bc.read_condition_value()",
@@ -347,13 +348,20 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
 
     # === build_filter function ===
     lines.append("/// Build an EffectFilter from the flat EffectKindLocals.")
-    lines.append("fn build_filter(ek: &EffectKindLocals) -> EffectFilter {")
-    lines.append("    EffectFilter {")
+    lines.append("/// Lazily allocates: returns None when every filter field is empty,")
+    lines.append("/// so effects that carry no targeting/filter data pay no heap box.")
+    lines.append("fn build_filter(ek: &EffectKindLocals) -> Option<Box<EffectFilter>> {")
+    lines.append("    let f = EffectFilter {")
     for fname, ftype, _ in filter_fields:
         if fname in all_ek_fields:
             lines.append(f"        {fname}: ek.{fname}.clone(),")
         else:
             lines.append(f"        {fname}: Default::default(),")
+    lines.append("    };")
+    lines.append("    if f == EffectFilter::default() {")
+    lines.append("        None")
+    lines.append("    } else {")
+    lines.append("        Some(Box::new(f))")
     lines.append("    }")
     lines.append("}")
     lines.append("")
@@ -366,7 +374,7 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
         lines.append(f"    EffectKind::{vname} {{")
         for fname, ftype, _ in vfields:
             if fname == "filter":
-                lines.append("        filter: Some(Box::new(build_filter(ek))),")
+                lines.append("        filter: build_filter(ek),")
             elif ftype in ("Box<Vec<String>>", "Vec<String>"):
                 lines.append(f"        {fname}: ek.{fname}.clone(),")
             elif ftype == "Option<Box<ArcStr>>":

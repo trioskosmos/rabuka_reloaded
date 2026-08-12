@@ -62,7 +62,7 @@ impl FrameSnapshot {
         let p = |player: &crate::player::Player| FramePlayerState {
             hand: player.hand.cards.iter().copied().collect(),
             hand_count: player.hand.cards.len(),
-            energy_count: player.energy_zone.active_count(),
+            energy_count: player.energy_zone.active_count() as usize,
             deck_count: player.main_deck.cards.len(),
             discard: player.waitroom.cards.iter().copied().collect(),
             stage: player.stage.stage,
@@ -1229,8 +1229,9 @@ async fn exec_code(
         with_player!(p, {
             if let Some(cid) = p.energy_zone.cards.pop() {
                 p.energy_deck.cards.push(cid);
-                p.energy_zone
-                    .set_active_count(p.energy_zone.active_count().min(p.energy_zone.cards.len()));
+                p.energy_zone.set_active_count(
+                    p.energy_zone.active_count().min(p.energy_zone.cards.len() as u8),
+                );
             }
         });
     }

@@ -78,12 +78,24 @@ pub fn show_result(ui: &mut dyn PlatformUi, gs: &GameState) {
 /// Select from a list of items. Returns the selected index.
 pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
     let mut sel: usize = 0;
+    let mut scroll: usize = 0;
+    const VIS: usize = 14;
     loop {
+        if sel < scroll {
+            scroll = sel;
+        }
+        if sel >= scroll + VIS {
+            scroll = sel + 1 - VIS;
+        }
         ui.clear_screen();
         ui.println(title);
-        for (n, item) in items.iter().enumerate() {
+        let end = (scroll + VIS).min(items.len());
+        for n in scroll..end {
             let prefix = if n == sel { " >" } else { "  " };
-            ui.println(&format!("{prefix} {item}"));
+            ui.println(&format!("{prefix} {}", items[n]));
+        }
+        if items.len() > end {
+            ui.println(&format!("  .. {} more", items.len() - end));
         }
         ui.swap_buffers();
         ui.poll_input();
@@ -93,7 +105,7 @@ pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
             if sel + 1 < items.len() {
                 sel += 1;
             }
-        } else if ui.just_pressed_a() || ui.just_pressed_b() {
+        } else if ui.just_pressed_a() {
             return sel;
         }
         ui.wait_vblank();
@@ -115,12 +127,24 @@ pub fn menu_select(
         None
     };
     let mut sel: usize = 0;
+    let mut scroll: usize = 0;
+    const VIS: usize = 14;
     loop {
+        if sel < scroll {
+            scroll = sel;
+        }
+        if sel >= scroll + VIS {
+            scroll = sel + 1 - VIS;
+        }
         ui.clear_screen();
         ui.println(title);
-        for (n, item) in all_items.iter().enumerate() {
+        let end = (scroll + VIS).min(all_items.len());
+        for n in scroll..end {
             let prefix = if n == sel { " >" } else { "  " };
-            ui.println(&format!("{prefix} {item}"));
+            ui.println(&format!("{prefix} {}", all_items[n]));
+        }
+        if all_items.len() > end {
+            ui.println(&format!("  .. {} more", all_items.len() - end));
         }
         ui.swap_buffers();
         ui.poll_input();
@@ -135,8 +159,6 @@ pub fn menu_select(
                 return None;
             }
             return Some(sel);
-        } else if ui.just_pressed_b() {
-            return None;
         }
         ui.wait_vblank();
     }
@@ -192,7 +214,7 @@ pub fn human_turn(
                     .unwrap_or_default(),
                 None => String::new(),
             };
-            ui.println(&format!("{prefix}[{a}] {line}{tag_str}"));
+            ui.println(&format!("{prefix}{line}{tag_str}"));
         }
         if acts.len() > end {
             ui.println(&format!("  .. {} more", acts.len() - end));
@@ -206,8 +228,6 @@ pub fn human_turn(
         } else if ui.just_pressed_a() {
             let _ = game_setup::execute_action(gs, &acts[sel]);
             return true;
-        } else if ui.just_pressed_b() {
-            return false;
         }
         ui.wait_vblank();
     }
@@ -270,7 +290,7 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                         if i < card_ids.len() {
                             gs.card_database
                                 .get_card(card_ids[i])
-                                .map(|c| c.name.to_string())
+                                .map(|c| format!("{} {}", c.card_no, c.name))
                                 .unwrap_or_else(|| format!("#{}", card_ids[i]))
                         } else {
                             format!("#{}", i)
@@ -282,7 +302,7 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                     .map(|cid| {
                         gs.card_database
                             .get_card(*cid)
-                            .map(|c| c.name.to_string())
+                            .map(|c| format!("{} {}", c.card_no, c.name))
                             .unwrap_or_else(|| format!("#{}", cid))
                     })
                     .collect(),
