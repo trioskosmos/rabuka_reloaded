@@ -29,11 +29,12 @@ impl<'a> Display<'a> {
             palette[1] = Rgb15::WHITE;
             Palette16::new(palette)
         };
-        // Small 16x16 sprites (4 VRAM tiles each) so any single allocation
-        // always fits and groups stay within the sprite bounds (the default
-        // max_group_width is 16). This is the proven object-text size used by
-        // the real agb examples/games.
-        let text_renderer = ObjectTextRenderer::new((&PALETTE).into(), Size::S16x16);
+        // Proven object-text config from the real agb games (the-dungeon-
+        // puzzlers-lament): S32x16 sprites paired with max_group_width(32) and a
+        // 12px pixel font. Group width is measured in pixels, so 32px = ~3 chars
+        // per object (the default 16 with 16x16 sprites made EVERY character its
+        // own object -> ~200 objects/screen, slow re-renders and artefacts).
+        let text_renderer = ObjectTextRenderer::new((&PALETTE).into(), Size::S32x16);
         Display {
             gfx,
             buf: String::new(),
@@ -74,13 +75,14 @@ impl<'a> Display<'a> {
         drop(self.gfx.frame());
         let mut frame = self.gfx.frame();
 
-        let settings = LayoutSettings::new().with_max_line_length(230);
+        let settings = LayoutSettings::new()
+            .with_max_group_width(32)
+            .with_max_line_length(230);
         let layout = Layout::new(&self.buf, &FONT, &settings);
 
         let mut new_objects = Vec::new();
-        // Safety cap: each 16x16 sprite costs 4 tiles; the sprite allocator has
-        // 1024 tiles, so a single screen must stay well under 256 groups.
-        for group in layout.take(240) {
+        // Each S32x16 sprite costs 8 VRAM tiles; 120 groups * 8 = 960 < 1024.
+        for group in layout.take(120) {
             new_objects.push(self.text_renderer.show(&group, (4, 2)));
         }
         self.text_objects = new_objects;
