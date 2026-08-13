@@ -21,6 +21,7 @@ pub mod bp7_q276_cheer_mode_return_hand_test;
 pub mod bp7_q278_q279_joint_blade_test;
 pub mod bp7_q280_energy_do_not_activate_test;
 pub mod bp7_q281_kanata_look_select_test;
+pub mod bp7_q282_parser_gap_tests;
 pub mod bp7_sd2_gap_test;
 pub mod blade_heart_types_test;
 pub mod blade_per_discard_test;

@@ -4102,9 +4102,15 @@ def _try_movement(text):
     # Extract "自分のカードの効果" (own card effect) constraint
     if "自分のカードの効果" in text:
         te_data["self_effect_only"] = True
-    # Extract "エネルギーが置かれ" (energy placed) trigger
-    if "エネルギーが置かれ" in text:
+    # Extract "エネルギーが置かれ" (energy placed) trigger. The placement verb
+    # may be separated from エネルギー by a location phrase ("エネルギーが...メンバーの下に置かれた"),
+    # so match on the energy subject + the 置かれ/置かれた placement verb.
+    if re.search(r"エネルギーが.*?(置かれ|置かれた)", text):
         te_data["energy_placed"] = True
+        # "エネルギーが...メンバーの下に置かれた" → placed UNDER a member.
+        if "メンバーの下に" in text:
+            te_data["destination"] = "under_member"
+            result["destination"] = "under_member"
     # Phase restriction: 自分のメインフェイズ / 相手のメインフェイズ
     if "メインフェイズ" in text:
         te_data["phase"] = "main"
@@ -5013,37 +5019,90 @@ def _try_those_cards_add_hand_optional(text):
 
 
 def _try_discard_shuffle_to_bottom_optional(text):
-    """G16: '自分の控え室にある…メンバーカードをN枚選び、それらをシャッフルし、
-    デッキの一番下に置いてもよい。そうしたとき、[consequence]' →
-    conditional_on_optional{optional: move discard→deck_bottom (shuffle, any order),
-    conditional: consequence}."""
-    if "選び" not in text or "シャッフル" not in text:
+    """G16 / 澁谷かのん: '自分の控え室にある…メンバーカードをN枚選び、それらを
+    シャッフルし／好きな順番で、デッキの(一番)下に置いてもよい。そうしたとき、
+    [consequence]' → conditional_on_optional{optional: move discard→deck_bottom
+    (shuffle / any order), conditional: consequence}."""
+    if "選び" not in text:
         return None
-    if "デッキの一番下に置いてもよい" not in text or "そうしたとき" not in text:
+    if "シャッフル" not in text and "好きな順番で" not in text:
+        return None
+    if "デッキの下に置いてもよい" not in text and "デッキの一番下に置いてもよい" not in text:
+        return None
+    if "そうしたとき" not in text:
         return None
     opt_text, _, cons_text = text.partition("そうしたとき")
     opt_text = opt_text.strip()
     cons_text = cons_text.strip().lstrip("、")
     groups = list(dict.fromkeys(extract_group_names(opt_text)))
     m = re.search(r"(\d+)枚", opt_text)
+    # "それぞれ1枚ずつ" = 1 from EACH group → the total count equals the number of groups.
+    per_each = "それぞれ" in opt_text or "ずつ" in opt_text
     count = int(m.group(1)) if m else 1
+    if per_each and groups:
+        count = len(groups)
+    card_type = "member_card" if "メンバーカード" in opt_text else "card"
     move_opt = {
         "action": "move_cards",
         "source": "discard",
         "destination": "deck_bottom",
         "count": count,
-        "card_type": "member_card",
+        "card_type": card_type,
         "target": "self",
-        "shuffle": True,
         "placement_order": "any_order",
         "optional": True,
         "text": opt_text,
     }
+    if per_each:
+        move_opt["per_group"] = True
+    if "シャッフル" in opt_text:
+        move_opt["shuffle"] = True
     if groups:
         move_opt["group_names"] = groups
+
+    cons = parse_effect(cons_text)
+    # The consequence (e.g. "カードを1枚引く") must NOT inherit the selection's
+    # group_names filter.
+    if isinstance(cons, dict):
+        cons.pop("group_names", None)
+
+    # "それぞれ1枚ずつ" of several groups = one selection PER group. Model it as a
+    # sequential of single-group moves so the engine's normal single-group select
+    # handles each group independently (no per-group engine plumbing needed).
+    if per_each and groups:
+        seq_actions = []
+        for g in groups:
+            gm = {
+                "action": "move_cards",
+                "source": "discard",
+                "destination": "deck_bottom",
+                "count": 1,
+                "card_type": card_type,
+                "target": "self",
+                "placement_order": "any_order",
+                "optional": True,
+                "group_names": [g],
+                "text": opt_text,
+            }
+            if "シャッフル" in opt_text:
+                gm["shuffle"] = True
+            seq_actions.append(gm)
+        return {
+            "text": text,
+            "action": "conditional_on_optional",
+            "optional_action": {"action": "sequential", "actions": seq_actions},
+            "conditional_action": {
+                "action": "sequential",
+                "actions": [
+                    {"action": "sequential", "actions": seq_actions},
+                    cons,
+                ],
+            },
+            "conditional_negation": False,
+        }
+
     move_done = dict(move_opt)
     move_done["optional"] = False
-    cons = parse_effect(cons_text)
     return {
         "text": text,
         "action": "conditional_on_optional",

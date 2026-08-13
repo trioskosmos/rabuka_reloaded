@@ -695,13 +695,13 @@ impl GameState {
     pub fn last_energy_placed_by_effect(&self) -> bool {
         self.batch_movements
             .iter()
-            .any(|m| (m.dest_zone == "energy" || m.dest_zone == "energy_zone") && m.effect_only)
+            .any(|m| (m.dest_zone == "energy" || m.dest_zone == "energy_zone" || m.dest_zone == "under_member") && m.effect_only)
     }
     /// Backward-compat: which player's effect caused the last energy placement.
     pub fn last_energy_placed_by_player(&self) -> Option<&str> {
         self.batch_movements
             .iter()
-            .find(|m| m.dest_zone == "energy" || m.dest_zone == "energy_zone")
+            .find(|m| m.dest_zone == "energy" || m.dest_zone == "energy_zone" || m.dest_zone == "under_member")
             .map(|m| m.cause_player_id.as_str())
     }
 

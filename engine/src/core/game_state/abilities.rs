@@ -1715,7 +1715,8 @@ impl GameState {
             .map(|e| {
                 e.snapshot_movements.iter().any(|m| {
                     (m.dest_zone == crate::types::ZoneId::Energy
-                        || m.dest_zone == crate::types::ZoneId::EnergyZone)
+                        || m.dest_zone == crate::types::ZoneId::EnergyZone
+                        || m.dest_zone == crate::types::ZoneId::UnderMember)
                         && m.effect_only
                 })
             })
@@ -1728,7 +1729,11 @@ impl GameState {
             .and_then(|e| {
                 e.snapshot_movements
                     .iter()
-                    .find(|m| m.dest_zone == "energy" || m.dest_zone == "energy_zone")
+                    .find(|m| {
+                        m.dest_zone == "energy"
+                            || m.dest_zone == "energy_zone"
+                            || m.dest_zone == "under_member"
+                    })
             })
             .map(|m| m.cause_player_id.clone())
     }

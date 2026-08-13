@@ -808,6 +808,11 @@ impl<'a> ConditionContext<'a> {
                     })
                 };
                 let energy_ok = energy_placed.is_none_or(|_| {
+                    // Optional destination constraint (e.g. "メンバーの下に置かれた").
+                    let want_dest = condition
+                        .get_destination()
+                        .or_else(|| te.and_then(|t| t.destination.as_deref()))
+                        .unwrap_or("");
                     let energy_val = if snapshot_energy {
                         true
                     } else if !self.game_state.last_energy_placed_by_effect() {
@@ -816,10 +821,37 @@ impl<'a> ConditionContext<'a> {
                         // snapshot is false but global is true — use global
                         true
                     };
+                    // Verify the placed energy's destination matches, when constrained.
+                    // Check both the entry snapshot (persistent) and the live batch.
+                    let dest_ok = if want_dest.is_empty() {
+                        true
+                    } else {
+                        let snapshot_dest_ok = self
+                            .game_state
+                            .ability_queue
+                            .current_entry()
+                            .map(|e| {
+                                e.snapshot_movements.iter().any(|m| {
+                                    (m.dest_zone == "energy"
+                                        || m.dest_zone == "energy_zone"
+                                        || m.dest_zone == "under_member")
+                                        && m.dest_zone == want_dest
+                                })
+                            })
+                            .unwrap_or(false);
+                        let live_dest_ok = self.game_state.batch_movements.iter().rev().any(|m| {
+                            (m.dest_zone == "energy"
+                                || m.dest_zone == "energy_zone"
+                                || m.dest_zone == "under_member")
+                                && m.dest_zone == want_dest
+                        });
+                        snapshot_dest_ok || live_dest_ok
+                    };
                     let energy_player = snapshot_energy_player
                         .as_deref()
                         .or_else(|| self.game_state.last_energy_placed_by_player());
                     energy_val
+                        && dest_ok
                         && (!self_effect_only.unwrap_or(false) || energy_player == Some(&player.id))
                 });
                 let has_area_check =

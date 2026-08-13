@@ -3043,6 +3043,24 @@ impl AbilityResolver {
         for &card in cids {
             player.stage.place_under_card(area, card);
         }
+        // Record the placement as a movement event so energy-placement watcher
+        // triggers (e.g. "エネルギーがメンバーの下に置かれたとき") fire.
+        let cause_pid = gs
+            .ability_queue
+            .current_entry()
+            .map(|e| e.player_id.clone())
+            .unwrap_or_default();
+        let cause_cid = gs.activating_card;
+        for &card in cids {
+            gs.push_movement_event(
+                card,
+                "energy_zone",
+                "under_member",
+                cause_cid,
+                &cause_pid,
+                true,
+            );
+        }
         gs.mark_constants_dirty();
         gs.recalculate_constants();
         let pp = self.player_prefix(gs);

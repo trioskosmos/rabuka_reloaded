@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-13T18:14:28.301572",
+  "generated_at": "2026-08-13T18:59:24.151291",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "b957378a",
+  "engine_commit": "fe831778",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -21590,13 +21590,16 @@
           "text": "自分のエネルギー置き場にあるエネルギーがメンバーの下に置かれたとき",
           "trigger_event": {
             "type": "energy_placed",
-            "tense": "past"
+            "tense": "past",
+            "energy_placed": true,
+            "destination": "under_member"
           },
           "movement": "moves",
           "target": "self",
           "location": "energy_zone",
           "resource_type": "energy",
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "destination": "under_member"
         },
         "source": "energy_deck",
         "destination": "energy_zone",
@@ -37441,26 +37444,148 @@
       "cost": null,
       "effect": {
         "text": "自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードをそれぞれ1枚ずつ選び、それらを好きな順番でデッキの下に置いてもよい。そうしたとき、カードを1枚引く",
-        "condition": {
-          "text": "自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードをそれぞれ1枚ずつ選び、それらを好きな順番でデッキの下に置いてもよい。そうしたとき",
+        "action": "conditional_on_optional",
+        "optional_action": {
+          "action": "sequential",
+          "actions": [
+            {
+              "action": "move_cards",
+              "source": "discard",
+              "destination": "deck_bottom",
+              "count": 1,
+              "card_type": "card",
+              "target": "self",
+              "placement_order": "any_order",
+              "optional": true,
+              "group_names": [
+                "CatChu!"
+              ],
+              "text": "自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードをそれぞれ1枚ずつ選び、それらを好きな順番でデッキの下に置いてもよい。",
+              "multiple_targets": true
+            },
+            {
+              "action": "move_cards",
+              "source": "discard",
+              "destination": "deck_bottom",
+              "count": 1,
+              "card_type": "card",
+              "target": "self",
+              "placement_order": "any_order",
+              "optional": true,
+              "group_names": [
+                "KALEIDOSCORE"
+              ],
+              "text": "自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードをそれぞれ1枚ずつ選び、それらを好きな順番でデッキの下に置いてもよい。",
+              "multiple_targets": true
+            },
+            {
+              "action": "move_cards",
+              "source": "discard",
+              "destination": "deck_bottom",
+              "count": 1,
+              "card_type": "card",
+              "target": "self",
+              "placement_order": "any_order",
+              "optional": true,
+              "group_names": [
+                "5yncri5e!"
+              ],
+              "text": "自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードをそれぞれ1枚ずつ選び、それらを好きな順番でデッキの下に置いてもよい。",
+              "multiple_targets": true
+            }
+          ],
+          "text": "自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードをそれぞれ1枚ずつ選び、それらを好きな順番でデッキの下に置いてもよい。そうしたとき、カードを1枚引く",
           "group_names": [
             "CatChu!",
             "KALEIDOSCORE",
             "5yncri5e!"
-          ],
-          "target": "self",
-          "location": "discard",
-          "locations": [
-            "discard",
-            "deck"
-          ],
-          "count": 1,
-          "type": "group_condition"
+          ]
         },
-        "action": "draw_card",
-        "count": 1,
-        "source": "deck",
-        "destination": "hand"
+        "conditional_action": {
+          "action": "sequential",
+          "actions": [
+            {
+              "action": "sequential",
+              "actions": [
+                {
+                  "action": "move_cards",
+                  "source": "discard",
+                  "destination": "deck_bottom",
+                  "count": 1,
+                  "card_type": "card",
+                  "target": "self",
+                  "placement_order": "any_order",
+                  "optional": true,
+                  "group_names": [
+                    "CatChu!"
+                  ],
+                  "text": "自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードをそれぞれ1枚ずつ選び、それらを好きな順番でデッキの下に置いてもよい。",
+                  "multiple_targets": true
+                },
+                {
+                  "action": "move_cards",
+                  "source": "discard",
+                  "destination": "deck_bottom",
+                  "count": 1,
+                  "card_type": "card",
+                  "target": "self",
+                  "placement_order": "any_order",
+                  "optional": true,
+                  "group_names": [
+                    "KALEIDOSCORE"
+                  ],
+                  "text": "自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードをそれぞれ1枚ずつ選び、それらを好きな順番でデッキの下に置いてもよい。",
+                  "multiple_targets": true
+                },
+                {
+                  "action": "move_cards",
+                  "source": "discard",
+                  "destination": "deck_bottom",
+                  "count": 1,
+                  "card_type": "card",
+                  "target": "self",
+                  "placement_order": "any_order",
+                  "optional": true,
+                  "group_names": [
+                    "5yncri5e!"
+                  ],
+                  "text": "自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードをそれぞれ1枚ずつ選び、それらを好きな順番でデッキの下に置いてもよい。",
+                  "multiple_targets": true
+                }
+              ],
+              "group_names": [
+                "CatChu!",
+                "KALEIDOSCORE",
+                "5yncri5e!"
+              ],
+              "text": "自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードをそれぞれ1枚ずつ選び、それらを好きな順番でデッキの下に置いてもよい。そうしたとき、カードを1枚引く"
+            },
+            {
+              "text": "カードを1枚引く",
+              "action": "draw_card",
+              "count": 1,
+              "source": "deck",
+              "destination": "hand",
+              "group_names": [
+                "CatChu!",
+                "KALEIDOSCORE",
+                "5yncri5e!"
+              ]
+            }
+          ],
+          "text": "自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードをそれぞれ1枚ずつ選び、それらを好きな順番でデッキの下に置いてもよい。そうしたとき、カードを1枚引く",
+          "group_names": [
+            "CatChu!",
+            "KALEIDOSCORE",
+            "5yncri5e!"
+          ]
+        },
+        "conditional_negation": false,
+        "group_names": [
+          "CatChu!",
+          "KALEIDOSCORE",
+          "5yncri5e!"
+        ]
       }
     },
     {
@@ -37953,9 +38078,9 @@
           "count": 9,
           "card_type": "member_card",
           "target": "self",
-          "shuffle": true,
           "placement_order": "any_order",
           "text": "自分の控え室にある『Liella!』のメンバーカードを9枚選び、それらをシャッフルし、デッキの一番下に置いてもよい。",
+          "shuffle": true,
           "group_names": [
             "Liella!"
           ]
@@ -37970,10 +38095,10 @@
               "count": 9,
               "card_type": "member_card",
               "target": "self",
-              "shuffle": true,
               "placement_order": "any_order",
               "optional": false,
               "text": "自分の控え室にある『Liella!』のメンバーカードを9枚選び、それらをシャッフルし、デッキの一番下に置いてもよい。",
+              "shuffle": true,
               "group_names": [
                 "Liella!"
               ],
