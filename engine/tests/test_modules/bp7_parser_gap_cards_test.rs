@@ -41,6 +41,46 @@ fn seed_deck(game: &mut TestGame) {
     }
 }
 
+/// Fire 澁谷かのん's 登場 (debut) ability and resolve its choices.
+fn trigger_kanon_debut(game: &mut TestGame, kanon: i16, accept: bool) {
+    let pid = game.state.player1.id.clone();
+    let card = game.db.get_card(kanon).unwrap();
+    let ab = card
+        .resolved_abilities()
+        .find(|a| a.triggers.as_deref() == Some("登場"))
+        .expect("card should have 登場");
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ab.full_text),
+        AbilityTrigger::Debut,
+        pid.clone(),
+        Some(card.card_no.to_string()),
+        Some(kanon),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(kanon);
+    game.state.process_pending_auto_abilities(&pid);
+
+    // The effect is conditional_on_optional: accept/skip the optional placement,
+    // then select each present group's card from the waitroom.
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 40 {
+        guard += 1;
+        let choice = game.get_pending_choice().clone();
+        match choice {
+            // Accept (1) or skip (0) the optional "place on deck bottom".
+            rabuka_engine::ability::types::Choice::SelectTarget { .. } => {
+                game.select_choice_option(if accept { 1 } else { 0 });
+            }
+            // Select the group cards from the waitroom.
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
+                game.select_indices(&[0]);
+            }
+            _ => game.select_indices(&[0]),
+        }
+    }
+}
+
 fn run_activate_drain(game: &mut TestGame, member: i16) {
     game.activate_ability(member);
     let mut guard = 0;
@@ -190,49 +230,26 @@ fn kanon_selects_each_group_to_deck_bottom_and_draws() {
     game.add_to_discard(c_sync);
     seed_deck(&mut game);
 
-    let deck_before = game.state.player1.main_deck.cards.len();
     let hand_before = game.state.player1.hand.cards.len();
 
-    let pid = game.state.player1.id.clone();
-    let card = game.db.get_card(kanon).unwrap();
-    let ab = card
-        .resolved_abilities()
-        .find(|a| a.triggers.as_deref() == Some("登場"))
-        .expect("card should have 登場");
-    game.state.trigger_auto_ability(
-        format!("{}_{}", card.card_no, ab.full_text),
-        AbilityTrigger::Debut,
-        pid.clone(),
-        Some(card.card_no.to_string()),
-        Some(kanon),
-        None,
-        None,
-    );
-    game.state.activating_card = Some(kanon);
-    game.state.process_pending_auto_abilities(&pid);
+    trigger_kanon_debut(&mut game, kanon, true);
 
-    // The effect is conditional_on_optional: accept the optional move, then
-    // select each group's card, then resolve the draw.
-    let mut guard = 0;
-    while game.has_pending_choice() && guard < 40 {
-        guard += 1;
-        let choice = game.get_pending_choice().clone();
-        match choice {
-            // Accept the optional "place on deck bottom" (SelectTarget pay = index 1).
-            rabuka_engine::ability::types::Choice::SelectTarget { .. } => {
-                game.select_choice_option(1);
-            }
-            // Select the group cards from the waitroom.
-            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
-                game.select_indices(&[0]);
-            }
-            _ => game.select_indices(&[0]),
-        }
-    }
-
+    // All 3 group cards are placed on the deck bottom. (The net deck count is
+    // deck_before + 2 because the draw took 1 off the top after placing 3.)
+    let bottom3: Vec<i16> = game
+        .state
+        .player1
+        .main_deck
+        .cards
+        .iter()
+        .rev()
+        .take(3)
+        .copied()
+        .collect();
     assert!(
-        game.state.player1.main_deck.cards.len() > deck_before,
-        "the selected group cards should be placed onto the deck"
+        bottom3.contains(&c_catchu) && bottom3.contains(&c_kaleido) && bottom3.contains(&c_sync),
+        "all 3 group cards must be placed on the deck bottom (got {:?})",
+        bottom3
     );
     assert!(
         game.state.player1.hand.cards.len() > hand_before,
@@ -256,35 +273,7 @@ fn kanon_skip_placement_no_draw() {
     let hand_before = game.state.player1.hand.cards.len();
     let deck_before = game.state.player1.main_deck.cards.len();
 
-    let pid = game.state.player1.id.clone();
-    let card = game.db.get_card(kanon).unwrap();
-    let ab = card
-        .resolved_abilities()
-        .find(|a| a.triggers.as_deref() == Some("登場"))
-        .expect("card should have 登場");
-    game.state.trigger_auto_ability(
-        format!("{}_{}", card.card_no, ab.full_text),
-        AbilityTrigger::Debut,
-        pid.clone(),
-        Some(card.card_no.to_string()),
-        Some(kanon),
-        None,
-        None,
-    );
-    game.state.activating_card = Some(kanon);
-    game.state.process_pending_auto_abilities(&pid);
-
-    // Skip the optional placement (SelectTarget pay = index 0 = skip).
-    let mut guard = 0;
-    while game.has_pending_choice() && guard < 40 {
-        guard += 1;
-        match game.get_pending_choice() {
-            rabuka_engine::ability::types::Choice::SelectTarget { .. } => {
-                game.select_choice_option(0); // skip
-            }
-            _ => game.select_indices(&[]),
-        }
-    }
+    trigger_kanon_debut(&mut game, kanon, false); // skip
 
     assert_eq!(
         game.state.player1.main_deck.cards.len(),
@@ -295,6 +284,49 @@ fn kanon_skip_placement_no_draw() {
         game.state.player1.hand.cards.len(),
         hand_before,
         "skipping the placement must not draw a card"
+    );
+}
+
+/// 澁谷かのん: if one of the three target groups has no card in the waitroom,
+/// the other two groups are still selectable and placed; drawing still occurs.
+#[test]
+fn kanon_missing_group_still_selects_present_groups() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let kanon = game.id("PL!SP-bp7-012-N");
+    game.state.player1.stage.stage[1] = kanon;
+    // Only CatChu! and KALEIDOSCORE present; 5yncri5e! has no card in waitroom.
+    let c_catchu = game.id("PL!SP-bp1-004-PR"); // CatChu!
+    let c_kaleido = game.id("PL!SP-bp1-013-PR"); // KALEIDOSCORE
+    game.add_to_discard(c_catchu);
+    game.add_to_discard(c_kaleido);
+    seed_deck(&mut game);
+
+    let hand_before = game.state.player1.hand.cards.len();
+
+    trigger_kanon_debut(&mut game, kanon, true);
+
+    // The two present groups' cards were placed; the missing group is skipped.
+    // (Net deck +1 because placing 2 and then drawing 1 off the top.)
+    let bottom2: Vec<i16> = game
+        .state
+        .player1
+        .main_deck
+        .cards
+        .iter()
+        .rev()
+        .take(2)
+        .copied()
+        .collect();
+    assert!(
+        bottom2.contains(&c_catchu) && bottom2.contains(&c_kaleido),
+        "the two present group cards must be placed on the deck bottom (got {:?})",
+        bottom2
+    );
+    assert!(
+        game.state.player1.hand.cards.len() > hand_before,
+        "placing them still draws 1 card"
     );
 }
 

@@ -5093,10 +5093,7 @@ def _try_discard_shuffle_to_bottom_optional(text):
             "optional_action": {"action": "sequential", "actions": seq_actions},
             "conditional_action": {
                 "action": "sequential",
-                "actions": [
-                    {"action": "sequential", "actions": seq_actions},
-                    cons,
-                ],
+                "actions": seq_actions + [cons],
             },
             "conditional_negation": False,
         }
