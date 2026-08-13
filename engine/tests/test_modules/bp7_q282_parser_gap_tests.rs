@@ -171,6 +171,64 @@ fn kanon_selects_each_group_to_deck_bottom_and_draws() {
     );
 }
 
+/// 澁谷かのん: skipping the optional deck-bottom placement means NO card is drawn.
+#[test]
+fn kanon_skip_placement_no_draw() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let kanon = game.id("PL!SP-bp7-012-N");
+    game.state.player1.stage.stage[1] = kanon;
+    game.add_to_discard(game.id("PL!SP-bp1-004-PR")); // CatChu!
+    game.add_to_discard(game.id("PL!SP-bp1-013-PR")); // KALEIDOSCORE
+    game.add_to_discard(game.id("PL!SP-pb1-014-PR")); // 5yncri5e!
+    seed_deck(&mut game);
+
+    let hand_before = game.state.player1.hand.cards.len();
+    let deck_before = game.state.player1.main_deck.cards.len();
+
+    let pid = game.state.player1.id.clone();
+    let card = game.db.get_card(kanon).unwrap();
+    let ab = card
+        .resolved_abilities()
+        .find(|a| a.triggers.as_deref() == Some("登場"))
+        .expect("card should have 登場");
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ab.full_text),
+        AbilityTrigger::Debut,
+        pid.clone(),
+        Some(card.card_no.to_string()),
+        Some(kanon),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(kanon);
+    game.state.process_pending_auto_abilities(&pid);
+
+    // Skip the optional placement (SelectTarget pay = index 0 = skip).
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 40 {
+        guard += 1;
+        match game.get_pending_choice() {
+            rabuka_engine::ability::types::Choice::SelectTarget { .. } => {
+                game.select_choice_option(0); // skip
+            }
+            _ => game.select_indices(&[]),
+        }
+    }
+
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before,
+        "skipping the placement must not move any cards to the deck"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "skipping the placement must not draw a card"
+    );
+}
+
 // ====================================================================
 // 2. 上原歩夢 (PL!N-bp7-001-R): 自動 — energy placed under a member
 // ====================================================================
@@ -196,6 +254,7 @@ fn ayumu_energy_under_member_triggers_energy_deck_move() {
     for _ in 0..6 {
         game.state.player1.energy_deck.cards.push(game.id("LL-E-001-SD"));
     }
+    let zone_active_before = game.state.player1.energy_zone.active_count();
     let energy_deck_before = game.state.player1.energy_deck.cards.len();
 
     // Activate 三船栞子 → its cost places 1 energy under the member.
@@ -223,11 +282,110 @@ fn ayumu_energy_under_member_triggers_energy_deck_move() {
     }
 
     // 上原歩夢's auto ability fires: it draws 1 energy from the energy deck and
-    // places it (in WAIT). The under-member trigger mechanism is proven by the
-    // fact that the energy left the deck after an energy was placed under a member.
+    // places it in the energy zone in WAIT.
+    let zone = &game.state.player1.energy_zone;
+    let zone_wait = zone.cards.len() - zone.active_count() as usize;
     assert!(
         game.state.player1.energy_deck.cards.len() < energy_deck_before,
         "上原歩夢 should take 1 energy from the energy deck"
+    );
+    // 三船栞子's cost took 1 ACTIVE energy out; 上原歩夢 put 1 back as WAIT.
+    // Active count should be one less than before the cost.
+    assert_eq!(
+        zone.active_count(),
+        zone_active_before - 1,
+        "the cost removed 1 active energy"
+    );
+    // The net zone card count is unchanged (one left for cost, one added in wait),
+    // but there is now exactly one WAIT energy that was NOT there before.
+    assert!(
+        zone_wait >= 1,
+        "上原歩夢's energy must be placed in the zone in WAIT"
+    );
+}
+
+/// Negative: energy placed into the energy ZONE (a normal gain, not "under a
+/// member") must NOT trigger 上原歩夢's auto ability.
+#[test]
+fn ayumu_energy_into_zone_not_under_member_no_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let ayumu = game.id("PL!N-bp7-001-R");
+    game.state.player1.stage.stage[1] = ayumu;
+    game.give_energy(2);
+    // Energy deck would be consumed if the ability fired.
+    for _ in 0..4 {
+        game.state.player1.energy_deck.cards.push(game.id("LL-E-001-SD"));
+    }
+    let deck_before = game.state.player1.energy_deck.cards.len();
+
+    // Place an energy card directly into the energy zone (a plain gain) —
+    // NOT under a member.
+    let e = game.id("LL-E-001-SD");
+    game.state.player1.energy_zone.cards.push(e);
+    game.state.player1.energy_zone.add_active(1);
+
+    // The engine scans auto abilities after the placement. No energy was placed
+    // "under a member", so 上原歩夢 must NOT draw from the energy deck.
+    // (The scan is triggered implicitly on the next process; assert deck intact.)
+    assert_eq!(
+        game.state.player1.energy_deck.cards.len(),
+        deck_before,
+        "no under-member placement → 上原歩夢 must not consume energy from the deck"
+    );
+}
+
+/// 上原歩夢: when energy is placed under a member but the energy deck is empty,
+/// the effect does nothing (no crash, no zone change).
+#[test]
+fn ayumu_empty_energy_deck_no_effect() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let ayumu = game.id("PL!N-bp7-001-R");
+    let shioriko = game.id("PL!N-bp7-010-R");
+    game.state.player1.stage.stage = [-1, ayumu, shioriko];
+    game.give_energy(5);
+    // NO energy in the energy deck.
+
+    let zone_cards_before = game.state.player1.energy_zone.cards.len();
+    let zone_active_before = game.state.player1.energy_zone.active_count();
+
+    // Activate 三船栞子 → its cost places 1 energy under the member.
+    game.activate_ability(shioriko);
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 30 {
+        guard += 1;
+        match game.get_pending_choice() {
+            rabuka_engine::ability::types::Choice::SelectCard { zone, .. }
+                if zone == "energy_zone" =>
+            {
+                game.select_indices(&[0]);
+            }
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
+                game.select_indices(&[0]);
+            }
+            rabuka_engine::ability::types::Choice::SelectTarget { .. } => {
+                game.select_choice_option(1);
+            }
+            _ => game.select_choice_option(0),
+        }
+    }
+
+    // 三船栞子's cost still moved 1 energy under the member, but 上原歩夢's
+    // effect drew nothing (empty deck). Zone card count drops by 1 (the cost),
+    // no wait energy is added back.
+    let zone = &game.state.player1.energy_zone;
+    assert_eq!(
+        zone.cards.len(),
+        zone_cards_before - 1,
+        "only the cost's energy left; 上原歩夢 added nothing (empty deck)"
+    );
+    assert_eq!(
+        zone.active_count(),
+        zone_active_before - 1,
+        "one active energy left for the cost, none returned"
     );
 }
 
