@@ -79,7 +79,7 @@ pub fn show_result(ui: &mut dyn PlatformUi, gs: &GameState) {
 pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
     let mut sel: usize = 0;
     let mut scroll: usize = 0;
-    const VIS: usize = 10;
+    const VIS: usize = 8;
     loop {
         if sel < scroll {
             scroll = sel;
@@ -100,11 +100,9 @@ pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
         ui.swap_buffers();
         ui.poll_input();
         if ui.just_pressed_up() {
-            sel = sel.saturating_sub(1);
+            sel = if sel == 0 { items.len() - 1 } else { sel - 1 };
         } else if ui.just_pressed_down() {
-            if sel + 1 < items.len() {
-                sel += 1;
-            }
+            sel = if sel + 1 == items.len() { 0 } else { sel + 1 };
         } else if ui.just_pressed_a() {
             return sel;
         }
@@ -128,7 +126,7 @@ pub fn menu_select(
     };
     let mut sel: usize = 0;
     let mut scroll: usize = 0;
-    const VIS: usize = 10;
+    const VIS: usize = 8;
     loop {
         if sel < scroll {
             scroll = sel;
@@ -149,11 +147,9 @@ pub fn menu_select(
         ui.swap_buffers();
         ui.poll_input();
         if ui.just_pressed_up() {
-            sel = sel.saturating_sub(1);
+            sel = if sel == 0 { all_items.len() - 1 } else { sel - 1 };
         } else if ui.just_pressed_down() {
-            if sel + 1 < all_items.len() {
-                sel += 1;
-            }
+            sel = if sel + 1 == all_items.len() { 0 } else { sel + 1 };
         } else if ui.just_pressed_a() {
             if Some(sel) == skip_idx {
                 return None;
@@ -173,7 +169,7 @@ pub fn human_turn(
 ) -> bool {
     let mut sel = 0;
     let mut scroll = 0;
-    const VIS: usize = 10;
+    const VIS: usize = 6;
     loop {
         ui.clear_screen();
         ui.println(&format!("Turn {} | {:?}", gs.turn_number, gs.current_phase));
@@ -222,9 +218,9 @@ pub fn human_turn(
         ui.swap_buffers();
         ui.poll_input();
         if ui.just_pressed_down() {
-            sel = (sel + 1).min(acts.len() - 1);
+            sel = if sel + 1 == acts.len() { 0 } else { sel + 1 };
         } else if ui.just_pressed_up() {
-            sel = sel.saturating_sub(1);
+            sel = if sel == 0 { acts.len() - 1 } else { sel - 1 };
         } else if ui.just_pressed_a() {
             let _ = game_setup::execute_action(gs, &acts[sel]);
             return true;
