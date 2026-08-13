@@ -100,6 +100,75 @@ fn wien_activation_moves_energy_zone_to_energy_deck() {
     );
 }
 
+/// ウィーン: energy zone is empty → the first effect step (zone→deck) has no
+/// card to move, so it fizzles; but the cost still pays and step 2 (waitroom→
+/// hand) still runs independently.
+#[test]
+fn wien_empty_energy_zone_step1_fizzles() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let wien = game.id("PL!SP-bp7-010-R");
+    game.state.player1.stage.stage[1] = wien;
+    // NO energy in the zone.
+    seed_deck(&mut game);
+    // Another card in the discard so step 2 has a distinct target besides ウィーン.
+    let recover = game.id("PL!-sd1-002-SD");
+    game.add_to_discard(recover);
+
+    let deck_before = game.state.player1.energy_deck.cards.len();
+    let hand_before = game.state.player1.hand.cards.len();
+
+    run_activate_drain(&mut game, wien);
+
+    // No energy moved (zone was empty) → step 1 fizzles.
+    assert_eq!(
+        game.state.player1.energy_deck.cards.len(),
+        deck_before,
+        "empty energy zone → nothing moves to the energy deck"
+    );
+    // Step 2 (waitroom → hand) still resolves and adds exactly 1 card to hand.
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before + 1,
+        "step 2 still runs and adds 1 discard card to hand even when step 1 fizzled"
+    );
+    // The cost paid: ウィーン left the stage (it is now a step-2 recovery candidate).
+    assert!(
+        !game.state.player1.stage.stage.contains(&wien),
+        "ウィーン's own cost still sends it to the waitroom"
+    );
+}
+
+/// ウィーン: even when the energy-zone step moves nothing, the "その後" step 2
+/// still runs. Here the waitroom holds only ウィーン (put there by its own cost),
+/// which step 2 recovers to hand.
+#[test]
+fn wien_step2_recovers_self_after_cost() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let wien = game.id("PL!SP-bp7-010-R");
+    game.state.player1.stage.stage[1] = wien;
+    game.give_energy(3);
+    seed_deck(&mut game);
+
+    let hand_before = game.state.player1.hand.cards.len();
+
+    run_activate_drain(&mut game, wien);
+
+    // The cost moved ウィーン to the waitroom; step 2 (waitroom→hand) recovers it.
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before + 1,
+        "step 2 recovers a card (ウィーン) from the waitroom to hand"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&wien),
+        "ウィーン is recovered to hand by step 2"
+    );
+}
+
 // ====================================================================
 // 3. 澁谷かのん (PL!SP-bp7-012-N): 登場 — multi-group select → deck bottom → draw
 // ====================================================================

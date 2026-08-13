@@ -1100,9 +1100,12 @@ impl AbilityResolver {
                 let actual_zone = effective_source;
 
                 let insufficient_behavior = match src_zone {
-                    Some(Zone::Energy) => util::InsufficientBehavior::Error(
-                        "Not enough cards in energy zone".to_string(),
-                    ),
+                    Some(Zone::Energy) => {
+                        // A move_cards EFFECT (e.g. "エネルギー1枚をエネルギーデッキに置く")
+                        // fizzles silently when the energy zone is empty, and the
+                        // enclosing sequential ("その後") continues with later steps.
+                        util::InsufficientBehavior::Silent
+                    }
                     Some(Zone::LiveCardZone) => util::InsufficientBehavior::Error(
                         "Not enough cards in live card zone".to_string(),
                     ),
