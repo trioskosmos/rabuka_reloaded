@@ -16,6 +16,7 @@ use crate::ui::card_atlas::CardAtlas;
 use crate::ui::colors::*;
 use crate::ui::grid::{card_grid_input, render_card_detail, render_card_grid, GridAction};
 use crate::ui::hint::render_hint_bar;
+use crate::ui::text::{SCALE_BODY, SCALE_LARGE, SCALE_SMALL};
 
 /// Overlay input handling. Mutates `overlay` and `redraw` based on `keys`.
 /// No-op when `*overlay == Overlay::None`.
@@ -202,7 +203,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                 160.0,
                 58.0,
                 COL_GOLD,
-                0.75f32,
+                SCALE_LARGE,
                 format!("{}\0", menu_title).as_ptr(),
             );
             let lang_label = current_lang().label();
@@ -221,7 +222,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                     70.0,
                     iy + 4.0,
                     COL_LIGHT,
-                    0.60f32,
+                    SCALE_BODY,
                     format!("{}{}\0", prefix, item).as_ptr(),
                 );
             }
@@ -237,7 +238,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                     4.0,
                     2.0,
                     COL_GOLD,
-                    0.65f32,
+                    SCALE_BODY,
                     format!("{}  {} entries (B=close, UP/DOWN=scroll)\0", log_hdr, n).as_ptr(),
                 );
             }
@@ -265,7 +266,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                         4.0,
                         ly,
                         col,
-                        0.60f32,
+                        SCALE_BODY,
                         format!("{}{}\0", prefix, truncated).as_ptr(),
                     );
                 }
@@ -279,7 +280,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                         300.0,
                         2.0,
                         COL_MED,
-                        0.50f32,
+                        SCALE_SMALL,
                         format!("{}-{} of {}\0", lo, hi, n).as_ptr(),
                     );
                 }
@@ -293,7 +294,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                     4.0,
                     2.0,
                     COL_GOLD,
-                    0.65f32,
+                    SCALE_BODY,
                     format!("{}  (B=close, A=detail, UP/DOWN=select)\0", perf_hdr).as_ptr(),
                 );
             }
@@ -305,7 +306,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                         40.0,
                         60.0,
                         COL_MED,
-                        0.65f32,
+                        SCALE_BODY,
                         format!("{}\0", msg).as_ptr(),
                     );
                 }
@@ -317,7 +318,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                             4.0,
                             20.0,
                             COL_LIGHT,
-                            0.60f32,
+                            SCALE_BODY,
                             format!(
                                 "{} {} | {} | {}{} | {}{}\0",
                                 tl("T"),
@@ -334,7 +335,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                             4.0,
                             34.0,
                             COL_MED,
-                            0.55f32,
+                            SCALE_SMALL,
                             format!("{}\0", tl("Lives:")).as_ptr(),
                         );
                     }
@@ -351,7 +352,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                                 8.0,
                                 ly,
                                 if lc.passed { 0xFF88FF88 } else { 0xFFFF8888 },
-                                0.60f32,
+                                SCALE_BODY,
                                 format!("{} #{} {} score:{}\0", cn, li, status, lc.score).as_ptr(),
                             );
                         }
@@ -401,7 +402,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                             4.0,
                             ly,
                             col,
-                            0.60f32,
+                            SCALE_BODY,
                             format!("{}{}\0", prefix, truncated).as_ptr(),
                         );
                     }
@@ -485,7 +486,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                         4.0,
                         4.0,
                         COL_GOLD,
-                        0.65f32,
+                        SCALE_BODY,
                         format!(
                             "{} ({})  {} cards  (B=close, X=detail)\0",
                             rev_hdr, who, total_cards
@@ -500,7 +501,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                             40.0,
                             60.0,
                             COL_MED,
-                            0.65f32,
+                            SCALE_BODY,
                             format!("{}\0", msg).as_ptr(),
                         );
                     }
@@ -531,7 +532,7 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                             4.0,
                             228.0,
                             COL_MED,
-                            0.45f32,
+                            SCALE_SMALL,
                             format!("{}\0", sec_text).as_ptr(),
                         );
                     }

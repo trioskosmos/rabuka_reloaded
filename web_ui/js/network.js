@@ -5,18 +5,37 @@ import { GameService } from './services/GameService.js';
 import { DebugService } from './services/DebugService.js';
 
 /**
+ * Build the standard API request headers from the current session state.
+ * Header names are case-insensitive per HTTP, so a single casing is used.
+ */
+export function apiHeaders() {
+    return {
+        'Content-Type': 'application/json',
+        'X-Session-Token': State.sessionToken || '',
+        'X-Room-Id': State.roomCode || ''
+    };
+}
+
+/**
+ * Centralized fetch wrapper for the backend API. Merges the standard headers
+ * with any caller-supplied options so every service talks to the server the
+ * same way. Returns the raw Response; callers decide how to read it.
+ */
+export function apiFetch(path, options = {}) {
+    const { headers, ...rest } = options;
+    return fetch(path, {
+        ...rest,
+        headers: { ...apiHeaders(), ...(headers || {}) }
+    });
+}
+
+/**
  * Network Facade
  * Orchestrates calls between specialized services while providing a unified API for the UI.
  */
 export const Network = {
     // Shared State & Utils
-    getHeaders: () => {
-        return {
-            'Content-Type': 'application/json',
-            'X-Session-Token': State.sessionToken || '',
-            'X-Room-Id': State.roomCode || ''
-        };
-    },
+    getHeaders: () => apiHeaders(),
 
     setOpenDeckModalCallback: () => {
         // Placeholder to prevent initialization error in main.js

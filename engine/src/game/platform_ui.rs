@@ -29,6 +29,217 @@ pub trait PlatformUi {
     fn just_pressed_down(&self) -> bool;
     fn just_pressed_start(&self) -> bool;
     fn wait_vblank(&mut self);
+
+    /// Render a graphical board for `gs` (consoles that support one). Called
+    /// from the human-turn loop in place of `swap_buffers` so a board can be
+    /// drawn. Return `true` if the renderer consumed this frame's input (e.g.
+    /// it is in a board-navigation mode that handles Up/Down itself) so the
+    /// engine skips its own action navigation/execution for this frame. The
+    /// default just swaps the text buffer and does not consume input.
+    fn render_board(&mut self, _gs: &GameState) -> bool {
+        self.swap_buffers();
+        false
+    }
+
+    /// Shoulder buttons. Default off; consoles without them keep the menu
+    /// behaviour unchanged. L/R open the full-text detail viewer on the
+    /// currently highlighted option.
+    fn just_pressed_l(&self) -> bool {
+        false
+    }
+    fn just_pressed_r(&self) -> bool {
+        false
+    }
+
+    /// Max characters that fit on one menu line, in half-width columns
+    /// (a CJK glyph is 2 columns). Used to keep each option on a single
+    /// line and to wrap the detail viewer. 30 fits a GBA screen row
+    /// (240px / 8px tiles).
+    fn option_cols(&self) -> usize {
+        30
+    }
+}
+
+/// Width of a single character in half-width columns (CJK glyphs = 2).
+fn char_cols(c: char) -> usize {
+    if (c as u32) < 0x1100 {
+        1
+    } else {
+        2
+    }
+}
+
+/// Wrap `text` into lines of at most `cols` half-width columns, honouring
+/// existing newlines as hard breaks.
+fn wrap_text(text: &str, cols: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    let mut w = 0usize;
+    for ch in text.chars() {
+        if ch == '\n' {
+            if !cur.is_empty() {
+                out.push(core::mem::take(&mut cur));
+            }
+            w = 0;
+            continue;
+        }
+        let cw = char_cols(ch);
+        if w + cw > cols && !cur.is_empty() {
+            out.push(core::mem::take(&mut cur));
+            w = 0;
+        }
+        cur.push(ch);
+        w += cw;
+    }
+    if !cur.is_empty() {
+        out.push(cur);
+    }
+    if out.is_empty() {
+        out.push(String::new());
+    }
+    out
+}
+
+/// Truncate `text` to a single line of at most `cols` columns, marking the
+/// cut so the player knows more is available (see the L/R detail viewer).
+fn one_line(text: &str, cols: usize) -> String {
+    let mut s = String::new();
+    let mut w = 0usize;
+    for ch in text.chars() {
+        let cw = char_cols(ch);
+        if w + cw > cols {
+            s.push_str("..");
+            break;
+        }
+        s.push(ch);
+        w += cw;
+    }
+    s
+}
+
+/// Scrollable full-text viewer. Shows `lines` in a window; Up/Down scroll,
+/// and A/B/L/R close it back to the menu without disturbing the option list's
+/// own scroll position.
+fn show_lines(ui: &mut dyn PlatformUi, lines: &[String]) {
+    let mut off = 0usize;
+    const H: usize = 8; // 9 screen rows, one held for a hint bar
+    loop {
+        ui.clear_screen();
+        ui.println("A/B close, Up/Down scroll");
+        let end = (off + H).min(lines.len());
+        for l in off..end {
+            ui.println(&lines[l]);
+        }
+        if lines.len() > end {
+            ui.println(&format!("  .. {} more", lines.len() - end));
+        }
+        ui.swap_buffers();
+        ui.poll_input();
+        if ui.just_pressed_up() {
+            off = off.saturating_sub(1);
+        } else if ui.just_pressed_down() && off + H < lines.len() {
+            off += 1;
+        } else if ui.just_pressed_a()
+            || ui.just_pressed_b()
+            || ui.just_pressed_l()
+            || ui.just_pressed_r()
+        {
+            return;
+        }
+        ui.wait_vblank();
+    }
+}
+
+/// Wrap `text` and show it in a scrollable viewer (L: full action/ability text).
+fn show_detail(ui: &mut dyn PlatformUi, text: &str) {
+    let cols = ui.option_cols();
+    let lines = wrap_text(text, cols);
+    show_lines(ui, &lines);
+}
+
+/// Format a heart map as "R2 B3"-style codes (like the 3DS stat line).
+fn heart_str(hm: &crate::card::HeartMap) -> String {
+    hm.iter()
+        .map(|(c, v)| format!("{}{}", c.short_label(), v))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Single-line stat summary, mirroring the 3DS card-detail stat line.
+fn card_stat_text(card: &Card) -> String {
+    use crate::card::CardType;
+    match card.card_type {
+        CardType::Member => {
+            let mut s = String::new();
+            if let Some(cost) = card.cost {
+                if cost > 0 {
+                    s.push_str(&format!("E{}  ", cost));
+                }
+            }
+            let hs = card
+                .base_heart
+                .as_ref()
+                .map(|bh| heart_str(&bh.hearts))
+                .unwrap_or_default();
+            if !hs.is_empty() {
+                s.push_str(&hs);
+                s.push_str("  ");
+            }
+            if card.blade > 0 {
+                s.push_str(&format!("BL{}", card.blade));
+            }
+            s
+        }
+        CardType::Live => {
+            let mut s = String::new();
+            if let Some(score) = card.score {
+                if score > 0 {
+                    s.push_str(&format!("SC{}  ", score));
+                }
+            }
+            let ns = card
+                .need_heart
+                .as_ref()
+                .map(|nh| heart_str(&nh.hearts))
+                .unwrap_or_default();
+            if !ns.is_empty() {
+                s.push_str(&ns);
+            }
+            s
+        }
+        CardType::Energy => String::new(),
+    }
+}
+
+/// A card's ability text. In compact builds `ability_text()` is empty, so the
+/// abilities are decoded from bytecode (which reconstructs `full_text`).
+/// `{{...}}` icon markers are kept so the renderer can show them.
+fn card_ability_text(card: &Card) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    for ab in card.resolved_abilities() {
+        let t = ab.full_text.trim();
+        if !t.is_empty() {
+            parts.push(t.to_string());
+        }
+    }
+    if parts.is_empty() {
+        card.ability_text().trim().to_string()
+    } else {
+        parts.join("\n")
+    }
+}
+
+/// Scrollable card detail (R): header, stat line, then the ability text.
+fn show_card_stats(ui: &mut dyn PlatformUi, card: &Card) {
+    let cols = ui.option_cols();
+    let mut lines: Vec<String> = Vec::new();
+    lines.push(format!("[{}] {}", card.card_no, card.name));
+    lines.push(card_stat_text(card));
+    let ab = card_ability_text(card);
+    if !ab.is_empty() {
+        lines.extend(wrap_text(&ab, cols));
+    }
+    show_lines(ui, &lines);
 }
 
 /// AI turn: pick a random action and execute it.
@@ -79,7 +290,8 @@ pub fn show_result(ui: &mut dyn PlatformUi, gs: &GameState) {
 pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
     let mut sel: usize = 0;
     let mut scroll: usize = 0;
-    const VIS: usize = 8;
+    const VIS: usize = 7;
+    let cols = ui.option_cols();
     loop {
         if sel < scroll {
             scroll = sel;
@@ -92,7 +304,7 @@ pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
         let end = (scroll + VIS).min(items.len());
         for n in scroll..end {
             let prefix = if n == sel { " >" } else { "  " };
-            ui.println(&format!("{prefix} {}", items[n]));
+            ui.println(&one_line(&format!("{prefix} {}", items[n]), cols));
         }
         if items.len() > end {
             ui.println(&format!("  .. {} more", items.len() - end));
@@ -103,6 +315,8 @@ pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
             sel = if sel == 0 { items.len() - 1 } else { sel - 1 };
         } else if ui.just_pressed_down() {
             sel = if sel + 1 == items.len() { 0 } else { sel + 1 };
+        } else if ui.just_pressed_l() || ui.just_pressed_r() {
+            show_detail(ui, items[sel]);
         } else if ui.just_pressed_a() {
             return sel;
         }
@@ -126,7 +340,8 @@ pub fn menu_select(
     };
     let mut sel: usize = 0;
     let mut scroll: usize = 0;
-    const VIS: usize = 8;
+    const VIS: usize = 7;
+    let cols = ui.option_cols();
     loop {
         if sel < scroll {
             scroll = sel;
@@ -139,7 +354,7 @@ pub fn menu_select(
         let end = (scroll + VIS).min(all_items.len());
         for n in scroll..end {
             let prefix = if n == sel { " >" } else { "  " };
-            ui.println(&format!("{prefix} {}", all_items[n]));
+            ui.println(&one_line(&format!("{prefix} {}", all_items[n]), cols));
         }
         if all_items.len() > end {
             ui.println(&format!("  .. {} more", all_items.len() - end));
@@ -150,6 +365,8 @@ pub fn menu_select(
             sel = if sel == 0 { all_items.len() - 1 } else { sel - 1 };
         } else if ui.just_pressed_down() {
             sel = if sel + 1 == all_items.len() { 0 } else { sel + 1 };
+        } else if ui.just_pressed_l() || ui.just_pressed_r() {
+            show_detail(ui, &all_items[sel]);
         } else if ui.just_pressed_a() {
             if Some(sel) == skip_idx {
                 return None;
@@ -169,7 +386,8 @@ pub fn human_turn(
 ) -> bool {
     let mut sel = 0;
     let mut scroll = 0;
-    const VIS: usize = 6;
+    const VIS: usize = 5;
+    let cols = ui.option_cols();
     loop {
         ui.clear_screen();
         ui.println(&format!("Turn {} | {:?}", gs.turn_number, gs.current_phase));
@@ -210,20 +428,33 @@ pub fn human_turn(
                     .unwrap_or_default(),
                 None => String::new(),
             };
-            ui.println(&format!("{prefix}{line}{tag_str}"));
+            ui.println(&one_line(&format!("{prefix}{line}{tag_str}"), cols));
         }
         if acts.len() > end {
             ui.println(&format!("  .. {} more", acts.len() - end));
         }
-        ui.swap_buffers();
+        let consumed = ui.render_board(gs);
         ui.poll_input();
-        if ui.just_pressed_down() {
-            sel = if sel + 1 == acts.len() { 0 } else { sel + 1 };
-        } else if ui.just_pressed_up() {
-            sel = if sel == 0 { acts.len() - 1 } else { sel - 1 };
-        } else if ui.just_pressed_a() {
-            let _ = game_setup::execute_action(gs, &acts[sel]);
-            return true;
+        if !consumed {
+            if ui.just_pressed_down() {
+                sel = if sel + 1 == acts.len() { 0 } else { sel + 1 };
+            } else if ui.just_pressed_up() {
+                sel = if sel == 0 { acts.len() - 1 } else { sel - 1 };
+            } else if ui.just_pressed_l() {
+                show_detail(ui, &acts[sel].description);
+            } else if ui.just_pressed_r() {
+                let card = acts[sel]
+                    .parameters
+                    .as_ref()
+                    .and_then(|p| p.card_no.as_ref())
+                    .and_then(|n| gs.card_database.get_card_by_no(n));
+                if let Some(c) = card {
+                    show_card_stats(ui, c);
+                }
+            } else if ui.just_pressed_a() {
+                let _ = game_setup::execute_action(gs, &acts[sel]);
+                return true;
+            }
         }
         ui.wait_vblank();
     }

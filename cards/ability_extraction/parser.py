@@ -7189,6 +7189,23 @@ def _try_kore_niyori_case(text):
     }
 
 
+def _apply_card_property_filter(d, text):
+    """Extract a card-property filter (e.g. has_blade_heart) from `text`.
+
+    "…を持たない" maps to negation=True (e.g. "ブレードハートを持たない").
+    Sets nothing when the dict already carries a card_property.
+    """
+    if d.get("card_property"):
+        return
+    if "ブレードハートを持たない" in text:
+        d["card_property"] = "has_blade_heart"
+        d["negation"] = True
+    elif "ブレードハートを持つ" in text:
+        d["card_property"] = "has_blade_heart"
+    elif "{{icon_score.png|スコア}}を持つ" in text:
+        d["card_property"] = "has_score_icon"
+
+
 def _build_reveal_add_discard(fp, sa_text, select_text):
     """Build select_cards for 'reveal → add → discard' pattern."""
     result = {
@@ -7219,6 +7236,7 @@ def _build_reveal_add_discard(fp, sa_text, select_text):
     gns = extract_group_names(select_text)
     if gns:
         result["group_names"] = gns
+    _apply_card_property_filter(result, select_text)
     char_names = re.findall(r"「([^」]+)」", select_text)
     if char_names:
         result["characters"] = list(dict.fromkeys(char_names))
@@ -7560,6 +7578,8 @@ def _build_look_select_actions_inner(select_text):
         "{{heart_" in select_text or "ハートに" in select_text
     ):
         result["destination"] = "hand"
+
+    _apply_card_property_filter(result, select_text)
 
     return result
 

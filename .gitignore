@@ -74,6 +74,7 @@ cards/build/cards_gen.rs
 
 # Regenerated build artifacts (rebuilt by the 3DS/GBA toolchains)
 platforms/3ds/.card_png_cache/
+platforms/3ds/.font_tmp/
 platforms/3ds/romfs/cards/*.t3x
 platforms/3ds/romfs/cards_fmt.txt
 platforms/3ds/romfs/cards_manifest.json
@@ -87,3 +88,12 @@ platforms/gba/src/font_tiles_gen.rs
 platforms/gba/output/font_preview.png
 platforms/gba/output/font_preview_packed.png
 platforms/gba/output/log.txt
+
+# Single source of truth: ability translations live in web_ui/js/i18n; the
+# 3DS romfs copy is produced by the build script.
+platforms/3ds/romfs/locales/ability_en.json
+
+# Stale/obsolete build outputs and unused duplicate data
+/romfs/
+engine/data/
+engine/tests/data/cards.json

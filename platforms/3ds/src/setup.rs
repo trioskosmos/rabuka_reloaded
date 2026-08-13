@@ -30,6 +30,7 @@ use crate::ui::card_atlas::CardAtlas;
 use crate::ui::colors::*;
 use crate::ui::grid::{card_grid_input, render_card_detail, render_card_grid, GridAction};
 use crate::ui::hint::render_hint_bar_bot;
+use crate::ui::text::{SCALE_BODY, SCALE_LARGE, SCALE_SMALL};
 use crate::util::{base64_decode, looks_like_b64, ticks_to_ms};
 
 /// On-device test suite — runs QA checks in limited 3DS memory.
@@ -116,7 +117,7 @@ fn pick_mode(
                     90.0,
                     8.0,
                     COL_GOLD,
-                    0.65f32,
+                    SCALE_BODY,
                     format!("{}\0", tl("SELECT MODE")).as_ptr(),
                 );
                 for (i, m) in ["VS AI", "Sandbox", "QR Scan", "Local MP"]
@@ -294,7 +295,7 @@ fn pick_deck(
                         60.0,
                         8.0,
                         COL_GOLD,
-                        0.65f32,
+                        SCALE_BODY,
                         format!("SELECT {}\0", label).as_ptr(),
                     );
                 }
@@ -319,7 +320,7 @@ fn pick_deck(
                             14.0,
                             y + 3.0,
                             color,
-                            0.65f32,
+                            SCALE_BODY,
                             format!("{}\0", decks[i].name).as_ptr(),
                         );
                     }
@@ -485,7 +486,7 @@ fn multiplayer_deck(
                         60.0,
                         8.0,
                         COL_GOLD,
-                        0.65f32,
+                        SCALE_BODY,
                         format!("{}\0", deck_hdr).as_ptr(),
                     );
                 }
@@ -508,7 +509,7 @@ fn multiplayer_deck(
                             14.0,
                             y + 3.0,
                             color,
-                            0.65f32,
+                            SCALE_BODY,
                             format!("{}\0", decks[i].name).as_ptr(),
                         );
                     }
@@ -620,7 +621,7 @@ fn pick_deck2(
                         60.0,
                         8.0,
                         COL_GOLD,
-                        0.65f32,
+                        SCALE_BODY,
                         format!("{}\0", deck_hdr).as_ptr(),
                     );
                 }
@@ -643,7 +644,7 @@ fn pick_deck2(
                             14.0,
                             y + 3.0,
                             color,
-                            0.65f32,
+                            SCALE_BODY,
                             format!("{}\0", decks[i].name).as_ptr(),
                         );
                     }
@@ -886,7 +887,7 @@ fn qr_scan(
                             120.0,
                             8.0,
                             COL_GOLD,
-                            0.65f32,
+                            SCALE_BODY,
                             format!("{}\0", qr_hdr).as_ptr(),
                         );
                         let qr_msg = tl("Point camera at deck QR code");
@@ -894,7 +895,7 @@ fn qr_scan(
                             40.0,
                             60.0,
                             COL_LIGHT,
-                            0.65f32,
+                            SCALE_BODY,
                             format!("{}\0", qr_msg).as_ptr(),
                         );
                         let qr_auto = tl("Auto-detects when QR is visible");
@@ -902,7 +903,7 @@ fn qr_scan(
                             40.0,
                             85.0,
                             COL_MED,
-                            0.65f32,
+                            SCALE_BODY,
                             format!("{}\0", qr_auto).as_ptr(),
                         );
                         let qr_cancel = tl("B=cancel");
@@ -910,7 +911,7 @@ fn qr_scan(
                             40.0,
                             220.0,
                             COL_MED,
-                            0.60f32,
+                            SCALE_BODY,
                             format!("{}\0", qr_cancel).as_ptr(),
                         );
                     }
@@ -1054,14 +1055,14 @@ fn qr_result(
                         120.0,
                         8.0,
                         COL_GOLD,
-                        0.65f32,
+                        SCALE_BODY,
                         format!("{}\0", tl("QR DECK")).as_ptr(),
                     );
                     _3ds_bot_queue_text(
                         160.0,
                         32.0,
                         COL_LIGHT,
-                        0.65f32,
+                        SCALE_BODY,
                         format!("{}\0", tl_fmt("cards imported", &[("n", &cards_read.len().to_string())]))
                             .as_ptr(),
                     );
@@ -1078,7 +1079,7 @@ fn qr_result(
                             20.0,
                             y,
                             COL_LIGHT,
-                            0.60f32,
+                            SCALE_BODY,
                             format!("{} x {}\0", card_no, qty).as_ptr(),
                         );
                         y += 11.0;
@@ -1087,7 +1088,7 @@ fn qr_result(
                         20.0,
                         230.0,
                         COL_MED,
-                        0.60f32,
+                        SCALE_BODY,
                         format!("{}\0", tl("A=use deck  B=discard")).as_ptr(),
                     );
                 }
@@ -1164,7 +1165,7 @@ fn qr_not_deck(
                         80.0,
                         8.0,
                         COL_GOLD,
-                        0.65f32,
+                        SCALE_BODY,
                         format!("{}\0", tl("NOT A DECK QR")).as_ptr(),
                     );
                     let preview = if scanned_text.len() > 40 {
@@ -1176,14 +1177,14 @@ fn qr_not_deck(
                         20.0,
                         60.0,
                         COL_LIGHT,
-                        0.60f32,
+                        SCALE_BODY,
                         format!("{}\0", preview).as_ptr(),
                     );
                     _3ds_bot_queue_text(
                         20.0,
                         220.0,
                         COL_MED,
-                        0.60f32,
+                        SCALE_BODY,
                         format!("{}\0", tl("B=back")).as_ptr(),
                     );
                 }
@@ -1227,7 +1228,7 @@ fn deck_viewer(
                     4.0,
                     4.0,
                     COL_GOLD,
-                    0.65f32,
+                    SCALE_BODY,
                     format!("{}  ({})\0", tl("DECK PREVIEW"), tl("B=close, X=detail")).as_ptr(),
                 );
             }
@@ -1371,7 +1372,7 @@ fn control_guide(
                                 24.0,
                                 y,
                                 COL_GOLD,
-                                0.65f32,
+                                SCALE_BODY,
                                 format!("{}\0", line).as_ptr(),
                             );
                         } else if !line.is_empty() {
@@ -1379,7 +1380,7 @@ fn control_guide(
                                 18.0,
                                 y,
                                 COL_LIGHT,
-                                0.60f32,
+                                SCALE_BODY,
                                 format!("{}\0", line).as_ptr(),
                             );
                         }
@@ -1389,7 +1390,7 @@ fn control_guide(
                         4.0,
                         215.0,
                         COL_MED,
-                        0.55f32,
+                        SCALE_SMALL,
                         format!(
                             "{}\0",
                             tl_fmt(
@@ -1468,7 +1469,7 @@ fn multiplayer_pick_role(
                         80.0,
                         8.0,
                         COL_GOLD,
-                        0.65f32,
+                        SCALE_BODY,
                         format!("{}\0", mp_hdr).as_ptr(),
                     );
                 }
@@ -1495,7 +1496,7 @@ fn multiplayer_pick_role(
                             30.0,
                             y + 12.0,
                             color,
-                            0.65f32,
+                            SCALE_BODY,
                             format!("{}\0", m).as_ptr(),
                         );
                     }
@@ -1622,7 +1623,7 @@ fn multiplayer_host_wait(
                                 60.0,
                                 8.0,
                                 COL_GOLD,
-                                0.65f32,
+                                SCALE_BODY,
                                 format!("{}\0", tl("HOST: Network created!")).as_ptr(),
                             );
                             let wait_msg = tl("Waiting for client...");
@@ -1630,14 +1631,14 @@ fn multiplayer_host_wait(
                                 30.0,
                                 100.0,
                                 COL_LIGHT,
-                                0.65f32,
+                                SCALE_BODY,
                                 format!("{}\0", wait_msg).as_ptr(),
                             );
                             _3ds_bot_queue_text(
                                 30.0,
                                 230.0,
                                 COL_MED,
-                                0.60f32,
+                                SCALE_BODY,
                                 format!("{}\0", tl("B=cancel")).as_ptr(),
                             );
                         }
@@ -1664,7 +1665,7 @@ fn multiplayer_host_wait(
                                 60.0,
                                 8.0,
                                 0xFF0000FF,
-                                0.65f32,
+                                SCALE_BODY,
                                 format!(
                                     "{}\0",
                                     tl_fmt("UDS INIT FAILED", &[("e", &e.to_string())])
@@ -1754,14 +1755,14 @@ fn multiplayer_client_scan(
                                 80.0,
                                 100.0,
                                 COL_MED,
-                                0.75f32,
+                                SCALE_LARGE,
                                 format!("{}\0", tl("Scanning...")).as_ptr(),
                             );
                             _3ds_bot_queue_text(
                                 80.0,
                                 230.0,
                                 COL_MED,
-                                0.60f32,
+                                SCALE_BODY,
                                 format!("{}\0", tl("A=refresh B=back")).as_ptr(),
                             );
                         }
@@ -1876,7 +1877,7 @@ fn multiplayer_client_host_select(
                         60.0,
                         8.0,
                         COL_GOLD,
-                        0.65f32,
+                        SCALE_BODY,
                         format!("{}\0", tl("SELECT HOST")).as_ptr(),
                     );
                 }
@@ -1889,7 +1890,7 @@ fn multiplayer_client_host_select(
                             20.0,
                             y,
                             col,
-                            0.65f32,
+                            SCALE_BODY,
                             format!("{}{}\0", prefix, format!("Host {}", i + 1)).as_ptr(),
                         );
                     }
@@ -1899,7 +1900,7 @@ fn multiplayer_client_host_select(
                         20.0,
                         220.0,
                         COL_MED,
-                        0.60f32,
+                        SCALE_BODY,
                         format!("{}\0", tl("A=connect B=back")).as_ptr(),
                     );
                 }
@@ -1986,7 +1987,7 @@ fn multiplayer_sync_deck(
                             60.0,
                             8.0,
                             COL_GOLD,
-                            0.65f32,
+                            SCALE_BODY,
                             format!("{}\0", tl("Receiving deck data...")).as_ptr(),
                         );
                     }

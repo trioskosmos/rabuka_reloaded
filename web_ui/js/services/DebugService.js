@@ -1,5 +1,6 @@
 import { State, updateStateData } from '../state.js';
 import { log } from '../logger.js';
+import { apiFetch } from '../network.js';
 
 export const DebugService = {
     _buildSlimReport: (explanation) => {
@@ -124,10 +125,9 @@ export const DebugService = {
     },
 
     fetchStandardizedState: async () => {
-        const roomCode = State.roomCode;
-        if (!roomCode) return null;
+        if (!State.roomCode) return null;
         try {
-            const res = await fetch('api/debug/dump_state', { headers: { 'X-Room-Id': roomCode } });
+            const res = await apiFetch('api/debug/dump_state');
             return res.ok ? await res.json() : null;
         } catch (e) { return null; }
     },
@@ -142,9 +142,8 @@ export const DebugService = {
         }
 
         try {
-            const res = await fetch('api/report', {
+            const res = await apiFetch('api/report', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(reportData)
             });
             return res.ok;
@@ -152,12 +151,10 @@ export const DebugService = {
     },
 
     applyState: async (jsonStr) => {
-        const roomCode = State.roomCode;
-        if (!roomCode) return { ok: false, error: 'No room code' };
+        if (!State.roomCode) return { ok: false, error: 'No room code' };
         try {
-            const res = await fetch('/api/debug/apply_state', {
+            const res = await apiFetch('/api/debug/apply_state', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Room-Id': roomCode },
                 body: jsonStr
             });
             const data = await res.json().catch(() => null);
@@ -166,21 +163,18 @@ export const DebugService = {
     },
 
     fetchDebugSnapshot: async () => {
-        const roomCode = State.roomCode;
-        if (!roomCode) return null;
+        if (!State.roomCode) return null;
         try {
-            const res = await fetch('/api/debug/snapshot', { headers: { 'X-Room-Id': roomCode } });
+            const res = await apiFetch('/api/debug/snapshot');
             return res.ok ? await res.json() : null;
         } catch (e) { return null; }
     },
 
     boardOverride: async (jsonStr) => {
-        const roomCode = State.roomCode;
-        if (!roomCode) return false;
+        if (!State.roomCode) return false;
         try {
-            const res = await fetch('/api/debug/board_override', {
+            const res = await apiFetch('/api/debug/board_override', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Room-Id': roomCode },
                 body: jsonStr
             });
             return res.ok;
@@ -188,18 +182,16 @@ export const DebugService = {
     },
 
     toggleDebugMode: async () => {
-        const headers = State.roomCode ? { 'X-Room-ID': State.roomCode } : {};
         try {
-            const res = await fetch('/api/debug/toggle', { method: 'POST', headers });
+            const res = await apiFetch('/api/debug/toggle', { method: 'POST' });
             const data = await res.json();
             return data.success ? data.debug_mode : null;
         } catch (e) { return null; }
     },
 
     rewind: async (networkFacade) => {
-        const headers = State.roomCode ? { 'X-Room-ID': State.roomCode } : {};
         try {
-            const res = await fetch('/api/debug/rewind', { method: 'POST', headers });
+            const res = await apiFetch('/api/debug/rewind', { method: 'POST' });
             const data = await res.json();
             if (data.success && networkFacade?.fetchState) await networkFacade.fetchState();
             return data.success;
@@ -207,9 +199,8 @@ export const DebugService = {
     },
 
     redo: async (networkFacade) => {
-        const headers = State.roomCode ? { 'X-Room-ID': State.roomCode } : {};
         try {
-            const res = await fetch('/api/debug/redo', { method: 'POST', headers });
+            const res = await apiFetch('/api/debug/redo', { method: 'POST' });
             const data = await res.json();
             if (data.success && networkFacade?.fetchState) await networkFacade.fetchState();
             return data.success;
@@ -217,22 +208,19 @@ export const DebugService = {
     },
 
     exportGame: async () => {
-        const roomCode = State.roomCode;
-        if (!roomCode) return null;
+        if (!State.roomCode) return null;
         try {
-            const res = await fetch('/api/export_game', { headers: { 'X-Room-ID': roomCode } });
+            const res = await apiFetch('/api/export_game');
             const data = await res.json();
             return data.success === false ? null : data;
         } catch (e) { return null; }
     },
 
     importGame: async (exportData, networkFacade) => {
-        const roomCode = State.roomCode;
-        if (!roomCode) return false;
+        if (!State.roomCode) return false;
         try {
-            const res = await fetch('/api/import_game', {
+            const res = await apiFetch('/api/import_game', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Room-ID': roomCode },
                 body: JSON.stringify(exportData)
             });
             const data = await res.json();
@@ -285,9 +273,8 @@ export const DebugService = {
 
     forceAction: async (id, networkFacade) => {
         try {
-            const res = await fetch('api/action', {
+            const res = await apiFetch('api/action', {
                 method: 'POST',
-                headers: networkFacade?.getHeaders ? networkFacade.getHeaders() : {},
                 body: JSON.stringify({ action_id: id, force: true })
             });
             const text = await res.text();
@@ -304,16 +291,15 @@ export const DebugService = {
 
     forcedTurnEnd: async (networkFacade) => {
         try {
-            await fetch('api/force_turn_end', { method: 'POST', headers: networkFacade?.getHeaders ? networkFacade.getHeaders() : {} });
+            await apiFetch('api/force_turn_end', { method: 'POST' });
             if (networkFacade?.fetchState) await networkFacade.fetchState();
         } catch (e) { console.error(e); }
     },
 
     execCode: async (code, networkFacade) => {
         try {
-            const res = await fetch('api/exec', {
+            const res = await apiFetch('api/exec', {
                 method: 'POST',
-                headers: networkFacade?.getHeaders ? networkFacade.getHeaders() : {},
                 body: JSON.stringify({ code: code })
             });
             const text = await res.text();

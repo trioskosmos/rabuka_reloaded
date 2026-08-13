@@ -5,6 +5,7 @@ import { DOMUtils } from '../utils/DOMUtils.js';
 import { DOM_IDS } from '../constants_dom.js';
 import { SSEClient } from './SSEClient.js';
 import { GameService } from './GameService.js';
+import { apiFetch } from '../network.js';
 
 export const RoomManager = {
     // Session Management
@@ -58,9 +59,8 @@ export const RoomManager = {
             const previousRoomCode = State.roomCode;
             State.resetForNewGame();
 
-            const res = await fetch('api/rooms/create', {
+            const res = await apiFetch('api/rooms/create', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ mode: mode })
             });
             const data = await res.json();
@@ -132,9 +132,8 @@ export const RoomManager = {
         RoomManager.loadSession(code);
 
         try {
-            const res = await fetch('api/rooms/join', {
+            const res = await apiFetch('api/rooms/join', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ room_id: code })
             });
             const data = await res.json();
@@ -174,12 +173,8 @@ export const RoomManager = {
 
     leaveRoom: async (networkFacade) => {
         try {
-            await fetch('api/rooms/leave', {
+            await apiFetch('api/rooms/leave', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Session-Token': State.sessionToken || ''
-                },
                 body: JSON.stringify({
                     room_id: State.roomCode,
                     session_id: State.sessionToken
@@ -219,7 +214,7 @@ export const RoomManager = {
         DOMUtils.setHTML(DOM_IDS.PUBLIC_ROOMS_LIST, '<div style="color:#666;text-align:center;padding-top:20px;">Loading...</div>');
 
         try {
-            const res = await fetch('api/rooms/list');
+            const res = await apiFetch('api/rooms/list');
             const data = await res.json();
 
             if (!data.rooms || data.rooms.length === 0) {

@@ -11,6 +11,26 @@ use crate::ffi::_3ds_icon_aspect;
 use crate::ffi::_3ds_measure_text_width;
 use crate::ffi::_3ds_top_queue_text;
 
+// ---------------------------------------------------------------------------
+// Font sizes — the ONLY three sizes the game uses, plus a debug/CLI size.
+//
+// Every text scale literal in the UI must be one of these constants instead of
+// a raw number. To change the overall font size, edit these values (they are
+// the single knob). The citro2d renderer multiplies each by FONT_SCALE (1.2 in
+// ctru_shim.c), and Rust word-wrapping uses the same multiplier, so these are
+// "logical" scales — resize globally by scaling this block.
+//
+// (Consolidated 2026: the old code had ~10 ad-hoc sizes 0.45–0.85.)
+// ---------------------------------------------------------------------------
+/// Captions, hints, page dots, stat lines.
+pub const SCALE_SMALL: f32 = 0.40;
+/// Standard body text, card labels, action lines, ability text.
+pub const SCALE_BODY: f32 = 0.52;
+/// Titles / headers / card name headers.
+pub const SCALE_LARGE: f32 = 0.64;
+/// CLI / debug console text.
+pub const SCALE_CLI: f32 = 0.68;
+
 /// Render text with inline `{{icon.png|label}}` icon images.
 /// Queue text for top screen rendering. C-side OP_TEXT handler parses {{icon}} markup natively.
 pub fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32) {

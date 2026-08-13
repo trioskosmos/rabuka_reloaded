@@ -49,6 +49,11 @@ echo [4/7] cards.bin + abilities.json ready
 
 copy /Y "%~dp0..\..\web_ui\decks\*.txt" "%~dp0romfs\decks\" >nul
 
+rem Single source of truth: ability translations live in web_ui; the 3DS romfs
+rem copies them at build time (ability_en.json == ability_translations.json).
+if not exist "%~dp0romfs\locales" mkdir "%~dp0romfs\locales"
+copy /Y "%~dp0..\..\web_ui\js\i18n\ability_translations.json" "%~dp0romfs\locales\ability_en.json" >nul
+
 echo [4/7] Card images (incremental atlas build)...
 if exist "%~dp0..\..\web_ui\img\cards_webp\*.webp" (
     cd /d "%~dp0"

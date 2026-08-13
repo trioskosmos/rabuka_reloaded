@@ -1,5 +1,6 @@
 import { State } from '../state.js';
 import { Phase } from '../constants.js';
+import { apiFetch } from '../network.js';
 
 export const PlannerService = {
     clearPlannerData: () => {
@@ -43,11 +44,9 @@ export const PlannerService = {
 
         try {
             const endpoint = score ? 'api/planner/score' : 'api/planner';
-            const headers = networkFacade?.getHeaders ? networkFacade.getHeaders() : {};
-            
-            const res = await fetch(endpoint, {
+
+            const res = await apiFetch(endpoint, {
                 method: score ? 'POST' : 'GET',
-                headers: headers,
                 body: score ? JSON.stringify({}) : undefined
             });
             const data = await res.json();

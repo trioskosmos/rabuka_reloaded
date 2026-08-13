@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-13T00:40:11.644687",
+  "generated_at": "2026-08-13T17:50:08.879495",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "9f467464",
+  "engine_commit": "7af38b7c",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -29894,6 +29894,7 @@
             "SunnyPassion",
             "Liella!"
           ],
+          "card_property": "has_blade_heart",
           "options": [
             {
               "group_names": [
@@ -36841,6 +36842,8 @@
           "group_names": [
             "虹ヶ咲"
           ],
+          "card_property": "has_blade_heart",
+          "negation": true,
           "text": "自分のデッキの上からカードを5枚見る。その中からブレードハートを持たない『虹ヶ咲』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
         "optional": true,

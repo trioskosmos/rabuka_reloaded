@@ -1,19 +1,26 @@
 #!/usr/bin/env python3
 """Bake the game's used glyphs into a static GBA 4bpp tile set.
 
-Reads tools/font/used_chars.txt (the characters actually used in the game),
-rasterizes each from assets/yoster_ja.ttf, packs them into 8x8 4bpp tiles
-(halfwidth=1 tile, fullwidth=2x2 tiles), and emits engine/src/font_tiles_gen.rs
-with the raw tile bytes and a char->(tile_index, tile_cols) lookup.
+Regenerates tools/font/used_chars.txt from the single source of truth
+(tools/font/used_chars.py, which scans card data, engine/platform Rust,
+locales and decks), rasterizes each from assets/yoster_ja.ttf, packs them into
+8x8 4bpp tiles (halfwidth=1 tile, fullwidth=2x2 tiles), and emits
+engine/src/font_tiles_gen.rs with the raw tile bytes and a
+char->(tile_index, tile_cols) lookup.
 
 Run:  py -3 tools/bake_font_tiles.py
 """
-import sys, math
+import sys, os, math
 from PIL import Image, ImageDraw, ImageFont
+from fontTools.ttLib import TTFont
+
+sys.path.insert(0, os.path.dirname(__file__))
+from font.used_chars import compute_used_chars, repo_root
 
 FONT_PATH = "platforms/gba/assets/yoster_ja.ttf"
+NOTO_PATH = "tools/font/NotoSansCJKjp-Regular.otf"
 USED_PATH = "tools/font/used_chars.txt"
-OUT_PATH = "engine/src/font_tiles_gen.rs"
+OUT_PATH = "platforms/gba/src/font_tiles_gen.rs"
 PX = 12  # rasterization size
 TILE = 8
 
@@ -33,7 +40,10 @@ def is_fullwidth(c):
 def char_bitmap(font, c, cell_w, cell_h, left_align=False):
     """Rasterize char into a cell_w x cell_h monochrome bitmap (0/1).
     Draws the glyph directly at full size (no shrink). Halfwidth glyphs are
-    left-aligned so they pack tightly at 8px; fullwidth are centered."""
+    left-aligned so they pack tightly at 8px; fullwidth are centered.
+    Placement is clamped so the glyph's bounding box stays inside the cell
+    (some fonts report ascender/descender boxes that would otherwise push
+    short glyphs like `{`, `|`, `_` off the bottom of the cell)."""
     img = Image.new("1", (cell_w, cell_h), 0)
     d = ImageDraw.Draw(img)
     bbox = d.textbbox((0, 0), c, font=font)
@@ -41,6 +51,9 @@ def char_bitmap(font, c, cell_w, cell_h, left_align=False):
     h = bbox[3] - bbox[1]
     x = -bbox[0] if left_align else (cell_w - w) // 2 - bbox[0]
     y = (cell_h - h) // 2 - bbox[1]
+    if w <= cell_w and h <= cell_h:
+        x = max(0, min(x, cell_w - w))
+        y = max(0, min(y, cell_h - h))
     d.text((x, y), c, font=font, fill=1)
     data = img.tobytes()
     # PIL '1' mode -> 1 bit/pixel, row-major
@@ -63,23 +76,32 @@ def pack_4bpp_tile(bmp, cell_w, tx, ty):
             src = (ty * 8 + r) * cell_w + (tx * 8 + c)
             val = bmp[src] & 0xF
             byte = r * 4 + c // 2
-            shift = 4 if c % 2 == 0 else 0
+            # GBA 4bpp: each byte = 2 pixels, left pixel in the low nibble,
+            # right pixel in the high nibble (even col -> shift 0, odd -> 4).
+            shift = 0 if c % 2 == 0 else 4
             tile[byte] |= val << shift
     return bytes(tile)
 
 
 def main():
-    with open(USED_PATH, encoding="utf-8") as f:
-        text = f.read()
-    chars = set(text)
-    # Always include printable ASCII (UI text: "Turn", "Pass", deck names, ...)
-    for cp in range(0x20, 0x7F):
-        chars.add(chr(cp))
-    chars = sorted(chars)
-    chars = [c for c in chars if c not in ("\n", "\r")]
+    # Regenerate the used-character file from the single source of truth, so the
+    # GBA font always covers every string (incl. engine-hardcoded Japanese).
+    used_text = compute_used_chars(repo_root())
+    with open(USED_PATH, "w", encoding="utf-8") as f:
+        f.write(used_text)
+    chars = sorted(set(used_text))
     print("baking", len(chars), "glyphs")
 
     font12 = ImageFont.truetype(FONT_PATH, 12)
+    noto12 = ImageFont.truetype(NOTO_PATH, 12)
+    # Fall back to Noto Sans CJK for any glyph the primary pixel font lacks
+    # (ASCII punctuation, Greek, symbols like ?/??/?, ...) so nothing bakes
+    # as a .notdef tofu box.
+    y_cmap = set(TTFont(FONT_PATH).getBestCmap())
+
+    def pick_font(ch):
+        return noto12 if ord(ch) not in y_cmap else font12
+
     tiles = bytearray()
     lookup = []  # (char, tile_index, tile_cols)
 
@@ -87,7 +109,13 @@ def main():
         # All glyphs at 12px in 16x16 cells (2x2 tiles). Advance is proportional:
         # halfwidth glyphs advance 1 tile if they fit 8px, else 2; fullwidth always 2.
         full = is_fullwidth(c)
-        bmp = char_bitmap(font12, c, 16, 16, left_align=(not full))
+        def render(fnt):
+            return char_bitmap(fnt, c, 16, 16, left_align=(not full))
+        fnt = pick_font(c)
+        bmp = render(fnt)
+        if not any(bmp):
+            # primary font drew nothing — retry the other one
+            bmp = render(noto12 if fnt is font12 else font12)
         idx = len(tiles) // 32
         for ty in range(2):
             for tx in range(2):
@@ -112,7 +140,7 @@ def main():
     for n, (c, _idx, _cols) in enumerate(lookup):
         px, py = (n % 32) * 16, (n // 32) * 16
         full = is_fullwidth(c)
-        bmp = char_bitmap(font12, c, 16, 16)
+        bmp = char_bitmap(pick_font(c), c, 16, 16)
         for yy in range(16):
             for xx in range(16):
                 if (yy * 16 + xx) < len(bmp) and bmp[yy * 16 + xx]:
@@ -128,7 +156,7 @@ def main():
         for r in range(8):
             for c in range(8):
                 byte = tile_bytes[r * 4 + c // 2]
-                val = (byte >> (4 if c % 2 == 0 else 0)) & 0xF
+                val = (byte >> (0 if c % 2 == 0 else 4)) & 0xF
                 if val:
                     img.putpixel((c, r), 1)
         return img

@@ -315,7 +315,6 @@ pub struct AppState {
 fn get_room_id_from_req(req: &actix_web::HttpRequest) -> Option<String> {
     req.headers()
         .get("X-Room-Id")
-        .or_else(|| req.headers().get("x-room-id"))
         .and_then(|v| v.to_str().ok())
         .filter(|s| !s.is_empty())
         .map(|s| s.to_uppercase())
@@ -324,7 +323,6 @@ fn get_room_id_from_req(req: &actix_web::HttpRequest) -> Option<String> {
 fn get_session_token_from_req(req: &actix_web::HttpRequest) -> Option<String> {
     req.headers()
         .get("X-Session-Token")
-        .or_else(|| req.headers().get("x-session-token"))
         .and_then(|v| v.to_str().ok())
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
@@ -383,22 +381,26 @@ fn read_actions(data: &AppState, room_id: Option<&str>) -> Vec<ActionIndex> {
     Vec::new()
 }
 
+fn build_action_indexes(game_state: &GameState) -> Vec<ActionIndex> {
+    crate::game_setup::generate_possible_actions(game_state)
+        .into_iter()
+        .enumerate()
+        .map(|(i, a)| ActionIndex {
+            description: a.description,
+            action_type: a.action_type.to_string(),
+            parameters: a.parameters,
+            index: i,
+        })
+        .collect::<Vec<_>>()
+}
+
 fn ensure_actions(data: &AppState, game_state: &GameState, room_id: Option<&str>) {
     if let Some(rid) = room_id {
         if let Ok(mut rooms) = data.rooms.lock() {
             if let Some(room) = rooms.get_mut(rid) {
                 if room.actions_dirty {
                     room.actions_dirty = false;
-                    room.cached_actions = crate::game_setup::generate_possible_actions(game_state)
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, a)| ActionIndex {
-                            description: a.description,
-                            action_type: a.action_type.to_string(),
-                            parameters: a.parameters,
-                            index: i,
-                        })
-                        .collect::<Vec<_>>();
+                    room.cached_actions = build_action_indexes(game_state);
                 }
                 return;
             }
@@ -409,19 +411,41 @@ fn ensure_actions(data: &AppState, game_state: &GameState, room_id: Option<&str>
         if *dirty {
             *dirty = false;
             if let Ok(mut cache) = data.cached_actions.lock() {
-                *cache = crate::game_setup::generate_possible_actions(game_state)
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, a)| ActionIndex {
-                        description: a.description,
-                        action_type: a.action_type.to_string(),
-                        parameters: a.parameters,
-                        index: i,
-                    })
-                    .collect::<Vec<_>>();
+                *cache = build_action_indexes(game_state);
             }
         }
     }
+}
+
+/// Push the undo snapshot (skipping if this was a choice-boundary resume) and
+/// handle any ability-engine snapshot_requested flag. Shared by room + global.
+fn push_undo_snapshot(
+    history: &mut Vec<GameState>,
+    snapshot: &GameState,
+    game_state: &mut GameState,
+    had_choice_before: bool,
+) {
+    // Fresh action: push before-state as undo point.
+    // Resume: the before-state is already in history (was pushed as the
+    // choice-boundary snapshot from the previous call), so skip it.
+    if !had_choice_before {
+        history.push(snapshot.clone());
+    }
+    // If the ability engine created a new pending choice at a choice
+    // boundary, push the current state so undo can step back to just before it.
+    if game_state.ability_queue.snapshot_requested {
+        game_state.ability_queue.snapshot_requested = false;
+        history.push(game_state.clone());
+    }
+}
+
+/// Build a short human-readable label for a frame snapshot.
+fn frame_label(action_type: Option<&str>, card_no: Option<&str>) -> String {
+    format!(
+        "{}{}",
+        action_type.unwrap_or("?"),
+        card_no.map(|n| format!(": {}", n)).unwrap_or_default(),
+    )
 }
 
 /// Lightweight version endpoint for polling — returns a sequence number
@@ -729,34 +753,18 @@ pub async fn execute_action(
             if let Some(ref rid) = exec_room_id_str {
                 if let Ok(mut rooms) = data.rooms.lock() {
                     if let Some(room) = rooms.get_mut(rid) {
-                        // Fresh action: push before-state as undo point.
-                        // Resume: the before-state is already in history (was pushed
-                        // as the choice-boundary snapshot from the previous call), so
-                        // skip it to avoid duplicates.
-                        if !had_choice_before {
-                            room.history.push(snapshot.clone());
-                        }
-                        // If the ability engine created a new pending choice at a
-                        // choice boundary, push the current state so undo can step
-                        // back to just before this choice.
-                        if game_state.ability_queue.snapshot_requested {
-                            game_state.ability_queue.snapshot_requested = false;
-                            room.history.push(game_state.clone());
-                        }
+                        push_undo_snapshot(
+                            &mut room.history,
+                            &snapshot,
+                            &mut game_state,
+                            had_choice_before,
+                        );
                         room.future.clear();
                         room.actions_dirty = true;
                         room.frame_counter += 1;
-                        let frame = room.frame_counter;
-                        let label = format!(
-                            "{}{}",
-                            req.action_type.as_deref().unwrap_or("?"),
-                            req.card_no
-                                .as_deref()
-                                .map(|n| format!(": {}", n))
-                                .unwrap_or_default(),
-                        );
+                        let label = frame_label(req.action_type.as_deref(), req.card_no.as_deref());
                         room.frame_history
-                            .push(FrameSnapshot::capture(&game_state, frame, label));
+                            .push(FrameSnapshot::capture(&game_state, room.frame_counter, label));
 
                         // Recording hook: buffer (state, action) for each step
                         if room.recording && room.recording_before.is_empty() {
@@ -823,31 +831,17 @@ pub async fn execute_action(
                 }
             } else {
                 let mut history = data.history.lock().unwrap();
-                if !had_choice_before {
-                    history.push(snapshot);
-                }
-                if game_state.ability_queue.snapshot_requested {
-                    game_state.ability_queue.snapshot_requested = false;
-                    history.push(game_state.clone());
-                }
+                push_undo_snapshot(&mut history, &snapshot, &mut game_state, had_choice_before);
                 drop(history);
                 data.future.lock().unwrap().clear();
                 invalidate_actions(&data, None);
                 let mut fc = data.frame_counter.lock().unwrap();
                 *fc += 1;
-                let frame = *fc;
-                let label = format!(
-                    "{}{}",
-                    req.action_type.as_deref().unwrap_or("?"),
-                    req.card_no
-                        .as_deref()
-                        .map(|n| format!(": {}", n))
-                        .unwrap_or_default(),
-                );
+                let label = frame_label(req.action_type.as_deref(), req.card_no.as_deref());
                 data.frame_history
                     .lock()
                     .unwrap()
-                    .push(FrameSnapshot::capture(&game_state, frame, label));
+                    .push(FrameSnapshot::capture(&game_state, *fc, label));
             }
 
             // Release write lock before building display (read-only work)

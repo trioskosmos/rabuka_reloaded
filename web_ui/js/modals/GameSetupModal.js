@@ -116,15 +116,16 @@ function parsePointSectionFormat(text) {
 }
 
 const _POINT_MAP = {
+    'LL-bp2-001-R+': 5, 'LL-bp2-001-R＋': 5,
     'PL!N-bp1-003-R+': 4, 'PL!N-bp1-003-P': 4, 'PL!N-bp1-003-P＋': 4, 'PL!N-bp1-003-SEC': 4,
     'PL!N-bp1-012-R+': 3, 'PL!N-bp1-012-P': 3, 'PL!N-bp1-012-P＋': 3, 'PL!N-bp1-012-SEC': 3,
-    'LL-bp2-001-R+': 3, 'LL-bp2-001-R＋': 3,
     'PL!N-bp1-002-R+': 2, 'PL!N-bp1-002-P': 2, 'PL!N-bp1-002-P＋': 2, 'PL!N-bp1-002-SEC': 2,
     'PL!N-sd1-008-SD': 2, 'PL!N-sd1-008-RM': 2, 'PL!HS-bp2-014-N': 2,
+    'PL!N-pb1-011-R': 2, 'PL!N-pb1-011-P＋': 2,
     'PL!SP-bp1-005-R': 1, 'PL!SP-bp1-005-P': 1, 'PL!N-bp1-029-L': 1,
-    'PL!SP-sd1-019-SD': 1, 'PL!SP-sd1-019-RM': 1,
-    'PL!SP-sd1-020-SD': 1, 'PL!SP-sd1-020-RM': 1,
-    'PL!SP-pb1-014-N': 1, 'PL!SP-bp2-024-L': 1, 'PL!SP-bp2-024-SECL': 1,
+    'PL!SP-sd1-019-SD': 1, 'PL!SP-sd1-019-RM': 1, 'PL!SP-sd1-019-SD2': 1, 'PL!SP-sd1-019-P': 1,
+    'PL!SP-sd1-020-SD': 1, 'PL!SP-sd1-020-RM': 1, 'PL!SP-sd1-020-SD2': 1, 'PL!SP-sd1-020-P': 1,
+    'PL!SP-pb1-014-N': 1, 'PL!N-bp3-030-L': 1, 'PL!N-bp4-030-L': 1,
 };
 let _ptCI = null;
 function cardPoints(no) {
@@ -192,10 +193,8 @@ function updateStatus(status, val) {
         if (textarea) textarea.value = result.raw;
     }
     const a = result.analysis;
-    const parts = [`M:${a.members}`, `L:${a.lives}`, `E:${a.energy}`];
-    if (a.points > 0) parts.push(`P:${a.points}`);
-    status.textContent = parts.join(' ');
-    status.style.color = '#22c55e';
+    status.textContent = `P:${a.points}`;
+    status.style.color = a.points > 0 ? '#22c55e' : '#6b7280';
 }
 
 function setupAutoConvert(pid) {

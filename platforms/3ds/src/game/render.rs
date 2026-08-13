@@ -23,6 +23,63 @@ use crate::util::{cn_or_empty, tl_area};
 
 use super::{action_list, compute_live_need, compute_total_hearts, find_card_zone_slot, pref};
 
+/// The number of screen lines a PlayMemberToStage group occupies: the card
+/// header line plus one line for all of its stage areas (left/center/right).
+const GROUP_LINES: usize = 2;
+/// Vertical space (px) reserved per rendered line in the action list.
+const LINE_H: f32 = 16.0;
+/// Bottom edge (px) of the action list area on the top screen.
+const LIST_BOTTOM: f32 = 230.0;
+
+/// Returns the index just past a PlayMemberToStage group starting at `di`.
+/// Consecutive same-card PMTS actions (one per stage area) form a single group.
+fn group_end(acts_cache: &[game_setup::Action], display_order: &[usize], di: usize, n: usize) -> usize {
+    let fi = display_order[di];
+    let act = &acts_cache[fi];
+    if act.action_type != game_setup::ActionType::PlayMemberToStage {
+        return di + 1;
+    }
+    let cid = act.parameters.as_ref().and_then(|p| p.card_id).unwrap_or(-1);
+    if cid == -1 {
+        return di + 1;
+    }
+    let mut ge = di + 1;
+    while ge < n {
+        let ga = &acts_cache[display_order[ge]];
+        if ga.action_type == game_setup::ActionType::PlayMemberToStage
+            && ga.parameters.as_ref().and_then(|p| p.card_id) == Some(cid)
+        {
+            ge += 1;
+        } else {
+            break;
+        }
+    }
+    ge
+}
+
+/// Backs `idx` up to the start of the group that contains it, so a window
+/// never starts mid-group (which would hide earlier areas of a card).
+fn snap_group_start(
+    acts_cache: &[game_setup::Action],
+    display_order: &[usize],
+    idx: usize,
+) -> usize {
+    let n = display_order.len();
+    if idx == 0 || idx >= n {
+        return idx;
+    }
+    // Iterate groups from the top; return the group start that contains idx.
+    let mut di = 0;
+    while di < n {
+        let ge = group_end(acts_cache, display_order, di, n);
+        if idx < ge {
+            return di;
+        }
+        di = ge;
+    }
+    idx
+}
+
 /// Render the board (CLI or graphical/image mode). Never returns early; the
 /// only side effects on locals are the text_page/list_scroll clamps, returned
 /// as a tuple.
@@ -78,7 +135,7 @@ pub(crate) fn render_board(
                             for ab in card.resolved_abilities() {
                                 let ab_text =
                                     i18n::translate_ability(&ab.full_text, current_lang());
-                                let w = wrap_ability_text(&ab_text, 390.0, 0.85);
+                                let w = wrap_ability_text(&ab_text, 390.0, SCALE_CLI);
                                 unsafe {
                                     _3ds_text_add_top(format!("{}\n\0", w).as_ptr());
                                 }
@@ -148,14 +205,14 @@ pub(crate) fn render_board(
                             format!(
                                 "[{}] {}\n\0",
                                 card.card_no,
-                                wrap_text(&display_name, 390.0, 0.85)
+                                wrap_text(&display_name, 390.0, SCALE_CLI)
                             )
                             .as_ptr(),
                         );
                     }
                     for ab in card.resolved_abilities() {
                         let ab_text = i18n::translate_ability(&ab.full_text, current_lang());
-                        let w = wrap_ability_text(&ab_text, 390.0, 0.85);
+                        let w = wrap_ability_text(&ab_text, 390.0, SCALE_CLI);
                         unsafe {
                             _3ds_text_add_top(format!("{}\n\0", w).as_ptr());
                         }
@@ -168,7 +225,7 @@ pub(crate) fn render_board(
                 let ab_text = wrap_ability_text(
                     &i18n::translate_ability(&entry.ability.full_text, current_lang()),
                     390.0,
-                    0.85,
+                    SCALE_CLI,
                 );
                 for line in ab_text.lines() {
                     unsafe {
@@ -224,7 +281,7 @@ pub(crate) fn render_board(
                     let prefix = if fi == cur { ">" } else { " " };
                     let line =
                         action_list::format_action_line(act, current_lang() == Lang::Japanese);
-                    let desc_full = wrap_text(&line, 390.0, 0.85);
+                    let desc_full = wrap_text(&line, 390.0, SCALE_CLI);
                     for (li, l) in desc_full.lines().enumerate() {
                         if li == 0 {
                             unsafe {
@@ -252,7 +309,7 @@ pub(crate) fn render_board(
                     .and_then(|card| card.resolved_abilities().next())
                     .map(|ab| {
                         let ab_text = i18n::translate_ability(&ab.full_text, current_lang());
-                        wrap_ability_text(&ab_text, 390.0, 0.85)
+                        wrap_ability_text(&ab_text, 390.0, SCALE_CLI)
                             .lines()
                             .next()
                             .unwrap_or("")
@@ -303,7 +360,7 @@ pub(crate) fn render_board(
                 4.0,
                 2.0,
                 COL_GOLD,
-                0.65f32,
+                SCALE_SMALL,
                 format!(
                     "T{} {} [{}]  Me H:{} E:{}/{} D:{}  Opp H:{} E:{}/{} D:{}\0",
                     gs.turn_number,
@@ -362,14 +419,14 @@ pub(crate) fn render_board(
             } else {
                 format!("{}  {{{{icon_blade.png|BLADE}}}}{}", p1_heart_str, p1_blade)
             };
-            render_text_with_icons(4.0, 22.0, &p1_stats, COL_LIGHT, 0.55f32);
+            render_text_with_icons(4.0, 22.0, &p1_stats, COL_LIGHT, SCALE_SMALL);
             // Render P2 hearts+blades on top screen line 3
             let p2_stats = if p2_heart_str.is_empty() {
                 format!("BL:{}", p2_blade)
             } else {
                 format!("{}  {{{{icon_blade.png|BLADE}}}}{}", p2_heart_str, p2_blade)
             };
-            render_text_with_icons(4.0, 34.0, &p2_stats, COL_LIGHT, 0.55f32);
+            render_text_with_icons(4.0, 34.0, &p2_stats, COL_LIGHT, SCALE_SMALL);
             // Show need hearts during live set phase
             // Rule 8.2.x: opponent's need hearts are hidden
             // until their cards are revealed (performed).
@@ -383,7 +440,7 @@ pub(crate) fn render_board(
                 if p1_nh.iter().any(|&v| v > 0) {
                     let nh_str = format_hearts(&p1_nh);
                     let need_display = format!("{{{{icon_heart_06.png|NEED}}}} {}", nh_str);
-                    render_text_with_icons(4.0, 46.0, &need_display, COL_GOLD, 0.50f32);
+                    render_text_with_icons(4.0, 46.0, &need_display, COL_GOLD, SCALE_SMALL);
                 }
                 // P2 (opponent) need hearts — only after performed
                 if gs.opponent_has_performed(my_player_idx) {
@@ -391,7 +448,7 @@ pub(crate) fn render_board(
                     if p2_nh.iter().any(|&v| v > 0) {
                         let nh_str = format_hearts(&p2_nh);
                         let need_display = format!("{{{{icon_heart_06.png|NEED}}}} {}", nh_str);
-                        render_text_with_icons(4.0, 46.0, &need_display, COL_GOLD, 0.50f32);
+                        render_text_with_icons(4.0, 46.0, &need_display, COL_GOLD, SCALE_SMALL);
                     }
                 }
             }
@@ -414,7 +471,7 @@ pub(crate) fn render_board(
                         4.0,
                         4.0,
                         COL_GOLD,
-                        0.65f32,
+                        SCALE_BODY,
                         format!("{}  (B=close, X=detail)\0", zlabel).as_ptr(),
                     );
                 }
@@ -441,7 +498,7 @@ pub(crate) fn render_board(
                                 4.0,
                                 4.0,
                                 COL_GOLD,
-                                0.70f32,
+                                SCALE_LARGE,
                                 format!("{}\0", tl("Ability")).as_ptr(),
                             );
                         }
@@ -451,7 +508,7 @@ pub(crate) fn render_board(
                             let raw = card.ability_text();
                             if !raw.is_empty() {
                                 let clean = raw.replace('\n', " ");
-                                let w = wrap_ability_text(&clean, 384.0, 0.65);
+                                let w = wrap_ability_text(&clean, 384.0, SCALE_BODY);
                                 for l in w.lines() {
                                     all_lines.push(l.to_string());
                                 }
@@ -460,7 +517,7 @@ pub(crate) fn render_board(
                             for ab in &abs {
                                 let ab_text =
                                     i18n::translate_ability(&ab.full_text, current_lang());
-                                let w = wrap_ability_text(&ab_text, 384.0, 0.65);
+                                let w = wrap_ability_text(&ab_text, 384.0, SCALE_BODY);
                                 for l in w.lines() {
                                     all_lines.push(l.to_string());
                                 }
@@ -476,7 +533,7 @@ pub(crate) fn render_board(
                             if ty > 220.0 {
                                 break;
                             }
-                            render_text_with_icons(4.0, ty, line, COL_LIGHT, 0.65);
+                            render_text_with_icons(4.0, ty, line, COL_LIGHT, SCALE_BODY);
                             ty += 18.0;
                         }
                         if total_pages > 1 {
@@ -485,7 +542,7 @@ pub(crate) fn render_board(
                                     370.0,
                                     4.0,
                                     COL_MED,
-                                    0.50f32,
+                                    SCALE_SMALL,
                                     format!("{}/{}\0", text_page + 1, total_pages).as_ptr(),
                                 );
                             }
@@ -506,7 +563,7 @@ pub(crate) fn render_board(
                         let mut line_count = 0usize;
                         for ab in card.resolved_abilities() {
                             let ab_text = i18n::translate_ability(&ab.full_text, current_lang());
-                            let w = wrap_ability_text(&ab_text, 392.0, 0.65);
+                            let w = wrap_ability_text(&ab_text, 392.0, SCALE_BODY);
                             line_count += w.lines().count();
                         }
                         // If no abilities, use minimal height; otherwise expand panel
@@ -551,10 +608,10 @@ pub(crate) fn render_board(
                             for ab in card.resolved_abilities() {
                                 let ab_text =
                                     i18n::translate_ability(&ab.full_text, current_lang());
-                                let w = wrap_ability_text(&ab_text, text_w, 0.65);
+                                let w = wrap_ability_text(&ab_text, text_w, SCALE_BODY);
                                 for line in w.lines() {
                                     if ty > -20.0 && ty < 240.0 {
-                                        render_text_with_icons(text_x, ty, line, COL_LIGHT, 0.65);
+                                        render_text_with_icons(text_x, ty, line, COL_LIGHT, SCALE_BODY);
                                     }
                                     ty += 18.0;
                                 }
@@ -576,11 +633,11 @@ pub(crate) fn render_board(
                                 text_x,
                                 card_y - 2.0,
                                 COL_BLUE,
-                                0.80f32,
+                                SCALE_LARGE,
                                 format!(
                                     "[{}] {}\0",
                                     card.card_no,
-                                    wrap_text(&display_name, text_w, 0.80)
+                                    wrap_text(&display_name, text_w, SCALE_LARGE)
                                 )
                                 .as_ptr(),
                             );
@@ -598,7 +655,7 @@ pub(crate) fn render_board(
                                     &stats.need_heart_str,
                                 ),
                                 COL_LIGHT,
-                                0.65f32,
+                                SCALE_BODY,
                             );
                             // Scroll indicators (right edge)
                             let arrow_x = 400.0 - 18.0;
@@ -607,7 +664,7 @@ pub(crate) fn render_board(
                                     arrow_x,
                                     228.0,
                                     COL_MED,
-                                    0.50f32,
+                                    SCALE_SMALL,
                                     format!("v\0").as_ptr(),
                                 );
                             }
@@ -616,7 +673,7 @@ pub(crate) fn render_board(
                                     arrow_x,
                                     56.0,
                                     COL_MED,
-                                    0.50f32,
+                                    SCALE_SMALL,
                                     format!("^\0").as_ptr(),
                                 );
                             }
@@ -641,7 +698,7 @@ pub(crate) fn render_board(
                         4.0,
                         2.0,
                         COL_GOLD,
-                        0.65f32,
+                        SCALE_BODY,
                         format!(
                             "T{} {} [{}]  Me H:{} E:{}/{} D:{}  Opp H:{} E:{}/{} D:{}\0",
                             gs.turn_number,
@@ -676,8 +733,8 @@ pub(crate) fn render_board(
                             4.0,
                             44.0,
                             COL_BLUE,
-                            0.75f32,
-                            format!("[{}] {}\0", card.card_no, wrap_text(&btm_name, 392.0, 0.75))
+                            SCALE_LARGE,
+                            format!("[{}] {}\0", card.card_no, wrap_text(&btm_name, 392.0, SCALE_LARGE))
                                 .as_ptr(),
                         );
                         render_text_with_icons(
@@ -693,16 +750,16 @@ pub(crate) fn render_board(
                                 &stats.need_heart_str,
                             ),
                             COL_LIGHT,
-                            0.65f32,
+                            SCALE_BODY,
                         );
                         if let Some(ab) = card.resolved_abilities().next() {
                             let ab_text = i18n::translate_ability(&ab.full_text, current_lang());
-                            let first_line = wrap_ability_text(&ab_text, 392.0, 0.60)
+                            let first_line = wrap_ability_text(&ab_text, 392.0, SCALE_BODY)
                                 .lines()
                                 .next()
                                 .unwrap_or("")
                                 .to_string();
-                            render_text_with_icons(4.0, 82.0, &first_line, COL_LIGHT, 0.60);
+                            render_text_with_icons(4.0, 82.0, &first_line, COL_LIGHT, SCALE_BODY);
                         }
                     }
                 }
@@ -712,7 +769,7 @@ pub(crate) fn render_board(
                 // The banner is only for CLI/text mode.
                 if !(has_image_choice || has_text_choice) && !is_ai_turn {
                     let ab_text = i18n::translate_ability(&entry.ability.full_text, current_lang());
-                    let ab_lines: Vec<String> = wrap_ability_text(&ab_text, 392.0, 0.65)
+                    let ab_lines: Vec<String> = wrap_ability_text(&ab_text, 392.0, SCALE_BODY)
                         .lines()
                         .take(4)
                         .map(|l| l.to_string())
@@ -721,14 +778,14 @@ pub(crate) fn render_board(
                     let h = 22.0 + n_lines as f32 * 14.0;
                     unsafe {
                         _3ds_top_queue_rect(0.0, 52.0, 400.0, h, COL_ABILITY);
-                        render_text_with_icons(4.0, 54.0, &ab_lines[0], COL_LIGHT, 0.65);
+                        render_text_with_icons(4.0, 54.0, &ab_lines[0], COL_LIGHT, SCALE_BODY);
                         for (li, line) in ab_lines.iter().enumerate().skip(1) {
                             render_text_with_icons(
                                 8.0,
                                 54.0 + li as f32 * 14.0,
                                 line,
                                 COL_LIGHT,
-                                0.65,
+                                SCALE_BODY,
                             );
                         }
                     }
@@ -785,7 +842,7 @@ pub(crate) fn render_board(
                             } else {
                                 description_en.as_deref().unwrap_or(description).to_string()
                             };
-                            let desc_lines: Vec<String> = wrap_text(&desc, 392.0, 0.60)
+                            let desc_lines: Vec<String> = wrap_text(&desc, 392.0, SCALE_BODY)
                                 .lines()
                                 .map(|l| l.to_string())
                                 .collect();
@@ -795,19 +852,24 @@ pub(crate) fn render_board(
                             }
                             let mut oy = content_y + 3.0;
                             for line in desc_lines.iter().take(2) {
-                                render_text_with_icons(4.0, oy, line, COL_GOLD, 0.60);
+                                render_text_with_icons(4.0, oy, line, COL_GOLD, SCALE_BODY);
                                 oy += 14.0;
                             }
                             let mut ty = content_y + header_h + 4.0;
                             let n = options.len();
-                            let max_vis = ((230.0 - ty) / 20.0) as usize + 1;
-                            if list_scroll >= n.saturating_sub(max_vis) {
-                                list_scroll = n.saturating_sub(max_vis);
-                            }
-                            if display_pos < list_scroll {
-                                list_scroll = display_pos.saturating_sub(max_vis / 3);
-                            } else if display_pos >= list_scroll + max_vis {
-                                list_scroll = display_pos.saturating_sub(max_vis / 3);
+                            let line_h = 16.0f32;
+                            let max_vis = ((230.0 - ty) / line_h) as usize + 1;
+                            if n <= max_vis {
+                                list_scroll = 0;
+                            } else {
+                                if display_pos < list_scroll {
+                                    list_scroll = display_pos;
+                                } else if display_pos >= list_scroll + max_vis {
+                                    list_scroll = display_pos - max_vis + 1;
+                                }
+                                if list_scroll >= n.saturating_sub(max_vis) {
+                                    list_scroll = n.saturating_sub(max_vis);
+                                }
                             }
                             let start = list_scroll.min(n.saturating_sub(max_vis));
                             let end = (start + max_vis).min(n);
@@ -817,10 +879,10 @@ pub(crate) fn render_board(
                                         4.0,
                                         ty,
                                         COL_MED,
-                                        0.60f32,
+                                        SCALE_BODY,
                                         format!("\u{25b2} +{}\0", start).as_ptr(),
                                     );
-                                    ty += 18.0;
+                                    ty += line_h;
                                 }
                             }
                             let mut di = start;
@@ -828,27 +890,26 @@ pub(crate) fn render_board(
                                 let opt = &options[di];
                                 let is_sel = di == display_pos;
                                 let line_color = if is_sel { COL_GOLD } else { COL_LIGHT };
-                                let prefix = if is_sel { ">" } else { " " };
                                 let cn = opt
                                     .card_id
                                     .and_then(|cid| gs.card_database.get_card(cid))
                                     .map(|card| card.card_no.to_string())
                                     .unwrap_or_default();
                                 let header = if cn.is_empty() {
-                                    format!("{}{}", prefix, opt.card_name)
+                                    opt.card_name.clone()
                                 } else {
-                                    format!("{}[{}] {}", prefix, cn, opt.card_name)
+                                    format!("[{}] {}", cn, opt.card_name)
                                 };
-                                for l in wrap_text(&header, 392.0, 0.65).lines() {
+                                for l in wrap_text(&header, 392.0, SCALE_BODY).lines() {
                                     if ty > 230.0 {
                                         break;
                                     }
-                                    render_text_with_icons(4.0, ty, l, line_color, 0.65);
-                                    ty += 20.0;
+                                    render_text_with_icons(4.0, ty, l, line_color, SCALE_BODY);
+                                    ty += line_h;
                                 }
                                 let ab_text =
                                     i18n::translate_ability(&opt.ability_text, current_lang());
-                                let ab_wrapped = wrap_ability_text(&ab_text, 392.0, 0.65);
+                                let ab_wrapped = wrap_ability_text(&ab_text, 392.0, SCALE_BODY);
                                 for (li, l) in ab_wrapped.lines().enumerate() {
                                     if ty > 230.0 {
                                         break;
@@ -858,8 +919,8 @@ pub(crate) fn render_board(
                                     } else {
                                         l.to_string()
                                     };
-                                    render_text_with_icons(4.0, ty, &txt, line_color, 0.65);
-                                    ty += 20.0;
+                                    render_text_with_icons(4.0, ty, &txt, line_color, SCALE_BODY);
+                                    ty += line_h;
                                 }
                                 ty += 4.0;
                                 di += 1;
@@ -870,7 +931,7 @@ pub(crate) fn render_board(
                                         4.0,
                                         ty,
                                         COL_MED,
-                                        0.60f32,
+                                        SCALE_BODY,
                                         format!("\u{25bc} +{}\0", n - end).as_ptr(),
                                     );
                                 }
@@ -925,7 +986,7 @@ pub(crate) fn render_board(
                     // ---- Render ability banner first ----
                     let mut grid_iy: f32 = 52.0;
                     if !banner_text.is_empty() {
-                        let ab_lines: Vec<String> = wrap_ability_text(&banner_text, 392.0, 0.60)
+                        let ab_lines: Vec<String> = wrap_ability_text(&banner_text, 392.0, SCALE_BODY)
                             .lines()
                             .take(2)
                             .map(|l| l.to_string())
@@ -941,7 +1002,7 @@ pub(crate) fn render_board(
                                 52.0 + 2.0 + li as f32 * 13.0,
                                 line,
                                 COL_LIGHT,
-                                0.60,
+                                SCALE_BODY,
                             );
                         }
                         grid_iy = 52.0 + h + 4.0;
@@ -1046,7 +1107,7 @@ pub(crate) fn render_board(
                                             ix + 1.0,
                                             iy_card + ch + 1.0,
                                             COL_LIGHT,
-                                            0.45f32,
+                                            SCALE_SMALL,
                                             label.as_ptr(),
                                         );
                                     }
@@ -1071,7 +1132,7 @@ pub(crate) fn render_board(
                             .trim_start_matches("- ")
                             .trim();
                         let color = if is_disabled { COL_MED } else { COL_LIGHT };
-                        let scale = 0.70f32;
+                        let scale = SCALE_LARGE;
                         let full_txt = desc_clean.to_string();
                         let total_h = unsafe {
                             _3ds_text_wrapped_height(
@@ -1096,7 +1157,7 @@ pub(crate) fn render_board(
                                     4.0,
                                     232.0,
                                     COL_MED,
-                                    0.55f32,
+                                    SCALE_SMALL,
                                     format!("{}/{}\0", cur, total).as_ptr(),
                                 );
                             }
@@ -1109,7 +1170,7 @@ pub(crate) fn render_board(
                             4.0,
                             228.0,
                             COL_MED,
-                            0.45f32,
+                            SCALE_SMALL,
                             format!("{}\0", tl("L=text")).as_ptr(),
                         );
                     }
@@ -1122,7 +1183,7 @@ pub(crate) fn render_board(
                                 300.0,
                                 228.0,
                                 COL_MED,
-                                0.45f32,
+                                SCALE_SMALL,
                                 format!("{}\0", format!("{}/{}", pg, total_p)).as_ptr(),
                             );
                         }
@@ -1131,7 +1192,7 @@ pub(crate) fn render_board(
                     if choice_subview {
                         if let Some(entry) = gs.ability_queue.current_entry() {
                             let ab_lines: Vec<String> =
-                                wrap_ability_text(&entry.ability.full_text, 384.0, 0.65)
+                                wrap_ability_text(&entry.ability.full_text, 384.0, SCALE_BODY)
                                     .lines()
                                     .map(|l| l.to_string())
                                     .collect();
@@ -1148,13 +1209,13 @@ pub(crate) fn render_board(
                                     4.0,
                                     44.0,
                                     COL_BLUE,
-                                    0.65f32,
+                                    SCALE_BODY,
                                     format!("{}\0", tl("Ability")).as_ptr(),
                                 );
                             }
                             let mut oy = 64.0;
                             for i in start_line..end_line {
-                                render_text_with_icons(8.0, oy, &ab_lines[i], COL_LIGHT, 0.65);
+                                render_text_with_icons(8.0, oy, &ab_lines[i], COL_LIGHT, SCALE_BODY);
                                 oy += 20.0;
                             }
                             let page_str = format!("{}/{}", text_page + 1, total_pages);
@@ -1163,7 +1224,7 @@ pub(crate) fn render_board(
                                     400.0 - page_str.len() as f32 * 7.0 - 8.0,
                                     44.0,
                                     COL_MED,
-                                    0.50f32,
+                                    SCALE_SMALL,
                                     format!("{}\0", page_str).as_ptr(),
                                 );
                                 render_hint_bar(&tl("L/B=close"));
@@ -1176,7 +1237,7 @@ pub(crate) fn render_board(
                             4.0,
                             content_y,
                             COL_MED,
-                            0.65f32,
+                            SCALE_BODY,
                             format!("{}\0", tl("AI is thinking...")).as_ptr(),
                         );
                     }
@@ -1187,29 +1248,59 @@ pub(crate) fn render_board(
                     && !detail_mode
                 {
                     let mut ty = content_y;
-                    let max_vis = ((230.0 - content_y) / 20.0) as usize + 1;
+                    let line_h = LINE_H;
                     let n = display_order.len();
-                    // Stable scroll: only adjust when cursor goes out of visible range
-                    if list_scroll >= n.saturating_sub(max_vis) {
-                        list_scroll = n.saturating_sub(max_vis);
+                    // Walk groups forward from a candidate start to build the
+                    // visible entry range [start, end). Each group consumes its
+                    // real entry span (GROUP_LINES worth of vertical space).
+                    let available = ((LIST_BOTTOM - content_y) / line_h) as usize;
+                    let build_window = |s: usize| -> (usize, usize) {
+                        let mut end = s.min(n);
+                        let mut used = 0usize;
+                        while end < n {
+                            let ge = group_end(acts_cache, display_order, end, n);
+                            let lines = if ge > end + 1 { GROUP_LINES } else { 1 };
+                            if used + lines > available {
+                                break;
+                            }
+                            used += lines;
+                            end = ge;
+                        }
+                        end = end.max(s + 1).min(n);
+                        (s, end)
+                    };
+                    // Advance the window so the cursor stays visible.
+                    let mut start = snap_group_start(acts_cache, display_order, list_scroll);
+                    let mut end = start;
+                    loop {
+                        let (_, e2) = build_window(start);
+                        end = e2;
+                        if display_pos >= start && display_pos < end {
+                            break;
+                        }
+                        if display_pos < start {
+                            // scroll up: move to the group containing display_pos
+                            start = snap_group_start(acts_cache, display_order, display_pos);
+                        } else {
+                            // scroll down: shift window forward by one group
+                            if e2 >= n {
+                                break;
+                            }
+                            start = e2;
+                            start = snap_group_start(acts_cache, display_order, start);
+                        }
                     }
-                    if display_pos < list_scroll {
-                        list_scroll = display_pos.saturating_sub(max_vis / 3);
-                    } else if display_pos >= list_scroll + max_vis {
-                        list_scroll = display_pos.saturating_sub(max_vis / 3);
-                    }
-                    let start = list_scroll.min(n.saturating_sub(max_vis));
-                    let end = (start + max_vis).min(n);
+                    list_scroll = start;
                     if start > 0 {
                         unsafe {
                             _3ds_top_queue_text(
                                 4.0,
                                 ty,
                                 COL_MED,
-                                0.60f32,
+                                SCALE_BODY,
                                 format!("\u{25b2} +{}\0", start).as_ptr(),
                             );
-                            ty += 18.0;
+                            ty += line_h;
                         }
                     }
                     let mut di = start;
@@ -1222,27 +1313,10 @@ pub(crate) fn render_board(
                             .as_ref()
                             .and_then(|p| p.disabled)
                             .unwrap_or(false);
-                        let this_cid = act
-                            .parameters
-                            .as_ref()
-                            .and_then(|p| p.card_id)
-                            .unwrap_or(-1);
-                        let is_pmts = act.action_type == game_setup::ActionType::PlayMemberToStage;
-                        let mut ge = di + 1;
-                        if is_pmts && this_cid != -1 {
-                            while ge < end {
-                                let n = &acts_cache[display_order[ge]];
-                                if n.action_type == game_setup::ActionType::PlayMemberToStage
-                                    && n.parameters.as_ref().and_then(|p| p.card_id)
-                                        == Some(this_cid)
-                                {
-                                    ge += 1;
-                                } else {
-                                    break;
-                                }
-                            }
-                        }
-                        let is_group = is_pmts && this_cid != -1;
+                        // Group = all consecutive same-card PlayMemberToStage areas.
+                        // Scans the FULL display_order so the group is never split.
+                        let ge = group_end(acts_cache, display_order, di, n);
+                        let is_group = ge > di + 1;
                         let group_sel = is_group && (di..ge).any(|i| i == display_pos);
                         let line_color = if group_sel || is_sel {
                             COL_GOLD
@@ -1251,7 +1325,7 @@ pub(crate) fn render_board(
                         } else {
                             COL_LIGHT
                         };
-                        let line_scale: f32 = 0.65;
+                        let line_scale: f32 = SCALE_BODY;
                         if ty > 230.0 {
                             break;
                         }
@@ -1380,7 +1454,7 @@ pub(crate) fn render_board(
                                         );
                                     }
                                 }
-                                ty += 20.0;
+                                ty += line_h;
                             }
                             let areas_prefix = "";
                             for (_li, l) in wrap_text(&areas, 370.0, line_scale).lines().enumerate()
@@ -1402,17 +1476,10 @@ pub(crate) fn render_board(
                                         );
                                     }
                                 }
-                                ty += 20.0;
+                                ty += line_h;
                             }
                             di = ge;
                         } else {
-                            let prefix = if is_sel {
-                                ""
-                            } else if is_disabled {
-                                "· "
-                            } else {
-                                "  "
-                            };
                             let line = super::action_list::format_action_line_image(act, gs);
                             let color = if is_disabled {
                                 COL_MED
@@ -1421,13 +1488,13 @@ pub(crate) fn render_board(
                             } else {
                                 COL_LIGHT
                             };
-                            let scale: f32 = 0.65;
-                            let wrap_w = if !prefix.is_empty() { 370.0 } else { 392.0 };
+                            let scale: f32 = SCALE_BODY;
+                            let wrap_w = 392.0;
                             for (_li, l) in wrap_text(&line, wrap_w, scale).lines().enumerate() {
                                 if ty > 230.0 {
                                     break;
                                 }
-                                let txt = format!("{}{}", prefix, l);
+                                let txt = l.to_string();
                                 if txt.contains("{{") {
                                     render_text_with_icons(4.0, ty, &txt, color, scale);
                                 } else {
@@ -1441,7 +1508,7 @@ pub(crate) fn render_board(
                                         );
                                     }
                                 }
-                                ty += 20.0;
+                                ty += line_h;
                             }
                             di += 1;
                         }
@@ -1452,7 +1519,7 @@ pub(crate) fn render_board(
                                 4.0,
                                 ty,
                                 COL_MED,
-                                0.60f32,
+                                SCALE_BODY,
                                 format!("\u{25bc} +{}\0", n - end).as_ptr(),
                             );
                         }

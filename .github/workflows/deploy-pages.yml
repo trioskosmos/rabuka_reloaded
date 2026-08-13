@@ -25,9 +25,12 @@ jobs:
 
       - name: Copy card data and images into docs
         run: |
-          mkdir -p docs/cards docs/img
+          mkdir -p docs/cards docs/img docs/js/i18n
           cp cards/cards.json cards/abilities.json docs/cards/
           cp -r web_ui/img/cards_webp web_ui/img/texticon web_ui/img/tutorial docs/img/
+          # i18n is served from web_ui; keep docs in sync at deploy time so
+          # web_ui/js/i18n is the single source of truth (no manual copies).
+          cp -r web_ui/js/i18n/* docs/js/i18n/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

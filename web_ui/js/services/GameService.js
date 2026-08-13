@@ -2,13 +2,26 @@ import { State, updateStateData } from '../state.js';
 import { log } from '../logger.js';
 import { DOMUtils } from '../utils/DOMUtils.js';
 import { DOM_IDS, COLORS } from '../constants_dom.js';
+import { apiFetch } from '../network.js';
+
+/** Backend responses carry legal_actions as {action_type, description, parameters}.
+ *  Ensure each has a stable numeric `index` for the UI. */
+function normalizeLegalActions(data) {
+    if (data && Array.isArray(data.legal_actions)) {
+        data.legal_actions = data.legal_actions.map((action, index) => ({
+            ...action,
+            index: action.index !== undefined ? action.index : index
+        }));
+    }
+    return data;
+}
 
 export const GameService = {
     checkSystemStatus: async () => {
         const badge = DOMUtils.getElement(DOM_IDS.SYSTEM_STATUS_BADGE);
         if (!badge) return;
         try {
-            const res = await fetch('api/status');
+            const res = await apiFetch('api/status');
             const data = await res.json();
             if (data.status === 'rust_server') {
                 const cardCount = (data.members || 0) + (data.lives || 0);
@@ -56,9 +69,7 @@ export const GameService = {
 
     checkVersionAndFetch: async () => {
         try {
-            const network = window.Network || null;
-            const headers = network?.getHeaders ? network.getHeaders() : {};
-            const res = await fetch('api/game-state/version', { headers });
+            const res = await apiFetch('api/game-state/version');
             if (!res.ok) return;
             const data = await res.json();
             if (data.version !== undefined && data.version !== GameService._lastKnownVersion) {
@@ -83,8 +94,7 @@ export const GameService = {
         try {
             if (State.replayMode) return;
 
-            const headers = networkFacade?.getHeaders ? networkFacade.getHeaders() : {};
-            const res = await fetch('api/game-state', { headers });
+            const res = await apiFetch('api/game-state');
             if (!res.ok) {
                 throw new Error(`State fetch failed: ${res.status}`);
             }
@@ -104,12 +114,7 @@ export const GameService = {
                 return;
             }
 
-            if (data.legal_actions) {
-                data.legal_actions = data.legal_actions.map((action, index) => ({
-                    ...action,
-                    index: action.index !== undefined ? action.index : index
-                }));
-            }
+            normalizeLegalActions(data);
 
             // If setup modal is still open (e.g., first player getting state via SSE), dismiss it
             const setupModal = document.getElementById(DOM_IDS.MODAL_SETUP);
@@ -183,10 +188,8 @@ export const GameService = {
 
         const actionStart = performance.now();
         try {
-            const headers = networkFacade?.getHeaders ? networkFacade.getHeaders() : { 'Content-Type': 'application/json' };
-            const res = await fetch('api/execute-action', {
+            const res = await apiFetch('api/execute-action', {
                 method: 'POST',
-                headers: headers,
                 body: JSON.stringify({
                     action_index: action.index || 0,
                     action_type: action.action_type,
@@ -228,11 +231,7 @@ export const GameService = {
         if (networkFacade?.clearPlannerData) networkFacade.clearPlannerData();
 
         try {
-            const headers = networkFacade?.getHeaders ? networkFacade.getHeaders() : { 'Content-Type': 'application/json' };
-            const res = await fetch('api/init', {
-                method: 'POST',
-                headers: headers
-            });
+            const res = await apiFetch('api/init', { method: 'POST' });
             const text = await res.text();
             if (!res.ok) {
                 let message = `Reset failed (${res.status})`;
@@ -250,12 +249,7 @@ export const GameService = {
             State.lastStateJson = text;
             const data = JSON.parse(text);
 
-            if (data.legal_actions) {
-                data.legal_actions = data.legal_actions.map((action, index) => ({
-                    ...action,
-                    index: action.index !== undefined ? action.index : index
-                }));
-            }
+            normalizeLegalActions(data);
 
             updateStateData(data);
             window.lastShownPerformanceHash = "";
@@ -269,9 +263,8 @@ export const GameService = {
 
     changeAI: async (aiMode, networkFacade) => {
         try {
-            const res = await fetch('api/set_ai', {
+            const res = await apiFetch('api/set_ai', {
                 method: 'POST',
-                headers: networkFacade?.getHeaders ? networkFacade.getHeaders() : {},
                 body: JSON.stringify({ ai_mode: aiMode })
             });
             const data = await res.json();

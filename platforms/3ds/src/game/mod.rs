@@ -658,7 +658,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
                     4.0,
                     140.0,
                     COL_LIGHT,
-                    0.65f32,
+                    SCALE_BODY,
                     format!(
                         "{}: {} vs {}\0",
                         wins_text,
@@ -671,7 +671,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
                     4.0,
                     170.0,
                     COL_MED,
-                    0.55f32,
+                    SCALE_SMALL,
                     format!("{}\0", tl("Press START to exit")).as_ptr(),
                 );
             }
@@ -717,7 +717,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
                     4.0,
                     215.0,
                     0xFFFFFF00,
-                    0.65f32,
+                    SCALE_BODY,
                     format!(
                         "MP|tx={} rx={} ap={} my={} can={} wait={} phase={} acts={}\0",
                         dbg_tx_bytes,

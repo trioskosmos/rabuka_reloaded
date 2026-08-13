@@ -87,20 +87,26 @@ export const Tooltips = {
 
         const state = State.data;
         const perspectivePlayer = State.perspectivePlayer;
-        let cardObj = null;
-        let actionObj = null;
-
         const actionId = dataSource.dataset.actionId;
         const cardId = dataSource.dataset.cardId;
+        const cardNo = dataSource.dataset.cardNo;
+        const cardName = dataSource.dataset.cardName;
 
-        if (cardId !== undefined) {
-            cardObj = Tooltips.findCardById(parseInt(cardId));
-        }
+        // The hovered element is the authoritative source for which card it
+        // represents. Resolve it first so we never show a different card just
+        // because an action happens to reference some other card.
+        let cardObj = cardId !== undefined ? Tooltips.findCardById(parseInt(cardId)) : null;
+        if (!cardObj && cardNo) cardObj = State.resolveCardData(cardNo);
+        if (!cardObj && cardName) cardObj = State.resolveCardDataByName(cardName);
 
+        // Action is used for text enrichment only; it must never override the
+        // hovered card. It is consulted only as a last resort to identify a
+        // card when the element itself carries none.
+        let actionObj = null;
         if (actionId !== undefined && state && state.legal_actions) {
             // Rust backend: use action.index instead of action.id
             actionObj = state.legal_actions.find(a => a.index === parseInt(actionId));
-            if (actionObj) {
+            if (!cardObj && actionObj) {
                 // highlight targets removed — data-action-id was shared across area buttons causing wrong highlights
                 // Rust backend format: player1, player2
                 const p = perspectivePlayer === 0 ? state.player1 : state.player2;
@@ -111,8 +117,8 @@ export const Tooltips = {
                     const liveCards = p.live_zone.cards;
                     const energyCards = p.energy.cards;
                     
-                    if (!cardObj && params.card_index !== undefined && handCards.length > 0) cardObj = handCards[params.card_index];
-                    else if (!cardObj && params.stage_area && p.stage) {
+                    if (params.card_index !== undefined && handCards.length > 0) cardObj = handCards[params.card_index];
+                    else if (params.stage_area && p.stage) {
                         // Rust engine MemberArea serializes as lowercase without underscores: "left", "center", "right"
                         // Support both formats for compatibility
                         const areaMap = { 
@@ -124,21 +130,13 @@ export const Tooltips = {
                         };
                         cardObj = areaMap[params.stage_area.toLowerCase()];
                     }
-                    else if (!cardObj && params.card_indices !== undefined && liveCards.length > 0) cardObj = liveCards[params.card_indices[0]];
-                    else if (!cardObj && params.card_index !== undefined && energyCards.length > 0) cardObj = energyCards[params.card_index];
+                    else if (params.card_indices !== undefined && liveCards.length > 0) cardObj = liveCards[params.card_indices[0]];
+                    else if (params.card_index !== undefined && energyCards.length > 0) cardObj = energyCards[params.card_index];
                 }
                 if (!cardObj && actionObj.source_card_id !== undefined && actionObj.source_card_id !== -1) {
                     cardObj = Tooltips.findCardById(actionObj.source_card_id);
                 }
             }
-        }
-
-        if (!cardObj && dataSource.dataset.cardName) {
-            cardObj = State.resolveCardDataByName(dataSource.dataset.cardName);
-        }
-
-        if (!cardObj && dataSource.dataset.cardNo) {
-            cardObj = State.resolveCardData(dataSource.dataset.cardNo);
         }
 
         if (cardObj && cardObj.id !== undefined && cardObj.id >= 0) {

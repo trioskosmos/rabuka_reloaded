@@ -23,6 +23,7 @@ use crate::ui::text::card_stat_line;
 use crate::ui::text::render_text_with_icons;
 use crate::ui::text::wrap_ability_text;
 use crate::ui::text::CardDisplayStats;
+use crate::ui::text::{SCALE_BODY, SCALE_LARGE, SCALE_SMALL};
 
 #[cfg(feature = "3ds")]
 #[derive(Clone, Copy, PartialEq)]
@@ -145,7 +146,7 @@ pub fn render_card_grid(
                 300.0,
                 4.0,
                 COL_MED,
-                0.50f32,
+                SCALE_SMALL,
                 format!("{}/{}\0", page_n, total_p).as_ptr(),
             );
         }
@@ -236,7 +237,7 @@ pub fn render_card_detail(
                 4.0,
                 4.0,
                 COL_BLUE,
-                0.80f32,
+                SCALE_LARGE,
                 format!("[{}] {}\0", card.card_no, display_name).as_ptr(),
             );
             render_text_with_icons(
@@ -252,7 +253,7 @@ pub fn render_card_detail(
                     &stats.need_heart_str,
                 ),
                 COL_LIGHT,
-                0.65f32,
+                SCALE_BODY,
             );
             // Content background below the header
             _3ds_top_queue_rect(0.0, HEADER_H, 400.0, 240.0 - HEADER_H, COL_CARD);
@@ -266,10 +267,10 @@ pub fn render_card_detail(
                 let raw = card.ability_text();
                 if !raw.is_empty() {
                     let clean = raw.replace('\n', " ");
-                    let w = wrap_ability_text(&clean, text_w, 0.65);
+                    let w = wrap_ability_text(&clean, text_w, SCALE_BODY);
                     for line in w.lines() {
                         if ty > -20.0 && ty < 240.0 {
-                            render_text_with_icons(text_x, ty, line, COL_LIGHT, 0.65);
+                            render_text_with_icons(text_x, ty, line, COL_LIGHT, SCALE_BODY);
                         }
                         ty += 18.0;
                     }
@@ -277,10 +278,10 @@ pub fn render_card_detail(
             } else {
                 for ab in abs {
                     let ab_text = i18n::translate_ability(&ab.full_text, current_lang());
-                    let w = wrap_ability_text(&ab_text, text_w, 0.65);
+                    let w = wrap_ability_text(&ab_text, text_w, SCALE_BODY);
                     for line in w.lines() {
                         if ty > -20.0 && ty < 240.0 {
-                            render_text_with_icons(text_x, ty, line, COL_LIGHT, 0.65);
+                            render_text_with_icons(text_x, ty, line, COL_LIGHT, SCALE_BODY);
                         }
                         ty += 18.0;
                     }
@@ -290,10 +291,10 @@ pub fn render_card_detail(
             // Scroll indicator if content extends beyond screen
             let arrow_x = 400.0 - 18.0;
             if ty > 220.0 {
-                _3ds_top_queue_text(arrow_x, 225.0, COL_MED, 0.50f32, format!("v\0").as_ptr());
+                _3ds_top_queue_text(arrow_x, 225.0, COL_MED, SCALE_SMALL, format!("v\0").as_ptr());
             }
             if scroll_y > 0.0 {
-                _3ds_top_queue_text(arrow_x, 42.0, COL_MED, 0.50f32, format!("^\0").as_ptr());
+                _3ds_top_queue_text(arrow_x, 42.0, COL_MED, SCALE_SMALL, format!("^\0").as_ptr());
             }
         }
     }

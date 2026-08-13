@@ -1167,10 +1167,31 @@ void _3ds_swap_buffers() {
                     }
                 } else if (draw_op_types[i] == OP_CARD) {
                     C2D_Image img = _3ds_get_card_image(draw_ops[i].atlas, draw_ops[i].atlas_idx);
-                    if (img.tex != NULL) {
-                        float sx = draw_ops[i].w / (float)img.subtex->width;
-                        float sy = draw_ops[i].h / (float)img.subtex->height;
-                        C2D_DrawImageAt(img, draw_ops[i].x + x_off, draw_ops[i].y, 0.5f, NULL, sx, sy);
+                    if (img.tex != NULL && img.subtex && img.subtex->width > 0 && img.subtex->height > 0) {
+                        float iw = (float)img.subtex->width;
+                        float ih = (float)img.subtex->height;
+                        float bx = draw_ops[i].x;
+                        float by = draw_ops[i].y;
+                        float bw = draw_ops[i].w;
+                        float bh = draw_ops[i].h;
+                        if (iw > ih) {
+                            // Landscape card (e.g. live cards) in a portrait box:
+                            // rotate 90° so it fills the box instead of stretching
+                            // or shrinking. Dimensions swap after rotation.
+                            float scale = (bw / ih) < (bh / iw) ? (bw / ih) : (bh / iw);
+                            float cx = bx + bw * 0.5f;
+                            float cy = by + bh * 0.5f;
+                            // Rotate 90° CW (other way from the board's waited cards).
+                            C2D_DrawImageAtRotated(img, cx + x_off, cy, 0.5f, -1.57079633f, NULL, scale, scale);
+                        } else {
+                            // Portrait: fit inside the box preserving aspect.
+                            float scale = (bw / iw) < (bh / ih) ? (bw / iw) : (bh / ih);
+                            float dw = iw * scale;
+                            float dh = ih * scale;
+                            float dx = bx + (bw - dw) * 0.5f;
+                            float dy = by + (bh - dh) * 0.5f;
+                            C2D_DrawImageAt(img, dx + x_off, dy, 0.5f, NULL, scale, scale);
+                        }
                     }
                 }
             }

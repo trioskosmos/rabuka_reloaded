@@ -10,6 +10,8 @@ pub enum Button {
     B,
     Start,
     Select,
+    L,
+    R,
 }
 
 pub struct Input {
@@ -46,5 +48,7 @@ fn to_gba(btn: Button) -> GbaButton {
         Button::B => GbaButton::B,
         Button::Select => GbaButton::Select,
         Button::Start => GbaButton::Start,
+        Button::L => GbaButton::L,
+        Button::R => GbaButton::R,
     }
 }
