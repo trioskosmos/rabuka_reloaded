@@ -113,5 +113,7 @@
   "No hosts found": "ホストが見つかりません",
   "Waitroom": "控え室",
   "Live Success": "ライブ成功",
-  "Ability": "アビリティ"
+  "Ability": "アビリティ",
+  "B=close, X=detail": "B=閉じる、X=詳細",
+  "Page {p}/{t}  L/R=pages  B=back": "ページ {p}/{t}  L/R=ページ  B=戻る"
 }

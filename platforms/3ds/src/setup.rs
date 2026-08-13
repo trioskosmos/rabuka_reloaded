@@ -29,7 +29,7 @@ use crate::uds;
 use crate::ui::card_atlas::CardAtlas;
 use crate::ui::colors::*;
 use crate::ui::grid::{card_grid_input, render_card_detail, render_card_grid, GridAction};
-use crate::ui::hint::render_hint_bar;
+use crate::ui::hint::render_hint_bar_bot;
 use crate::util::{base64_decode, looks_like_b64, ticks_to_ms};
 
 /// On-device test suite — runs QA checks in limited 3DS memory.
@@ -110,10 +110,10 @@ fn pick_mode(
                 let tip = tl("L=help R=lang/言語 A=confirm B=back");
                 _3ds_text_add_top(format!("\n{}\0", tip).as_ptr());
             } else {
-                _3ds_top_clear();
-                _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                _3ds_top_queue_text(
-                    100.0,
+                _3ds_bot_clear();
+                _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                _3ds_bot_queue_text(
+                    90.0,
                     8.0,
                     COL_GOLD,
                     0.65f32,
@@ -126,28 +126,60 @@ fn pick_mode(
                     let y = 40.0 + i as f32 * 38.0;
                     let bg = if i == cur { COL_SEL } else { COL_DIM };
                     unsafe {
-                        _3ds_top_queue_rect(40.0, y, 320.0, 36.0, bg);
+                        _3ds_bot_queue_rect(10.0, y, 300.0, 36.0, bg);
                     }
                     if i == cur {
                         unsafe {
-                            _3ds_top_queue_rect(40.0, y, 320.0, 36.0, COL_HIGHLIGHT);
+                            _3ds_bot_queue_rect(10.0, y, 300.0, 36.0, COL_HIGHLIGHT);
                         }
                     }
                     let color = if i == cur { COL_GOLD } else { COL_LIGHT };
                     let label = tl(m);
                     unsafe {
-                        _3ds_top_queue_text(
-                            50.0,
+                        _3ds_bot_queue_text(
+                            20.0,
                             y + 6.0,
                             color,
-                            0.65f32,
+                            0.6f32,
                             format!("{}\0", label).as_ptr(),
                         );
                     }
                 }
-                render_hint_bar(&tl("L=help  R=lang/言語  A=confirm  B=back"));
+                // Bottom hint bar (touch + buttons)
+                _3ds_bot_queue_text(
+                    4.0,
+                    224.0,
+                    COL_MED,
+                    0.5f32,
+                    format!(
+                        "{}\0",
+                        tl("Touch=tap  UP/DOWN=move  R=lang/言語  L=help  B=back")
+                    )
+                    .as_ptr(),
+                );
             }
         }
+        // Touch input: tapping a row selects + activates it (like pressing A).
+        let mut t_x: u32 = 0;
+        let mut t_y: u32 = 0;
+        unsafe {
+            _3ds_touch_read(&mut t_x, &mut t_y);
+        }
+        let touch_press = keys & 0x00100000 != 0;
+        let mut tapped: Option<usize> = None;
+        if touch_press {
+            if t_x >= 10 && t_x <= 310 {
+                for i in 0..4usize {
+                    let ry = 40u32 + (i as u32) * 38;
+                    if t_y >= ry && t_y <= ry + 36 {
+                        tapped = Some(i);
+                        break;
+                    }
+                }
+            }
+        }
+        let tap_cur = tapped.unwrap_or(cur);
+        let confirm = keys & 0x00000001 != 0 || tapped.is_some();
         if keys & 0x00000200 != 0 {
             Step::Setup(
                 cards.clone(),
@@ -186,11 +218,11 @@ fn pick_mode(
                 SetupPhase::PickMode(cur),
                 false,
             )
-        } else if keys & 0x00000001 != 0 {
-            if cur == 2 {
+        } else if confirm {
+            if tap_cur == 2 {
                 // "QR Scan"
                 Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan(0), true)
-            } else if cur == 3 {
+            } else if tap_cur == 3 {
                 // "Local Multiplayer" — pick deck then connect
                 Step::Setup(
                     cards.clone(),
@@ -204,7 +236,7 @@ fn pick_mode(
                 Step::Setup(
                     cards.clone(),
                     decks.clone(),
-                    SetupPhase::PickDeck(0, cur == 0, false),
+                    SetupPhase::PickDeck(0, tap_cur == 0, false),
                     true,
                 )
             }
@@ -256,10 +288,10 @@ fn pick_deck(
                 }
             } else {
                 unsafe {
-                    _3ds_top_clear();
-                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                    _3ds_top_queue_text(
-                        80.0,
+                    _3ds_bot_clear();
+                    _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                    _3ds_bot_queue_text(
+                        60.0,
                         8.0,
                         COL_GOLD,
                         0.65f32,
@@ -274,17 +306,17 @@ fn pick_deck(
                     let y = 30.0 + (i - start) as f32 * 32.0;
                     let bg = if i == cur { COL_SEL } else { COL_DIM };
                     unsafe {
-                        _3ds_top_queue_rect(20.0, y, 360.0, 30.0, bg);
+                        _3ds_bot_queue_rect(10.0, y, 300.0, 30.0, bg);
                     }
                     if i == cur {
                         unsafe {
-                            _3ds_top_queue_rect(20.0, y, 360.0, 30.0, COL_HIGHLIGHT);
+                            _3ds_bot_queue_rect(10.0, y, 300.0, 30.0, COL_HIGHLIGHT);
                         }
                     }
                     let color = if i == cur { COL_GOLD } else { COL_LIGHT };
                     unsafe {
-                        _3ds_top_queue_text(
-                            24.0,
+                        _3ds_bot_queue_text(
+                            14.0,
                             y + 3.0,
                             color,
                             0.65f32,
@@ -292,11 +324,57 @@ fn pick_deck(
                         );
                     }
                 }
-                render_hint_bar(&tl("UP/DOWN=select  A=confirm  X=preview  B=back"));
+                render_hint_bar_bot(&tl("UP/DOWN=select  A=confirm  X=preview  B=back"));
+            }
+        }
+        // Touch input: tap a deck row moves the cursor there and selects it (like A).
+        let mut t_x: u32 = 0;
+        let mut t_y: u32 = 0;
+        unsafe {
+            _3ds_touch_read(&mut t_x, &mut t_y);
+        }
+        let touch_press = keys & 0x00100000 != 0;
+        let mut tapped: Option<usize> = None;
+        if touch_press && n > 0 {
+            let start = cur.saturating_sub(3).min(n.saturating_sub(6));
+            let end = (start + 6).min(n);
+            if t_x >= 10 && t_x <= 310 {
+                for i in start..end {
+                    let row_y = (30.0 + (i - start) as f32 * 32.0) as u32;
+                    if t_y >= row_y && t_y <= row_y + 30 {
+                        tapped = Some(i);
+                        break;
+                    }
+                }
             }
         }
         // X = preview deck contents
-        if keys & 0x00000400 != 0 && cur < n {
+        if tapped.is_some() {
+            // Confirm the tapped deck (same as pressing A on it).
+            let tcur = tapped.unwrap();
+            if is_multiplayer {
+                Step::Setup(
+                    cards.clone(),
+                    decks.clone(),
+                    SetupPhase::MultiplayerPickRole(tcur, 0),
+                    true,
+                )
+            } else if vs_ai {
+                Step::Setup(
+                    cards.clone(),
+                    decks.clone(),
+                    SetupPhase::Loading(tcur, tcur, true),
+                    true,
+                )
+            } else {
+                Step::Setup(
+                    cards.clone(),
+                    decks.clone(),
+                    SetupPhase::PickDeck2(0, tcur, false),
+                    true,
+                )
+            }
+        } else if keys & 0x00000400 != 0 && cur < n {
             let card_db = std::sync::Arc::new(CardDatabase::load_or_create(cards.as_ref().clone()));
             let card_ids: Vec<i16> = DeckParser::deck_list_to_card_numbers(&decks[cur])
                 .iter()
@@ -400,11 +478,11 @@ fn multiplayer_deck(
                 }
             } else {
                 unsafe {
-                    _3ds_top_clear();
-                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                    _3ds_bot_clear();
+                    _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
                     let deck_hdr = tl("SELECT YOUR DECK");
-                    _3ds_top_queue_text(
-                        80.0,
+                    _3ds_bot_queue_text(
+                        60.0,
                         8.0,
                         COL_GOLD,
                         0.65f32,
@@ -417,17 +495,17 @@ fn multiplayer_deck(
                     let y = 30.0 + (i - start) as f32 * 32.0;
                     let bg = if i == cur { COL_SEL } else { COL_DIM };
                     unsafe {
-                        _3ds_top_queue_rect(20.0, y, 360.0, 30.0, bg);
+                        _3ds_bot_queue_rect(10.0, y, 300.0, 30.0, bg);
                     }
                     if i == cur {
                         unsafe {
-                            _3ds_top_queue_rect(20.0, y, 360.0, 30.0, COL_HIGHLIGHT);
+                            _3ds_bot_queue_rect(10.0, y, 300.0, 30.0, COL_HIGHLIGHT);
                         }
                     }
                     let color = if i == cur { COL_GOLD } else { COL_LIGHT };
                     unsafe {
-                        _3ds_top_queue_text(
-                            24.0,
+                        _3ds_bot_queue_text(
+                            14.0,
                             y + 3.0,
                             color,
                             0.65f32,
@@ -435,10 +513,39 @@ fn multiplayer_deck(
                         );
                     }
                 }
-                render_hint_bar(&tl("UP/DOWN=select  A=confirm  B=back"));
+                render_hint_bar_bot(&tl("UP/DOWN=select  A=confirm  B=back"));
             }
         }
-        if keys & 0x00000040 != 0 && cur > 0 {
+        // Touch input: tap a deck row selects it (like A).
+        let mut t_x: u32 = 0;
+        let mut t_y: u32 = 0;
+        unsafe {
+            _3ds_touch_read(&mut t_x, &mut t_y);
+        }
+        let touch_press = keys & 0x00100000 != 0;
+        let mut tapped: Option<usize> = None;
+        if touch_press && n > 0 {
+            let start = cur.saturating_sub(3).min(n.saturating_sub(6));
+            let end = (start + 6).min(n);
+            if t_x >= 10 && t_x <= 310 {
+                for i in start..end {
+                    let row_y = (30.0 + (i - start) as f32 * 32.0) as u32;
+                    if t_y >= row_y && t_y <= row_y + 30 {
+                        tapped = Some(i);
+                        break;
+                    }
+                }
+            }
+        }
+        if tapped.is_some() {
+            // A = select deck, go to role selection with deck index
+            Step::Setup(
+                cards.clone(),
+                decks.clone(),
+                SetupPhase::MultiplayerPickRole(tapped.unwrap(), 0), // deck_idx=cur, role_cursor=0
+                true,
+            )
+        } else if keys & 0x00000040 != 0 && cur > 0 {
             Step::Setup(
                 cards.clone(),
                 decks.clone(),
@@ -506,11 +613,11 @@ fn pick_deck2(
                 }
             } else {
                 unsafe {
-                    _3ds_top_clear();
-                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                    _3ds_bot_clear();
+                    _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
                     let deck_hdr = tl("SELECT P2 DECK");
-                    _3ds_top_queue_text(
-                        80.0,
+                    _3ds_bot_queue_text(
+                        60.0,
                         8.0,
                         COL_GOLD,
                         0.65f32,
@@ -523,17 +630,17 @@ fn pick_deck2(
                     let y = 30.0 + (i - start) as f32 * 32.0;
                     let bg = if i == cur { COL_SEL } else { COL_DIM };
                     unsafe {
-                        _3ds_top_queue_rect(20.0, y, 360.0, 30.0, bg);
+                        _3ds_bot_queue_rect(10.0, y, 300.0, 30.0, bg);
                     }
                     if i == cur {
                         unsafe {
-                            _3ds_top_queue_rect(20.0, y, 360.0, 30.0, COL_HIGHLIGHT);
+                            _3ds_bot_queue_rect(10.0, y, 300.0, 30.0, COL_HIGHLIGHT);
                         }
                     }
                     let color = if i == cur { COL_GOLD } else { COL_LIGHT };
                     unsafe {
-                        _3ds_top_queue_text(
-                            24.0,
+                        _3ds_bot_queue_text(
+                            14.0,
                             y + 3.0,
                             color,
                             0.65f32,
@@ -541,11 +648,41 @@ fn pick_deck2(
                         );
                     }
                 }
-                render_hint_bar(&tl("X=preview  A=select  B=use same"));
+                render_hint_bar_bot(&tl("X=preview  A=select  B=use same"));
+            }
+        }
+        // Touch input: tap a deck row selects it (like A).
+        let mut t_x: u32 = 0;
+        let mut t_y: u32 = 0;
+        unsafe {
+            _3ds_touch_read(&mut t_x, &mut t_y);
+        }
+        let touch_press = keys & 0x00100000 != 0;
+        let mut tapped: Option<usize> = None;
+        if touch_press && n > 0 {
+            let start = cur.saturating_sub(3).min(n.saturating_sub(6));
+            let end = (start + 6).min(n);
+            if t_x >= 10 && t_x <= 310 {
+                for i in start..end {
+                    let row_y = (30.0 + (i - start) as f32 * 32.0) as u32;
+                    if t_y >= row_y && t_y <= row_y + 30 {
+                        tapped = Some(i);
+                        break;
+                    }
+                }
             }
         }
         // X = preview deck contents
-        if keys & 0x00000400 != 0 && cur < n {
+        if tapped.is_some() {
+            // Confirm the tapped deck as P2 (same as pressing A).
+            let tcur = tapped.unwrap();
+            Step::Setup(
+                cards.clone(),
+                decks.clone(),
+                SetupPhase::Loading(p1_idx, tcur, false),
+                true,
+            )
+        } else if keys & 0x00000400 != 0 && cur < n {
             let card_db = std::sync::Arc::new(CardDatabase::load_or_create(cards.as_ref().clone()));
             let card_ids: Vec<i16> = DeckParser::deck_list_to_card_numbers(&decks[cur])
                 .iter()
@@ -901,26 +1038,32 @@ fn qr_result(
                         _3ds_text_add_top(format!("  {}\n\0", c).as_ptr());
                     }
                     _3ds_text_add_top(
-                        format!("\n{} cards\nA=use  B=discard\0", cards_read.len()).as_ptr(),
+                        format!(
+                            "\n{}\n{}\0",
+                            tl_fmt("cards", &[("n", &cards_read.len().to_string())]),
+                            tl("A=use  B=discard")
+                        )
+                        .as_ptr(),
                     );
                 }
             } else {
                 unsafe {
-                    _3ds_top_clear();
-                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                    _3ds_top_queue_text(
+                    _3ds_bot_clear();
+                    _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                    _3ds_bot_queue_text(
                         120.0,
                         8.0,
                         COL_GOLD,
                         0.65f32,
                         format!("{}\0", tl("QR DECK")).as_ptr(),
                     );
-                    _3ds_top_queue_text(
-                        200.0,
+                    _3ds_bot_queue_text(
+                        160.0,
                         32.0,
                         COL_LIGHT,
                         0.65f32,
-                        format!("{} cards imported\0", cards_read.len()).as_ptr(),
+                        format!("{}\0", tl_fmt("cards imported", &[("n", &cards_read.len().to_string())]))
+                            .as_ptr(),
                     );
                     // Count unique cards
                     let mut counts: HashMap<String, u32> = HashMap::new();
@@ -931,8 +1074,8 @@ fn qr_result(
                     sorted.sort_by(|a, b| a.0.cmp(&b.0));
                     let mut y = 55.0f32;
                     for (card_no, qty) in sorted.iter().take(15) {
-                        _3ds_top_queue_text(
-                            40.0,
+                        _3ds_bot_queue_text(
+                            20.0,
                             y,
                             COL_LIGHT,
                             0.60f32,
@@ -940,8 +1083,8 @@ fn qr_result(
                         );
                         y += 11.0;
                     }
-                    _3ds_top_queue_text(
-                        40.0,
+                    _3ds_bot_queue_text(
+                        20.0,
                         230.0,
                         COL_MED,
                         0.60f32,
@@ -1015,10 +1158,10 @@ fn qr_not_deck(
                 }
             } else {
                 unsafe {
-                    _3ds_top_clear();
-                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                    _3ds_top_queue_text(
-                        100.0,
+                    _3ds_bot_clear();
+                    _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                    _3ds_bot_queue_text(
+                        80.0,
                         8.0,
                         COL_GOLD,
                         0.65f32,
@@ -1029,14 +1172,14 @@ fn qr_not_deck(
                     } else {
                         &scanned_text
                     };
-                    _3ds_top_queue_text(
+                    _3ds_bot_queue_text(
                         20.0,
                         60.0,
                         COL_LIGHT,
                         0.60f32,
                         format!("{}\0", preview).as_ptr(),
                     );
-                    _3ds_top_queue_text(
+                    _3ds_bot_queue_text(
                         20.0,
                         220.0,
                         COL_MED,
@@ -1077,6 +1220,7 @@ fn deck_viewer(
     {
         if was_dirty {
             unsafe {
+                _3ds_bot_clear();
                 _3ds_top_clear();
                 _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
                 _3ds_top_queue_text(
@@ -1084,7 +1228,7 @@ fn deck_viewer(
                     4.0,
                     COL_GOLD,
                     0.65f32,
-                    format!("{}  (B=close, X=detail)\0", tl("DECK PREVIEW")).as_ptr(),
+                    format!("{}  ({})\0", tl("DECK PREVIEW"), tl("B=close, X=detail")).as_ptr(),
                 );
             }
             if viewing_card.is_none() {
@@ -1198,31 +1342,41 @@ fn control_guide(
                         _3ds_text_add_top(format!("{}\n\0", line).as_ptr());
                     }
                     _3ds_text_add_top(
-                        format!("\nPage {}/{}  L/R=pages  B=back\0", page + 1, total).as_ptr(),
+                        format!(
+                            "\n{}\0",
+                            tl_fmt(
+                                "Page {p}/{t}  L/R=pages  B=back",
+                                &[
+                                    ("p", &(page + 1).to_string()),
+                                    ("t", &total.to_string())
+                                ]
+                            )
+                        )
+                        .as_ptr(),
                     );
                 }
             } else {
                 unsafe {
-                    _3ds_top_clear();
-                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                    _3ds_top_queue_rect(20.0, 15.0, 360.0, 195.0, 0xE60A0E1Au32);
-                    _3ds_top_queue_rect(20.0, 15.0, 360.0, 2.0, COL_DIM);
-                    _3ds_top_queue_rect(20.0, 208.0, 360.0, 2.0, COL_DIM);
-                    _3ds_top_queue_rect(20.0, 15.0, 2.0, 195.0, COL_DIM);
-                    _3ds_top_queue_rect(378.0, 15.0, 2.0, 195.0, COL_DIM);
+                    _3ds_bot_clear();
+                    _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                    _3ds_bot_queue_rect(10.0, 15.0, 300.0, 195.0, 0xE60A0E1Au32);
+                    _3ds_bot_queue_rect(10.0, 15.0, 300.0, 2.0, COL_DIM);
+                    _3ds_bot_queue_rect(10.0, 208.0, 300.0, 2.0, COL_DIM);
+                    _3ds_bot_queue_rect(10.0, 15.0, 2.0, 195.0, COL_DIM);
+                    _3ds_bot_queue_rect(308.0, 15.0, 2.0, 195.0, COL_DIM);
                     let mut y = 25.0f32;
                     for line in guide_text.split('\n') {
                         if line.starts_with("===") {
-                            _3ds_top_queue_text(
-                                40.0,
+                            _3ds_bot_queue_text(
+                                24.0,
                                 y,
                                 COL_GOLD,
                                 0.65f32,
                                 format!("{}\0", line).as_ptr(),
                             );
                         } else if !line.is_empty() {
-                            _3ds_top_queue_text(
-                                30.0,
+                            _3ds_bot_queue_text(
+                                18.0,
                                 y,
                                 COL_LIGHT,
                                 0.60f32,
@@ -1231,12 +1385,22 @@ fn control_guide(
                         }
                         y += 16.0;
                     }
-                    _3ds_top_queue_text(
+                    _3ds_bot_queue_text(
                         4.0,
                         215.0,
                         COL_MED,
                         0.55f32,
-                        format!("Page {}/{}   L/R=pages  B=back\0", page + 1, total).as_ptr(),
+                        format!(
+                            "{}\0",
+                            tl_fmt(
+                                "Page {p}/{t}  L/R=pages  B=back",
+                                &[
+                                    ("p", &(page + 1).to_string()),
+                                    ("t", &total.to_string())
+                                ]
+                            )
+                        )
+                        .as_ptr(),
                     );
                 }
             }
@@ -1297,11 +1461,11 @@ fn multiplayer_pick_role(
                 }
             } else {
                 unsafe {
-                    _3ds_top_clear();
-                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                    _3ds_bot_clear();
+                    _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
                     let mp_hdr = tl("MULTIPLAYER");
-                    _3ds_top_queue_text(
-                        100.0,
+                    _3ds_bot_queue_text(
+                        80.0,
                         8.0,
                         COL_GOLD,
                         0.65f32,
@@ -1318,17 +1482,17 @@ fn multiplayer_pick_role(
                     let y = 60.0 + i as f32 * 64.0;
                     let bg = if i == cur { COL_SEL } else { COL_DIM };
                     unsafe {
-                        _3ds_top_queue_rect(40.0, y, 320.0, 50.0, bg);
+                        _3ds_bot_queue_rect(20.0, y, 280.0, 50.0, bg);
                     }
                     if i == cur {
                         unsafe {
-                            _3ds_top_queue_rect(40.0, y, 320.0, 50.0, COL_HIGHLIGHT);
+                            _3ds_bot_queue_rect(20.0, y, 280.0, 50.0, COL_HIGHLIGHT);
                         }
                     }
                     let color = if i == cur { COL_GOLD } else { COL_LIGHT };
                     unsafe {
-                        _3ds_top_queue_text(
-                            50.0,
+                        _3ds_bot_queue_text(
+                            30.0,
                             y + 12.0,
                             color,
                             0.65f32,
@@ -1336,10 +1500,48 @@ fn multiplayer_pick_role(
                         );
                     }
                 }
-                render_hint_bar(&tl("UP/DOWN=select  A=confirm  B=back"));
+                render_hint_bar_bot(&tl("UP/DOWN=select  A=confirm  B=back"));
             }
         }
-        if keys & 0x00000040 != 0 && cur > 0 {
+        // Touch input: tap Host/Client row selects it (like A).
+        let mut t_x: u32 = 0;
+        let mut t_y: u32 = 0;
+        unsafe {
+            _3ds_touch_read(&mut t_x, &mut t_y);
+        }
+        let touch_press = keys & 0x00100000 != 0;
+        let mut tapped: Option<usize> = None;
+        if touch_press {
+            if t_x >= 20 && t_x <= 300 {
+                for i in 0..2usize {
+                    let row_y = 60u32 + (i as u32) * 64;
+                    if t_y >= row_y && t_y <= row_y + 50 {
+                        tapped = Some(i);
+                        break;
+                    }
+                }
+            }
+        }
+        if let Some(t) = tapped {
+            // A = select role
+            if t == 0 {
+                // Host
+                Step::Setup(
+                    cards.clone(),
+                    decks.clone(),
+                    SetupPhase::MultiplayerHostWait(deck_idx),
+                    true,
+                )
+            } else {
+                // Client
+                Step::Setup(
+                    cards.clone(),
+                    decks.clone(),
+                    SetupPhase::MultiplayerClientScan(deck_idx, 0),
+                    true,
+                )
+            }
+        } else if keys & 0x00000040 != 0 && cur > 0 {
             Step::Setup(
                 cards.clone(),
                 decks.clone(),
@@ -1414,25 +1616,25 @@ fn multiplayer_host_wait(
                         }
                     } else {
                         unsafe {
-                            _3ds_top_clear();
-                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                            _3ds_top_queue_text(
-                                80.0,
+                            _3ds_bot_clear();
+                            _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                            _3ds_bot_queue_text(
+                                60.0,
                                 8.0,
                                 COL_GOLD,
                                 0.65f32,
                                 format!("{}\0", tl("HOST: Network created!")).as_ptr(),
                             );
                             let wait_msg = tl("Waiting for client...");
-                            _3ds_top_queue_text(
-                                50.0,
+                            _3ds_bot_queue_text(
+                                30.0,
                                 100.0,
                                 COL_LIGHT,
                                 0.65f32,
                                 format!("{}\0", wait_msg).as_ptr(),
                             );
-                            _3ds_top_queue_text(
-                                50.0,
+                            _3ds_bot_queue_text(
+                                30.0,
                                 230.0,
                                 COL_MED,
                                 0.60f32,
@@ -1456,10 +1658,10 @@ fn multiplayer_host_wait(
                         }
                     } else {
                         unsafe {
-                            _3ds_top_clear();
-                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                            _3ds_top_queue_text(
-                                80.0,
+                            _3ds_bot_clear();
+                            _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                            _3ds_bot_queue_text(
+                                60.0,
                                 8.0,
                                 0xFF0000FF,
                                 0.65f32,
@@ -1546,16 +1748,16 @@ fn multiplayer_client_scan(
                         }
                     } else {
                         unsafe {
-                            _3ds_top_clear();
-                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                            _3ds_top_queue_text(
+                            _3ds_bot_clear();
+                            _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                            _3ds_bot_queue_text(
                                 80.0,
                                 100.0,
                                 COL_MED,
                                 0.75f32,
                                 format!("{}\0", tl("Scanning...")).as_ptr(),
                             );
-                            _3ds_top_queue_text(
+                            _3ds_bot_queue_text(
                                 80.0,
                                 230.0,
                                 COL_MED,
@@ -1668,10 +1870,10 @@ fn multiplayer_client_host_select(
                 }
             } else {
                 unsafe {
-                    _3ds_top_clear();
-                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                    _3ds_top_queue_text(
-                        80.0,
+                    _3ds_bot_clear();
+                    _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                    _3ds_bot_queue_text(
+                        60.0,
                         8.0,
                         COL_GOLD,
                         0.65f32,
@@ -1683,8 +1885,8 @@ fn multiplayer_client_host_select(
                     let col = if i == new_cursor { COL_SEL } else { COL_LIGHT };
                     let prefix = "";
                     unsafe {
-                        _3ds_top_queue_text(
-                            40.0,
+                        _3ds_bot_queue_text(
+                            20.0,
                             y,
                             col,
                             0.65f32,
@@ -1693,8 +1895,8 @@ fn multiplayer_client_host_select(
                     }
                 }
                 unsafe {
-                    _3ds_top_queue_text(
-                        40.0,
+                    _3ds_bot_queue_text(
+                        20.0,
                         220.0,
                         COL_MED,
                         0.60f32,
@@ -1778,10 +1980,10 @@ fn multiplayer_sync_deck(
                     }
                 } else {
                     unsafe {
-                        _3ds_top_clear();
-                        _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                        _3ds_top_queue_text(
-                            80.0,
+                        _3ds_bot_clear();
+                        _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                        _3ds_bot_queue_text(
+                            60.0,
                             8.0,
                             COL_GOLD,
                             0.65f32,

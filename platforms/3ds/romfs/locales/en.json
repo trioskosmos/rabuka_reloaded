@@ -113,5 +113,7 @@
   "No hosts found": "No hosts found",
   "Waitroom": "Waitroom",
   "Live Success": "Live Success",
-  "Ability": "Ability"
+  "Ability": "Ability",
+  "B=close, X=detail": "B=close, X=detail",
+  "Page {p}/{t}  L/R=pages  B=back": "Page {p}/{t}  L/R=pages  B=back"
 }

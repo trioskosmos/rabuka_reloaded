@@ -17,11 +17,11 @@ set DEVKITPRO=C:\devkitPro
 set DEVKITARM=%DEVKITPRO%\devkitARM
 set "PATH=%DEVKITARM%\bin;%DEVKITPRO%\tools\bin;%PATH%"
 
-echo [2/7] Checking Rust nightly...
-rustup toolchain list 2>nul | findstr nightly >nul
-if %errorlevel% neq 0 ( rustup toolchain install nightly )
-rustup component add rust-src --toolchain nightly-x86_64-pc-windows-msvc 2>nul
-echo [2/7] Rust nightly + rust-src ready
+echo [2/7] Checking Rust nightly (pinned to nightly-2025-05-23 for 3DS)...
+rustup toolchain list 2>nul | findstr /c:"nightly-2025-05-23" >nul
+if %errorlevel% neq 0 ( rustup toolchain install nightly-2025-05-23 )
+rustup component add rust-src --toolchain nightly-2025-05-23-x86_64-pc-windows-msvc 2>nul
+echo [2/7] Rust nightly-2025-05-23 + rust-src ready
 
 echo [3/7] Checking cargo-3ds...
 cargo 3ds --version >nul 2>&1
@@ -98,7 +98,7 @@ cd /d "%~dp0"
 set RUSTFLAGS=
 set CARGO_PROFILE_RELEASE_LTO=false
 set CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16
-cargo +nightly 3ds build --bin rabuka_3ds --release --features 3ds
+cargo 3ds build --bin rabuka_3ds --release --features 3ds
 if %errorlevel% neq 0 (
     echo Build FAILED.
     pause

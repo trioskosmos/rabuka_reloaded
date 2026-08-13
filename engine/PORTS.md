@@ -922,3 +922,52 @@ the llvm-mos-sdk `snes` platform) and the ~200 lines of tile/input glue — the
 "compiles" milestone that was previously blocked is now done. GBA/PS1 remain
 proven and shipped; SNES is no longer a compiler dead-end.
 
+---
+
+## SNES — the actual ROM link hits a backend codegen wall (Aug 2026, final)
+
+Took the compile past the finish line to a **real `.sfc` link** and hit the
+toolchain's true limit. Honest conclusion: **SNES does not run this engine on the
+current rust-mos/llvm-mos, and it is not fixable from the engine side here.**
+
+### What actually works
+- **bsnes emulator** runs the demo `snes-hello.sfc` (`platforms/snes/emu/`).
+- The full ROM pipeline is wired: crt0, the 92KB `BYTECODE` data object
+  (`bytecode_data.c`, defines the extern `BYTECODE_C0..C3`), the LoROM linker
+  script, and the SDK init libs are all passed to the linker.
+- `platforms/snes/` is a complete port crate (display via a 8x16 font, joypad,
+  bump allocator, SNES header, engine bootstrap).
+
+### The wall: rust-mos/llvm-mos legalizer gaps
+The `.sfc` link fails at **codegen** (LLVM GlobalISel "unable to legalize"):
+- `G_TRUNC (s8)→(s8)` — a no-op truncate, in engine game functions
+  (e.g. `execute_modify_required_hearts_success`).
+- `G_SCMP (s16)→(s8)` — in **`core::slice::cmp::Ord::cmp`** (the standard library
+  slice comparison used by any `Vec` compare/sort).
+- `G_FCMP` — float compare in **`core::fmt`** (float formatting).
+
+These are missing legalizer rules in the backend, **not** engine bugs. Even the
+`no_std` essentials (`core`/`alloc`) can't be fully codegen'd; you cannot opt out
+of `core`'s slice-cmp / `fmt` code. Optimization-level / LTO changes just move the
+crash to a different missing pattern (high opt+LTO: engine ICEs; low opt/no-LTO:
+`core` float ICEs).
+
+### Why it's not fixable here (verified, not laziness)
+- **Engine rewrite = whack-a-mole.** Trimming one ICEing function makes it
+  compile, then the same bug fires in the next (`execute_modify_required_hearts_success`
+  → `apply_success_zone_effect` → `core::slice::cmp` → ...). Dozens of game
+  functions share the patterns. Fixing them guts the game logic, and it never
+  reaches `core`, which is unavoidable.
+- **Backend patch = needs a bigger machine + real compiler engineering.** llvm-mos
+  is a fork of all of LLVM (huge C++); building it needs ~16GB RAM (this WSL box
+  has 3GB) and an hour per iteration, so a legalizer fix can't be developed here.
+
+### Bottom line
+The engine **compiles** for the SNES target and the entire ROM link is wired —
+real, preserved progress. But a **running** SNES game is blocked by rust-mos/llvm-mos
+being too immature to codegen the standard library and the game logic. That is a
+compiler-backend limitation, not a code problem, and not something the engine (or
+this environment) can fix. **GBA remains the floor for a playable rabuka port.**
+The SNES work is preserved as research: the engine is SNES-compilable and the port
+scaffolding + emulator pipeline are in place for the day the backend matures.
+

@@ -71,3 +71,18 @@ hf_temp/
 # Generated duplicate Rust sources (canonical copies live in engine/src)
 cards/build/abilities_gen.rs
 cards/build/cards_gen.rs
+
+# Regenerated build artifacts (rebuilt by the 3DS/GBA toolchains)
+platforms/3ds/.card_png_cache/
+platforms/3ds/romfs/cards/*.t3x
+platforms/3ds/romfs/cards_fmt.txt
+platforms/3ds/romfs/cards_manifest.json
+platforms/3ds/romfs/abilities.json
+cards/build/bytecode_data.c
+cards/build/abilities.bin
+cards/build/cards.bin
+cards/build/generation_manifest.json
+engine/src/font_tiles_gen.rs
+platforms/gba/src/font_tiles_gen.rs
+platforms/gba/output/font_preview.png
+platforms/gba/output/font_preview_packed.png

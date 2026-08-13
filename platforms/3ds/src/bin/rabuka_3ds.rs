@@ -106,8 +106,15 @@ fn main() {
         _3ds_init();
     }
     unsafe {
-        _3ds_audio_init();
-        _3ds_audio_play_ogg(b"romfs:/next_card.ogg\0".as_ptr());
+        let rc = _3ds_audio_init();
+        if rc != 0 {
+            dprintln!("[AUDIO] ndspInit failed rc={} (need /3ds/dspfirm.cdc)", rc);
+        } else {
+            let rc2 = _3ds_audio_play_ogg(b"romfs:/next_card.ogg\0".as_ptr());
+            if rc2 != 0 {
+                dprintln!("[AUDIO] next_card.ogg failed rc={}", rc2);
+            }
+        }
     }
     i18n::init();
 

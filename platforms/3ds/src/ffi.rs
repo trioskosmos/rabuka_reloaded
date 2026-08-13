@@ -118,6 +118,10 @@ extern "C" {
     pub fn _3ds_top_queue_rect(x: f32, y: f32, w: f32, h: f32, color: u32);
     pub fn _3ds_top_queue_text(x: f32, y: f32, color: u32, scale: f32, text: *const u8);
     pub fn _3ds_top_queue_card(atlas: *const u8, idx: i32, x: f32, y: f32, w: f32, h: f32);
+    // Bottom screen graphical drawing (setup menus before the board is enabled)
+    pub fn _3ds_bot_clear();
+    pub fn _3ds_bot_queue_rect(x: f32, y: f32, w: f32, h: f32, color: u32);
+    pub fn _3ds_bot_queue_text(x: f32, y: f32, color: u32, scale: f32, text: *const u8);
     pub fn _3ds_measure_text_width(text: *const u8, scale: f32) -> f32;
     pub fn _3ds_text_wrapped_height(text: *const u8, scale: f32, max_w: f32) -> f32;
     pub fn _3ds_icon_aspect(atlas_name: *const u8) -> f32;
@@ -150,9 +154,9 @@ extern "C" {
     pub fn _3ds_qr_stop(ctx: *mut u8);
     pub fn _3ds_qr_free(ctx: *mut u8);
     pub fn _3ds_qr_poll(ctx: *mut u8, out_text: *mut u8, out_max: u32) -> i32;
-    // Audio (CSND + tremor OGG)
-    pub fn _3ds_audio_init();
-    pub fn _3ds_audio_play_ogg(path: *const u8);
+    // Audio (CSND + tremor OGG); *_init/*_play_ogg return 0 on success
+    pub fn _3ds_audio_init() -> i32;
+    pub fn _3ds_audio_play_ogg(path: *const u8) -> i32;
     pub fn _3ds_audio_stop();
     pub fn _3ds_audio_set_volume(vol: f32);
 }

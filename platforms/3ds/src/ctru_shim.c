@@ -147,7 +147,34 @@ static const char* pool_strdup(const char* s) {
 }
 static u32   COL_TOP_BG = 0xFF0A0E1A; // very dark navy
 
-
+// ---- Bottom screen draw-op queue (setup menus before board mode) ----
+// Mirrors the top draw-op queue but renders to the bottom screen when the
+// board is not active (board_mode == false). Used by setup-phase menus so
+// they appear on the touch screen.
+#define MAX_BOT_DRAW_OPS 256
+#define BOT_STRING_POOL_SIZE (32 * 1024)
+typedef struct {
+    float x, y, w, h;
+    u32 color;
+    float scale;
+    const char *text;  // points into bot_string_pool
+} BotDrawOp;
+static BotDrawOp bot_draw_ops[MAX_BOT_DRAW_OPS];
+static int   bot_draw_op_count = 0;
+static int   bot_draw_op_types[MAX_BOT_DRAW_OPS];
+static char  bot_string_pool[BOT_STRING_POOL_SIZE];
+static int   bot_string_pool_pos = 0;
+static const char* bot_pool_strdup(const char* s) {
+    if (!s) return "";
+    int len = 0;
+    while (s[len]) len++;
+    len++;  /* include NUL */
+    if (bot_string_pool_pos + len > BOT_STRING_POOL_SIZE) return "";
+    char* dest = &bot_string_pool[bot_string_pool_pos];
+    memcpy(dest, s, len);
+    bot_string_pool_pos += len;
+    return dest;
+}
 
 // ---- Action highlight on board slots (multiple) ----
 #define MAX_HIGHLIGHTS 16
@@ -205,6 +232,8 @@ void _3ds_init() {
     cli_mode = false;
     draw_op_count = 0;
     overlay_count = 0;
+    bot_draw_op_count = 0;
+    bot_string_pool_pos = 0;
 
     hl_count = 0;
     tmp_text_buf = C2D_TextBufNew(32768);
@@ -409,6 +438,26 @@ void _3ds_top_queue_card(const char* atlas, int idx, float x, float y, float w, 
     draw_ops[i].x = x; draw_ops[i].y = y; draw_ops[i].w = w; draw_ops[i].h = h;
     draw_ops[i].atlas = pool_strdup(atlas);
     draw_ops[i].atlas_idx = idx;
+}
+
+void _3ds_bot_clear() { bot_draw_op_count = 0; bot_string_pool_pos = 0; }
+
+void _3ds_bot_queue_rect(float x, float y, float w, float h, u32 color) {
+    if (bot_draw_op_count >= MAX_BOT_DRAW_OPS) return;
+    int i = bot_draw_op_count++;
+    bot_draw_op_types[i] = OP_RECT;
+    bot_draw_ops[i].x = x; bot_draw_ops[i].y = y;
+    bot_draw_ops[i].w = w; bot_draw_ops[i].h = h;
+    bot_draw_ops[i].color = color;
+}
+
+void _3ds_bot_queue_text(float x, float y, u32 color, float scale, const char* text) {
+    if (!text || bot_draw_op_count >= MAX_BOT_DRAW_OPS) return;
+    int i = bot_draw_op_count++;
+    bot_draw_op_types[i] = OP_TEXT;
+    bot_draw_ops[i].x = x; bot_draw_ops[i].y = y;
+    bot_draw_ops[i].color = color; bot_draw_ops[i].scale = scale;
+    bot_draw_ops[i].text = bot_pool_strdup(text);
 }
 
 static C2D_Image _atlas_get_image(const char* atlas, int idx) {
@@ -1134,7 +1183,24 @@ void _3ds_swap_buffers() {
     } else {
         C2D_SceneBegin(bot_target);
         C2D_TargetClear(bot_target, C2D_Color32(0, 0, 0, 255));
-        // Legacy text fallback (not used in board mode)
+        // Setup menus render their draw-op queue onto the bottom screen.
+        C2D_TextBufClear(tmp_text_buf);
+        C2D_Font f = custom_font ? custom_font : NULL;
+        float font_scale = 1.2f;
+        for (int i = 0; i < bot_draw_op_count; i++) {
+            if (bot_draw_op_types[i] == OP_RECT) {
+                C2D_DrawRectSolid(bot_draw_ops[i].x, bot_draw_ops[i].y, 0.5f,
+                    bot_draw_ops[i].w, bot_draw_ops[i].h, bot_draw_ops[i].color);
+            } else if (bot_draw_op_types[i] == OP_TEXT) {
+                C2D_TextBufClear(tmp_text_buf);
+                C2D_TextFontParse(&tmp_text_obj, f, tmp_text_buf, bot_draw_ops[i].text);
+                C2D_TextOptimize(&tmp_text_obj);
+                float s = bot_draw_ops[i].scale * font_scale;
+                C2D_DrawText(&tmp_text_obj, C2D_WithColor | C2D_WordWrap,
+                    bot_draw_ops[i].x, bot_draw_ops[i].y, 0.5f, s, s,
+                    bot_draw_ops[i].color, fmaxf(320.0f - bot_draw_ops[i].x, 0.0f));
+            }
+        }
     }
 
     C3D_FrameEnd(0);
@@ -1533,134 +1599,167 @@ int _3ds_qr_poll(void *p, char *out_text, unsigned int out_max) {
 }
 
 
-// ===================== AUDIO (NDSP — requires /3ds/dspfirm.cdc on SD) =====================
+// ===================== AUDIO (NDSP streaming OGG — requires /3ds/dspfirm.cdc on SD) =====================
 #include <3ds/ndsp/ndsp.h>
 
-static struct { s16* data; u32 samples; int rate; int channels; ndspWaveBuf wave_buf; } s_audio;
-static volatile int s_audio_playing = 0;
-static volatile int s_audio_exit = 0;
-static Thread s_audio_thread;
+// Triple-buffered streaming decoder (pattern: Anemone3DS music.c). A worker
+// thread decodes the OGG with Tremor into a few small wave buffers and hands
+// each finished buffer back to NDSP, instead of decoding the whole song into
+// RAM (the old code capped this at 10s and truncated long tracks).
+#define AUDIO_NUM_BUFS    3
+#define AUDIO_BUF_SAMPLES 4096   // ~93ms @44.1kHz per buffer
+
+typedef struct {
+    OggVorbis_File vf;
+    int  opened;                    // vf is valid & owned
+    int  rate;
+    int  channels;
+    s16* bufs[AUDIO_NUM_BUFS];
+    ndspWaveBuf wb[AUDIO_NUM_BUFS];
+    volatile bool stop;
+    Thread thread;
+} audio_ogg_t;
+
+static audio_ogg_t s_audio = {0};
 
 static void _3ds_audio_stop(void);
 
-static int decode_ogg_to_mem(const char* path, s16** out_pcm, u32* out_samples, int* out_channels) {
-    FILE* f = fopen(path, "rb");
-    if (!f) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "[AUDIO] fopen failed for %s\n", path);
-        svcOutputDebugString(buf, strlen(buf));
-        return -1;
-    }
-
-    ov_callbacks cb = { 0 };
-    cb.read_func = (size_t(*)(void*, size_t, size_t, void*))fread;
-    cb.seek_func = (int(*)(void*, int64_t, int))fseek;
-    cb.tell_func = (long(*)(void*))ftell;
-
-    OggVorbis_File vf;
-    if (ov_open_callbacks(f, &vf, NULL, 0, cb) < 0) {
-        fclose(f);
-        char buf[64];
-        snprintf(buf, sizeof(buf), "[AUDIO] ov_open_callbacks FAILED\n");
-        svcOutputDebugString(buf, strlen(buf));
-        return -1;
-    }
-
-    vorbis_info* vi = ov_info(&vf, -1);
-    *out_channels = vi->channels;
-    int rate = vi->rate;
-    int max_samples = rate * 10 * vi->channels;  // 10s loop chunk
-
-    *out_pcm = (s16*)linearAlloc(max_samples * sizeof(s16));
-    if (!*out_pcm) {
-        ov_clear(&vf);
-        return -1;
-    }
-
+// Decode one buffer's worth of interleaved PCM16 into `data` and set wb->nsamples.
+// Seamlessly loops by rewinding on EOF. Returns 1 on success, 0 on hard error.
+static int audio_fill(audio_ogg_t* a, ndspWaveBuf* wb, s16* data) {
+    int cap_samples = AUDIO_BUF_SAMPLES * a->channels; // interleaved PCM16 samples
     int total = 0;
-    while (total < max_samples) {
-        long ret = ov_read(&vf, (char*)((*out_pcm) + total), (max_samples - total) * sizeof(s16), NULL);
-        if (ret <= 0) break;
-        total += ret / sizeof(s16);
+    while (total < cap_samples) {
+        long ret = ov_read(&a->vf, (char*)(data + total),
+                           (cap_samples - total) * (int)sizeof(s16), NULL);
+        if (ret == 0) {
+            // EOF: rewind to the start so the track loops forever.
+            if (ov_pcm_seek(&a->vf, 0) < 0) break;
+            if (total == 0) break; // empty stream
+            continue;
+        }
+        if (ret < 0) break; // decode error
+        total += (int)(ret / sizeof(s16));
     }
-    ov_clear(&vf);
-
-    *out_samples = total;
-    return rate;
+    if (total <= 0) return 0;
+    wb->nsamples = (u32)(total / a->channels);
+    DSP_FlushDataCache(data, total * (int)sizeof(s16));
+    return 1;
 }
 
-static void audio_loop_thread_func(void* arg) {
+static void audio_thread(void* arg) {
     (void)arg;
-    while (!s_audio_exit) {
-        while (s_audio_playing && !s_audio_exit) {
-            if (s_audio.wave_buf.status == NDSP_WBUF_DONE) {
-                s_audio.wave_buf.status = 0;
-                ndspChnWaveBufAdd(0, &s_audio.wave_buf);
+    // Prefill every buffer so playback begins immediately.
+    for (int i = 0; i < AUDIO_NUM_BUFS && !s_audio.stop; i++) {
+        if (audio_fill(&s_audio, &s_audio.wb[i], s_audio.bufs[i]))
+            ndspChnWaveBufAdd(0, &s_audio.wb[i]);
+        else
+            break;
+    }
+    // Keep feeding NDSP: whenever a buffer finishes playing, refill and re-add it.
+    while (!s_audio.stop) {
+        for (int i = 0; i < AUDIO_NUM_BUFS && !s_audio.stop; i++) {
+            ndspWaveBuf* wb = &s_audio.wb[i];
+            if (wb->nsamples > 0 && wb->status == NDSP_WBUF_DONE) {
+                if (audio_fill(&s_audio, wb, s_audio.bufs[i]))
+                    ndspChnWaveBufAdd(0, wb);
             }
-            svcSleepThread(50000000ULL);  // 50ms
         }
-        if (!s_audio_exit) {
-            svcSleepThread(50000000ULL);
-        }
+        svcSleepThread(3000000ULL); // 3ms poll
     }
 }
 
-void _3ds_audio_init(void) {
+int _3ds_audio_init(void) {
     Result res = ndspInit();
     if (R_FAILED(res)) {
-        char buf[64];
-        snprintf(buf, sizeof(buf), "[AUDIO] ndspInit FAILED res=%08lX\n", (unsigned long)res);
-        svcOutputDebugString(buf, strlen(buf));
+        // Make the failure visible on-screen instead of only in the debugger.
+        char buf[96];
+        snprintf(buf, sizeof(buf), "[AUDIO] ndspInit FAILED (need /3ds/dspfirm.cdc)\n");
+        _3ds_text_add_top(buf);
+        return (int)res;
     }
     ndspSetOutputMode(NDSP_OUTPUT_STEREO);
     ndspSetMasterVol(1.0f);
+    return 0;
 }
 
-void _3ds_audio_play_ogg(const char* path) {
+int _3ds_audio_play_ogg(const char* path) {
     _3ds_audio_stop();
 
-    int channels = 0;
-    u32 samples = 0;
-    int rate = decode_ogg_to_mem(path, &s_audio.data, &s_audio.samples, &channels);
-    if (rate <= 0 || !s_audio.data || s_audio.samples == 0) return;
+    FILE* f = fopen(path, "rb");
+    if (!f) {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "[AUDIO] fopen failed: %s\n", path);
+        _3ds_text_add_top(buf);
+        return -1;
+    }
+    ov_callbacks cb = { 0 };
+    cb.read_func  = (size_t(*)(void*, size_t, size_t, void*))fread;
+    cb.seek_func  = (int(*)(void*, int64_t, int))fseek;
+    cb.close_func = (int(*)(void*))fclose;
+    cb.tell_func  = (long(*)(void*))ftell;
+    if (ov_open_callbacks(f, &s_audio.vf, NULL, 0, cb) < 0) {
+        fclose(f);
+        _3ds_text_add_top("[AUDIO] ov_open FAILED (not a valid Ogg Vorbis)\n");
+        return -2;
+    }
+    s_audio.opened = 1;
 
-    s_audio.rate = rate;
-    s_audio.channels = channels;
+    vorbis_info* vi = ov_info(&s_audio.vf, -1);
+    if (!vi || vi->channels < 1 || vi->channels > 2) {
+        _3ds_audio_stop();
+        return -3;
+    }
+    s_audio.rate     = vi->rate;
+    s_audio.channels = vi->channels;
 
-    ndspWaveBuf* wb = &s_audio.wave_buf;
-    memset(wb, 0, sizeof(ndspWaveBuf));
-    wb->data_vaddr = s_audio.data;
-    wb->nsamples = s_audio.samples;
-    wb->looping = 1;
+    for (int i = 0; i < AUDIO_NUM_BUFS; i++) {
+        s_audio.bufs[i] = (s16*)linearAlloc(AUDIO_BUF_SAMPLES * s_audio.channels * sizeof(s16));
+        if (!s_audio.bufs[i]) {
+            _3ds_audio_stop();
+            return -4;
+        }
+        memset(&s_audio.wb[i], 0, sizeof(ndspWaveBuf));
+        s_audio.wb[i].data_vaddr = s_audio.bufs[i];
+    }
 
     ndspChnReset(0);
-    ndspChnSetInterp(0, NDSP_INTERP_LINEAR);
-    ndspChnSetRate(0, (float)rate);
-    ndspChnSetFormat(0, channels == 2 ? NDSP_FORMAT_STEREO_PCM16 : NDSP_FORMAT_MONO_PCM16);
+    ndspChnSetInterp(0, NDSP_INTERP_POLYPHASE);
+    ndspChnSetRate(0, (float)s_audio.rate);
+    ndspChnSetFormat(0, s_audio.channels == 2 ? NDSP_FORMAT_STEREO_PCM16 : NDSP_FORMAT_MONO_PCM16);
     float mix[12] = {0};
-    mix[0] = 1.0f;
-    if (channels == 2) mix[1] = 1.0f; else mix[0] = 1.414f;
+    if (s_audio.channels == 2) { mix[0] = 1.0f; mix[1] = 1.0f; }
+    else                       { mix[0] = 0.5f; mix[1] = 0.5f; } // mono -> both speakers
     ndspChnSetMix(0, mix);
 
-    DSP_FlushDataCache(s_audio.data, s_audio.samples * sizeof(s16));
-    ndspChnWaveBufAdd(0, wb);
-
-    s_audio_playing = 1;
-    s_audio_exit = 0;
-    s_audio_thread = threadCreate(audio_loop_thread_func, NULL, 0x4000, 0x18, -1, true);
+    s_audio.stop = false;
+    s_audio.thread = threadCreate(audio_thread, NULL, 0x4000, 0x18, -1, true);
+    if (!s_audio.thread) {
+        _3ds_audio_stop();
+        return -5;
+    }
+    return 0;
 }
 
 void _3ds_audio_stop(void) {
-    s_audio_exit = 1;
-    s_audio_playing = 0;
-    if (s_audio_thread) {
-        threadJoin(s_audio_thread, 0xFFFFFFFF);
-        threadFree(s_audio_thread);
-        s_audio_thread = NULL;
+    s_audio.stop = true;
+    if (s_audio.thread) {
+        threadJoin(s_audio.thread, 0xFFFFFFFF);
+        threadFree(s_audio.thread);
+        s_audio.thread = NULL;
     }
-    if (s_audio.data) {
-        linearFree(s_audio.data);
-        s_audio.data = NULL;
+    s_audio.stop = false;
+    if (s_audio.opened) {
+        ov_clear(&s_audio.vf);
+        s_audio.opened = 0;
+    }
+    ndspChnWaveBufClear(0);
+    ndspChnReset(0);
+    for (int i = 0; i < AUDIO_NUM_BUFS; i++) {
+        if (s_audio.bufs[i]) {
+            linearFree(s_audio.bufs[i]);
+            s_audio.bufs[i] = NULL;
+        }
     }
 }
 
