@@ -7491,6 +7491,7 @@ def _build_look_select_actions_inner(select_text):
                     result["card_type"] = ct
                 _add_or_card_types_if_needed(result, select_text)
                 _enrich_from_text(result, select_text)
+                _apply_card_property_filter(result, select_text)
                 if extract_optional(select_text):
                     result["optional"] = True
                 # Check for "か" (OR) between 'debut to stage' and 'add to hand'
@@ -7674,6 +7675,10 @@ def _try_heart_select_reveal(text):
             sel["group_names"] = select_actions["group_names"]
         if select_actions.get("card_type"):
             sel["card_type"] = select_actions["card_type"]
+        if select_actions.get("card_property"):
+            sel["card_property"] = select_actions["card_property"]
+        if select_actions.get("negation") is not None:
+            sel["negation"] = select_actions["negation"]
         followup_actions.append(sel)
     if blade_count > 0:
         gr = {
