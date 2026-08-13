@@ -86,3 +86,4 @@ engine/src/font_tiles_gen.rs
 platforms/gba/src/font_tiles_gen.rs
 platforms/gba/output/font_preview.png
 platforms/gba/output/font_preview_packed.png
+platforms/gba/output/log.txt
