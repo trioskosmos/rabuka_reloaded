@@ -330,9 +330,58 @@ fn kanon_missing_group_still_selects_present_groups() {
     );
 }
 
-// ====================================================================
-// 2. 上原歩夢 (PL!N-bp7-001-R): 自動 — energy placed under a member
-// ====================================================================
+/// 澁谷かのん: "それぞれ1枚ずつ" means exactly ONE from EACH group. When the
+/// waitroom holds multiple cards of the same group, only one of that group is
+/// placed — never two from a single group at the expense of another group.
+#[test]
+fn kanon_one_per_group_not_multiple_from_same_group() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let kanon = game.id("PL!SP-bp7-012-N");
+    game.state.player1.stage.stage[1] = kanon;
+    // Two distinct CatChu! cards + one each of the other two groups.
+    let catchu_a = game.id("PL!SP-bp1-004-PR"); // CatChu! (平安名すみれ)
+    let catchu_b = game.id("PL!SP-bp1-018-PR"); // CatChu! (米女メイ)
+    let kaleido = game.id("PL!SP-bp1-013-PR"); // KALEIDOSCORE
+    let sync = game.id("PL!SP-pb1-014-PR"); // 5yncri5e!
+    game.add_to_discard(catchu_a);
+    game.add_to_discard(catchu_b);
+    game.add_to_discard(kaleido);
+    game.add_to_discard(sync);
+    seed_deck(&mut game);
+
+    let waitroom_before = game.state.player1.waitroom.cards.len();
+    trigger_kanon_debut(&mut game, kanon, true);
+
+    // Exactly 3 cards total are placed on the deck bottom (one per group),
+    // even though the waitroom held 4 (2 of one group).
+    let deck = &game.state.player1.main_deck.cards;
+    let bottom3: Vec<i16> = deck.iter().rev().take(3).copied().collect();
+    assert_eq!(bottom3.len(), 3, "exactly 3 cards on the deck bottom");
+    // All three groups are represented.
+    assert!(
+        bottom3.contains(&kaleido) && bottom3.contains(&sync),
+        "the other two groups must each contribute one card (got {:?})",
+        bottom3
+    );
+    // Only ONE of the two CatChu! cards is placed.
+    let catchu_placed = bottom3
+        .iter()
+        .filter(|&&c| c == catchu_a || c == catchu_b)
+        .count();
+    assert_eq!(
+        catchu_placed, 1,
+        "exactly one CatChu! card placed, not both (got {:?})",
+        bottom3
+    );
+    // The unplaced CatChu! card remains in the waitroom (one left over).
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        waitroom_before - 3,
+        "one card of each group placed; the extra same-group card stays in waitroom"
+    );
+}
 
 /// When an energy card is placed under a member, 上原歩夢's auto ability fires:
 /// it places 1 energy from the energy deck into the energy zone in WAIT.
