@@ -685,7 +685,6 @@ pub(crate) fn render_board(
                 } else {
                     158.0
                 };
-                render_hint_bar(&tl("B/X=close  Up/Down=scroll"));
                 // Redraw game header on top of detail content
                 unsafe {
                     _3ds_top_queue_rect(0.0, 0.0, 400.0, 50.0, COL_PANEL);

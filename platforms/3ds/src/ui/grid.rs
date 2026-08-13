@@ -233,6 +233,8 @@ pub fn render_card_detail(
             _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
             _3ds_top_queue_rect(0.0, 0.0, 400.0, HEADER_H, COL_CARD);
             let display_name = i18n::card_display_name(&card.name, current_lang());
+            // Single line, let it overflow to the right — a long name must not
+            // wrap onto a second line (which would collide with the stat line).
             _3ds_top_queue_text(
                 4.0,
                 4.0,
@@ -260,8 +262,12 @@ pub fn render_card_detail(
             // Card portrait (left column)
             _3ds_top_queue_rect(card_x - 2.0, card_y - 2.0, card_w + 4.0, card_h + 4.0, COL_GOLD);
             draw_card_image(&card.card_no, atlas, card_x, card_y, card_w, card_h);
-            // Scrollable ability text (right column)
-            let mut ty = card_y - scroll_y;
+            // Scrollable ability text (right column). Text may scroll up under
+            // the header; draw it first, then paint an opaque cover over the
+            // header region of the right column and redraw the id/name on top
+            // so scrolled text is properly hidden beneath the header.
+            let text_top = card_y;
+            let mut ty = text_top - scroll_y;
             let abs: Vec<_> = card.resolved_abilities().collect();
             if abs.is_empty() {
                 let raw = card.ability_text();
@@ -288,7 +294,19 @@ pub fn render_card_detail(
                     ty += 3.0;
                 }
             }
-            // Scroll indicator if content extends beyond screen
+            // Clip: paint an opaque cover over the header region of the right
+            // column (drawn after the ability text so scrolled text is hidden),
+            // then redraw the id/name on top.
+            _3ds_top_queue_rect(text_x, 0.0, 400.0 - text_x, HEADER_H, COL_CARD);
+            _3ds_top_queue_text(
+                text_x,
+                4.0,
+                COL_BLUE,
+                SCALE_LARGE,
+                format!("[{}] {}\0", card.card_no, display_name).as_ptr(),
+            );
+            // Scroll indicator if content extends beyond screen (right edge,
+            // clear of the portrait so it doesn't overlap the card image).
             let arrow_x = 400.0 - 18.0;
             if ty > 220.0 {
                 _3ds_top_queue_text(arrow_x, 225.0, COL_MED, SCALE_SMALL, format!("v\0").as_ptr());

@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-13T18:06:58.251764",
+  "generated_at": "2026-08-13T18:14:28.301572",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "6c739303",
+  "engine_commit": "b957378a",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -2717,6 +2717,7 @@
         "actions": [
           {
             "text": "自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。",
+            "source": "energy_zone",
             "destination": "under_member",
             "count": 1,
             "card_type": "member_card",
@@ -4530,10 +4531,11 @@
       "is_null": false,
       "cost": {
         "text": "エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く",
+        "source": "energy_zone",
+        "zone": "energy_zone",
         "destination": "under_member",
         "count": 1,
         "card_type": "energy_card",
-        "source": "energy_zone",
         "type": "place_energy_under_member"
       },
       "effect": {
@@ -7215,6 +7217,8 @@
       "is_null": false,
       "cost": {
         "text": "エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい",
+        "source": "energy_zone",
+        "zone": "energy_zone",
         "destination": "energy_deck",
         "count": 1,
         "optional": true,
@@ -7290,6 +7294,8 @@
       "is_null": false,
       "cost": {
         "text": "エネルギー置き場にあるエネルギー2枚をエネルギーデッキに置いてもよい",
+        "source": "energy_zone",
+        "zone": "energy_zone",
         "destination": "energy_deck",
         "count": 2,
         "optional": true,
@@ -7646,6 +7652,7 @@
           },
           {
             "text": "自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く",
+            "source": "energy_zone",
             "destination": "under_member",
             "count": 1,
             "card_type": "member_card",
@@ -9283,10 +9290,11 @@
       "is_null": false,
       "cost": {
         "text": "エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く",
+        "source": "energy_zone",
+        "zone": "energy_zone",
         "destination": "under_member",
         "count": 1,
         "card_type": "energy_card",
-        "source": "energy_zone",
         "type": "place_energy_under_member"
       },
       "effect": {
@@ -16437,6 +16445,7 @@
       "cost": null,
       "effect": {
         "text": "自分のエネルギー置き場にあるエネルギー2枚をこのメンバーの下に置いてもよい",
+        "source": "energy_zone",
         "destination": "under_member",
         "count": 2,
         "card_type": "member_card",
@@ -16975,11 +16984,12 @@
       "is_null": false,
       "cost": {
         "text": "自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く",
+        "source": "energy_zone",
+        "zone": "energy_zone",
         "destination": "under_member",
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "source": "energy_zone",
         "type": "place_energy_under_member"
       },
       "effect": {
@@ -20644,8 +20654,8 @@
           "count": 1,
           "target": "self",
           "action": "move_cards",
-          "source": "energy_zone",
-          "card_type": "energy_card"
+          "card_type": "energy_card",
+          "source": "energy_zone"
         },
         "conditional_negation": true
       }
@@ -21645,10 +21655,11 @@
       "is_null": false,
       "cost": {
         "text": "エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く",
+        "source": "energy_zone",
+        "zone": "energy_zone",
         "destination": "under_member",
         "count": 1,
         "card_type": "energy_card",
-        "source": "energy_zone",
         "type": "place_energy_under_member"
       },
       "effect": {
@@ -21803,10 +21814,11 @@
       "is_null": false,
       "cost": {
         "text": "エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く",
+        "source": "energy_zone",
+        "zone": "energy_zone",
         "destination": "under_member",
         "count": 1,
         "card_type": "energy_card",
-        "source": "energy_zone",
         "type": "place_energy_under_member"
       },
       "effect": {
@@ -22327,11 +22339,11 @@
         "actions": [
           {
             "text": "自分のエネルギー置き場にあるエネルギー1枚をエネルギーデッキに置く",
-            "destination": "deck",
+            "source": "energy_zone",
+            "destination": "energy_deck",
             "count": 1,
             "target": "self",
             "action": "move_cards",
-            "source": "hand",
             "card_type": "energy_card"
           },
           {
@@ -26516,6 +26528,7 @@
         "actions": [
           {
             "text": "自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。",
+            "source": "energy_zone",
             "destination": "under_member",
             "count": 1,
             "card_type": "member_card",
@@ -37753,6 +37766,8 @@
       "is_null": false,
       "cost": {
         "text": "エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置く",
+        "source": "energy_zone",
+        "zone": "energy_zone",
         "destination": "energy_deck",
         "count": 1,
         "type": "move_cards"
@@ -37808,6 +37823,8 @@
       "is_null": false,
       "cost": {
         "text": "エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい",
+        "source": "energy_zone",
+        "zone": "energy_zone",
         "destination": "energy_deck",
         "count": 1,
         "optional": true,
@@ -37856,6 +37873,8 @@
       "is_null": false,
       "cost": {
         "text": "エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい",
+        "source": "energy_zone",
+        "zone": "energy_zone",
         "destination": "energy_deck",
         "count": 1,
         "optional": true,

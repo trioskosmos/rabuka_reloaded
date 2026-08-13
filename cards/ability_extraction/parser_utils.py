@@ -398,6 +398,7 @@ SOURCE_PATTERNS: List[Tuple[str, str]] = [
     ("そのライブカードを", "those_cards"),
     ("このカードを手札に加えてもよい", "revealed_cards"),
     ("手札にある", "hand"),
+    ("エネルギー置き場にある", "energy_zone"),
     # Discard/waitroom patterns before stage patterns, since effect texts
     # may reference both stage (in count specification) and waiting room
     # (as actual card source). The waiting room should take priority.
@@ -451,6 +452,14 @@ DESTINATION_PATTERNS: List[Tuple[str, str]] = [
     ("デッキの一番上か一番下に置いて", "deck_top_or_bottom"),
     ("山札の上に置く", "deck_top"),
     ("山札の下に置く", "deck_bottom"),
+    # エネルギーデッキ must come before the generic デッキ patterns below, since
+    # substring matching would otherwise let "エネルギーデッキに置く" hit "デッキに置く".
+    ("エネルギーデッキに置く", "energy_deck"),
+    ("エネルギーデッキに置いてもよい", "energy_deck"),
+    ("エネルギーデッキに置いて", "energy_deck"),
+    ("エネルギー・デッキに置く", "energy_deck"),
+    ("エネルギー・デッキに置いてもよい", "energy_deck"),
+    ("エネルギー・デッキに置いて", "energy_deck"),
     ("ライブカード置き場に置いてもよい", "live_card_zone"),
     ("表向きでライブカード置き場に置く", "live_card_zone"),
     ("いたエリアに", "same_area"),

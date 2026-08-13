@@ -1192,8 +1192,6 @@ def _cost_choice_comma(text, cost):
 
 def _classify_cost(cost, text):
     """Fallback type classification for costs not matched by a structural rule."""
-    if cost.get("source") and cost.get("destination"):
-        return "move_cards"
     if cost.get("destination") == "under_member":
         # Placing a card under a member: infer the placed card's type from the
         # object, not from the "このメンバーの下に" location phrase.
@@ -1207,6 +1205,8 @@ def _classify_cost(cost, text):
             src = extract_source(text)
             cost["source"] = src or "energy_zone"
         return "place_energy_under_member"
+    if cost.get("source") and cost.get("destination"):
+        return "move_cards"
     if cost.get("destination") in ("energy_deck", "energy_zone") and not cost.get(
         "source"
     ):
@@ -8871,7 +8871,7 @@ def _try_unless_effect(text):
         aa = parse_effect(eff_text)
         # When the conditional action is "place energy to energy deck", fix both
         # the source (energy_zone, not hand) and the destination (energy_deck, not deck).
-        if aa.get("card_type") == "energy_card" and aa.get("destination") == "deck":
+        if aa.get("card_type") == "energy_card" and aa.get("destination") in ("deck", "energy_deck"):
             aa["source"] = "energy_zone"
             aa["destination"] = "energy_deck"
         if aa.get("action") != "custom":
