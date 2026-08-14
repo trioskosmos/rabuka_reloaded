@@ -3028,6 +3028,14 @@ impl super::resolver::AbilityResolver {
                 // no + no negation → nothing fires
                 (false, false) => None,
             };
+            // The player accepted the optional placement. Arm the gate so the
+            // trailing "そうしたとき" consequence only fires if the placement
+            // actually moved a card. Any optional move that auto-skips (e.g. a
+            // group with no card in discard) clears it, suppressing the draw —
+            // Q118 "それぞれ1枚ずつ…置いてもよい。そうしたとき" is all-or-nothing.
+            if chose_yes && !is_negation {
+                self.optional_moves_all_moved = Some(true);
+            }
             if let Some(cmd) = cmd {
                 gs.ability_queue.set_pending_actions(vec![cmd]);
             }

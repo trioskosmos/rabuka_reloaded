@@ -287,10 +287,48 @@ fn kanon_skip_placement_no_draw() {
     );
 }
 
-/// 澁谷かのん: if one of the three target groups has no card in the waitroom,
-/// the other two groups are still selectable and placed; drawing still occurs.
+/// 澁谷かのん: with ZERO cards in the discard pile there is nothing to place, so
+/// the optional placement moves nothing and the "そうしたとき" draw must NOT fire
+/// (Q118 all-or-nothing; the user-reported bug "0 cards → still draws").
 #[test]
-fn kanon_missing_group_still_selects_present_groups() {
+fn kanon_empty_discard_no_placement_no_draw() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let kanon = game.id("PL!SP-bp7-012-N");
+    game.state.player1.stage.stage[1] = kanon;
+    // No cards in the discard pile at all.
+    seed_deck(&mut game);
+
+    let hand_before = game.state.player1.hand.cards.len();
+    let deck_before = game.state.player1.main_deck.cards.len();
+    let waitroom_before = game.state.player1.waitroom.cards.len();
+
+    trigger_kanon_debut(&mut game, kanon, true);
+
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before,
+        "empty discard → nothing placed on the deck bottom"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        waitroom_before,
+        "nothing moved out of the discard pile"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "empty discard → incomplete placement → NO draw"
+    );
+}
+
+/// 澁谷かのん: if one of the three target groups has no card in the waitroom,
+/// the other two groups are still selectable and placed (partial placement is
+/// allowed — Q167 "実行可能な限り解決"), BUT the draw does NOT occur because the
+/// "そうしたとき" placement was incomplete (Q118: all-or-nothing consequence).
+#[test]
+fn kanon_missing_group_places_present_but_no_draw() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
@@ -304,11 +342,12 @@ fn kanon_missing_group_still_selects_present_groups() {
     seed_deck(&mut game);
 
     let hand_before = game.state.player1.hand.cards.len();
+    let deck_before = game.state.player1.main_deck.cards.len();
 
     trigger_kanon_debut(&mut game, kanon, true);
 
-    // The two present groups' cards were placed; the missing group is skipped.
-    // (Net deck +1 because placing 2 and then drawing 1 off the top.)
+    // The two present groups' cards were placed (partial placement allowed).
+    // (Net deck count = before + 2, since the draw does NOT fire.)
     let bottom2: Vec<i16> = game
         .state
         .player1
@@ -324,9 +363,15 @@ fn kanon_missing_group_still_selects_present_groups() {
         "the two present group cards must be placed on the deck bottom (got {:?})",
         bottom2
     );
-    assert!(
-        game.state.player1.hand.cards.len() > hand_before,
-        "placing them still draws 1 card"
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before + 2,
+        "only the 2 present cards are placed; nothing drawn on top"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "Q118: incomplete placement → 'そうしたとき' unmet → NO draw"
     );
 }
 

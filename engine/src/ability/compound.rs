@@ -925,6 +925,15 @@ impl AbilityResolver {
                 if let Some(cmd) = cmd {
                     gs.ability_queue.set_pending_actions(vec![cmd]);
                 }
+                // The player accepted the optional placement. Arm the gate so the
+                // trailing consequence ("そうしたとき") only fires if the moves
+                // actually placed a card. Any optional move that auto-skips
+                // (e.g. a group with no card in discard) clears this, suppressing
+                // the draw — Q118 "それぞれ1枚ずつ…置いてもよい。そうしたとき" is
+                // all-or-nothing.
+                if chose_yes && !is_negation {
+                    self.optional_moves_all_moved = Some(true);
+                }
                 return self.resume_pending_actions(gs);
             }
             if let Some(entry) = gs.ability_queue.current_entry_mut() {

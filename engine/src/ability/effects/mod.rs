@@ -46,6 +46,22 @@ impl AbilityResolver {
             // Keep verdicts — condition failure info will be captured by push_ability_result
             return Ok(());
         }
+        // Q118 all-or-nothing "そうしたとき": after an accepted conditional_on_optional
+        // placement that could not place every required card (e.g. a group missing
+        // from the discard pile), the trailing draw consequence must not fire. This
+        // guard catches the consequence whether it runs in the sequential loop or
+        // via resume_pending_actions.
+        if self.optional_moves_all_moved == Some(false)
+            && matches!(
+                effect.action,
+                ActionType::DrawCard | ActionType::DrawUntilCount
+            )
+        {
+            log::debug!(
+                "DEBUG: skipping draw consequence — placement was incomplete (Q118)"
+            );
+            return Ok(());
+        }
         // Drain condition verdicts from the can_activate_effect pre-check;
         // the effect execution will produce its own items and we don't want duplicates.
         #[cfg(not(feature = "no_std"))]

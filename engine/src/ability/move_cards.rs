@@ -1650,6 +1650,17 @@ impl AbilityResolver {
             &destination,
             &card_db,
         )?;
+        // Q118 all-or-nothing: inside an accepted conditional_on_optional placement,
+        // a move that found no card AND offered no choice (e.g. a group missing from
+        // the discard pile) makes the placement incomplete, so the trailing
+        // "そうしたとき" consequence must not fire. A successful move either returns
+        // cards here or creates a pending_choice — only a genuine miss has neither.
+        if self.optional_moves_all_moved.is_some()
+            && taken.is_empty()
+            && self.pending_choice.is_none()
+        {
+            self.optional_moves_all_moved = Some(false);
+        }
         let is_deck_dest = Zone::from_str(&destination) == Some(Zone::Deck)
             || Zone::from_str(&destination) == Some(Zone::DeckTop);
         let is_eligible_source = Zone::from_str(&source) == Some(Zone::Discard)
