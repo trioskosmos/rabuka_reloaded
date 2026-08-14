@@ -119,6 +119,11 @@ pub struct AbilityResolver {
     /// same pending choice re-stored (re-prompt, auto-ability interleave) is not
     /// re-logged as a fresh offer. `None` = never offered yet.
     pub last_offered_sig: Option<String>,
+    /// Pending "place card under a member" — (card_id, target, source_zone,
+    /// state_change). Set when `place_card_with_stage_choice` asks the player
+    /// which stage member should receive the card underneath. Resolved once the
+    /// SelectCard stage choice returns the chosen member index.
+    pub pending_under_placement: Option<(i16, String, String, Option<String>)>,
 }
 
 impl AbilityResolver {
@@ -156,6 +161,7 @@ impl AbilityResolver {
             formation_plan: SmallVec::new(),
             last_move_moved_any: None,
             last_offered_sig: None,
+            pending_under_placement: None,
         }
     }
 

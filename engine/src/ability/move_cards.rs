@@ -166,6 +166,7 @@ impl AbilityResolver {
         deck_position: Option<usize>,
         source_zone: &str,
         allow_occupied_stage: bool,
+        under_self: bool,
     ) -> Result<bool, String> {
         let activating_card = gs.activating_card;
         let player = gs.resolve_target_player_mut(player_target);
@@ -258,6 +259,50 @@ impl AbilityResolver {
             }
         }
         let pos_to_use = if Zone::from_str(destination) == Some(Zone::UnderMember) {
+            // "メンバー1人の下に置く" — when the effect moves a NEW card (from a
+            // non-stage zone like discard/hand) and freely picks WHICH stage
+            // member to place it under, the player chooses. A card being displaced
+            // from the stage (self-target, e.g. baton-touch under the arriver)
+            // OR placed under "this member" (under_self, e.g. きな子/璃奈)
+            // must NOT prompt — it auto-places under the target member.
+            let from_self_displacement = Zone::from_str(source_zone) == Some(Zone::Stage)
+                || source_zone.is_empty();
+            let stage_members: Vec<usize> = (0..3)
+                .filter(|&i| player.stage.stage[i] != -1)
+                .collect();
+            if !from_self_displacement && !under_self && stage_members.len() > 1 && vacated_area.is_none() {
+                let desc = format!(
+                    "Choose a member to place {} under",
+                    gs.card_database
+                        .get_card(card_id)
+                        .map_or("card", |c| c.name.as_ref())
+                );
+                let desc_ja = format!(
+                    "{}を下に置くメンバーを選択",
+                    gs.card_database
+                        .get_card(card_id)
+                        .map_or("カード", |c| c.name.as_ref())
+                );
+                self.pending_choice = Some(
+                    Choice::select_cards(Zone::Stage.to_str(), 1, desc, false)
+                        .description_ja(Some(desc_ja))
+                        .target_player_id(Some(player_target.to_string()))
+                        .build(),
+                );
+                self.execution_context = ExecutionContext::MoveCardsPosition {
+                    card_id,
+                    state_change: state_change.clone(),
+                    target: player_target.to_string(),
+                    source_zone: source_zone.to_string(),
+                };
+                self.pending_under_placement = Some((
+                    card_id,
+                    player_target.to_string(),
+                    source_zone.to_string(),
+                    state_change,
+                ));
+                return Ok(true);
+            }
             // Use the resolver's stored activating_card_id first (survives choice
             // pauses and ability queue transitions), then fall back to gs.activating_card.
             let member_card = self.activating_card_id.or(activating_card);
@@ -1838,6 +1883,7 @@ impl AbilityResolver {
                         deck_pos,
                         &source,
                         effect.allow_occupied_stage_any().unwrap_or(false),
+                        effect.under_self_any().unwrap_or(false),
                     ) {
                         Ok(true) => {
                             return Ok(());
@@ -2000,6 +2046,7 @@ impl AbilityResolver {
                     None,
                     None,
                     &source,
+                    false,
                     false,
                 ) {
                     Ok(true) => {
@@ -2271,6 +2318,10 @@ impl AbilityResolver {
                 .as_ref()
                 .and_then(|ef| ef.allow_occupied_stage_any())
                 .unwrap_or(false);
+            let entry_self_target = entry_effect
+                .as_ref()
+                .and_then(|ef| ef.under_self_any())
+                .unwrap_or(false);
             match self.place_card_with_stage_choice(
                 gs,
                 target,
@@ -2283,6 +2334,7 @@ impl AbilityResolver {
                 None,
                 src_zone,
                 allow_occupied,
+                entry_self_target,
             ) {
                 Ok(true) => {
                     moved.push(card_id);

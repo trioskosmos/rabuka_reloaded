@@ -62,6 +62,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "same_unit_name" => { ek.same_unit_name = bc.read_bool_value(); return Some(true); }
             "group_names" => { ek.group_names = bc.read_opt_str_vec_value(); return Some(true); }
             "self_target" => { ek.self_target = bc.read_bool_value(); return Some(true); }
+            "under_self" => { ek.under_self = bc.read_bool_value(); return Some(true); }
             "location" => { ek.location = bc.read_arc_str_value(); return Some(true); }
             "heart_colors" => { ek.heart_colors = bc.read_str_vec_value(); return Some(true); }
             "characters" => { ek.characters = bc.read_opt_str_vec_value(); return Some(true); }
@@ -357,6 +358,7 @@ pub(crate) struct EffectKindLocals {
     pub trigger_filter: Option<Box<Vec<String>>>,
     pub trigger_type: Option<ArcStr>,
     pub triggers: Option<ArcStr>,
+    pub under_self: Option<bool>,
     pub use_limit: Option<u8>,
     pub value: Option<u8>,
     pub yell_source: Option<ArcStr>,
@@ -373,6 +375,7 @@ fn build_filter(ek: &EffectKindLocals) -> Option<Box<EffectFilter>> {
         same_unit_name: ek.same_unit_name.clone(),
         group_names: ek.group_names.clone(),
         self_target: ek.self_target.clone(),
+        under_self: ek.under_self.clone(),
         location: ek.location.clone(),
         heart_colors: ek.heart_colors.clone(),
         source: ek.source.clone(),

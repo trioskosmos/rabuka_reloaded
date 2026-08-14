@@ -798,6 +798,54 @@ impl super::resolver::AbilityResolver {
                 gs.ability_queue.has_pending_actions()
             );
         }
+        // "Place a card under a member" resume: the stage-member SelectCard choice
+        // from `place_card_with_stage_choice` has been answered. Put the pending
+        // card under the chosen stage member and finish the move.
+        if let Some((card_id, target, source_zone, state_change)) =
+            self.pending_under_placement.take()
+        {
+            self.pending_under_placement = None;
+            self.pending_choice = None;
+            let player = gs.resolve_target_player_mut(&target);
+            let chosen_idx = ctx
+                .mfi(&ctx.indices)
+                .first()
+                .copied()
+                .filter(|&i| i < 3)
+                .unwrap_or(1);
+            if chosen_idx < 3 && player.stage.stage[chosen_idx] != -1 {
+                let area = match chosen_idx {
+                    0 => crate::zones::MemberArea::LeftSide,
+                    1 => crate::zones::MemberArea::Center,
+                    _ => crate::zones::MemberArea::RightSide,
+                };
+                player.stage.place_under_card(area, card_id);
+                gs.mods.clear_all_for_card(card_id);
+                gs.record_card_movement(card_id);
+                if !self.moved_cards.contains(&card_id) {
+                    self.moved_cards.push(card_id);
+                }
+                if state_change.as_deref() == Some("wait") {
+                    gs.mods.add_orientation_modifier(card_id, "wait");
+                }
+                let pid = gs
+                    .ability_queue
+                    .current_entry()
+                    .map(|e| e.player_id.clone())
+                    .unwrap_or_default();
+                gs.push_movement_event(
+                    card_id,
+                    &source_zone,
+                    "under_member",
+                    gs.activating_card,
+                    &pid,
+                    true,
+                );
+                gs.mark_constants_dirty();
+                gs.recalculate_constants();
+            }
+            return self.resume_pending_actions(gs);
+        }
         match Zone::from_str(zone) {
             Some(Zone::Hand) => {
                 return self.handle_hand_selection(gs, &ctx, &context, &mut validate_card);

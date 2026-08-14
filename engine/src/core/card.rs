@@ -754,6 +754,11 @@ pub struct EffectFilter {
     pub same_unit_name: Option<bool>,
     pub group_names: Option<Box<Vec<String>>>,
     pub self_target: Option<bool>,
+    /// "Under THIS member" for under_member placement (e.g. "…をこのメンバーの
+    /// 下に置く"). Distinct from `self_target` (which has source-filtering
+    /// semantics). When set, the player does NOT choose which stage member
+    /// receives the card — it auto-places under the activating member.
+    pub under_self: Option<bool>,
     pub location: Option<ArcStr>,
     pub heart_colors: Box<Vec<String>>,
     pub source: Option<ArcStr>,
@@ -1112,6 +1117,7 @@ impl AbilityEffect {
             same_unit_name: bool_field!("same_unit_name"),
             group_names: opt_str_vec_field!("group_names"),
             self_target: bool_field!("self_target"),
+            under_self: bool_field!("under_self"),
             location: str_field!("location"),
             heart_colors: str_vec_field!("heart_colors").unwrap_or_default(),
             source: str_field!("source"),
@@ -1756,6 +1762,7 @@ impl AbilityEffect {
     filter_bool_getter!(self_cost_any, self_cost);
 
     filter_bool_getter!(self_target_any, self_target);
+    filter_bool_getter!(under_self_any, under_self);
 
     filter_bool_getter!(shuffle_any, shuffle);
 

@@ -151,3 +151,112 @@ fn watanabe_two_hosts_with_members_under_both_gain() {
     assert_eq!(blade_of(&game, a), 1, "center Aqours host → 1 blade");
     assert_eq!(blade_of(&game, b), 1, "right Aqours host → 1 blade");
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// End-to-end: 渡辺 曜 ab#0 (登場) places a discard member under a chosen
+// stage member, then ab#1 (常時) grants the blade. The player must be able
+// to CHOOSE which stage member receives the card underneath.
+// ═══════════════════════════════════════════════════════════════════
+
+/// 渡辺 曜 debuts with an Aqours host on stage + a discard member card.
+/// ab#0 must offer a choice of which member to place the card under.
+#[test]
+fn watanabe_debut_offers_which_member_to_place_under() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let watanabe = game.id(WATANABE);
+    let host = game.id(HOST_AQOURS);
+    let under = game.id(MEMBER_UNDER);
+
+    game.state.player1.hand.cards.push(watanabe);
+    game.state.player1.waitroom.cards.push(under);
+    game.state.player1.stage.stage = [host, -1, -1];
+    game.give_energy(15);
+
+    game.play_to_stage(watanabe, MemberArea::Center);
+
+    // ab#0 should prompt which stage member to place the card under.
+    assert!(
+        game.has_pending_choice(),
+        "ab#0 must prompt which member to place the card under"
+    );
+    game.assert_select_card("stage", 1, false);
+}
+
+/// Choosing the Aqours host (善子) places the card under it, and ab#1 then
+/// grants the host 1 blade.
+#[test]
+fn watanabe_debut_places_under_chosen_host_and_grants_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let watanabe = game.id(WATANABE);
+    let host = game.id(HOST_AQOURS);
+    let under = game.id(MEMBER_UNDER);
+
+    game.state.player1.hand.cards.push(watanabe);
+    game.state.player1.waitroom.cards.push(under);
+    game.state.player1.stage.stage = [host, -1, -1];
+    game.give_energy(15);
+
+    game.play_to_stage(watanabe, MemberArea::Center);
+    assert!(
+        game.has_pending_choice(),
+        "ab#0 must prompt which member to place the card under"
+    );
+    // Choose the Aqours host (善子) — left slot (index 0).
+    game.select_indices(&[0]);
+    game.drain_auto_ability_choices();
+
+    assert!(
+        !game.state.player1.stage.under_cards[0].is_empty(),
+        "card should be placed under the chosen host (left slot)"
+    );
+    assert!(
+        game.state.player1.stage.under_cards[1].is_empty(),
+        "card should NOT be under 渡辺 曜 (center)"
+    );
+    assert_eq!(
+        blade_of(&game, host),
+        1,
+        "Aqours host with a member card under (via ab#0) → 1 blade"
+    );
+}
+
+/// Choosing 渡辺 曜 herself as the target places the card under her, granting
+/// her the blade from ab#1.
+#[test]
+fn watanabe_debut_places_under_self_grants_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let watanabe = game.id(WATANABE);
+    let host = game.id(HOST_AQOURS);
+    let under = game.id(MEMBER_UNDER);
+
+    game.state.player1.hand.cards.push(watanabe);
+    game.state.player1.waitroom.cards.push(under);
+    game.state.player1.stage.stage = [host, -1, -1];
+    game.give_energy(15);
+
+    game.play_to_stage(watanabe, MemberArea::Center);
+    assert!(
+        game.has_pending_choice(),
+        "ab#0 must prompt which member to place the card under"
+    );
+    // Choose 渡辺 曜 (center slot = index 1).
+    game.select_indices(&[1]);
+    game.drain_auto_ability_choices();
+
+    assert!(
+        !game.state.player1.stage.under_cards[1].is_empty(),
+        "card should be placed under 渡辺 曜 (center)"
+    );
+    assert_eq!(
+        blade_of(&game, watanabe),
+        1,
+        "渡辺 曜 with a member card under (via ab#0) → 1 blade"
+    );
+}
+

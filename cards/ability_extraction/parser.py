@@ -1864,6 +1864,19 @@ _register_action(
         }
     ),
 )
+# Under-member placement onto THIS member (e.g. "…をこのメンバーの下に置く"
+# from discard): the moved card goes under the activating member specifically,
+# NOT a player-chosen member. Emits `under_self` (not `self_target`, which has
+# source-filtering semantics in the engine and would wrongly restrict the source
+# zone to the activating card). Distinguishes "このメンバーの下に" (under this
+# member — no choice) from "メンバー1人の下に" (under one member — player chooses).
+_register_action(
+    lambda t, a: a.get("destination") == "under_member"
+    and "このメンバーの下に" in t,
+    "move_cards",
+    lambda t, a: a.update({"under_self": True}),
+)
+
 _register_action(
     lambda t: "枚になるまで" in t and "引く" in t,
     "draw_until_count",

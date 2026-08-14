@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-14T22:15:59.388771",
+  "generated_at": "2026-08-14T23:36:39.766475",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "171f3c99",
+  "engine_commit": "ef2c1910",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -5482,6 +5482,7 @@
             ],
             "optional": true,
             "action": "move_cards",
+            "under_self": true,
             "activation_position": "center"
           },
           {
@@ -6513,7 +6514,7 @@
           {
             "text": "自分の控え室から『Aqours』のメンバーカードを3枚まで好きな順番でデッキの下に置く",
             "source": "discard",
-            "destination": "under_member",
+            "destination": "deck_bottom",
             "placement_order": "any_order",
             "count": 3,
             "card_type": "member_card",
@@ -6579,7 +6580,8 @@
             "group_names": [
               "虹ヶ咲"
             ],
-            "action": "move_cards"
+            "action": "move_cards",
+            "under_self": true
           },
           {
             "text": "ライブ終了時まで、このメンバーが元々持つハートは、これにより下に置いたメンバーカードが持つハートと同じになる",
@@ -7070,6 +7072,7 @@
             "destination": "under_member",
             "card_type": "member_card",
             "action": "move_cards",
+            "under_self": true,
             "count": 1
           },
           {
@@ -18149,6 +18152,7 @@
         "destination": "under_member",
         "card_type": "member_card",
         "action": "move_cards",
+        "under_self": true,
         "count": 1
       }
     },
@@ -18823,7 +18827,7 @@
         "primary_effect": {
           "text": "自分と相手はそれぞれ、自身の控え室にあるすべてのメンバーカードをシャッフルし、自身のデッキの下に置く",
           "source": "discard",
-          "destination": "under_member",
+          "destination": "deck_bottom",
           "card_type": "member_card",
           "target": "deck",
           "multiple_targets": true,
@@ -20521,7 +20525,8 @@
         "group_names": [
           "Liella!"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "under_self": true
       }
     },
     {
@@ -21756,7 +21761,7 @@
           {
             "text": "自分の控え室からブレードハートを持たないメンバーカードを4枚まで好きな順番でデッキの下に置いてもよい",
             "source": "discard",
-            "destination": "under_member",
+            "destination": "deck_bottom",
             "placement_order": "any_order",
             "count": 4,
             "card_type": "member_card",
@@ -23457,7 +23462,8 @@
         "group_names": [
           "虹ヶ咲"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "under_self": true
       }
     },
     {
@@ -34414,7 +34420,7 @@
         "primary_effect": {
           "text": "自分の控え室にあるすべてのメンバーカードをシャッフルし、デッキの下に置いてもよい",
           "source": "discard",
-          "destination": "under_member",
+          "destination": "deck_bottom",
           "card_type": "member_card",
           "target": "deck",
           "optional": true,
@@ -36264,7 +36270,7 @@
           {
             "text": "自分は、そのプレイヤーの控え室にあるメンバーカードを2枚まで好きな順番でデッキの下に置く",
             "source": "discard",
-            "destination": "under_member",
+            "destination": "deck_bottom",
             "placement_order": "any_order",
             "count": 2,
             "card_type": "member_card",
@@ -36477,7 +36483,7 @@
       "effect": {
         "text": "自分の控え室から『Aqours』のカードを2枚まで好きな順番でデッキの下に置く",
         "source": "discard",
-        "destination": "under_member",
+        "destination": "deck_bottom",
         "placement_order": "any_order",
         "count": 2,
         "target": "self",

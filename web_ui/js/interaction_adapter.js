@@ -36,20 +36,23 @@ export const InteractionAdapter = {
             // select_card actions (ChoiceSelect) — map to both zone-specific and .selection
             if (actionType === 'select_card') {
                 if (!valid.selection) valid.selection = {};
+                const zone = state.pending_choice?.zone;
                 if (cardIndex !== undefined) {
                     valid.selection[cardIndex] = action;
-                    const zone = state.pending_choice?.zone;
                     if (zone === 'hand') valid.myHand[cardIndex] = action;
                     else if (zone === 'discard') valid.discard[cardIndex] = action;
+                    else if (zone === 'energy' || zone === 'energy_zone') valid.myEnergy[cardIndex] = action;
+                    else if (zone === 'stage') valid.myStage[cardIndex] = action;
                 }
                 if (cardIndices && cardIndices.length > 0) {
                     cardIndices.forEach(idx => {
                         const perCard = { ...action, parameters: { ...action.parameters, card_index: idx } };
                         delete perCard.parameters.card_indices;
                         valid.selection[idx] = perCard;
-                        const zone = state.pending_choice?.zone;
                         if (zone === 'hand') valid.myHand[idx] = perCard;
                         else if (zone === 'discard') valid.discard[idx] = perCard;
+                        else if (zone === 'energy' || zone === 'energy_zone') valid.myEnergy[idx] = perCard;
+                        else if (zone === 'stage') valid.myStage[idx] = perCard;
                     });
                 }
                 return;
