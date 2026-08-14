@@ -243,3 +243,185 @@ fn ruby_center_member_noop() {
     assert_eq!(stage[0], left, "left untouched");
     assert_eq!(stage[2], right, "right untouched");
 }
+
+/// The destination is FIXED at center — after picking the source member the engine
+/// must NOT offer a free destination choice. Only one member-selection choice
+/// should be presented before the move resolves.
+#[test]
+fn ruby_destination_is_fixed_center_no_free_dest_choice() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let ruby = ruby_id(&game);
+    let left = filler_id(&game);
+    let right = filler_id(&game);
+    game.state.player1.stage.stage = [left, -1, right];
+    game.add_to_hand(ruby);
+    game.give_energy(10);
+
+    game.play_to_stage(ruby, MemberArea::Center);
+    // Exactly one member-selection choice (fixed destination = no second choice).
+    let mut member_choices = 0;
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 20 {
+        guard += 1;
+        let choice = game.get_pending_choice().clone();
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectTarget { options, .. } => {
+                member_choices += 1;
+                // pick the left member
+                let idx = options
+                    .as_ref()
+                    .and_then(|o| o.iter().position(|x| x.contains("left") || x.ends_with("left")))
+                    .expect("should offer left");
+                game.select_option(idx as i16);
+            }
+            rabuka_engine::ability::types::Choice::SelectPosition { .. } => {
+                member_choices += 1;
+                let actions = game.generated_actions();
+                let idx = actions
+                    .iter()
+                    .position(|a| {
+                        a.parameters
+                            .as_ref()
+                            .and_then(|p| p.stage_area.as_deref())
+                            .is_some_and(|area| area == "left")
+                    })
+                    .expect("should offer left");
+                game.select_generated(idx);
+            }
+            other => panic!("unexpected extra choice during fixed-dest move: {:?}", other),
+        }
+    }
+    game.drain_auto_ability_choices();
+
+    assert_eq!(
+        member_choices, 1,
+        "fixed destination should produce exactly one member-selection choice"
+    );
+    let stage = &game.state.player1.stage.stage;
+    assert_eq!(stage[1], left, "left member moved straight to center");
+}
+
+/// Moving a member to center when center is occupied swaps the two members and
+/// records movement for both.
+#[test]
+fn ruby_move_left_to_occupied_center_swaps_and_records() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let ruby = ruby_id(&game);
+    let left = filler_id(&game);
+    let center = filler_id(&game);
+    let right = filler_id(&game);
+    // center already occupied by `center`; ruby will debut to left.
+    game.state.player1.stage.stage = [-1, center, right];
+    game.add_to_hand(ruby);
+    game.give_energy(10);
+
+    game.play_to_stage(ruby, MemberArea::LeftSide);
+    // Choose ruby herself (left) to move to occupied center.
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 20 {
+        guard += 1;
+        let choice = game.get_pending_choice().clone();
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectTarget { options, .. } => {
+                let idx = options
+                    .as_ref()
+                    .and_then(|o| o.iter().position(|x| x.contains("left") || x.ends_with("left")))
+                    .expect("should offer left (ruby)");
+                game.select_option(idx as i16);
+            }
+            rabuka_engine::ability::types::Choice::SelectPosition { .. } => {
+                let actions = game.generated_actions();
+                let idx = actions
+                    .iter()
+                    .position(|a| {
+                        a.parameters
+                            .as_ref()
+                            .and_then(|p| p.stage_area.as_deref())
+                            .is_some_and(|area| area == "left")
+                    })
+                    .expect("should offer left");
+                game.select_generated(idx);
+            }
+            _ => game.select_indices(&[0]),
+        }
+    }
+    game.drain_auto_ability_choices();
+
+    let stage = &game.state.player1.stage.stage;
+    assert_eq!(stage[1], ruby, "ruby moved to center");
+    assert_eq!(stage[0], center, "former center member swapped to left");
+    assert_eq!(stage[2], right, "right untouched");
+    assert!(
+        game.state.has_card_moved_this_turn(ruby),
+        "ruby recorded as moved"
+    );
+    assert!(
+        game.state.has_card_moved_this_turn(center),
+        "center member recorded as moved"
+    );
+}
+
+/// With all three stage positions occupied, any one can be chosen to move to center.
+#[test]
+fn ruby_full_stage_choose_any_member() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let ruby = ruby_id(&game);
+    let left = filler_id(&game);
+    let center = filler_id(&game);
+    let right = filler_id(&game);
+    // All three stage slots occupied by distinct members.
+    game.state.player1.stage.stage = [left, center, right];
+    game.add_to_hand(ruby);
+    game.give_energy(10);
+
+    // Debut ruby to the CENTER (replacing the center filler — play_to_stage with
+    // an occupied slot moves the occupant to waitroom). Then choose the RIGHT
+    // member to move to center.
+    game.play_to_stage(ruby, MemberArea::Center);
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 20 {
+        guard += 1;
+        let choice = game.get_pending_choice().clone();
+        match choice {
+            rabuka_engine::ability::types::Choice::SelectTarget { options, .. } => {
+                let opts = options.as_ref().expect("options");
+                assert!(
+                    opts.iter().any(|x| x.contains("right") || x.ends_with("right")),
+                    "right should be a choice, got {:?}",
+                    opts
+                );
+                let idx = opts
+                    .iter()
+                    .position(|x| x.contains("right") || x.ends_with("right"))
+                    .unwrap();
+                game.select_option(idx as i16);
+            }
+            rabuka_engine::ability::types::Choice::SelectPosition { .. } => {
+                let actions = game.generated_actions();
+                let idx = actions
+                    .iter()
+                    .position(|a| {
+                        a.parameters
+                            .as_ref()
+                            .and_then(|p| p.stage_area.as_deref())
+                            .is_some_and(|area| area == "right")
+                    })
+                    .expect("should offer right");
+                game.select_generated(idx);
+            }
+            _ => game.select_indices(&[0]),
+        }
+    }
+    game.drain_auto_ability_choices();
+
+    let stage = &game.state.player1.stage.stage;
+    assert_eq!(stage[1], right, "right member moved to center");
+    assert_eq!(stage[2], ruby, "ruby swapped to right");
+}
+
