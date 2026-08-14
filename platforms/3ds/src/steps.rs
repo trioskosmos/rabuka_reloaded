@@ -60,9 +60,20 @@ pub enum SetupPhase {
 pub enum Overlay {
     None,
     StartMenu(usize),
-    GameLog(usize, usize),                   // offset (from end), cursor
-    PerfStats(Option<usize>, usize),         // detail snapshot index, cursor
+    GameLog(usize, usize), // offset (from end), cursor
+    PerfStats(Option<usize>, PerfTab, usize, usize), // snapshot idx, tab, cursor, summary cursor
     RevealedCards(bool, usize, Option<i16>), // show_self, flat cursor, viewing card id
+}
+
+/// Which panel is shown for a selected performance snapshot.
+#[derive(Clone, Copy, PartialEq)]
+pub enum PerfTab {
+    Overview,
+    Live,
+    Hearts,
+    Yell,
+    Contributions,
+    Triggered,
 }
 
 #[derive(Clone)]

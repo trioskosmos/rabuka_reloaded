@@ -139,9 +139,28 @@ static const char* pool_strdup(const char* s) {
     int len = 0;
     while (s[len]) len++;
     len++;  /* include NUL */
+    /* The source TTF has no arrow glyphs, so transliterate U+2192 '→'
+       (UTF-8 E2 86 92) to ASCII "->" on the way into the string pool. */
+    for (int i = 0; s[i]; i++) {
+        if ((unsigned char)s[i] == 0xE2 && (unsigned char)s[i+1] == 0x86 &&
+            (unsigned char)s[i+2] == 0x92) {
+            len += 1;  /* 3 bytes -> 2 chars, net +1 */
+        }
+    }
     if (string_pool_pos + len > STRING_POOL_SIZE) return "";
     char* dest = &string_pool[string_pool_pos];
-    memcpy(dest, s, len);
+    int di = 0;
+    for (int i = 0; s[i]; i++) {
+        if ((unsigned char)s[i] == 0xE2 && (unsigned char)s[i+1] == 0x86 &&
+            (unsigned char)s[i+2] == 0x92) {
+            dest[di++] = '-';
+            dest[di++] = '>';
+            i += 2;
+        } else {
+            dest[di++] = s[i];
+        }
+    }
+    dest[di] = '\0';
     string_pool_pos += len;
     return dest;
 }
@@ -169,9 +188,26 @@ static const char* bot_pool_strdup(const char* s) {
     int len = 0;
     while (s[len]) len++;
     len++;  /* include NUL */
+    for (int i = 0; s[i]; i++) {
+        if ((unsigned char)s[i] == 0xE2 && (unsigned char)s[i+1] == 0x86 &&
+            (unsigned char)s[i+2] == 0x92) {
+            len += 1;
+        }
+    }
     if (bot_string_pool_pos + len > BOT_STRING_POOL_SIZE) return "";
     char* dest = &bot_string_pool[bot_string_pool_pos];
-    memcpy(dest, s, len);
+    int di = 0;
+    for (int i = 0; s[i]; i++) {
+        if ((unsigned char)s[i] == 0xE2 && (unsigned char)s[i+1] == 0x86 &&
+            (unsigned char)s[i+2] == 0x92) {
+            dest[di++] = '-';
+            dest[di++] = '>';
+            i += 2;
+        } else {
+            dest[di++] = s[i];
+        }
+    }
+    dest[di] = '\0';
     bot_string_pool_pos += len;
     return dest;
 }
@@ -272,7 +308,19 @@ void _3ds_exit() {
 
 // ---- Text API (top screen) ----
 void _3ds_text_add_top(const char* msg) {
-    strncat(top_text, msg, TEXTLEN - strlen(top_text) - 1);
+    char out[TEXTLEN];
+    int di = 0;
+    for (int i = 0; msg && msg[i] && di < TEXTLEN - 1; i++) {
+        if ((unsigned char)msg[i] == 0xE2 && (unsigned char)msg[i+1] == 0x86 &&
+            (unsigned char)msg[i+2] == 0x92) {
+            if (di + 2 < TEXTLEN - 1) { out[di++] = '-'; out[di++] = '>'; }
+            i += 2;
+        } else {
+            out[di++] = msg[i];
+        }
+    }
+    out[di] = '\0';
+    strncat(top_text, out, TEXTLEN - strlen(top_text) - 1);
     text_dirty = true;
 }
 
@@ -281,8 +329,7 @@ int  _3ds_text_get_scroll_y() { return top_scroll_y; }
 
 void _3ds_text_add_bot(const char* msg) {
     // Board mode: redirect to top (debug info)
-    strncat(top_text, msg, TEXTLEN - strlen(top_text) - 1);
-    text_dirty = true;
+    _3ds_text_add_top(msg);
 }
 
 void _3ds_clear_top() {

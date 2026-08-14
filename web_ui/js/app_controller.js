@@ -18,6 +18,7 @@ import { PlayActionModal } from './modals/PlayActionModal.js';
 import { StageAbilityModal } from './modals/StageAbilityModal.js';
 import { AbilityQueueModal } from './modals/AbilityQueueModal.js';
 import { LogRenderer } from './components/LogRenderer.js';
+import { ImageLoader } from './components/CardRenderer.js';
 import { DOM_IDS, COLORS, DISPLAY_VALUES } from './constants_dom.js';
 
 const POLL_DELAYS = {
@@ -103,6 +104,7 @@ const actionHandlers = {
     'toggle-log-sidebar': toggleLogSidebar,
     'toggle-actions-sidebar': toggleActionsSidebar,
     'close-sidebar': closeSidebar,
+    'refresh-images': () => ImageLoader.refreshAll(),
     'save-state': Modals.saveState,
     'load-state': Modals.loadState,
     'rewind': Modals.rewind,

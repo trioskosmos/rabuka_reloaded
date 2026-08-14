@@ -60,7 +60,7 @@ pub(crate) fn format_action_line(act: &game_setup::Action, is_ja: bool) -> Strin
                     })
                     .collect();
                 format!(
-                    "[{}] E{} {} {}→{}",
+                    "[{}] E{} {} {}->{}",
                     cn,
                     cost,
                     name,

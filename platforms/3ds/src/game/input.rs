@@ -91,7 +91,9 @@ pub(crate) fn handle_input(
     ai_vs_ai: &bool,
     my_player_idx: usize,
 ) -> InputOut {
-    if detail_mode && viewing_card.is_some() {
+    // DPAD/menu navigation is suppressed while an overlay (Start/perf/log/revealed)
+    // is open — the overlay consumes D-pad/A/B itself via overlay_input.
+    if overlay == Overlay::None && detail_mode && viewing_card.is_some() {
         // Detail mode with ability subview: L/B dismiss, Up/Down scrolls
         if choice_subview {
             if keys & 0x00000200 != 0 || keys & 0x00000002 != 0 {
@@ -127,7 +129,7 @@ pub(crate) fn handle_input(
                 redraw = true;
             }
         }
-    } else if detail_mode {
+    } else if overlay == Overlay::None && detail_mode {
         // Detail view without card: Up/Down scrolls
         if keys & 0x00000040 != 0 {
             detail_scroll_y -= 18.0;
@@ -140,7 +142,7 @@ pub(crate) fn handle_input(
             detail_scroll_y += 18.0;
             redraw = true;
         }
-    } else if !has_image_choice {
+    } else if overlay == Overlay::None && !has_image_choice {
         // Navigate in display space with wrap-around
         // Skipped when choice grid handles its own navigation
         // L opens full ability text overlay for text choices too

@@ -20,6 +20,7 @@ pub mod blade_heart_colorless_test;
 pub mod bp7_q276_cheer_mode_return_hand_test;
 pub mod bp7_q278_q279_joint_blade_test;
 pub mod bp7_q280_energy_do_not_activate_test;
+pub mod bp7_ai_energy_under_member_optional_test;
 pub mod bp7_kanata_look_select_test;
 pub mod bp7_parser_gap_cards_test;
 pub mod bp7_sd2_gap_test;

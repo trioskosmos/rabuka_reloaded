@@ -136,6 +136,31 @@ export const ImageLoader = {
             this.observer.observe(img);
         }
     },
+
+    /**
+     * Force-reload every card image currently in the DOM, bypassing the
+     * success/failure caches and adding a cache-busting query param so the
+     * browser fetches fresh copies. Useful when images were missing/stale
+     * (e.g. the server rebuilt them) and a full page reload isn't desired.
+     */
+    refreshAll() {
+        // Clear caches so every image gets a genuine reload attempt.
+        this.loadedImages.clear();
+        this.failedImages.clear();
+
+        const images = document.querySelectorAll('img[data-src], img.card-img, .card img, .card-back img, .under-card img, .member-slot img, .live-card-inner img');
+        let count = 0;
+        images.forEach((img) => {
+            const src = img.dataset.src || img.src;
+            if (!src) return;
+            // Reset fallback list so failed variants can be retried.
+            delete img.dataset.fallbackPaths;
+            this._doLoad(img, src, true);
+            count++;
+        });
+        console.log(`[ImageLoader] Refresh all: reloading ${count} image(s)`);
+        return count;
+    },
 };
 
 // Consistent image path resolution across all card displays

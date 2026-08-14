@@ -299,6 +299,32 @@ fn pick_deck(
                         format!("SELECT {}\0", label).as_ptr(),
                     );
                 }
+                // Top screen: show the currently selected deck's card grid as a
+                // live preview. The X button still opens the scrollable DeckViewer
+                // (with detail screens); here we just mirror the chosen deck.
+                unsafe {
+                    _3ds_top_clear();
+                }
+                if cur < n {
+                    let card_db =
+                        std::sync::Arc::new(CardDatabase::load_or_create(cards.as_ref().clone()));
+                    let card_ids: Vec<i16> = DeckParser::deck_list_to_card_numbers(&decks[cur])
+                        .iter()
+                        .filter_map(|cn| card_db.get_card_id(cn))
+                        .collect();
+                    let deck_atlas = CardAtlas::load();
+                    unsafe {
+                        _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                        _3ds_top_queue_text(
+                            4.0,
+                            4.0,
+                            COL_GOLD,
+                            SCALE_BODY,
+                            format!("{}\0", decks[cur].name).as_ptr(),
+                        );
+                    }
+                    render_card_grid(&card_ids, 0, 5, 3, 26.0, &card_db, &deck_atlas);
+                }
                 // Show 6 decks max: 240px screen - 30px title - 20px help = 190px
                 // 190 / 6 = ~32px per row at 0.70 scale (~21px glyph)
                 let start = cur.saturating_sub(3).min(n.saturating_sub(6));

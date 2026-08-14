@@ -2053,6 +2053,24 @@ impl AbilityResolver {
         }
 
         if source.as_deref() == Some("energy_deck") {
+            // Optional "置いてもよい" placement: offer a Skip/Do choice first.
+            // The accept path re-enters via handle_optional_cost_payment →
+            // execute_place_energy_under_member_non_optional (optional=false), so
+            // we gate only the initial prompt here.
+            if optional && gs.entry_choice_card_no() != Some(ChoiceRoute::OptionalCost) {
+                self.pending_choice = Some(Choice::SelectTarget {
+                    target: "pay_optional_cost:skip_optional_cost".to_string(),
+                    description: "Place energy under a member (optional)?".to_string(),
+                    description_en: Some("Place energy under a member (optional)?".to_string()),
+                    description_ja: Some("メンバーの下にエネルギーを置きますか？（オプション）".to_string()),
+                    allow_skip: true,
+                    options: None,
+                });
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
+                }
+                return;
+            }
             // Move `count` energy cards from the ENERGY DECK under a member on
             // stage (e.g. "自分のエネルギーデッキから、エネルギーカード1枚を…
             // メンバーの下に置く"). Prefer the activating card when it matches the
