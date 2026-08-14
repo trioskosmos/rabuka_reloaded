@@ -874,6 +874,13 @@ impl AbilityResolver {
                             .iter()
                             .filter(|&&id| {
                                 super::util::card_matches_type(card_db, id, card_type.as_deref())
+                                    && match cost.cost_values_any() {
+                                        Some(vals) if !vals.is_empty() => card_db
+                                            .get_card(id)
+                                            .and_then(|c| c.cost.or(c.score))
+                                            .is_some_and(|v| vals.contains(&v)),
+                                        _ => true,
+                                    }
                             })
                             .copied()
                             .collect(),
@@ -924,6 +931,7 @@ impl AbilityResolver {
                             cost.cost_limit_any(),
                             cost.cost_limit_operator_any().map(|s| s.to_string()),
                         )
+                        .cost_values(cost.cost_values_any().cloned())
                         .group(group)
                         .characters(cost.characters_any().cloned())
                         .target_player_id(Some(

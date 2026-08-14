@@ -295,15 +295,17 @@ ability can trigger more than once.
 
 ### Regeneration
 
-After any parser or schema change, run:
+After any parser, card, or engine field change, run:
 
 ```bash
-bash cards/regenerate.sh
+python cards/ability_extraction/extract_card_abilities.py
 ```
 
-This extracts abilities from `cards/cards.json`, compiles the bytecode and Rust
-artifacts, and runs the bytecode validation tests. All generated outputs are
-updated atomically.
+This is the single entry point. It extracts abilities from `cards/cards.json`,
+compiles the bytecode + Rust artifact (`abilities_gen.rs`), regenerates both
+Rust decoders (`effect_decoder_gen.rs`, `condition_decoder_gen.rs` from
+`core/card.rs`), and runs bytecode validation. All generated outputs are updated
+in one run — there is no separate compile/decoder step to remember.
 
 ### Phase 0: make the current system explainable and fail loudly
 
@@ -314,7 +316,7 @@ Do this before a broad refactor.
 - [x] Use repository-relative source paths in generated metadata; the current
   `source_file` value can contain a machine-specific absolute path.
 - [x] Add one documented regeneration command and make it update all generated
-  outputs atomically. (`cards/regenerate.sh`)
+  outputs atomically. (`python cards/ability_extraction/extract_card_abilities.py`)
 - [ ] Decide whether `cards/build/abilities.bin` is a retained artifact or a
   temporary intermediate. The runtime currently embeds `BYTECODE` from the
   generated Rust file, so the build should not imply that the loose `.bin`

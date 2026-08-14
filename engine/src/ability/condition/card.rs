@@ -2700,6 +2700,26 @@ impl<'a> ConditionContext<'a> {
             card_type,
             group_names,
         );
+        // Comparison target (e.g. "自分のエネルギーが相手より2枚以上多い"):
+        // self is `count` more than the opponent → self_count >= opp_count + count.
+        // When comparison_target is opponent, the effective comparison is the
+        // DIFFERENCE between self and opponent, not a fixed threshold.
+        if condition.get_comparison_target() == Some(ComparisonTarget::Opponent) {
+            let opp_count = self.get_count_for_target(condition, "opponent");
+            let threshold = opp_count.saturating_add(count);
+            let op = condition
+                .get_operator()
+                .unwrap_or_else(|| if count == 0 { "==" } else { ">=" });
+            log::debug!(
+                "[CARD_COUNT_OPPONENT] self={} opp={} count={} threshold={} op={}",
+                actual,
+                opp_count,
+                count,
+                threshold,
+                op
+            );
+            return compare_counts(Some(op), actual, threshold);
+        }
         let count_op =
             condition
                 .get_operator()

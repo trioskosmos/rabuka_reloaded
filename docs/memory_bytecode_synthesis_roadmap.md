@@ -14,8 +14,9 @@ confirmed against the source; every number was re-measured from the current tree
 >
 > **There is exactly ONE verification loop for all work in this roadmap:**
 >
-> 1. **Run the parser:** `bash cards/regenerate.sh` (from the repo root — this runs
->    `extract_card_abilities.py` → `compile_abilities.py` → `validate_schema.py`).
+> 1. **Run the parser:** `python cards/ability_extraction/extract_card_abilities.py`
+>    (from the repo root — this single command chains `compile_abilities.py`, both
+>    decoder generators, and `validate_schema.py`).
 > 2. **Run the tests:** `cargo test` (from `engine/`, NOT the workspace root).
 >
 > **Nothing else. Ever.**
@@ -603,7 +604,7 @@ the deferred optimization track:
 | 6 | R6 Pools + dep sweep (CondBox, `once_cell`) | removal | `refactor: remove unwired CondBox pool and dead once_cell dep` | DONE `13ce4337` |
 | 7+ | O1–O4 squeezing (was B1/B2/B3/C1) | deferred | — | only if measured |
 
-Each phase: **run the parser (`bash cards/regenerate.sh`) → `cargo test` from `engine/` →
+Each phase: **run the parser (`python cards/ability_extraction/extract_card_abilities.py`) → `cargo test` from `engine/` →
 commit if green.** This is the **only** verification loop (see TESTING POLICY at top).
 The deep-compare guard (`bytecode_deep_matches_json_path`) runs inside the normal
 `cargo test` — no extra feature-flag runs, no `cargo check`, no probes, no benchmarks.

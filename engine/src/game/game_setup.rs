@@ -905,6 +905,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             ref filtered_indices,
             cost_limit,
             ref cost_limit_operator,
+            ref cost_values,
             ref group,
             ref characters,
             ref target_player_id,
@@ -1053,7 +1054,16 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         cost_limit_operator.as_deref(),
                     )
                 });
-                let is_selectable = in_fi && matches_chars && matches_group && matches_cost;
+                let matches_cost_values = match cost_values {
+                    Some(vals) if !vals.is_empty() => game_state
+                        .card_database
+                        .get_card(*card_id)
+                        .and_then(|c| c.cost.or(c.score))
+                        .is_some_and(|v| vals.contains(&v)),
+                    _ => true,
+                };
+                let is_selectable =
+                    in_fi && matches_chars && matches_group && matches_cost && matches_cost_values;
 
                 // For non-look zones: skip non-selectable cards entirely
                 if !is_look_zone && !is_selectable {

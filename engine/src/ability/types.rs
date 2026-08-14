@@ -84,6 +84,8 @@ pub enum Choice {
         cost_limit_operator: Option<String>,
         cost_total: Option<u8>,
         cost_total_operator: Option<String>,
+        #[cfg_attr(feature = "serde_support", serde(default))]
+        cost_values: Option<Vec<u8>>,
         group: Option<String>,
         characters: Option<Vec<String>>,
         #[cfg_attr(feature = "serde_support", serde(default))]
@@ -323,6 +325,7 @@ pub struct ChoiceBuilder {
     cost_limit_operator: Option<String>,
     cost_total: Option<u8>,
     cost_total_operator: Option<String>,
+    cost_values: Option<Vec<u8>>,
     group: Option<String>,
     characters: Option<Vec<String>>,
     filtered_indices: Option<Vec<usize>>,
@@ -352,6 +355,7 @@ impl ChoiceBuilder {
             cost_limit_operator: self.cost_limit_operator,
             cost_total: self.cost_total,
             cost_total_operator: self.cost_total_operator,
+            cost_values: self.cost_values,
             group: self.group,
             characters: self.characters,
             filtered_indices: self.filtered_indices,
@@ -380,6 +384,10 @@ impl ChoiceBuilder {
     pub fn cost_total(mut self, v: Option<u8>, op: Option<String>) -> Self {
         self.cost_total = v;
         self.cost_total_operator = op;
+        self
+    }
+    pub fn cost_values(mut self, v: Option<Vec<u8>>) -> Self {
+        self.cost_values = v;
         self
     }
     pub fn group(mut self, v: Option<String>) -> Self {
@@ -490,6 +498,7 @@ impl Choice {
             cost_limit_operator: None,
             cost_total: None,
             cost_total_operator: None,
+            cost_values: None,
             group: None,
             characters: None,
             filtered_indices: None,
@@ -525,6 +534,7 @@ impl Choice {
                 groups: None,
                 cost_limit: *cost_limit,
                 cost_operator: cost_limit_operator.as_deref(),
+                cost_values: None,
                 cost_limit_min: None,
                 cost_total: None,
                 cost_total_operator: None,

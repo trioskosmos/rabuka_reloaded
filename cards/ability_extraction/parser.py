@@ -113,6 +113,7 @@ from parser_utils import (
     extract_operator,
     extract_cost_limit,
     extract_cost_limit_with_operator,
+    extract_cost_values,
     extract_picker,
     detect_card_property,
     detect_require_all_hearts,
@@ -776,6 +777,11 @@ def _extract_basic_cost_fields(cost, text):
             if kw in text:
                 cost["cost_limit_operator"] = op
                 break
+    # Discrete cost values (OR) — "コストが10か20" → cost_values: [10, 20]
+    cv = extract_cost_values(text)
+    if cv:
+        cost["cost_values"] = cv
+        cost.pop("cost_limit", None)
     # Exclude self / self cost
     if "このメンバー以外" in text or bool(re.search(r"ほかの.*?メンバー", text)):
         cost["exclude_self"] = True

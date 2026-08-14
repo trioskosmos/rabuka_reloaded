@@ -775,6 +775,8 @@ pub struct CardFilter<'a> {
     pub groups: Option<&'a Vec<String>>,
     pub cost_limit: Option<u8>,
     pub cost_operator: Option<&'a str>,
+    /// Discrete set of allowed cost values (OR) — e.g. "コストが10か20" → [10, 20].
+    pub cost_values: Option<&'a Vec<u8>>,
     /// Minimum cost bound for range filters (e.g. cost >= 4)
     pub cost_limit_min: Option<u8>,
     /// Sum-total cost constraint — checked post-selection, not in per-card matches()
@@ -1229,6 +1231,12 @@ impl<'a> CardFilter<'a> {
                 return false;
             }
         }
+        if let Some(vals) = self.cost_values {
+            let card_cost = db.get_card(id).and_then(|c| c.cost.or(c.score));
+            if !card_cost.is_some_and(|v| vals.contains(&v)) {
+                return false;
+            }
+        }
         if let Some(min) = self.cost_limit_min {
             if !card_matches_cost_limit_op(db, id, Some(min), Some(">=")) {
                 return false;
@@ -1335,6 +1343,7 @@ impl<'a> CardFilter<'a> {
             groups: group_names.as_ref().map(|v| &**v),
             cost_limit: effect.cost_limit_any(),
             cost_operator,
+            cost_values: None,
             cost_limit_min: effect.cost_limit_min_any(),
             cost_total: effect.cost_total_any(),
             cost_total_operator,
@@ -1404,8 +1413,9 @@ impl<'a> CardFilter<'a> {
                 card_type: card_type.as_deref(),
                 group: group.as_deref(),
                 groups: None,
-                cost_limit: cost_limit.map(|c| c as u8),
-                cost_operator: cost_limit_operator.as_deref(),
+            cost_limit: cost_limit.map(|c| c as u8),
+            cost_operator: cost_limit_operator.as_deref(),
+            cost_values: None,
                 cost_limit_min: None,
                 cost_total: None,
                 cost_total_operator: None,

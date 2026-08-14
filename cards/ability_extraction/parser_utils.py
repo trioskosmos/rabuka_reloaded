@@ -645,6 +645,18 @@ def extract_cost_limit_with_operator(text: str) -> Optional[Tuple[int, str]]:
     return None
 
 
+def extract_cost_values(text: str) -> Optional[List[int]]:
+    """Extract a discrete set of allowed cost values joined by か (or),
+    e.g. "コストが10か20のメンバーカード" → [10, 20]. Returns None if the text
+    does not use the か (or) multi-value form."""
+    m = re.search(r"コスト[がは](\d+か\d+)", text)
+    if m:
+        parts = re.findall(r"\d+", m.group(1))
+        if len(parts) >= 2:
+            return [int(p) for p in parts]
+    return None
+
+
 def detect_card_property(text: str) -> Optional[Tuple[str, bool]]:
     """Detect card property patterns from text.
     Returns (property_name, is_negated) or None.

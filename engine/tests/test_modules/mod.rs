@@ -52,6 +52,7 @@ pub mod bp7_mia_play_cost_reduction_test;
 pub mod bp7_q271_colorful_dreams_test;
 pub mod bp7_q272_just_believe_test;
 pub mod bp7_q273_watanabe_cost_test;
+pub mod bp7_we_will_energy_score_test;
 pub mod bp7_tomari_discard_all_hand_test;
 pub mod bp7_q274_immune_still_selectable_test;
 pub mod bp7_q275_forcepick_wait_test;
@@ -402,6 +403,9 @@ pub mod self_control_position_change_test;
 
 // 黒澤ルビィ (PL!S-bp7-018-N) 登場: move a chosen stage member to the center area.
 pub mod ruby_bp7_center_position_test;
+
+// 嵐 千砂都 (PL!SP-bp7-003) ab#2 起動: reveal a cost-10-or-20 member, place under, draw 2.
+pub mod chika_bp7_reveal_cost_test;
 
 // 譯懷・譴ｨ蟄・(PL!S-bp5-002) 窶・LiveStart center: left_cost == right_cost 竊・wait opponent low-blade
 // Verifies require_position_cards: both positions must have cards (empty = no trigger)

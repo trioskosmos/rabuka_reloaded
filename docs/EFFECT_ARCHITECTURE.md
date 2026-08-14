@@ -136,8 +136,9 @@ For every parser/engine fix (each entry in `cards/_bp07_ability_gaps_hand_analys
    action type): live-start gain tests, wait/change_state tests,
    place_energy_under_member tests, both-player effects, etc.
 3. Run the new tests — they must FAIL against the current parser/engine output.
-4. Fix `cards/ability_extraction/parser.py`, regenerate:
-   `bash cards/regenerate.sh` (extract + compile + schema).
+4. Fix `cards/ability_extraction/parser.py`, regenerate (extract + compile +
+   bytecode + decoders in one step):
+   `python cards/ability_extraction/extract_card_abilities.py`.
 5. Fix the engine (`engine/src/...`) as needed.
 6. `cargo test --test run_all` — new tests pass AND all existing tests stay green.
 7. Commit. Then move to the next ability.

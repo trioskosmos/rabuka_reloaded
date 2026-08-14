@@ -553,6 +553,19 @@ def main():
             for line in (result.stdout or "").splitlines()[-5:]:
                 print(f"  {line}")
 
+    # Auto-regenerate the Rust decoders so a NEW field added to
+    # engine/src/core/card.rs is picked up without a separate manual step.
+    # These are generated FROM card.rs, so they only change when card.rs does.
+    decoder_scripts = [
+        compile_script.parent / "generate_effect_decoder.py",
+        compile_script.parent / "generate_condition_decoder.py",
+    ]
+    for dec in decoder_scripts:
+        if dec.exists():
+            dr = subprocess.run([sys.executable, str(dec)], cwd=dec.parent)
+            if dr.returncode != 0:
+                print(f"WARNING: {dec.name} failed ({dr.returncode}); decoders may be stale.")
+
 
 def _validate_output(result):
     """Post-extraction validation -- check for known parser gaps in output."""

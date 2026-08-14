@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-14T23:36:39.766475",
+  "generated_at": "2026-08-15T00:03:40.681976",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "ef2c1910",
+  "engine_commit": "4823fa4b",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -7056,6 +7056,10 @@
         "zone": "hand",
         "count": 1,
         "card_type": "member_card",
+        "cost_values": [
+          10,
+          20
+        ],
         "type": "reveal"
       },
       "effect": {

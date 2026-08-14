@@ -82,6 +82,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "per_unit_heart_colors" => { ek.per_unit_heart_colors = bc.read_str_vec_value(); return Some(true); }
             "cost_limit" => { ek.cost_limit = bc.read_u8_value(); return Some(true); }
             "cost_limit_operator" => { ek.cost_limit_operator = bc.read_operator_value(); return Some(true); }
+            "cost_values" => { ek.cost_values = bc.read_opt_u8_vec_value().map(|b| *b); return Some(true); }
             "blade_limit" => { ek.blade_limit = bc.read_u8_value(); return Some(true); }
             "blade_limit_operator" => { ek.blade_limit_operator = bc.read_operator_value(); return Some(true); }
             "blade_limit_from_energy_under" => { ek.blade_limit_from_energy_under = bc.read_bool_value(); return Some(true); }
@@ -253,6 +254,7 @@ pub(crate) struct EffectKindLocals {
     pub cost_reference: Option<ArcStr>,
     pub cost_total: Option<u8>,
     pub cost_total_operator: Option<Operator>,
+    pub cost_values: Option<Vec<u8>>,
     pub count: Option<u8>,
     pub custom_type: Option<ArcStr>,
     pub delayed: Option<bool>,
@@ -398,6 +400,7 @@ fn build_filter(ek: &EffectKindLocals) -> Option<Box<EffectFilter>> {
         per_unit_heart_colors: ek.per_unit_heart_colors.clone(),
         cost_limit: ek.cost_limit.clone(),
         cost_limit_operator: ek.cost_limit_operator.clone(),
+        cost_values: ek.cost_values.clone(),
         blade_limit: ek.blade_limit.clone(),
         blade_limit_operator: ek.blade_limit_operator.clone(),
         blade_limit_from_energy_under: ek.blade_limit_from_energy_under.clone(),

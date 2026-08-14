@@ -29,6 +29,8 @@ READER_MAP = {
     "Option<Operation>": "bc.read_operation_value()",
     "Option<Box<Vec<String>>>": "bc.read_opt_str_vec_value()",
     "Box<Vec<String>>": "bc.read_str_vec_value()",
+    "Option<Box<Vec<u8>>>": "bc.read_opt_u8_vec_value()",
+    "Option<Vec<u8>>": "bc.read_opt_u8_vec_value().map(|b| *b)",
     "Option<Box<Condition>>": "bc.read_condition_value()",
     "Option<Box<AbilityEffect>>": "bc.read_effect_value()",
     "Option<Vec<Box<AbilityEffect>>>": "bc.read_effect_vec_value()",

@@ -781,6 +781,9 @@ pub struct EffectFilter {
     pub per_unit_heart_colors: Box<Vec<String>>,
     pub cost_limit: Option<u8>,
     pub cost_limit_operator: Option<Operator>,
+    /// Discrete set of allowed cost values (OR) — e.g. "コストが10か20" → [10, 20].
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub cost_values: Option<Vec<u8>>,
     /// Blade-count target filter (e.g. "ブレードを4つ以上持つ"). Whether it
     /// means the printed/original value or the CURRENT total is decided by the
     /// effect's `original_value` flag when building a CardFilter.
@@ -1159,6 +1162,15 @@ impl AbilityEffect {
                 .get("cost_limit_operator")
                 .and_then(|v| v.as_str())
                 .and_then(parse_operator),
+            cost_values: obj
+                .get("cost_values")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|x| x.as_u64())
+                        .map(|n| n as u8)
+                        .collect()
+                }),
             blade_limit: u8_field!("blade_limit"),
             blade_limit_operator: obj
                 .get("blade_limit_operator")
@@ -1542,6 +1554,11 @@ impl AbilityEffect {
 
     filter_opt_vec_ref_getter!(characters_any, characters);
 
+    /// Discrete set of allowed cost values (OR) — e.g. "コストが10か20" → [10, 20].
+    pub fn cost_values_any(&self) -> Option<&Vec<u8>> {
+        self.kind.as_deref()?.filter()?.cost_values.as_ref()
+    }
+
     filter_bool_getter!(choice_any, choice);
 
     filter_bool_getter!(choice_based_any, choice_based);
@@ -1906,8 +1923,9 @@ impl AbilityEffect {
         crate::ability::util::CardFilter {
             card_type: self.card_type_any().map(|ct| ct.as_card_str()),
             group: self.group_name(),
-            cost_limit: self.cost_limit_any(),
-            cost_operator: self.cost_limit_operator_any().map(Operator::as_str),
+                cost_limit: self.cost_limit_any(),
+                cost_operator: self.cost_limit_operator_any().map(Operator::as_str),
+                cost_values: self.cost_values_any(),
             characters: self.characters_any(),
             exclude_characters: self.exclude_characters_any(),
             exclude_self: if self.exclude_self_any().unwrap_or(false) {
