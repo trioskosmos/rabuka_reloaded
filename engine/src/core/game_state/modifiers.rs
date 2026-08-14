@@ -16,6 +16,47 @@ macro_rules! tdbg {
     ($($arg:tt)*) => {};
 }
 impl GameState {
+    /// Compute the opponent-front targets for a constant "正面のエリア" (front area)
+    /// ability. Given the activating card's stage slot, mirrors to the opponent's
+    /// slot via MemberArea::front_area (your left ↔ opp right, center ↔ center,
+    /// right ↔ opp left) and applies the effect's card filter (cost_limit etc.).
+    /// Returns an empty vec when no qualifying member occupies the front slot.
+    fn constant_front_targets(
+        &self,
+        cid: i16,
+        effect: &crate::card::AbilityEffect,
+    ) -> Vec<i16> {
+        use crate::zones::MemberArea;
+        let (is_p1, area) = if let Some(pos) =
+            self.player1.stage.stage.iter().position(|&x| x == cid)
+        {
+            (true, MemberArea::from_index(pos))
+        } else if let Some(pos) = self.player2.stage.stage.iter().position(|&x| x == cid) {
+            (false, MemberArea::from_index(pos))
+        } else {
+            return Vec::new();
+        };
+        let Some(area) = area else {
+            return Vec::new();
+        };
+        let opp_area = area.front_area();
+        let opp_stage = if is_p1 {
+            &self.player2.stage.stage
+        } else {
+            &self.player1.stage.stage
+        };
+        let opp_cid = opp_stage[opp_area.to_index()];
+        if opp_cid == -1 {
+            return Vec::new();
+        }
+        let filter = effect.filter_subset();
+        if filter.matches(&self.card_database, opp_cid, false) {
+            vec![opp_cid]
+        } else {
+            Vec::new()
+        }
+    }
+
     /// Re-evaluate all constant (常時) abilities on all stage members.
     /// Handles gain_resource(blade, heart), modify_score, modify_cost.
     /// Clears old constant-derived values and re-applies those whose conditions pass.
@@ -111,17 +152,23 @@ impl GameState {
                 // evaluation time, not during constant registration.
                 ctx.skip_phase_gate = true;
 
-                // Check effect-level position requirement
+                // Check effect-level position requirement.
+                // "front" is a targeting rule (正面のエリア) not an activation gate,
+                // so it does not restrict where the activating card must sit.
                 let pos_ok = if let Some(ref pos) = effect.position_any() {
                     let pos_str = pos.get_position();
-                    let card_pos = entry_positions.get(&card_id).copied().flatten();
-                    matches!(
-                        (pos_str, card_pos),
-                        (Some("center"), Some(1))
-                            | (Some("left") | Some("left_side"), Some(0))
-                            | (Some("right") | Some("right_side"), Some(2))
-                            | (None, _)
-                    )
+                    if pos_str == Some("front") {
+                        true
+                    } else {
+                        let card_pos = entry_positions.get(&card_id).copied().flatten();
+                        matches!(
+                            (pos_str, card_pos),
+                            (Some("center"), Some(1))
+                                | (Some("left") | Some("left_side"), Some(0))
+                                | (Some("right") | Some("right_side"), Some(2))
+                                | (None, _)
+                        )
+                    }
                 } else {
                     true
                 };
@@ -201,7 +248,68 @@ impl GameState {
                                                 .unwrap_or(effect.count_any().unwrap_or(1))
                                                 as i32
                                         };
-                                        *exp_blade.entry(card_id).or_insert(0) += n as i16;
+                                        // "失う" (lose) is represented as sign:negative.
+                                        // Apply the sign so the modifier is negative.
+                                        let sign_mult: i16 = if matches!(
+                                            effect.sign_any().as_deref(),
+                                            Some("negative") | Some("-")
+                                        ) {
+                                            -1
+                                        } else {
+                                            1
+                                        };
+                                        let delta = (n as i16) * sign_mult;
+                                        // Determine blade grant targets:
+                                        //   - position "front" (正面のエリア): opponent's
+                                        //     mirrored slot (your left faces opp right, etc.)
+                                        //   - all_any (自分のステージにいる...): all matching
+                                        //     members on the ability card's side
+                                        //   - otherwise: the activating card itself
+                                        let is_front = effect
+                                            .position_any()
+                                            .as_ref()
+                                            .and_then(|p| p.get_position())
+                                            == Some("front");
+                                        if is_front {
+                                            for tid in self.constant_front_targets(card_id, effect) {
+                                                *exp_blade.entry(tid).or_insert(0) += delta;
+                                            }
+                                        } else if effect.all_any().unwrap_or(false) {
+                                            // Grant to ALL matching stage members on the
+                                            // ability card's side. Optionally restricted to
+                                            // members that have a member card underneath
+                                            // (requires_under_card, e.g. 渡辺曜 ab#1).
+                                            let player = if self.player1.stage.stage.contains(&card_id) {
+                                                &self.player1
+                                            } else {
+                                                &self.player2
+                                            };
+                                            let filter = effect.filter_subset();
+                                            let need_under =
+                                                effect.requires_under_card_any().unwrap_or(false);
+                                            for (slot, &mid) in player.stage.stage.iter().enumerate() {
+                                                if mid == -1
+                                                    || !filter.matches(&self.card_database, mid, true)
+                                                {
+                                                    continue;
+                                                }
+                                                if need_under {
+                                                    let has_member_under = player.stage.under_cards[slot]
+                                                        .iter()
+                                                        .any(|&u| {
+                                                            self.card_database
+                                                                .get_card(u)
+                                                                .map_or(false, |c| c.is_member())
+                                                        });
+                                                    if !has_member_under {
+                                                        continue;
+                                                    }
+                                                }
+                                                *exp_blade.entry(mid).or_insert(0) += delta;
+                                            }
+                                        } else {
+                                            *exp_blade.entry(card_id).or_insert(0) += delta;
+                                        }
                                     }
                                     "heart" | "ハート" => {
                                         let n = if let Some(ref dc) = effect.dynamic_count_any() {
@@ -509,6 +617,67 @@ impl GameState {
         self.constant_ability_statuses = jyouji_statuses.into();
         tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
 
+        // Under-card constant blade abilities ("常時：このカードが『X』のメンバーの
+        // 下に置かれているかぎり、そのメンバーはブレードを得る"). The blade is
+        // granted to the HOST member the card is stacked under, not the card itself
+        // (which isn't on stage).
+        for (under_cid, host) in self
+            .player1
+            .stage
+            .under_cards_with_hosts()
+            .into_iter()
+            .chain(self.player2.stage.under_cards_with_hosts().into_iter())
+        {
+            let card = match self.card_database.get_card(under_cid) {
+                Some(c) => c,
+                None => continue,
+            };
+            for (_ability_idx, ar) in card.abilities.iter().enumerate() {
+                if !GameState::ability_matches_trigger(
+                    &ar.resolve(),
+                    &crate::game_state::AbilityTrigger::Constant,
+                ) {
+                    continue;
+                }
+                let ability = ar.resolve();
+                let Some(ref effect) = ability.effect else {
+                    continue;
+                };
+                if effect.action != crate::ability::enums::ActionType::GainResource
+                    || !matches!(
+                        effect.resource_any().as_deref(),
+                        Some("blade") | Some("ブレード")
+                    )
+                {
+                    continue;
+                }
+                let Some(ref cond) = effect.condition else {
+                    continue;
+                };
+                // Only under-member-scoped grants route to the host; a generic
+                // constant gain on an under-card has no such meaning.
+                if cond.get_location() != Some("under_member") {
+                    continue;
+                }
+                let Some(groups) = cond.get_group_names() else {
+                    continue;
+                };
+                // Condition met iff this card is under a host of the group.
+                if !crate::ability::util::card_matches_any_group(
+                    &self.card_database,
+                    host,
+                    groups,
+                ) {
+                    continue;
+                }
+                let count = effect
+                    .resource_icon_count_any()
+                    .unwrap_or(effect.count_any().unwrap_or(1))
+                    as i16;
+                *exp_blade.entry(host).or_insert(0) += count;
+            }
+        }
+
         // Blade
         tdbg!("RC:7 BLADE");
         let old_blade = core::mem::take(&mut self.mods.constant_blade_bonuses);
@@ -642,257 +811,6 @@ impl GameState {
                 }
             }
         }
-    }
-
-    pub fn recalculate_constant_blade_modifiers(&mut self) {
-        let card_db = self.card_database.clone();
-        let all_ids = self.collect_constant_stage_effect_ids();
-        let blade_ids: Vec<(i16, usize)> = all_ids
-            .into_iter()
-            .filter(|&(cid, idx)| {
-                GameState::resolve_constant_ability(&card_db, cid, idx).map_or(false, |a| {
-                    a.effect.as_ref().map_or(false, |effect| {
-                        effect.action == crate::ability::enums::ActionType::GainResource
-                            && matches!(
-                                effect.resource_any().as_deref(),
-                                Some("blade") | Some("ブレード")
-                            )
-                    })
-                })
-            })
-            .collect();
-
-
-        let mut expected: HashMap<i16, i16> = HashMap::default();
-        {
-            let ctx = crate::ability::condition::ConditionContext::new(self);
-            for &(cid, ability_idx) in &blade_ids {
-                let Some(blade_ability) =
-                    GameState::resolve_constant_ability(&card_db, cid, ability_idx)
-                else {
-                    continue;
-                };
-                let Some(ref effect) = blade_ability.effect else {
-                    continue;
-                };
-                let cond_met = effect
-                    .condition
-                    .as_ref()
-                    .is_none_or(|c| ctx.evaluate_condition(c));
-
-                if cond_met {
-                    let count = if effect.per_unit_any().unwrap_or(false) {
-                        let player = if self.player1.stage.stage.contains(&cid) {
-                            &self.player1
-                        } else {
-                            &self.player2
-                        };
-                        let loc = effect.location_any();
-                        let per_type = effect.per_unit_type_any();
-                        let zone = loc
-                            .or(per_type)
-                            .unwrap_or(crate::ability::enums::Zone::Hand.to_str());
-                        let mut filter = effect.filter_subset();
-                        // Per-unit counts exclude the activating card, and
-                        // host_card_id scopes under-member counts.
-                        filter.exclude_self = Some(cid);
-                        let per_count = crate::ability::util::resolve_per_unit_count(
-                            true,
-                            Some(zone),
-                            player,
-                            &self.card_database,
-                            &filter,
-                            &[],
-                            effect.state_any().as_deref(),
-                            &self.mods.orientation_modifiers,
-                            Some(cid),
-                        );
-                        let base = if effect.max.unwrap_or(false) {
-                            1
-                        } else {
-                            effect
-                                .resource_icon_count_any()
-                                .unwrap_or(effect.count_any().unwrap_or(1))
-                        };
-                        let mut units = per_count as i32
-                            / effect.per_unit_count_any().unwrap_or(1).max(1) as i32;
-                        if effect.max.unwrap_or(false) {
-                            if let Some(cap) = effect.count_any() {
-                                units = units.min(cap as i32);
-                            }
-                        }
-                        units * base as i32
-                    } else {
-                        effect
-                            .resource_icon_count_any()
-                            .unwrap_or(effect.count_any().unwrap_or(1))
-                            as i32
-                    };
-                    let sign_mult: i16 = if matches!(
-                        effect.sign_any().as_deref(),
-                        Some("negative") | Some("-")
-                    ) {
-                        -1
-                    } else {
-                        1
-                    };
-                    let delta = (count as i16) * sign_mult;
-
-                    let is_front = effect
-                        .position_any()
-                        .as_ref()
-                        .and_then(|p| p.get_position())
-                        == Some("front");
-                    let target_ids = if is_front {
-                        let (is_p1, slot_idx) = if let Some(pos) =
-                            self.player1.stage.stage.iter().position(|&x| x == cid)
-                        {
-                            (true, pos)
-                        } else if let Some(pos) =
-                            self.player2.stage.stage.iter().position(|&x| x == cid)
-                        {
-                            (false, pos)
-                        } else {
-                            (true, 999)
-                        };
-                        if slot_idx < 3 {
-                            let opp_stage = if is_p1 {
-                                &self.player2.stage.stage
-                            } else {
-                                &self.player1.stage.stage
-                            };
-                            let opp_slot = 2 - slot_idx;
-                            let opp_cid = opp_stage[opp_slot];
-                            if opp_cid != -1 {
-                                let filter = effect.filter_subset();
-                                if filter.matches(&self.card_database, opp_cid, false) {
-                                    vec![opp_cid]
-                                } else {
-                                    vec![]
-                                }
-                            } else {
-                                vec![]
-                            }
-                        } else {
-                            vec![]
-                        }
-                    } else if effect.all_any().unwrap_or(false) {
-                        // Grant to ALL matching stage members on the ability card's
-                        // side. Optionally restricted to members that have a member
-                        // card underneath (requires_under_card, CLEAN-G3).
-                        let player = if self.player1.stage.stage.contains(&cid) {
-                            &self.player1
-                        } else {
-                            &self.player2
-                        };
-                        let filter = effect.filter_subset();
-                        let need_under = effect.requires_under_card_any().unwrap_or(false);
-                        let mut targets: Vec<i16> = Vec::new();
-                        for (slot, &mid) in player.stage.stage.iter().enumerate() {
-                            if mid == -1 || !filter.matches(&self.card_database, mid, true) {
-                                continue;
-                            }
-                            if need_under {
-                                let has_member_under = player.stage.under_cards[slot]
-                                    .iter()
-                                    .any(|&u| {
-                                        self.card_database
-                                            .get_card(u)
-                                            .map_or(false, |c| c.is_member())
-                                    });
-                                if !has_member_under {
-                                    continue;
-                                }
-                            }
-                            targets.push(mid);
-                        }
-                        targets
-                    } else {
-                        vec![cid]
-                    };
-
-                    for tid in target_ids {
-                        *expected.entry(tid).or_insert(0) += delta;
-                    }
-                }
-            }
-        }
-
-        let old_bonuses = core::mem::take(&mut self.mods.constant_blade_bonuses);
-        for (cid, old) in &old_bonuses {
-            self.mods.remove_blade_modifier(*cid, *old as i16);
-        }
-        // Under-card constant blade abilities ("常時：このカードが『X』のメンバーの
-        // 下に置かれているかぎり、そのメンバーはブレードを得る"). Unlike stage
-        // abilities, the blade is granted to the HOST member the card is stacked
-        // under (not to the ability card itself, which isn't on stage).
-        {
-            for (under_cid, host) in self
-                .player1
-                .stage
-                .under_cards_with_hosts()
-                .into_iter()
-                .chain(self.player2.stage.under_cards_with_hosts().into_iter())
-            {
-                let card = match self.card_database.get_card(under_cid) {
-                    Some(c) => c,
-                    None => continue,
-                };
-                for (_ability_idx, ar) in card.abilities.iter().enumerate() {
-                    if !GameState::ability_matches_trigger(
-                        &ar.resolve(),
-                        &crate::game_state::AbilityTrigger::Constant,
-                    ) {
-                        continue;
-                    }
-                    let ability = ar.resolve();
-                    let Some(ref effect) = ability.effect else {
-                        continue;
-                    };
-                    if effect.action != crate::ability::enums::ActionType::GainResource
-                        || !matches!(
-                            effect.resource_any().as_deref(),
-                            Some("blade") | Some("ブレード")
-                        )
-                    {
-                        continue;
-                    }
-                    let Some(ref cond) = effect.condition else {
-                        continue;
-                    };
-                    // Only under-member-scoped grants route to the host; a generic
-                    // constant gain on an under-card has no such meaning.
-                    if cond.get_location() != Some("under_member") {
-                        continue;
-                    }
-                    let Some(groups) = cond.get_group_names() else {
-                        continue;
-                    };
-                    // Condition met iff this card is under a host of the group.
-                    if !crate::ability::util::card_matches_any_group(
-                        &self.card_database,
-                        host,
-                        groups,
-                    ) {
-                        continue;
-                    }
-                    let count = effect
-                        .resource_icon_count_any()
-                        .unwrap_or(effect.count_any().unwrap_or(1))
-                        as i16;
-                    *expected.entry(host).or_insert(0) += count;
-                }
-            }
-        }
-        for (&cid, &new_val) in &expected {
-            self.mods.add_blade_modifier(cid, new_val as i16);
-        }
-        self.mods.constant_blade_bonuses = expected;
-        self.recalculate_constant_cost_modifiers();
-        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            log::debug!("[SZ_DEBUG] about to call evaluate_success_zone_constant_modifiers from recalculate_constants");
-        }
-        self.evaluate_success_zone_constant_modifiers();
     }
 
     pub fn recalculate_constant_cost_modifiers(&mut self) {

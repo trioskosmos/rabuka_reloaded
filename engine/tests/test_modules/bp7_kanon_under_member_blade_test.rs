@@ -41,7 +41,7 @@ fn kanon_under_liella_host_gains_blade() {
 
     place_kanon_under(&mut game, MemberArea::Center);
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     let blade_mod = game.state.mods.get_blade_modifier(host);
     assert_eq!(
@@ -62,7 +62,7 @@ fn kanon_on_stage_grants_no_blade() {
     // 澁谷かのん herself on stage, host on stage; neither is under the other.
     game.state.player1.stage.stage = [kanon, host, -1];
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     let host_blade = game.state.mods.get_blade_modifier(host);
     let kanon_blade = game.state.mods.get_blade_modifier(kanon);
@@ -90,7 +90,7 @@ fn kanon_under_non_liella_host_grants_no_blade() {
 
     place_kanon_under(&mut game, MemberArea::Center);
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     let blade_mod = game.state.mods.get_blade_modifier(host);
     assert_eq!(
@@ -109,7 +109,7 @@ fn kanon_absent_grants_no_blade() {
     let host = game.id("PL!SP-sd1-004-SD");
     game.state.player1.stage.stage = [-1, host, -1];
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     let blade_mod = game.state.mods.get_blade_modifier(host);
     assert_eq!(
@@ -134,7 +134,7 @@ fn two_kanon_copies_under_one_liella_host() {
     game.state.player1.stage.place_under_card(MemberArea::Center, k1);
     game.state.player1.stage.place_under_card(MemberArea::Center, k2);
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     let blade_mod = game.state.mods.get_blade_modifier(host);
     assert_eq!(
@@ -157,7 +157,7 @@ fn kanon_under_center_does_not_leak_to_other_slots() {
 
     place_kanon_under(&mut game, MemberArea::Center);
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     let center_blade = game.state.mods.get_blade_modifier(center_host);
     let right_blade = game.state.mods.get_blade_modifier(right_host);
@@ -185,7 +185,7 @@ fn kanon_in_hand_contributes_nothing() {
     let kanon = game.id("PL!SP-bp7-001-R");
     game.state.player1.hand.cards.push(kanon);
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     let blade_mod = game.state.mods.get_blade_modifier(host);
     assert_eq!(
@@ -210,7 +210,7 @@ fn kanon_copies_under_two_liella_hosts() {
     game.state.player1.stage.place_under_card(MemberArea::Center, ka);
     game.state.player1.stage.place_under_card(MemberArea::RightSide, kb);
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     let center_blade = game.state.mods.get_blade_modifier(center_host);
     let right_blade = game.state.mods.get_blade_modifier(right_host);
@@ -240,7 +240,7 @@ fn kanon_under_opponent_liella_host_gains_blade() {
     let kanon = game.id("PL!SP-bp7-001-R");
     game.state.player2.stage.place_under_card(MemberArea::Center, kanon);
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     let blade_mod = game.state.mods.get_blade_modifier(p2_host);
     assert_eq!(
@@ -263,7 +263,7 @@ fn kanon_leaving_removes_blade() {
     let kanon = game.id("PL!SP-bp7-001-R");
     game.state.player1.stage.place_under_card(MemberArea::Center, kanon);
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.get_blade_modifier(host),
         1,
@@ -277,7 +277,7 @@ fn kanon_leaving_removes_blade() {
         .stage
         .recycle_under_cards(MemberArea::Center, &game.db);
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.get_blade_modifier(host),
         0,
@@ -363,7 +363,7 @@ fn kanon_full_flow_baton_touch_places_under_and_grants_blade() {
     );
 
     // ab#0: the Liella! arriver host now gains a blade.
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
     let blade_mod = game.state.mods.get_blade_modifier(arriver);
     assert_eq!(
         blade_mod, 1,

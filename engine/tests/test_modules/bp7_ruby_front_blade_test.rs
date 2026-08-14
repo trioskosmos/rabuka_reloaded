@@ -27,7 +27,7 @@ fn setup(ruby_slot: usize, opp_slot: usize, opp_card: &str) -> (TestGame, i16, i
     p2[opp_slot] = opp;
     game.state.player1.stage.stage = p1;
     game.state.player2.stage.stage = p2;
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
     (game, ruby, opp)
 }
 
@@ -75,7 +75,7 @@ fn ruby_left_affects_p2_right_only() {
     // Ruby at P1 Left; cost 4 members at P2 Center and P2 Right
     game.state.player1.stage.stage = [ruby, -1, -1];
     game.state.player2.stage.stage = [-1, opp_center, opp_right];
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     assert_eq!(
         game.state.mods.get_blade_modifier(opp_right), -1,
@@ -110,7 +110,7 @@ fn ruby_facing_ruby_both_debuffed() {
 
     game.state.player1.stage.stage = [-1, ruby_p1, -1];
     game.state.player2.stage.stage = [-1, ruby_p2, -1];
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     assert_eq!(
         game.state.mods.get_blade_modifier(ruby_p1), -1,
@@ -131,7 +131,7 @@ fn empty_front_slot_no_crash() {
 
     game.state.player1.stage.stage = [-1, ruby, -1];
     game.state.player2.stage.stage = [-1, -1, -1];
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     assert_eq!(game.state.mods.constant_blade_bonuses.len(), 0);
 }
@@ -147,12 +147,12 @@ fn opponent_member_moves_out_of_front_recovers_blade() {
     // Opponent member at P2 Center (in front of Ruby)
     game.state.player1.stage.stage = [-1, ruby, -1];
     game.state.player2.stage.stage = [-1, opp, -1];
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
     assert_eq!(game.state.mods.get_blade_modifier(opp), -1);
 
     // Opponent moves to P2 Left (slot 0)
     game.state.player2.stage.stage = [opp, -1, -1];
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.get_blade_modifier(opp), 0,
         "After moving to side slot out of front area, blade should recover to 0"
@@ -169,10 +169,45 @@ fn ruby_leaves_stage_modifier_removed() {
 
     game.state.player1.stage.stage = [-1, ruby, -1];
     game.state.player2.stage.stage = [-1, opp, -1];
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
     assert_eq!(game.state.mods.get_blade_modifier(opp), -1, "Should have -1 with Ruby on stage");
 
     game.state.player1.stage.stage[1] = -1; // Ruby leaves
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
     assert_eq!(game.state.mods.get_blade_modifier(opp), 0, "Modifier should be 0 after Ruby leaves");
+}
+
+/// Edge case (ruling): final blade count can never be negative.
+/// A member with base blade 0 in front of Ruby gets modifier -1, but the
+/// EFFECTIVE total blade is floored at 0 (never -1).
+#[test]
+fn ruby_zero_blade_member_stays_zero() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let ruby = game.id(RUBY);
+    let opp = game.id("PL!-sd1-008-SD"); // 小泉花陽, cost 4, base blade 0
+
+    game.state.player1.stage.stage = [-1, ruby, -1];
+    game.state.player2.stage.stage = [-1, opp, -1];
+    game.state.recalculate_constants();
+
+    // Internal modifier is -1 (the debuff is tracked on the target)
+    assert_eq!(
+        game.state.mods.get_blade_modifier(opp),
+        -1,
+        "Opponent gets -1 blade modifier from Ruby"
+    );
+
+    // Effective total blade across the stage is floored at 0, never negative.
+    // Ruby has base blade 0 and opp has base blade 0 + modifier -1.
+    let total = game.state.player2.stage.total_blades(
+        &game.db,
+        &game.state.mods.blade_modifiers,
+        &game.state.mods.orientation_modifiers,
+        true,
+    );
+    assert_eq!(
+        total, 0,
+        "Total blade must floor at 0 even with a -1 modifier (got {total})"
+    );
 }

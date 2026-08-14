@@ -32,6 +32,25 @@ impl MemberArea {
         }
     }
 
+    /// Stage slot index (0=left, 1=center, 2=right).
+    pub fn to_index(&self) -> usize {
+        match self {
+            MemberArea::LeftSide => 0,
+            MemberArea::Center => 1,
+            MemberArea::RightSide => 2,
+        }
+    }
+
+    /// Inverse of [`MemberArea::to_index`]. Returns None for unknown indices.
+    pub fn from_index(idx: usize) -> Option<MemberArea> {
+        match idx {
+            0 => Some(MemberArea::LeftSide),
+            1 => Some(MemberArea::Center),
+            2 => Some(MemberArea::RightSide),
+            _ => None,
+        }
+    }
+
     /// Wire tag used by the 3DS multiplayer protocol (1=left, 2=center, 3=right).
     pub fn to_tag(&self) -> u8 {
         match self {

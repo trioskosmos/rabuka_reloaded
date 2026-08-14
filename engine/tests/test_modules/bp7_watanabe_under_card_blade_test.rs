@@ -46,7 +46,7 @@ fn watanabe_aqours_host_with_member_under_gains_blade() {
     let host = game.id(HOST_AQOURS);
     let u = game.id(MEMBER_UNDER); setup(&mut game, host, MemberArea::Center, Some(u));
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     assert_eq!(
         blade_of(&game, host),
@@ -65,7 +65,7 @@ fn watanabe_aqours_host_without_under_gains_nothing() {
     let host = game.id(HOST_AQOURS);
     setup(&mut game, host, MemberArea::Center, None);
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     assert_eq!(
         blade_of(&game, host),
@@ -85,7 +85,7 @@ fn watanabe_aqours_host_with_energy_under_gains_nothing() {
     let host = game.id(HOST_AQOURS);
     let u = game.id(ENERGY_UNDER); setup(&mut game, host, MemberArea::Center, Some(u));
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     assert_eq!(
         blade_of(&game, host),
@@ -104,7 +104,7 @@ fn watanabe_non_aqours_host_with_member_under_gains_nothing() {
     let host = game.id(HOST_NON_AQOURS);
     let u = game.id(MEMBER_UNDER); setup(&mut game, host, MemberArea::Center, Some(u));
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     assert_eq!(
         blade_of(&game, host),
@@ -123,7 +123,7 @@ fn watanabe_self_no_under_gains_nothing() {
     let watanabe = game.id(WATANABE);
     game.state.player1.stage.stage[1] = watanabe;
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     assert_eq!(
         blade_of(&game, watanabe),
@@ -146,7 +146,7 @@ fn watanabe_two_hosts_with_members_under_both_gain() {
     game.state.player1.stage.place_under_card(MemberArea::Center, game.id(MEMBER_UNDER));
     game.state.player1.stage.place_under_card(MemberArea::RightSide, game.id(MEMBER_UNDER));
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     assert_eq!(blade_of(&game, a), 1, "center Aqours host → 1 blade");
     assert_eq!(blade_of(&game, b), 1, "right Aqours host → 1 blade");

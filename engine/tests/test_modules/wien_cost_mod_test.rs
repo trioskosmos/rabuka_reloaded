@@ -22,7 +22,7 @@ fn wien_low_energy_no_cost_modifier() {
     assert_eq!(remaining, 5, "spent 4 energy (base cost)");
 
     // Recalc should NOT add cost mod (9 < 10)
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.get_cost_modifier(wien),
         0,
@@ -52,7 +52,7 @@ fn wien_high_energy_cost_modifier_applied() {
     );
 
     // Recalc SHOULD add +4 cost mod (10 >= 10)
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.get_cost_modifier(wien),
         4,
@@ -73,7 +73,7 @@ fn wien_cost_modifier_dynamic() {
     game.give_energy(9);
 
     // At 9 energy: no modifier
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.get_cost_modifier(wien),
         0,
@@ -83,7 +83,7 @@ fn wien_cost_modifier_dynamic() {
     // Add 1 more → 10 energy
     game.state.player1.energy_zone.cards.push(energy_id);
     game.state.player1.energy_zone.add_active(1);
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.get_cost_modifier(wien),
         4,
@@ -93,7 +93,7 @@ fn wien_cost_modifier_dynamic() {
     // Remove 1 → back to 9
     game.state.player1.energy_zone.cards.pop();
     game.state.player1.energy_zone.sub_active(1);
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.get_cost_modifier(wien),
         0,
@@ -111,7 +111,7 @@ fn wien_cost_modifier_cleared_on_leave() {
 
     game.state.player1.stage.stage = [-1, wien, -1];
     game.give_energy(10);
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
     assert_eq!(
         game.state.mods.get_cost_modifier(wien),
         4,
@@ -122,7 +122,7 @@ fn wien_cost_modifier_cleared_on_leave() {
     game.state.player1.stage.stage[1] = -1;
     game.state.player1.waitroom.cards.push(wien);
     game.state.mods.clear_all_for_card(wien);
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     assert_eq!(
         game.state.mods.get_cost_modifier(wien),

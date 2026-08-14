@@ -20,7 +20,7 @@ fn eri_constant_blade_per_wait_member() {
     game.state.mods.add_orientation_modifier(friend, "wait");
 
     // Recalculate constant blade modifiers
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     // The constant ability should have added a blade modifier: +1 per wait member
     let blade_mod = game.state.mods.get_blade_modifier(eri);
@@ -105,7 +105,7 @@ fn mia_constant_blade_per_energy_under() {
         );
     }
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     let blade_mod = game.state.mods.get_blade_modifier(mia);
     assert_eq!(blade_mod, 2, "2 energy under → 2 blade, got {}", blade_mod);
@@ -120,7 +120,7 @@ fn mia_constant_blade_zero_energy_under() {
 
     game.state.player1.stage.stage = [-1, mia, -1];
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     let blade_mod = game.state.mods.get_blade_modifier(mia);
     assert_eq!(blade_mod, 0, "0 energy under → 0 blade, got {}", blade_mod);

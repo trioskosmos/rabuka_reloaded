@@ -58,7 +58,7 @@ fn chika_constant_blade_per_member_under() {
     place_member_under(&mut game, MemberArea::Center, "PL!SP-sd1-001-SD");
     place_member_under(&mut game, MemberArea::Center, "PL!SP-sd1-004-SD");
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     let blade_mod = game.state.mods.get_blade_modifier(chika);
     assert_eq!(
@@ -77,7 +77,7 @@ fn chika_constant_blade_zero_under() {
     let chika = game.id("PL!SP-bp7-003-R＋");
     game.state.player1.stage.stage = [-1, chika, -1];
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     let blade_mod = game.state.mods.get_blade_modifier(chika);
     assert_eq!(
@@ -110,7 +110,7 @@ fn chika_constant_blade_counts_only_under() {
         .stage
         .place_under_card(MemberArea::Center, kanon);
 
-    game.state.recalculate_constant_blade_modifiers();
+    game.state.recalculate_constants();
 
     let blade_mod = game.state.mods.get_blade_modifier(chika);
     assert_eq!(
