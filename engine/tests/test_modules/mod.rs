@@ -324,6 +324,7 @@ pub mod bp4_live_start_change_state_gain_test;
 pub mod bp6_004_002_audit_test;
 pub mod cards_6_thru_13_test;
 pub mod chika_center_cost_test;
+pub mod chika_bp7_conditional_result_test;
 pub mod conditional_alternative_test;
 pub mod daydream_mermaid_test;
 pub mod ll_bp1_001_test;
@@ -398,6 +399,9 @@ pub mod nonfiction_cost_comparison_test;
 
 // SELF CONTROL!! + 鮖ｿ隗定＊濶ｯ: position_change triggers moved-this-turn blade grant
 pub mod self_control_position_change_test;
+
+// 黒澤ルビィ (PL!S-bp7-018-N) 登場: move a chosen stage member to the center area.
+pub mod ruby_bp7_center_position_test;
 
 // 譯懷・譴ｨ蟄・(PL!S-bp5-002) 窶・LiveStart center: left_cost == right_cost 竊・wait opponent low-blade
 // Verifies require_position_cards: both positions must have cards (empty = no trigger)

@@ -4238,6 +4238,30 @@ impl<'a> ConditionContext<'a> {
             return total;
         }
         let player = self.resolve_condition_player(target);
+        // Character-name zone count: when a comparison condition specifies
+        // `characters` (e.g. "これにより「桜内梨子」か「渡辺曜」を手札に加えた場合")
+        // against a location, count the matching cards rather than returning the
+        // raw zone length. Otherwise a hand with any cards would satisfy count>=1
+        // regardless of which character was actually moved.
+        if let Some(chars) = condition.get_characters() {
+            if !chars.is_empty() && !location.is_empty() {
+                let card_db = &self.game_state.card_database;
+                // Prefer cards moved by the preceding effect (this is a
+                // "これにより…を手札に加えた場合" result check). This avoids a
+                // false positive when a matching character was ALREADY in the
+                // zone before the effect ran. Fall back to the whole zone.
+                let source_cards: SmallVec<[i16; 8]> = if !self.moved_cards.is_empty() {
+                    self.moved_cards.iter().copied().collect()
+                } else {
+                    util::zone_cards(player, location).iter().copied().collect()
+                };
+                let matching: u8 = source_cards
+                    .iter()
+                    .filter(|&&cid| util::card_matches_characters(card_db, cid, Some(chars)))
+                    .count() as u8;
+                return matching;
+            }
+        }
         self.zone_len(player, location)
     }
 

@@ -109,11 +109,7 @@ extern "C" {
     pub fn _3ds_board_get_zone_h(zone_type: i32) -> i32;
     pub fn _3ds_board_get_slot_w(zone_type: i32) -> f32;
 
-    // Game-mode / CLI mode toggle
-    pub fn _3ds_set_cli_mode(cli: bool);
-    pub fn _3ds_is_cli_mode() -> bool;
-
-    // Top screen graphical drawing (game mode)
+    // Top screen graphical drawing
     pub fn _3ds_top_clear();
     pub fn _3ds_top_queue_rect(x: f32, y: f32, w: f32, h: f32, color: u32);
     pub fn _3ds_top_queue_text(x: f32, y: f32, color: u32, scale: f32, text: *const u8);

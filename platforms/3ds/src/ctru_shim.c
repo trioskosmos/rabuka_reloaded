@@ -109,10 +109,8 @@ static u32 COL_PINK      = 0xFFFF55AA; // pink
 static u32 COL_PRPL      = 0xFF9B59B6; // purple
 static u32 COL_TAPPED    = 0xAA000000; // tapped overlay
 
-// ---- Game mode state (vs CLI debug mode) ----
-static bool cli_mode = false;
-
-// ---- Top screen draw-op queue (used when !cli_mode) ----
+// ---- Game mode state ----
+// ---- Top screen draw-op queue ----
 #define MAX_DRAW_OPS 256
 typedef struct {
     float x, y, w, h;
@@ -265,7 +263,6 @@ void _3ds_init() {
     // Initialize game-mode draw queue + overlay
     atlas_count = 0;
     board_mode = false;
-    cli_mode = false;
     draw_op_count = 0;
     overlay_count = 0;
     bot_draw_op_count = 0;
@@ -449,10 +446,6 @@ float _3ds_board_get_slot_w(int zone_type) {
         default: return 0;
     }
 }
-
-// ---- CLI mode toggle ----
-void _3ds_set_cli_mode(bool cli) { cli_mode = cli; }
-bool _3ds_is_cli_mode() { return cli_mode; }
 
 // ---- Top screen draw-op queue (game mode) ----
 // Queued draw ops are rendered in _3ds_swap_buffers. Text ops carry a scale
@@ -920,7 +913,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
         float psx = st_x + st_pad_x;
         _3ds_draw_border(psx, sy + st_pad_y, st_card_w, st_slot_h - 2, COL_BLUE, 1);
         int play_cost = -1;
-        if (!cli_mode && _is_highlighted(1, si, opponent)) {
+        if (_is_highlighted(1, si, opponent)) {
             _3ds_draw_border(st_x, sy, st_slot_w, st_slot_h, COL_SEL, 2);
             // Show the energy cost to play a hand card into this slot, drawn
             // above the zone (like the web UI's play-cost label).
@@ -982,7 +975,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float e_sz = energy_h - 4;
     float e_w = e_sz * PORTRAIT;
     for (int i = 0; i < pb->energy_count && i < MAX_SLOTS; i++) {
-        if (!cli_mode && _is_highlighted(2, i, opponent)) {
+        if (_is_highlighted(2, i, opponent)) {
             _3ds_draw_border(ex, energy_y + 2, e_w, e_sz, COL_SEL, 2);
         }
         if (pb->energy[i].active) _3ds_draw_card_at(&pb->energy[i], ex, energy_y + 2, e_w, e_sz);
@@ -999,7 +992,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float h_slot_w = hand_card_h * PORTRAIT;
     for (int i = 0; i < pb->hand_count && i < MAX_SLOTS; i++) {
         if (pb->hand[i].active) _3ds_draw_card_at(&pb->hand[i], hx, hand_y + 2, h_slot_w, hand_card_h);
-        if (!cli_mode && _is_highlighted(3, i, opponent)) {
+        if (_is_highlighted(3, i, opponent)) {
             // Draw highlight border above card (z=0.6 > card z=0.5)
             C2D_DrawRectSolid(hx, hand_y + 2, 0.6f, h_slot_w, 2, COL_SEL);
             C2D_DrawRectSolid(hx, hand_y + hand_card_h, 0.6f, h_slot_w, 2, COL_SEL);
@@ -1016,7 +1009,7 @@ void _3ds_render_board() {
     C2D_TargetClear(bot_target, COL_BG);
 
     // Only draw active-player section border overlay in game mode
-    if (!cli_mode && board_view == 2) {
+    if (board_view == 2) {
         float half = 114.0f;
         float div_y = half + 2;
         _3ds_board_set_section_rect(2, half, true);
@@ -1035,7 +1028,7 @@ void _3ds_render_board() {
 
     // Action overlay panel (game mode, bottom-right)
     // Action overlay panel: scale 0.60 = 18px glyph, line height 24px.
-    if (!cli_mode && overlay_count > 0) {
+    if (overlay_count > 0) {
         float p_w = 210.0f, p_h = 24.0f * overlay_count + 8.0f;
         float p_x = 320.0f - p_w - 2.0f;
         float p_y = 240.0f - p_h - 2.0f;
@@ -1164,27 +1157,14 @@ void _3ds_swap_buffers() {
         C3D_RenderTarget* target = (eye == 0) ? top_target : top_target_right;
         float x_off = (eye == 1) ? -slider * 48.0f : 0.0f;
 
-        if (cli_mode) {
-            C2D_TargetClear(target, C2D_Color32(0, 0, 0, 255));
-            C2D_SceneBegin(target);
-            if (top_parsed) {
-                float cli_scale = custom_font ? 0.85f : 0.66f;
-                C2D_DrawText(&top_obj,
-                    C2D_WithColor,
-                    2.0f + x_off, 2.0f - (float)top_scroll_y, 0.5f,
-                    cli_scale, cli_scale,
-                    C2D_Color32(0, 255, 0, 255),
-                    390.0f);
-            }
-        } else {
-            C2D_TargetClear(target, COL_TOP_BG);
-            C2D_SceneBegin(target);
-            // Camera preview for QR scan (draws behind text overlays)
-            _3ds_qr_draw_preview(x_off);
-            C2D_TextBufClear(tmp_text_buf);
-            C2D_Font f = custom_font ? custom_font : NULL;
-            float font_scale = 1.2f;
-            for (int i = 0; i < draw_op_count; i++) {
+        C2D_TargetClear(target, COL_TOP_BG);
+        C2D_SceneBegin(target);
+        // Camera preview for QR scan (draws behind text overlays)
+        _3ds_qr_draw_preview(x_off);
+        C2D_TextBufClear(tmp_text_buf);
+        C2D_Font f = custom_font ? custom_font : NULL;
+        float font_scale = 1.2f;
+        for (int i = 0; i < draw_op_count; i++) {
                 if (draw_op_types[i] == OP_RECT) {
                     C2D_DrawRectSolid(draw_ops[i].x + x_off, draw_ops[i].y, 0.5f,
                         draw_ops[i].w, draw_ops[i].h, draw_ops[i].color);
@@ -1282,7 +1262,6 @@ void _3ds_swap_buffers() {
                     }
                 }
             }
-        }
     }
 
     // BOTTOM SCREEN: board or text (no 3D effect)

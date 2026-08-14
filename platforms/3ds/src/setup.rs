@@ -22,7 +22,6 @@ use rabuka_engine::player::Player;
 use crate::dprintln;
 use crate::ffi::*;
 use crate::game::PlayState;
-use crate::i18n::Lang;
 use crate::lang::{current_lang, set_lang, tl, tl_fmt};
 use crate::steps::{Overlay, SetupPhase, Step};
 use crate::uds;
@@ -88,29 +87,6 @@ fn pick_mode(
     unsafe {
         let cur = cur.min(3);
         if was_dirty {
-            if _3ds_is_cli_mode() {
-                _3ds_clear_top();
-                _3ds_text_add_top(format!("{}\n\0", tl("SELECT MODE")).as_ptr());
-                for (i, m) in ["VS AI", "Sandbox (2 players)", "QR Scan", "Local MP"]
-                    .iter()
-                    .enumerate()
-                {
-                    let arrow = if i == cur { ">" } else { " " };
-                    _3ds_text_add_top(format!("{} [{}] {}\n\0", arrow, i, tl(m)).as_ptr());
-                }
-                _3ds_text_add_top(
-                    format!(
-                        "{}\n\0",
-                        match current_lang() {
-                            Lang::English => "English / 英語",
-                            Lang::Japanese => "日本語 / English",
-                        }
-                    )
-                    .as_ptr(),
-                );
-                let tip = tl("L=help R=lang/言語 A=confirm B=back");
-                _3ds_text_add_top(format!("\n{}\0", tip).as_ptr());
-            } else {
                 _3ds_bot_clear();
                 _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
                 _3ds_bot_queue_text(
@@ -158,7 +134,6 @@ fn pick_mode(
                     )
                     .as_ptr(),
                 );
-            }
         }
         // Touch input: tapping a row selects + activates it (like pressing A).
         let mut t_x: u32 = 0;
@@ -269,25 +244,6 @@ fn pick_deck(
             } else {
                 tl("YOUR DECK")
             };
-            if unsafe { _3ds_is_cli_mode() } {
-                unsafe {
-                    _3ds_clear_top();
-                }
-                unsafe {
-                    _3ds_text_add_top(format!("{}\n\0", label).as_ptr());
-                }
-                for i in
-                    cur.saturating_sub(6).min(n.saturating_sub(12))..(0usize.min(n) + 12).min(n)
-                {
-                    let arrow = if i == cur { ">" } else { " " };
-                    unsafe {
-                        _3ds_text_add_top(format!("{} {}\n\0", arrow, decks[i].name).as_ptr());
-                    }
-                }
-                unsafe {
-                    _3ds_text_add_top("\nA=select B=back\0".as_ptr());
-                }
-            } else {
                 unsafe {
                     _3ds_bot_clear();
                     _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
@@ -352,7 +308,6 @@ fn pick_deck(
                     }
                 }
                 render_hint_bar_bot(&tl("UP/DOWN=select  A=confirm  X=preview  B=back"));
-            }
         }
         // Touch input: tap a deck row moves the cursor there and selects it (like A).
         let mut t_x: u32 = 0;
@@ -484,26 +439,6 @@ fn multiplayer_deck(
 ) -> Step {
     {
         if was_dirty {
-            if unsafe { _3ds_is_cli_mode() } {
-                unsafe {
-                    _3ds_clear_top();
-                }
-                let deck_hdr = tl("SELECT YOUR DECK");
-                unsafe {
-                    _3ds_text_add_top(format!("{}\n\0", deck_hdr).as_ptr());
-                }
-                for i in
-                    cur.saturating_sub(6).min(n.saturating_sub(12))..(0usize.min(n) + 12).min(n)
-                {
-                    let arrow = if i == cur { ">" } else { " " };
-                    unsafe {
-                        _3ds_text_add_top(format!("{} {}\n\0", arrow, decks[i].name).as_ptr());
-                    }
-                }
-                unsafe {
-                    _3ds_text_add_top("\nA=select B=back\0".as_ptr());
-                }
-            } else {
                 unsafe {
                     _3ds_bot_clear();
                     _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
@@ -541,7 +476,6 @@ fn multiplayer_deck(
                     }
                 }
                 render_hint_bar_bot(&tl("UP/DOWN=select  A=confirm  B=back"));
-            }
         }
         // Touch input: tap a deck row selects it (like A).
         let mut t_x: u32 = 0;
@@ -619,26 +553,6 @@ fn pick_deck2(
 ) -> Step {
     {
         if was_dirty {
-            if unsafe { _3ds_is_cli_mode() } {
-                unsafe {
-                    _3ds_clear_top();
-                }
-                let deck_hdr = tl("SELECT P2 DECK");
-                unsafe {
-                    _3ds_text_add_top(format!("{}\n\0", deck_hdr).as_ptr());
-                }
-                for i in
-                    cur.saturating_sub(6).min(n.saturating_sub(12))..(0usize.min(n) + 12).min(n)
-                {
-                    let arrow = if i == cur { ">" } else { " " };
-                    unsafe {
-                        _3ds_text_add_top(format!("{} {}\n\0", arrow, decks[i].name).as_ptr());
-                    }
-                }
-                unsafe {
-                    _3ds_text_add_top("\nA=select B=same\0".as_ptr());
-                }
-            } else {
                 unsafe {
                     _3ds_bot_clear();
                     _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
@@ -676,7 +590,6 @@ fn pick_deck2(
                     }
                 }
                 render_hint_bar_bot(&tl("X=preview  A=select  B=use same"));
-            }
         }
         // Touch input: tap a deck row selects it (like A).
         let mut t_x: u32 = 0;
@@ -825,9 +738,7 @@ fn loading(
                     atlas,
                     vs_ai,
                     ai_vs_ai: false,
-                    cli_mode: false,
                     detail_mode: false,
-                    choice_image_mode: true,
                     choice_subview: false,
                     text_page: 0,
                     choice_grid_offset: 0,
@@ -860,12 +771,24 @@ fn testing(cards: &Arc<Vec<Card>>, decks: &Vec<DeckList>, keys: u32) -> Step {
     {
         let results = run_on_device_tests(cards.clone(), decks.clone());
         unsafe {
-            _3ds_clear_both();
-            _3ds_text_add_top("=== ON-DEVICE TESTS ===\n\0".as_ptr());
+            _3ds_bot_clear();
+            _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+            _3ds_bot_queue_text(
+                4.0,
+                2.0,
+                COL_GOLD,
+                SCALE_BODY,
+                "=== ON-DEVICE TESTS ===\0".as_ptr(),
+            );
+            let mut ty = 24.0;
             for line in &results {
-                _3ds_text_add_top(format!("{}\n\0", line).as_ptr());
+                if ty > 218.0 {
+                    break;
+                }
+                _3ds_bot_queue_text(4.0, ty, COL_LIGHT, SCALE_SMALL, format!("{}\0", line).as_ptr());
+                ty += 15.0;
             }
-            _3ds_text_add_top("\nSTART=exit\0".as_ptr());
+            _3ds_bot_queue_text(4.0, 224.0, COL_MED, SCALE_SMALL, "START=exit\0".as_ptr());
         }
         if keys & 0x00000008 != 0 {
             Step::Done(Ok(()))
@@ -889,23 +812,20 @@ fn qr_scan(
             let ptr = unsafe { _3ds_qr_start() };
             if ptr.is_null() {
                 unsafe {
-                    _3ds_clear_both();
-                    _3ds_text_add_top(format!("{}\n\0", tl("Camera init failed")).as_ptr());
-                    _3ds_text_add_top(format!("{}\0", tl("B=back")).as_ptr());
+                    _3ds_bot_clear();
+                    _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                    _3ds_bot_queue_text(
+                        40.0,
+                        100.0,
+                        COL_MED,
+                        SCALE_BODY,
+                        format!("{}\0", tl("Camera init failed")).as_ptr(),
+                    );
+                    _3ds_bot_queue_text(40.0, 130.0, COL_MED, SCALE_SMALL, format!("{}\0", tl("B=back")).as_ptr());
                 }
                 qr_start_failed = true;
             } else {
                 qr_ctx = ptr as usize;
-                if unsafe { _3ds_is_cli_mode() } {
-                    unsafe {
-                        _3ds_clear_top();
-                        _3ds_text_add_top(format!("{}\n\0", tl("QR SCAN")).as_ptr());
-                        _3ds_text_add_top(
-                            format!("{}\n{}\0", tl("Point camera at QR code"), tl("B=cancel"))
-                                .as_ptr(),
-                        );
-                    }
-                } else {
                     unsafe {
                         _3ds_top_clear();
                         let qr_hdr = tl("QR SCAN");
@@ -941,7 +861,6 @@ fn qr_scan(
                             format!("{}\0", qr_cancel).as_ptr(),
                         );
                     }
-                }
             }
         }
         if qr_start_failed {
@@ -1023,12 +942,16 @@ fn qr_scan(
                     }
                 }
                 unsafe {
-                    _3ds_clear_both();
-                    _3ds_text_add_top(
-                        format!("{}\n\0", tl_fmt("Camera error", &[("e", &r.to_string())]))
-                            .as_ptr(),
+                    _3ds_bot_clear();
+                    _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
+                    _3ds_bot_queue_text(
+                        40.0,
+                        100.0,
+                        COL_MED,
+                        SCALE_BODY,
+                        format!("{}\0", tl_fmt("Camera error", &[("e", &r.to_string())])).as_ptr(),
                     );
-                    _3ds_text_add_top(format!("{}\0", tl("B=back")).as_ptr());
+                    _3ds_bot_queue_text(40.0, 130.0, COL_MED, SCALE_SMALL, format!("{}\0", tl("B=back")).as_ptr());
                 }
                 Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(2), true)
             } else {
@@ -1057,23 +980,6 @@ fn qr_result(
             was_dirty
         );
         if was_dirty {
-            if unsafe { _3ds_is_cli_mode() } {
-                unsafe {
-                    _3ds_clear_top();
-                    _3ds_text_add_top(format!("{}\n\0", tl("QR DECK")).as_ptr());
-                    for c in cards_read.iter().take(20) {
-                        _3ds_text_add_top(format!("  {}\n\0", c).as_ptr());
-                    }
-                    _3ds_text_add_top(
-                        format!(
-                            "\n{}\n{}\0",
-                            tl_fmt("cards", &[("n", &cards_read.len().to_string())]),
-                            tl("A=use  B=discard")
-                        )
-                        .as_ptr(),
-                    );
-                }
-            } else {
                 unsafe {
                     _3ds_bot_clear();
                     _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
@@ -1118,7 +1024,6 @@ fn qr_result(
                         format!("{}\0", tl("A=use deck  B=discard")).as_ptr(),
                     );
                 }
-            }
         }
         if keys & 0x00000002 != 0 {
             unsafe {
@@ -1171,19 +1076,6 @@ fn qr_not_deck(
 ) -> Step {
     {
         if was_dirty {
-            if unsafe { _3ds_is_cli_mode() } {
-                unsafe {
-                    _3ds_clear_top();
-                    _3ds_text_add_top(format!("{}\n\0", tl("NOT A DECK QR")).as_ptr());
-                    let preview = if scanned_text.len() > 40 {
-                        &scanned_text[..40]
-                    } else {
-                        &scanned_text
-                    };
-                    _3ds_text_add_top(format!("  {}\n\0", preview).as_ptr());
-                    _3ds_text_add_top(format!("\n{}\n\0", tl("B=back")).as_ptr());
-                }
-            } else {
                 unsafe {
                     _3ds_bot_clear();
                     _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
@@ -1214,7 +1106,6 @@ fn qr_not_deck(
                         format!("{}\0", tl("B=back")).as_ptr(),
                     );
                 }
-            }
         }
         if keys & 0x00000002 != 0 {
             Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(2), true)
@@ -1361,28 +1252,6 @@ fn control_guide(
         let page = page.min(total - 1);
         let guide_text = GUIDE_PAGES[page];
         if was_dirty {
-            if unsafe { _3ds_is_cli_mode() } {
-                unsafe {
-                    _3ds_clear_top();
-                    _3ds_text_add_top(format!("{}\n\0", tl("HELP")).as_ptr());
-                    for line in guide_text.split('\n') {
-                        _3ds_text_add_top(format!("{}\n\0", line).as_ptr());
-                    }
-                    _3ds_text_add_top(
-                        format!(
-                            "\n{}\0",
-                            tl_fmt(
-                                "Page {p}/{t}  L/R=pages  B=back",
-                                &[
-                                    ("p", &(page + 1).to_string()),
-                                    ("t", &total.to_string())
-                                ]
-                            )
-                        )
-                        .as_ptr(),
-                    );
-                }
-            } else {
                 unsafe {
                     _3ds_bot_clear();
                     _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
@@ -1430,7 +1299,6 @@ fn control_guide(
                         .as_ptr(),
                     );
                 }
-            }
         }
         if keys & 0x00000002 != 0 {
             Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(0), true)
@@ -1469,24 +1337,6 @@ fn multiplayer_pick_role(
 ) -> Step {
     {
         if was_dirty {
-            if unsafe { _3ds_is_cli_mode() } {
-                unsafe {
-                    _3ds_clear_top();
-                    let mp_hdr = tl("MULTIPLAYER");
-                    _3ds_text_add_top(format!("{}\n\0", mp_hdr).as_ptr());
-                    let host_net = tl("Host = create network");
-                    _3ds_text_add_top(format!("{}\n\0", host_net).as_ptr());
-                    let client_net = tl("Client = join network");
-                    _3ds_text_add_top(format!("{}\n\n\0", client_net).as_ptr());
-                    let arrow_h = if cur == 0 { ">" } else { " " };
-                    let arrow_c = if cur == 1 { ">" } else { " " };
-                    let host_label = tl("Host");
-                    let client_label = tl("Client");
-                    _3ds_text_add_top(format!("{} {}\n\0", arrow_h, host_label).as_ptr());
-                    _3ds_text_add_top(format!("{} {}\n\0", arrow_c, client_label).as_ptr());
-                    _3ds_text_add_top("\nUP/DOWN=select A=confirm B=back\0".as_ptr());
-                }
-            } else {
                 unsafe {
                     _3ds_bot_clear();
                     _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
@@ -1528,7 +1378,6 @@ fn multiplayer_pick_role(
                     }
                 }
                 render_hint_bar_bot(&tl("UP/DOWN=select  A=confirm  B=back"));
-            }
         }
         // Touch input: tap Host/Client row selects it (like A).
         let mut t_x: u32 = 0;
@@ -1630,18 +1479,6 @@ fn multiplayer_host_wait(
             let init_result = uds::uds_init(true);
             match init_result {
                 Ok(()) => {
-                    if unsafe { _3ds_is_cli_mode() } {
-                        unsafe {
-                            _3ds_clear_top();
-                            _3ds_text_add_top(
-                                format!("{}\n\0", tl("HOST: Network created!")).as_ptr(),
-                            );
-                            let wait_msg = tl("Waiting for client...");
-                            _3ds_text_add_top(format!("{}\n\0", wait_msg).as_ptr());
-                            let b_cancel = tl("B = cancel");
-                            _3ds_text_add_top(format!("{}\n\0", b_cancel).as_ptr());
-                        }
-                    } else {
                         unsafe {
                             _3ds_bot_clear();
                             _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
@@ -1668,22 +1505,8 @@ fn multiplayer_host_wait(
                                 format!("{}\0", tl("B=cancel")).as_ptr(),
                             );
                         }
-                    }
                 }
                 Err(e) => {
-                    if unsafe { _3ds_is_cli_mode() } {
-                        unsafe {
-                            _3ds_clear_top();
-                            _3ds_text_add_top(
-                                format!(
-                                    "{}\n\0",
-                                    tl_fmt("UDS INIT FAILED", &[("e", &e.to_string())])
-                                )
-                                .as_ptr(),
-                            );
-                            _3ds_text_add_top(format!("{}\n\0", tl("B = back")).as_ptr());
-                        }
-                    } else {
                         unsafe {
                             _3ds_bot_clear();
                             _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
@@ -1699,7 +1522,6 @@ fn multiplayer_host_wait(
                                 .as_ptr(),
                             );
                         }
-                    }
                 }
             }
         }
@@ -1767,13 +1589,6 @@ fn multiplayer_client_scan(
                 let hosts = uds::uds_scan_networks();
                 if hosts.is_empty() {
                     // No hosts found — rescan after delay
-                    if unsafe { _3ds_is_cli_mode() } {
-                        unsafe {
-                            _3ds_clear_top();
-                            _3ds_text_add_top(format!("{}\n\0", tl("Scanning...")).as_ptr());
-                            _3ds_text_add_top(format!("{}\n\0", tl("A=refresh B=back")).as_ptr());
-                        }
-                    } else {
                         unsafe {
                             _3ds_bot_clear();
                             _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
@@ -1792,7 +1607,6 @@ fn multiplayer_client_scan(
                                 format!("{}\0", tl("A=refresh B=back")).as_ptr(),
                             );
                         }
-                    }
                     Step::Setup(
                         cards.clone(),
                         decks.clone(),
@@ -1877,25 +1691,6 @@ fn multiplayer_client_host_select(
                 new_cursor = cursor + 1;
             }
             // Draw host list
-            if unsafe { _3ds_is_cli_mode() } {
-                unsafe {
-                    _3ds_clear_top();
-                }
-                let hdr = tl("SELECT HOST");
-                unsafe {
-                    _3ds_text_add_top(format!("{}\n\0", hdr).as_ptr());
-                }
-                for (i, _) in hosts.iter().enumerate() {
-                    let prefix = "";
-                    let label = format!("{}{}\0", prefix, format!("Host {}", i + 1));
-                    unsafe {
-                        _3ds_text_add_top(format!("{}\n\0", label).as_ptr());
-                    }
-                }
-                unsafe {
-                    _3ds_text_add_top(format!("{}\n\0", tl("A=connect B=back")).as_ptr());
-                }
-            } else {
                 unsafe {
                     _3ds_bot_clear();
                     _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
@@ -1930,7 +1725,6 @@ fn multiplayer_client_host_select(
                         format!("{}\0", tl("A=connect B=back")).as_ptr(),
                     );
                 }
-            }
             Step::Setup(
                 cards.clone(),
                 decks.clone(),
@@ -2000,12 +1794,6 @@ fn multiplayer_sync_deck(
         } else {
             // Client: Receive deck order from host
             if was_dirty {
-                if unsafe { _3ds_is_cli_mode() } {
-                    unsafe {
-                        _3ds_clear_top();
-                        _3ds_text_add_top(format!("{}\n\0", tl("Receiving deck data...")).as_ptr());
-                    }
-                } else {
                     unsafe {
                         _3ds_bot_clear();
                         _3ds_bot_queue_rect(0.0, 0.0, 320.0, 240.0, COL_TOP_BG);
@@ -2017,7 +1805,6 @@ fn multiplayer_sync_deck(
                             format!("{}\0", tl("Receiving deck data...")).as_ptr(),
                         );
                     }
-                }
             }
             // Try to receive deck sync
             let mut recv_buf = [0u8; 4096];
@@ -2175,9 +1962,7 @@ fn multiplayer_loading(
                     atlas,
                     vs_ai: false,
                     ai_vs_ai: false,
-                    cli_mode: false,
                     detail_mode: false,
-                    choice_image_mode: true,
                     choice_subview: false,
                     text_page: 0,
                     choice_grid_offset: 0,

@@ -12,7 +12,7 @@ use crate::ffi::_3ds_measure_text_width;
 use crate::ffi::_3ds_top_queue_text;
 
 // ---------------------------------------------------------------------------
-// Font sizes — the ONLY three sizes the game uses, plus a debug/CLI size.
+// Font sizes — the ONLY three sizes the game uses.
 //
 // Every text scale literal in the UI must be one of these constants instead of
 // a raw number. To change the overall font size, edit these values (they are
@@ -28,8 +28,6 @@ pub const SCALE_SMALL: f32 = 0.40;
 pub const SCALE_BODY: f32 = 0.52;
 /// Titles / headers / card name headers.
 pub const SCALE_LARGE: f32 = 0.64;
-/// CLI / debug console text.
-pub const SCALE_CLI: f32 = 0.68;
 
 /// Render text with inline `{{icon.png|label}}` icon images.
 /// Queue text for top screen rendering. C-side OP_TEXT handler parses {{icon}} markup natively.

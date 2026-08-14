@@ -24,9 +24,7 @@ use super::{pref, visible_hand_slots};
 /// Mutable play state carried back to play_step after input handling.
 pub(crate) struct InputOut {
     pub cur: usize,
-    pub cli_mode: bool,
     pub detail_mode: bool,
-    pub choice_image_mode: bool,
     pub choice_subview: bool,
     pub text_page: usize,
     pub choice_grid_offset: usize,
@@ -60,9 +58,7 @@ pub(crate) fn handle_input(
     keys: u32,
     display_order: &[usize],
     mut cur: usize,
-    mut cli_mode: bool,
     mut detail_mode: bool,
-    mut choice_image_mode: bool,
     mut choice_subview: bool,
     mut text_page: usize,
     mut choice_grid_offset: usize,
@@ -225,13 +221,18 @@ pub(crate) fn handle_input(
                 }
             }
         } else {
-            // === Choices: L opens text overlay, DPAD navigates items ===
+            // === Choices: L shows the detail screen for the card whose ability
+            // is being activated; DPAD navigates items ===
             // Card items use grid navigation; text items use vertical list navigation.
             if keys & 0x00000200 != 0 {
-                let has_ab_entry = gs.ability_queue.current_entry().is_some();
-                if has_ab_entry {
-                    choice_subview = true;
-                    text_page = 0;
+                if let Some(cid) = gs
+                    .ability_queue
+                    .current_entry()
+                    .and_then(|e| e.card_id)
+                {
+                    viewing_card = Some(cid);
+                    detail_mode = true;
+                    detail_scroll_y = 0.0;
                     redraw = true;
                 }
             }
@@ -379,9 +380,6 @@ pub(crate) fn handle_input(
                 }
             } else if !detail_mode {
                 viewing_card = None;
-                unsafe {
-                    _3ds_text_set_scroll_y(0);
-                }
             }
         }
         redraw = true;
@@ -400,21 +398,6 @@ pub(crate) fn handle_input(
         if !matches!(action, GridAction::None) {
             redraw = true;
         }
-    }
-
-    // R toggles choice image mode (board highlights vs text action list)
-    if overlay == Overlay::None && keys & 0x00000100 != 0 {
-        choice_image_mode = !choice_image_mode;
-        redraw = true;
-    }
-
-    // Y toggles CLI/game mode
-    if overlay == Overlay::None && keys & 0x00000800 != 0 {
-        cli_mode = !cli_mode;
-        unsafe {
-            _3ds_set_cli_mode(cli_mode);
-        }
-        redraw = true;
     }
 
     // START opens the in-game menu (perf stats / game log / revealed cards)
@@ -616,7 +599,7 @@ pub(crate) fn handle_input(
             _3ds_touch_read(&mut tx, &mut ty);
         }
         // Phase 2: tap action overlay to select action
-        if !cli_mode && ty < 240 && !acts_cache.is_empty() {
+        if ty < 240 && !acts_cache.is_empty() {
             let n = acts_cache.len();
             let max_vis = 8usize;
             let half = max_vis / 2;
@@ -734,7 +717,6 @@ pub(crate) fn handle_input(
                 }
                 // Also detect stage tap for choice position (any side, any mode)
                 if stage_tap.is_none()
-                    && choice_image_mode
                     && gs.has_pending_choice()
                     && (ty as i32) >= stage_y
                     && (ty as i32) < (stage_y + stage_h)
@@ -1107,9 +1089,7 @@ pub(crate) fn handle_input(
     was_touching = touching;
     InputOut {
         cur,
-        cli_mode,
         detail_mode,
-        choice_image_mode,
         choice_subview,
         text_page,
         choice_grid_offset,

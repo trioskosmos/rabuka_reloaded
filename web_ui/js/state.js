@@ -377,27 +377,41 @@ const stateInternal = {
                 console.log('[State] Loaded card ID mapping, total mappings:', Object.keys(mappingData).length);
             }
 
-            const imageMappingData = await fetchOptionalJson('js/card_image_mapping.json', 'card_image_mapping.json');
-            if (imageMappingData) {
-                State.cardImageMapping = imageMappingData;
-                console.log('[State] Loaded card image mapping, total mappings:', Object.keys(imageMappingData).length);
+            // Derive the card image mapping directly from cards.json. This is a
+            // pure function of each card's own data (card_no + rare_list), so it
+            // stays in sync automatically whenever a new set/card is added — no
+            // separately-generated JSON file that can go stale.
+            State.cardImageMapping = {};
+            if (State.staticCardDatabase) {
+                for (const [cardNo, card] of Object.entries(State.staticCardDatabase)) {
+                    let filename;
+                    if (card.type === 'エネルギー') {
+                        filename = 'LL-E-001-SD.webp';
+                    } else if (
+                        card.rare_list && Array.isArray(card.rare_list) && card.rare_list.length > 1
+                    ) {
+                        filename = (card.rare_list[0].card_no || card.card_no || cardNo) + '.webp';
+                    } else {
+                        filename = (card.card_no || cardNo) + '.webp';
+                    }
+                    State.cardImageMapping[cardNo] = `img/cards_webp/${filename}`;
+                }
+                console.log('[State] Derived card image mapping, total mappings:', Object.keys(State.cardImageMapping).length);
                 // Replace remote img URLs with local WebP paths in the static database
-                if (State.staticCardDatabase) {
-                    let replaced = 0;
-                    for (const [cardNo, card] of Object.entries(State.staticCardDatabase)) {
-                        if (card.img && card.img.startsWith('http')) {
-                            const localPath = State.cardImageMapping[cardNo]
-                                || State.cardImageMapping[cardNo.normalize('NFKC')];
-                            if (localPath) {
-                                card.img = localPath;
-                                replaced++;
-                            } else {
-                                delete card.img;
-                            }
+                let replaced = 0;
+                for (const [cardNo, card] of Object.entries(State.staticCardDatabase)) {
+                    if (card.img && card.img.startsWith('http')) {
+                        const localPath = State.cardImageMapping[cardNo]
+                            || State.cardImageMapping[cardNo.normalize('NFKC')];
+                        if (localPath) {
+                            card.img = localPath;
+                            replaced++;
+                        } else {
+                            delete card.img;
                         }
                     }
-                    if (replaced > 0) console.log('[State] Replaced', replaced, 'remote img URLs with local WebP paths');
                 }
+                if (replaced > 0) console.log('[State] Replaced', replaced, 'remote img URLs with local WebP paths');
                 State.emit('carddb-loaded');
                 if (State.data) {
                     State.emit('change', State.data);

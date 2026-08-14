@@ -2503,7 +2503,6 @@ impl super::resolver::AbilityResolver {
             });
             if was_select {
                 // The user just chose WHICH member to move (the source position).
-                // Now ask WHERE to move it (destination choice).
                 let target_str = modified
                     .target
                     .clone()
@@ -2511,6 +2510,77 @@ impl super::resolver::AbilityResolver {
                     .unwrap_or_else(|| "self".to_string().into());
                 self.clear_choice_meta(gs);
                 self.pending_choice = None;
+                // If the card fixes the destination (e.g. "…をセンターエリアにポジション
+                // チェンジ" → position=center), use it directly — no destination choice.
+                // Otherwise ask the player where to move the chosen member.
+                let fixed_dest = modified
+                    .position_any()
+                    .and_then(|p| p.get_position())
+                    .map(|s| s.to_string());
+                if let Some(fixed_dest) = fixed_dest {
+                    // The selected source is `dest` (from the source-selection choice);
+                    // move that member to the fixed destination.
+                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                        entry.choice_card_no = Some(ChoiceRoute::Raw(format!(
+                            "position_change:{}:{}",
+                            target_str, dest
+                        )));
+                    }
+                    modified.destination = Some(dest.into());
+                    if let Some(ref src_pos) = explicit_source_pos {
+                        let target = modified.target.as_deref().unwrap_or("self");
+                        let player = gs.resolve_target_player_mut(target);
+                        let src_idx = crate::ability::util::stage_position_index(src_pos)
+                            .unwrap_or(999);
+                        let dst_idx =
+                            crate::ability::util::stage_position_index(&fixed_dest).unwrap_or(999);
+                        if src_idx != dst_idx
+                            && src_idx < 3
+                            && dst_idx < 3
+                            && player.stage.stage[src_idx] != -1
+                        {
+                            use crate::zones::MemberArea;
+                            let from = match src_idx {
+                                0 => MemberArea::LeftSide,
+                                1 => MemberArea::Center,
+                                _ => MemberArea::RightSide,
+                            };
+                            let to = match dst_idx {
+                                0 => MemberArea::LeftSide,
+                                1 => MemberArea::Center,
+                                _ => MemberArea::RightSide,
+                            };
+                            let tgt_id = player.stage.stage[dst_idx];
+                            let src_id = player.stage.stage[src_idx];
+                            if let Err(e) = player.stage.position_change(from, to) {
+                                log::debug!("Direct position change failed: {}", e);
+                            } else {
+                                gs.position_change_occurred_this_turn = true;
+                                if src_id != -1 {
+                                    gs.record_card_movement(src_id);
+                                }
+                                if tgt_id != -1 {
+                                    gs.record_card_movement(tgt_id);
+                                }
+                            }
+                        }
+                        let pid = gs
+                            .ability_queue
+                            .current_entry()
+                            .map(|e| e.player_id.clone())
+                            .unwrap_or_default();
+                        gs.trigger_auto_abilities_for_player_with_event(
+                            &pid,
+                            &TriggerEvent {
+                                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
+                                position_change_occurred: gs.position_change_occurred_this_turn,
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    self.clear_choice_state_and_resume(gs)?;
+                    return Ok(());
+                }
                 // Compute destinations directly — all positions except source
                 // are valid (no group_names/exclude_self filtering for dest).
                 let all_positions = ["left", "center", "right"];

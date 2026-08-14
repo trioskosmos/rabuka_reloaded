@@ -32,9 +32,7 @@ pub struct PlayState {
     pub atlas: CardAtlas,
     pub vs_ai: bool,
     pub ai_vs_ai: bool,
-    pub cli_mode: bool,
     pub detail_mode: bool,
-    pub choice_image_mode: bool,
     pub choice_subview: bool,
     pub text_page: usize,
     pub choice_grid_offset: usize,
@@ -146,9 +144,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
         ref atlas,
         ref vs_ai,
         ref ai_vs_ai,
-        mut cli_mode,
         mut detail_mode,
-        mut choice_image_mode,
         mut choice_subview,
         mut text_page,
         mut choice_grid_offset,
@@ -185,9 +181,8 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
     let _my_id: i32 = my_player_idx as i32;
     // General check: do the current choice actions have card images?
     // ChoiceOption actions with card_id → image grid. Otherwise → text fallback.
-    // Image mode: SelectCard only. Text mode: ChoiceOption/answer_based.
-    let has_image_choice = choice_image_mode
-        && gs.has_pending_choice()
+    // Image mode is the default for SelectCard prompts (board-highlight picker).
+    let has_image_choice = gs.has_pending_choice()
         && matches!(
             gs.get_pending_choice(),
             Some(rabuka_engine::ability::types::Choice::SelectCard { .. })
@@ -230,9 +225,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
         keys,
         &display_order,
         cur,
-        cli_mode,
         detail_mode,
-        choice_image_mode,
         choice_subview,
         text_page,
         choice_grid_offset,
@@ -262,9 +255,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
         my_player_idx,
     );
     cur = out.cur;
-    cli_mode = out.cli_mode;
     detail_mode = out.detail_mode;
-    choice_image_mode = out.choice_image_mode;
     choice_subview = out.choice_subview;
     text_page = out.text_page;
     choice_grid_offset = out.choice_grid_offset;
@@ -339,7 +330,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
                 "[CHOICE] acts_cache={} display_order={} choice_img={}",
                 acts_cache.len(),
                 display_order.len(),
-                choice_image_mode
+                has_image_choice
             );
             for (i, act) in acts_cache.iter().enumerate() {
                 let cid = act
@@ -684,14 +675,12 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
             &acts_cache,
             &display_order,
             display_pos,
-            cli_mode,
             detail_mode,
             choice_subview,
             text_page,
             choice_grid_offset,
             list_scroll,
             detail_scroll_y,
-            touch_tap_count,
             viewing_card,
             &zone_viewer,
             zone_viewer_offset,
@@ -751,9 +740,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
         atlas: atlas.clone(),
         vs_ai: *vs_ai,
         ai_vs_ai: *ai_vs_ai,
-        cli_mode,
         detail_mode,
-        choice_image_mode,
         choice_subview,
         text_page,
         choice_grid_offset,

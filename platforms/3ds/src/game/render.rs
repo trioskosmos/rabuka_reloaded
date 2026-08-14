@@ -17,13 +17,13 @@ use crate::net::mp_can_act;
 use crate::ui::card_atlas::CardAtlas;
 use crate::ui::colors::*;
 use crate::ui::grid::{render_card_detail, render_card_grid};
-use crate::ui::hint::render_hint_bar;
+use crate::ui::hint::{render_hint_bar, HINT_BAR_SCALE, HINT_BAR_Y};
 use crate::ui::layers::Layer;
 use crate::ui::layers::Painter;
 use crate::ui::text::*;
 use crate::util::{cn_or_empty, tl_area};
 
-use super::{action_list, compute_live_need, compute_total_hearts, find_card_zone_slot, pref};
+use super::{compute_live_need, compute_total_hearts, find_card_zone_slot, pref};
 
 /// The number of screen lines a PlayMemberToStage group occupies: the card
 /// header line plus one line for all of its stage areas (left/center/right).
@@ -93,14 +93,12 @@ pub(crate) fn render_board(
     acts_cache: &[game_setup::Action],
     display_order: &[usize],
     display_pos: usize,
-    cli_mode: bool,
     detail_mode: bool,
     choice_subview: bool,
     mut text_page: usize,
-    choice_grid_offset: usize,
+    _choice_grid_offset: usize,
     mut list_scroll: usize,
     detail_scroll_y: f32,
-    touch_tap_count: u32,
     viewing_card: Option<i16>,
     zone_viewer: &Option<(String, Vec<i16>)>,
     zone_viewer_offset: usize,
@@ -114,218 +112,6 @@ pub(crate) fn render_board(
     is_ai_turn: bool,
     atlas: &CardAtlas,
 ) -> (usize, usize) {
-    if cli_mode {
-        // ===== CLI MODE: existing text-based rendering =====
-        unsafe {
-            _3ds_clear_top();
-        }
-        if detail_mode {
-            unsafe {
-                _3ds_text_set_scroll_y(0);
-            }
-            if cur < acts_cache.len() {
-                let act = &acts_cache[cur];
-                if let Some(ref p) = act.parameters {
-                    if let Some(cid) = p.card_id {
-                        if let Some(card) = gs.card_database.get_card(cid) {
-                            let display_name = i18n::card_display_name(&card.name, current_lang());
-                            unsafe {
-                                _3ds_text_add_top(
-                                    format!("[{}] {}\n\0", card.card_no, display_name).as_ptr(),
-                                );
-                            }
-                            for ab in card.resolved_abilities() {
-                                let ab_text =
-                                    i18n::translate_ability(&ab.full_text, current_lang());
-                                let w = wrap_ability_text(&ab_text, 390.0, SCALE_CLI);
-                                unsafe {
-                                    _3ds_text_add_top(format!("{}\n\0", w).as_ptr());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            unsafe {
-                _3ds_text_add_top("[X]=back Y=game\0".as_ptr());
-            }
-        } else {
-            let ap_label = if ap.id == pref(gs, my_player_idx).id {
-                "P1"
-            } else {
-                "P2"
-            };
-            let touch_indicator = if viewing_card.is_some() { "[T]" } else { "   " };
-            unsafe {
-                let phase_name;
-                _3ds_text_add_top(
-                    {
-                        phase_name = if current_lang() == Lang::Japanese {
-                            gs.current_phase.label_jp().to_string()
-                        } else {
-                            format!("{}", gs.current_phase)
-                        };
-                        format!(
-                            "{} {} | {} | {}{} | taps:{}\n\0",
-                            tl("Turn").trim_end_matches(':'),
-                            gs.turn_number,
-                            phase_name,
-                            ap_label,
-                            touch_indicator,
-                            touch_tap_count,
-                        )
-                    }
-                    .as_ptr(),
-                );
-                _3ds_text_add_top(
-                    format!(
-                        "Me H:{} E:{}/{} D:{} W:{} L:{}  Opp H:{} E:{}/{} D:{} W:{} L:{}\n\0",
-                        pref(gs, my_player_idx).hand.cards.len(),
-                        pref(gs, my_player_idx).energy_zone.active_count(),
-                        pref(gs, my_player_idx).energy_zone.cards.len(),
-                        pref(gs, my_player_idx).main_deck.cards.len(),
-                        pref(gs, my_player_idx).waitroom.cards.len(),
-                        pref(gs, my_player_idx).success_live_card_zone.cards.len(),
-                        pref(gs, 1 - my_player_idx).hand.cards.len(),
-                        pref(gs, 1 - my_player_idx).energy_zone.active_count(),
-                        pref(gs, 1 - my_player_idx).energy_zone.cards.len(),
-                        pref(gs, 1 - my_player_idx).main_deck.cards.len(),
-                        pref(gs, 1 - my_player_idx).waitroom.cards.len(),
-                        pref(gs, 1 - my_player_idx)
-                            .success_live_card_zone
-                            .cards
-                            .len(),
-                    )
-                    .as_ptr(),
-                );
-            }
-            if let Some(vcid) = viewing_card {
-                if let Some(card) = gs.card_database.get_card(vcid) {
-                    let display_name = i18n::card_display_name(&card.name, current_lang());
-                    unsafe {
-                        _3ds_text_add_top(
-                            format!(
-                                "[{}] {}\n\0",
-                                card.card_no,
-                                wrap_text(&display_name, 390.0, SCALE_CLI)
-                            )
-                            .as_ptr(),
-                        );
-                    }
-                    for ab in card.resolved_abilities() {
-                        let ab_text = i18n::translate_ability(&ab.full_text, current_lang());
-                        let w = wrap_ability_text(&ab_text, 390.0, SCALE_CLI);
-                        unsafe {
-                            _3ds_text_add_top(format!("{}\n\0", w).as_ptr());
-                        }
-                    }
-                    unsafe {
-                        _3ds_text_add_top("(tap slot to dismiss)\n\0".as_ptr());
-                    }
-                }
-            } else if let Some(entry) = gs.ability_queue.current_entry() {
-                let ab_text = wrap_ability_text(
-                    &i18n::translate_ability(&entry.ability.full_text, current_lang()),
-                    390.0,
-                    SCALE_CLI,
-                );
-                for line in ab_text.lines() {
-                    unsafe {
-                        _3ds_text_add_top(format!("{}\n\0", line).as_ptr());
-                    }
-                }
-            }
-            let is_ai_turn = *ai_vs_ai || (*vs_ai && !mp_can_act(gs, 0));
-            let is_opponent_turn_mp = is_multiplayer
-                && !mp_can_act(
-                    gs,
-                    if is_multiplayer {
-                        if is_host {
-                            0
-                        } else {
-                            1
-                        }
-                    } else {
-                        0
-                    },
-                );
-            if is_ai_turn {
-                let msg = tl("AI is thinking...");
-                unsafe {
-                    _3ds_text_add_top(format!("{}\n\0", msg).as_ptr());
-                }
-            } else if is_opponent_turn_mp {
-                let msg = tl("Waiting for opponent...");
-                unsafe {
-                    _3ds_text_add_top(format!("{}\n\0", msg).as_ptr());
-                }
-            } else {
-                // Render grouped list using display_order
-                let n = display_order.len();
-                let max_vis = 6usize;
-                let half = max_vis / 2;
-                let start = if n > max_vis {
-                    (display_pos as isize - half as isize)
-                        .max(0)
-                        .min((n - max_vis) as isize) as usize
-                } else {
-                    0
-                };
-                let end = (start + max_vis).min(n);
-                if start > 0 {
-                    unsafe {
-                        _3ds_text_add_top(format!("\u{25b2} +{}\n\0", start).as_ptr());
-                    }
-                }
-                for di in start..end {
-                    let fi = display_order[di];
-                    let act = &acts_cache[fi];
-                    let prefix = if fi == cur { ">" } else { " " };
-                    let line =
-                        action_list::format_action_line(act, current_lang() == Lang::Japanese);
-                    let desc_full = wrap_text(&line, 390.0, SCALE_CLI);
-                    for (li, l) in desc_full.lines().enumerate() {
-                        if li == 0 {
-                            unsafe {
-                                _3ds_text_add_top(format!("{}{}\n\0", prefix, l).as_ptr());
-                            }
-                        } else {
-                            unsafe {
-                                _3ds_text_add_top(format!("{}\n\0", l).as_ptr());
-                            }
-                        }
-                    }
-                }
-                if end < n {
-                    unsafe {
-                        _3ds_text_add_top(format!("\u{25bc} +{}\n\0", n - end).as_ptr());
-                    }
-                }
-            }
-            let detail_hint = if cur < acts_cache.len() {
-                acts_cache[cur]
-                    .parameters
-                    .as_ref()
-                    .and_then(|p| p.card_id)
-                    .and_then(|cid| gs.card_database.get_card(cid))
-                    .and_then(|card| card.resolved_abilities().next())
-                    .map(|ab| {
-                        let ab_text = i18n::translate_ability(&ab.full_text, current_lang());
-                        wrap_ability_text(&ab_text, 390.0, SCALE_CLI)
-                            .lines()
-                            .next()
-                            .unwrap_or("")
-                            .to_string()
-                    })
-                    .unwrap_or_default()
-            } else {
-                String::new()
-            };
-            unsafe {
-                _3ds_text_add_top(format!("[X]=detail Y=game {}\0", detail_hint).as_ptr());
-            }
-        }
-    } else {
         // ===== GAME MODE: graphical rendering =====
         //
         // FONT SCALING REFERENCE (citro2d BCFNT):
@@ -460,7 +246,7 @@ pub(crate) fn render_board(
         //   1. zone_viewer       — zone card grid (own/opponent stage)
         //   2. detail_mode        — full-screen card detail overlay
         //   3. ability_queue      — compact ability banner (CLI/text only)
-        //   4. choice_image_mode  — ability banner + card choice grid
+        //   4. image choice grid  — ability banner + card choice grid
         //   5. action list        — text action list (bottom text area)
 
         let mut content_y: f32 = 52.0;
@@ -990,31 +776,68 @@ pub(crate) fn render_board(
                     let gap = 4.0f32;
                     let max_rows = if has_ability { 1 } else { 2 };
                     let pp = cols * max_rows;
-                    let page = (choice_grid_offset / pp) * pp;
                     let n = display_order.len();
+                    let pos = display_pos.min(n.saturating_sub(1));
+
+                    // ---- Paginate over CARD items only ----
+                    // Text-only options (e.g. skip) never consume a page slot:
+                    // they're drawn as a bottom row on whichever card page the
+                    // cursor is on. So the page anchor is the first card index
+                    // of the card-page that contains `pos`.
+                    let mut page = 0usize;
+                    {
+                        let mut cards_seen = 0usize;
+                        let mut page_start = 0usize;
+                        for (di, &fi) in display_order.iter().enumerate() {
+                            if is_text_only(&acts_cache[fi]) {
+                                continue;
+                            }
+                            if cards_seen % pp == 0 {
+                                page_start = di;
+                            }
+                            if di >= pos {
+                                break;
+                            }
+                            cards_seen += 1;
+                        }
+                        page = page_start;
+                    }
 
                     // ---- Classify items on this page ----
+                    // Cards fill the grid slots; text items go to the bottom row.
                     let mut card_gis: Vec<usize> = Vec::new();
                     let mut text_gis: Vec<usize> = Vec::new();
-                    for gi in 0..pp {
-                        let di = page + gi;
-                        if di >= n {
-                            break;
+                    {
+                        let mut di = page;
+                        let mut cards_taken = 0usize;
+                        while di < n && cards_taken < pp {
+                            let fi = display_order[di];
+                            if is_text_only(&acts_cache[fi]) {
+                                text_gis.push(di - page);
+                            } else {
+                                card_gis.push(di - page);
+                                cards_taken += 1;
+                            }
+                            di += 1;
                         }
-                        let fi = display_order[di];
-                        if is_text_only(&acts_cache[fi]) {
-                            text_gis.push(gi);
-                        } else {
-                            card_gis.push(gi);
+                        // Trailing text items after the last card also belong here.
+                        while di < n && is_text_only(&acts_cache[display_order[di]]) {
+                            text_gis.push(di - page);
+                            di += 1;
                         }
                     }
 
                     // ---- Reserve a bottom row for text-only options (e.g. "skip")
                     // ---- so they sit below the cards like a menu row instead of
-                    // ---- an overlay drawn on top of the grid.
+                    // ---- an overlay drawn on top of the grid. The whole grid +
+                    // ---- skip row live above the canonical hint bar (HINT_BAR_Y).
                     let has_text_opt = !text_gis.is_empty();
-                    let skip_row_h = 18.0f32;
-                    let grid_floor = if has_text_opt { 230.0 - skip_row_h } else { 230.0 };
+                    let skip_row_h = 16.0f32;
+                    let grid_floor = if has_text_opt {
+                        HINT_BAR_Y - skip_row_h - 4.0
+                    } else {
+                        HINT_BAR_Y - 4.0
+                    };
                     let max_ch = ((grid_floor - grid_iy) / max_rows as f32) - 14.0;
                     let cw = (max_ch * 0.711)
                         .min((400.0 - 8.0 - (cols as f32 - 1.0) * gap) / cols as f32);
@@ -1104,7 +927,7 @@ pub(crate) fn render_board(
                     // Styled like main-phase action-list options: text-only, color
                     // marks the selected one (no box, no disappearing highlight).
                     if has_text_opt {
-                        let row_y = 230.0 - skip_row_h + 2.0;
+                        let row_y = HINT_BAR_Y - skip_row_h + 2.0;
                         let mut row_x = 8.0;
                         for &gi in text_gis.iter() {
                             let di = page + gi;
@@ -1149,28 +972,30 @@ pub(crate) fn render_board(
                         }
                     }
 
-                    // Hint: L opens text
-                    unsafe {
-                        _3ds_top_queue_text(
-                            4.0,
-                            232.0,
-                            COL_MED,
-                            SCALE_SMALL,
-                            format!("{}\0", tl("L=text")).as_ptr(),
-                        );
-                    }
-                    // Page indicator when more choices than visible
-                    if n > pp {
-                        let pg = page / pp + 1;
-                        let total_p = (n + pp - 1) / pp;
-                        unsafe {
-                            _3ds_top_queue_text(
-                                300.0,
-                                232.0,
-                                COL_MED,
-                                SCALE_SMALL,
-                                format!("{}\0", format!("{}/{}", pg, total_p)).as_ptr(),
-                            );
+                    // Hint: L opens text (canonical hint bar position)
+                    render_hint_bar(&tl("L=text"));
+                    // Page indicator: count CARD pages only (text options share the page).
+                    {
+                        let n_cards = display_order
+                            .iter()
+                            .filter(|&&fi| !is_text_only(&acts_cache[fi]))
+                            .count();
+                        let total_p = (n_cards + pp - 1) / pp;
+                        let cards_before = display_order[..pos]
+                            .iter()
+                            .filter(|&&fi| !is_text_only(&acts_cache[fi]))
+                            .count();
+                        let pg = cards_before / pp + 1;
+                        if total_p > 1 {
+                            unsafe {
+                                _3ds_top_queue_text(
+                                    300.0,
+                                    HINT_BAR_Y,
+                                    COL_MED,
+                                    HINT_BAR_SCALE,
+                                    format!("{}\0", format!("{}/{}", pg, total_p)).as_ptr(),
+                                );
+                            }
                         }
                     }
                     // Text overlay on top of choices grid
@@ -1688,6 +1513,5 @@ pub(crate) fn render_board(
                 }
             }
         }
-    }
     (text_page, list_scroll)
 }

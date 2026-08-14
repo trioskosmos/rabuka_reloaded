@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-14T19:06:42.823393",
+  "generated_at": "2026-08-14T22:15:59.388771",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "5571dc4c",
+  "engine_commit": "171f3c99",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -36458,8 +36458,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "self",
+        "position": "center",
         "action": "position_change",
-        "source_position": "center",
         "target_member": "select"
       }
     },

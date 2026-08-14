@@ -4522,7 +4522,7 @@ def _handle_position_change_fields(text, action):
         action["exclude_position"] = "center"
         action.pop("position", None)
     elif "センター" in text:
-        if "にいる" in text:
+        if "センターにいる" in text or "センターにある" in text:
             action["source_position"] = "center"
             action.pop("position", None)
         else:
