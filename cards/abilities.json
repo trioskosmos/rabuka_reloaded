@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-13T20:15:23.885289",
+  "generated_at": "2026-08-14T19:06:42.823393",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "719fbea2",
+  "engine_commit": "5571dc4c",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -22377,6 +22377,7 @@
         "source": "hand",
         "zone": "hand",
         "destination": "discard",
+        "all": true,
         "optional": true,
         "type": "move_cards"
       },

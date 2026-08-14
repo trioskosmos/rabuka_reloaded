@@ -492,6 +492,7 @@ impl super::TurnEngine {
                 match target.as_str() {
                     "primary|alternative" => return card_id == Some(2),
                     "pay_optional_cost:skip_optional_cost" => return card_id == Some(2),
+                    "pay_cost_all:discard_all" => return card_id == Some(2),
                     "choice" | "choice_string" | "conditional_optional" => {
                         return card_id.is_none()
                             && card_indices.map_or(true, |v| v.is_empty())
@@ -653,6 +654,13 @@ impl super::TurnEngine {
                     "pay_optional_cost:skip_optional_cost" => {
                         if card_id == Some(1) {
                             "pay_optional_cost".to_string()
+                        } else {
+                            "skip_optional_cost".to_string()
+                        }
+                    }
+                    "pay_cost_all:discard_all" => {
+                        if card_id == Some(1) {
+                            "pay_cost_all".to_string()
                         } else {
                             "skip_optional_cost".to_string()
                         }

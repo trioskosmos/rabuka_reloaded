@@ -2247,6 +2247,9 @@ impl super::resolver::AbilityResolver {
             Some(super::enums::SelectTargetKind::PayOptionalCostSkipOptionalCost) => {
                 return self.handle_optional_cost_payment(gs, selected);
             }
+            Some(super::enums::SelectTargetKind::PayCostAllDiscard) => {
+                return self.handle_pay_cost_all_discard(gs, selected);
+            }
             Some(super::enums::SelectTargetKind::DoubleBatonTouch) => {
                 return self.handle_double_baton_touch(gs, selected);
             }

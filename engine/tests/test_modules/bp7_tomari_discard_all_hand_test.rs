@@ -38,7 +38,11 @@ fn tomari_discards_entire_hand_then_draws_6() {
     let filler = game.id("PL!-sd1-010-SD");
 
     // 3 cards in hand besides the member
-    let extra = [game.id("PL!-sd1-011-SD"), game.id("PL!-sd1-012-SD"), game.id("PL!-sd1-013-SD")];
+    let extra = [
+        game.id("PL!-sd1-011-SD"),
+        game.id("PL!-sd1-012-SD"),
+        game.id("PL!-sd1-013-SD"),
+    ];
     for &c in &extra {
         game.add_to_hand(c);
     }
@@ -56,8 +60,6 @@ fn tomari_discards_entire_hand_then_draws_6() {
     play_tomari_discard_all(&mut game, tomari);
 
     // After accepting: hand should be empty except the 6 drawn.
-    // Cost: 1 card (the member) is played to stage, then ALL remaining hand
-    // cards are discarded, then 6 drawn.
     assert_eq!(
         game.state.player1.hand.cards.len(),
         6,

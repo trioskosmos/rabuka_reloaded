@@ -727,6 +727,16 @@ def _extract_basic_cost_fields(cost, text):
             cost["destination"] = "discard"
         elif cost["source"] == "discard" and "手札に加える" in text:
             cost["destination"] = "hand"
+    # Discard-all-hand costs (手札をすべて控え室に置く) must mark `all`.
+    # Without this the engine defaults the count to 1 and only asks to
+    # discard a single card instead of discarding the entire hand.
+    if (
+        cost.get("source") == "hand"
+        and cost.get("destination") == "discard"
+        and re.search(r"手札を\s*(すべて|全て|全部)|手札の\s*(すべて|全て|全部)", text)
+    ):
+        cost["all"] = True
+        cost.pop("count", None)
     # State change
     sc = extract_state_change(text)
     if sc:

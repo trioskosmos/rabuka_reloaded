@@ -590,6 +590,7 @@ pub enum SelectTargetKind {
     DrawAnyNumber,
     Order,
     SelfOrOpponent,
+    PayCostAllDiscard,
 }
 
 impl SelectTargetKind {
@@ -610,6 +611,7 @@ impl SelectTargetKind {
             "draw_any_number" => Some(Self::DrawAnyNumber),
             "order" => Some(Self::Order),
             "self_or_opponent" => Some(Self::SelfOrOpponent),
+            "pay_cost_all:discard_all" => Some(Self::PayCostAllDiscard),
             _ => None,
         }
     }
@@ -631,6 +633,7 @@ impl SelectTargetKind {
             Self::DrawAnyNumber => "draw_any_number",
             Self::Order => "order",
             Self::SelfOrOpponent => "self_or_opponent",
+            Self::PayCostAllDiscard => "pay_cost_all:discard_all",
         }
     }
 }

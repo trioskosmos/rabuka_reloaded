@@ -606,6 +606,30 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     .with_ja("オプショナルコストをスキップ"),
                 ];
             }
+            if target == "pay_cost_all:discard_all" {
+                return vec![
+                    make_action_params(
+                        ActionType::ChoiceDecision,
+                        "Discard all hand",
+                        ActionParameters {
+                            card_id: Some(1),
+                            card_no: Some("pay_cost_all".to_string()),
+                            ..make_params()
+                        },
+                    )
+                    .with_ja("手札をすべて控え室に置く"),
+                    make_action_params(
+                        ActionType::ChoiceDecision,
+                        "Skip optional cost",
+                        ActionParameters {
+                            card_id: Some(0),
+                            card_no: Some("skip_optional_cost".to_string()),
+                            ..make_params()
+                        },
+                    )
+                    .with_ja("オプショナルコストをスキップ"),
+                ];
+            }
             if target == "position|destination" || target == "area_select" {
                 let is_source = description == "Choose which member to move";
                 // Extract source position from description e.g. "(currently at Center)"

@@ -184,6 +184,41 @@ impl AbilityResolver {
 
         let same_unit = cost.same_unit_name_any().unwrap_or(false);
         let is_from_hand = Zone::from_str(source) == Some(Zone::Hand) && !same_unit;
+        let is_all = cost.all_any().unwrap_or(false);
+        if is_from_hand && is_all {
+            // "手札をすべて控え室に置く" — discard the ENTIRE hand as an optional
+            // cost. Only offer the yes/no (discard all or skip) choice when there
+            // are cards in hand; if the hand is empty, auto-skip.
+            // NOTE: this cost colon-gates the effect. When skipped (or empty-hand
+            // auto-skip), the resolver's cost_was_skipped path prevents the gated
+            // effect from firing (e.g. "手札をすべて控え室に置いてもよい：カードを6枚引く").
+            let target_str = cost.target.as_deref().unwrap_or("self");
+            let hand_len = gs.resolve_target_player(target_str).hand.cards.len();
+            let is_optional = (optional || is_any_number) && !is_activation;
+            if hand_len == 0 {
+                log::debug!("  └─ skip (optional all-hand discard, hand is empty)");
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.cost_paid = true;
+                    entry.optional_cost_result = Some(false);
+                }
+                return Ok(());
+            }
+            self.pending_choice = Some(Choice::SelectTarget {
+                target: "pay_cost_all:discard_all".to_string(),
+                description: format!("Discard entire hand ({} cards)?", hand_len),
+                description_en: Some(format!("Discard entire hand ({} cards)?", hand_len)),
+                description_ja: Some(format!(
+                    "手札をすべて控え室に置く（{}枚）？",
+                    hand_len
+                )),
+                allow_skip: is_optional,
+                options: None,
+            });
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
+            }
+            return Ok(());
+        }
         if is_from_hand {
             let target_str = cost.target.as_deref().unwrap_or("self");
             let pl = gs.resolve_target_player(target_str);
@@ -1171,6 +1206,79 @@ impl AbilityResolver {
         } else if is_effect_optional {
             if let Some(effect) = gs.entry_effect().cloned() {
                 self.execute_place_energy_under_member_non_optional(gs, &effect);
+            }
+        }
+        Ok(())
+    }
+
+    /// Handle the "discard entire hand" optional cost choice
+    /// (`pay_cost_all:discard_all`). `selected` is "1"/"pay_cost_all"
+    /// to accept, "0"/"skip_optional_cost" to skip.
+    pub fn handle_pay_cost_all_discard(
+        &mut self,
+        gs: &mut GameState,
+        selected: &str,
+    ) -> Result<(), String> {
+        self.pending_choice = None;
+        self.pending_energy_payment = None;
+        let accepted = selected != "skip_optional_cost" && selected != "0";
+        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+            entry.cost_paid = true;
+            entry.optional_cost_result = Some(accepted);
+        }
+        if accepted {
+            let cost = gs
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.ability.cost.clone());
+            let target_str = cost
+                .as_ref()
+                .and_then(|c| c.target.as_deref())
+                .unwrap_or("self");
+            let source = cost
+                .as_ref()
+                .and_then(|c| c.source.as_deref())
+                .unwrap_or("hand");
+            let player = gs.resolve_target_player_mut(target_str);
+            let hand_ids: Vec<i16> = player.hand.cards.drain(..).collect();
+            player
+                .waitroom
+                .cards
+                .extend(hand_ids.iter().copied());
+            for &cid in &hand_ids {
+                gs.push_movement_event(cid, source, "discard", None, target_str, true);
+            }
+        }
+        // After the optional cost is settled, only execute the ability's effect
+        // if the cost was paid. Per the colon-gated pattern ("may discard X:
+        // draw Y"), skipping the optional cost means the effect does not run.
+        self.pending_choice = None;
+        if accepted {
+            let effect_started = gs
+                .ability_queue
+                .current_entry()
+                .is_some_and(|e| e.effect_started);
+            if gs.entry_cost().is_some() && !effect_started {
+                if let Some(effect) = gs.entry_effect().cloned() {
+                    if effect.action == ActionType::PlaceEnergyUnderMember {
+                        self.execute_place_energy_under_member_non_optional(gs, &effect);
+                    } else if let Err(e) = self.execute_effect(gs, &effect) {
+                        log::debug!(
+                            "Failed to execute effect after all-hand discard cost: {}",
+                            e
+                        );
+                    }
+                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                        entry.effect_started = true;
+                    }
+                }
+            } else if gs.ability_queue.has_pending_actions() {
+                if let Err(e) = self.resume_pending_actions(gs) {
+                    log::debug!(
+                        "Failed to execute action after all-hand discard cost: {}",
+                        e
+                    );
+                }
             }
         }
         Ok(())
