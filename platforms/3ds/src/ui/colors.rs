@@ -16,5 +16,6 @@ pub const COL_SEL: u32 = 0xFF5C3A2A; // c2d(42,58,92,255)   selected-item backgr
 pub const COL_DIM: u32 = 0x66231A33; // c2d(26,35,51,102)   semi-transparent dark
 pub const COL_HIGHLIGHT: u32 = 0x330B9EF5; // c2d(245,158,11,51)  semi-transparent gold
 pub const COL_CARD: u32 = 0x22231A22; // c2d(34,26,35,34)    card detail semi-transparent
+pub const COL_CARD_OPAQUE: u32 = 0xFF231A22; // c2d(34,26,35,255) opaque card detail background
 pub const COL_ABILITY: u32 = 0x33231A2A; // c2d(42,26,51,51)    ability queue semi-transparent
 pub const COL_BLUE: u32 = 0xFFFF9E4A; // c2d(74,158,255,255) blue accent text

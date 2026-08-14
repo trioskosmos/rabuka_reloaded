@@ -263,12 +263,16 @@ pub(crate) fn format_action_line_image(act: &game_setup::Action, gs: &GameState)
                 } else {
                     desc
                 };
-                if !cn.is_empty() && !name.is_empty() {
-                    format!("[{}] {} {}", cn, name, display)
-                } else if !cn.is_empty() {
-                    format!("[{}] {}", cn, display)
-                } else {
+                // Text-only choice options (e.g. skip, yes/no, pay/skip cost) are
+                // identified by card_no sentinels; don't prepend their bracketed
+                // tag (e.g. [skip]) to the localized label (e.g. スキップ).
+                let text_only = crate::ui::text::is_text_only(act);
+                if cn.is_empty() || text_only {
                     display
+                } else if !name.is_empty() {
+                    format!("[{}] {} {}", cn, name, display)
+                } else {
+                    format!("[{}] {}", cn, display)
                 }
             };
             line

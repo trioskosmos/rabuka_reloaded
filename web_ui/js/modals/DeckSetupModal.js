@@ -2,6 +2,7 @@ import { State } from '../state.js';
 import { Network } from '../network.js';
 import { Modals } from '../ui_modals.js';
 import { ModalManager } from '../utils/ModalManager.js';
+import { analyzeDeckList, deckCompositionLabel } from '../card_utils.js';
 
 export const DeckSetupModal = {
     openDeckModal: () => {
@@ -45,7 +46,11 @@ export const DeckSetupModal = {
         (decks || []).forEach(d => {
             const opt = document.createElement('option');
             opt.value = d.id;
-            opt.textContent = `${d.name} (${d.card_count} cards)`;
+            // Show member/live/point composition when the deck's card list is
+            // available, falling back to the raw card count.
+            const analysis = Array.isArray(d.main) ? analyzeDeckList(d.main) : null;
+            const label = analysis ? deckCompositionLabel(analysis) : `${d.card_count} cards`;
+            opt.textContent = `${d.name} (${label})`;
             select.appendChild(opt);
         });
 

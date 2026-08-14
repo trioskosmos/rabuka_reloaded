@@ -16,8 +16,10 @@ use crate::lang::{current_lang, tl};
 use crate::net::mp_can_act;
 use crate::ui::card_atlas::CardAtlas;
 use crate::ui::colors::*;
-use crate::ui::grid::{draw_card_image, render_card_detail, render_card_grid};
+use crate::ui::grid::{render_card_detail, render_card_grid};
 use crate::ui::hint::render_hint_bar;
+use crate::ui::layers::Layer;
+use crate::ui::layers::Painter;
 use crate::ui::text::*;
 use crate::util::{cn_or_empty, tl_area};
 
@@ -583,101 +585,120 @@ pub(crate) fn render_board(
                         let text_x = card_x + card_w + 10.0; // ~140
                         let text_w = 400.0 - text_x - 8.0; // ~252
 
-                        unsafe {
-                            // Background for the detail area
-                            _3ds_top_queue_rect(0.0, 52.0, 400.0, 188.0, COL_CARD);
-                            // Card portrait (left column)
-                            _3ds_top_queue_rect(
-                                card_x - 2.0,
-                                card_y - 2.0,
-                                card_w + 4.0,
-                                card_h + 4.0,
-                                COL_GOLD,
-                            );
-                            draw_card_image(
-                                &card.card_no,
-                                atlas,
-                                card_x,
-                                card_y,
-                                card_w,
-                                card_h,
-                            );
-                            // Scrollable ability text (right column)
-                            let text_top = card_y + 40.0;
-                            let mut ty = text_top - detail_scroll_y;
-                            for ab in card.resolved_abilities() {
-                                let ab_text =
-                                    i18n::translate_ability(&ab.full_text, current_lang());
-                                let w = wrap_ability_text(&ab_text, text_w, SCALE_BODY);
-                                for line in w.lines() {
-                                    if ty > -20.0 && ty < 240.0 {
-                                        render_text_with_icons(text_x, ty, line, COL_LIGHT, SCALE_BODY);
-                                    }
-                                    ty += 18.0;
-                                }
-                                ty += 3.0;
-                            }
-                            ability_end = ty;
-                            // Clip: draw an opaque cover over the top of the right
-                            // column so scrolled text is hidden beneath the name/stats,
-                            // then redraw name + stats on top of it.
-                            _3ds_top_queue_rect(
-                                text_x,
-                                52.0,
-                                400.0 - text_x,
-                                text_top - 52.0,
-                                COL_CARD,
-                            );
-                            let display_name = i18n::card_display_name(&card.name, current_lang());
-                            _3ds_top_queue_text(
-                                text_x,
-                                card_y - 2.0,
-                                COL_BLUE,
-                                SCALE_LARGE,
-                                format!(
-                                    "[{}] {}\0",
-                                    card.card_no,
-                                    wrap_text(&display_name, text_w, SCALE_LARGE)
-                                )
-                                .as_ptr(),
-                            );
-                            let stats = compute_card_stats(card, cid, gs);
-                            render_text_with_icons(
-                                text_x,
-                                card_y + 20.0,
-                                &card_stat_line(
-                                    stats.total_blade,
-                                    &stats.heart_str,
-                                    stats.score,
-                                    stats.cost.into(),
-                                    stats.is_tapped,
-                                    card.card_type.as_card_str(),
-                                    &stats.need_heart_str,
-                                ),
-                                COL_LIGHT,
-                                SCALE_BODY,
-                            );
-                            // Scroll indicators (right edge)
-                            let arrow_x = 400.0 - 18.0;
-                            if ty > 228.0 {
-                                _3ds_top_queue_text(
-                                    arrow_x,
-                                    228.0,
-                                    COL_MED,
-                                    SCALE_SMALL,
-                                    format!("v\0").as_ptr(),
-                                );
-                            }
-                            if detail_scroll_y > 0.0 {
-                                _3ds_top_queue_text(
-                                    arrow_x,
-                                    56.0,
-                                    COL_MED,
-                                    SCALE_SMALL,
-                                    format!("^\0").as_ptr(),
-                                );
-                            }
+                        let mut p = Painter::new();
+                        // Background for the detail area (opaque so scrolled
+                        // ability text never bleeds through behind the name)
+                        p.rect(Layer::Content, 0.0, 52.0, 400.0, 188.0, COL_CARD_OPAQUE);
+                        // Card portrait (left column)
+                        p.rect(
+                            Layer::Content,
+                            card_x - 2.0,
+                            card_y - 2.0,
+                            card_w + 4.0,
+                            card_h + 4.0,
+                            COL_GOLD,
+                        );
+                        if let Some((atl, idx)) = atlas.lookup(&card.card_no) {
+                            p.card(Layer::Content, atl, *idx as i32, card_x, card_y, card_w, card_h);
                         }
+                        // Scrollable ability text (right column) on the BodyText
+                        // layer; scrolled lines may reach up into the header region.
+                        let text_top = card_y + 40.0;
+                        let mut ty = text_top - detail_scroll_y;
+                        for ab in card.resolved_abilities() {
+                            let ab_text =
+                                i18n::translate_ability(&ab.full_text, current_lang());
+                            let w = wrap_ability_text(&ab_text, text_w, SCALE_BODY);
+                            for line in w.lines() {
+                                if ty > -200.0 && ty < 240.0 {
+                                    p.text(Layer::BodyText, text_x, ty, COL_LIGHT, SCALE_BODY, line);
+                                }
+                                ty += 18.0;
+                            }
+                            ty += 3.0;
+                        }
+                        ability_end = ty;
+                        // Cover layer: an opaque rect the same color as the
+                        // background, spanning the whole right column from the
+                        // top down to the text start, so any scrolled-up text is
+                        // hidden beneath the name/stats. Flushes above BodyText.
+                        p.rect(
+                            Layer::Cover,
+                            text_x,
+                            0.0,
+                            400.0 - text_x,
+                            text_top,
+                            COL_CARD_OPAQUE,
+                        );
+                        // Header layer: card id/name and stats on top of the cover.
+                        let display_name = i18n::card_display_name(&card.name, current_lang());
+                        let name_label = crate::ui::text::truncate_to_width(
+                            &format!("[{}] ", card.card_no),
+                            &display_name,
+                            SCALE_LARGE,
+                            text_w,
+                        );
+                        p.text(Layer::Header, text_x, card_y - 2.0, COL_BLUE, SCALE_LARGE, &name_label);
+                        let stats = compute_card_stats(card, cid, gs);
+                        p.text(
+                            Layer::Header,
+                            text_x,
+                            card_y + 20.0,
+                            COL_LIGHT,
+                            SCALE_BODY,
+                            &card_stat_line(
+                                stats.total_blade,
+                                &stats.heart_str,
+                                stats.score,
+                                stats.cost.into(),
+                                stats.is_tapped,
+                                card.card_type.as_card_str(),
+                                &stats.need_heart_str,
+                            ),
+                        );
+                        // Scroll indicators (right edge)
+                        let arrow_x = 400.0 - 18.0;
+                        if ty > 228.0 {
+                            p.text(Layer::Header, arrow_x, 228.0, COL_MED, SCALE_SMALL, "v");
+                        }
+                        if detail_scroll_y > 0.0 {
+                            p.text(Layer::Header, arrow_x, 56.0, COL_MED, SCALE_SMALL, "^");
+                        }
+                        // Game header redrawn on top of detail content: opaque
+                        // rect on the Cover layer, its text on the Header layer so
+                        // anything scrolled under it is hidden.
+                        p.rect(Layer::Cover, 0.0, 0.0, 400.0, 50.0, COL_PANEL);
+                        let ph = if current_lang() == Lang::Japanese {
+                            gs.current_phase.label_jp().to_string()
+                        } else {
+                            format!("{}", gs.current_phase)
+                        };
+                        p.text(
+                            Layer::Header,
+                            4.0,
+                            2.0,
+                            COL_GOLD,
+                            SCALE_BODY,
+                            &format!(
+                                "T{} {} [{}]  Me H:{} E:{}/{} D:{}  Opp H:{} E:{}/{} D:{}",
+                                gs.turn_number,
+                                ph,
+                                if ap.id == pref(gs, my_player_idx).id {
+                                    "Me"
+                                } else {
+                                    "Opp"
+                                },
+                                pref(gs, my_player_idx).hand.cards.len(),
+                                pref(gs, my_player_idx).energy_zone.active_count(),
+                                pref(gs, my_player_idx).energy_zone.cards.len(),
+                                pref(gs, my_player_idx).main_deck.cards.len(),
+                                pref(gs, 1 - my_player_idx).hand.cards.len(),
+                                pref(gs, 1 - my_player_idx).energy_zone.active_count(),
+                                pref(gs, 1 - my_player_idx).energy_zone.cards.len(),
+                                pref(gs, 1 - my_player_idx).main_deck.cards.len(),
+                            ),
+                        );
+                        p.flush();
                     }
                 }
                 content_y = if ability_end > 0.0 {
@@ -685,48 +706,14 @@ pub(crate) fn render_board(
                 } else {
                     158.0
                 };
-                // Redraw game header on top of detail content
-                unsafe {
-                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 50.0, COL_PANEL);
-                    let ph = if current_lang() == Lang::Japanese {
-                        gs.current_phase.label_jp().to_string()
-                    } else {
-                        format!("{}", gs.current_phase)
-                    };
-                    _3ds_top_queue_text(
-                        4.0,
-                        2.0,
-                        COL_GOLD,
-                        SCALE_BODY,
-                        format!(
-                            "T{} {} [{}]  Me H:{} E:{}/{} D:{}  Opp H:{} E:{}/{} D:{}\0",
-                            gs.turn_number,
-                            ph,
-                            if ap.id == pref(gs, my_player_idx).id {
-                                "Me"
-                            } else {
-                                "Opp"
-                            },
-                            pref(gs, my_player_idx).hand.cards.len(),
-                            pref(gs, my_player_idx).energy_zone.active_count(),
-                            pref(gs, my_player_idx).energy_zone.cards.len(),
-                            pref(gs, my_player_idx).main_deck.cards.len(),
-                            pref(gs, 1 - my_player_idx).hand.cards.len(),
-                            pref(gs, 1 - my_player_idx).energy_zone.active_count(),
-                            pref(gs, 1 - my_player_idx).energy_zone.cards.len(),
-                            pref(gs, 1 - my_player_idx).main_deck.cards.len(),
-                        )
-                        .as_ptr(),
-                    );
-                }
-            } // end else (not choice_subview)
+            }
         } else {
             if let Some(vcid) = viewing_card {
                 // Compact card info overlay with stats
                 if let Some(card) = gs.card_database.get_card(vcid) {
                     let stats = compute_card_stats(card, vcid, gs);
                     unsafe {
-                        _3ds_top_queue_rect(0.0, 52.0, 400.0, 76.0, COL_CARD);
+                        _3ds_top_queue_rect(0.0, 52.0, 400.0, 76.0, COL_CARD_OPAQUE);
                         let btm_name = i18n::card_display_name(&card.name, current_lang());
                         _3ds_top_queue_text(
                             4.0,
@@ -857,21 +844,12 @@ pub(crate) fn render_board(
                             let mut ty = content_y + header_h + 4.0;
                             let n = options.len();
                             let line_h = 16.0f32;
-                            let max_vis = ((230.0 - ty) / line_h) as usize + 1;
-                            if n <= max_vis {
-                                list_scroll = 0;
-                            } else {
-                                if display_pos < list_scroll {
-                                    list_scroll = display_pos;
-                                } else if display_pos >= list_scroll + max_vis {
-                                    list_scroll = display_pos - max_vis + 1;
-                                }
-                                if list_scroll >= n.saturating_sub(max_vis) {
-                                    list_scroll = n.saturating_sub(max_vis);
-                                }
-                            }
-                            let start = list_scroll.min(n.saturating_sub(max_vis));
-                            let end = (start + max_vis).min(n);
+                            // Keep the selected option at the top of the list so its
+                            // (possibly multi-line) ability text is always visible.
+                            // Options with many lines no longer push it off-screen.
+                            list_scroll = display_pos.min(n.saturating_sub(1));
+                            let start = list_scroll;
+                            let end = n;
                             if start > 0 {
                                 unsafe {
                                     _3ds_top_queue_text(
@@ -924,14 +902,14 @@ pub(crate) fn render_board(
                                 ty += 4.0;
                                 di += 1;
                             }
-                            if end < n && ty < 230.0 {
+                            if di < n && ty < 230.0 {
                                 unsafe {
                                     _3ds_top_queue_text(
                                         4.0,
                                         ty,
                                         COL_MED,
                                         SCALE_BODY,
-                                        format!("\u{25bc} +{}\0", n - end).as_ptr(),
+                                        format!("\u{25bc} +{}\0", n - di).as_ptr(),
                                     );
                                 }
                             }
@@ -1011,11 +989,6 @@ pub(crate) fn render_board(
                     let cols = 5usize;
                     let gap = 4.0f32;
                     let max_rows = if has_ability { 1 } else { 2 };
-                    let max_ch = ((230.0 - grid_iy) / max_rows as f32) - 14.0;
-                    let cw = (max_ch * 0.711)
-                        .min((400.0 - 8.0 - (cols as f32 - 1.0) * gap) / cols as f32);
-                    let ch = cw / 0.711;
-                    let row_h = ch + 16.0 + gap;
                     let pp = cols * max_rows;
                     let page = (choice_grid_offset / pp) * pp;
                     let n = display_order.len();
@@ -1035,6 +1008,18 @@ pub(crate) fn render_board(
                             card_gis.push(gi);
                         }
                     }
+
+                    // ---- Reserve a bottom row for text-only options (e.g. "skip")
+                    // ---- so they sit below the cards like a menu row instead of
+                    // ---- an overlay drawn on top of the grid.
+                    let has_text_opt = !text_gis.is_empty();
+                    let skip_row_h = 18.0f32;
+                    let grid_floor = if has_text_opt { 230.0 - skip_row_h } else { 230.0 };
+                    let max_ch = ((grid_floor - grid_iy) / max_rows as f32) - 14.0;
+                    let cw = (max_ch * 0.711)
+                        .min((400.0 - 8.0 - (cols as f32 - 1.0) * gap) / cols as f32);
+                    let ch = cw / 0.711;
+                    let row_h = ch + 16.0 + gap;
 
                     // ---- Render card items in grid ----
                     for (ci, &gi) in card_gis.iter().enumerate() {
@@ -1115,50 +1100,51 @@ pub(crate) fn render_board(
                         }
                     }
 
-                    // ---- Render text items as one-per-page ----
-                    if let Some(&sel_gi) = text_gis.iter().find(|&&g| g == display_pos) {
-                        let fi = display_order[sel_gi];
-                        let act = &acts_cache[fi];
-                        let is_disabled = act
-                            .parameters
-                            .as_ref()
-                            .and_then(|p| p.disabled)
-                            .unwrap_or(false);
-                        let desc = act.display_desc(current_lang() == Lang::Japanese);
-                        let desc_nlb = desc.replace('\n', " ");
-                        let desc_clean = desc_nlb
-                            .trim_start_matches(|c: char| c == '・' || c == '\u{2022}')
-                            .trim_start_matches("- ")
-                            .trim();
-                        let color = if is_disabled { COL_MED } else { COL_LIGHT };
-                        let scale = SCALE_LARGE;
-                        let full_txt = desc_clean.to_string();
-                        let total_h = unsafe {
-                            _3ds_text_wrapped_height(
-                                format!("{}\0", full_txt).as_ptr(),
-                                scale,
-                                380.0,
-                            )
-                        };
-                        let iy = grid_iy + ((230.0 - grid_iy) - total_h) / 2.0;
-
-                        unsafe {
-                            _3ds_top_queue_rect(4.0, iy - 2.0, 392.0, total_h + 4.0, COL_DIM);
-                            render_text_with_icons(8.0, iy + 2.0, &full_txt, color, scale);
-                        }
-                        // Page indicator
-                        let total = text_gis.len();
-                        if total > 1 {
-                            let cur =
-                                text_gis.iter().position(|&g| g == display_pos).unwrap_or(0) + 1;
+                    // ---- Render text-only options (e.g. "skip") as a bottom row ----
+                    // Styled like main-phase action-list options: text-only, color
+                    // marks the selected one (no box, no disappearing highlight).
+                    if has_text_opt {
+                        let row_y = 230.0 - skip_row_h + 2.0;
+                        let mut row_x = 8.0;
+                        for &gi in text_gis.iter() {
+                            let di = page + gi;
+                            if di >= n {
+                                break;
+                            }
+                            let fi = display_order[di];
+                            let act = &acts_cache[fi];
+                            let is_disabled = act
+                                .parameters
+                                .as_ref()
+                                .and_then(|p| p.disabled)
+                                .unwrap_or(false);
+                            let is_sel = di == display_pos;
+                            let desc = act.display_desc(current_lang() == Lang::Japanese);
+                            let label = desc
+                                .replace('\n', " ")
+                                .trim_start_matches(|c: char| c == '・' || c == '\u{2022}')
+                                .trim_start_matches("- ")
+                                .trim()
+                                .to_string();
+                            let color = if is_disabled {
+                                COL_MED
+                            } else if is_sel {
+                                COL_GOLD
+                            } else {
+                                COL_LIGHT
+                            };
                             unsafe {
                                 _3ds_top_queue_text(
-                                    4.0,
-                                    232.0,
-                                    COL_MED,
-                                    SCALE_SMALL,
-                                    format!("{}/{}\0", cur, total).as_ptr(),
+                                    row_x,
+                                    row_y,
+                                    color,
+                                    SCALE_BODY,
+                                    format!("{}\0", label).as_ptr(),
                                 );
+                            }
+                            row_x += crate::ui::text::measure_text_width(&label, SCALE_BODY) + 12.0;
+                            if row_x > 388.0 {
+                                break;
                             }
                         }
                     }
@@ -1167,7 +1153,7 @@ pub(crate) fn render_board(
                     unsafe {
                         _3ds_top_queue_text(
                             4.0,
-                            228.0,
+                            232.0,
                             COL_MED,
                             SCALE_SMALL,
                             format!("{}\0", tl("L=text")).as_ptr(),
@@ -1180,7 +1166,7 @@ pub(crate) fn render_board(
                         unsafe {
                             _3ds_top_queue_text(
                                 300.0,
-                                228.0,
+                                232.0,
                                 COL_MED,
                                 SCALE_SMALL,
                                 format!("{}\0", format!("{}/{}", pg, total_p)).as_ptr(),
@@ -1258,7 +1244,11 @@ pub(crate) fn render_board(
                         let mut used = 0usize;
                         while end < n {
                             let ge = group_end(acts_cache, display_order, end, n);
-                            let lines = if ge > end + 1 { GROUP_LINES } else { 1 };
+                            // Every PlayMemberToStage action renders as a 2-line
+                            // group (header + areas), even a single-area one.
+                            let is_pmts = acts_cache[display_order[end]].action_type
+                                == game_setup::ActionType::PlayMemberToStage;
+                            let lines = if is_pmts { GROUP_LINES } else { 1 };
                             if used + lines > available {
                                 break;
                             }
@@ -1313,10 +1303,14 @@ pub(crate) fn render_board(
                             .and_then(|p| p.disabled)
                             .unwrap_or(false);
                         // Group = all consecutive same-card PlayMemberToStage areas.
-                        // Scans the FULL display_order so the group is never split.
+                        // Always render PMTS as a 2-line group (header + areas row),
+                        // even when only one area is available, so the layout is
+                        // consistent and the selected area is clearly marked.
                         let ge = group_end(acts_cache, display_order, di, n);
-                        let is_group = ge > di + 1;
-                        let group_sel = is_group && (di..ge).any(|i| i == display_pos);
+                        let is_pmts =
+                            act.action_type == game_setup::ActionType::PlayMemberToStage;
+                        let is_group = is_pmts;
+                        let group_sel = is_pmts && (di..ge).any(|i| i == display_pos);
                         let line_color = if group_sel || is_sel {
                             COL_GOLD
                         } else if is_disabled {
@@ -1343,20 +1337,12 @@ pub(crate) fn render_board(
                                 .and_then(|p| p.base_cost)
                                 .unwrap_or(0);
                             let hdr = if !cn.is_empty() {
-                                if base_cost > 0 {
-                                    format!(
-                                        "{{{{icon_energy.png|E}}}}{} [{}] {}",
-                                        base_cost, cn, name
-                                    )
-                                } else {
-                                    format!("[{}] {}", cn, name)
-                                }
+                                format!(
+                                    "{{{{icon_energy.png|E}}}}{} [{}] {}",
+                                    base_cost, cn, name
+                                )
                             } else {
-                                if base_cost > 0 {
-                                    format!("{{{{icon_energy.png|E}}}}{} {}", base_cost, name)
-                                } else {
-                                    name.clone()
-                                }
+                                format!("{{{{icon_energy.png|E}}}}{} {}", base_cost, name)
                             };
                             let mut areas = String::new();
                             let area_costs: std::collections::HashMap<String, (u8, bool)> =
@@ -1416,14 +1402,7 @@ pub(crate) fn render_board(
                                 // Regular single-area action with per-area cost
                                 let area_cost_info = area_costs.get(&stage);
                                 let area_str = match area_cost_info {
-                                    Some((cost, true)) if *cost > 0 => format!(
-                                        "{} {{{{icon_energy.png|E}}}}{}BT{}{}",
-                                        prefix,
-                                        cost,
-                                        tl_area(&stage),
-                                        suffix
-                                    ),
-                                    Some((cost, false)) if *cost > 0 => format!(
+                                    Some((cost, _)) if *cost > 0 => format!(
                                         "{} {{{{icon_energy.png|E}}}}{}{}{}",
                                         prefix,
                                         cost,
@@ -1530,6 +1509,7 @@ pub(crate) fn render_board(
         // Clear stale action highlight on bottom board
         unsafe {
             _3ds_board_clear_action_highlight();
+            _3ds_board_clear_stage_play_cost();
         }
 
         // Highlight interactive zones for all tap-to-deploy action types
@@ -1572,8 +1552,17 @@ pub(crate) fn render_board(
                                         "right" => 2,
                                         _ => continue,
                                     };
+                                    // Per-area energy cost for the play target.
+                                    let cost = p
+                                        .available_areas
+                                        .as_ref()
+                                        .and_then(|areas| {
+                                            areas.iter().find(|a| &a.area == sa).map(|a| a.cost)
+                                        })
+                                        .unwrap_or(0);
                                     unsafe {
                                         _3ds_board_set_action_highlight(1, slot, false);
+                                        _3ds_board_set_stage_play_cost(0, slot, cost as i32);
                                     }
                                 }
                             } else {

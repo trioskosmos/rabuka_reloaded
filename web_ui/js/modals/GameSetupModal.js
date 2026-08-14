@@ -3,7 +3,7 @@ import { Network } from '../network.js';
 import { Modals } from '../ui_modals.js';
 import { ModalManager } from '../utils/ModalManager.js';
 import { DOM_IDS, DISPLAY_VALUES } from '../constants_dom.js';
-import { normalizeCode, extractCardId } from '../card_utils.js';
+import { normalizeCode, extractCardId, lookupCard, cardPoints } from '../card_utils.js';
 
 function convertDecklogHtml(html) {
     const cards = {};
@@ -70,29 +70,6 @@ function convertDecklogHtml(html) {
     return result;
 }
 
-let _ciIndex = null;
-function _ensureIndex() {
-    const db = State.staticCardDatabase;
-    if (!db) return;
-    if (_ciIndex) return;
-    _ciIndex = {};
-    for (const key of Object.keys(db)) {
-        const nk = key.replace(/＋/g, '+').toUpperCase();
-        _ciIndex[nk] = key;
-    }
-}
-
-function lookupCard(no) {
-    const db = State.staticCardDatabase;
-    if (!db) return null;
-    let card = db[no];
-    if (card) return card;
-    _ensureIndex();
-    const nk = no.replace(/＋/g, '+').toUpperCase();
-    const actualKey = _ciIndex?.[nk];
-    return actualKey ? db[actualKey] : null;
-}
-
 function parsePointSectionFormat(text) {
     let members = 0, lives = 0, energy = 0, points = 0;
     let currentPt = 0;
@@ -113,32 +90,6 @@ function parsePointSectionFormat(text) {
         points += currentPt || 1;
     }
     return { members, lives, energy, points };
-}
-
-const _POINT_MAP = {
-    'LL-bp2-001-R+': 5, 'LL-bp2-001-R＋': 5,
-    'PL!N-bp1-003-R+': 4, 'PL!N-bp1-003-P': 4, 'PL!N-bp1-003-P＋': 4, 'PL!N-bp1-003-SEC': 4,
-    'PL!N-bp1-012-R+': 3, 'PL!N-bp1-012-P': 3, 'PL!N-bp1-012-P＋': 3, 'PL!N-bp1-012-SEC': 3,
-    'PL!N-bp1-002-R+': 2, 'PL!N-bp1-002-P': 2, 'PL!N-bp1-002-P＋': 2, 'PL!N-bp1-002-SEC': 2,
-    'PL!N-sd1-008-SD': 2, 'PL!N-sd1-008-RM': 2, 'PL!HS-bp2-014-N': 2,
-    'PL!N-pb1-011-R': 2, 'PL!N-pb1-011-P＋': 2,
-    'PL!SP-bp1-005-R': 1, 'PL!SP-bp1-005-P': 1, 'PL!N-bp1-029-L': 1,
-    'PL!SP-sd1-019-SD': 1, 'PL!SP-sd1-019-RM': 1, 'PL!SP-sd1-019-SD2': 1, 'PL!SP-sd1-019-P': 1,
-    'PL!SP-sd1-020-SD': 1, 'PL!SP-sd1-020-RM': 1, 'PL!SP-sd1-020-SD2': 1, 'PL!SP-sd1-020-P': 1,
-    'PL!SP-pb1-014-N': 1, 'PL!N-bp3-030-L': 1, 'PL!N-bp4-030-L': 1,
-};
-let _ptCI = null;
-function cardPoints(no) {
-    let p = _POINT_MAP[no];
-    if (p !== undefined) return p;
-    if (!_ptCI) {
-        _ptCI = {};
-        for (const [k, v] of Object.entries(_POINT_MAP)) {
-            _ptCI[k.replace(/＋/g, '+').toUpperCase()] = v;
-        }
-    }
-    const nk = no.replace(/＋/g, '+').toUpperCase();
-    return _ptCI[nk] ?? 0;
 }
 
 function parseSimpleCardLines(text) {

@@ -12,15 +12,19 @@ use crate::i18n;
 use crate::lang::current_lang;
 #[cfg(feature = "3ds")]
 use crate::ui::card_atlas::CardAtlas;
+#[cfg(feature = "3ds")]
+use crate::ui::layers::Layer;
+#[cfg(feature = "3ds")]
+use crate::ui::layers::Painter;
 use crate::ui::colors::COL_BLUE;
 use crate::ui::colors::COL_CARD;
+use crate::ui::colors::COL_CARD_OPAQUE;
 use crate::ui::colors::COL_GOLD;
 use crate::ui::colors::COL_LIGHT;
 use crate::ui::colors::COL_MED;
 use crate::ui::colors::COL_TOP_BG;
 use crate::ui::text::build_heart_str;
 use crate::ui::text::card_stat_line;
-use crate::ui::text::render_text_with_icons;
 use crate::ui::text::wrap_ability_text;
 use crate::ui::text::CardDisplayStats;
 use crate::ui::text::{SCALE_BODY, SCALE_LARGE, SCALE_SMALL};
@@ -229,91 +233,85 @@ pub fn render_card_detail(
         let text_x = card_x + card_w + 10.0; // ~150
         let text_w = 400.0 - text_x - 6.0; // ~244
 
-        unsafe {
-            _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-            _3ds_top_queue_rect(0.0, 0.0, 400.0, HEADER_H, COL_CARD);
-            let display_name = i18n::card_display_name(&card.name, current_lang());
-            // Single line, let it overflow to the right — a long name must not
-            // wrap onto a second line (which would collide with the stat line).
-            _3ds_top_queue_text(
-                4.0,
-                4.0,
-                COL_BLUE,
-                SCALE_LARGE,
-                format!("[{}] {}\0", card.card_no, display_name).as_ptr(),
-            );
-            render_text_with_icons(
-                4.0,
-                24.0,
-                &card_stat_line(
-                    stats.total_blade,
-                    &stats.heart_str,
-                    stats.score,
-                    stats.cost.into(),
-                    stats.is_tapped,
-                    card.card_type.as_card_str(),
-                    &stats.need_heart_str,
-                ),
-                COL_LIGHT,
-                SCALE_BODY,
-            );
-            // Content background below the header
-            _3ds_top_queue_rect(0.0, HEADER_H, 400.0, 240.0 - HEADER_H, COL_CARD);
-            // Card portrait (left column)
-            _3ds_top_queue_rect(card_x - 2.0, card_y - 2.0, card_w + 4.0, card_h + 4.0, COL_GOLD);
-            draw_card_image(&card.card_no, atlas, card_x, card_y, card_w, card_h);
-            // Scrollable ability text (right column). Text may scroll up under
-            // the header; draw it first, then paint an opaque cover over the
-            // header region of the right column and redraw the id/name on top
-            // so scrolled text is properly hidden beneath the header.
-            let text_top = card_y;
-            let mut ty = text_top - scroll_y;
-            let abs: Vec<_> = card.resolved_abilities().collect();
-            if abs.is_empty() {
-                let raw = card.ability_text();
-                if !raw.is_empty() {
-                    let clean = raw.replace('\n', " ");
-                    let w = wrap_ability_text(&clean, text_w, SCALE_BODY);
-                    for line in w.lines() {
-                        if ty > -20.0 && ty < 240.0 {
-                            render_text_with_icons(text_x, ty, line, COL_LIGHT, SCALE_BODY);
-                        }
-                        ty += 18.0;
+        let mut p = Painter::new();
+        p.rect(Layer::Background, 0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+        p.rect(Layer::Content, 0.0, 0.0, 400.0, HEADER_H, COL_CARD_OPAQUE);
+        let display_name = i18n::card_display_name(&card.name, current_lang());
+        let name_label =
+            crate::ui::text::truncate_to_width(&format!("[{}] ", card.card_no), &display_name, SCALE_LARGE, 392.0);
+        // Single line, let it overflow to the right — a long name must not
+        // wrap onto a second line (which would collide with the stat line).
+        p.text(Layer::Header, 4.0, 4.0, COL_BLUE, SCALE_LARGE, &name_label);
+        p.text(
+            Layer::Header,
+            4.0,
+            24.0,
+            COL_LIGHT,
+            SCALE_BODY,
+            &card_stat_line(
+                stats.total_blade,
+                &stats.heart_str,
+                stats.score,
+                stats.cost.into(),
+                stats.is_tapped,
+                card.card_type.as_card_str(),
+                &stats.need_heart_str,
+            ),
+        );
+        // Content background below the header
+        p.rect(Layer::Content, 0.0, HEADER_H, 400.0, 240.0 - HEADER_H, COL_CARD_OPAQUE);
+        // Card portrait (left column)
+        p.rect(Layer::Content, card_x - 2.0, card_y - 2.0, card_w + 4.0, card_h + 4.0, COL_GOLD);
+        if let Some((atl, idx)) = atlas.lookup(&card.card_no) {
+            p.card(Layer::Content, atl, *idx as i32, card_x, card_y, card_w, card_h);
+        }
+        // Scrollable ability text (right column). Text may scroll up under the
+        // header: it's drawn on the BodyText layer (below Cover), then the Cover
+        // layer is painted opaque over the header region of the right column so
+        // scrolled text is hidden beneath the header. The id/name label lives on
+        // the Header layer which flushes above the cover — no fragile ordering.
+        let text_top = card_y;
+        let mut ty = text_top - scroll_y;
+        let abs: Vec<_> = card.resolved_abilities().collect();
+        if abs.is_empty() {
+            let raw = card.ability_text();
+            if !raw.is_empty() {
+                let clean = raw.replace('\n', " ");
+                let w = wrap_ability_text(&clean, text_w, SCALE_BODY);
+                for line in w.lines() {
+                    if ty > -20.0 && ty < 240.0 {
+                        p.text(Layer::BodyText, text_x, ty, COL_LIGHT, SCALE_BODY, line);
                     }
-                }
-            } else {
-                for ab in abs {
-                    let ab_text = i18n::translate_ability(&ab.full_text, current_lang());
-                    let w = wrap_ability_text(&ab_text, text_w, SCALE_BODY);
-                    for line in w.lines() {
-                        if ty > -20.0 && ty < 240.0 {
-                            render_text_with_icons(text_x, ty, line, COL_LIGHT, SCALE_BODY);
-                        }
-                        ty += 18.0;
-                    }
-                    ty += 3.0;
+                    ty += 18.0;
                 }
             }
-            // Clip: paint an opaque cover over the header region of the right
-            // column (drawn after the ability text so scrolled text is hidden),
-            // then redraw the id/name on top.
-            _3ds_top_queue_rect(text_x, 0.0, 400.0 - text_x, HEADER_H, COL_CARD);
-            _3ds_top_queue_text(
-                text_x,
-                4.0,
-                COL_BLUE,
-                SCALE_LARGE,
-                format!("[{}] {}\0", card.card_no, display_name).as_ptr(),
-            );
-            // Scroll indicator if content extends beyond screen (right edge,
-            // clear of the portrait so it doesn't overlap the card image).
-            let arrow_x = 400.0 - 18.0;
-            if ty > 220.0 {
-                _3ds_top_queue_text(arrow_x, 225.0, COL_MED, SCALE_SMALL, format!("v\0").as_ptr());
-            }
-            if scroll_y > 0.0 {
-                _3ds_top_queue_text(arrow_x, 42.0, COL_MED, SCALE_SMALL, format!("^\0").as_ptr());
+        } else {
+            for ab in abs {
+                let ab_text = i18n::translate_ability(&ab.full_text, current_lang());
+                let w = wrap_ability_text(&ab_text, text_w, SCALE_BODY);
+                for line in w.lines() {
+                    if ty > -20.0 && ty < 240.0 {
+                        p.text(Layer::BodyText, text_x, ty, COL_LIGHT, SCALE_BODY, line);
+                    }
+                    ty += 18.0;
+                }
+                ty += 3.0;
             }
         }
+        // Clip: opaque cover over the header region of the right column on the
+        // Cover layer (hides scrolled BodyText). The id/name on the Header layer
+        // is flushed above it automatically.
+        p.rect(Layer::Cover, text_x, 0.0, 400.0 - text_x, text_top, COL_CARD_OPAQUE);
+        p.text(Layer::Header, text_x, 4.0, COL_BLUE, SCALE_LARGE, &name_label);
+        // Scroll indicator if content extends beyond screen (right edge,
+        // clear of the portrait so it doesn't overlap the card image).
+        let arrow_x = 400.0 - 18.0;
+        if ty > 220.0 {
+            p.text(Layer::Header, arrow_x, 225.0, COL_MED, SCALE_SMALL, "v");
+        }
+        if scroll_y > 0.0 {
+            p.text(Layer::Header, arrow_x, 42.0, COL_MED, SCALE_SMALL, "^");
+        }
+        p.flush();
     }
 }

@@ -129,6 +129,9 @@ extern "C" {
     // Action highlight on board slots
     pub fn _3ds_board_set_action_highlight(zone: i32, slot: i32, opponent: bool);
     pub fn _3ds_board_clear_action_highlight();
+    // Energy cost label shown above a stage slot where a hand card can be played.
+    pub fn _3ds_board_set_stage_play_cost(player: i32, slot: i32, cost: i32);
+    pub fn _3ds_board_clear_stage_play_cost();
 
     // Action overlay (Phase 2: actions on bottom screen, safe per-line copy)
     pub fn _3ds_board_set_action_overlay_state(count: i32, selected: i32);

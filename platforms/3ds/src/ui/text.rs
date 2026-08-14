@@ -186,6 +186,32 @@ pub fn measure_text_width(s: &str, scale: f32) -> f32 {
     unsafe { _3ds_measure_text_width(c_str.as_ptr() as *const u8, scale) }
 }
 
+/// Build a single-line string that never wraps: truncate with an ellipsis if it
+/// would exceed `max_px` at `scale`. Keeps the leading `[id] ` prefix intact and
+/// lets the tail overflow off-screen rather than wrapping onto a second line.
+pub fn truncate_to_width(prefix: &str, text: &str, scale: f32, max_px: f32) -> String {
+    let full = format!("{}{}", prefix, text);
+    if measure_text_width(&full, scale) <= max_px {
+        return full;
+    }
+    // Shrink the name portion until it fits; always keep the prefix.
+    let prefix_w = measure_text_width(prefix, scale);
+    let avail = (max_px - prefix_w).max(0.0);
+    let mut name = text.to_string();
+    loop {
+        if name.is_empty() || measure_text_width(&name, scale) <= avail {
+            break;
+        }
+        let chars: Vec<char> = name.chars().collect();
+        if chars.len() <= 1 {
+            break; // can't shrink further
+        }
+        let cut = (chars.len() * 9) / 10; // drop ~10% per iteration
+        name = chars.into_iter().take(cut.max(1)).collect();
+    }
+    format!("{}{}", prefix, name)
+}
+
 /// Pre-computed card display stats for detail rendering.
 pub struct CardDisplayStats {
     pub is_tapped: bool,

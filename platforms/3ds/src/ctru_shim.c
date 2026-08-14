@@ -488,6 +488,19 @@ static bool _is_highlighted(int zone, int slot, bool opponent) {
     return false;
 }
 
+// ---- Stage play cost labels (shown above a stage slot when a hand card can be
+// ---- played there). -1 = no cost label.  Indexed [player][slot(0=left,2=right)].
+static int stage_play_cost[2][3] = {{-1, -1, -1}, {-1, -1, -1}};
+void _3ds_board_set_stage_play_cost(int player, int slot, int cost) {
+    if (player >= 0 && player < 2 && slot >= 0 && slot < 3) {
+        stage_play_cost[player][slot] = cost;
+    }
+}
+void _3ds_board_clear_stage_play_cost() {
+    stage_play_cost[0][0] = stage_play_cost[0][1] = stage_play_cost[0][2] = -1;
+    stage_play_cost[1][0] = stage_play_cost[1][1] = stage_play_cost[1][2] = -1;
+}
+
 // ---- Action overlay (safe: copies strings into C buffer) ----
 // action_idx_map[i] = index into the flat action list for display line i.
 // This lets grouped/reordered display lines map back to correct action indices.
@@ -776,6 +789,8 @@ static void zone_heights(float h, float* live, float* stage, float* energy, floa
     *hand   = u * 0.35f;
 }
 
+float _3ds_measure_text_width(const char* text, float scale);
+
 static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool flip_cards) {
     const float W = 320.0f, M = 2.0f;
     const float PORTRAIT = 0.711f;
@@ -857,8 +872,13 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
         // Portrait card slot (solid border, centered)
         float psx = st_x + st_pad_x;
         _3ds_draw_border(psx, sy + st_pad_y, st_card_w, st_slot_h - 2, COL_BLUE, 1);
+        int play_cost = -1;
         if (!cli_mode && _is_highlighted(1, si, opponent)) {
             _3ds_draw_border(st_x, sy, st_slot_w, st_slot_h, COL_SEL, 2);
+            // Show the energy cost to play a hand card into this slot, drawn
+            // above the zone (like the web UI's play-cost label).
+            int pi = opponent ? 1 : 0;
+            play_cost = stage_play_cost[pi][si];
         }
         if (pb->stage[si].active) {
             _3ds_draw_card_at(&pb->stage[si], st_x + 1, sy + 2, st_slot_w - 2, st_slot_h - 4);
@@ -869,6 +889,26 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
         float ddx = st_x + (st_slot_w - ddw) * 0.5f;
         float ddy = sy + (st_slot_h - ddh) * 0.5f;
         _3ds_draw_dotted_rect(ddx, ddy, ddw, ddh, 0xFFFF8800);
+        // Play-cost label: centered in the zone, on top of everything, so it
+        // fills most of the slot (matches the web UI's overlaid cost number).
+        if (play_cost >= 0) {
+            char cost_buf[8];
+            snprintf(cost_buf, sizeof(cost_buf), "%d", play_cost);
+            // Scale so the number spans most of the slot width, capped by height.
+            float base_w = _3ds_measure_text_width(cost_buf, 1.0f);
+            float max_w = st_slot_w * 0.78f;
+            float max_h = st_slot_h * 0.78f;
+            float scale = base_w > 0.0f ? (max_w / base_w) : 1.0f;
+            float h_scale = max_h / 40.0f; // ~40px glyph line height at scale 1.0
+            if (h_scale < scale) scale = h_scale;
+            if (scale > 2.5f) scale = 2.5f;
+            if (scale < 0.4f) scale = 0.4f;
+            float tw = _3ds_measure_text_width(cost_buf, scale);
+            float th = 24.0f * scale;
+            float cx = st_x + (st_slot_w - tw) * 0.5f;
+            float cy = sy + (st_slot_h - th) * 0.5f;
+            _3ds_draw_label(cost_buf, cx, cy, COL_GOLD, scale);
+        }
         st_x += st_slot_w + 2;
     }
 
