@@ -51,7 +51,12 @@ impl AbilityResolver {
         // from the discard pile), the trailing draw consequence must not fire. This
         // guard catches the consequence whether it runs in the sequential loop or
         // via resume_pending_actions.
-        if self.optional_moves_all_moved == Some(false)
+        let placement_incomplete = gs
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.optional_moves_all_moved)
+            == Some(false);
+        if placement_incomplete
             && matches!(
                 effect.action,
                 ActionType::DrawCard | ActionType::DrawUntilCount

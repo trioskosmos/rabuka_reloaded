@@ -140,6 +140,7 @@ impl GameState {
             effect_started: false,
             use_limit_recorded: false,
             optional_cost_result: None,
+            optional_moves_all_moved: None,
             choice_player_id: None,
             pending_actions: Vec::new(),
             resolver: None,

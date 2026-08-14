@@ -3034,7 +3034,9 @@ impl super::resolver::AbilityResolver {
             // group with no card in discard) clears it, suppressing the draw —
             // Q118 "それぞれ1枚ずつ…置いてもよい。そうしたとき" is all-or-nothing.
             if chose_yes && !is_negation {
-                self.optional_moves_all_moved = Some(true);
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.optional_moves_all_moved = Some(true);
+                }
             }
             if let Some(cmd) = cmd {
                 gs.ability_queue.set_pending_actions(vec![cmd]);

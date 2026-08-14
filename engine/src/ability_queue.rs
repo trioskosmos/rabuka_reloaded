@@ -90,6 +90,14 @@ pub struct AbilityQueueEntry {
     /// Result of the optional cost evaluation.
     /// None = not evaluated, Some(true) = paid, Some(false) = skipped.
     pub optional_cost_result: Option<bool>,
+    /// For an accepted `conditional_on_optional` placement: whether every required
+    /// optional move actually moved a card. `Some(true)` is armed when the player
+    /// accepts; any optional move that resolves nothing (and offers no choice —
+    /// e.g. a group missing from the discard pile) clears it to `Some(false)`.
+    /// The trailing "そうしたとき" consequence (Q118: all-or-nothing) is gated on
+    /// this, so the draw only fires if all required cards were actually placed.
+    /// `None` = not inside a conditional_on_optional consequence (no gating).
+    pub optional_moves_all_moved: Option<bool>,
     /// Player who must make the pending choice (if different from activating player)
     pub choice_player_id: Option<String>,
     /// Card IDs that triggered this each_time auto ability (snapshot of
@@ -310,14 +318,15 @@ impl AbilityQueue {
                     card_id: None,
                     trigger_type: AbilityTrigger::Auto,
                     completed: false,
-                    cost_paid: false,
-                    cost_paid_index: 0,
-                    choice_card_no: None,
-                    conditional_choice: None,
-                    effect_started: false,
-                    use_limit_recorded: false,
-                    optional_cost_result: None,
-                    choice_player_id: None,
+            cost_paid: false,
+            cost_paid_index: 0,
+            choice_card_no: None,
+            conditional_choice: None,
+            effect_started: false,
+            use_limit_recorded: false,
+            optional_cost_result: None,
+            optional_moves_all_moved: None,
+            choice_player_id: None,
                     pending_actions: Vec::new(),
                     resolver: None,
                     trigger_moved_cards: None,
@@ -414,6 +423,7 @@ impl AbilityQueue {
             effect_started: false,
             use_limit_recorded: false,
             optional_cost_result: None,
+            optional_moves_all_moved: None,
             choice_player_id: None,
             pending_actions: Vec::new(),
             resolver: None,

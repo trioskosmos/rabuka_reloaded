@@ -1655,11 +1655,15 @@ impl AbilityResolver {
         // the discard pile) makes the placement incomplete, so the trailing
         // "そうしたとき" consequence must not fire. A successful move either returns
         // cards here or creates a pending_choice — only a genuine miss has neither.
-        if self.optional_moves_all_moved.is_some()
-            && taken.is_empty()
-            && self.pending_choice.is_none()
-        {
-            self.optional_moves_all_moved = Some(false);
+        let armed = gs
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.optional_moves_all_moved)
+            .is_some();
+        if armed && taken.is_empty() && self.pending_choice.is_none() {
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.optional_moves_all_moved = Some(false);
+            }
         }
         let is_deck_dest = Zone::from_str(&destination) == Some(Zone::Deck)
             || Zone::from_str(&destination) == Some(Zone::DeckTop);

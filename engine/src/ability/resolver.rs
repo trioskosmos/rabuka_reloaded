@@ -112,14 +112,6 @@ pub struct AbilityResolver {
     /// `modify_score` step directly following a `those_cards`→hand move must
     /// only apply when the move actually added a card.
     pub last_move_moved_any: Option<bool>,
-    /// For an accepted `conditional_on_optional` placement: whether every
-    /// required optional move actually moved a card. `Some(true)` is set when
-    /// the player accepts; any optional move that auto-skips (moved 0) clears it
-    /// to `Some(false)`. The trailing "そうしたとき" consequence is gated on this
-    /// (Q118: all-or-nothing), so the draw only fires if all required cards were
-    /// actually placed. `None` = not inside a conditional_on_optional consequence
-    /// (no gating).
-    pub optional_moves_all_moved: Option<bool>,
     /// Formation change plan: (member_id, chosen_destination) pairs accumulated
     /// across sequential choices.  All swaps execute as a batch at the end.
     pub formation_plan: SmallVec<[(i16, String); 2]>,
@@ -163,7 +155,6 @@ impl AbilityResolver {
             log_items: Vec::new(),
             formation_plan: SmallVec::new(),
             last_move_moved_any: None,
-            optional_moves_all_moved: None,
             last_offered_sig: None,
         }
     }
