@@ -83,8 +83,6 @@ impl GameState {
         // Reuse pre-allocated scratch buffers to avoid allocation storm
         let mut exp_blade = core::mem::take(&mut self.scratch_exp_blade);
         exp_blade.clear();
-        let mut exp_cost = core::mem::take(&mut self.scratch_exp_cost);
-        exp_cost.clear();
         let mut exp_score = core::mem::take(&mut self.scratch_exp_score);
         exp_score.clear();
         let mut exp_heart = core::mem::take(&mut self.scratch_exp_heart);
@@ -388,10 +386,6 @@ impl GameState {
                                     ));
                                 }
                             }
-                            crate::ability::enums::ActionType::ModifyCost => {
-                                *exp_cost.entry(card_id).or_insert(0) +=
-                                    effect.value_any().unwrap_or(0) as i16;
-                            }
                             crate::ability::enums::ActionType::Restriction => {
                                 if let Some(rt) = effect.restriction_type_any() {
                                     let card_name = self
@@ -690,18 +684,6 @@ impl GameState {
         self.mods.constant_blade_bonuses = exp_blade;
         self.scratch_exp_blade = old_blade;
 
-        // Cost
-        tdbg!("RC:8 COST");
-        let old_cost = core::mem::take(&mut self.mods.constant_cost_bonuses);
-        for (cid, val) in &old_cost {
-            self.mods.remove_cost_modifier(*cid, *val as i16);
-        }
-        for (&cid, &val) in &exp_cost {
-            self.mods.add_cost_modifier(cid, val as i16);
-        }
-        self.mods.constant_cost_bonuses = exp_cost;
-        self.scratch_exp_cost = old_cost;
-
         // Score
         tdbg!("RC:9 SCORE");
         let old_score = core::mem::take(&mut self.mods.constant_score_bonuses);
@@ -831,7 +813,6 @@ impl GameState {
         // to an absolute value rather than adjusting it by a delta.
         let mut expected_set: HashMap<i16, i16> = HashMap::default();
         {
-            let ctx = crate::ability::condition::ConditionContext::new(self);
             // Chain stage and hand ability IDs, look up each effect, filter to ModifyCost
             let all_ids = stage_ids.iter().chain(hand_ids.iter());
             for &(cid, ability_idx) in all_ids {
@@ -846,6 +827,27 @@ impl GameState {
                 if effect.action != crate::ability::enums::ActionType::ModifyCost {
                     continue;
                 }
+                // Resolve each card's OWNER so condition evaluators ("自分の..." /
+                // comparison_target: opponent) judge from the right player's
+                // perspective. A shared context would evaluate every copy as if
+                // it belonged to player1, wrongly applying a mirror-match ability
+                // to both sides when only the side with more energy should qualify.
+                let owner_in_p1 = self.player1.stage.stage.contains(&cid)
+                    || self.player1.hand.cards.contains(&cid)
+                    || self.player1.energy_zone.cards.contains(&cid);
+                let owner_in_p2 = self.player2.stage.stage.contains(&cid)
+                    || self.player2.hand.cards.contains(&cid)
+                    || self.player2.energy_zone.cards.contains(&cid);
+                let self_player = if owner_in_p1 {
+                    Some(&self.player1)
+                } else if owner_in_p2 {
+                    Some(&self.player2)
+                } else {
+                    None
+                };
+                let mut ctx =
+                    crate::ability::condition::ConditionContext::new_with_self(self, self_player);
+                ctx.skip_phase_gate = true;
                 let cond_met = effect
                     .condition
                     .as_ref()

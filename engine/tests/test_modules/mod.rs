@@ -53,6 +53,7 @@ pub mod bp7_q271_colorful_dreams_test;
 pub mod bp7_q272_just_believe_test;
 pub mod bp7_q273_watanabe_cost_test;
 pub mod bp7_we_will_energy_score_test;
+pub mod bp7_tang_keke_cost_test;
 pub mod bp7_tomari_discard_all_hand_test;
 pub mod bp7_q274_immune_still_selectable_test;
 pub mod bp7_q275_forcepick_wait_test;

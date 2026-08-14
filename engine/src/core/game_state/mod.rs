@@ -137,8 +137,6 @@ pub struct GameState {
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub scratch_exp_blade: HashMap<i16, i16>,
     #[cfg_attr(feature = "serde_support", serde(skip))]
-    pub scratch_exp_cost: HashMap<i16, i16>,
-    #[cfg_attr(feature = "serde_support", serde(skip))]
     pub scratch_exp_score: HashMap<i16, i16>,
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub scratch_exp_heart: HashMap<i16, HashMap<String, i16>>,
@@ -422,7 +420,6 @@ impl GameState {
             gained_card_abilities: HashMap::default(),
             delayed_gained_effects: SmallVec::new(),
             scratch_exp_blade: HashMap::default(),
-            scratch_exp_cost: HashMap::default(),
             scratch_exp_score: HashMap::default(),
             scratch_exp_heart: HashMap::default(),
             scratch_entry_positions: HashMap::default(),
