@@ -286,6 +286,7 @@ impl AbilityResolver {
                 self.pending_choice = Some(
                     Choice::select_cards(Zone::Stage.to_str(), 1, desc, false)
                         .description_ja(Some(desc_ja))
+                        .destination(Some(Zone::UnderMember.to_str().to_string()))
                         .target_player_id(Some(player_target.to_string()))
                         .build(),
                 );
@@ -295,12 +296,6 @@ impl AbilityResolver {
                     target: player_target.to_string(),
                     source_zone: source_zone.to_string(),
                 };
-                self.pending_under_placement = Some((
-                    card_id,
-                    player_target.to_string(),
-                    source_zone.to_string(),
-                    state_change,
-                ));
                 return Ok(true);
             }
             // Use the resolver's stored activating_card_id first (survives choice
