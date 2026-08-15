@@ -7,8 +7,8 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
     // AbilityEffect fields
     text: &mut ArcStr,
     action: &mut ActionType,
-    source: &mut Option<ArcStr>,
-    destination: &mut Option<ArcStr>,
+    source: &mut Option<Zone>,
+    destination: &mut Option<Zone>,
     count: &mut Option<u8>,
     target: &mut Option<ArcStr>,
     condition: &mut Option<Box<Condition>>,
@@ -35,8 +35,8 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
     match key {
             "text" => { *text = bc.read_string_value().map(ArcStr::from).unwrap_or_default(); return Some(true); }
             "action" => { *action = ActionType::from_str(&bc.read_string_value().unwrap_or_default()).unwrap_or_default(); return Some(true); }
-            "source" => { *source = bc.read_arc_str_value(); return Some(true); }
-            "destination" => { *destination = bc.read_arc_str_value(); return Some(true); }
+            "source" => { *source = bc.read_zone_value(); return Some(true); }
+            "destination" => { *destination = bc.read_zone_value(); return Some(true); }
             "count" => { *count = bc.read_u8_value(); return Some(true); }
             "target" => { *target = bc.read_arc_str_value(); return Some(true); }
             "condition" => { *condition = bc.read_condition_value(); return Some(true); }
@@ -258,7 +258,7 @@ pub(crate) struct EffectKindLocals {
     pub count: Option<u8>,
     pub custom_type: Option<ArcStr>,
     pub delayed: Option<bool>,
-    pub destination: Option<ArcStr>,
+    pub destination: Option<Zone>,
     pub discard_remaining: Option<bool>,
     pub distinct: Option<Box<DistinctType>>,
     pub duration: Option<ArcStr>,
@@ -343,7 +343,7 @@ pub(crate) struct EffectKindLocals {
     pub self_target: Option<bool>,
     pub shuffle: Option<bool>,
     pub sign: Option<ArcStr>,
-    pub source: Option<ArcStr>,
+    pub source: Option<Zone>,
     pub source_card: Option<ArcStr>,
     pub source_position: Option<ArcStr>,
     pub state: Option<Box<EffectState>>,

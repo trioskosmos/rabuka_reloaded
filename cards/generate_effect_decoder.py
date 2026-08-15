@@ -21,6 +21,7 @@ READER_MAP = {
     "Option<u8>": "bc.read_u8_value()",
     "Option<i8>": "bc.read_i8_value()",
     "Option<ArcStr>": "bc.read_arc_str_value()",
+    "Option<Zone>": "bc.read_zone_value()",
     "Option<Box<ArcStr>>": "bc.read_arc_str_value().map(|s| Box::new(s))",
     "Option<CardType>": "bc.read_card_type_value()",
     "Option<PlacementOrder>": "bc.read_placement_order_value()",

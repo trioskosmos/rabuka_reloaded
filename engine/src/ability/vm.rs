@@ -272,6 +272,21 @@ impl<'a> BcReader<'a> {
         }
     }
 
+    fn read_zone_value(&mut self) -> Option<Zone> {
+        let tag = self.read_u8()?;
+        match tag {
+            TAG_NULL => None,
+            TAG_STR => {
+                let idx = self.read_idx()?;
+                if idx >= STRINGS.len() {
+                    return None;
+                }
+                Some(Zone::from_source_str(STRINGS[idx]))
+            }
+            _ => None,
+        }
+    }
+
     fn read_bool_value(&mut self) -> Option<bool> {
         let tag = self.read_u8()?;
         match tag {
@@ -1234,8 +1249,8 @@ fn decode_ability_effect_direct(bc: &mut BcReader, variant: u8) -> Option<Abilit
     let count = bc.read_len()?;
     let mut text = ArcStr::from("");
     let mut action = ActionType::default();
-    let mut source: Option<ArcStr> = None;
-    let mut destination: Option<ArcStr> = None;
+    let mut source: Option<Zone> = None;
+    let mut destination: Option<Zone> = None;
     let mut count_val: Option<u8> = None;
     let mut target: Option<ArcStr> = None;
     let mut condition: Option<Box<Condition>> = None;
@@ -1322,8 +1337,8 @@ fn decode_ability_effect_direct(bc: &mut BcReader, variant: u8) -> Option<Abilit
     let mut effect = AbilityEffect {
         text,
         action,
-        source: source.map(|s| Zone::from_source_str(&s)),
-        destination: destination.map(|s| Zone::from_source_str(&s)),
+        source,
+        destination,
         count: count_val,
         target,
         condition,

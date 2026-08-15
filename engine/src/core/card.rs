@@ -761,9 +761,9 @@ pub struct EffectFilter {
     pub under_self: Option<bool>,
     pub location: Option<ArcStr>,
     pub heart_colors: Box<Vec<String>>,
-    pub source: Option<ArcStr>,
+    pub source: Option<Zone>,
     pub target: Option<ArcStr>,
-    pub destination: Option<ArcStr>,
+    pub destination: Option<Zone>,
     pub characters: Option<Box<Vec<String>>>,
     pub exclude_characters: Option<Box<Vec<String>>>,
     pub exclude_group_names: Option<Box<Vec<String>>>,
@@ -1066,6 +1066,11 @@ impl AbilityEffect {
                     .map(|s| ArcStr::from(s))
             };
         }
+        macro_rules! zone_field {
+            ($key:expr) => {
+                obj.get($key).and_then(|v| v.as_str()).map(Zone::from_source_str)
+            };
+        }
         macro_rules! bool_field {
             ($key:expr) => {
                 obj.get($key).and_then(|v| v.as_bool())
@@ -1123,9 +1128,9 @@ impl AbilityEffect {
             under_self: bool_field!("under_self"),
             location: str_field!("location"),
             heart_colors: str_vec_field!("heart_colors").unwrap_or_default(),
-            source: str_field!("source"),
+            source: zone_field!("source"),
             target: str_field!("target"),
-            destination: str_field!("destination"),
+            destination: zone_field!("destination"),
             characters: opt_str_vec_field!("characters"),
             exclude_characters: opt_str_vec_field!("exclude_characters"),
             exclude_group_names: opt_str_vec_field!("exclude_group_names"),
@@ -1789,9 +1794,20 @@ impl AbilityEffect {
 
     filter_str_getter!(source_position_any, source_position);
 
-    filter_str_getter!(source_any, source);
+    /// String form of the filter-level source zone (mirrors the pre-refactor
+    /// `Option<ArcStr>.as_deref()`). The typed form is `source_zone()`.
+    pub fn source_any(&self) -> Option<&str> {
+        self.kind.as_deref()?.filter()?.source.map(|z| z.as_str())
+    }
 
-    filter_str_getter!(destination_any, destination);
+    /// String form of the filter-level destination zone.
+    pub fn destination_any(&self) -> Option<&str> {
+        self.kind
+            .as_deref()?
+            .filter()?
+            .destination
+            .map(|z| z.as_str())
+    }
 
     pub fn count_any(&self) -> Option<u8> {
         let filter_count = self
