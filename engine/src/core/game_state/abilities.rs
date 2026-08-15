@@ -1677,13 +1677,13 @@ impl GameState {
         if let Some(entry) = self.ability_queue.current_entry() {
             if !entry.effect_started {
                 if let Some(ref cost) = entry.ability.cost {
-                    if let Some(ref dest) = cost.destination {
-                        return Some(dest);
+                    if let Some(dest) = cost.destination {
+                        return Some(dest.to_str());
                     }
                 }
             }
         }
-        self.entry_effect().and_then(|e| e.destination.as_deref())
+        self.entry_effect().and_then(|e| e.destination.map(|d| d.to_str()))
     }
 
     pub fn entry_choice_card_no(&self) -> Option<crate::ability::types::ChoiceRoute> {
@@ -2268,7 +2268,7 @@ impl GameState {
                 ) {
                     if let Some(ref effect) = ability.effect {
                         let res_dest = effect.restricted_destination_any();
-                        let dest = effect.destination.as_deref();
+                        let dest = effect.destination.map(|d| d.to_str());
                         let restricted_to = res_dest.or(dest);
                         if effect.action == crate::ability::enums::ActionType::Restriction
                             && effect.restriction_type_any().as_deref() == Some("cannot_place")

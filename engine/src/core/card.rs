@@ -1,5 +1,5 @@
 use crate::ability::ability_store::AbilityRef;
-pub(crate) use crate::ability::enums::{ActionType, ConditionType, EffectState};
+pub(crate) use crate::ability::enums::{ActionType, ConditionType, EffectState, Zone};
 use crate::core::types::ArcStr;
 #[cfg(feature = "serde_support")]
 use crate::BTreeMap;
@@ -1024,9 +1024,9 @@ pub struct AbilityEffect {
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub action: ActionType,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub source: Option<ArcStr>,
+    pub source: Option<Zone>,
     #[cfg_attr(feature = "serde_support", serde(default))]
-    pub destination: Option<ArcStr>,
+    pub destination: Option<Zone>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub count: Option<u8>,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -1908,6 +1908,26 @@ impl AbilityEffect {
     /// Returns the source zone string with a static default.
     pub fn source_or(&self, default: &'static str) -> &str {
         self.source_any().unwrap_or(default)
+    }
+
+    /// Typed source zone. `self.source` is `Option<Zone>`; this exposes it directly.
+    pub fn source_zone(&self) -> Option<Zone> {
+        self.source
+    }
+
+    /// Typed destination zone. `self.destination` is `Option<Zone>`.
+    pub fn destination_zone(&self) -> Option<Zone> {
+        self.destination
+    }
+
+    /// String form of the source zone (mirrors the pre-refactor `Option<ArcStr>.as_deref()`).
+    pub fn source_str(&self) -> Option<&str> {
+        self.source.map(|z| z.as_str())
+    }
+
+    /// String form of the destination zone.
+    pub fn destination_str(&self) -> Option<&str> {
+        self.destination.map(|z| z.as_str())
     }
 
     /// Build a `CardFilter` containing the 7 base filter fields (card_type,

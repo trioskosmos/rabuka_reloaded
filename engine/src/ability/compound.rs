@@ -2,7 +2,7 @@ use super::condition::ConditionContext;
 use super::resolver::AbilityResolver;
 use super::types::{AbilityTraceNode, Choice, ExecutionContext, StepOutput, ZoneSnapshot};
 use crate::ability::debug::ABILITY_DEBUG;
-use crate::ability::enums::ActionType;
+use crate::ability::enums::{ActionType, Zone};
 use crate::ability_queue::ConditionalChoice;
 use crate::card::{AbilityEffect, Condition};
 use crate::game_state::GameState;
@@ -389,7 +389,7 @@ impl AbilityResolver {
                     // sub-action so it never gates an unrelated later step.
                     let is_gated_consequence = action.action == ActionType::ModifyScore
                         || (action.action == ActionType::MoveCards
-                            && action.destination.as_deref() == Some("hand")
+                            && action.destination == Some(Zone::Hand)
                             && action.self_target_any().unwrap_or(false)
                             && action.source_any().is_some_and(|s| {
                                 s == "discard" || s == "waitroom"

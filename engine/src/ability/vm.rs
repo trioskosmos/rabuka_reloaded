@@ -3,7 +3,7 @@ use super::abilities_gen::{BYTECODE, NUM_ABILITIES, OFFSET_DELTAS, STRINGS};
 #[cfg(feature = "snes")]
 use super::abilities_gen::{ABILITY_LOCS, NUM_ABILITIES, STRINGS, bytecode_slice};
 use super::enums::EffectState;
-use crate::ability::enums::ActionType;
+use crate::ability::enums::{ActionType, Zone};
 #[cfg_attr(not(feature = "debug_conditions"), allow(unused_imports))]
 use crate::card::{
     ek_box_new, Ability, AbilityCost, AbilityEffect, AbilityFilter, AbilityFilterBranch,
@@ -1322,8 +1322,8 @@ fn decode_ability_effect_direct(bc: &mut BcReader, variant: u8) -> Option<Abilit
     let mut effect = AbilityEffect {
         text,
         action,
-        source,
-        destination,
+        source: source.map(|s| Zone::from_source_str(&s)),
+        destination: destination.map(|s| Zone::from_source_str(&s)),
         count: count_val,
         target,
         condition,

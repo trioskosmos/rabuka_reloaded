@@ -1736,7 +1736,10 @@ impl AbilityResolver {
             .source_any()
             .map(|s| s.to_string())
             .unwrap_or_default();
-        let destination = effect.destination.clone().unwrap_or_default();
+        let destination = effect
+            .destination
+            .map(|z| z.to_str().to_string())
+            .unwrap_or_default();
 
         let raw_target = tgt.as_deref().unwrap_or("self");
         let target = raw_target;
@@ -1755,7 +1758,7 @@ impl AbilityResolver {
         // Store destination for execute_selected_cards_from_zone to read later
         // (needed when the resolve creates a card selection choice and the destination
         // is not accessible via entry_destination, e.g. for sequential sub-actions).
-        self.spawn_context.destination = effect.destination.clone().map(|s| s.to_string());
+        self.spawn_context.destination = effect.destination.map(|z| z.to_str().to_string());
         self.spawn_context.source = effect.source_any().map(|s| s.to_string());
         self.spawn_context.position = effect.position_any().and_then(|p| match p {
             crate::card::PositionInfo::String(s) => s.parse::<u8>().ok(),

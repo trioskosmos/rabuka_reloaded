@@ -103,7 +103,7 @@ impl AbilityResolver {
             ActionType::ChoiceCondition => Ok(()),
             ActionType::MoveCards => {
                 let count = cost.count.unwrap_or(1) as usize;
-                let source = cost.source.as_deref().unwrap_or("");
+let source = cost.source_str().unwrap_or("");
                 let target_str = cost.target.as_deref().unwrap_or("self");
                 let player = gs.resolve_target_player(target_str);
                 if !matches!(
@@ -170,7 +170,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         cost: &AbilityEffect,
     ) -> Result<(), String> {
-        let source = cost.source.as_deref().unwrap_or("");
+        let source = cost.source_str().unwrap_or("");
         // any_number means player chooses 0..N
         let is_any_number = cost.any_number_any().unwrap_or(false);
         let count = cost.count.unwrap_or(1) as usize;
@@ -860,7 +860,7 @@ impl AbilityResolver {
                 Ok(())
             }
             ActionType::Reveal => {
-                let source = cost.source.as_deref().unwrap_or(Zone::Hand.to_str());
+                let source = cost.source_str().unwrap_or(Zone::Hand.to_str());
                 let target = cost.target.as_deref().unwrap_or("self");
                 let card_type = cost.card_type_any().map(|s| s.to_string());
 
@@ -948,7 +948,7 @@ impl AbilityResolver {
                 Ok(())
             }
             ActionType::Custom => {
-                if cost.destination.as_deref().and_then(Zone::from_str) == Some(Zone::UnderMember) {
+                if cost.destination == Some(Zone::UnderMember) {
                     self.execute_place_energy_under_member(gs, cost);
                 }
                 Ok(())
@@ -1028,17 +1028,19 @@ impl AbilityResolver {
         let has_cost = gs.entry_cost().is_some();
         let is_deck_top = gs
             .entry_effect()
-            .and_then(|e| e.source.as_deref())
-            .is_some_and(|s| s == "deck_top" || s == "deck" || s == "deck_bottom")
+            .and_then(|e| e.source)
+            .is_some_and(|s| {
+                s == Zone::DeckTop || s == Zone::Deck || s == Zone::DeckBottom
+            })
             || gs
                 .ability_queue
                 .current_entry()
                 .map(|e| &e.pending_actions)
                 .map(|pa| {
                     pa.iter().any(|a| {
-                        a.source.as_deref() == Some("deck_top")
-                            || a.source.as_deref() == Some("deck")
-                            || a.source.as_deref() == Some("deck_bottom")
+                        a.source == Some(Zone::DeckTop)
+                            || a.source == Some(Zone::Deck)
+                            || a.source == Some(Zone::DeckBottom)
                     })
                 })
                 .unwrap_or(false);
@@ -1245,7 +1247,7 @@ impl AbilityResolver {
                 .unwrap_or("self");
             let source = cost
                 .as_ref()
-                .and_then(|c| c.source.as_deref())
+                .and_then(|c| c.source_str())
                 .unwrap_or("hand");
             let player = gs.resolve_target_player_mut(target_str);
             let hand_ids: Vec<i16> = player.hand.cards.drain(..).collect();

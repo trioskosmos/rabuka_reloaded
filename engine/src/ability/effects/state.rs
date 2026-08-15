@@ -69,7 +69,7 @@ impl AbilityResolver {
         let optional = effect.optional.unwrap_or(false);
         let self_cost = effect.self_cost_any().unwrap_or(false);
         let source = effect.source_any();
-        let destination = effect.destination.as_deref();
+        let destination = effect.destination.map(|z| z.as_str());
         let cost_limit_operator = effect.cost_limit_operator_any().map(|s| s.to_string());
         let characters = effect.characters_any();
         let mut q266_no_target = false;

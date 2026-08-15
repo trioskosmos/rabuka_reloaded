@@ -851,8 +851,8 @@ impl AbilityResolver {
                 let cost_desc = format!(
                     "{}: {}→{} {}",
                     cost.action,
-                    cost.source.as_deref().unwrap_or("?"),
-                    cost.destination.as_deref().unwrap_or("?"),
+                    cost.source.map(|z| z.as_str()).unwrap_or("?"),
+                    cost.destination.map(|z| z.as_str()).unwrap_or("?"),
                     cost.count.unwrap_or(cost.energy_count_any().unwrap_or(1))
                 );
                 #[cfg(not(feature = "no_std"))]

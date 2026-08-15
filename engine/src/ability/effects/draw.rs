@@ -133,7 +133,7 @@ impl AbilityResolver {
             draw_count,
             effect.target_name(),
             effect.source_or(Zone::Deck.to_str()),
-            effect.destination.as_deref().unwrap_or(Zone::Hand.to_str()),
+            effect.destination.map(|z| z.as_str()).unwrap_or(Zone::Hand.to_str()),
             effect.card_type_any().map(|ct| ct.as_card_str()),
             effect.per_unit_any().unwrap_or(false),
             effect.per_unit_count_any().unwrap_or(1),
@@ -500,7 +500,7 @@ impl AbilityResolver {
     pub fn execute_draw_until_count(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
         let target_count: u8 = effect.target_count_any().unwrap_or(0) as u8;
         let target = effect.target_name();
-        let destination = effect.destination.as_deref().unwrap_or(Zone::Hand.to_str());
+        let destination = effect.destination.map(|z| z.as_str()).unwrap_or(Zone::Hand.to_str());
         let player = gs.resolve_target_player_mut(target);
         let current_count = match Zone::from_str(destination) {
             Some(Zone::Hand) => player.hand.len(),

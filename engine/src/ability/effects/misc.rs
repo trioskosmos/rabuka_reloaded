@@ -4,7 +4,6 @@ use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
 use super::super::util;
 use crate::ability_queue::ConditionalChoice;
 use crate::card::{AbilityEffect, PlacementOrder, PositionInfo};
-use crate::core::types::ArcStr;
 use crate::game_state::GameState;
 use crate::{HashMap, HashSet};
 #[cfg(feature = "no_std")]
@@ -2006,7 +2005,7 @@ impl AbilityResolver {
         // count from under member, but move from energy_deck → energy_zone (wait).
         // e.g. PL!N-bp5-012-R+ LiveSuccess: place (under_count + 1) from deck.
         if source.as_deref() == Some("under_member")
-            && effect.destination.as_deref() == Some("energy_zone")
+            && effect.destination == Some(Zone::Energy)
         {
             let player = gs.resolve_target_player_mut(&target);
             for _ in 0..count {
@@ -2023,7 +2022,7 @@ impl AbilityResolver {
         // Special case: deploy from under_member to empty_area
         // (e.g. PL!-bp6-003-R+ LiveSuccess)
         if source.as_deref() == Some("under_member")
-            && effect.destination.as_deref() == Some("empty_area")
+            && effect.destination == Some(Zone::EmptyArea)
         {
             let player = gs.resolve_target_player(&target);
             let has_empty_slot = (0..3).any(|i| player.stage.stage[i] == -1);
@@ -2508,7 +2507,7 @@ impl AbilityResolver {
             if let Some(ref area) = stored_area {
                 self.selected_area = None;
                 let mut copy = effect.clone();
-                copy.destination = Some(ArcStr::from(area.as_str()));
+                copy.destination = Some(Zone::from_source_str(area));
                 return self.execute_position_change_with_destination(gs, &copy, area);
             }
 
@@ -3647,7 +3646,7 @@ impl AbilityResolver {
         let restricted_dest_binding = effect.restricted_destination_any();
         let restricted_destination = restricted_dest_binding
             .as_deref()
-            .or(effect.destination.as_deref());
+            .or(effect.destination.map(|z| z.as_str()));
         let target = effect.target_name();
         let delayed = effect.delayed_any().unwrap_or(false);
         let pp = self.player_prefix(gs);

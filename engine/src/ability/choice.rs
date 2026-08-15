@@ -1570,7 +1570,7 @@ impl super::resolver::AbilityResolver {
         let pending = gs.ability_queue.take_pending_actions();
         let filtered: Vec<AbilityEffect> = pending
             .into_iter()
-            .filter(|cmd| cmd.source.as_deref() != Some("success_live_zone"))
+            .filter(|cmd| cmd.source != Some(Zone::SuccessLiveZone))
             .collect();
         gs.ability_queue.set_pending_actions(filtered);
         self.resume_pending_actions(gs)
@@ -2389,7 +2389,10 @@ impl super::resolver::AbilityResolver {
         let count: usize = selected.parse().unwrap_or(0);
         if let Some(effect) = gs.entry_effect().cloned() {
             let source = effect.source_any().unwrap_or(Zone::Deck.to_str());
-            let destination = effect.destination.as_deref().unwrap_or(Zone::Hand.to_str());
+            let destination = effect
+                .destination
+                .map(|d| d.to_str())
+                .unwrap_or(Zone::Hand.to_str());
             let ct_binding = effect.card_type_any();
             let card_type = ct_binding.map(|ct| ct.as_card_str());
             let card_db = gs.card_database.clone();
@@ -2564,7 +2567,7 @@ impl super::resolver::AbilityResolver {
                             target_str, dest
                         )));
                     }
-                    modified.destination = Some(dest.into());
+modified.destination = Some(Zone::from_source_str(dest));
                     if let Some(ref src_pos) = explicit_source_pos {
                         let target = modified.target.as_deref().unwrap_or("self");
                         let player = gs.resolve_target_player_mut(target);
@@ -2769,7 +2772,7 @@ impl super::resolver::AbilityResolver {
                 }
             }
 
-            modified.destination = Some(dest.into());
+            modified.destination = Some(Zone::from_source_str(dest));
             // Use explicit_source_pos if available (handles Choice/compound
             // effects where source_position_any() returns None).
             if let Some(ref src_pos) = explicit_source_pos {
@@ -2998,7 +3001,7 @@ impl super::resolver::AbilityResolver {
                 // Fall back to effect modification for non-card-specific position choices
                 // (e.g. stage position selection).
                 self.apply_effect_modification(gs, |effect| {
-                    effect.destination = Some(selected.into());
+                    effect.destination = Some(Zone::from_source_str(selected));
                 })
             }
         }

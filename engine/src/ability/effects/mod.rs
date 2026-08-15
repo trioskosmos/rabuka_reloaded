@@ -37,7 +37,7 @@ impl AbilityResolver {
             "DEBUG: execute_effect - action: {}, source: {}, destination: {}",
             effect.action,
             effect.source_or("none"),
-            effect.destination.as_deref().unwrap_or("none")
+            effect.destination.map(|z| z.as_str()).unwrap_or("none")
         );
         #[cfg(not(feature = "no_std"))]
         let exec_snapshot = crate::ability::log::buffer_len();

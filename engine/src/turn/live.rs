@@ -855,7 +855,7 @@ impl super::TurnEngine {
                     let ability = ar.resolve();
                     if let Some(ref effect) = ability.effect {
                         let rd_binding = effect.restricted_destination_any();
-                        let dest_binding = effect.destination.as_deref();
+                        let dest_binding = effect.destination.map(|z| z.as_str());
                         let restricted_dest = rd_binding.or(dest_binding);
                         effect.action == crate::ability::enums::ActionType::Restriction
                             && effect.restriction_type_any().as_deref() == Some("cannot_place")
@@ -1086,7 +1086,7 @@ impl super::TurnEngine {
             if alt.action != crate::ability::enums::ActionType::MoveCards {
                 continue;
             }
-            let alt_source = alt.source.as_deref().unwrap_or("");
+            let alt_source = alt.source.map(|z| z.as_str()).unwrap_or("");
             if Zone::from_str(alt_source) != Some(Zone::Discard) && alt_source != "discard" {
                 continue;
             }

@@ -41,6 +41,10 @@ pub enum Zone {
     LookedAtRemaining,
     DeckTopOrBottom,
     Front,
+    /// Fallback for source/destination strings not among the known markers.
+    /// Never produced by real card data; exists so `From<&str>`/decode can
+    /// always succeed without an owned `Other(String)` (keeps `Zone: Copy`).
+    Unknown,
 }
 
 impl Zone {
@@ -114,13 +118,63 @@ impl Zone {
             Zone::LookedAtRemaining => "looked_at_remaining",
             Zone::DeckTopOrBottom => "deck_top_or_bottom",
             Zone::Front => "front",
+            Zone::Unknown => "unknown",
         }
+    }
+
+    /// Always-succeed conversion for the effect `source`/`destination` fields.
+    /// Unlike `from_str` (which returns `None` for unrecognized strings so the
+    /// ~100 condition/location call sites keep their `None` handling), this
+    /// maps any known zone/marker to its typed variant and everything else to
+    /// `Zone::Unknown`. Real card data only ever contains known values, so
+    /// round-trip fidelity is preserved.
+    pub fn from_source_str(s: &str) -> Self {
+        Zone::from_str(s).unwrap_or(Zone::Unknown)
+    }
+
+    /// String form, matching `to_str`. Exists so `Option<Zone>` fields can be
+    /// read via `.map(Zone::as_str)` mirroring the old `Option<ArcStr>.as_deref()`.
+    pub fn as_str(&self) -> &'static str {
+        self.to_str()
     }
 }
 
 impl core::fmt::Display for Zone {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.to_str())
+    }
+}
+
+impl From<&str> for Zone {
+    fn from(s: &str) -> Self {
+        Zone::from_source_str(s)
+    }
+}
+
+impl From<String> for Zone {
+    fn from(s: String) -> Self {
+        Zone::from_source_str(&s)
+    }
+}
+
+impl From<ArcStr> for Zone {
+    fn from(s: ArcStr) -> Self {
+        Zone::from_source_str(s.as_ref())
+    }
+}
+
+#[cfg(feature = "serde_support")]
+impl serde::Serialize for Zone {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.to_str())
+    }
+}
+
+#[cfg(feature = "serde_support")]
+impl<'de> serde::Deserialize<'de> for Zone {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = <ArcStr as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(Zone::from_source_str(&s))
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::ability::enums::ActionType;
+use crate::ability::enums::{ActionType, Zone};
 use crate::card::AbilityEffect;
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -100,7 +100,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
     let c = effect.count_any();
     let t = effect.target_any();
     let s = effect.source_any();
-    let d = effect.destination.as_deref();
+    let d = effect.destination.map(|z| z.as_str());
     let gn = group_label(effect.group_names_any());
 
     match action {
@@ -224,7 +224,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
                 .compound
                 .select_action
                 .as_ref()
-                .and_then(|a| a.destination.as_deref())
+                .and_then(|a| a.destination.map(|z| z.as_str()))
                 .map(|s| zone_label(Some(s)));
             if let (Some(lc), Some(sc)) = (look_count, select_count) {
                 if sc == 1 {
@@ -525,12 +525,12 @@ pub fn describe_cost_en(cost: &AbilityEffect) -> String {
             }
         }
         ActionType::MoveCards => {
-            let src = zone_label(cost.source.as_deref());
-            let dest = zone_label(cost.destination.as_deref());
+            let src = zone_label(cost.source.map(|z| z.as_str()));
+            let dest = zone_label(cost.destination.map(|z| z.as_str()));
             let card_type_binding = cost.card_type_any();
             let card_type = card_type_label(card_type_binding.map(|ct| ct.as_card_str()));
             let count = cost.count.unwrap_or(1);
-            if cost.self_cost_any() == Some(true) && cost.source.as_deref() == Some("those_cards") {
+            if cost.self_cost_any() == Some(true) && cost.source == Some(Zone::ThoseCards) {
                 format!("Move that card to {}", dest)
             } else {
                 format!("Place {} {} from {} to {}", count, card_type, src, dest)
@@ -538,7 +538,7 @@ pub fn describe_cost_en(cost: &AbilityEffect) -> String {
         }
         ActionType::Reveal => {
             let count = cost.count.unwrap_or(1);
-            let source = cost.source.as_deref().unwrap_or("hand");
+            let source = cost.source.map(|z| z.as_str()).unwrap_or("hand");
             format!("Reveal {} card(s) from {}", count, zone_label(Some(source)))
         }
         _ => describe_effect_en(cost),
@@ -565,12 +565,12 @@ pub fn describe_cost_ja(cost: &AbilityEffect) -> String {
             }
         }
         ActionType::MoveCards => {
-            let src = zone_label_ja(cost.source.as_deref());
-            let dest = zone_label_ja(cost.destination.as_deref());
+            let src = zone_label_ja(cost.source.map(|z| z.as_str()));
+            let dest = zone_label_ja(cost.destination.map(|z| z.as_str()));
             let ct_binding = cost.card_type_any();
             let ct = card_type_label_ja(ct_binding.map(|ct| ct.as_card_str()));
             let count = cost.count.unwrap_or(1);
-            if cost.self_cost_any() == Some(true) && cost.source.as_deref() == Some("those_cards") {
+            if cost.self_cost_any() == Some(true) && cost.source == Some(Zone::ThoseCards) {
                 format!("そのカードを{}に置く", dest)
             } else {
                 let count_str = if count == 1 {
@@ -583,7 +583,7 @@ pub fn describe_cost_ja(cost: &AbilityEffect) -> String {
         }
         ActionType::Reveal => {
             let count = cost.count.unwrap_or(1);
-            let source = cost.source.as_deref().unwrap_or("hand");
+            let source = cost.source.map(|z| z.as_str()).unwrap_or("hand");
             let count_str = if count == 1 {
                 "1枚".to_string()
             } else {
@@ -694,7 +694,7 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
     let c = effect.count_any();
     let t = effect.target_any();
     let s = effect.source_any();
-    let d = effect.destination.as_deref();
+    let d = effect.destination.map(|z| z.as_str());
     let gn = group_label(effect.group_names_any());
 
     match action {
@@ -845,7 +845,7 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
                 .compound
                 .select_action
                 .as_ref()
-                .and_then(|a| a.destination.as_deref())
+                .and_then(|a| a.destination.map(|z| z.as_str()))
                 .map(|s| zone_label_ja(Some(s)));
             if let (Some(lc), Some(sc)) = (look_count, select_count) {
                 if sc == 1 {
