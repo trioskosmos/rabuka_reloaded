@@ -32,6 +32,15 @@ pub enum Zone {
     SelectedCards,
     Resolution,
     ExclusionZone,
+    // Non-zone "source"/"destination" marker values found in card data.
+    // Kept as Zone variants (rather than an Other/String catch-all) so the
+    // source/destination fields can be typed without losing these markers.
+    PrecedingMoved,
+    RecentlyMoved,
+    ThoseCards,
+    LookedAtRemaining,
+    DeckTopOrBottom,
+    Front,
 }
 
 impl Zone {
@@ -62,6 +71,12 @@ impl Zone {
             "selected_cards" => Some(Zone::SelectedCards),
             "resolution" | "resolution_zone" => Some(Zone::Resolution),
             "exclusion_zone" => Some(Zone::ExclusionZone),
+            "preceding_moved" => Some(Zone::PrecedingMoved),
+            "recently_moved" => Some(Zone::RecentlyMoved),
+            "those_cards" => Some(Zone::ThoseCards),
+            "looked_at_remaining" => Some(Zone::LookedAtRemaining),
+            "deck_top_or_bottom" => Some(Zone::DeckTopOrBottom),
+            "front" => Some(Zone::Front),
             _ => None,
         }
     }
@@ -93,6 +108,12 @@ impl Zone {
             Zone::SelectedCards => "selected_cards",
             Zone::Resolution => "resolution",
             Zone::ExclusionZone => "exclusion_zone",
+            Zone::PrecedingMoved => "preceding_moved",
+            Zone::RecentlyMoved => "recently_moved",
+            Zone::ThoseCards => "those_cards",
+            Zone::LookedAtRemaining => "looked_at_remaining",
+            Zone::DeckTopOrBottom => "deck_top_or_bottom",
+            Zone::Front => "front",
         }
     }
 }
