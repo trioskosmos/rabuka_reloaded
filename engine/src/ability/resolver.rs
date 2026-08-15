@@ -676,6 +676,89 @@ impl AbilityResolver {
         );
     }
 
+    /// Returns true if the ability has already been used `use_limit`+ times this turn.
+    fn check_use_limit_reached(
+        &self,
+        gs: &GameState,
+        card_id: i16,
+        ability_index: usize,
+        use_limit: u8,
+    ) -> bool {
+        gs.ability_uses_used(card_id, ability_index) >= use_limit
+    }
+
+    /// Record an ability use for this turn, guarded by the effect-activability check
+    /// (unless `unconditional`, in which case the key is always recorded).
+    fn record_ability_use_guarded(
+        &mut self,
+        gs: &mut GameState,
+        key: (i16, usize, u8),
+        ability: &Ability,
+        unconditional: bool,
+    ) {
+        if ability.use_limit.is_none() {
+            return;
+        }
+        let can_activate = unconditional
+            || ability
+                .effect
+                .as_ref()
+                .is_none_or(|e| self.can_activate_effect(gs, e));
+        if can_activate {
+            gs.record_ability_use(key);
+        }
+    }
+
+    /// Post-cost activation-keyword check. Returns Ok(()) when the ability's
+    /// position keywords are satisfied (or it has none / isn't an on-stage card).
+    fn check_post_cost_position_keywords(
+        &mut self,
+        gs: &mut GameState,
+        ability: &Ability,
+        activating_card: Option<i16>,
+        card_name: &str,
+    ) -> Result<(), String> {
+        let Some(card_id) = activating_card else {
+            return Ok(());
+        };
+        let position = gs
+            .player1
+            .stage
+            .stage
+            .iter()
+            .position(|&id| id == card_id)
+            .or_else(|| gs.player2.stage.stage.iter().position(|&id| id == card_id))
+            .map(|idx| match idx {
+                0 => crate::zones::MemberArea::LeftSide,
+                1 => crate::zones::MemberArea::Center,
+                _ => crate::zones::MemberArea::RightSide,
+            });
+        if let Some(ref kws) = ability.keywords {
+            for kw in kws {
+                let pos_ok = match kw {
+                    Keyword::Center => position == Some(crate::zones::MemberArea::Center),
+                    Keyword::LeftSide => position == Some(crate::zones::MemberArea::LeftSide),
+                    Keyword::RightSide => position == Some(crate::zones::MemberArea::RightSide),
+                    _ => true,
+                };
+                if !pos_ok {
+                    // Suppress position condition failures for auto abilities
+                    // to avoid noise (they fire on every phase transition).
+                    if ability.triggers.as_deref() != Some(crate::triggers::ACTIVATION)
+                        && ability.triggers.as_deref() != Some(crate::triggers::DEBUT)
+                    {
+                        let pp2 = gs.player_prefix();
+                        gs.push_rule_log(format!(
+                            "{pp2} {card_name}: [[log_position_fail:keyword={kw:?}]]"
+                        ));
+                    }
+                    return Err("position requirement not met — effect skipped".to_string());
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn resolve_ability(
         &mut self,
         gs: &mut GameState,
@@ -717,8 +800,8 @@ impl AbilityResolver {
 
         if let Some(card_id) = activating_card {
             if let Some(use_limit) = ability.use_limit {
-                let used = gs.ability_uses_used(card_id, ability_index);
-                if used >= use_limit {
+                if self.check_use_limit_reached(gs, card_id, ability_index, use_limit) {
+                    let used = gs.ability_uses_used(card_id, ability_index);
                     let msg = format!(
                         "Ability already used {} of {} times this turn",
                         used, use_limit
@@ -805,15 +888,7 @@ impl AbilityResolver {
             && !is_optional_effect
         {
             if let Some(ref key) = ability_key {
-                if ability.use_limit.is_some() {
-                    let can_activate = ability
-                        .effect
-                        .as_ref()
-                        .is_none_or(|e| self.can_activate_effect(gs, e));
-                    if can_activate {
-                        gs.record_ability_use(*key);
-                    }
-                }
+                self.record_ability_use_guarded(gs, *key, ability, false);
             }
         }
 
@@ -830,43 +905,14 @@ impl AbilityResolver {
         // Check position keywords (Center/LeftSide/RightSide) AFTER cost payment.
         // Position checks gate the effect, not the cost — the test expects cost to still be paid.
         if let Some(card_id) = activating_card {
-            let position = gs
-                .player1
-                .stage
-                .stage
-                .iter()
-                .position(|&id| id == card_id)
-                .or_else(|| gs.player2.stage.stage.iter().position(|&id| id == card_id))
-                .map(|idx| match idx {
-                    0 => crate::zones::MemberArea::LeftSide,
-                    1 => crate::zones::MemberArea::Center,
-                    _ => crate::zones::MemberArea::RightSide,
-                });
-            if let Some(ref kws) = ability.keywords {
-                for kw in kws {
-                    let pos_ok = match kw {
-                        Keyword::Center => position == Some(crate::zones::MemberArea::Center),
-                        Keyword::LeftSide => position == Some(crate::zones::MemberArea::LeftSide),
-                        Keyword::RightSide => position == Some(crate::zones::MemberArea::RightSide),
-                        _ => true,
-                    };
-                    if !pos_ok {
-                        // Suppress position condition failures for auto abilities
-                        // to avoid noise (they fire on every phase transition).
-                        if ability.triggers.as_deref() != Some(crate::triggers::ACTIVATION)
-                            && ability.triggers.as_deref() != Some(crate::triggers::DEBUT)
-                        {
-                            let pp2 = gs.player_prefix();
-                            gs.push_rule_log(format!(
-                                "{pp2} {card_name}: [[log_position_fail:keyword={kw:?}]]"
-                            ));
-                        }
-                        dbg.p("RESULT", "position requirement not met — effect skipped");
-                        let items = drain_verdicts();
-                        self.push_ability_result(gs, "position_fail", items, None);
-                        return Ok(());
-                    }
+            match self.check_post_cost_position_keywords(gs, ability, Some(card_id), &card_name) {
+                Err(_) => {
+                    dbg.p("RESULT", "position requirement not met — effect skipped");
+                    let items = drain_verdicts();
+                    self.push_ability_result(gs, "position_fail", items, None);
+                    return Ok(());
                 }
+                Ok(()) => {}
             }
         }
 
@@ -988,15 +1034,7 @@ impl AbilityResolver {
 
         if !cost_already_paid {
             if let Some(ref key) = ability_key {
-                if ability.use_limit.is_some() {
-                    let can_activate = ability
-                        .effect
-                        .as_ref()
-                        .is_none_or(|e| self.can_activate_effect(gs, e));
-                    if can_activate {
-                        gs.record_ability_use(*key);
-                    }
-                }
+                self.record_ability_use_guarded(gs, *key, ability, false);
             }
         }
         if let Some(key) = ability_key {

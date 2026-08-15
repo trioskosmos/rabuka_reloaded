@@ -423,10 +423,6 @@ impl super::resolver::AbilityResolver {
         let filtered_indices: &Option<Vec<usize>> = &ctx.filtered_indices;
         let is_select_action: bool = ctx.is_select_action;
         let target_player_id: &Option<String> = &ctx.target_player_id;
-        let destination: &Option<String> = &ctx.destination;
-        let discard_remaining: &Option<bool> = &ctx.discard_remaining;
-        let blind: bool = ctx.blind;
-        let is_reveal: bool = ctx.is_reveal;
 
         let card_db = gs.card_database.clone();
         let validate_filter = choice.as_filter();
