@@ -1245,7 +1245,7 @@ fn recursive_normalize_cost_value(val: &mut serde_json::Value) {
 }
 
 /// Direct decoder for TAG_OBJECT_VARIANT effects using the generated field dispatch.
-fn decode_ability_effect_direct(bc: &mut BcReader, variant: u8) -> Option<AbilityEffect> {
+fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<AbilityEffect> {
     let count = bc.read_len()?;
     let mut text = ArcStr::from("");
     let mut action = ActionType::default();
@@ -1316,24 +1316,10 @@ fn decode_ability_effect_direct(bc: &mut BcReader, variant: u8) -> Option<Abilit
     ek.non_stackable = non_stackable;
     ek.alternative_condition = alternative_condition.clone();
 
-    let kind = Some(ek_box_new(match variant {
-        1 => build_movecards(&ek),
-        2 => build_drawcards(&ek),
-        3 => build_selecttarget(&ek),
-        4 => build_lookreveal(&ek),
-        5 => build_modifyscore(&ek),
-        6 => build_modifyhearts(&ek),
-        7 => build_gainresource(&ek),
-        8 => build_changestate(&ek),
-        9 => build_abilityop(&ek),
-        10 => build_compoundeffect(&ek),
-        11 => build_restrictionop(&ek),
-        12 => build_positionop(&ek),
-        13 => build_miscop(&ek),
-        14 => build_customop(&ek),
-        _ => return None,
-    }));
-
+    // Build the EffectKind variant from the action via the shared single
+    // derivation (single source of truth shared with the JSON deep-compare path).
+    let filter = build_filter(&ek);
+    let kind = EffectKind::from_action(action.to_str(), filter).map(ek_box_new);
     let mut effect = AbilityEffect {
         text,
         action,

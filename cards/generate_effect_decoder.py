@@ -369,35 +369,11 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
     lines.append("}")
     lines.append("")
 
-    # === build_* functions for each variant ===
-    for vname, vfields in sorted(variants.items()):
-        lines.append(
-            f"fn build_{vname.lower()}(ek: &EffectKindLocals) -> EffectKind {{"
-        )
-        lines.append(f"    EffectKind::{vname} {{")
-        for fname, ftype, _ in vfields:
-            if fname == "filter":
-                lines.append("        filter: build_filter(ek),")
-            elif ftype in ("Box<Vec<String>>", "Vec<String>"):
-                lines.append(f"        {fname}: ek.{fname}.clone(),")
-            elif ftype == "Option<Box<ArcStr>>":
-                if fname in boxed_arcstr_fields:
-                    lines.append(f"        {fname}: ek.{fname}.clone(),")
-                else:
-                    lines.append(
-                        f"        {fname}: ek.{fname}.clone().map(|s| Box::new(s)),"
-                    )
-            elif ftype.startswith("Option<Box<") or ftype.startswith("Option<Vec<"):
-                lines.append(f"        {fname}: ek.{fname}.clone(),")
-            elif ftype.startswith("Option<"):
-                lines.append(f"        {fname}: ek.{fname}.clone(),")
-            elif ftype in ("bool", "u8", "i8"):
-                lines.append(f"        {fname}: ek.{fname},")
-            else:
-                lines.append(f"        {fname}: ek.{fname}.clone(),")
-        lines.append("    }")
-        lines.append("}")
-        lines.append("")
+    # === build_* functions ===
+    # Variant construction now lives in a single shared function
+    # `EffectKind::from_action` (card.rs), so no per-variant build_* functions
+    # are emitted here. The decoder builds the flat `EffectFilter` via
+    # `build_filter` and dispatches on the action string via `from_action`.
 
     return "\n".join(lines)
 

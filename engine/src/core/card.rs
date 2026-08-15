@@ -1014,6 +1014,85 @@ impl EffectKind {
             | EffectKind::CustomOp { filter, .. } => filter.as_deref_mut(),
         }
     }
+
+    /// Single source of truth for the action → `EffectKind` mapping. Both the
+    /// bytecode decoder and the JSON deep-compare path build an `EffectKind`
+    /// from an action string + a pre-built filter via this function, so the
+    /// variant-selection logic lives in exactly one place.
+    ///
+    /// Returns `None` for action strings that don't map to a known variant
+    /// (the JSON path treats these as a decode failure).
+    pub(crate) fn from_action(
+        action: &str,
+        filter: Option<Box<EffectFilter>>,
+    ) -> Option<EffectKind> {
+        let a = action.to_lowercase();
+        Some(match a.as_str() {
+            "move_cards"
+            | "discard_card"
+            | "discard_until_count"
+            | "place_energy_under_member"
+            | "re_yell"
+            | "shuffle"
+            | "play_baton_touch"
+            | "double_baton_touch" => EffectKind::MoveCards { filter },
+            "draw" | "draw_card" | "draw_until_count" => EffectKind::DrawCards { filter },
+            "select" | "select_cards" | "select_number" | "choose_target_player" => {
+                EffectKind::SelectTarget { filter }
+            }
+            "look"
+            | "look_at"
+            | "reveal"
+            | "reveal_effect"
+            | "reveal_per_group"
+            | "reveal_until_live_card"
+            | "reveal_until_chosen_card"
+            | "look_and_select" => EffectKind::LookReveal { filter },
+            "modify_score" => EffectKind::ModifyScore { filter },
+            "modify_required_hearts"
+            | "modify_required_hearts_global"
+            | "modify_required_hearts_success" => EffectKind::ModifyHearts { filter },
+            "gain_resource" | "pay_energy" => EffectKind::GainResource { filter },
+            "change_state" | "set_card_identity" | "set_card_identity_all_regions" => {
+                EffectKind::ChangeState { filter }
+            }
+            "gain_ability"
+            | "gain_ability_from_source"
+            | "invalidate_ability"
+            | "suppress_ability_trigger"
+            | "activate_ability" => EffectKind::AbilityOp { filter },
+            "sequential"
+            | "sequential_cost"
+            | "choice"
+            | "choice_condition"
+            | "repeat_procedure"
+            | "conditional_alternative"
+            | "conditional_on_optional"
+            | "conditional_on_result" => EffectKind::CompoundEffect { filter },
+            "restriction"
+            | "activation_restriction"
+            | "modify_limit"
+            | "all_blade_timing"
+            | "reduce_live_card_set_limit" => EffectKind::RestrictionOp { filter },
+            "position_change" | "rotation" => EffectKind::PositionOp { filter },
+            "set_cost"
+            | "set_cost_to_use"
+            | "modify_cost"
+            | "activation_cost"
+            | "set_blade_type"
+            | "set_blade_count"
+            | "set_heart_type"
+            | "specify_heart_color"
+            | "choose_required_hearts"
+            | "perform_yell"
+            | "modify_yell_count" => EffectKind::MiscOp { filter },
+            "custom" | "do_nothing" | "action_by" | "opponent_action" | "modify_yell_source" => {
+                EffectKind::CustomOp { filter }
+            }
+            "" => EffectKind::SelectTarget { filter },
+            _ => return None,
+        })
+    }
 }
 
 /// Recursively re-populate EffectKind for a serialization-deserialized
@@ -1331,98 +1410,7 @@ impl AbilityEffect {
             }
         };
 
-        let a = action.to_lowercase();
-        Some(match a.as_str() {
-            "move_cards"
-            | "discard_card"
-            | "discard_until_count"
-            | "place_energy_under_member"
-            | "re_yell"
-            | "shuffle"
-            | "play_baton_touch"
-            | "double_baton_touch" => EffectKind::MoveCards {
-                filter: filter(),
-            },
-            "draw" | "draw_card" | "draw_until_count" => EffectKind::DrawCards {
-                filter: filter(),
-            },
-            "select" | "select_cards" | "select_number" | "choose_target_player" => {
-                EffectKind::SelectTarget {
-                    filter: filter(),
-                }
-            }
-            "look"
-            | "look_at"
-            | "reveal"
-            | "reveal_effect"
-            | "reveal_per_group"
-            | "reveal_until_live_card"
-            | "reveal_until_chosen_card"
-            | "look_and_select" => EffectKind::LookReveal {
-                filter: filter(),
-            },
-            "modify_score" => EffectKind::ModifyScore {
-                filter: filter(),
-            },
-            "modify_required_hearts"
-            | "modify_required_hearts_global"
-            | "modify_required_hearts_success" => EffectKind::ModifyHearts {
-                filter: filter(),
-            },
-            "gain_resource" | "pay_energy" => EffectKind::GainResource {
-                filter: filter(),
-            },
-            "change_state" | "set_card_identity" | "set_card_identity_all_regions" => {
-                EffectKind::ChangeState {
-                    filter: filter(),
-                }
-            }
-            "gain_ability"
-            | "gain_ability_from_source"
-            | "invalidate_ability"
-            | "suppress_ability_trigger"
-            | "activate_ability" => EffectKind::AbilityOp {
-                filter: filter(),
-            },
-            "sequential"
-            | "choice"
-            | "repeat_procedure"
-            | "conditional_alternative"
-            | "conditional_on_optional"
-            | "conditional_on_result" => EffectKind::CompoundEffect {
-                filter: filter(),
-            },
-            "restriction"
-            | "activation_restriction"
-            | "modify_limit"
-            | "all_blade_timing"
-            | "reduce_live_card_set_limit" => EffectKind::RestrictionOp {
-                filter: filter(),
-            },
-            "position_change" | "rotation" => EffectKind::PositionOp {
-                filter: filter(),
-            },
-            "set_cost"
-            | "set_cost_to_use"
-            | "modify_cost"
-            | "activation_cost"
-            | "set_blade_type"
-            | "set_blade_count"
-            | "set_heart_type"
-            | "specify_heart_color"
-            | "choose_required_hearts"
-            | "perform_yell"
-            | "modify_yell_count" => EffectKind::MiscOp {
-                filter: filter(),
-            },
-            "custom" | "do_nothing" | "action_by" | "opponent_action" => EffectKind::CustomOp {
-                filter: filter(),
-            },
-            "" => EffectKind::SelectTarget {
-                filter: filter(),
-            },
-            _ => return None,
-        })
+        EffectKind::from_action(action, filter())
     }
 }
 
