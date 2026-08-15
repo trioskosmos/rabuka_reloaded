@@ -57,6 +57,156 @@ impl GameState {
         }
     }
 
+    /// Grant blade to host members from constant under-card abilities. See call site.
+    fn grant_under_card_constant_blades(&mut self, exp_blade: &mut HashMap<i16, i16>) {
+        for (under_cid, host) in self
+            .player1
+            .stage
+            .under_cards_with_hosts()
+            .into_iter()
+            .chain(self.player2.stage.under_cards_with_hosts().into_iter())
+        {
+            let card = match self.card_database.get_card(under_cid) {
+                Some(c) => c,
+                None => continue,
+            };
+            for (_ability_idx, ar) in card.abilities.iter().enumerate() {
+                if !GameState::ability_matches_trigger(
+                    &ar.resolve(),
+                    &crate::game_state::AbilityTrigger::Constant,
+                ) {
+                    continue;
+                }
+                let ability = ar.resolve();
+                let Some(ref effect) = ability.effect else {
+                    continue;
+                };
+                if effect.action != crate::ability::enums::ActionType::GainResource
+                    || !matches!(
+                        effect.resource_any().as_deref(),
+                        Some("blade") | Some("ブレード")
+                    )
+                {
+                    continue;
+                }
+                let Some(ref cond) = effect.condition else {
+                    continue;
+                };
+                // Only under-member-scoped grants route to the host; a generic
+                // constant gain on an under-card has no such meaning.
+                if cond.get_location() != Some("under_member") {
+                    continue;
+                }
+                let Some(groups) = cond.get_group_names() else {
+                    continue;
+                };
+                // Condition met iff this card is under a host of the group.
+                if !crate::ability::util::card_matches_any_group(
+                    &self.card_database,
+                    host,
+                    groups,
+                ) {
+                    continue;
+                }
+                let count = effect
+                    .resource_icon_count_any()
+                    .unwrap_or(effect.count_any().unwrap_or(1))
+                    as i16;
+                *exp_blade.entry(host).or_insert(0) += count;
+            }
+        }
+    }
+
+    /// Apply the accumulated constant-effect scratch results onto the live
+    /// modifier state: clear old constant-derived bonuses and re-apply the new
+    /// ones (blade, score, per-player score bonus, heart, prohibition, and
+    /// global need_heart).
+    fn commit_constant_results(
+        &mut self,
+        exp_blade: HashMap<i16, i16>,
+        exp_score: HashMap<i16, i16>,
+        exp_heart: HashMap<i16, HashMap<String, i16>>,
+        exp_prohibition: Vec<String>,
+        exp_global_need_heart: Vec<(i16, String, i16)>,
+        p1_constant_score_bonus: i32,
+        p2_constant_score_bonus: i32,
+    ) {
+        // Blade
+        tdbg!("RC:7 BLADE");
+        let old_blade = core::mem::take(&mut self.mods.constant_blade_bonuses);
+        for (cid, val) in &old_blade {
+            self.mods.remove_blade_modifier(*cid, *val as i16);
+        }
+        for (&cid, &val) in &exp_blade {
+            self.mods.add_blade_modifier(cid, val as i16);
+        }
+        self.mods.constant_blade_bonuses = exp_blade;
+        self.scratch_exp_blade = old_blade;
+
+        // Score
+        tdbg!("RC:9 SCORE");
+        let old_score = core::mem::take(&mut self.mods.constant_score_bonuses);
+        for (cid, val) in &old_score {
+            self.mods.remove_score_modifier(*cid, *val as i16);
+        }
+        for (&cid, &val) in &exp_score {
+            self.mods.add_score_modifier(cid, val as i16);
+        }
+        self.mods.constant_score_bonuses = exp_score;
+        self.scratch_exp_score = old_score;
+
+        // Per-player global score bonus (from GainAbility modify_score)
+        self.mods.p1_constant_total_score_bonus = p1_constant_score_bonus as i16;
+        self.mods.p2_constant_total_score_bonus = p2_constant_score_bonus as i16;
+
+        // Heart — clear old constant heart modifiers first, then re-apply new ones.
+        tdbg!("RC:10 HEART");
+        // Must drain the OLD map so bonuses from cards that left the stage are removed.
+        {
+            let old_heart = core::mem::take(&mut self.mods.constant_heart_bonuses);
+            for (cid, cols) in &old_heart {
+                for (color_str, &delta) in cols {
+                    let hc = crate::card::parse_heart_color(color_str);
+                    self.mods.remove_heart_modifier(*cid, hc, delta as i16);
+                }
+            }
+            self.scratch_exp_heart = old_heart;
+        }
+        for (cid, cols) in &exp_heart {
+            for (color_str, delta) in cols {
+                let hc = crate::card::parse_heart_color(color_str);
+                self.mods.add_heart_modifier(*cid, hc, *delta as i16);
+            }
+        }
+        self.mods.constant_heart_bonuses = exp_heart;
+
+        tdbg!("RC:11 PROHIBITION");
+        // Apply restriction effects from constant abilities.
+        // Use "const_restriction:" prefix to distinguish from debut/live ability restrictions
+        // so we can safely clear and re-add constant restrictions on each recalculate call.
+        self.prohibition_effects
+            .retain(|p| !p.starts_with("const_restriction:"));
+        for p in &exp_prohibition {
+            self.prohibition_effects.push(p.clone());
+        }
+
+        tdbg!("RC:12 GLOBAL_NEED_HEART");
+        // Clear old constant global need_heart modifiers, then re-apply new ones.
+        let old_global_nh = core::mem::take(&mut self.mods.constant_global_need_heart);
+        for (card_id, color_str, delta) in &old_global_nh {
+            let hc = crate::card::parse_heart_color(color_str);
+            self.mods
+                .add_need_heart_modifier(*card_id, hc, -*delta as i16);
+        }
+        for (card_id, color_str, delta) in &exp_global_need_heart {
+            let hc = crate::card::parse_heart_color(color_str);
+            self.mods
+                .add_need_heart_modifier(*card_id, hc, *delta as i16);
+        }
+        self.mods.constant_global_need_heart = exp_global_need_heart;
+        tdbg!("RC:12b GLOBAL_NEED_HEART_DONE");
+    }
+
     /// Re-evaluate all constant (常時) abilities on all stage members.
     /// Handles gain_resource(blade, heart), modify_score, modify_cost.
     /// Clears old constant-derived values and re-applies those whose conditions pass.
@@ -615,137 +765,17 @@ impl GameState {
         // 下に置かれているかぎり、そのメンバーはブレードを得る"). The blade is
         // granted to the HOST member the card is stacked under, not the card itself
         // (which isn't on stage).
-        for (under_cid, host) in self
-            .player1
-            .stage
-            .under_cards_with_hosts()
-            .into_iter()
-            .chain(self.player2.stage.under_cards_with_hosts().into_iter())
-        {
-            let card = match self.card_database.get_card(under_cid) {
-                Some(c) => c,
-                None => continue,
-            };
-            for (_ability_idx, ar) in card.abilities.iter().enumerate() {
-                if !GameState::ability_matches_trigger(
-                    &ar.resolve(),
-                    &crate::game_state::AbilityTrigger::Constant,
-                ) {
-                    continue;
-                }
-                let ability = ar.resolve();
-                let Some(ref effect) = ability.effect else {
-                    continue;
-                };
-                if effect.action != crate::ability::enums::ActionType::GainResource
-                    || !matches!(
-                        effect.resource_any().as_deref(),
-                        Some("blade") | Some("ブレード")
-                    )
-                {
-                    continue;
-                }
-                let Some(ref cond) = effect.condition else {
-                    continue;
-                };
-                // Only under-member-scoped grants route to the host; a generic
-                // constant gain on an under-card has no such meaning.
-                if cond.get_location() != Some("under_member") {
-                    continue;
-                }
-                let Some(groups) = cond.get_group_names() else {
-                    continue;
-                };
-                // Condition met iff this card is under a host of the group.
-                if !crate::ability::util::card_matches_any_group(
-                    &self.card_database,
-                    host,
-                    groups,
-                ) {
-                    continue;
-                }
-                let count = effect
-                    .resource_icon_count_any()
-                    .unwrap_or(effect.count_any().unwrap_or(1))
-                    as i16;
-                *exp_blade.entry(host).or_insert(0) += count;
-            }
-        }
+        self.grant_under_card_constant_blades(&mut exp_blade);
 
-        // Blade
-        tdbg!("RC:7 BLADE");
-        let old_blade = core::mem::take(&mut self.mods.constant_blade_bonuses);
-        for (cid, val) in &old_blade {
-            self.mods.remove_blade_modifier(*cid, *val as i16);
-        }
-        for (&cid, &val) in &exp_blade {
-            self.mods.add_blade_modifier(cid, val as i16);
-        }
-        self.mods.constant_blade_bonuses = exp_blade;
-        self.scratch_exp_blade = old_blade;
-
-        // Score
-        tdbg!("RC:9 SCORE");
-        let old_score = core::mem::take(&mut self.mods.constant_score_bonuses);
-        for (cid, val) in &old_score {
-            self.mods.remove_score_modifier(*cid, *val as i16);
-        }
-        for (&cid, &val) in &exp_score {
-            self.mods.add_score_modifier(cid, val as i16);
-        }
-        self.mods.constant_score_bonuses = exp_score;
-        self.scratch_exp_score = old_score;
-
-        // Per-player global score bonus (from GainAbility modify_score)
-        self.mods.p1_constant_total_score_bonus = p1_constant_score_bonus as i16;
-        self.mods.p2_constant_total_score_bonus = p2_constant_score_bonus as i16;
-
-        // Heart — clear old constant heart modifiers first, then re-apply new ones.
-        tdbg!("RC:10 HEART");
-        // Must drain the OLD map so bonuses from cards that left the stage are removed.
-        {
-            let old_heart = core::mem::take(&mut self.mods.constant_heart_bonuses);
-            for (cid, cols) in &old_heart {
-                for (color_str, &delta) in cols {
-                    let hc = crate::card::parse_heart_color(color_str);
-                    self.mods.remove_heart_modifier(*cid, hc, delta as i16);
-                }
-            }
-            self.scratch_exp_heart = old_heart;
-        }
-        for (cid, cols) in &exp_heart {
-            for (color_str, delta) in cols {
-                let hc = crate::card::parse_heart_color(color_str);
-                self.mods.add_heart_modifier(*cid, hc, *delta as i16);
-            }
-        }
-        self.mods.constant_heart_bonuses = exp_heart;
-
-        tdbg!("RC:11 PROHIBITION");
-        // Apply restriction effects from constant abilities.
-        // Use "const_restriction:" prefix to distinguish from debut/live ability restrictions
-        // so we can safely clear and re-add constant restrictions on each recalculate call.
-        self.prohibition_effects
-            .retain(|p| !p.starts_with("const_restriction:"));
-        for p in &exp_prohibition {
-            self.prohibition_effects.push(p.clone());
-        }
-
-        tdbg!("RC:12 GLOBAL_NEED_HEART");
-        // Clear old constant global need_heart modifiers, then re-apply new ones.
-        let old_global_nh = core::mem::take(&mut self.mods.constant_global_need_heart);
-        for (card_id, color_str, delta) in &old_global_nh {
-            let hc = crate::card::parse_heart_color(color_str);
-            self.mods
-                .add_need_heart_modifier(*card_id, hc, -*delta as i16);
-        }
-        for (card_id, color_str, delta) in &exp_global_need_heart {
-            let hc = crate::card::parse_heart_color(color_str);
-            self.mods
-                .add_need_heart_modifier(*card_id, hc, *delta as i16);
-        }
-        self.mods.constant_global_need_heart = exp_global_need_heart;
-        tdbg!("RC:12b GLOBAL_NEED_HEART_DONE");
+        self.commit_constant_results(
+            exp_blade,
+            exp_score,
+            exp_heart,
+            exp_prohibition,
+            exp_global_need_heart,
+            p1_constant_score_bonus,
+            p2_constant_score_bonus,
+        );
 
         // Also recalculate cost modifiers from hand cards (hand-based cost reductions)
         // Pass pre-collected stage effects to avoid re-scanning the stage
