@@ -21,6 +21,31 @@ pub enum MoveCardsTarget {
     Opponent,
 }
 
+/// Bundles the inputs to `resolve_from_zone` so per-zone resolution methods
+/// have a small signature instead of 21 positional arguments. Holds only
+/// borrows / `Copy` values, so the whole struct is freely reconstructable.
+struct MoveSourceContext<'a> {
+    effective_source: &'a str,
+    source_str: &'a str,
+    count: usize,
+    effect: &'a AbilityEffect,
+    card_type_filter: Option<&'a str>,
+    group_name: Option<&'a str>,
+    cost_limit: Option<u8>,
+    cost_total: Option<u8>,
+    cost_total_operator: Option<&'a str>,
+    character_filter: Option<&'a Vec<String>>,
+    name_fragments: Option<&'a Vec<String>>,
+    is_self_cost: bool,
+    is_max: bool,
+    is_all: bool,
+    exclude_self: bool,
+    activating_card_id: Option<i16>,
+    use_p2: bool,
+    destination: &'a str,
+    card_db: &'a crate::card::CardDatabase,
+}
+
 fn remove_card_from_any_zone(
     player: &mut crate::player::Player,
     last_vacated_stage_area: &mut Option<u8>,
@@ -532,25 +557,27 @@ impl AbilityResolver {
         };
         self.resolve_from_zone(
             gs,
-            effective_source,
-            source_str,
-            count,
-            effect,
-            card_type_filter,
-            group_name,
-            cost_limit,
-            cost_total,
-            cost_total_operator,
-            character_filter,
-            name_fragments,
-            is_self_cost,
-            is_max,
-            is_all,
-            exclude_self,
-            activating_card_id,
-            use_p2,
-            destination,
-            card_db,
+            MoveSourceContext {
+                effective_source,
+                source_str,
+                count,
+                effect,
+                card_type_filter,
+                group_name,
+                cost_limit,
+                cost_total,
+                cost_total_operator,
+                character_filter,
+                name_fragments,
+                is_self_cost,
+                is_max,
+                is_all,
+                exclude_self,
+                activating_card_id,
+                use_p2,
+                destination,
+                card_db,
+            },
         )
     }
 
@@ -882,638 +909,716 @@ impl AbilityResolver {
     fn resolve_from_zone(
         &mut self,
         gs: &mut GameState,
-        effective_source: &str,
-        source_str: &str,
-        count: usize,
-        effect: &AbilityEffect,
-        card_type_filter: Option<&str>,
-        group_name: Option<&str>,
-        cost_limit: Option<u8>,
-        cost_total: Option<u8>,
-        cost_total_operator: Option<&str>,
-        character_filter: Option<&Vec<String>>,
-        name_fragments: Option<&Vec<String>>,
-        is_self_cost: bool,
-        is_max: bool,
-        is_all: bool,
-        exclude_self: bool,
-        activating_card_id: Option<i16>,
-        use_p2: bool,
-        destination: &str,
-        card_db: &crate::card::CardDatabase,
+        c: MoveSourceContext,
     ) -> Result<Vec<i16>, String> {
-        let player = if use_p2 {
-            &mut gs.player2
-        } else {
-            &mut gs.player1
-        };
-        let cheer_buf = if use_p2 {
-            &mut gs.player2_cheer_revealed_cards
-        } else {
-            &mut gs.player1_cheer_revealed_cards
-        };
-
-        match Zone::from_str(effective_source) {
-            Some(Zone::Deck) | Some(Zone::DeckTop) => {
-                if effect.optional.unwrap_or(false) {
-                    let entry = gs.ability_queue.current_entry();
-                    let decided = entry
-                        .as_ref()
-                        .and_then(|e| e.conditional_choice.as_ref())
-                        .is_some();
-                    let _opt_paid = entry
-                        .as_ref()
-                        .and_then(|e| e.optional_cost_result)
-                        .is_some();
-                    if !decided {
-                        if let Some(entry_mut) = gs.ability_queue.current_entry_mut() {
-                            entry_mut.choice_card_no =
-                                Some(crate::ability::types::ChoiceRoute::Raw(
-                                    "pay_optional_cost".to_string(),
-                                ));
-                        }
-                        self.pending_choice = Some(Choice::SelectTarget {
-                            target: "pay_optional_cost:skip_optional_cost".to_string(),
-                            description: "Place top card of deck to waiting room?".to_string(),
-                            description_en: Some(
-                                "Place top card of deck to waiting room?".to_string(),
-                            ),
-                            description_ja: Some("山札の上を控え室に置きますか？".to_string()),
-                            allow_skip: true,
-                            options: Some(vec!["No".to_string(), "Yes".to_string()]),
-                        });
-                        return Ok(vec![]);
-                    }
-                }
-                let mut drawn = Vec::new();
-                let mut attempts = 0u8;
-                let mut remaining = count;
-                while remaining > 0
-                    && attempts < (count as u8 + player.main_deck.cards.len() as u8 + 10)
-                {
-                    // Q104 / Rule 10.2.1: deck empty mid-draw → refresh from waitroom
-                    // and continue. This handles deck-to-discard costs/effects when the
-                    // deck has fewer cards than needed. E.g. deck=2, need=3:
-                    //   [1] draw 2 from deck → deck is empty
-                    //   [2] flush drawn to waitroom, refresh (shuffle waitroom into deck)
-                    //   [3] draw remaining 1 from new deck
-                    if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
-                        // Move already-drawn cards to waitroom so refresh includes them
-                        player.waitroom.cards.extend(drawn.drain(..));
-                        player.refresh();
-                    }
-                    if let Some(card) = player.main_deck.draw() {
-                        attempts += 1;
-                        if !util::card_matches_type(card_db, card, card_type_filter) {
-                            player.main_deck.cards.push(card);
-                            continue;
-                        }
-                        if !util::card_matches_group_str(card_db, card, group_name) {
-                            player.main_deck.cards.push(card);
-                            continue;
-                        }
-                        drawn.push(card);
-                        remaining = remaining.saturating_sub(1);
-                    } else {
-                        // Both deck and waitroom are empty — cannot draw more
-                        break;
-                    }
-                }
-                Ok(drawn)
-            }
-            Some(Zone::DeckBottom) => {
-                // Take `count` cards from the BOTTOM of the deck (last indices),
-                // e.g. "自分のデッキの下からカードを3枚控え室に置く".
-                if effect.optional.unwrap_or(false) {
-                    let entry = gs.ability_queue.current_entry();
-                    let decided = entry
-                        .as_ref()
-                        .and_then(|e| e.conditional_choice.as_ref())
-                        .is_some();
-                    if !decided {
-                        if let Some(entry_mut) = gs.ability_queue.current_entry_mut() {
-                            entry_mut.choice_card_no =
-                                Some(crate::ability::types::ChoiceRoute::Raw(
-                                    "pay_optional_cost".to_string(),
-                                ));
-                        }
-                        self.pending_choice = Some(Choice::SelectTarget {
-                            target: "pay_optional_cost:skip_optional_cost".to_string(),
-                            description: "Place bottom card of deck to waiting room?".to_string(),
-                            description_en: Some(
-                                "Place bottom card of deck to waiting room?".to_string(),
-                            ),
-                            description_ja: Some("山札の下を控え室に置きますか？".to_string()),
-                            allow_skip: true,
-                            options: Some(vec!["No".to_string(), "Yes".to_string()]),
-                        });
-                        return Ok(vec![]);
-                    }
-                }
-                let mut drawn = Vec::new();
-                for _i in 0..count {
-                    if let Some(card) = player.main_deck.draw_bottom() {
-                        drawn.push(card);
-                    } else {
-                        break;
-                    }
-                }
-                Ok(drawn)
-            }
-            Some(Zone::EnergyDeck) => {
-                let mut drawn = Vec::new();
-                for _i in 0..count {
-                    if let Some(card) = player.energy_deck.draw() {
-                        drawn.push(card);
-                    } else {
-                        break;
-                    }
-                }
-                Ok(drawn)
-            }
-            Some(Zone::Stage) => {
-                if is_self_cost {
-                    let idx = activating_card_id
-                        .and_then(|act_id| player.stage.stage.iter().position(|&id| id == act_id))
-                        .ok_or_else(|| "Activating card not found at stage".to_string())?;
-                    gs.last_vacated_stage_area = Some(idx as u8);
-                    if destination != "same_area" {
-                        Ok(player
-                            .remove_member_from_stage_with_recycling(idx, card_db)
-                            .into_iter()
-                            .collect())
-                    } else {
-                        gs.last_vacated_stage_area = None;
-                        Ok(vec![player.stage.stage[idx]])
-                    }
-                } else {
-                    let filter = util::filter_from_parts_full(
-                        card_type_filter,
-                        group_name,
-                        cost_limit,
-                        None,
-                        character_filter,
-                        name_fragments,
-                        None,
-                        if exclude_self {
-                            activating_card_id
-                        } else {
-                            None
-                        },
-                        cost_total,
-                        cost_total_operator,
-                    );
-                    match util::resolve_selection(
-                        &player.stage.stage,
-                        card_db,
-                        activating_card_id,
-                        count,
-                        is_all,
-                        &filter,
-                        effect.self_target_any().unwrap_or(false),
-                        util::InsufficientBehavior::Silent,
-                        true,
-                    )? {
-                        util::SelectionOutcome::Exact(indices) => {
-                            let mut vacated = None;
-                            let cards = indices
-                                .iter()
-                                .rev()
-                                .filter_map(|&i| {
-                                    let cid =
-                                        player.remove_member_from_stage_with_recycling(i, card_db);
-                                    if cid.is_some() {
-                                        vacated = Some(i as u8);
-                                    }
-                                    cid
-                                })
-                                .collect();
-                            gs.last_vacated_stage_area = vacated;
-                            log::debug!(
-                                "[STAGE_EXACT] moved cards={:?} vacated={:?} last_vacated={:?}",
-                                cards,
-                                vacated,
-                                gs.last_vacated_stage_area
-                            );
-                            Ok(cards)
-                        }
-                        util::SelectionOutcome::Prompt => {
-                            let filter = util::filter_from_parts_full(
-                                card_type_filter,
-                                group_name,
-                                cost_limit,
-                                None,
-                                character_filter,
-                                name_fragments,
-                                None,
-                                if exclude_self {
-                                    activating_card_id
-                                } else {
-                                    None
-                                },
-                                cost_total,
-                                cost_total_operator,
-                            );
-                            let stage_indices: Vec<usize> = (0..player.stage.stage.len())
-                                .filter(|&i| filter.matches(card_db, player.stage.stage[i], true))
-                                .collect();
-                            self.prompt_card_selection(
-                                Zone::Stage.to_str(),
-                                count,
-                                false,
-                                effect,
-                                &filter,
-                                Some(stage_indices),
-                            );
-                            Ok(vec![])
-                        }
-                        util::SelectionOutcome::Skip => Ok(vec![]),
-                    }
-                }
-            }
+        match Zone::from_str(c.effective_source) {
+            Some(Zone::Deck) | Some(Zone::DeckTop) => self.resolve_from_deck(gs, &c),
+            Some(Zone::DeckBottom) => self.resolve_from_deck_bottom(gs, &c),
+            Some(Zone::EnergyDeck) => self.resolve_from_energy_deck(gs, &c),
+            Some(Zone::Stage) => self.resolve_from_stage(gs, &c),
             Some(Zone::Hand)
             | Some(Zone::Discard)
             | Some(Zone::Energy)
             | Some(Zone::LiveCardZone)
-            | Some(Zone::SuccessLiveZone) => {
-                let src_zone = Zone::from_str(effective_source);
-                let actual_zone = effective_source;
+            | Some(Zone::SuccessLiveZone) => self.resolve_from_standard_zone(gs, &c),
+            Some(Zone::LookedAt) => self.resolve_source_looked_at(gs, &c),
+            Some(Zone::SelectedCards) => self.resolve_from_selected_cards(gs, &c),
+            Some(Zone::RevealedCards) => self.resolve_source_revealed_cards(gs, &c),
+            Some(Zone::UnderMember) => self.resolve_from_under_member(gs, &c),
+            _ => Err(format!("Unknown source zone: {}", c.source_str)),
+        }
+    }
 
-                let insufficient_behavior = match src_zone {
-                    Some(Zone::Energy) => {
-                        // A move_cards EFFECT (e.g. "エネルギー1枚をエネルギーデッキに置く")
-                        // fizzles silently when the energy zone is empty, and the
-                        // enclosing sequential ("その後") continues with later steps.
-                        util::InsufficientBehavior::Silent
-                    }
-                    Some(Zone::LiveCardZone) => util::InsufficientBehavior::Error(
-                        "Not enough cards in live card zone".to_string(),
-                    ),
-                    Some(Zone::SuccessLiveZone) => util::InsufficientBehavior::Silent,
-                    _ => util::InsufficientBehavior::Silent,
-                };
-
-                let can_skip = match src_zone {
-                    Some(Zone::Discard) => is_max || effect.optional.unwrap_or(false),
-                    Some(Zone::Hand) => {
-                        effect.optional.unwrap_or(false) || effect.any_number_any().unwrap_or(false)
-                    }
-                    Some(Zone::SuccessLiveZone) => effect.optional.unwrap_or(false),
-                    _ => false,
-                };
-
-                let pass_is_all = match src_zone {
-                    Some(Zone::Hand) | Some(Zone::Discard) | Some(Zone::Energy) => is_all,
-                    _ => false,
-                };
-
-                let has_effect_groups = effect
-                    .group_names_any()
-                    .as_ref()
-                    .map_or(false, |g| !g.is_empty());
-                let filter_group_name = if has_effect_groups { None } else { group_name };
-                let mut filter = util::filter_from_parts_full(
-                    if src_zone == Some(Zone::LiveCardZone)
-                        || (src_zone == Some(Zone::SuccessLiveZone) && card_type_filter.is_some())
-                    {
-                        Some("live_card")
-                    } else if src_zone == Some(Zone::SuccessLiveZone) {
-                        None
-                    } else {
-                        card_type_filter
-                    },
-                    if src_zone == Some(Zone::Energy) {
-                        None
-                    } else {
-                        filter_group_name
-                    },
-                    if src_zone == Some(Zone::Energy) {
-                        None
-                    } else {
-                        cost_limit
-                    },
-                    if src_zone == Some(Zone::Discard) {
-                        effect.cost_limit_operator_any().map(Operator::as_str)
-                    } else {
-                        None
-                    },
-                    character_filter,
-                    if matches!(src_zone, Some(Zone::Hand) | Some(Zone::Discard)) {
-                        name_fragments
-                    } else {
-                        None
-                    },
-                    None,
-                    None,
-                    if matches!(src_zone, Some(Zone::Hand) | Some(Zone::Discard)) {
-                        cost_total
-                    } else {
-                        None
-                    },
-                    if matches!(src_zone, Some(Zone::Hand) | Some(Zone::Discard)) {
-                        cost_total_operator
-                    } else {
-                        None
-                    },
-                );
-                filter.need_heart_total = effect.need_heart_total_any();
-                let nho_binding = effect.need_heart_operator_any();
-                filter.need_heart_operator = nho_binding.as_deref();
-                let nhc_binding = effect.need_heart_color_any();
-                filter.need_heart_color = nhc_binding.as_deref();
-                filter.heart_colors = effect.heart_colors_any();
-                if has_effect_groups {
-                    filter.groups = effect.group_names_any();
+    fn resolve_from_deck(
+        &mut self,
+        gs: &mut GameState,
+        c: &MoveSourceContext,
+    ) -> Result<Vec<i16>, String> {
+        let player = if c.use_p2 {
+            &mut gs.player2
+        } else {
+            &mut gs.player1
+        };
+        let count = c.count;
+        let card_db = c.card_db;
+        if c.effect.optional.unwrap_or(false) {
+            let entry = gs.ability_queue.current_entry();
+            let decided = entry
+                .as_ref()
+                .and_then(|e| e.conditional_choice.as_ref())
+                .is_some();
+            let _opt_paid = entry
+                .as_ref()
+                .and_then(|e| e.optional_cost_result)
+                .is_some();
+            if !decided {
+                if let Some(entry_mut) = gs.ability_queue.current_entry_mut() {
+                    entry_mut.choice_card_no =
+                        Some(crate::ability::types::ChoiceRoute::Raw(
+                            "pay_optional_cost".to_string(),
+                        ));
                 }
-                let cp_binding = effect.card_property_any();
-                filter.card_property = cp_binding.as_deref();
-
-                // ── group_reference: "different_group_names" ──────────────────
-                // Q89: Multi-name cards have the group name(s) from their series.
-                // Q105: A multi-name card contributes ONE constituent group for
-                //   "different group names" conditions.
-                // Q208: When checking "different from ALL members on stage", all
-                //   groups a multi-name card can match via its series are blocked.
-                // → Exclude discard cards whose group matches ANY stage member's group.
-                // Only apply stage-group exclusion when the effect itself has
-                // group_reference and there's no condition with the same reference.
-                // Bring the LOVE ab#1 has effect.group_reference without a condition
-                // (genuine stage-group exclusion).  Mia option 1 has BOTH
-                // condition.group_reference and effect.group_reference — the
-                // condition already handles different-group counting; we should
-                // NOT also exclude stage groups (which would over-filter).
-                let cond_has_grp = effect
-                    .condition
-                    .as_ref()
-                    .and_then(|c| {
-                        if c.get_group_reference() == Some("different_group_names") {
-                            Some(true)
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap_or(false);
-                if !cond_has_grp
-                    && effect.group_reference_any().as_deref() == Some("different_group_names")
-                    && source_str == "discard"
-                {
-                    let mut stage_groups: SmallVec<[String; 8]> = SmallVec::new();
-                    for &cid in &player.stage.stage {
-                        if cid == -1 {
-                            continue;
-                        }
-                        if let Some(card) = card_db.get_card(cid) {
-                            if !card.group.is_empty() {
-                                if !stage_groups.contains(&card.group.to_string()) {
-                                    stage_groups.push(card.group.to_string());
-                                }
-                            } else {
-                                for known_group in ["μ's", "Aqours", "虹ヶ咲", "Liella!", "蓮ノ空"]
-                                {
-                                    if util::card_matches_group_str(card_db, cid, Some(known_group))
-                                    {
-                                        let s = known_group.to_string();
-                                        if !stage_groups.contains(&s) {
-                                            stage_groups.push(s);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if !stage_groups.is_empty() {
-                        let groups_vec: Vec<String> = stage_groups.into_iter().collect();
-                        // This &'static leak persists for the game's lifetime.
-                        let leaked = Vec::leak(groups_vec);
-                        filter.exclude_group_names = Some(leaked);
-                    }
-                }
-
-                log::debug!(
-                    "[NEED_HEART] filter: color={:?} total={:?} op={:?} src={:?} card_type={:?}",
-                    filter.need_heart_color,
-                    filter.need_heart_total,
-                    filter.need_heart_operator,
-                    source_str,
-                    card_type_filter
-                );
-
-                match self.take_cards_from_standard_zone(
-                    player,
-                    card_db,
-                    actual_zone,
-                    &filter,
-                    count,
-                    pass_is_all,
-                    insufficient_behavior,
-                    can_skip,
-                    effect,
-                    activating_card_id,
-                )? {
-                    Some(cards) => Ok(cards),
-                    None => Ok(vec![]),
-                }
+                self.pending_choice = Some(Choice::SelectTarget {
+                    target: "pay_optional_cost:skip_optional_cost".to_string(),
+                    description: "Place top card of deck to waiting room?".to_string(),
+                    description_en: Some("Place top card of deck to waiting room?".to_string()),
+                    description_ja: Some("山札の上を控え室に置きますか？".to_string()),
+                    allow_skip: true,
+                    options: Some(vec!["No".to_string(), "Yes".to_string()]),
+                });
+                return Ok(vec![]);
             }
-            Some(Zone::LookedAt) => {
-                let matching: Vec<usize> = (0..gs.looked_at_cards.len())
-                    .filter(|&i| {
-                        let cid = gs.looked_at_cards[i];
-                        util::card_matches_type(card_db, cid, card_type_filter)
-                            && util::card_matches_group_str(card_db, cid, group_name)
-                            && util::card_matches_cost_limit(card_db, cid, cost_limit)
-                    })
-                    .collect();
+        }
+        let mut drawn = Vec::new();
+        let mut attempts = 0u8;
+        let mut remaining = count;
+        while remaining > 0
+            && attempts < (count as u8 + player.main_deck.cards.len() as u8 + 10)
+        {
+            // Q104 / Rule 10.2.1: deck empty mid-draw → refresh from waitroom
+            // and continue. This handles deck-to-discard costs/effects when the
+            // deck has fewer cards than needed. E.g. deck=2, need=3:
+            //   [1] draw 2 from deck → deck is empty
+            //   [2] flush drawn to waitroom, refresh (shuffle waitroom into deck)
+            //   [3] draw remaining 1 from new deck
+            if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
+                // Move already-drawn cards to waitroom so refresh includes them
+                player.waitroom.cards.extend(drawn.drain(..));
+                player.refresh();
+            }
+            if let Some(card) = player.main_deck.draw() {
+                attempts += 1;
+                if !util::card_matches_type(card_db, card, c.card_type_filter) {
+                    player.main_deck.cards.push(card);
+                    continue;
+                }
+                if !util::card_matches_group_str(card_db, card, c.group_name) {
+                    player.main_deck.cards.push(card);
+                    continue;
+                }
+                drawn.push(card);
+                remaining = remaining.saturating_sub(1);
+            } else {
+                // Both deck and waitroom are empty — cannot draw more
+                break;
+            }
+        }
+        Ok(drawn)
+    }
 
-                if matching.is_empty() {
-                    Ok(vec![])
-                } else if effect.optional.unwrap_or(false) && count > 0 {
-                    // Optional discard: card selection with user-friendly description
-                    let max_take = count.min(matching.len());
-                    let description = format!("Discard up to {} looked-at card(s)?", max_take);
-                    let description_en = Some(description.clone());
-                    let description_ja = Some(if max_take == 1 {
-                        "見たカードを控え室に置きますか？".to_string()
-                    } else {
-                        format!("見たカードを最大{}枚まで控え室に置きますか？", max_take)
-                    });
-                    let mut filter = util::CardFilter::from_effect(effect);
-                    // Resolve dynamic cost limit reference (e.g. "previous_moved_card" + offset)
-                    if let Ok(resolved) = self.resolve_cost_limit_reference(gs, effect) {
-                        if let Some(cost) = resolved {
-                            filter.cost_limit = Some(cost);
-                        }
-                    }
-                    self.pending_choice = Some(
-                        Choice::select_cards(Zone::LookedAt.to_str(), max_take, description, true)
-                            .description_en(description_en)
-                            .description_ja(description_ja)
-                            .card_type(filter.card_type.map(|s| s.to_string()))
-                            .cost_limit(
-                                filter.cost_limit,
-                                effect.cost_limit_operator_any().map(|s| s.to_string()),
-                            )
-                            .cost_total(
-                                filter.cost_total,
-                                effect.cost_total_operator_any().map(|s| s.to_string()),
-                            )
-                            .group(filter.group.map(|s| s.to_string()))
-                            .characters(filter.characters.map(|v| v.to_vec()))
-                            .target_player_id(Some(
-                                effect.target.as_deref().unwrap_or("self").to_string(),
-                            ))
-                            .destination(effect.destination.clone().map(|s| s.to_string()))
-                            .discard_remaining(effect.discard_remaining_any())
-                            .build(),
-                    );
-                    self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
-                    Ok(vec![])
+    fn resolve_from_deck_bottom(
+        &mut self,
+        gs: &mut GameState,
+        c: &MoveSourceContext,
+    ) -> Result<Vec<i16>, String> {
+        let player = if c.use_p2 {
+            &mut gs.player2
+        } else {
+            &mut gs.player1
+        };
+        let count = c.count;
+        if c.effect.optional.unwrap_or(false) {
+            let entry = gs.ability_queue.current_entry();
+            let decided = entry
+                .as_ref()
+                .and_then(|e| e.conditional_choice.as_ref())
+                .is_some();
+            if !decided {
+                if let Some(entry_mut) = gs.ability_queue.current_entry_mut() {
+                    entry_mut.choice_card_no =
+                        Some(crate::ability::types::ChoiceRoute::Raw(
+                            "pay_optional_cost".to_string(),
+                        ));
+                }
+                self.pending_choice = Some(Choice::SelectTarget {
+                    target: "pay_optional_cost:skip_optional_cost".to_string(),
+                    description: "Place bottom card of deck to waiting room?".to_string(),
+                    description_en: Some("Place bottom card of deck to waiting room?".to_string()),
+                    description_ja: Some("山札の下を控え室に置きますか？".to_string()),
+                    allow_skip: true,
+                    options: Some(vec!["No".to_string(), "Yes".to_string()]),
+                });
+                return Ok(vec![]);
+            }
+        }
+        let mut drawn = Vec::new();
+        for _i in 0..count {
+            if let Some(card) = player.main_deck.draw_bottom() {
+                drawn.push(card);
+            } else {
+                break;
+            }
+        }
+        Ok(drawn)
+    }
+
+    fn resolve_from_energy_deck(
+        &mut self,
+        gs: &mut GameState,
+        c: &MoveSourceContext,
+    ) -> Result<Vec<i16>, String> {
+        let player = if c.use_p2 {
+            &mut gs.player2
+        } else {
+            &mut gs.player1
+        };
+        let count = c.count;
+        let mut drawn = Vec::new();
+        for _i in 0..count {
+            if let Some(card) = player.energy_deck.draw() {
+                drawn.push(card);
+            } else {
+                break;
+            }
+        }
+        Ok(drawn)
+    }
+
+    fn resolve_from_stage(
+        &mut self,
+        gs: &mut GameState,
+        c: &MoveSourceContext,
+    ) -> Result<Vec<i16>, String> {
+        let player = if c.use_p2 {
+            &mut gs.player2
+        } else {
+            &mut gs.player1
+        };
+        let card_db = c.card_db;
+        let effect = c.effect;
+        if c.is_self_cost {
+            let idx = c
+                .activating_card_id
+                .and_then(|act_id| player.stage.stage.iter().position(|&id| id == act_id))
+                .ok_or_else(|| "Activating card not found at stage".to_string())?;
+            gs.last_vacated_stage_area = Some(idx as u8);
+            if c.destination != "same_area" {
+                Ok(player
+                    .remove_member_from_stage_with_recycling(idx, card_db)
+                    .into_iter()
+                    .collect())
+            } else {
+                gs.last_vacated_stage_area = None;
+                Ok(vec![player.stage.stage[idx]])
+            }
+        } else {
+            let filter = util::filter_from_parts_full(
+                c.card_type_filter,
+                c.group_name,
+                c.cost_limit,
+                None,
+                c.character_filter,
+                c.name_fragments,
+                None,
+                if c.exclude_self {
+                    c.activating_card_id
                 } else {
-                    // For LookedAt, cards are ordered: [0] = matched target,
-                    // remaining = revealed but non-matching. Take first `count`
-                    // without prompting, since the order is meaningful.
-                    let take = if is_all {
-                        matching.len()
-                    } else {
-                        count.min(matching.len())
-                    };
-                    let mut taken: Vec<i16> = matching[..take]
+                    None
+                },
+                c.cost_total,
+                c.cost_total_operator,
+            );
+            match util::resolve_selection(
+                &player.stage.stage,
+                card_db,
+                c.activating_card_id,
+                c.count,
+                c.is_all,
+                &filter,
+                effect.self_target_any().unwrap_or(false),
+                util::InsufficientBehavior::Silent,
+                true,
+            )? {
+                util::SelectionOutcome::Exact(indices) => {
+                    let mut vacated = None;
+                    let cards = indices
                         .iter()
                         .rev()
-                        .map(|&i| gs.looked_at_cards.remove(i))
-                        .collect();
-                    taken.reverse();
-                    Ok(taken)
-                }
-            }
-            Some(Zone::SelectedCards) => {
-                let selected = self.selected_cards.clone();
-                let idxs: Vec<usize> = (0..selected.len()).collect();
-                match util::classify_selection(
-                    &idxs,
-                    count,
-                    is_all,
-                    util::InsufficientBehavior::Silent,
-                )? {
-                    util::SelectionOutcome::Exact(indices) => {
-                        let taken: Vec<i16> = indices.iter().map(|&i| selected[i]).collect();
-                        for &card_id in &taken {
-                            remove_card_from_any_zone(
-                                player,
-                                &mut gs.last_vacated_stage_area,
-                                card_id,
-                            );
-                        }
-                        // Card left any zone → clean up its gained abilities
-                        for &card_id in &taken {
-                            gs.clear_gained_abilities_for_card(card_id);
-                        }
-                        Ok(taken)
-                    }
-                    util::SelectionOutcome::Prompt => {
-                        let mut filter = util::CardFilter::from_effect(effect);
-                        // Resolve dynamic cost limit reference (e.g. "previous_moved_card" + offset)
-                        if let Ok(resolved) = self.resolve_cost_limit_reference(gs, effect) {
-                            if let Some(cost) = resolved {
-                                filter.cost_limit = Some(cost);
+                        .filter_map(|&i| {
+                            let cid =
+                                player.remove_member_from_stage_with_recycling(i, card_db);
+                            if cid.is_some() {
+                                vacated = Some(i as u8);
                             }
-                        }
-                        self.prompt_card_selection(
-                            Zone::SelectedCards.to_str(),
-                            count,
-                            false,
-                            effect,
-                            &filter,
-                            None,
-                        );
-                        Ok(vec![])
-                    }
-                    util::SelectionOutcome::Skip => Ok(vec![]),
-                }
-            }
-            Some(Zone::RevealedCards) => {
-                // Drain from source to prevent card duplication.
-                // (line 619 cloned before, leaving originals in cheer_buf/revealed_cards,
-                //  causing the returned cards to still exist in the source after move.)
-                // Use gs.revealed_cards as the primary source; drain cheer_buf in sync.
-                let cards: Vec<i16> = if !cheer_buf.is_empty() {
-                    let c: SmallVec<[i16; 8]> = core::mem::take(cheer_buf);
-                    gs.revealed_cards.retain(|id| !c.contains(id));
-                    c.to_vec()
-                } else {
-                    // Filter to only include cards owned by the target player.
-                    // revealed_cards is a global pool containing cards from both players'
-                    // yells/cheers. When the per-player cheer_buf has been consumed by
-                    // a prior ability, falling back to the entire pool would expose
-                    // the opponent's cards. Check zone ownership to filter correctly.
-                    let owned: Vec<i16> = gs
-                        .revealed_cards
-                        .iter()
-                        .filter(|&&cid| {
-                            player.hand.cards.contains(&cid)
-                                || player.waitroom.cards.contains(&cid)
-                                || player.stage.stage.contains(&cid)
-                                || player.stage.under_cards.iter().any(|v| v.contains(&cid))
-                                || player.energy_zone.cards.contains(&cid)
-                                || player.main_deck.cards.contains(&cid)
-                                || player.energy_deck.cards.contains(&cid)
-                                || player.live_card_zone.cards.contains(&cid)
-                                || player.success_live_card_zone.cards.contains(&cid)
-                                || gs.resolution_zone.cards.contains(&cid)
+                            cid
                         })
-                        .copied()
                         .collect();
-                    for &cid in &owned {
-                        gs.revealed_cards.retain(|id| *id != cid);
-                    }
-                    owned
-                };
-                if cards.len() > count {
-                    // Put cards back so prompt_card_selection can find them.
-                    gs.revealed_cards.extend(cards.iter().copied());
-                    let filter = util::filter_from_parts_full(
-                        card_type_filter,
-                        group_name,
-                        cost_limit,
-                        None,
-                        character_filter,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
+                    gs.last_vacated_stage_area = vacated;
+                    log::debug!(
+                        "[STAGE_EXACT] moved cards={:?} vacated={:?} last_vacated={:?}",
+                        cards,
+                        vacated,
+                        gs.last_vacated_stage_area
                     );
-                    let matching: Vec<usize> = (0..gs.revealed_cards.len())
-                        .filter(|&i| filter.matches(&gs.card_database, gs.revealed_cards[i], false))
-                        .collect();
-                    self.prompt_card_selection(
-                        Zone::RevealedCards.to_str(),
-                        count,
-                        effect.optional.unwrap_or(false),
-                        effect,
-                        &filter,
-                        Some(matching),
-                    );
-                    Ok(vec![])
-                } else {
-                    let player = gs.active_player_mut();
-                    for &cid in &cards {
-                        if let Some(pos) = player.hand.cards.iter().position(|&c| c == cid) {
-                            player.hand.remove_card(pos);
-                        }
-                    }
                     Ok(cards)
                 }
+                util::SelectionOutcome::Prompt => {
+                    let filter = util::filter_from_parts_full(
+                        c.card_type_filter,
+                        c.group_name,
+                        c.cost_limit,
+                        None,
+                        c.character_filter,
+                        c.name_fragments,
+                        None,
+                        if c.exclude_self {
+                            c.activating_card_id
+                        } else {
+                            None
+                        },
+                        c.cost_total,
+                        c.cost_total_operator,
+                    );
+                    let stage_indices: Vec<usize> = (0..player.stage.stage.len())
+                        .filter(|&i| filter.matches(card_db, player.stage.stage[i], true))
+                        .collect();
+                    self.prompt_card_selection(
+                        Zone::Stage.to_str(),
+                        c.count,
+                        false,
+                        effect,
+                        &filter,
+                        Some(stage_indices),
+                    );
+                    Ok(vec![])
+                }
+                util::SelectionOutcome::Skip => Ok(vec![]),
             }
-            Some(Zone::UnderMember) => {
-                // Move from under_member to destination needs a choice.
-                // Delegate to place_energy_under_member for choice creation.
-                let mut modified = effect.clone();
-                modified.source = Some(crate::ability::enums::Zone::UnderMember.to_str().into());
-                self.execute_place_energy_under_member(gs, &modified);
+        }
+    }
+
+    fn resolve_from_standard_zone(
+        &mut self,
+        gs: &mut GameState,
+        c: &MoveSourceContext,
+    ) -> Result<Vec<i16>, String> {
+        let player = if c.use_p2 {
+            &mut gs.player2
+        } else {
+            &mut gs.player1
+        };
+        let card_db = c.card_db;
+        let effect = c.effect;
+        let src_zone = Zone::from_str(c.effective_source);
+        let actual_zone = c.effective_source;
+
+        let insufficient_behavior = match src_zone {
+            Some(Zone::Energy) => {
+                // A move_cards EFFECT (e.g. "エネルギー1枚をエネルギーデッキに置く")
+                // fizzles silently when the energy zone is empty, and the
+                // enclosing sequential ("その後") continues with later steps.
+                util::InsufficientBehavior::Silent
+            }
+            Some(Zone::LiveCardZone) => util::InsufficientBehavior::Error(
+                "Not enough cards in live card zone".to_string(),
+            ),
+            Some(Zone::SuccessLiveZone) => util::InsufficientBehavior::Silent,
+            _ => util::InsufficientBehavior::Silent,
+        };
+
+        let can_skip = match src_zone {
+            Some(Zone::Discard) => c.is_max || effect.optional.unwrap_or(false),
+            Some(Zone::Hand) => {
+                effect.optional.unwrap_or(false) || effect.any_number_any().unwrap_or(false)
+            }
+            Some(Zone::SuccessLiveZone) => effect.optional.unwrap_or(false),
+            _ => false,
+        };
+
+        let pass_is_all = match src_zone {
+            Some(Zone::Hand) | Some(Zone::Discard) | Some(Zone::Energy) => c.is_all,
+            _ => false,
+        };
+
+        let has_effect_groups = effect
+            .group_names_any()
+            .as_ref()
+            .map_or(false, |g| !g.is_empty());
+        let filter_group_name = if has_effect_groups { None } else { c.group_name };
+        let mut filter = util::filter_from_parts_full(
+            if src_zone == Some(Zone::LiveCardZone)
+                || (src_zone == Some(Zone::SuccessLiveZone) && c.card_type_filter.is_some())
+            {
+                Some("live_card")
+            } else if src_zone == Some(Zone::SuccessLiveZone) {
+                None
+            } else {
+                c.card_type_filter
+            },
+            if src_zone == Some(Zone::Energy) {
+                None
+            } else {
+                filter_group_name
+            },
+            if src_zone == Some(Zone::Energy) {
+                None
+            } else {
+                c.cost_limit
+            },
+            if src_zone == Some(Zone::Discard) {
+                effect.cost_limit_operator_any().map(Operator::as_str)
+            } else {
+                None
+            },
+            c.character_filter,
+            if matches!(src_zone, Some(Zone::Hand) | Some(Zone::Discard)) {
+                c.name_fragments
+            } else {
+                None
+            },
+            None,
+            None,
+            if matches!(src_zone, Some(Zone::Hand) | Some(Zone::Discard)) {
+                c.cost_total
+            } else {
+                None
+            },
+            if matches!(src_zone, Some(Zone::Hand) | Some(Zone::Discard)) {
+                c.cost_total_operator
+            } else {
+                None
+            },
+        );
+        filter.need_heart_total = effect.need_heart_total_any();
+        let nho_binding = effect.need_heart_operator_any();
+        filter.need_heart_operator = nho_binding.as_deref();
+        let nhc_binding = effect.need_heart_color_any();
+        filter.need_heart_color = nhc_binding.as_deref();
+        filter.heart_colors = effect.heart_colors_any();
+        if has_effect_groups {
+            filter.groups = effect.group_names_any();
+        }
+        let cp_binding = effect.card_property_any();
+        filter.card_property = cp_binding.as_deref();
+
+        // ── group_reference: "different_group_names" ──────────────────
+        // Q89: Multi-name cards have the group name(s) from their series.
+        // Q105: A multi-name card contributes ONE constituent group for
+        //   "different group names" conditions.
+        // Q208: When checking "different from ALL members on stage", all
+        //   groups a multi-name card can match via its series are blocked.
+        // → Exclude discard cards whose group matches ANY stage member's group.
+        // Only apply stage-group exclusion when the effect itself has
+        // group_reference and there's no condition with the same reference.
+        // Bring the LOVE ab#1 has effect.group_reference without a condition
+        // (genuine stage-group exclusion).  Mia option 1 has BOTH
+        // condition.group_reference and effect.group_reference — the
+        // condition already handles different-group counting; we should
+        // NOT also exclude stage groups (which would over-filter).
+        let cond_has_grp = effect
+            .condition
+            .as_ref()
+            .and_then(|cd| {
+                if cd.get_group_reference() == Some("different_group_names") {
+                    Some(true)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(false);
+        if !cond_has_grp
+            && effect.group_reference_any().as_deref() == Some("different_group_names")
+            && c.source_str == "discard"
+        {
+            let mut stage_groups: SmallVec<[String; 8]> = SmallVec::new();
+            for &cid in &player.stage.stage {
+                if cid == -1 {
+                    continue;
+                }
+                if let Some(card) = card_db.get_card(cid) {
+                    if !card.group.is_empty() {
+                        if !stage_groups.contains(&card.group.to_string()) {
+                            stage_groups.push(card.group.to_string());
+                        }
+                    } else {
+                        for known_group in ["μ's", "Aqours", "虹ヶ咲", "Liella!", "蓮ノ空"] {
+                            if util::card_matches_group_str(card_db, cid, Some(known_group)) {
+                                let s = known_group.to_string();
+                                if !stage_groups.contains(&s) {
+                                    stage_groups.push(s);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if !stage_groups.is_empty() {
+                let groups_vec: Vec<String> = stage_groups.into_iter().collect();
+                // This &'static leak persists for the game's lifetime.
+                let leaked = Vec::leak(groups_vec);
+                filter.exclude_group_names = Some(leaked);
+            }
+        }
+
+        log::debug!(
+            "[NEED_HEART] filter: color={:?} total={:?} op={:?} src={:?} card_type={:?}",
+            filter.need_heart_color,
+            filter.need_heart_total,
+            filter.need_heart_operator,
+            c.source_str,
+            c.card_type_filter
+        );
+
+        match self.take_cards_from_standard_zone(
+            player,
+            card_db,
+            actual_zone,
+            &filter,
+            c.count,
+            pass_is_all,
+            insufficient_behavior,
+            can_skip,
+            effect,
+            c.activating_card_id,
+        )? {
+            Some(cards) => Ok(cards),
+            None => Ok(vec![]),
+        }
+    }
+
+    fn resolve_source_looked_at(
+        &mut self,
+        gs: &mut GameState,
+        c: &MoveSourceContext,
+    ) -> Result<Vec<i16>, String> {
+        let card_db = c.card_db;
+        let count = c.count;
+        let effect = c.effect;
+        let matching: Vec<usize> = (0..gs.looked_at_cards.len())
+            .filter(|&i| {
+                let cid = gs.looked_at_cards[i];
+                util::card_matches_type(card_db, cid, c.card_type_filter)
+                    && util::card_matches_group_str(card_db, cid, c.group_name)
+                    && util::card_matches_cost_limit(card_db, cid, c.cost_limit)
+            })
+            .collect();
+
+        if matching.is_empty() {
+            Ok(vec![])
+        } else if effect.optional.unwrap_or(false) && count > 0 {
+            // Optional discard: card selection with user-friendly description
+            let max_take = count.min(matching.len());
+            let description = format!("Discard up to {} looked-at card(s)?", max_take);
+            let description_en = Some(description.clone());
+            let description_ja = Some(if max_take == 1 {
+                "見たカードを控え室に置きますか？".to_string()
+            } else {
+                format!("見たカードを最大{}枚まで控え室に置きますか？", max_take)
+            });
+            let mut filter = util::CardFilter::from_effect(effect);
+            // Resolve dynamic cost limit reference (e.g. "previous_moved_card" + offset)
+            if let Ok(resolved) = self.resolve_cost_limit_reference(gs, effect) {
+                if let Some(cost) = resolved {
+                    filter.cost_limit = Some(cost);
+                }
+            }
+            self.pending_choice = Some(
+                Choice::select_cards(Zone::LookedAt.to_str(), max_take, description, true)
+                    .description_en(description_en)
+                    .description_ja(description_ja)
+                    .card_type(filter.card_type.map(|s| s.to_string()))
+                    .cost_limit(
+                        filter.cost_limit,
+                        effect.cost_limit_operator_any().map(|s| s.to_string()),
+                    )
+                    .cost_total(
+                        filter.cost_total,
+                        effect.cost_total_operator_any().map(|s| s.to_string()),
+                    )
+                    .group(filter.group.map(|s| s.to_string()))
+                    .characters(filter.characters.map(|v| v.to_vec()))
+                    .target_player_id(Some(
+                        effect.target.as_deref().unwrap_or("self").to_string(),
+                    ))
+                    .destination(effect.destination.clone().map(|s| s.to_string()))
+                    .discard_remaining(effect.discard_remaining_any())
+                    .build(),
+            );
+            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+            Ok(vec![])
+        } else {
+            // For LookedAt, cards are ordered: [0] = matched target,
+            // remaining = revealed but non-matching. Take first `count`
+            // without prompting, since the order is meaningful.
+            let take = if c.is_all {
+                matching.len()
+            } else {
+                count.min(matching.len())
+            };
+            let mut taken: Vec<i16> = matching[..take]
+                .iter()
+                .rev()
+                .map(|&i| gs.looked_at_cards.remove(i))
+                .collect();
+            taken.reverse();
+            Ok(taken)
+        }
+    }
+
+    fn resolve_from_selected_cards(
+        &mut self,
+        gs: &mut GameState,
+        c: &MoveSourceContext,
+    ) -> Result<Vec<i16>, String> {
+        let player = if c.use_p2 {
+            &mut gs.player2
+        } else {
+            &mut gs.player1
+        };
+        let effect = c.effect;
+        let count = c.count;
+        let selected = self.selected_cards.clone();
+        let idxs: Vec<usize> = (0..selected.len()).collect();
+        match util::classify_selection(
+            &idxs,
+            count,
+            c.is_all,
+            util::InsufficientBehavior::Silent,
+        )? {
+            util::SelectionOutcome::Exact(indices) => {
+                let taken: Vec<i16> = indices.iter().map(|&i| selected[i]).collect();
+                for &card_id in &taken {
+                    remove_card_from_any_zone(
+                        player,
+                        &mut gs.last_vacated_stage_area,
+                        card_id,
+                    );
+                }
+                // Card left any zone → clean up its gained abilities
+                for &card_id in &taken {
+                    gs.clear_gained_abilities_for_card(card_id);
+                }
+                Ok(taken)
+            }
+            util::SelectionOutcome::Prompt => {
+                let mut filter = util::CardFilter::from_effect(effect);
+                // Resolve dynamic cost limit reference (e.g. "previous_moved_card" + offset)
+                if let Ok(resolved) = self.resolve_cost_limit_reference(gs, effect) {
+                    if let Some(cost) = resolved {
+                        filter.cost_limit = Some(cost);
+                    }
+                }
+                self.prompt_card_selection(
+                    Zone::SelectedCards.to_str(),
+                    count,
+                    false,
+                    effect,
+                    &filter,
+                    None,
+                );
                 Ok(vec![])
             }
-            _ => Err(format!("Unknown source zone: {}", source_str)),
+            util::SelectionOutcome::Skip => Ok(vec![]),
         }
+    }
+
+    fn resolve_source_revealed_cards(
+        &mut self,
+        gs: &mut GameState,
+        c: &MoveSourceContext,
+    ) -> Result<Vec<i16>, String> {
+        let count = c.count;
+        let player = if c.use_p2 {
+            &mut gs.player2
+        } else {
+            &mut gs.player1
+        };
+        // Drain from source to prevent card duplication.
+        // (line 619 cloned before, leaving originals in cheer_buf/revealed_cards,
+        //  causing the returned cards to still exist in the source after move.)
+        // Use gs.revealed_cards as the primary source; drain cheer_buf in sync.
+        let cheer_is_empty = if c.use_p2 {
+            gs.player2_cheer_revealed_cards.is_empty()
+        } else {
+            gs.player1_cheer_revealed_cards.is_empty()
+        };
+        let cards: Vec<i16> = if !cheer_is_empty {
+            let cheer_buf = if c.use_p2 {
+                &mut gs.player2_cheer_revealed_cards
+            } else {
+                &mut gs.player1_cheer_revealed_cards
+            };
+            let cbuf: SmallVec<[i16; 8]> = core::mem::take(cheer_buf);
+            gs.revealed_cards.retain(|id| !cbuf.contains(id));
+            cbuf.to_vec()
+        } else {
+            // Filter to only include cards owned by the target player.
+            // revealed_cards is a global pool containing cards from both players'
+            // yells/cheers. When the per-player cheer_buf has been consumed by
+            // a prior ability, falling back to the entire pool would expose
+            // the opponent's cards. Check zone ownership to filter correctly.
+            let owned: Vec<i16> = gs
+                .revealed_cards
+                .iter()
+                .filter(|&&cid| {
+                    player.hand.cards.contains(&cid)
+                        || player.waitroom.cards.contains(&cid)
+                        || player.stage.stage.contains(&cid)
+                        || player.stage.under_cards.iter().any(|v| v.contains(&cid))
+                        || player.energy_zone.cards.contains(&cid)
+                        || player.main_deck.cards.contains(&cid)
+                        || player.energy_deck.cards.contains(&cid)
+                        || player.live_card_zone.cards.contains(&cid)
+                        || player.success_live_card_zone.cards.contains(&cid)
+                        || gs.resolution_zone.cards.contains(&cid)
+                })
+                .copied()
+                .collect();
+            for &cid in &owned {
+                gs.revealed_cards.retain(|id| *id != cid);
+            }
+            owned
+        };
+        if cards.len() > count {
+            // Put cards back so prompt_card_selection can find them.
+            gs.revealed_cards.extend(cards.iter().copied());
+            let filter = util::filter_from_parts_full(
+                c.card_type_filter,
+                c.group_name,
+                c.cost_limit,
+                None,
+                c.character_filter,
+                None,
+                None,
+                None,
+                None,
+                None,
+            );
+            let matching: Vec<usize> = (0..gs.revealed_cards.len())
+                .filter(|&i| filter.matches(&gs.card_database, gs.revealed_cards[i], false))
+                .collect();
+            self.prompt_card_selection(
+                Zone::RevealedCards.to_str(),
+                count,
+                c.effect.optional.unwrap_or(false),
+                c.effect,
+                &filter,
+                Some(matching),
+            );
+            Ok(vec![])
+        } else {
+            let player = gs.active_player_mut();
+            for &cid in &cards {
+                if let Some(pos) = player.hand.cards.iter().position(|&cd| cd == cid) {
+                    player.hand.remove_card(pos);
+                }
+            }
+            Ok(cards)
+        }
+    }
+
+    fn resolve_from_under_member(
+        &mut self,
+        gs: &mut GameState,
+        c: &MoveSourceContext,
+    ) -> Result<Vec<i16>, String> {
+        // Move from under_member to destination needs a choice.
+        // Delegate to place_energy_under_member for choice creation.
+        let mut modified = c.effect.clone();
+        modified.source =
+            Some(crate::ability::enums::Zone::UnderMember.to_str().into());
+        self.execute_place_energy_under_member(gs, &modified);
+        Ok(vec![])
     }
 
     pub fn execute_move_cards(
