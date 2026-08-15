@@ -4073,108 +4073,7 @@ impl<'a> ConditionContext<'a> {
             }
         }
         if resource_type == Some("surplus_heart") {
-            // delta=true means the condition should check the count that was LOST
-            // by the preceding action, not the current absolute surplus.
-            if condition.get_delta() == Some(true) {
-                return self.game_state.mods.last_surplus_loss_count;
-            }
-            // After live clearance the computed surplus count is stored on GameState.
-            // Prefer the stored snapshot value over a runtime recalculation
-            // (includes yell ALL hearts that can fill any color gap).
-            if self.game_state.live_surplus_ready_this_turn {
-                // Q174: When a heart_colors filter is present (e.g. heart04 for La Bella
-                // Patria), read the per-color surplus from the performance snapshot rather
-                // than returning the total surplus. ALL hearts (icon_all) are consumed
-                // during Phase 4 of allocation to fill color deficits and do NOT contribute
-                // to colored surplus; see rules 8.3.15.1.1-8.3.15.1.2. The "treated as any
-                // color" in 8.3.15.1.1 is a check-time fiction — surplus is computed from
-                // the actual pool indices (colored = 1..6, ALL = 7), not from the
-                // functional assignment used during the check.
-                // snap.surplus_hearts is populated at live.rs:~148 before LiveSuccess
-                // abilities fire, so it is safe to read here.
-                if let Some(colors) = condition.get_heart_colors() {
-                    let player = self.resolve_condition_player(target);
-                    let player_id = &player.id;
-                    for snap in &self.game_state.performance_snapshots {
-                        if &snap.player_id == player_id {
-                            let mut total = 0u8;
-                            for hc_str in colors {
-                                let color = crate::card::parse_heart_color(hc_str);
-                                total += snap.surplus_hearts[color.index()];
-                            }
-                            return total;
-                        }
-                    }
-                }
-                return match target {
-                    "opponent" => self.game_state.opponent_live_surplus_count,
-                    _ => {
-                        let player = self.resolve_condition_player(target);
-                        if player.id == self.game_state.player1.id {
-                            self.game_state.self_live_surplus_count
-                        } else {
-                            self.game_state.opponent_live_surplus_count
-                        }
-                    }
-                };
-            }
-            // Fallback: compute from current state (before live clearance or if snapshot
-            // unavailable). Supports color-specific surplus via condition.get_heart_colors().
-            let player = self.resolve_condition_player(target);
-            let card_db = &self.game_state.card_database;
-
-            if let Some(colors) = condition.get_heart_colors() {
-                let mut total = 0u8;
-                for hc_str in colors {
-                    let color = crate::card::parse_heart_color(hc_str);
-                    let member_of_color: u8 = player
-                        .stage
-                        .stage
-                        .iter()
-                        .filter(|&&id| id != -1)
-                        .map(|&id| {
-                            card_db
-                                .get_card(id)
-                                .and_then(|c| c.base_heart.as_ref())
-                                .and_then(|bh| bh.hearts.get(&color))
-                                .copied()
-                                .unwrap_or(0)
-                        })
-                        .sum();
-                    let needed_of_color: u8 = player
-                        .live_card_zone
-                        .cards
-                        .iter()
-                        .chain(player.success_live_card_zone.cards.iter())
-                        .map(|&id| {
-                            card_db
-                                .get_card(id)
-                                .and_then(|c| c.need_heart.as_ref())
-                                .and_then(|nh| nh.hearts.get(&color))
-                                .copied()
-                                .unwrap_or(0)
-                        })
-                        .sum();
-                    total += member_of_color.saturating_sub(needed_of_color);
-                }
-                return total;
-            }
-
-            let member_hearts: u8 = player
-                .stage
-                .stage
-                .iter()
-                .filter(|&&id| id != -1)
-                .map(|&id| card_db.get_card(id).map(|c| c.total_hearts()).unwrap_or(0))
-                .sum();
-            let needed: u8 = player
-                .live_card_zone
-                .cards
-                .iter()
-                .chain(player.success_live_card_zone.cards.iter())
-                .map(|&id| card_db.get_card(id).map(|c| c.total_hearts()).unwrap_or(0))
-                .sum();
-            return member_hearts.saturating_sub(needed);
+            return self.count_surplus_heart(condition, target);
         }
         if resource_type == Some("energy") {
             let player = self.resolve_condition_player(target);
@@ -4283,6 +4182,111 @@ impl<'a> ConditionContext<'a> {
             }
         }
         self.zone_len(player, location)
+    }
+
+    fn count_surplus_heart(&self, condition: &Condition, target: &str) -> u8 {
+        // delta=true means the condition should check the count that was LOST
+        // by the preceding action, not the current absolute surplus.
+        if condition.get_delta() == Some(true) {
+            return self.game_state.mods.last_surplus_loss_count;
+        }
+        // After live clearance the computed surplus count is stored on GameState.
+        // Prefer the stored snapshot value over a runtime recalculation
+        // (includes yell ALL hearts that can fill any color gap).
+        if self.game_state.live_surplus_ready_this_turn {
+            // Q174: When a heart_colors filter is present (e.g. heart04 for La Bella
+            // Patria), read the per-color surplus from the performance snapshot rather
+            // than returning the total surplus. ALL hearts (icon_all) are consumed
+            // during Phase 4 of allocation to fill color deficits and do NOT contribute
+            // to colored surplus; see rules 8.3.15.1.1-8.3.15.1.2. The "treated as any
+            // color" in 8.3.15.1.1 is a check-time fiction — surplus is computed from
+            // the actual pool indices (colored = 1..6, ALL = 7), not from the
+            // functional assignment used during the check.
+            // snap.surplus_hearts is populated at live.rs:~148 before LiveSuccess
+            // abilities fire, so it is safe to read here.
+            if let Some(colors) = condition.get_heart_colors() {
+                let player = self.resolve_condition_player(target);
+                let player_id = &player.id;
+                for snap in &self.game_state.performance_snapshots {
+                    if &snap.player_id == player_id {
+                        let mut total = 0u8;
+                        for hc_str in colors {
+                            let color = crate::card::parse_heart_color(hc_str);
+                            total += snap.surplus_hearts[color.index()];
+                        }
+                        return total;
+                    }
+                }
+            }
+            return match target {
+                "opponent" => self.game_state.opponent_live_surplus_count,
+                _ => {
+                    let player = self.resolve_condition_player(target);
+                    if player.id == self.game_state.player1.id {
+                        self.game_state.self_live_surplus_count
+                    } else {
+                        self.game_state.opponent_live_surplus_count
+                    }
+                }
+            };
+        }
+        // Fallback: compute from current state (before live clearance or if snapshot
+        // unavailable). Supports color-specific surplus via condition.get_heart_colors().
+        let player = self.resolve_condition_player(target);
+        let card_db = &self.game_state.card_database;
+
+        if let Some(colors) = condition.get_heart_colors() {
+            let mut total = 0u8;
+            for hc_str in colors {
+                let color = crate::card::parse_heart_color(hc_str);
+                let member_of_color: u8 = player
+                    .stage
+                    .stage
+                    .iter()
+                    .filter(|&&id| id != -1)
+                    .map(|&id| {
+                        card_db
+                            .get_card(id)
+                            .and_then(|c| c.base_heart.as_ref())
+                            .and_then(|bh| bh.hearts.get(&color))
+                            .copied()
+                            .unwrap_or(0)
+                    })
+                    .sum();
+                let needed_of_color: u8 = player
+                    .live_card_zone
+                    .cards
+                    .iter()
+                    .chain(player.success_live_card_zone.cards.iter())
+                    .map(|&id| {
+                        card_db
+                            .get_card(id)
+                            .and_then(|c| c.need_heart.as_ref())
+                            .and_then(|nh| nh.hearts.get(&color))
+                            .copied()
+                            .unwrap_or(0)
+                    })
+                    .sum();
+                total += member_of_color.saturating_sub(needed_of_color);
+            }
+            return total;
+        }
+
+        let member_hearts: u8 = player
+            .stage
+            .stage
+            .iter()
+            .filter(|&&id| id != -1)
+            .map(|&id| card_db.get_card(id).map(|c| c.total_hearts()).unwrap_or(0))
+            .sum();
+        let needed: u8 = player
+            .live_card_zone
+            .cards
+            .iter()
+            .chain(player.success_live_card_zone.cards.iter())
+            .map(|&id| card_db.get_card(id).map(|c| c.total_hearts()).unwrap_or(0))
+            .sum();
+        member_hearts.saturating_sub(needed)
     }
 
     pub(crate) fn get_count_for_target(&self, condition: &Condition, target: &str) -> u8 {
