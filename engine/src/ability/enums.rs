@@ -178,6 +178,53 @@ impl<'de> serde::Deserialize<'de> for Zone {
     }
 }
 
+/// Which player an effect targets. The effect-level `target` string currently
+/// overloads a player ("self"/"opponent"/"both"/"either") with a destination
+/// zone ("deck") and rare ability-reference strings; `TargetPlayer` captures
+/// the player subset so comparisons become typed instead of string re-parsing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TargetPlayer {
+    Self_,
+    Opponent,
+    Both,
+    Either,
+}
+
+impl TargetPlayer {
+    /// Parse a player-target string. Returns `None` for values that are not a
+    /// player target ("deck", ability-reference strings, etc.), so callers can
+    /// fall back to the raw string for those cases.
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "self" => Some(TargetPlayer::Self_),
+            "opponent" => Some(TargetPlayer::Opponent),
+            "both" => Some(TargetPlayer::Both),
+            "either" => Some(TargetPlayer::Either),
+            _ => None,
+        }
+    }
+
+    /// Convert back to the string form used in card data / bytecode.
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            TargetPlayer::Self_ => "self",
+            TargetPlayer::Opponent => "opponent",
+            TargetPlayer::Both => "both",
+            TargetPlayer::Either => "either",
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        self.to_str()
+    }
+}
+
+impl core::fmt::Display for TargetPlayer {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.to_str())
+    }
+}
+
 /// Strongly-typed ability effect action types to prevent stringly-typed dispatch bugs.
 /// Action type for ability effects.
 /// ~60 variants cover all effect actions in the game.

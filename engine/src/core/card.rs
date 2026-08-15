@@ -1,5 +1,5 @@
 use crate::ability::ability_store::AbilityRef;
-pub(crate) use crate::ability::enums::{ActionType, ConditionType, EffectState, Zone};
+pub(crate) use crate::ability::enums::{ActionType, ConditionType, EffectState, TargetPlayer, Zone};
 use crate::core::types::ArcStr;
 #[cfg(feature = "serde_support")]
 use crate::BTreeMap;
@@ -1827,6 +1827,20 @@ impl AbilityEffect {
             .as_ref()
             .map(|s| -> &str { s });
         variant_target.or_else(|| self.target.as_deref())
+    }
+
+    /// Typed player-target subset of `target`. Returns `None` when the merged
+    /// target string is not a player ("deck", ability-reference strings, etc.),
+    /// matching `TargetPlayer::from_str`.
+    pub fn target_player(&self) -> Option<TargetPlayer> {
+        self.target_any().and_then(TargetPlayer::from_str)
+    }
+
+    /// Typed player-target subset of the *top-level* `self.target` only,
+    /// mirroring `target_name()`'s read source (does not consult the filter).
+    /// Use this where the original code compared against `target_name()`.
+    pub fn target_name_player(&self) -> Option<TargetPlayer> {
+        self.target.as_deref().and_then(TargetPlayer::from_str)
     }
 
     pub fn state_any(&self) -> Option<&str> {

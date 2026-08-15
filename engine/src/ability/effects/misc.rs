@@ -1,4 +1,4 @@
-use super::super::enums::Zone;
+use super::super::enums::{TargetPlayer, Zone};
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
 use super::super::util;
@@ -799,14 +799,20 @@ impl AbilityResolver {
         let is_all = effect.all_any().unwrap_or(false)
             || (effect.source_any().is_none()
                 && effect.card_type_any() == Some(&crate::card::CardType::Member)
-                && (target == "self" || target == "opponent")
+                && matches!(
+                    effect.target_name_player(),
+                    Some(TargetPlayer::Self_) | Some(TargetPlayer::Opponent)
+                )
                 && !is_self_target
                 && effect.exclude_self_any().is_none()
                 && effect.target_count_any().is_none())
             // Also detect "all members" when the effect has no target_count limit
             // and targets "self"/"opponent" members (e.g. "自分のステージにいるメンバーは")
             || (effect.card_type_any() == Some(&crate::card::CardType::Member)
-                && (target == "self" || target == "opponent")
+                && matches!(
+                    effect.target_name_player(),
+                    Some(TargetPlayer::Self_) | Some(TargetPlayer::Opponent)
+                )
                 && effect.target_count_any().is_none()
                 && effect.distinct_any().is_none());
 
@@ -1622,7 +1628,7 @@ impl AbilityResolver {
                         }
                     }
                 } else if effect.target_count_any().is_none()
-                    && (effect.exclude_self_any().is_none() || effect.target_any() == Some("self"))
+                    && (effect.exclude_self_any().is_none() || effect.target_player() == Some(TargetPlayer::Self_))
                 {
                     if let Some(card_id) = activating_card_id {
                         gs.mods.add_blade_modifier_with_trace(
@@ -1745,7 +1751,7 @@ impl AbilityResolver {
                         }
                     }
                 } else if effect.target_count_any().is_none()
-                    && (effect.exclude_self_any().is_none() || effect.target_any() == Some("self"))
+                    && (effect.exclude_self_any().is_none() || effect.target_player() == Some(TargetPlayer::Self_))
                 {
                     if let Some(card_id) = activating_card_id {
                         self.apply_heart_to_card(
@@ -1762,7 +1768,7 @@ impl AbilityResolver {
                     }
                 }
             } else if is_self_target
-                || (target == "self"
+                || (effect.target_name_player() == Some(TargetPlayer::Self_)
                     && activating_card_id.is_some()
                     && effect.source_any().is_none()
                     && effect.card_type_any().is_none()

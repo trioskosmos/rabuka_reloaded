@@ -1,4 +1,4 @@
-use super::super::enums::Zone;
+use super::super::enums::{TargetPlayer, Zone};
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
 use super::super::util;
@@ -113,7 +113,7 @@ impl AbilityResolver {
         }
         // When targeting opponent, group_names is trigger-level metadata
         // (from the wrapper's condition), not an effect filter.
-        let group_filter = if target == "opponent" {
+        let group_filter = if effect.target_name_player() == Some(TargetPlayer::Opponent) {
             None
         } else {
             group_name.map(|s| s.to_string())
