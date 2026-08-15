@@ -596,6 +596,161 @@ impl AbilityResolver {
         };
         units * per_unit_base
     }
+    fn gain_heart_colors_from_selected_card(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
+        let target_str = effect.target_name().to_string();
+        let player = gs.resolve_target_player_mut(&target_str);
+        let card_db = self.card_db();
+        let target_ids: Vec<i16> = player
+            .stage
+            .stage
+            .iter()
+            .cloned()
+            .filter(|&tid| {
+                tid != -1
+                    && crate::ability::util::card_matches_characters(
+                        &card_db,
+                        tid,
+                        effect.characters_any().map(|v| &**v),
+                    )
+            })
+            .collect();
+        let _ = player;
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
+            eprintln!("[GR_SELECTED_CARD] entering branch. selected_cards={:?} target_ids={:?} gs.activating={:?}",
+                self.selected_cards, target_ids, gs.activating_card);
+        }
+        if let Some(&selected_id) = self.selected_cards.first() {
+            if let Some(selected_card) = card_db.get_card(selected_id) {
+                if crate::ability::debug::ABILITY_DEBUG
+                    .load(core::sync::atomic::Ordering::Relaxed)
+                {
+                    eprintln!(
+                        "[GR_SELECTED_BH] selected_id={} has_base_heart={} hearts_count={}",
+                        selected_id,
+                        selected_card.base_heart.is_some(),
+                        selected_card
+                            .base_heart
+                            .as_ref()
+                            .map(|bh| bh.hearts.len())
+                            .unwrap_or(0)
+                    );
+                }
+                if let Some(ref base_heart) = selected_card.base_heart {
+                    for &(color, _) in &base_heart.hearts {
+                        for &target_id in &target_ids {
+                            if crate::ability::debug::ABILITY_DEBUG
+                                .load(core::sync::atomic::Ordering::Relaxed)
+                            {
+                                eprintln!(
+                                    "[GR_APPLY] target={} color={:?} before={}",
+                                    target_id,
+                                    color,
+                                    gs.mods.get_heart_modifier(target_id, color)
+                                );
+                            }
+                            gs.mods.add_heart_modifier_with_trace(
+                                target_id,
+                                color,
+                                1,
+                                &mut gs.ability_applications,
+                                target_id,
+                                &effect.text,
+                            );
+                            if crate::ability::debug::ABILITY_DEBUG
+                                .load(core::sync::atomic::Ordering::Relaxed)
+                            {
+                                eprintln!(
+                                    "[GR_APPLY] target={} color={:?} after={}",
+                                    target_id,
+                                    color,
+                                    gs.mods.get_heart_modifier(target_id, color)
+                                );
+                            }
+                            if effect.duration_any().as_deref() == Some("live_end") {
+                                let effect_data = crate::core::types::EffectData::SingleCard {
+                                    card_id: target_id,
+                                    amount: 1,
+                                    color: Some(format!("{:?}", color)),
+                                };
+                                crate::ability::util::push_temporary_effect(
+                                    gs,
+                                    "gain_heart",
+                                    Some("live_end"),
+                                    "self",
+                                    &format!("Gain +1 {:?} from selected card", color),
+                                    Some(effect_data),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn gain_heart_all_type(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
+        let target_str = effect.target_name().to_string();
+        // Capture values before mutable borrow of gs
+        let triggering_member = gs
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.triggering_member_id);
+        let activating = gs.activating_card;
+        let has_explicit_target = effect.target_any().is_some();
+        let player = gs.resolve_target_player_mut(&target_str);
+        let card_id = triggering_member.or_else(|| {
+            if let Some(ref pos) = effect.position_any() {
+                let pos_str = pos.get_position()?;
+                let idx = crate::ability::util::stage_position_index(pos_str)?;
+                if idx < player.stage.stage.len() && player.stage.stage[idx] != -1 {
+                    Some(player.stage.stage[idx])
+                } else {
+                    None
+                }
+            } else if has_explicit_target {
+                player.stage.stage.iter().find(|&&id| id != -1).copied()
+            } else {
+                activating
+            }
+        });
+        if let Some(card_id) = card_id {
+            let amount = effect.count_or(1) as i16;
+            gs.mods.add_heart_modifier_with_trace(
+                card_id,
+                crate::card::HeartColor::All,
+                amount,
+                &mut gs.ability_applications,
+                card_id,
+                &effect.text,
+            );
+            if effect.duration_any().as_deref() == Some("live_end") {
+                let effect_data = crate::core::types::EffectData::SingleCard {
+                    card_id,
+                    amount,
+                    color: Some("all".to_string()),
+                };
+                crate::ability::util::push_temporary_effect(
+                    gs,
+                    "gain_heart",
+                    Some("live_end"),
+                    "self",
+                    &format!("Gain {} all-heart", amount),
+                    Some(effect_data),
+                );
+            }
+        }
+        Ok(())
+    }
+
     pub fn execute_gain_resource(
         &mut self,
         gs: &mut GameState,
@@ -612,152 +767,13 @@ impl AbilityResolver {
                 .heart_colors_from_selected_card_any()
                 .unwrap_or(false)
         {
-            let target_str = effect.target_name().to_string();
-            let player = gs.resolve_target_player_mut(&target_str);
-            let card_db = self.card_db();
-            let target_ids: Vec<i16> = player
-                .stage
-                .stage
-                .iter()
-                .cloned()
-                .filter(|&tid| {
-                    tid != -1
-                        && crate::ability::util::card_matches_characters(
-                            &card_db,
-                            tid,
-                            effect.characters_any().map(|v| &**v),
-                        )
-                })
-                .collect();
-            let _ = player;
-            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-                eprintln!("[GR_SELECTED_CARD] entering branch. selected_cards={:?} target_ids={:?} gs.activating={:?}",
-                    self.selected_cards, target_ids, gs.activating_card);
-            }
-            if let Some(&selected_id) = self.selected_cards.first() {
-                if let Some(selected_card) = card_db.get_card(selected_id) {
-                    if crate::ability::debug::ABILITY_DEBUG
-                        .load(core::sync::atomic::Ordering::Relaxed)
-                    {
-                        eprintln!(
-                            "[GR_SELECTED_BH] selected_id={} has_base_heart={} hearts_count={}",
-                            selected_id,
-                            selected_card.base_heart.is_some(),
-                            selected_card
-                                .base_heart
-                                .as_ref()
-                                .map(|bh| bh.hearts.len())
-                                .unwrap_or(0)
-                        );
-                    }
-                    if let Some(ref base_heart) = selected_card.base_heart {
-                        for &(color, _) in &base_heart.hearts {
-                            for &target_id in &target_ids {
-                                if crate::ability::debug::ABILITY_DEBUG
-                                    .load(core::sync::atomic::Ordering::Relaxed)
-                                {
-                                    eprintln!(
-                                        "[GR_APPLY] target={} color={:?} before={}",
-                                        target_id,
-                                        color,
-                                        gs.mods.get_heart_modifier(target_id, color)
-                                    );
-                                }
-                                gs.mods.add_heart_modifier_with_trace(
-                                    target_id,
-                                    color,
-                                    1,
-                                    &mut gs.ability_applications,
-                                    target_id,
-                                    &effect.text,
-                                );
-                                if crate::ability::debug::ABILITY_DEBUG
-                                    .load(core::sync::atomic::Ordering::Relaxed)
-                                {
-                                    eprintln!(
-                                        "[GR_APPLY] target={} color={:?} after={}",
-                                        target_id,
-                                        color,
-                                        gs.mods.get_heart_modifier(target_id, color)
-                                    );
-                                }
-                                if effect.duration_any().as_deref() == Some("live_end") {
-                                    let effect_data = crate::core::types::EffectData::SingleCard {
-                                        card_id: target_id,
-                                        amount: 1,
-                                        color: Some(format!("{:?}", color)),
-                                    };
-                                    crate::ability::util::push_temporary_effect(
-                                        gs,
-                                        "gain_heart",
-                                        Some("live_end"),
-                                        "self",
-                                        &format!("Gain +1 {:?} from selected card", color),
-                                        Some(effect_data),
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            return Ok(());
+            return self.gain_heart_colors_from_selected_card(gs, effect);
         }
 
         if effect.resource_any().as_deref() == Some("heart")
             && effect.heart_type_any().as_deref() == Some("all")
         {
-            let target_str = effect.target_name().to_string();
-            // Capture values before mutable borrow of gs
-            let triggering_member = gs
-                .ability_queue
-                .current_entry()
-                .and_then(|e| e.triggering_member_id);
-            let activating = gs.activating_card;
-            let has_explicit_target = effect.target_any().is_some();
-            let player = gs.resolve_target_player_mut(&target_str);
-            let card_id = triggering_member.or_else(|| {
-                if let Some(ref pos) = effect.position_any() {
-                    let pos_str = pos.get_position()?;
-                    let idx = crate::ability::util::stage_position_index(pos_str)?;
-                    if idx < player.stage.stage.len() && player.stage.stage[idx] != -1 {
-                        Some(player.stage.stage[idx])
-                    } else {
-                        None
-                    }
-                } else if has_explicit_target {
-                    player.stage.stage.iter().find(|&&id| id != -1).copied()
-                } else {
-                    activating
-                }
-            });
-            if let Some(card_id) = card_id {
-                let amount = effect.count_or(1) as i16;
-                gs.mods.add_heart_modifier_with_trace(
-                    card_id,
-                    crate::card::HeartColor::All,
-                    amount,
-                    &mut gs.ability_applications,
-                    card_id,
-                    &effect.text,
-                );
-                if effect.duration_any().as_deref() == Some("live_end") {
-                    let effect_data = crate::core::types::EffectData::SingleCard {
-                        card_id,
-                        amount,
-                        color: Some("all".to_string()),
-                    };
-                    crate::ability::util::push_temporary_effect(
-                        gs,
-                        "gain_heart",
-                        Some("live_end"),
-                        "self",
-                        &format!("Gain {} all-heart", amount),
-                        Some(effect_data),
-                    );
-                }
-            }
-            return Ok(());
+            return self.gain_heart_all_type(gs, effect);
         }
 
         if self.handle_bp6_pattern(gs, effect)? {
