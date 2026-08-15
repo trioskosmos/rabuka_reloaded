@@ -155,7 +155,7 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let db = &gs.card_database;
-        let is_self = effect.self_target_any().unwrap_or(false);
+        let is_self = effect.is_self_target();
 
         if is_self {
             // Self-targeting: invalidate the activating card itself (works for any zone)

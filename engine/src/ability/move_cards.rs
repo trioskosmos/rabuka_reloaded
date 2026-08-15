@@ -378,7 +378,7 @@ impl AbilityResolver {
             count,
             is_all,
             filter,
-            effect.self_target_any().unwrap_or(false),
+            effect.is_self_target(),
             behavior,
             false,
         )? {
@@ -1125,7 +1125,7 @@ impl AbilityResolver {
                 c.count,
                 c.is_all,
                 &filter,
-                effect.self_target_any().unwrap_or(false),
+                effect.is_self_target(),
                 util::InsufficientBehavior::Silent,
                 true,
             )? {
@@ -1986,7 +1986,7 @@ impl AbilityResolver {
                         deck_pos,
                         &source,
                         effect.allow_occupied_stage_any().unwrap_or(false),
-                        effect.under_self_any().unwrap_or(false),
+                        effect.is_under_self(),
                     ) {
                         Ok(true) => {
                             return Ok(());
@@ -2423,7 +2423,7 @@ impl AbilityResolver {
                 .unwrap_or(false);
             let entry_self_target = entry_effect
                 .as_ref()
-                .and_then(|ef| ef.under_self_any())
+                .map(|ef| ef.is_under_self())
                 .unwrap_or(false);
             match self.place_card_with_stage_choice(
                 gs,

@@ -345,7 +345,7 @@ impl AbilityResolver {
             // When self_cost or self_target explicitly restricts to "this member"
             // (e.g. "このメンバーをウェイトにする"), filter candidates to only the
             // activating card. If the card is already in the target state, skip.
-            if (self_cost || effect.self_target_any().unwrap_or(false))
+            if (self_cost || effect.is_self_target())
                 && self.selected_cards.is_empty()
             {
                 if let Some(act_id) = gs.activating_card {
@@ -1039,7 +1039,7 @@ impl AbilityResolver {
             self.execute_set_heart_copy_from_under(gs, effect.duration_any().as_deref());
             return;
         }
-        let is_self_target = effect.self_target_any().unwrap_or(false);
+        let is_self_target = effect.is_self_target();
         let needs_target = !is_self_target
             && (effect.heart_selection_any().unwrap_or(false)
                 || effect.group_names_any().is_some()
@@ -1592,7 +1592,7 @@ impl AbilityResolver {
         }
         // When self_target is set, only the activating card receives the modifier
         // (e.g. "このメンバーのコストを+Nする" — only this member, not all matching).
-        if effect.self_target_any().unwrap_or(false) {
+        if effect.is_self_target() {
             if let Some(cid) = gs.activating_card {
                 card_ids.retain(|id| *id == cid);
             }

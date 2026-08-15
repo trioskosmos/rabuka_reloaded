@@ -390,7 +390,7 @@ impl AbilityResolver {
                     let is_gated_consequence = action.action == ActionType::ModifyScore
                         || (action.action == ActionType::MoveCards
                             && action.destination == Some(Zone::Hand)
-                            && action.self_target_any().unwrap_or(false)
+                            && action.is_self_target()
                             && action.source_any().is_some_and(|s| {
                                 s == "discard" || s == "waitroom"
                             }));

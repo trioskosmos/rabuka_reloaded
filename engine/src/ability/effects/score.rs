@@ -33,7 +33,7 @@ impl AbilityResolver {
         let per_unit_type_str = effect.per_unit_type_any().map(|s| s.to_string());
         let location = effect.location_any().map(|s| s.to_string());
         let effect_constraint = effect.effect_constraint_any().map(|s| s.to_string());
-        let self_target = effect.self_target_any().unwrap_or(false);
+        let self_target = effect.is_self_target();
         let heart_colors = effect.heart_colors_any();
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             eprintln!(
@@ -275,7 +275,7 @@ impl AbilityResolver {
         let original_operator_binding = effect.original_operator_any();
         let original_operator = original_operator_binding.as_deref();
         let exclude_self = effect.exclude_self_any().unwrap_or(false);
-        let self_target = effect.self_target_any().unwrap_or(false);
+        let self_target = effect.is_self_target();
         let exclude_heart_colors = effect.exclude_heart_colors_any();
         let max = effect.max.unwrap_or(false);
         let repeat_limit = effect.repeat_limit_any().map(|v| v as u8);

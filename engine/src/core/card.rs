@@ -1,5 +1,7 @@
 use crate::ability::ability_store::AbilityRef;
-pub(crate) use crate::ability::enums::{ActionType, ConditionType, EffectState, TargetPlayer, Zone};
+pub(crate) use crate::ability::enums::{
+    ActionType, ConditionType, EffectState, PlacementTarget, TargetPlayer, Zone,
+};
 use crate::core::types::ArcStr;
 #[cfg(feature = "serde_support")]
 use crate::BTreeMap;
@@ -1834,6 +1836,47 @@ impl AbilityEffect {
     /// matching `TargetPlayer::from_str`.
     pub fn target_player(&self) -> Option<TargetPlayer> {
         self.target_any().and_then(TargetPlayer::from_str)
+    }
+
+    /// Derived `PlacementTarget` from the filter-level `self_target`/`under_self`
+    /// booleans. `self_target` takes precedence (source-filtering semantics);
+    /// `under_self` indicates auto-placing under the activating member.
+    pub fn placement_target(&self) -> Option<PlacementTarget> {
+        let filter = self.kind.as_deref()?.filter()?;
+        if filter.under_self == Some(true) {
+            Some(PlacementTarget::UnderThisMember)
+        } else if filter.self_target == Some(true) {
+            Some(PlacementTarget::FilterSelfAsSource)
+        } else {
+            None
+        }
+    }
+
+    /// Set the placement target consistently on both underlying booleans so the
+    /// two never conflict. `None` clears both.
+    pub fn set_placement_target(&mut self, target: Option<PlacementTarget>) {
+        let (st, us) = match target {
+            Some(PlacementTarget::UnderThisMember) => (None, Some(true)),
+            Some(PlacementTarget::FilterSelfAsSource) => (Some(true), None),
+            Some(PlacementTarget::UnderChosenMember) | None => (None, None),
+        };
+        if let Some(f) = self.kind.as_deref_mut().and_then(|k| k.filter_mut()) {
+            f.self_target = st;
+            f.under_self = us;
+        }
+    }
+
+    /// Boolean convenience: whether the effect targets the activating card as a
+    /// source-filter (the legacy `self_target` boolean). Derived from
+    /// `placement_target()`; equivalent to `self_target_any().unwrap_or(false)`.
+    pub fn is_self_target(&self) -> bool {
+        self.placement_target() == Some(PlacementTarget::FilterSelfAsSource)
+    }
+
+    /// Boolean convenience: whether the placed card auto-places under the
+    /// activating member (the legacy `under_self` boolean).
+    pub fn is_under_self(&self) -> bool {
+        self.placement_target() == Some(PlacementTarget::UnderThisMember)
     }
 
     /// Typed player-target subset of the *top-level* `self.target` only,

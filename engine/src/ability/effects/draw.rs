@@ -331,7 +331,7 @@ impl AbilityResolver {
         let card_db = self.card_db();
         let is_any_number = effect.any_number_any().unwrap_or(false);
         let is_distinct = effect.distinct_any();
-        let is_self_target = effect.self_target_any().unwrap_or(false);
+        let is_self_target = effect.is_self_target();
 
         if target == "both" {
             for player in [&mut gs.player1, &mut gs.player2] {

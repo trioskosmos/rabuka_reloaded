@@ -71,7 +71,7 @@ impl AbilityResolver {
             effect.blind_any().unwrap_or(false),
         )?;
 
-        if effect.self_target_any().unwrap_or(false) {
+        if effect.is_self_target() {
             if let Some(ct) = effect.card_type_any() {
                 let card_db = &gs.card_database;
                 let has_matching = gs.revealed_cards.iter().any(|&cid| {
@@ -794,7 +794,7 @@ impl AbilityResolver {
         let sign = sign_binding.as_deref();
         let activating_card_id = gs.activating_card;
         let card_db = self.card_db();
-        let is_self_target = effect.self_target_any().unwrap_or(false);
+        let is_self_target = effect.is_self_target();
         let last_discard_count = gs.mods.last_cost_discard_count;
         let is_all = effect.all_any().unwrap_or(false)
             || (effect.source_any().is_none()

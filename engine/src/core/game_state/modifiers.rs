@@ -1702,7 +1702,7 @@ impl GameState {
                 // When self_target is true, apply the score modifier to the
                 // success zone card itself (e.g. Angelic Angel's +5 self buff).
                 // Otherwise, target cards in the live set zone.
-                let targets: Vec<i16> = if effect.self_target_any().unwrap_or(false) {
+                let targets: Vec<i16> = if effect.is_self_target() {
                     vec![cid]
                 } else {
                     player.live_card_zone.cards.to_vec()

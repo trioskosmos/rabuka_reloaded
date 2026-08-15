@@ -225,6 +225,23 @@ impl core::fmt::Display for TargetPlayer {
     }
 }
 
+/// How an effect designates the member that receives the placed card.
+/// Folds the previously-separate `self_target` + `under_self` booleans into one
+/// typed enum. The two booleans never co-occur in card data and were read with
+/// different semantics (filtering vs. placement), so folding into a single
+/// enum removes the overlap ambiguity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PlacementTarget {
+    /// The effect's target is the activating card itself (source-filtering
+    /// semantics — the activating card is a valid selection target).
+    FilterSelfAsSource,
+    /// The placed card auto-places under the activating member (no stage-member
+    /// choice), i.e. "…をこのメンバーの下に置く".
+    UnderThisMember,
+    /// The player chooses which stage member receives the placed card.
+    UnderChosenMember,
+}
+
 /// Strongly-typed ability effect action types to prevent stringly-typed dispatch bugs.
 /// Action type for ability effects.
 /// ~60 variants cover all effect actions in the game.
