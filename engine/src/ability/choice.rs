@@ -274,32 +274,34 @@ impl super::resolver::AbilityResolver {
                 gs,
                 choice.as_ref().unwrap(),
                 zone,
-                card_type,
-                *count,
-                *allow_skip,
-                &indices,
                 context,
-                *cost_limit,
-                cost_limit_operator.clone(),
-                *cost_total,
-                cost_total_operator.clone(),
-                group.clone(),
-                characters.clone(),
-                filtered_indices.clone(),
-                *is_select_action,
-                target_player_id.clone(),
-                destination.clone(),
-                *blind,
-                choice.as_ref().is_some_and(|c| {
-                    matches!(
-                        c,
-                        Choice::SelectCard {
-                            is_reveal: true,
-                            ..
-                        }
-                    )
-                }),
-                *discard_remaining,
+                SelectionContext {
+                    card_type: card_type.clone(),
+                    count: *count,
+                    allow_skip: *allow_skip,
+                    indices: indices.to_vec(),
+                    cost_limit: *cost_limit,
+                    cost_limit_operator: cost_limit_operator.clone(),
+                    cost_total: *cost_total,
+                    cost_total_operator: cost_total_operator.clone(),
+                    group: group.clone(),
+                    characters: characters.clone(),
+                    filtered_indices: filtered_indices.clone(),
+                    is_select_action: *is_select_action,
+                    target_player_id: target_player_id.clone(),
+                    destination: destination.clone(),
+                    discard_remaining: *discard_remaining,
+                    blind: *blind,
+                    is_reveal: choice.as_ref().is_some_and(|c| {
+                        matches!(
+                            c,
+                            Choice::SelectCard {
+                                is_reveal: true,
+                                ..
+                            }
+                        )
+                    }),
+                },
             ),
             (
                 Some(Choice::SelectCard {
@@ -378,29 +380,13 @@ impl super::resolver::AbilityResolver {
         gs: &mut GameState,
         choice: &Choice,
         zone: &str,
-        card_type: &Option<String>,
-        count: usize,
-        allow_skip: bool,
-        indices: &[usize],
         context: ExecutionContext,
-        cost_limit: Option<u8>,
-        cost_limit_operator: Option<String>,
-        cost_total: Option<u8>,
-        cost_total_operator: Option<String>,
-        group: Option<String>,
-        characters: Option<Vec<String>>,
-        filtered_indices: Option<Vec<usize>>,
-        is_select_action: bool,
-        target_player_id: Option<String>,
-        destination: Option<String>,
-        blind: bool,
-        is_reveal: bool,
-        discard_remaining: Option<bool>,
+        ctx: SelectionContext,
     ) -> Result<(), String> {
         if ABILITY_DEBUG.load(Ordering::Relaxed) {
             log::debug!(
                 "[SEL_CARD] zone='{}' indices={:?} count={} allow_skip={} context={:?} is_reveal={}",
-                zone, indices, count, allow_skip, context, is_reveal
+                zone, ctx.indices, ctx.count, ctx.allow_skip, context, ctx.is_reveal
             );
         }
 
@@ -412,27 +398,7 @@ impl super::resolver::AbilityResolver {
             .is_some_and(|e| e.effect_started);
 
         // Handle reveal action: push selected cards to revealed_cards, don't discard.
-        let ctx = SelectionContext {
-            card_type: card_type.clone(),
-            count,
-            allow_skip,
-            indices: indices.to_vec(),
-            cost_limit,
-            cost_limit_operator: cost_limit_operator.clone(),
-            cost_total,
-            cost_total_operator: cost_total_operator.clone(),
-            group: group.clone(),
-            characters: characters.clone(),
-            filtered_indices: filtered_indices.clone(),
-            is_select_action,
-            target_player_id: target_player_id.clone(),
-            destination,
-            discard_remaining,
-            blind,
-            is_reveal,
-        };
-
-        if is_reveal && Zone::from_str(zone) == Some(Zone::Hand) {
+        if ctx.is_reveal && Zone::from_str(zone) == Some(Zone::Hand) {
             return self.handle_reveal_selection(gs, &ctx);
         }
 
@@ -443,6 +409,24 @@ impl super::resolver::AbilityResolver {
         {
             return self.handle_entry_cost_reveal(gs, &ctx, &context);
         }
+
+        let card_type: &Option<String> = &ctx.card_type;
+        let count: usize = ctx.count;
+        let allow_skip: bool = ctx.allow_skip;
+        let indices: &[usize] = &ctx.indices;
+        let cost_limit: Option<u8> = ctx.cost_limit;
+        let cost_limit_operator: &Option<String> = &ctx.cost_limit_operator;
+        let cost_total: Option<u8> = ctx.cost_total;
+        let cost_total_operator: &Option<String> = &ctx.cost_total_operator;
+        let group: &Option<String> = &ctx.group;
+        let characters: &Option<Vec<String>> = &ctx.characters;
+        let filtered_indices: &Option<Vec<usize>> = &ctx.filtered_indices;
+        let is_select_action: bool = ctx.is_select_action;
+        let target_player_id: &Option<String> = &ctx.target_player_id;
+        let destination: &Option<String> = &ctx.destination;
+        let discard_remaining: &Option<bool> = &ctx.discard_remaining;
+        let blind: bool = ctx.blind;
+        let is_reveal: bool = ctx.is_reveal;
 
         let card_db = gs.card_database.clone();
         let validate_filter = choice.as_filter();
