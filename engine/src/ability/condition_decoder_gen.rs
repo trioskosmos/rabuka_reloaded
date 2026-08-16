@@ -4,7 +4,9 @@
 // Direct decoder for the serde internally-tagged `Condition` enum.
 // `text`/`trigger_event` exist only under the `debug_conditions` feature
 // and are skipped otherwise.
-use crate::card::{ConditionCommon, DistinctInfo, TriggerEvent};
+use crate::card::{ConditionCommon, DistinctInfo};
+#[cfg(feature = "debug_conditions")]
+use crate::card::TriggerEvent;
 
 /// Accumulator for Condition fields during direct decode.
 #[derive(Default)]

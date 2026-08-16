@@ -133,6 +133,31 @@ fn pref<'a>(gs: &'a GameState, idx: usize) -> &'a Player {
     }
 }
 
+/// Whether `cid` is a stage member that has member/energy cards stacked
+/// beneath it on either player's stage.
+pub(crate) fn has_under_cards(gs: &GameState, cid: i16) -> bool {
+    (0..2).any(|pi| {
+        let st = &pref(gs, pi).stage;
+        (0..3).any(|slot| st.stage[slot] == cid && !st.under_cards[slot].is_empty())
+    })
+}
+
+/// The under-cards (member/energy) stacked beneath the stage member `cid`,
+/// plus which player's stage it was found on. `None` if `cid` isn't a stage
+/// member or has nothing stacked beneath it.
+pub(crate) fn under_cards_of(gs: &GameState, cid: i16) -> Option<(usize, Vec<i16>)> {
+    (0..2).find_map(|pi| {
+        let st = &pref(gs, pi).stage;
+        (0..3).find_map(|slot| {
+            if st.stage[slot] == cid && !st.under_cards[slot].is_empty() {
+                Some((pi, st.under_cards[slot].to_vec()))
+            } else {
+                None
+            }
+        })
+    })
+}
+
 #[allow(unused_assignments)] // display_pos snapshot may be recomputed by the render guard
 pub fn play_step(p: PlayState, keys: u32) -> Step {
     let PlayState {

@@ -23,7 +23,9 @@ use crate::ui::layers::Painter;
 use crate::ui::text::*;
 use crate::util::{cn_or_empty, tl_area};
 
-use super::{compute_live_need, compute_total_hearts, find_card_zone_slot, pref};
+use super::{
+    compute_live_need, compute_total_hearts, find_card_zone_slot, has_under_cards, pref,
+};
 
 /// The number of screen lines a PlayMemberToStage group occupies: the card
 /// header line plus one line for all of its stage areas (left/center/right).
@@ -492,6 +494,12 @@ pub(crate) fn render_board(
                 } else {
                     158.0
                 };
+                // If the viewed card is a stage member with cards stacked
+                // beneath it, offer a button to open the under-cards viewer.
+                let has_under = viewing_card.is_some_and(|cid| has_under_cards(gs, cid));
+                if has_under {
+                    render_hint_bar(&tl("L=text  Y=under"));
+                }
             }
         } else {
             if let Some(vcid) = viewing_card {
@@ -784,8 +792,7 @@ pub(crate) fn render_board(
                     // they're drawn as a bottom row on whichever card page the
                     // cursor is on. So the page anchor is the first card index
                     // of the card-page that contains `pos`.
-                    let mut page = 0usize;
-                    {
+                    let page = {
                         let mut cards_seen = 0usize;
                         let mut page_start = 0usize;
                         for (di, &fi) in display_order.iter().enumerate() {
@@ -800,8 +807,8 @@ pub(crate) fn render_board(
                             }
                             cards_seen += 1;
                         }
-                        page = page_start;
-                    }
+                        page_start
+                    };
 
                     // ---- Classify items on this page ----
                     // Cards fill the grid slots; text items go to the bottom row.
@@ -1085,7 +1092,7 @@ pub(crate) fn render_board(
                     };
                     // Advance the window so the cursor stays visible.
                     let mut start = snap_group_start(acts_cache, display_order, list_scroll);
-                    let mut end = start;
+                    let mut end;
                     loop {
                         let (_, e2) = build_window(start);
                         end = e2;

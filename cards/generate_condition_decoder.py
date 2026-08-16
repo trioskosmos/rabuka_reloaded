@@ -203,7 +203,9 @@ def main():
         "// `text`/`trigger_event` exist only under the `debug_conditions` feature"
     )
     lines.append("// and are skipped otherwise.")
-    lines.append("use crate::card::{ConditionCommon, DistinctInfo, TriggerEvent};")
+    lines.append("use crate::card::{ConditionCommon, DistinctInfo};")
+    lines.append('#[cfg(feature = "debug_conditions")]')
+    lines.append("use crate::card::TriggerEvent;")
     lines.append("")
 
     # === ConditionLocals accumulator ===

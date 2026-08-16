@@ -1,14 +1,11 @@
 #![cfg(feature = "3ds")]
 // Per-SetupPhase handlers extracted from the bin's Step::Setup match arm.
-// Inner `unsafe {}` blocks are inherited verbatim from the original arm
-// (which carried the bin-level #![allow(unused_unsafe)]).
-#![allow(unused_unsafe)]
 
 // Setup state machine: one handler function per SetupPhase.
 // Each handler returns the next Step. Bodies were moved verbatim from the
 // Step::Setup match arm in the bin (see extract_setup.py).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use rabuka_engine::card::{Card, CardDatabase};
@@ -102,25 +99,19 @@ fn pick_mode(
                 {
                     let y = 40.0 + i as f32 * 38.0;
                     let bg = if i == cur { COL_SEL } else { COL_DIM };
-                    unsafe {
-                        _3ds_bot_queue_rect(10.0, y, 300.0, 36.0, bg);
-                    }
+                    _3ds_bot_queue_rect(10.0, y, 300.0, 36.0, bg);
                     if i == cur {
-                        unsafe {
-                            _3ds_bot_queue_rect(10.0, y, 300.0, 36.0, COL_HIGHLIGHT);
-                        }
+                        _3ds_bot_queue_rect(10.0, y, 300.0, 36.0, COL_HIGHLIGHT);
                     }
                     let color = if i == cur { COL_GOLD } else { COL_LIGHT };
                     let label = tl(m);
-                    unsafe {
-                        _3ds_bot_queue_text(
-                            20.0,
-                            y + 6.0,
-                            color,
-                            0.6f32,
-                            format!("{}\0", label).as_ptr(),
-                        );
-                    }
+                    _3ds_bot_queue_text(
+                        20.0,
+                        y + 6.0,
+                        color,
+                        0.6f32,
+                        format!("{}\0", label).as_ptr(),
+                    );
                 }
                 // Bottom hint bar (touch + buttons)
                 _3ds_bot_queue_text(
@@ -138,9 +129,7 @@ fn pick_mode(
         // Touch input: tapping a row selects + activates it (like pressing A).
         let mut t_x: u32 = 0;
         let mut t_y: u32 = 0;
-        unsafe {
-            _3ds_touch_read(&mut t_x, &mut t_y);
-        }
+        _3ds_touch_read(&mut t_x, &mut t_y);
         let touch_press = keys & 0x00100000 != 0;
         let mut tapped: Option<usize> = None;
         if touch_press {
@@ -255,21 +244,13 @@ fn pick_deck(
                         format!("SELECT {}\0", label).as_ptr(),
                     );
                 }
-                // Top screen: show the currently selected deck's card grid as a
-                // live preview. The X button still opens the scrollable DeckViewer
-                // (with detail screens); here we just mirror the chosen deck.
+                // Top screen: just the selected deck's name. A full card-image
+                // live preview was removed — loading every deck's atlases on
+                // selection is a perf hit (SD atlas I/O); the X button opens the
+                // scrollable DeckViewer with detail screens instead.
                 unsafe {
                     _3ds_top_clear();
-                }
-                if cur < n {
-                    let card_db =
-                        std::sync::Arc::new(CardDatabase::load_or_create(cards.as_ref().clone()));
-                    let card_ids: Vec<i16> = DeckParser::deck_list_to_card_numbers(&decks[cur])
-                        .iter()
-                        .filter_map(|cn| card_db.get_card_id(cn))
-                        .collect();
-                    let deck_atlas = CardAtlas::load();
-                    unsafe {
+                    if cur < n {
                         _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
                         _3ds_top_queue_text(
                             4.0,
@@ -279,7 +260,6 @@ fn pick_deck(
                             format!("{}\0", decks[cur].name).as_ptr(),
                         );
                     }
-                    render_card_grid(&card_ids, 0, 5, 3, 26.0, &card_db, &deck_atlas);
                 }
                 // Show 6 decks max: 240px screen - 30px title - 20px help = 190px
                 // 190 / 6 = ~32px per row at 0.70 scale (~21px glyph)
@@ -700,18 +680,6 @@ fn loading(
             pd1.shuffle_energy_deck();
             pd2.shuffle_main_deck();
             pd2.shuffle_energy_deck();
-            let mut deck_nos: HashSet<String> = HashSet::new();
-            for cid in pd1
-                .main_deck
-                .iter()
-                .chain(pd1.energy_deck.iter())
-                .chain(pd2.main_deck.iter())
-                .chain(pd2.energy_deck.iter())
-            {
-                if let Some(card) = db.get_card(*cid) {
-                    deck_nos.insert(card.card_no.to_string());
-                }
-            }
             DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
             DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
             let mut p1 = Player::new("p1".into(), "P1".into(), true);
@@ -1924,18 +1892,6 @@ fn multiplayer_loading(
             pd1.shuffle_energy_deck();
             pd2.shuffle_main_deck();
             pd2.shuffle_energy_deck();
-            let mut deck_nos: HashSet<String> = HashSet::new();
-            for cid in pd1
-                .main_deck
-                .iter()
-                .chain(pd1.energy_deck.iter())
-                .chain(pd2.main_deck.iter())
-                .chain(pd2.energy_deck.iter())
-            {
-                if let Some(card) = db.get_card(*cid) {
-                    deck_nos.insert(card.card_no.to_string());
-                }
-            }
             DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
             DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
             let mut p1 = Player::new("p1".into(), "P1".into(), true);

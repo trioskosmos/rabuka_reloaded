@@ -19,7 +19,7 @@ use crate::uds;
 use crate::ui::grid::{card_grid_input, GridAction};
 use crate::ui::text::*;
 
-use super::{pref, visible_hand_slots};
+use super::{pref, under_cards_of, visible_hand_slots};
 
 /// Mutable play state carried back to play_step after input handling.
 pub(crate) struct InputOut {
@@ -111,6 +111,22 @@ pub(crate) fn handle_input(
                 choice_subview = true;
                 text_page = 0;
                 redraw = true;
+            }
+            // Y opens a zone viewer of all cards (member/energy) stacked under
+            // the stage member being viewed, so each can be inspected in detail.
+            if keys & 0x00000800 != 0 {
+                if let Some((pi, zc)) = viewing_card.and_then(|cid| under_cards_of(gs, cid)) {
+                    let side = if pi == my_player_idx {
+                        tl("My Stage")
+                    } else {
+                        tl("Opp Stage")
+                    };
+                    viewing_card = None;
+                    detail_mode = false;
+                    zone_viewer = Some((format!("{} - {}", side, tl("Under")), zc));
+                    zone_viewer_offset = 0;
+                    redraw = true;
+                }
             }
             // Up/Down scrolls card detail
             if keys & 0x00000040 != 0 {

@@ -2386,6 +2386,7 @@ impl Operator {
     }
 }
 
+#[cfg(feature = "json_path_test")]
 pub(crate) fn parse_operator(s: &str) -> Option<Operator> {
     Some(match s {
         ">=" => Operator::Gte,
