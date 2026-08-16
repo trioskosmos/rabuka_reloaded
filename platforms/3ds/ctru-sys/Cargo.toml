@@ -1,0 +1,22 @@
+[package]
+name = "ctru-sys"
+version = "0.0.0"
+edition = "2021"
+publish = false
+# Local stub satisfying cargo-3ds's `ctru_sys` unit-graph probe.
+#
+# cargo-3ds's `should_use_ctru_debuginfo()` scans the build graph for a unit
+# whose lib target is named `ctru_sys` so it can decide whether to link the
+# debug variant of libctru (`-lctrud`) vs the normal one (`-lctru`). We link
+# libctru directly through our own FFI shim (src/ffi.rs), not via the upstream
+# rust3ds `ctru-sys` bindings, so that unit never existed and cargo-3ds printed
+# a one-line informational warning on every build.
+#
+# This empty lib supplies that unit so the probe succeeds. It is never compiled
+# into the final binary (nothing in rabuka_3ds references it) and adds no
+# dependencies; it exists purely so cargo's dependency graph contains a
+# `ctru_sys` target.
+
+[lib]
+name = "ctru_sys"
+path = "src/lib.rs"

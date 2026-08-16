@@ -893,6 +893,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctru-sys"
+version = "0.0.0"
+
+[[package]]
 name = "darling"
 version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2138,6 +2142,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 name = "rabuka_3ds"
 version = "0.1.0"
 dependencies = [
+ "ctru-sys",
  "rabuka_engine",
  "rmp-serde",
  "serde",
