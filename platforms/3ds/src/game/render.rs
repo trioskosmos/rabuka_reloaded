@@ -62,6 +62,38 @@ struct RenderCtx<'a> {
     atlas: &'a CardAtlas,
 }
 
+/// The top status line (turn/phase/perspective + both players' hand/energy/
+/// deck counts). Shared by the game header and the card-detail overlay so the
+/// two never drift apart.
+fn header_status_line(ctx: &RenderCtx) -> String {
+    let gs = ctx.gs;
+    let ap = ctx.ap;
+    let my = ctx.my_player_idx;
+    let phase_name = if current_lang() == Lang::Japanese {
+        gs.current_phase.label_jp().to_string()
+    } else {
+        format!("{}", gs.current_phase)
+    };
+    format!(
+        "T{} {} [{}]  Me H:{} E:{}/{} D:{}  Opp H:{} E:{}/{} D:{}",
+        gs.turn_number,
+        phase_name,
+        if ap.id == pref(gs, my).id {
+            "Me"
+        } else {
+            "Opp"
+        },
+        pref(gs, my).hand.cards.len(),
+        pref(gs, my).energy_zone.active_count(),
+        pref(gs, my).energy_zone.cards.len(),
+        pref(gs, my).main_deck.cards.len(),
+        pref(gs, 1 - my).hand.cards.len(),
+        pref(gs, 1 - my).energy_zone.active_count(),
+        pref(gs, 1 - my).energy_zone.cards.len(),
+        pref(gs, 1 - my).main_deck.cards.len(),
+    )
+}
+
 /// Returns the index just past a PlayMemberToStage group starting at `di`.
 /// Consecutive same-card PMTS actions (one per stage area) form a single group.
 fn group_end(acts_cache: &[game_setup::Action], display_order: &[usize], di: usize, n: usize) -> usize {
@@ -178,35 +210,12 @@ fn render_game_header(ctx: &RenderCtx) {
     }
     unsafe {
         _3ds_top_queue_rect(0.0, 0.0, 400.0, 50.0, COL_PANEL);
-        let phase_name = if current_lang() == Lang::Japanese {
-            ctx.gs.current_phase.label_jp().to_string()
-        } else {
-            format!("{}", ctx.gs.current_phase)
-        };
         _3ds_top_queue_text(
             4.0,
             2.0,
             COL_GOLD,
             SCALE_SMALL,
-            format!(
-                "T{} {} [{}]  Me H:{} E:{}/{} D:{}  Opp H:{} E:{}/{} D:{}\0",
-                ctx.gs.turn_number,
-                phase_name,
-                if ctx.ap.id == pref(ctx.gs, ctx.my_player_idx).id {
-                    "Me"
-                } else {
-                    "Opp"
-                },
-                pref(ctx.gs, ctx.my_player_idx).hand.cards.len(),
-                pref(ctx.gs, ctx.my_player_idx).energy_zone.active_count(),
-                pref(ctx.gs, ctx.my_player_idx).energy_zone.cards.len(),
-                pref(ctx.gs, ctx.my_player_idx).main_deck.cards.len(),
-                pref(ctx.gs, 1 - ctx.my_player_idx).hand.cards.len(),
-                pref(ctx.gs, 1 - ctx.my_player_idx).energy_zone.active_count(),
-                pref(ctx.gs, 1 - ctx.my_player_idx).energy_zone.cards.len(),
-                pref(ctx.gs, 1 - ctx.my_player_idx).main_deck.cards.len(),
-            )
-            .as_ptr(),
+            format!("{}\0", header_status_line(ctx)).as_ptr(),
         );
         let p1_blade: u32 = ctx.gs.player1.stage.total_blades(
             &ctx.gs.card_database,
@@ -284,7 +293,6 @@ fn render_game_header(ctx: &RenderCtx) {
 
 fn render_content_panel(ctx: &RenderCtx, mut text_page: usize, mut content_y: f32) -> (usize, f32) {
     let gs = ctx.gs;
-    let ap = ctx.ap;
     let cur = ctx.cur;
     let acts_cache = ctx.acts_cache;
     let detail_mode = ctx.detail_mode;
@@ -293,7 +301,6 @@ fn render_content_panel(ctx: &RenderCtx, mut text_page: usize, mut content_y: f3
     let viewing_card = ctx.viewing_card;
     let zone_viewer = ctx.zone_viewer;
     let zone_viewer_offset = ctx.zone_viewer_offset;
-    let my_player_idx = ctx.my_player_idx;
     let has_image_choice = ctx.has_image_choice;
     let has_text_choice = ctx.has_text_choice;
     let is_ai_turn = ctx.is_ai_turn;
@@ -502,35 +509,13 @@ fn render_content_panel(ctx: &RenderCtx, mut text_page: usize, mut content_y: f3
                     // rect on the Cover layer, its text on the Header layer so
                     // anything scrolled under it is hidden.
                     p.rect(Layer::Cover, 0.0, 0.0, 400.0, 50.0, COL_PANEL);
-                    let ph = if current_lang() == Lang::Japanese {
-                        gs.current_phase.label_jp().to_string()
-                    } else {
-                        format!("{}", gs.current_phase)
-                    };
                     p.text(
                         Layer::Header,
                         4.0,
                         2.0,
                         COL_GOLD,
                         SCALE_BODY,
-                        &format!(
-                            "T{} {} [{}]  Me H:{} E:{}/{} D:{}  Opp H:{} E:{}/{} D:{}",
-                            gs.turn_number,
-                            ph,
-                            if ap.id == pref(gs, my_player_idx).id {
-                                "Me"
-                            } else {
-                                "Opp"
-                            },
-                            pref(gs, my_player_idx).hand.cards.len(),
-                            pref(gs, my_player_idx).energy_zone.active_count(),
-                            pref(gs, my_player_idx).energy_zone.cards.len(),
-                            pref(gs, my_player_idx).main_deck.cards.len(),
-                            pref(gs, 1 - my_player_idx).hand.cards.len(),
-                            pref(gs, 1 - my_player_idx).energy_zone.active_count(),
-                            pref(gs, 1 - my_player_idx).energy_zone.cards.len(),
-                            pref(gs, 1 - my_player_idx).main_deck.cards.len(),
-                        ),
+                        &header_status_line(ctx),
                     );
                     p.flush();
                 }
