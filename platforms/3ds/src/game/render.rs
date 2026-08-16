@@ -62,6 +62,32 @@ struct RenderCtx<'a> {
     atlas: &'a CardAtlas,
 }
 
+impl RenderCtx<'_> {
+    /// True when it is the AI's turn (or an AI-vs-AI match), meaning the human
+    /// shouldn't be shown interactive choices.
+    fn is_ai_turn(&self) -> bool {
+        self.ai_vs_ai || (self.vs_ai && !mp_can_act(self.gs, 0))
+    }
+
+    /// True when it is the opponent's turn in a multiplayer match.
+    fn is_opponent_turn_mp(&self) -> bool {
+        self.is_multiplayer && !mp_can_act(self.gs, self.host_player_idx())
+    }
+
+    /// The local player index in multiplayer (0 if host, 1 if guest).
+    fn host_player_idx(&self) -> i32 {
+        if self.is_multiplayer {
+            if self.is_host {
+                0
+            } else {
+                1
+            }
+        } else {
+            0
+        }
+    }
+}
+
 /// The top status line (turn/phase/perspective + both players' hand/energy/
 /// deck counts). Shared by the game header and the card-detail overlay so the
 /// two never drift apart.
@@ -618,25 +644,9 @@ fn render_choice_area(ctx: &RenderCtx, mut text_page: usize, mut list_scroll: us
     let zone_viewer = ctx.zone_viewer;
     let has_image_choice = ctx.has_image_choice;
     let has_text_choice = ctx.has_text_choice;
-    let is_multiplayer = ctx.is_multiplayer;
-    let is_host = ctx.is_host;
-    let vs_ai = &ctx.vs_ai;
-    let ai_vs_ai = &ctx.ai_vs_ai;
     let atlas = ctx.atlas;
-        let is_ai_turn = *ai_vs_ai || (*vs_ai && !mp_can_act(gs, 0));
-        let is_opponent_turn_mp = is_multiplayer
-            && !mp_can_act(
-                gs,
-                if is_multiplayer {
-                    if is_host {
-                        0
-                    } else {
-                        1
-                    }
-                } else {
-                    0
-                },
-            );
+        let is_ai_turn = ctx.is_ai_turn();
+        let is_opponent_turn_mp = ctx.is_opponent_turn_mp();
         if zone_viewer.is_none() {
             let is_auto_ability_choice = matches!(
                 gs.get_pending_choice(),
@@ -1391,10 +1401,6 @@ fn render_board_highlights(ctx: &RenderCtx) {
     let viewing_card = ctx.viewing_card;
     let my_player_idx = ctx.my_player_idx;
     let has_image_choice = ctx.has_image_choice;
-    let is_multiplayer = ctx.is_multiplayer;
-    let is_host = ctx.is_host;
-    let vs_ai = &ctx.vs_ai;
-    let ai_vs_ai = &ctx.ai_vs_ai;
     // Clear stale action highlight on bottom board
     unsafe {
         _3ds_board_clear_action_highlight();
@@ -1403,20 +1409,8 @@ fn render_board_highlights(ctx: &RenderCtx) {
     
     // Highlight interactive zones for all tap-to-deploy action types
     {
-        let ai_turn = *ai_vs_ai || (*vs_ai && !mp_can_act(gs, 0));
-        let opp_turn = is_multiplayer
-            && !mp_can_act(
-                gs,
-                if is_multiplayer {
-                    if is_host {
-                        0
-                    } else {
-                        1
-                    }
-                } else {
-                    0
-                },
-            );
+        let ai_turn = ctx.is_ai_turn();
+        let opp_turn = ctx.is_opponent_turn_mp();
         if !ai_turn && !opp_turn {
             for act in acts_cache {
                 let p = match &act.parameters {
@@ -1544,21 +1538,7 @@ fn render_board_highlights(ctx: &RenderCtx) {
         }
     }
     // Also highlight SelectAutoAbility option cards
-    if !(*ai_vs_ai || (*vs_ai && !mp_can_act(gs, 0)))
-        && !(is_multiplayer
-            && !mp_can_act(
-                gs,
-                if is_multiplayer {
-                    if is_host {
-                        0
-                    } else {
-                        1
-                    }
-                } else {
-                    0
-                },
-            ))
-        && has_image_choice
+    if !ctx.is_ai_turn() && !ctx.is_opponent_turn_mp() && has_image_choice
     {
         if let Some(c) = gs.get_pending_choice() {
             use rabuka_engine::ability::types::Choice;
