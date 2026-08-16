@@ -306,7 +306,6 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
     if !(dirty || redraw) {
         display_pos = out.display_pos;
     }
-    let is_ai_turn = out.is_ai_turn;
 
     if dirty || redraw {
         if dirty {
@@ -716,7 +715,6 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
             is_host,
             vs_ai,
             ai_vs_ai,
-            is_ai_turn,
             atlas,
         );
         text_page = new_text_page;

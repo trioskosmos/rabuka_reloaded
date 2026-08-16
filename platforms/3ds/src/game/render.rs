@@ -58,7 +58,6 @@ struct RenderCtx<'a> {
     is_host: bool,
     vs_ai: bool,
     ai_vs_ai: bool,
-    is_ai_turn: bool,
     atlas: &'a CardAtlas,
 }
 
@@ -196,7 +195,6 @@ pub(crate) fn render_board(
     is_host: bool,
     vs_ai: &bool,
     ai_vs_ai: &bool,
-    is_ai_turn: bool,
     atlas: &CardAtlas,
 ) -> (usize, usize) {
     let ctx = RenderCtx {
@@ -219,7 +217,6 @@ pub(crate) fn render_board(
         is_host,
         vs_ai: *vs_ai,
         ai_vs_ai: *ai_vs_ai,
-        is_ai_turn,
         atlas,
     };
     render_game_header(&ctx);
@@ -318,20 +315,23 @@ fn render_game_header(ctx: &RenderCtx) {
 }
 
 fn render_content_panel(ctx: &RenderCtx, mut text_page: usize, mut content_y: f32) -> (usize, f32) {
-    let gs = ctx.gs;
-    let cur = ctx.cur;
-    let acts_cache = ctx.acts_cache;
-    let detail_mode = ctx.detail_mode;
-    let choice_subview = ctx.choice_subview;
-    let detail_scroll_y = ctx.detail_scroll_y;
-    let viewing_card = ctx.viewing_card;
-    let zone_viewer = ctx.zone_viewer;
-    let zone_viewer_offset = ctx.zone_viewer_offset;
-    let has_image_choice = ctx.has_image_choice;
-    let has_text_choice = ctx.has_text_choice;
-    let is_ai_turn = ctx.is_ai_turn;
-    let atlas = ctx.atlas;
+    if ctx.zone_viewer.is_some() {
+        render_zone_viewer(ctx);
+    } else if ctx.detail_mode {
+        content_y = render_detail_mode(ctx, &mut text_page);
+    } else {
+        content_y = render_compact_or_banner(ctx);
+    }
+    (text_page, content_y)
+}
 
+fn render_zone_viewer(ctx: &RenderCtx) {
+    let gs = ctx.gs;
+    let zone_viewer = ctx.zone_viewer;
+    let viewing_card = ctx.viewing_card;
+    let zone_viewer_offset = ctx.zone_viewer_offset;
+    let detail_scroll_y = ctx.detail_scroll_y;
+    let atlas = ctx.atlas;
     if let Some((ref zlabel, ref zcards)) = zone_viewer {
         if viewing_card.is_none() {
             unsafe {
@@ -356,7 +356,18 @@ fn render_content_panel(ctx: &RenderCtx, mut text_page: usize, mut content_y: f3
         } else {
             render_card_detail(viewing_card.unwrap(), &gs.card_database, atlas, detail_scroll_y);
         }
-    } else if detail_mode {
+    }
+}
+
+fn render_detail_mode(ctx: &RenderCtx, text_page: &mut usize) -> f32 {
+    let gs = ctx.gs;
+    let cur = ctx.cur;
+    let acts_cache = ctx.acts_cache;
+    let choice_subview = ctx.choice_subview;
+    let detail_scroll_y = ctx.detail_scroll_y;
+    let viewing_card = ctx.viewing_card;
+    let atlas = ctx.atlas;
+    let mut content_y = 0.0;
         // L pressed: show full ability text overlay
         if choice_subview {
             if let Some(cid) = viewing_card {
@@ -395,8 +406,8 @@ fn render_content_panel(ctx: &RenderCtx, mut text_page: usize, mut content_y: f3
                     }
                     let lpp = 10usize;
                     let total_pages = ((all_lines.len() + lpp - 1) / lpp).max(1);
-                    text_page = text_page.min(total_pages - 1);
-                    let start = text_page * lpp;
+                    *text_page = (*text_page).min(total_pages - 1);
+                    let start = *text_page * lpp;
                     let mut ty = 24.0;
                     for line in &all_lines[start..] {
                         if ty > 220.0 {
@@ -412,7 +423,7 @@ fn render_content_panel(ctx: &RenderCtx, mut text_page: usize, mut content_y: f3
                                 4.0,
                                 COL_MED,
                                 SCALE_SMALL,
-                                format!("{}/{}\0", text_page + 1, total_pages).as_ptr(),
+                                format!("{}/{}\0", *text_page + 1, total_pages).as_ptr(),
                             );
                         }
                     }
@@ -558,7 +569,16 @@ fn render_content_panel(ctx: &RenderCtx, mut text_page: usize, mut content_y: f3
                 render_hint_bar(&tl("L=text  Y=under"));
             }
         }
-    } else {
+    content_y
+}
+
+fn render_compact_or_banner(ctx: &RenderCtx) -> f32 {
+    let gs = ctx.gs;
+    let viewing_card = ctx.viewing_card;
+    let has_image_choice = ctx.has_image_choice;
+    let has_text_choice = ctx.has_text_choice;
+    let is_ai_turn = ctx.is_ai_turn();
+    let mut content_y = 0.0;
         if let Some(vcid) = viewing_card {
             // Compact card info overlay with stats
             if let Some(card) = gs.card_database.get_card(vcid) {
@@ -629,8 +649,7 @@ fn render_content_panel(ctx: &RenderCtx, mut text_page: usize, mut content_y: f3
                 content_y = 52.0 + h + 6.0;
             }
         }
-    }
-    (text_page, content_y)
+    content_y
 }
 
 fn render_choice_area(

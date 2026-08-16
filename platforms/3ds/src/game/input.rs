@@ -46,7 +46,6 @@ pub(crate) struct InputOut {
     pub dirty: bool,
     pub redraw: bool,
     pub display_pos: usize,
-    pub is_ai_turn: bool,
 }
 
 /// Process one frame of input. `gs`/`acts_cache` are mutated in place; the
@@ -1127,6 +1126,5 @@ pub(crate) fn handle_input(
         dirty,
         redraw,
         display_pos,
-        is_ai_turn,
     }
 }
