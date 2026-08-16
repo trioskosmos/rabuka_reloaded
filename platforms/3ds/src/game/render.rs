@@ -633,30 +633,50 @@ fn render_content_panel(ctx: &RenderCtx, mut text_page: usize, mut content_y: f3
     (text_page, content_y)
 }
 
-fn render_choice_area(ctx: &RenderCtx, mut text_page: usize, mut list_scroll: usize, content_y: f32) -> (usize, usize) {
-    let gs = ctx.gs;
-    let acts_cache = ctx.acts_cache;
-    let display_order = ctx.display_order;
-    let display_pos = ctx.display_pos;
-    let detail_mode = ctx.detail_mode;
-    let choice_subview = ctx.choice_subview;
-    let viewing_card = ctx.viewing_card;
+fn render_choice_area(
+    ctx: &RenderCtx,
+    mut text_page: usize,
+    mut list_scroll: usize,
+    content_y: f32,
+) -> (usize, usize) {
     let zone_viewer = ctx.zone_viewer;
-    let has_image_choice = ctx.has_image_choice;
-    let has_text_choice = ctx.has_text_choice;
-    let atlas = ctx.atlas;
+    if zone_viewer.is_none() {
         let is_ai_turn = ctx.is_ai_turn();
         let is_opponent_turn_mp = ctx.is_opponent_turn_mp();
-        if zone_viewer.is_none() {
-            let is_auto_ability_choice = matches!(
-                gs.get_pending_choice(),
-                Some(rabuka_engine::ability::types::Choice::SelectAutoAbility { .. })
-            );
-            if is_auto_ability_choice
-                && !(detail_mode && viewing_card.is_some())
-                && !is_ai_turn
-                && !is_opponent_turn_mp
-            {
+        let is_auto_ability_choice = matches!(
+            ctx.gs.get_pending_choice(),
+            Some(rabuka_engine::ability::types::Choice::SelectAutoAbility { .. })
+        );
+        if is_auto_ability_choice
+            && !(ctx.detail_mode && ctx.viewing_card.is_some())
+            && !is_ai_turn
+            && !is_opponent_turn_mp
+        {
+            list_scroll = render_auto_ability_queue(ctx, content_y);
+        } else if (ctx.has_image_choice || ctx.has_text_choice)
+            && !(ctx.detail_mode && ctx.viewing_card.is_some())
+            && !is_ai_turn
+            && !is_opponent_turn_mp
+        {
+            text_page = render_image_choice_grid(ctx, text_page);
+        } else if is_ai_turn && content_y < 230.0 {
+            render_ai_thinking(ctx, content_y);
+        } else if !is_ai_turn
+            && !is_opponent_turn_mp
+            && !ctx.display_order.is_empty()
+            && content_y < 240.0
+            && !ctx.detail_mode
+        {
+            list_scroll = render_action_list(ctx, list_scroll, content_y);
+        }
+    }
+    (text_page, list_scroll)
+}
+
+fn render_auto_ability_queue(ctx: &RenderCtx, content_y: f32) -> usize {
+    let mut list_scroll = 0;
+    let gs = ctx.gs;
+    let display_pos = ctx.display_pos;
                 // ===== Ability queue (SelectAutoAbility): vertical text
                 //      list, styled like the main-phase action list. Each
                 //      queued ability is a row: card-name header + full
@@ -765,11 +785,16 @@ fn render_choice_area(ctx: &RenderCtx, mut text_page: usize, mut list_scroll: us
                         render_hint_bar(&tl("UP/DOWN=select  A=confirm"));
                     }
                 }
-            } else if (has_image_choice || has_text_choice)
-                && !(detail_mode && viewing_card.is_some())
-                && !is_ai_turn
-                && !is_opponent_turn_mp
-            {
+    list_scroll
+}
+
+fn render_image_choice_grid(ctx: &RenderCtx, mut text_page: usize) -> usize {
+    let gs = ctx.gs;
+    let acts_cache = ctx.acts_cache;
+    let display_order = ctx.display_order;
+    let display_pos = ctx.display_pos;
+    let choice_subview = ctx.choice_subview;
+    let atlas = ctx.atlas;
                 // ---- Build option→text map from SelectAutoAbility ----
                 let (opt_map, opt_ability_texts): (
                     std::collections::HashMap<i16, i16>,
@@ -1103,7 +1128,10 @@ fn render_choice_area(ctx: &RenderCtx, mut text_page: usize, mut list_scroll: us
                         }
                     }
                 }
-            } else if is_ai_turn && content_y < 230.0 {
+    text_page
+}
+
+fn render_ai_thinking(_ctx: &RenderCtx, content_y: f32) {
                 unsafe {
                     _3ds_top_queue_text(
                         4.0,
@@ -1113,12 +1141,13 @@ fn render_choice_area(ctx: &RenderCtx, mut text_page: usize, mut list_scroll: us
                         format!("{}\0", tl("AI is thinking...")).as_ptr(),
                     );
                 }
-            } else if !is_ai_turn
-                && !is_opponent_turn_mp
-                && !display_order.is_empty()
-                && content_y < 240.0
-                && !detail_mode
-            {
+}
+
+fn render_action_list(ctx: &RenderCtx, mut list_scroll: usize, content_y: f32) -> usize {
+    let gs = ctx.gs;
+    let acts_cache = ctx.acts_cache;
+    let display_order = ctx.display_order;
+    let display_pos = ctx.display_pos;
                 let mut ty = content_y;
                 let line_h = LINE_H;
                 let n = display_order.len();
@@ -1389,9 +1418,7 @@ fn render_choice_area(ctx: &RenderCtx, mut text_page: usize, mut list_scroll: us
                         );
                     }
                 }
-            }
-        } // closes if zone_viewer.is_none()
-    (text_page, list_scroll)
+    list_scroll
 }
 
 fn render_board_highlights(ctx: &RenderCtx) {
