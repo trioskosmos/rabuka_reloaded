@@ -1,11 +1,6 @@
 /// Edge-case tests for untested 常時 (constant/always-on) abilities with complex
 /// conditions. Constants are conditionally-granted modifiers — the most error-prone
 /// path because they must dynamically update as game state changes.
-///
-/// Known issue: PL!S-PR-037-PR (exactly-2-members constant) is not granted by
-/// `recalculate_constants` despite the ability being found and the condition
-/// evaluating correctly. This appears to be a pre-existing engine gap in how
-/// sequential constant effects are handled in the condition path.
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
 
@@ -17,6 +12,44 @@ fn blade(game: &TestGame, cid: i16) -> i32 {
 
 fn heart(game: &TestGame, cid: i16, hc: HeartColor) -> i32 {
     game.state.mods.get_heart_modifier(cid, hc)
+}
+
+// ===================================================================
+// PL!S-PR-037-PR: 常時 自分のステージにいるメンバーがちょうど2人である
+//   かぎり、heart05＋ブレード×1を得る。
+//   Parser bug: heart_colors leaked from effect into condition, making the
+//   count filter only match members with heart05 (wrong). Fixed by stripping
+//   heart_colors from conditions whose text has no {{heart_ icons.
+// ===================================================================
+
+#[test]
+fn exactly_two_members_grants() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let card = game.id("PL!S-PR-037-PR");
+    let a = game.id("PL!-sd1-001-SD");
+
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(game.id(FILLER));
+    }
+
+    // 1 member (card only): no gain
+    game.add_to_stage(rabuka_engine::zones::MemberArea::Center, card);
+    game.state.recalculate_constants();
+    assert_eq!(blade(&game, card), 0, "1 stage member → no blade");
+    assert_eq!(heart(&game, card, HeartColor::Heart05), 0, "1 stage member → no heart05");
+
+    // 2 members: gain heart05 + blade
+    game.add_to_stage(rabuka_engine::zones::MemberArea::LeftSide, a);
+    game.state.recalculate_constants();
+    assert!(blade(&game, card) >= 1, "2 stage members → blade, got {}", blade(&game, card));
+    assert!(heart(&game, card, HeartColor::Heart05) >= 1, "2 stage members → heart05");
+
+    // 3 members: no gain (exactly 2)
+    game.add_to_stage(rabuka_engine::zones::MemberArea::RightSide, game.id("PL!-sd1-002-SD"));
+    game.state.recalculate_constants();
+    assert_eq!(blade(&game, card), 0, "3 stage members → no blade");
 }
 
 // ===================================================================

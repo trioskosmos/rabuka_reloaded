@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-17T14:47:11.875649",
+  "generated_at": "2026-08-17T20:06:41.047939",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "cab333a6",
+  "engine_commit": "6a9ada67",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -2206,10 +2206,7 @@
           "location": "discard",
           "card_type": "member_card",
           "type": "location_condition",
-          "target": "self",
-          "heart_colors": [
-            "heart04"
-          ]
+          "target": "self"
         },
         "action": "sequential",
         "actions": [
@@ -3902,10 +3899,7 @@
           "location": "stage",
           "count": 3,
           "operator": ">=",
-          "unit": "人",
-          "heart_colors": [
-            "heart03"
-          ]
+          "unit": "人"
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -4458,10 +4452,7 @@
           "operator": "=",
           "comparison_type": "equality",
           "type": "location_condition",
-          "scope": "both",
-          "heart_colors": [
-            "heart02"
-          ]
+          "scope": "both"
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -8080,11 +8071,6 @@
           "unit": "人",
           "group_names": [
             "Liella!"
-          ],
-          "heart_colors": [
-            "heart02",
-            "heart03",
-            "heart06"
           ]
         },
         "action": "modify_required_hearts",
@@ -10391,10 +10377,7 @@
           "card_type": "member_card",
           "count": 2,
           "operator": "=",
-          "type": "location_condition",
-          "heart_colors": [
-            "heart05"
-          ]
+          "type": "location_condition"
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -23230,10 +23213,6 @@
           "aggregate": "total",
           "scope": "both",
           "type": "location_condition",
-          "heart_colors": [
-            "heart02",
-            "heart04"
-          ],
           "operator": "="
         },
         "duration": "as_long_as",
@@ -23521,10 +23500,6 @@
           "aggregate": "total",
           "scope": "both",
           "type": "location_condition",
-          "heart_colors": [
-            "heart02",
-            "heart05"
-          ],
           "operator": "="
         },
         "duration": "as_long_as",
@@ -23627,10 +23602,6 @@
           "aggregate": "total",
           "scope": "both",
           "type": "location_condition",
-          "heart_colors": [
-            "heart02",
-            "heart03"
-          ],
           "operator": "="
         },
         "duration": "as_long_as",
@@ -24941,9 +24912,6 @@
           "text": "エールにより公開された自分のカードの中にブレードハートを持つカードがないとき",
           "negation": true,
           "card_property": "has_blade_heart",
-          "heart_colors": [
-            "heart06"
-          ],
           "yell_trigger": true
         },
         "action": "gain_resource",
@@ -24976,9 +24944,6 @@
           "text": "エールにより公開された自分のカードの中にブレードハートを持つカードがないとき",
           "negation": true,
           "card_property": "has_blade_heart",
-          "heart_colors": [
-            "heart02"
-          ],
           "yell_trigger": true
         },
         "action": "gain_resource",
@@ -25011,9 +24976,6 @@
           "text": "エールにより公開された自分のカードの中にブレードハートを持つカードがないとき",
           "negation": true,
           "card_property": "has_blade_heart",
-          "heart_colors": [
-            "heart03"
-          ],
           "yell_trigger": true
         },
         "action": "gain_resource",
@@ -26097,12 +26059,7 @@
           "target": "self",
           "location": "success_live_card_zone",
           "card_type": "live_card",
-          "type": "location_condition",
-          "heart_colors": [
-            "heart01",
-            "heart03",
-            "heart06"
-          ]
+          "type": "location_condition"
         },
         "action": "sequential",
         "actions": [
@@ -31321,10 +31278,7 @@
           ],
           "target": "self",
           "location": "stage",
-          "type": "location_condition",
-          "heart_colors": [
-            "heart04"
-          ]
+          "type": "location_condition"
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -31725,10 +31679,7 @@
           "location": "revealed_cards",
           "target": "self",
           "text": "自分がエールしたとき",
-          "yell_trigger": true,
-          "heart_colors": [
-            "heart02"
-          ]
+          "yell_trigger": true
         },
         "target": "self"
       }
@@ -32279,10 +32230,7 @@
           ],
           "target": "self",
           "location": "stage",
-          "type": "location_condition",
-          "heart_colors": [
-            "heart01"
-          ]
+          "type": "location_condition"
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -32435,9 +32383,6 @@
           "unit": "人",
           "group_names": [
             "蓮ノ空"
-          ],
-          "heart_colors": [
-            "heart00"
           ]
         },
         "action": "modify_required_hearts",

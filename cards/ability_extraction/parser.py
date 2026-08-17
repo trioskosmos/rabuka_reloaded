@@ -3433,6 +3433,13 @@ def _enrich_card_count_condition(result, text):
     from the raw text (exclude_self, negation, character names, cost limits,
     heart colors, location, target, etc.).
     """
+    # Heart colors leaked from effect text into condition are incorrect.
+    # The condition text "恰好で2人" has no heart icons; heart05 belongs only
+    # in the effect's gain_resource. If condition text has no {{heart_ icons
+    # but heart_colors is set, strip it — this is effect metadata, not a filter.
+    hc = result.get("heart_colors")
+    if hc and "{{heart_" not in text:
+        del result["heart_colors"]
     # Unit → card_type inference
     u = result.get("unit", "")
     if u == "人":
@@ -5324,6 +5331,9 @@ def _extract_generic_fields(condition, text):
     if hm:
         colors = sorted(set(f"heart{m.zfill(2)}" for m in hm))
         condition["heart_colors"] = colors
+        # DEBUG: trace heart_colors extraction
+        import sys
+        print(f"[HEART_DEBUG] text={text[:100]!r}", file=sys.stderr)
 
     # Energy count
     if "エネルギー" in text:
@@ -10321,6 +10331,10 @@ def _walk_propagate_heart_colors_to_conditions(d):
     # Q148: Skip blade-aggregate conditions — "ブレードの合計がN以上" is a blade total
     # check, not a heart filter. The heart_colors in the effect text is the modification
     # target (what gets decreased), not a condition filter (what triggers the effect).
+    import sys
+    if "heart_colors" in d and "condition" in d:
+        cond = d.get("condition", {})
+        print(f"[PROPAGATE_DEBUG] effect_text={d.get('text','')[:60]!r} cond_text={cond.get('text','')[:60]!r}", file=sys.stderr) if isinstance(cond, dict) else None
     if "heart_colors" in d and "condition" in d:
         cond = d["condition"]
         if isinstance(cond, dict) and "heart_colors" not in cond:
@@ -10337,12 +10351,17 @@ def _walk_propagate_heart_colors_to_conditions(d):
             elif "ブレード" in cond_text and cond.get("aggregate") == "total":
                 pass
             elif loc in ("stage", "hand", "live_card_zone", ""):
-                if cond_type == "or_condition":
-                    for sub in cond.get("conditions", []):
-                        if isinstance(sub, dict) and "heart_colors" not in sub:
-                            sub["heart_colors"] = d["heart_colors"]
-                elif cond_type in ("location_condition",):
-                    cond["heart_colors"] = d["heart_colors"]
+                # Only propagate heart_colors when the condition TEXT actually
+                # references heart icons. Otherwise it's effect metadata that
+                # leaks into a pure-count condition (e.g. "恰好で2人" has no
+                # heart icons but the effect has heart05).
+                if "{{heart_" in cond_text:
+                    if cond_type == "or_condition":
+                        for sub in cond.get("conditions", []):
+                            if isinstance(sub, dict) and "heart_colors" not in sub:
+                                sub["heart_colors"] = d["heart_colors"]
+                    elif cond_type in ("location_condition",):
+                        cond["heart_colors"] = d["heart_colors"]
 
 
 def _walk_cleanup_text(d, d_text):
@@ -11474,6 +11493,15 @@ def _process_post_fixes(data: Dict[str, Any], fix_stats: Dict[str, int]) -> None
             continue
         t = ability.get("triggerless_text", "")
         cond = eff.get("condition", {})
+
+        # ---- Strip leaked heart_colors from conditions ----
+        # heart_colors on a condition means "only count cards with this heart color".
+        # If heart_colors is present but the condition text has no {{heart_ icons,
+        # it's effect metadata that leaked into a pure-count condition. Strip it.
+        if isinstance(cond, dict) and cond.get("heart_colors"):
+            cond_text = cond.get("text", "")
+            if "{{heart_" not in cond_text:
+                del cond["heart_colors"]
 
         # ---- Cost: card_property enrichment ----
         cost = ability.get("cost")
