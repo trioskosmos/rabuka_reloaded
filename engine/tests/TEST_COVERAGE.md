@@ -19,16 +19,16 @@ A card with multiple abilities counts as **covered** if *any* of them is touched
 
 - **Unique abilities:** 936
 - **Distinct cards (base identity):** 771
-- **Cards referenced in tests:** 510 / 771  (510/771)
-- **Abilities on a referenced card:** 659 / 936
+- **Cards referenced in tests:** 517 / 771  (517/771)
+- **Abilities on a referenced card:** 667 / 936
 
 ## By trigger type
 
 | Category | Covered | Total | % |
 |---|---|---|---|
 | 登場 (Debut) | 182 | 269 | 182/269 |
-| 自動 (Auto) | 68 | 75 | 68/75 |
-| 起動 (Activation) | 73 | 96 | 73/96 |
+| 自動 (Auto) | 75 | 75 | 75/75 |
+| 起動 (Activation) | 74 | 96 | 74/96 |
 | 常時 (Constant) | 79 | 117 | 79/117 |
 | ライブ開始時 (LiveStart) | 183 | 268 | 183/268 |
 | ライブ成功時 (LiveSuccess) | 81 | 122 | 81/122 |
@@ -38,31 +38,31 @@ A card with multiple abilities counts as **covered** if *any* of them is touched
 | Category | Covered | Total | % |
 |---|---|---|---|
 | activate_ability | 1 | 1 | 1/1 |
-| change active/wait state | 45 | 63 | 45/63 |
+| change active/wait state | 47 | 63 | 47/63 |
 | choice | 16 | 22 | 16/22 |
 | choose_target_player | 2 | 6 | 2/6 |
 | conditional_alternative | 5 | 7 | 5/7 |
 | conditional_on_optional | 9 | 9 | 9/9 |
 | conditional_on_result | 17 | 19 | 17/19 |
-| draw | 26 | 44 | 26/44 |
+| draw | 27 | 44 | 27/44 |
 | draw_until_count | 2 | 2 | 2/2 |
 | gain_ability | 9 | 11 | 9/11 |
 | gain_ability_from_source | 2 | 2 | 2/2 |
-| gain heart/blade/score resource | 108 | 160 | 108/160 |
+| gain heart/blade/score resource | 109 | 160 | 109/160 |
 | invalidate_ability | 1 | 1 | 1/1 |
-| look at / select from deck | 39 | 72 | 39/72 |
+| look at / select from deck | 40 | 72 | 40/72 |
 | modify_cost | 14 | 16 | 14/16 |
 | modify_required_hearts | 12 | 16 | 12/16 |
 | modify_required_hearts_global | 3 | 3 | 3/3 |
 | modify live score | 55 | 73 | 55/73 |
 | modify_yell_count | 1 | 1 | 1/1 |
 | modify_yell_source | 1 | 1 | 1/1 |
-| move card between zones | 106 | 146 | 106/146 |
-| place_energy_under_member | 5 | 6 | 5/6 |
+| move card between zones | 107 | 146 | 107/146 |
+| place_energy_under_member | 6 | 6 | 6/6 |
 | play_baton_touch | 1 | 1 | 1/1 |
 | position change / area move | 16 | 19 | 16/19 |
 | restriction | 8 | 8 | 8/8 |
-| sequential compound effect | 146 | 217 | 146/217 |
+| sequential compound effect | 147 | 217 | 147/217 |
 | set_blade_count | 1 | 1 | 1/1 |
 | set_blade_type | 2 | 2 | 2/2 |
 | set_card_identity | 1 | 1 | 1/1 |
@@ -78,17 +78,17 @@ A card with multiple abilities counts as **covered** if *any* of them is touched
 | all_cost_comparison_condition | 1 | 1 | 1/1 |
 | appearance_condition | 9 | 13 | 9/13 |
 | card_blade_condition | 1 | 1 | 1/1 |
-| card_count_condition | 63 | 88 | 63/88 |
+| card_count_condition | 65 | 88 | 65/88 |
 | comparison_condition | 34 | 60 | 34/60 |
-| compound | 29 | 35 | 29/35 |
+| compound | 30 | 35 | 30/35 |
 | energy_state_condition | 0 | 2 | 0/2 |
 | group_condition | 28 | 43 | 28/43 |
 | highest_cost_on_stage_condition | 1 | 1 | 1/1 |
-| location_condition | 52 | 73 | 52/73 |
-| movement:area_move | 12 | 14 | 12/14 |
-| movement:baton_touch | 12 | 18 | 12/18 |
+| location_condition | 53 | 73 | 53/73 |
+| movement:area_move | 14 | 14 | 14/14 |
+| movement:baton_touch | 13 | 18 | 13/18 |
 | movement:energy_placed | 4 | 4 | 4/4 |
-| none | 384 | 545 | 384/545 |
+| none | 385 | 545 | 385/545 |
 | or_condition | 8 | 9 | 8/9 |
 | position_condition | 1 | 1 | 1/1 |
 | state_change_condition | 1 | 1 | 1/1 |
@@ -101,12 +101,12 @@ A card with multiple abilities counts as **covered** if *any* of them is touched
 |---|---|---|---|
 | PR | 36 | 52 | 36/52 |
 | bp1 | 49 | 56 | 49/56 |
-| bp2 | 51 | 68 | 51/68 |
+| bp2 | 53 | 68 | 53/68 |
 | bp3 | 50 | 66 | 50/66 |
-| bp4 | 59 | 88 | 59/88 |
+| bp4 | 60 | 88 | 60/88 |
 | bp5 | 96 | 134 | 96/134 |
-| bp6 | 56 | 82 | 56/82 |
-| bp7 | 76 | 111 | 76/111 |
+| bp6 | 57 | 82 | 57/82 |
+| bp7 | 80 | 111 | 80/111 |
 | cl1 | 2 | 10 | 2/10 |
 | pb1 | 90 | 137 | 90/137 |
 | pb2 | 25 | 43 | 25/43 |
@@ -388,19 +388,7 @@ These abilities' cards are **not referenced by any test**. They are the highest-
 | `PL!SP-pb2-037-N` | pb2 | sequential | none | {{toujyou.png/登場}}{{leftside.png/左サイド}}カードを2枚引き、手札を2枚控え室に置く。 |
 | `PL!SP-sd1-007-SD` | sd1 | move_cards | none | {{toujyou.png/登場}}{{icon_energy.png/E}}{{icon_energy.png/E}}支払ってもよい：自分の控え室から『Liella!』のメンバーカードを1枚手札に加える。 |
 
-### 自動  (7)
-
-| Card | Set | Action | Condition | Text |
-|---|---|---|---|---|
-| `PL!HS-bp2-013-N` | bp2 | look_and_select | card_count_condition | {{jidou.png/自動}}このメンバーがステージから控え室に置かれたとき、自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く。 |
-| `PL!HS-bp6-018-N` | bp6 | sequential | card_count_condition | {{jidou.png/自動}}このメンバーがステージから控え室に置かれたとき、手札を1枚控え室に置いてもよい。そうした場合、ライブ終了時まで、自分のステージにいるメンバー1人は、{{heart_05.png/heart |
-| `PL!N-bp7-019-N` | bp7 | place_energy_under_member | movement:baton_touch | {{jidou.png/自動}}このメンバーがステージから控え室に置かれたとき、このメンバーが『虹ヶ咲』のメンバーとバトンタッチしていた場合、自分のエネルギーデッキから、エネルギーカード1枚をこのバトンタッチで登場したメ |
-| `PL!N-bp7-022-N` | bp7 | change_state | compound | {{jidou.png/自動}}{{turn1.png/ターン1回}}ライブフェイズの間、自分のステージにいる『虹ヶ咲』のメンバー1人がウェイト状態になったとき、手札を1枚控え室に置いてもよい。そうしたとき、そのメンバー |
-| `PL!SP-bp2-020-N` | bp2 | gain_resource | location_condition | {{jidou.png/自動}}{{turn1.png/ターン1回}}エールにより公開された自分のカードの中にブレードハートを持つカードがないとき、ライブ終了時まで、{{heart_02.png/heart02}}を得る |
-| `PL!SP-bp4-007-R` | bp4 | move_cards | movement:area_move | {{jidou.png/自動}}{{turn1.png/ターン1回}}このメンバーがエリアを移動したとき、自分の控え室から、スコア3以下の『Liella!』のライブカードを1枚手札に加える。 |
-| `PL!SP-bp7-008-R` | bp7 | change_state | movement:area_move | {{jidou.png/自動}}ウェイト状態のこのメンバーがエリアを移動したとき、このメンバーをアクティブにする。 |
-
-### 起動  (23)
+### 起動  (22)
 
 | Card | Set | Action | Condition | Text |
 |---|---|---|---|---|
@@ -424,7 +412,6 @@ These abilities' cards are **not referenced by any test**. They are the highest-
 | `PL!SP-bp4-010-R` | bp4 | move_cards | none | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}このメンバーをウェイトにする：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。 |
 | `PL!SP-bp4-018-N` | bp4 | move_cards | none | {{kidou.png/起動}}このメンバーをステージから控え室に置く：自分の控え室から『Liella!』のカードを1枚手札に加える。 |
 | `PL!SP-bp5-021-N` | bp5 | move_cards | card_count_condition | {{kidou.png/起動}}このメンバーをステージから控え室に置く：自分のエネルギーが6枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。 |
-| `PL!SP-bp7-008-R` | bp7 | draw_card | none | {{kidou.png/起動}}このメンバーをウェイトにする：カードを1枚引く。 |
 | `PL!SP-bp7-022-N` | bp7 | position_change | none | {{kidou.png/起動}}{{turn1.png/ターン1回}}エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置く：このメンバーはポジションチェンジする。(このメンバーを今いるエリア以外のエリアに移動させ |
 | `PL!SP-sd2-006-SD2` | sd2 | move_cards | none | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}手札を1枚控え室に置く：自分の控え室から『Liella!』のライブ |
 
