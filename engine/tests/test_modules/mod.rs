@@ -48,6 +48,7 @@ pub mod bp7_like_a_treasure_optional_test;
 pub mod bp7_mirai_no_oto_optional_test;
 pub mod bp7_mia_optional_recover_test;
 pub mod bp7_auto_gap_test;
+pub mod bp7_constant_edge_case_test;
 pub mod bp7_mia_deck_to_discard_test;
 pub mod bp7_q269_mia_yell_no_trigger_test;
 pub mod bp7_mia_play_cost_reduction_test;

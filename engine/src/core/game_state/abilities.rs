@@ -1005,7 +1005,7 @@ impl GameState {
     }
 
     fn process_player_abilities(&mut self, raw_player_id: &str) {
-        self.process_player_abilities_depth(raw_player_id, 0)
+        self.process_player_abilities_depth(raw_player_id)
     }
 
     /// Recursive auto-ability resolution with a bounded re-entry depth.
@@ -1016,9 +1016,7 @@ impl GameState {
     /// runaway re-triggering would otherwise recurse without bound and overflow
     /// the stack. `max_auto_recursion` caps the depth as a last-resort safety
     /// net; well-formed games resolve in a handful of levels.
-    const MAX_AUTO_RECURSION: u8 = 64;
-
-    fn process_player_abilities_depth(&mut self, raw_player_id: &str, depth: u8) {
+    fn process_player_abilities_depth(&mut self, raw_player_id: &str) {
         let player_id = match raw_player_id {
             "player1" => "p1",
             "player2" => "p2",
@@ -1032,7 +1030,10 @@ impl GameState {
             );
         }
         let mut reprocess_counts: HashMap<(i16, usize), u8> = HashMap::default();
-        loop {
+        let mut batch_rerun = true;
+        while batch_rerun {
+            batch_rerun = false;
+            loop {
             if !self.ability_queue.is_idle() {
                 break;
             }
@@ -1231,19 +1232,13 @@ impl GameState {
             // Keep this_batch_triggered_ability_ids alive through the recursive
             // call so the same ability isn't enqueued twice from stale events.
             if !self.has_pending_choice() {
-                if depth + 1 > Self::MAX_AUTO_RECURSION {
-                    log::error!(
-                        "[PCA_RECURSION_LIMIT] auto-ability re-entry exceeded {} levels for player={}; aborting batch scan",
-                        Self::MAX_AUTO_RECURSION, player_id
-                    );
-                } else {
-                    self.process_player_abilities_depth(player_id, depth + 1);
-                }
+                batch_rerun = true;
             }
             self.batch_movements.clear();
             self.position_change_events.clear();
             self.this_batch_triggered_ability_ids.clear();
         }
+        } // end while batch_rerun
     }
 
     pub fn process_pending_auto_abilities(&mut self, raw_player_id: &str) {
