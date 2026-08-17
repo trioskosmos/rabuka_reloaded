@@ -10321,47 +10321,7 @@ def _walk_propagate_flags(d, d_ctx):
         d["same_name"] = True
 
 
-def _walk_propagate_heart_colors_to_conditions(d):
-    # Propagate heart_colors from effect into condition for collective heart checks.
-    # Only propagate when the condition's location is a zone that CAN have heart colors
-    # (stage, hand — NOT energy_zone, discard, energy_deck, success_live_zone which store colorless game pieces).
-    # Also skip card_count_condition (pure count check — heart colors don't apply).
-    # Skip check_self conditions (they check a specific card's location, not collective
-    # heart presence — heart_colors on the condition is effect metadata leakage).
-    # Q148: Skip blade-aggregate conditions — "ブレードの合計がN以上" is a blade total
-    # check, not a heart filter. The heart_colors in the effect text is the modification
-    # target (what gets decreased), not a condition filter (what triggers the effect).
-    import sys
-    if "heart_colors" in d and "condition" in d:
-        cond = d.get("condition", {})
-        print(f"[PROPAGATE_DEBUG] effect_text={d.get('text','')[:60]!r} cond_text={cond.get('text','')[:60]!r}", file=sys.stderr) if isinstance(cond, dict) else None
-    if "heart_colors" in d and "condition" in d:
-        cond = d["condition"]
-        if isinstance(cond, dict) and "heart_colors" not in cond:
-            cond_type = cond.get("type", "")
-            loc = cond.get("location", "")
-            cond_text = cond.get("text", "")
-            if (
-                cond_type == "card_count_condition"
-                and cond.get("source") != "preceding_moved"
-            ):
-                pass
-            elif cond.get("check_self"):
-                pass
-            elif "ブレード" in cond_text and cond.get("aggregate") == "total":
-                pass
-            elif loc in ("stage", "hand", "live_card_zone", ""):
-                # Only propagate heart_colors when the condition TEXT actually
-                # references heart icons. Otherwise it's effect metadata that
-                # leaks into a pure-count condition (e.g. "恰好で2人" has no
-                # heart icons but the effect has heart05).
-                if "{{heart_" in cond_text:
-                    if cond_type == "or_condition":
-                        for sub in cond.get("conditions", []):
-                            if isinstance(sub, dict) and "heart_colors" not in sub:
-                                sub["heart_colors"] = d["heart_colors"]
-                    elif cond_type in ("location_condition",):
-                        cond["heart_colors"] = d["heart_colors"]
+
 
 
 def _walk_cleanup_text(d, d_text):
@@ -10387,7 +10347,6 @@ def _walk(d, full_text, original_text, ctx_text=None):
     _walk_set_defaults(d, d_text, ct)
     _walk_propagate_position(d, d_ctx, d_text)
     _walk_propagate_flags(d, d_ctx)
-    _walk_propagate_heart_colors_to_conditions(d)
     _walk_cleanup_text(d, d_text)
 
     # Recurse into sub-actions
