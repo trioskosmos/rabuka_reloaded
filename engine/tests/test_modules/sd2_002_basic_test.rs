@@ -1,5 +1,6 @@
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
+use rabuka_engine::turn::TurnEngine;
 
 /// Test: PL!SP-sd2-002-SD2 (唐 可可)
 ///
@@ -72,5 +73,35 @@ fn sd2_002_kidou_position_change_grants_heart_bonus() {
     assert_eq!(
         heart_mod, 1,
         "keke should have heart06 ×1 modifier from area move auto-ability"
+    );
+}
+
+/// SCOPE (inclusive opponent effect): ab#1 text is "(対戦相手のカードの効果でも
+/// 発動する。)" — the area-move auto must ALSO fire when the OPPONENT's card
+/// effect moves keke, not just when her own ability does.
+#[test]
+fn sd2_002_opponent_effect_area_move_triggers_heart() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let keke = game.id("PL!SP-sd2-002-SD2");
+    game.state.player1.stage.stage[1] = keke;
+
+    // An OPPONENT's card effect moves keke (cause_player_id "p2").
+    game.state
+        .push_movement_event(keke, "stage", "stage", Some(keke), "p2", true);
+
+    let pid = game.state.player1.id.clone();
+    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    game.state.process_pending_auto_abilities(&pid);
+    game.drain_auto_ability_choices();
+
+    let heart_mod = game
+        .state
+        .mods
+        .get_heart_modifier(keke, HeartColor::Heart06);
+    assert_eq!(
+        heart_mod, 1,
+        "keke's area-move auto is inclusive of opponent effects (でも発動する) → must gain heart06 when the OPPONENT's effect moves her"
     );
 }
