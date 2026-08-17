@@ -34,6 +34,10 @@ const GROUP_LINES: usize = 2;
 const LINE_H: f32 = 16.0;
 /// Bottom edge (px) of the action list area on the top screen.
 const LIST_BOTTOM: f32 = 230.0;
+/// Height (px) of the game status header drawn at the top of the top screen.
+const HEADER_H: f32 = 50.0;
+/// Y at which body/content starts — just below the game header.
+const CONTENT_Y: f32 = HEADER_H + 2.0;
 
 /// Immutable context for one board-render frame. Bundles the game/UI state
 /// that every per-mode render function reads, so none of them need the huge
@@ -84,6 +88,13 @@ impl RenderCtx<'_> {
         } else {
             0
         }
+    }
+
+    /// Whether the game status header is visible this frame. It is hidden by
+    /// the full-screen modes (zone viewer, detail ability subview) that paint
+    /// their own background + title; everything else keeps it.
+    fn show_header(&self) -> bool {
+        self.zone_viewer.is_none() && !(self.detail_mode && self.choice_subview)
     }
 }
 
@@ -220,19 +231,35 @@ pub(crate) fn render_board(
         atlas,
     };
     render_game_header(&ctx);
-    let (text_page, content_y) = render_content_panel(&ctx, text_page, 52.0);
+    let (text_page, content_y) = render_content_panel(&ctx, text_page, CONTENT_Y);
     let (text_page, list_scroll) = render_choice_area(&ctx, text_page, list_scroll, content_y);
     render_board_highlights(&ctx);
     (text_page, list_scroll)
 }
 
 fn render_game_header(ctx: &RenderCtx) {
-    // Clear the top screen so old menu content doesn't overlap
+    // Clear the top screen so old menu content doesn't overlap.
+    // This must run every frame regardless of mode — it resets the C draw queue.
     unsafe {
         _3ds_top_clear();
     }
+    // The header itself is only drawn when the active mode keeps it. The
+    // full-screen modes (zone viewer, detail ability subview) paint their own
+    // background and title, so drawing the header over them is wrong.
+    if !ctx.show_header() {
+        return;
+    }
+    draw_game_header(ctx);
+}
+
+/// Paint the full game status header (opaque panel + status line + per-player
+/// stats). Kept separate so a mode that scrolls content underneath (card
+/// detail) can repaint the *entire* header on top afterwards — not just the
+/// top status line, which would otherwise wipe the per-player heart/blade
+/// stats drawn here.
+fn draw_game_header(ctx: &RenderCtx) {
     unsafe {
-        _3ds_top_queue_rect(0.0, 0.0, 400.0, 50.0, COL_PANEL);
+        _3ds_top_queue_rect(0.0, 0.0, 400.0, HEADER_H, COL_PANEL);
         _3ds_top_queue_text(
             4.0,
             2.0,
@@ -367,7 +394,9 @@ fn render_detail_mode(ctx: &RenderCtx, text_page: &mut usize) -> f32 {
     let detail_scroll_y = ctx.detail_scroll_y;
     let viewing_card = ctx.viewing_card;
     let atlas = ctx.atlas;
-    let mut content_y = 0.0;
+    // Default content starts below the game header so nothing drawn off the
+    // detail branches ever overlaps it.
+    let mut content_y = CONTENT_Y;
         // L pressed: show full ability text overlay
         if choice_subview {
             if let Some(cid) = viewing_card {
@@ -466,7 +495,7 @@ fn render_detail_mode(ctx: &RenderCtx, text_page: &mut usize) -> f32 {
                     let mut p = Painter::new();
                     // Background for the detail area (opaque so scrolled
                     // ability text never bleeds through behind the name)
-                    p.rect(Layer::Content, 0.0, 52.0, 400.0, 188.0, COL_CARD_OPAQUE);
+                    p.rect(Layer::Content, 0.0, CONTENT_Y, 400.0, 188.0, COL_CARD_OPAQUE);
                     // Card portrait (left column)
                     p.rect(
                         Layer::Content,
@@ -542,19 +571,22 @@ fn render_detail_mode(ctx: &RenderCtx, text_page: &mut usize) -> f32 {
                     if detail_scroll_y > 0.0 {
                         p.text(Layer::Header, arrow_x, 56.0, COL_MED, SCALE_SMALL, "^");
                     }
-                    // Game header redrawn on top of detail content: opaque
-                    // rect on the Cover layer, its text on the Header layer so
-                    // anything scrolled under it is hidden.
-                    p.rect(Layer::Cover, 0.0, 0.0, 400.0, 50.0, COL_PANEL);
+                    // Repaint the full game header on top of the detail content:
+                    // an opaque Cover rect hides anything scrolled up under the
+                    // header area, then the whole header (status + per-player
+                    // stats) is redrawn so it is never clobbered by the detail
+                    // body. Uses HEADER_H so it stays in sync with the header.
+                    p.rect(Layer::Cover, 0.0, 0.0, 400.0, HEADER_H, COL_PANEL);
                     p.text(
                         Layer::Header,
                         4.0,
                         2.0,
                         COL_GOLD,
-                        SCALE_BODY,
+                        SCALE_SMALL,
                         &header_status_line(ctx),
                     );
                     p.flush();
+                    draw_game_header(ctx);
                 }
             }
             content_y = if ability_end > 0.0 {
@@ -578,13 +610,15 @@ fn render_compact_or_banner(ctx: &RenderCtx) -> f32 {
     let has_image_choice = ctx.has_image_choice;
     let has_text_choice = ctx.has_text_choice;
     let is_ai_turn = ctx.is_ai_turn();
-    let mut content_y = 0.0;
+    // Default content starts below the game header so choice/action lists
+    // never draw their header rect over it.
+    let mut content_y = CONTENT_Y;
         if let Some(vcid) = viewing_card {
             // Compact card info overlay with stats
             if let Some(card) = gs.card_database.get_card(vcid) {
                 let stats = compute_card_stats(card, vcid, gs);
                 unsafe {
-                    _3ds_top_queue_rect(0.0, 52.0, 400.0, 76.0, COL_CARD_OPAQUE);
+                    _3ds_top_queue_rect(0.0, CONTENT_Y, 400.0, 76.0, COL_CARD_OPAQUE);
                     let btm_name = i18n::card_display_name(&card.name, current_lang());
                     _3ds_top_queue_text(
                         4.0,
@@ -634,7 +668,7 @@ fn render_compact_or_banner(ctx: &RenderCtx) -> f32 {
                 let n_lines = ab_lines.len();
                 let h = 22.0 + n_lines as f32 * 14.0;
                 unsafe {
-                    _3ds_top_queue_rect(0.0, 52.0, 400.0, h, COL_ABILITY);
+                        _3ds_top_queue_rect(0.0, CONTENT_Y, 400.0, h, COL_ABILITY);
                     render_text_with_icons(4.0, 54.0, &ab_lines[0], COL_LIGHT, SCALE_BODY);
                     for (li, line) in ab_lines.iter().enumerate().skip(1) {
                         render_text_with_icons(
@@ -646,7 +680,7 @@ fn render_compact_or_banner(ctx: &RenderCtx) -> f32 {
                         );
                     }
                 }
-                content_y = 52.0 + h + 6.0;
+                content_y = CONTENT_Y + h + 6.0;
             }
         }
     content_y
@@ -854,7 +888,7 @@ fn render_image_choice_grid(ctx: &RenderCtx, mut text_page: usize) -> usize {
                     .unwrap_or_default();
     
                 // ---- Render ability banner first ----
-                let mut grid_iy: f32 = 52.0;
+                let mut grid_iy: f32 = CONTENT_Y;
                 if !banner_text.is_empty() {
                     let ab_lines: Vec<String> = wrap_ability_text(&banner_text, 392.0, SCALE_BODY)
                         .lines()
@@ -864,18 +898,18 @@ fn render_image_choice_grid(ctx: &RenderCtx, mut text_page: usize) -> usize {
                     let n_lines = ab_lines.len();
                     let h = 16.0 + n_lines as f32 * 13.0;
                     unsafe {
-                        _3ds_top_queue_rect(0.0, 52.0, 400.0, h, COL_ABILITY);
+                    _3ds_top_queue_rect(0.0, CONTENT_Y, 400.0, h, COL_ABILITY);
                     }
                     for (li, line) in ab_lines.iter().enumerate() {
                         render_text_with_icons(
                             4.0,
-                            52.0 + 2.0 + li as f32 * 13.0,
+                            CONTENT_Y + 2.0 + li as f32 * 13.0,
                             line,
                             COL_LIGHT,
                             SCALE_BODY,
                         );
                     }
-                    grid_iy = 52.0 + h + 4.0;
+                    grid_iy = CONTENT_Y + h + 4.0;
                 }
                 // ---- Dynamic card sizing (matches waitroom) ----
                 let has_ability = gs.ability_queue.current_entry().is_some();
@@ -1120,7 +1154,7 @@ fn render_image_choice_grid(ctx: &RenderCtx, mut text_page: usize) -> usize {
                         let start_line = text_page * lpp;
                         let end_line = (start_line + lpp).min(ab_lines.len());
                         unsafe {
-                            _3ds_top_queue_rect(0.0, 52.0, 400.0, 198.0, 0xCC000000);
+                            _3ds_top_queue_rect(0.0, CONTENT_Y, 400.0, 198.0, 0xCC000000);
                             _3ds_top_queue_text(
                                 4.0,
                                 44.0,

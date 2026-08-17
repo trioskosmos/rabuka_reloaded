@@ -4185,6 +4185,8 @@ def _try_zone_placement(text):
             src = "energy_deck"
         elif "エネルギー置き場" in source_text:
             src = "energy_zone"
+        elif "デッキ" in source_text:
+            src = "deck"
         elif "手札" in source_text or "手元" in source_text:
             src = "hand"
         elif "ステージ" in source_text:

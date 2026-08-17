@@ -222,6 +222,7 @@ let allCardsArr = [];
 let abilityIndex = null;
 let abilityTextIndex = null;
 let filterActive = false;
+let abilityFilterCards = null; // array of card_no when filtered by a unique ability (?ability=)
 
 function iconImg(src, alt) {
   return `<img class="icon" src="${src}" alt="${alt}" loading="lazy">`;
@@ -316,6 +317,7 @@ function applyFilters() {
   const searchQ = (vals.search || '').trim().toLowerCase();
 
   let results = allCardsArr.filter(card => {
+    if (abilityFilterCards && !abilityFilterCards.includes(card.card_no)) return false;
     if (vals.type && vals.type !== 'All' && card.type !== vals.type) return false;
     if (vals.series && vals.series !== 'All' && card.series !== vals.series) return false;
     if (vals.unit && vals.unit !== 'All' && (card.unit || '') !== vals.unit) return false;
@@ -389,7 +391,7 @@ function applyFilters() {
   }
 
   let displayCards = results;
-  if (!vals.showAllRarities) {
+  if (!vals.showAllRarities && !abilityFilterCards) {
     const seen = new Set();
     const deduped = [];
     for (const card of results) {
@@ -647,9 +649,39 @@ async function init() {
     allCardsArr = Object.values(await cardsResp.json()).filter(c => c && c.card_no);
     if (abilitiesResp.ok) window._uniqueAbilities = (await abilitiesResp.json()).unique_abilities || [];
     populateFilters();
+    applyAbilityParam();
   } catch (err) {
     filtersEl.innerHTML = `<div style="color:#e94560;padding:10px;font-size:12px;">Failed: ${err.message}</div>`;
   }
+}
+
+function applyAbilityParam() {
+  const params = new URLSearchParams(location.search);
+  const abilityText = params.get('ability');
+  if (!abilityText) return;
+  const entry = (window._uniqueAbilities || []).find(a => a.full_text === abilityText);
+  if (!entry || !entry.cards || entry.cards.length === 0) {
+    toast('Ability not found');
+    return;
+  }
+  abilityFilterCards = entry.cards.map(c => c.split(' | ')[0].trim()).filter(Boolean);
+  filterActive = true;
+  const banner = document.createElement('div');
+  banner.id = 'ability-filter-banner';
+  banner.style.cssText =
+    'padding:8px 10px;margin-bottom:8px;background:#16213e;border:1px solid #e94560;' +
+    'border-radius:4px;font-size:11px;color:#c0c0d0;line-height:1.6;display:flex;align-items:center;gap:8px;';
+  banner.innerHTML =
+    `<div style="flex:1;">Filtered to <b>${abilityFilterCards.length}</b> card${abilityFilterCards.length !== 1 ? 's' : ''} sharing this unique ability.</div>` +
+    `<button id="clear-ability-filter" class="btn-opt" style="white-space:nowrap;">Clear</button>`;
+  const filterContainer = document.getElementById('filters');
+  filterContainer.parentNode.insertBefore(banner, filterContainer);
+  document.getElementById('clear-ability-filter').addEventListener('click', () => {
+    abilityFilterCards = null;
+    banner.remove();
+    clearAllFilters();
+  });
+  applyFilters();
 }
 
 // ══════════════════════════════════════════════

@@ -21,9 +21,22 @@ const FILLER: &str = "PL!-sd1-010-SD";
 /// + standby processing, then answers the conditional_on_optional.
 /// `accept`: true → option 1 (pay/do it), false → option 0 (skip).
 fn trigger_mia(game: &mut TestGame, mia: i16, moved: Vec<i16>, accept: bool) {
+    trigger_mia_from(game, mia, moved, "deck", accept);
+}
+
+/// Same as `trigger_mia` but the movement event uses an explicit source zone,
+/// so the test can verify the deck→discard trigger does NOT fire for other
+/// source zones (e.g. hand→discard).
+fn trigger_mia_from(
+    game: &mut TestGame,
+    mia: i16,
+    moved: Vec<i16>,
+    source: &str,
+    accept: bool,
+) {
     for &cid in &moved {
         game.state
-            .push_movement_event(cid, "deck", "discard", Some(mia), "p1", true);
+            .push_movement_event(cid, source, "discard", Some(mia), "p1", true);
     }
     game.state
         .trigger_auto_abilities_for_player(&game.state.player1.id.clone());
@@ -190,4 +203,46 @@ fn mia_does_not_fire_for_other_card() {
         "ab#0 must not fire when a different card goes to the discard"
     );
     assert_eq!(game.state.player1.hand.cards.len(), 1, "hand unchanged");
+}
+
+/// 6. The deck→discard trigger must NOT fire when ミア goes hand→discard.
+/// The Japanese text says デッキから控え室に置かれた (placed from deck to discard).
+/// Before the parser fix the `source` was dropped, so ANY movement into the
+/// discard fired ab#0 — which would let a ミア already in hand + one in discard
+/// loop forever. source="deck" now restricts it.
+#[test]
+fn mia_does_not_fire_on_hand_to_discard() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let mia = game.id(MIA);
+    let f1 = game.id(FILLER);
+    let f2 = game.new_id(FILLER);
+    game.state.player1.waitroom.cards.push(mia);
+    game.state.player1.hand.cards.push(f1);
+    game.state.player1.hand.cards.push(f2);
+    let hand_before = game.state.player1.hand.cards.len();
+    let wait_before = game.state.player1.waitroom.cards.len();
+
+    // ミア went hand→discard — NOT a valid trigger, must not fire ab#0.
+    trigger_mia_from(&mut game, mia, vec![mia], "hand", true);
+
+    assert!(
+        game.state.player1.waitroom.cards.contains(&mia),
+        "hand→discard is not the deck→discard trigger; ミア must stay in the discard"
+    );
+    assert!(
+        !game.state.player1.hand.cards.contains(&mia),
+        "hand→discard must not recover ミア to hand"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "hand→discard must not discard anything from hand"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        wait_before,
+        "waitroom unchanged (no self recovery)"
+    );
 }

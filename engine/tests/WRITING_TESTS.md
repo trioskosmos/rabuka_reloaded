@@ -527,7 +527,7 @@ fn test_activate_recover() {
 cargo test --test run_all 2>&1 | grep "test result"
 ```
 
-You should see `1159 passed; 0 failed`. The exact count varies as tests are added, but zero failures is the invariant.
+You should see a few thousand `passed; 0 failed`. The exact count varies as tests are added, but zero failures is the invariant.
 
 ---
 
@@ -629,7 +629,127 @@ in `cards/abilities.json`.
 `ModifyScore` or self-recover move is skipped when the preceding move moved nothing. Tests:
 `bp7_like_a_treasure_optional_test.rs`, `bp7_mia_optional_recover_test.rs`.
 
-### F. Reading a card's parsed effect during debugging
+### F. Firing a real ability deterministically (no live-phase scaffolding)
+
+Instead of threading a card through the live phase, you can enqueue a **specific
+real ability** on a card and drive it straight into the resolver. This is the
+most reliable way to test an effect in isolation while still using the real
+card + real ability:
+
+```rust
+use rabuka_engine::core::types::AbilityTrigger;
+
+fn fire_debut(game: &mut TestGame, card_no: &str, card_id: i16) {
+    let card = game.db.get_card(card_id).unwrap();
+    let ab = card.resolved_abilities()
+        .find(|a| a.triggers.as_deref() == Some("登場"))
+        .expect("card should have a 登場 ability");
+    let pid = game.state.player1.id.clone();
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ab.full_text), // ability_id, e.g. "PL!X-...-R_登場…"
+        AbilityTrigger::Debut,
+        pid.clone(),
+        Some(card.card_no.to_string()), // source_card_id (card_no)
+        Some(card_id),                  // explicit_card_id (the copy on the board)
+        None,                           // trigger_moved_cards
+        None,                           // triggering_member_id
+    );
+    game.state.activating_card = Some(card_id);
+    game.state.process_pending_auto_abilities(&pid);
+    game.drain_auto_ability_choices();
+}
+```
+
+`trigger_auto_ability`'s full signature (engine/src/core/game_state/abilities.rs:729):
+
+```
+trigger_auto_ability(
+    ability_id: String,                       // "<card_no>_<full_text>"
+    trigger_type: AbilityTrigger,             // Debut | Auto | LiveStart | LiveSuccess | …
+    player_id: String,                        // "p1"
+    source_card_id: Option<String>,           // the card_no string
+    explicit_card_id: Option<i16>,            // the copy id; None → found by card_no
+    trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
+    triggering_member_id: Option<i16>,
+)
+```
+
+The `ability_id` format is `"{card_no}_{full_text}"`. Match it against
+`card.resolved_abilities()` to get the exact string. See
+`bp7_q267_rinna_mill_refresh_test.rs` for a full example (fires RINA's real
+登場 mill-7). This is far less fragile than driving the live phase.
+
+### G. Reading back a zone-change (asserting source/destination)
+
+Zone-change autos ("…から…に置かれたとき") read `game.state.turn_movements`. The
+engine records a real movement with BOTH source and destination zones, and the
+condition filters on them. To assert which zone a card actually came from:
+
+```rust
+// The engine recorded a real deck→discard (or hand→discard) move:
+let mv = game.state.turn_movements.last().expect("a movement was recorded");
+assert_eq!(mv.moved_card_id, mia);
+assert_eq!(mv.source_zone, "deck");   // THE crux — was it really deck, not hand?
+assert_eq!(mv.dest_zone, "discard");
+```
+
+`MovementEvent` fields: `moved_card_id`, `source_zone`, `dest_zone`,
+`cause_card_id`, `cause_player_id`, `effect_only`, `timestamp`. When the
+condition's `source` is set (e.g. `deck`), the engine filters
+`turn_movements` by `source_zone`, so a hand→discard event (`source_zone="hand"`)
+must NOT match a `deck→discard` trigger. See
+`live_card_zone_movement_test.rs::source_dest_condition_matches_turn_movements`
+for the canonical read-back assertions.
+
+`turn_movements` is cleared at turn start (`clear_card_movement_tracking`), so
+capture baselines per-turn when a test crosses phases.
+
+### H. Multiple abilities in one test — driving the chain
+
+Cards with 2+ abilities (or a 登場 ability that itself spawns a second ability)
+produce a chain of heterogeneous choices. The robust idiom is a **guarded loop
+that dispatches on choice type**, never an unguarded sequence of
+`select_indices`:
+
+```rust
+fn drain_choices(game: &mut TestGame, want_recover: bool) {
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 40 {
+        guard += 1;
+        match game.get_pending_choice() {
+            Choice::SelectAutoAbility { .. } => game.select_indices(&[]), // trigger which autos
+            Choice::SelectTarget { target, options, .. }
+                if target == "conditional_optional" => {
+                    // "may do X, if you do then Y" — accept/skip
+                    game.select_choice_option(if want_recover { 1 } else { 0 });
+                }
+            Choice::SelectTarget { target, .. }
+                if target == "pay_optional_cost:skip_optional_cost" => {
+                    game.select_option(1); // pay the optional cost
+                }
+            Choice::SelectCard { count, .. } => {
+                if *count > 0 { game.select_indices(&[0]); } else { game.select_indices(&[]); }
+            }
+            Choice::SelectPosition { .. } => game.select_option(0),
+            _ => break, // unexpected type — stop so the guard never spins
+        }
+    }
+}
+```
+
+Key rules for multi-ability tests:
+- **Dispatch on `Choice` variant, not just zone string.** Use a `match
+  game.get_pending_choice() { … }` with a `_ => break` fallback (the WRITING_TESTS
+  §5 warning about infinite loops applies doubly here).
+- **`conditional_optional`** gates a follow-up action on the move actually
+  happening; options[1] = do it, options[0] = skip.
+- **`pay_optional_cost:skip_optional_cost`** is the "may pay X" cost gate.
+- **Assert the chain exhaustively when the order is deterministic**, but use the
+  guarded loop when the order/number of prompts varies.
+- To test one ability in a multi-ability card without the others interfering,
+  fire the specific ability via pattern F above.
+
+### I. Reading a card's parsed effect during debugging
 
 `cards/abilities.json` is grouped by unique ability text. Quick inspect with python:
 

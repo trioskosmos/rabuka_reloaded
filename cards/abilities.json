@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-15T12:05:41.698897",
+  "generated_at": "2026-08-17T14:47:11.875649",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "f9f25a7d",
+  "engine_commit": "cab333a6",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -6907,9 +6907,11 @@
           "text": "このカードがデッキから控え室に置かれたとき",
           "trigger_event": {
             "type": "zone_change",
+            "source": "deck",
             "destination": "discard"
           },
           "self_target": true,
+          "source": "deck",
           "destination": "discard"
         }
       }
@@ -37432,9 +37434,11 @@
           "text": "自分の{{live_success.png|ライブ成功時}}能力によって、カードが自分のデッキから自分の控え室に置かれる",
           "trigger_event": {
             "type": "zone_change",
+            "source": "deck",
             "destination": "discard"
           },
           "target": "self",
+          "source": "deck",
           "destination": "discard"
         },
         "group_names": [

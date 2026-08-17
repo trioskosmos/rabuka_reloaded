@@ -725,6 +725,28 @@ impl ZoneId {
             || (*self == ZoneId::Energy && *other == ZoneId::EnergyZone)
             || (*self == ZoneId::EnergyZone && *other == ZoneId::Energy)
     }
+
+    /// Whether this zone should satisfy a zone-change condition whose requested
+    /// source is `source`. Semantic aliasing, one-directional:
+    ///
+    /// - A condition asking for the generic `deck` matches any deck subzone
+    ///   (`Deck`, `DeckTop`, `DeckBottom`), because a card milled off the top
+    ///   of the deck is still "placed from the deck" (the ミア ab#0 case:
+    ///   "このカードがデッキから控え室に置かれたとき").
+    /// - A condition asking for a *specific* `deck_top` / `deck_bottom` matches
+    ///   only that exact subzone — a top-of-deck trigger must NOT fire for a
+    ///   bottom-of-deck move.
+    /// - `discard`/`waitroom` are the same zone.
+    pub fn matches_source(&self, source: &str) -> bool {
+        match ZoneId::from_str(source) {
+            ZoneId::Deck => matches!(*self, ZoneId::Deck | ZoneId::DeckTop | ZoneId::DeckBottom),
+            ZoneId::DeckTop => *self == ZoneId::DeckTop,
+            ZoneId::DeckBottom => *self == ZoneId::DeckBottom,
+            ZoneId::Discard => matches!(*self, ZoneId::Discard | ZoneId::Waitroom),
+            ZoneId::Waitroom => matches!(*self, ZoneId::Discard | ZoneId::Waitroom),
+            other => *self == other,
+        }
+    }
 }
 
 impl PartialEq<&str> for ZoneId {

@@ -390,8 +390,28 @@ pub(crate) fn handle_input(
             detail_mode = !detail_mode;
             detail_scroll_y = 0.0;
             if detail_mode && cur < acts_cache.len() {
-                if let Some(cid) = acts_cache[cur].parameters.as_ref().and_then(|p| p.card_id) {
-                    viewing_card = Some(cid);
+                // Resolve the real card id the same way the image grid does:
+                // for a SelectAutoAbility choice the action's card_id is an
+                // option index that must be mapped through opt_map.
+                let cid = acts_cache[cur].parameters.as_ref().and_then(|p| p.card_id);
+                let real = cid.and_then(|i| {
+                    let mut m = std::collections::HashMap::new();
+                    if let Some(c) = gs.get_pending_choice() {
+                        use rabuka_engine::ability::types::Choice;
+                        if let Choice::SelectAutoAbility { options, .. } = c {
+                            for (oi, opt) in options.iter().enumerate() {
+                                if let Some(card) = opt.card_id {
+                                    m.insert(oi as i16, card);
+                                }
+                            }
+                        }
+                    }
+                    m.get(&i).copied()
+                });
+                if let Some(rcid) = real {
+                    viewing_card = Some(rcid);
+                } else if let Some(ccid) = cid {
+                    viewing_card = Some(ccid);
                 }
             } else if !detail_mode {
                 viewing_card = None;

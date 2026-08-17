@@ -185,7 +185,7 @@ pub(crate) fn overlay_input(
                 let left = 0x00000020;
                 let right = 0x00000010;
                 if si.is_none() {
-                    // Summary list of snapshots.
+                    // Summary list of snapshots (newest first, row 0 = newest).
                     if keys & up != 0 && *cursor > 0 {
                         *cursor -= 1;
                         *redraw = true;
@@ -196,7 +196,7 @@ pub(crate) fn overlay_input(
                     }
                     if keys & a != 0 && n > 0 {
                         *summary_cursor = *cursor;
-                        *si = Some(*cursor);
+                        *si = Some(n - 1 - *cursor);
                         *tab = PerfTab::Overview;
                         *cursor = 0;
                         *redraw = true;
@@ -478,6 +478,34 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                 match tab {
                     PerfTab::Overview => unsafe {
                         let mut ly = 44.0;
+                        // Header line: player + turn + outcome.
+                        let passed = s.lives.iter().filter(|l| l.passed).count();
+                        let (out_col, out_txt) = perf_outcome(s);
+                        _3ds_top_queue_text(
+                            8.0,
+                            ly,
+                            COL_LIGHT,
+                            SCALE_BODY,
+                            format!(
+                                "{}{}  {}{} {}/{}\0",
+                                tl("Player"),
+                                s.player_id,
+                                tl("T"),
+                                s.turn,
+                                passed,
+                                s.lives.len()
+                            )
+                            .as_ptr(),
+                        );
+                        ly += 2.0;
+                        _3ds_top_queue_text(
+                            8.0,
+                            ly,
+                            out_col,
+                            SCALE_LARGE,
+                            format!("{}\0", out_txt).as_ptr(),
+                        );
+                        ly += 24.0;
                         let rows = [
                             (
                                 format!("{{{{icon_score.png|S}}}}{} {}", tl("Live Pts:"), s.base_score_total),
@@ -500,6 +528,10 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                                 0xFFFFFF88,
                             ),
                             (
+                                format!("{} {}", tl("Hearts:"), hearts_row(&s.total_hearts)),
+                                0xFF88DDFF,
+                            ),
+                            (
                                 format!("{} {}", tl("Surplus:"), hearts_row(&s.surplus_hearts)),
                                 0xFF88DDFF,
                             ),
@@ -511,19 +543,6 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                                 break;
                             }
                         }
-                        // Pass/fail per live summarized.
-                        let passed = s.lives.iter().filter(|l| l.passed).count();
-                        _3ds_top_queue_text(
-                            8.0,
-                            ly,
-                            if passed == s.lives.len() && !s.lives.is_empty() {
-                                0xFF88FF88
-                            } else {
-                                0xFFFF8888
-                            },
-                            SCALE_BODY,
-                            format!("{} {}/{} {}\0", tl("Lives:"), passed, s.lives.len(), tl("PASS")).as_ptr(),
-                        );
                     },
                     PerfTab::Live => {
                         let mut ly = 42.0;
@@ -689,27 +708,34 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                     }
                 }
             } else {
-                // Summary list.
+                // Summary list (newest first). Row 0 = newest snapshot.
                 let mut ly = 20.0;
                 let max_vis = 11usize;
                 let total = snapshots.len();
-                let display_start = total.saturating_sub(cursor + 1);
-                let display_end = display_start.saturating_sub(max_vis);
-                for idx in (display_end..display_start).rev() {
+                // Keep the cursor row on screen: clamp the top visible row.
+                let top_row = total
+                    .saturating_sub(cursor + 1)
+                    .min(cursor.saturating_sub(max_vis - 1));
+                for row in 0..max_vis {
+                    let idx = total.saturating_sub(top_row + row + 1);
                     if idx >= total {
                         continue;
                     }
                     let s = &snapshots[idx];
-                    let is_cur = idx == cursor;
+                    let is_cur = (top_row + row) == cursor;
                     let pc = perf_outcome(s).0;
+                    let passed = s.lives.iter().filter(|l| l.passed).count();
                     let label = format!(
-                        "{} {} score:{} fate:{}  {}{}",
+                        "{} {} {} {}/{} {} {}{}{}",
                         tl("T"),
                         s.turn,
+                        tl("score"),
                         s.total_score,
+                        tl("pass"),
+                        passed,
+                        s.lives.len(),
                         if s.success { tl("PASS") } else { tl("FAIL") },
-                        notes_str(s.note_icons, 0),
-                        blade_str(s.yell_count)
+                        blade_str(s.yell_count),
                     );
                     let base_col = if s.success { 0xFF88FF88 } else { 0xFFFF8888 };
                     let col = if is_cur { pc } else { base_col };
@@ -724,6 +750,9 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                         &label
                     };
                     unsafe {
+                        if is_cur {
+                            _3ds_top_queue_rect(2.0, ly - 2.0, 396.0, 15.0, 0xFF557755);
+                        }
                         _3ds_top_queue_text(
                             4.0,
                             ly,
@@ -731,6 +760,28 @@ pub(crate) fn render_overlay(gs: &GameState, overlay: Overlay, is_host: bool, at
                             SCALE_BODY,
                             format!("{}\0", truncated).as_ptr(),
                         );
+                    }
+                    // Second line for the selected snapshot: hearts + notes.
+                    if is_cur {
+                        unsafe {
+                            _3ds_top_queue_text(
+                                6.0,
+                                ly + 15.0,
+                                COL_LIGHT,
+                                SCALE_SMALL,
+                                format!(
+                                    "{}{} {}\0",
+                                    hearts_row(&s.total_hearts),
+                                    notes_str(s.note_icons, 0),
+                                    tl("surplus")
+                                        .to_string()
+                                        + " "
+                                        + &hearts_row(&s.surplus_hearts),
+                                )
+                                .as_ptr(),
+                            );
+                        }
+                        ly += 6.0;
                     }
                     ly += 17.0;
                 }

@@ -225,17 +225,19 @@ pub fn render_card_detail(
         // Layout: 400x240 top screen. Header bar spans full width; the card
         // portrait fills the left column (nearly the full height below the
         // header) and the ability text sits in the right column.
-        const HEADER_H: f32 = 40.0;
-        let card_h = 240.0 - HEADER_H - 12.0; // ~188px tall
+        // NOTE: this is the card-detail header for the grid/zone viewer, NOT
+        // the in-game status header (render.rs HEADER_H = 50). Keep separate.
+        const CARD_DETAIL_HEADER_H: f32 = 40.0;
+        let card_h = 240.0 - CARD_DETAIL_HEADER_H - 12.0; // ~188px tall
         let card_w = card_h * 0.711; // ~134px portrait
         let card_x = 6.0;
-        let card_y = HEADER_H + 6.0; // 46
+        let card_y = CARD_DETAIL_HEADER_H + 6.0; // 46
         let text_x = card_x + card_w + 10.0; // ~150
         let text_w = 400.0 - text_x - 6.0; // ~244
 
         let mut p = Painter::new();
         p.rect(Layer::Background, 0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-        p.rect(Layer::Content, 0.0, 0.0, 400.0, HEADER_H, COL_CARD_OPAQUE);
+        p.rect(Layer::Content, 0.0, 0.0, 400.0, CARD_DETAIL_HEADER_H, COL_CARD_OPAQUE);
         let display_name = i18n::card_display_name(&card.name, current_lang());
         let name_label =
             crate::ui::text::truncate_to_width(&format!("[{}] ", card.card_no), &display_name, SCALE_LARGE, 392.0);
@@ -259,7 +261,7 @@ pub fn render_card_detail(
             ),
         );
         // Content background below the header
-        p.rect(Layer::Content, 0.0, HEADER_H, 400.0, 240.0 - HEADER_H, COL_CARD_OPAQUE);
+        p.rect(Layer::Content, 0.0, CARD_DETAIL_HEADER_H, 400.0, 240.0 - CARD_DETAIL_HEADER_H, COL_CARD_OPAQUE);
         // Card portrait (left column)
         p.rect(Layer::Content, card_x - 2.0, card_y - 2.0, card_w + 4.0, card_h + 4.0, COL_GOLD);
         if let Some((atl, idx)) = atlas.lookup(&card.card_no) {

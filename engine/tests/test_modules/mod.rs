@@ -47,6 +47,7 @@ pub mod bp7_watanabe_select_self_and_other_test;
 pub mod bp7_like_a_treasure_optional_test;
 pub mod bp7_mirai_no_oto_optional_test;
 pub mod bp7_mia_optional_recover_test;
+pub mod bp7_mia_deck_to_discard_test;
 pub mod bp7_q269_mia_yell_no_trigger_test;
 pub mod bp7_mia_play_cost_reduction_test;
 pub mod bp7_q271_colorful_dreams_test;

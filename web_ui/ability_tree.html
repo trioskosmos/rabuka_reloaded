@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rabuka ! | Ability Tree</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; }
+
+#app { position: fixed; inset: 0; display: flex; flex-direction: column; }
+
+#topbar {
+  display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+  background: #16213e; border-bottom: 1px solid #0f3460; flex-shrink: 0;
+}
+#topbar h1 { font-size: 14px; color: #e94560; display: flex; align-items: center; gap: 6px; }
+#topbar h1 span { font-size: 16px; }
+#topbar .spacer { flex: 1; }
+#search-bar { display: flex; gap: 4px; }
+#search-bar input {
+  width: 280px; padding: 6px 8px; background: #1a1a2e; color: #e0e0e0;
+  border: 1px solid #0f3460; border-radius: 4px; font-size: 12px; outline: none;
+}
+#search-bar input:focus { border-color: #e94560; }
+button.nav-btn {
+  padding: 6px 10px; background: #1a1a2e; color: #8888a0; border: 1px solid #0f3460;
+  border-radius: 3px; font-size: 11px; cursor: pointer; white-space: nowrap;
+}
+button.nav-btn:hover { border-color: #555; color: #ccc; }
+button.nav-btn.primary { background: #e94560; color: #fff; border-color: #e94560; }
+
+#body { flex: 1; display: flex; min-height: 0; }
+
+#sidebar {
+  width: 380px; display: flex; flex-direction: column; flex-shrink: 0;
+  background: #16213e; border-right: 1px solid #0f3460; min-height: 0;
+}
+#sidebar-head {
+  padding: 8px 10px; border-bottom: 1px solid #0f3460; flex-shrink: 0;
+}
+#stats-bar { font-size: 10px; color: #808090; }
+#path-crumb {
+  font-size: 11px; color: #8888a0; display: flex; align-items: center;
+  gap: 3px; flex-wrap: wrap; margin-top: 6px; min-height: 18px;
+}
+#path-crumb .crumb { cursor: pointer; padding: 1px 5px; border-radius: 3px; }
+#path-crumb .crumb:hover { background: #0f3460; color: #fff; }
+#path-crumb .crumb.current { color: #e94560; cursor: default; }
+#path-crumb .crumb.current:hover { background: transparent; }
+#path-crumb .crumb-sep { color: #505060; }
+
+#tree { flex: 1; overflow-y: auto; padding: 6px 8px 12px; }
+#tree::-webkit-scrollbar { width: 5px; }
+#tree::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 2px; }
+
+/* Tree nodes */
+.tnode { position: relative; }
+.tnode-row {
+  display: flex; align-items: center; gap: 5px; padding: 3px 5px; border-radius: 3px;
+  cursor: pointer; font-size: 12px;
+}
+.tnode-row:hover { background: #0f3460; }
+.tnode-row.selected { background: #e94560; color: #fff; }
+.tnode-row.selected .twist { color: #fff; }
+.tnode-row.selected .tcount { background: rgba(255,255,255,0.25); color: #fff; }
+.tnode .twist { width: 14px; color: #808090; font-size: 10px; text-align: center; flex-shrink: 0; }
+.tnode .tlabel { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tnode .tcount { font-size: 10px; color: #808090; background: #0f3460; border-radius: 8px; padding: 0 6px; flex-shrink: 0; }
+.tnode .badge { font-size: 9px; padding: 1px 5px; border-radius: 8px; color: #fff; flex-shrink: 0; }
+.tnode-children { margin-left: 12px; border-left: 1px solid #26304d; padding-left: 6px; }
+
+/* leaf abilities in tree */
+.tleaf { margin: 4px 0 8px; }
+.tleaf-row {
+  display: flex; align-items: flex-start; gap: 5px; padding: 5px; border-radius: 3px;
+  cursor: pointer; font-size: 11px;
+}
+.tleaf-row:hover { background: #0f3460; }
+.tleaf-row.selected { background: #e94560; color: #fff; }
+.tleaf-row.selected .tl-text { color: #fff; }
+.tleaf .tl-text { flex: 1; color: #c0c0d0; line-height: 1.5; }
+.tleaf .tl-thumbs { display: flex; flex-wrap: wrap; gap: 3px; margin: 5px 0 0 19px; }
+.tleaf .mini {
+  width: 40px; border-radius: 2px; overflow: hidden; cursor: pointer;
+  border: 1px solid #0f3460; background: #0f3460; flex-shrink: 0;
+}
+.tleaf .mini img { width: 100%; display: block; }
+.tleaf .mini:hover { border-color: #e94560; }
+
+/* Detail panel */
+#detail-panel { flex: 1; overflow-y: auto; padding: 14px 18px; }
+#detail-panel::-webkit-scrollbar { width: 6px; }
+#detail-panel::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+#empty-state { color: #505060; font-size: 13px; margin-top: 40px; text-align: center; }
+
+.detail-head { margin-bottom: 12px; }
+.detail-head .dh-title { font-size: 15px; color: #fff; font-weight: 600; margin-bottom: 4px; }
+.detail-head .dh-sub { font-size: 11px; color: #808090; }
+
+.section { margin-bottom: 14px; }
+.section-title {
+  font-size: 11px; color: #e94560; text-transform: uppercase; letter-spacing: 0.4px;
+  margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #0f3460;
+}
+.ability-entry { background: #0d1b2a; border: 1px solid #0f3460; border-radius: 6px; padding: 12px; margin-bottom: 10px; }
+.ability-entry .ae-text { font-size: 13px; color: #e0e0e0; line-height: 1.7; margin-bottom: 8px; }
+.ability-entry .ae-text img.tt-icon { height: 1.1em; vertical-align: middle; }
+.ability-entry .ae-meta { font-size: 11px; color: #8888a0; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.ability-entry .ae-meta .tag b { color: #e94560; }
+.ability-entry .ae-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.ability-entry .card-full { width: 200px; border-radius: 4px; overflow: hidden; cursor: pointer; border: 1px solid #0f3460; background: #0f3460; }
+.ability-entry .card-full:hover { border-color: #e94560; }
+.ability-entry .card-full img { width: 100%; display: block; }
+.ability-entry .card-full .cf-name { padding: 3px 5px; font-size: 10px; color: #b0b0c0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ability-entry .ae-actions { margin-top: 8px; display: flex; gap: 6px; }
+
+.card-viewer {
+  background: #0d1b2a; border: 1px solid #0f3460; border-radius: 6px;
+  padding: 12px; margin-bottom: 10px; display: flex; justify-content: center;
+}
+.card-viewer img { max-width: 280px; width: 100%; border-radius: 4px; }
+
+.raw-block {
+  background: #0d1b2a; border: 1px solid #0f3460; border-radius: 6px;
+  padding: 10px; font-family: 'Consolas', 'Menlo', monospace; font-size: 11px;
+  color: #c0d0e0; overflow-x: auto; white-space: pre; line-height: 1.5;
+}
+.raw-block .rkey { color: #e94560; }
+.raw-block .rstr { color: #8be08b; }
+.raw-block .rnum { color: #e0a050; }
+.raw-block .rbool { color: #c080ff; }
+.raw-block .rnull { color: #8888a0; font-style: italic; }
+
+#toast {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  background: #e94560; color: #fff; padding: 6px 16px; border-radius: 5px;
+  font-size: 11px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 99999;
+}
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="topbar">
+    <h1><span>&#127795;</span> Ability Tree</h1>
+    <div class="spacer"></div>
+    <div id="search-bar">
+      <input type="search" id="search" placeholder="Search ability text or card...">
+    </div>
+    <button class="nav-btn" id="collapse-all">Collapse</button>
+  </div>
+  <div id="body">
+    <aside id="sidebar">
+      <div id="sidebar-head">
+        <div id="stats-bar"></div>
+        <div id="path-crumb"></div>
+      </div>
+      <div id="tree"></div>
+    </aside>
+    <div id="detail-panel">
+      <div id="empty-state">&#128270; Click a branch to drill in, or a leaf ability to see its details.</div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════ Data ═══════════════
+let abilities = [];
+let cardNames = {};
+let toastTimeout = null;
+const collapsed = new Set(); // node keys (action@sub@trigger path) currently collapsed
+
+function enrichText(text) {
+  if (!text) return '';
+  return text.replace(/\{\{(.*?)\|(.*?)\}\}/g, (match, img, alt) => {
+    const src = img.endsWith('.png') && !img.includes('/') ? 'img/texticon/' + img : 'img/' + img;
+    let style = 'height:1.1em;vertical-align:middle;';
+    if (img.includes('live_start') || img.includes('live_success')) style += 'min-width:3.2em;';
+    return `<img class="tt-icon" src="${src}" alt="${alt}" style="${style}">`;
+  });
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => toast('Copied: ' + text)).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('Copied: ' + text);
+  });
+}
+
+// ═══════════════ Decision-tree build ═══════════════
+// Flatten an effect into an ordered list of descriptive step-labels, one per
+// action in the sequence. `sequential`/`compound`/look+select/conditional all
+// expand into their ordered sub-actions so they are NOT treated as a category.
+function effectSteps(eff, out) {
+  out = out || [];
+  if (!eff || typeof eff !== 'object') return out;
+  if (eff.action) {
+    if ((eff.action === 'sequential' || eff.action === 'compound') && Array.isArray(eff.actions) && eff.actions.length) {
+      eff.actions.forEach(s => effectSteps(s, out));
+    } else if (eff.look_action || eff.select_action) {
+      if (eff.look_action) effectSteps(eff.look_action, out);
+      if (eff.select_action) effectSteps(eff.select_action, out);
+      if (!eff.look_action && !eff.select_action) out.push(stepLabel(eff));
+    } else if (eff.primary_effect || eff.alternative_effect) {
+      if (eff.primary_effect) effectSteps(eff.primary_effect, out);
+      if (eff.alternative_effect) effectSteps(eff.alternative_effect, out);
+    } else if (eff.followup_action) {
+      if (eff.followup_action) effectSteps(eff.followup_action, out);
+      out.push(stepLabel(eff));
+    } else {
+      out.push(stepLabel(eff));
+    }
+  } else {
+    if (eff.look_action) effectSteps(eff.look_action, out);
+    if (eff.select_action) effectSteps(eff.select_action, out);
+  }
+  return out;
+}
+
+const ZONE_NAMES = {
+  deck:'deck', deck_top:'deck top', deck_bottom:'deck bottom', hand:'hand',
+  stage:'stage', discard:'discard', waitroom:'waitroom', energy_deck:'energy deck',
+  energy_zone:'energy zone', energy:'energy', under_member:'under member',
+  revealed_cards:'revealed cards', selected_cards:'selected cards', success_live_zone:'success live zone',
+  live_card_zone:'live zone', empty_area:'empty area', same_area:'same area', looked_at:'looked at'
+};
+const RESOURCE_NAMES = { blade:'blade', heart:'heart', yell:'yell', shield:'shield', energy:'energy' };
+
+function stepLabel(e) {
+  const a = e.action || '?';
+  const bits = [];
+  if (e.resource && RESOURCE_NAMES[e.resource]) bits.push(RESOURCE_NAMES[e.resource]);
+  else if (e.resource) bits.push(e.resource);
+  if (e.source) bits.push('from ' + (ZONE_NAMES[e.source] || e.source));
+  if (e.destination) bits.push('to ' + (ZONE_NAMES[e.destination] || e.destination));
+  if (e.card_type) bits.push(e.card_type.replace('_card',''));
+  if (e.count != null && e.count !== 1) bits.push('x' + e.count);
+  else if (e.count === 1 && (a === 'draw_card')) bits.push('x1');
+  if (e.state_change) bits.push(e.state_change);
+  if (e.operation) bits.push(e.operation);
+  if (e.value != null) bits.push(e.value);
+  return bits.length ? (a + ' (' + bits.join(' ') + ')') : a;
+}
+
+function costLabel(ab) {
+  if (!ab.cost) return 'no cost';
+  const c = ab.cost;
+  const bits = [];
+  if (c.type === 'move_cards') {
+    bits.push('from ' + (ZONE_NAMES[c.source] || c.source), 'to ' + (ZONE_NAMES[c.destination] || c.destination));
+    if (c.count != null) bits.push('x' + c.count);
+  } else if (c.type === 'pay_energy') {
+    bits.push('energy x' + (c.count != null ? c.count : c.energy != null ? c.energy : '?'));
+  } else if (c.type === 'change_state') {
+    bits.push(c.state_change || 'state');
+  } else {
+    bits.push(c.type);
+  }
+  if (c.optional) bits.push('optional');
+  return (c.type || 'cost') + (bits.length ? ' (' + bits.join(' ') + ')' : '');
+}
+
+// Build a decision trie. Each ability is inserted as a path:
+//   step1 -> step1Params? -> step2 -> ... -> TRIGGER -> COST -> leaves
+// Nodes are { count, children: Map<label, node>, leaves: [ability], kind }
+function buildTree() {
+  const root = { count: 0, children: new Map(), leaves: [], kind: 'root' };
+  function descend(node, label) {
+    if (!node.children.has(label)) node.children.set(label, { count: 0, children: new Map(), leaves: [], kind: 'node' });
+    const child = node.children.get(label);
+    child.count++;
+    return child;
+  }
+  for (const ab of abilities) {
+    const steps = effectSteps(ab.effect || {});
+    let cur = root; root.count++;
+    if (steps.length === 0) { cur.leaves.push(ab); continue; }
+    for (let i = 0; i < steps.length; i++) {
+      cur = descend(cur, steps[i]);
+    }
+    cur = descend(cur, 'Trigger: ' + (ab.triggers || 'none').replace(/\s+/g, ' '));
+    cur = descend(cur, 'Cost: ' + costLabel(ab));
+    cur.leaves.push(ab);
+  }
+  return root;
+}
+
+function subtreeSize(node) {
+  let n = node.leaves ? node.leaves.length : 0;
+  if (node.children) for (const c of node.children.values()) n += subtreeSize(c);
+  return n;
+}
+
+const ACTION_COLORS = {
+  move_cards:'#3b82f6', draw_card:'#8b5cf6', gain_resource:'#e94560',
+  change_state:'#22c55e', gain_ability:'#f59e0b', sequential:'#14b8a6',
+  look_at:'#06b6d4', reveal:'#10b981', select:'#6366f1', select_cards:'#6366f1',
+  pay_energy:'#f43f5e', modify_score:'#eab308', look_and_select:'#0ea5e9',
+  choice:'#a855f7', restriction:'#78716c', default:'#64748b'
+};
+function actionColor(a) { return ACTION_COLORS[a] || ACTION_COLORS.default; }
+function cardId(s) { return s.split(' | ')[0].trim(); }
+function cardName(s) { return (s.split(' | ')[1] || '').trim(); }
+
+function miniThumbs(cards) {
+  return cards.map(c => {
+    const id = cardId(c);
+    return `<div class="mini" data-card="${id}" title="${id}"><img src="img/cards_webp/${id}.webp" alt="" loading="lazy" onerror="this.src='img/texticon/lltcg-back.png'"></div>`;
+  }).join('');
+}
+
+// ═══════════════ Render tree ═══════════════
+const treeEl = document.getElementById('tree');
+const pathEl = document.getElementById('path-crumb');
+const detailEl = document.getElementById('detail-panel');
+let selectedId = null;
+let idCounter = 0;
+let nodeIndex = {}; // id -> {kind, node, label, path}
+
+function nodeId() { return 'n' + (++idCounter); }
+
+function buildRow(id, twist, badgeHtml, label, count) {
+  return `<div class="tnode-row" data-id="${id}">
+    <span class="twist">${twist}</span>${badgeHtml}
+    <span class="tlabel" title="${label}">${label}</span>
+    <span class="tcount">${count}</span>
+  </div>`;
+}
+
+function renderLeaf(container, node) {
+  node.leaves.forEach(ab => {
+    const id = nodeId();
+    nodeIndex[id] = { kind: 'ability', node: node, label: ab.full_text || '', path: node._path };
+    const wrap = document.createElement('div');
+    wrap.className = 'tleaf';
+    wrap.innerHTML = `
+      <div class="tleaf-row" data-id="${id}">
+        <span class="twist">&#9656;</span>
+        <span class="tl-text">${enrichText(ab.full_text)}</span>
+      </div>
+      <div class="tl-thumbs">${miniThumbs(ab.cards || [])}</div>`;
+    container.appendChild(wrap);
+  });
+}
+
+// Recursively render a decision trie. Default: all branches open.
+function renderNode(container, node, level, path) {
+  const entries = [...node.children.entries()].sort((a, b) => b[1].count - a[1].count);
+  for (const [label, child] of entries) {
+    const id = nodeId();
+    const childPath = path.concat([label]);
+    child._path = childPath;
+    const childCount = subtreeSize(child);
+    const isCollapsed = collapsed.has(childPath.join('|'));
+    // step rows (the current action) get an accent if this is a leaf in the sequence
+    const badge = /^(Trigger:|Cost:)/.test(label)
+      ? `<span class="badge" style="background:${/^Trigger:/.test(label) ? '#8b5cf6' : '#f59e0b'}">${label.split(': ')[0]}</span>`
+      : '';
+    const showLabel = badge ? label.split(': ')[1] : label;
+
+    const div = document.createElement('div');
+    div.className = 'tnode';
+    div.innerHTML = buildRow(id, '\u25BE', badge, showLabel, childCount);
+    const childrenEl = document.createElement('div');
+    childrenEl.className = 'tnode-children';
+    childrenEl.style.display = isCollapsed ? 'none' : 'block';
+    nodeIndex[id] = { kind: 'branch', node: child, label: showLabel, path: childPath, rawLabel: label };
+    pathToId[childPath.join('|')] = id;
+    div.appendChild(childrenEl);
+
+    if (child.leaves && child.children.size === 0) {
+      renderLeaf(childrenEl, child);
+    } else {
+      renderNode(childrenEl, child, level + 1, childPath);
+    }
+    container.appendChild(div);
+  }
+}
+
+function updatePath() {
+  const node = nodeIndex[selectedId];
+  if (!node) { pathEl.innerHTML = ''; return; }
+  let html = '<span class="crumb current" data-id="' + selectedId + '">' + escapeHtml(node.path.join(' / ')) + '</span>';
+  pathEl.innerHTML = html;
+}
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ═══════════════ Detail rendering ═══════════════
+function rawJson(obj) {
+  return syntaxHighlight(JSON.stringify(obj, null, 2));
+}
+function syntaxHighlight(json) {
+  return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false)\b|\bnull\b|-?\d+(?:\.\d+)?)/g, (m) => {
+    let cls = 'rnum';
+    if (/^"/.test(m)) cls = /:$/.test(m) ? 'rkey' : 'rstr';
+    else if (/true|false/.test(m)) cls = 'rbool';
+    else if (/null/.test(m)) cls = 'rnull';
+    return '<span class="' + cls + '">' + m + '</span>';
+  });
+}
+
+function abilityEntryHtml(ab) {
+  const meta = [];
+  if (ab.triggers) meta.push(`<span class="tag">Trigger <b>${ab.triggers}</b></span>`);
+  if (ab.cost) meta.push(`<span class="tag">Cost <b>${ab.cost.type || 'n/a'}</b></span>`);
+  if (ab.use_limit != null) meta.push(`<span class="tag">Use limit <b>${ab.use_limit}</b></span>`);
+  meta.push(`<span class="tag">Cards <b>${(ab.cards || []).length}</b></span>`);
+  const cards = (ab.cards || []).map(c => {
+    const id = cardId(c);
+    const name = cardName(c) || cardNames[id] || id;
+    return `<div class="card-full" data-card="${id}" title="${id}">
+      <img src="img/cards_webp/${id}.webp" alt="${name}" loading="lazy" onerror="this.src='img/texticon/lltcg-back.png'">
+      <div class="cf-name">${name}</div>
+    </div>`;
+  }).join('');
+  const q = encodeURIComponent(ab.full_text || '');
+  return `<div class="ability-entry">
+    <div class="ae-text">${enrichText(ab.full_text)}</div>
+    <div class="ae-meta">${meta.join('')}</div>
+    <div class="ae-grid">${cards}</div>
+    <div class="ae-actions">
+      <button class="nav-btn primary" data-browse="${q}">Show all in Browser</button>
+    </div>
+  </div>`;
+}
+
+function showBranch(node) {
+  detailEl.innerHTML = '';
+  if (!node) { detailEl.innerHTML = '<div id="empty-state">Select a node.</div>'; return; }
+  const n = node.node;
+  const total = subtreeSize(n);
+  const title = node.path.join(' / ');
+  detailEl.innerHTML = `
+    <div class="detail-head">
+      <div class="dh-title">${escapeHtml(node.label)}</div>
+      <div class="dh-sub">${escapeHtml(title)} &middot; ${total} abilit${total === 1 ? 'y' : 'ies'}</div>
+    </div>`;
+
+  // Direct leaf abilities (if this node is a leaf bucket)
+  if (n.leaves && n.leaves.length > 0) {
+    const abEl = document.createElement('div');
+    abEl.className = 'section';
+    abEl.innerHTML = `<div class="section-title">Abilities (${n.leaves.length})</div>`;
+    const list = document.createElement('div');
+    n.leaves.forEach(ab => {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = abilityEntryHtml(ab);
+      list.appendChild(wrap);
+    });
+    abEl.appendChild(list);
+    detailEl.appendChild(abEl);
+  }
+
+  // Child branches (drill deeper)
+  const children = [...n.children.entries()].sort((a, b) => b[1].count - a[1].count);
+  if (children.length > 0) {
+    let chips = '<div class="section"><div class="section-title">Drill deeper</div><div style="display:flex;flex-wrap:wrap;gap:6px;">';
+    children.forEach(([label, child]) => {
+      const childId = pathToId[child._path.join('|')];
+      if (!childId) return;
+      const badge = /^(Trigger:|Cost:)/.test(label)
+        ? `<span style="color:${/^Trigger:/.test(label) ? '#8b5cf6' : '#f59e0b'}">${label.split(': ')[0]}:</span> `
+        : '';
+      const showLabel = badge ? label.split(': ')[1] : label;
+      chips += `<button class="nav-btn" data-jump="${childId}">${escapeHtml(badge + showLabel)} (${subtreeSize(child)})</button>`;
+    });
+    chips += '</div></div>';
+    detailEl.innerHTML += chips;
+  }
+
+  if (n.leaves && n.leaves.length === 0 && children.length === 0) {
+    detailEl.innerHTML += '<div style="color:#808090;font-size:12px;">No abilities at this level.</div>';
+  }
+}
+
+// map a path -> node id (fallback: find by stored path)
+let pathToId = {};
+function nodeIndexForPath(path) {
+  const key = path.join('|');
+  if (pathToId[key]) return pathToId[key];
+  // fallback scan
+  for (const id in nodeIndex) if (nodeIndex[id].path.join('|') === key) return id;
+  return null;
+}
+
+function showAbility(node) {
+  const ab = node.node[0];
+  detailEl.innerHTML = `
+    <div class="detail-head">
+      <div class="dh-title">Unique Ability</div>
+      <div class="dh-sub">${escapeHtml(node.path.join(' / '))} &middot; ${(ab.cards || []).length} cards</div>
+    </div>
+    <div class="section">
+      <div class="section-title">Cards</div>
+      <div>${abilityEntryHtml(ab)}</div>
+    </div>
+    <div class="section">
+      <div class="section-title">Parsed JSON</div>
+      <div class="raw-block">${rawJson(ab)}</div>
+    </div>`;
+}
+
+function showCard(cardNo) {
+  const name = cardNames[cardNo] || cardNo;
+  detailEl.innerHTML = `
+    <div class="detail-head">
+      <div class="dh-title">${escapeHtml(name)}</div>
+      <div class="dh-sub">${escapeHtml(cardNo)}</div>
+    </div>
+    <div class="card-viewer">
+      <img src="img/cards_webp/${cardNo}.webp" alt="${escapeHtml(name)}" onerror="this.src='img/texticon/lltcg-back.png'">
+    </div>
+    <div class="ae-actions">
+      <button class="nav-btn primary" id="copy-card-btn">Copy card ID</button>
+    </div>`;
+  const btn = document.getElementById('copy-card-btn');
+  if (btn) btn.addEventListener('click', () => copyToClipboard(cardNo));
+}
+
+function selectNode(id) {
+  selectedId = id;
+  document.querySelectorAll('#tree .tnode-row, #tree .tleaf-row').forEach(r =>
+    r.classList.toggle('selected', r.dataset.id === id));
+  const node = nodeIndex[id];
+  if (!node) return;
+  if (node.kind === 'ability') showAbility(node);
+  else showBranch(node);
+  updatePath();
+}
+
+// ═══════════════ Tree interaction ═══════════════
+treeEl.addEventListener('click', (e) => {
+  // clicking a card opens it in the main panel (no silent copy)
+  const card = e.target.closest('[data-copy]');
+  if (card) { showCard(card.dataset.copy); return; }
+
+  // clicking a branch row toggles its expansion
+  const row = e.target.closest('.tnode-row[data-id]');
+  if (row) {
+    const id = row.dataset.id;
+    const node = nodeIndex[id];
+    if (!node) return;
+    const parent = row.closest('.tnode');
+    const childrenEl = parent ? parent.querySelector('.tnode-children') : null;
+    if (parent && childrenEl && childrenEl.children.length > 0) {
+      const twist = row.querySelector('.twist');
+      if (childrenEl.style.display === 'none') {
+        childrenEl.style.display = 'block';
+        twist.textContent = '\u25BE';
+        collapsed.delete(node.path.join('|'));
+      } else {
+        childrenEl.style.display = 'none';
+        twist.textContent = '\u25B6';
+        collapsed.add(node.path.join('|'));
+      }
+    }
+    selectNode(id);
+    return;
+  }
+
+  // clicking a leaf ability opens it in the main panel (no tree collapse)
+  const leaf = e.target.closest('.tleaf-row[data-id]');
+  if (leaf) {
+    const node = nodeIndex[leaf.dataset.id];
+    if (node && node.kind === 'ability') selectNode(leaf.dataset.id);
+  }
+});
+
+detailEl.addEventListener('click', (e) => {
+  const card = e.target.closest('[data-card]');
+  if (card) { showCard(card.dataset.card); return; }
+  const jump = e.target.closest('[data-jump]');
+  if (jump) {
+    const id = jump.dataset.jump;
+    if (id && nodeIndex[id]) {
+      selectNode(id);
+      // auto-expand the tree path to this node
+      expandPath(nodeIndex[id].path);
+    }
+    return;
+  }
+  const browse = e.target.closest('[data-browse]');
+  if (browse) { window.open('card_browser.html?ability=' + browse.dataset.browse, '_blank'); return; }
+});
+
+function expandPath(path) {
+  for (let i = 1; i < path.length; i++) {
+    const id = pathToId[path.slice(0, i).join('|')];
+    if (!id) continue;
+    const node = nodeIndex[id];
+    if (!node || node.kind !== 'branch') continue;
+    collapsed.delete(node.path.join('|'));
+    const row = document.querySelector('#tree .tnode-row[data-id="' + id + '"]');
+    if (row) {
+      const parent = row.closest('.tnode');
+      const childrenEl = parent.querySelector('.tnode-children');
+      if (childrenEl) {
+        childrenEl.style.display = 'block';
+        const twist = row.querySelector('.twist');
+        if (twist) twist.textContent = '\u25BE';
+      }
+    }
+  }
+}
+
+document.getElementById('collapse-all').addEventListener('click', () => {
+  document.querySelectorAll('#tree .tnode-children').forEach(c => c.style.display = 'none');
+  document.querySelectorAll('#tree .tnode-row .twist').forEach(t => t.textContent = '\u25B6');
+  collapsed.clear();
+  // keep root level visible? collapse-all collapses all; roots still shown
+});
+
+// search
+document.getElementById('search').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  if (!q) { detailEl.innerHTML = '<div id="empty-state">Click a branch to drill in, or a leaf ability to see its details.</div>'; return; }
+  const matches = abilities.filter(a =>
+    (a.full_text || '').toLowerCase().includes(q) ||
+    (a.cards || []).some(c => c.toLowerCase().includes(q)));
+  renderSearch(matches);
+});
+
+function renderSearch(matches) {
+  detailEl.innerHTML = '';
+  if (matches.length === 0) {
+    detailEl.innerHTML = '<div id="empty-state">No abilities match the search.</div>';
+    return;
+  }
+  const hint = document.createElement('div');
+  hint.style.cssText = 'color:#e94560;font-size:11px;margin-bottom:8px;';
+  hint.textContent = matches.length + ' matching unique abilit' + (matches.length === 1 ? 'y' : 'ies') + ':';
+  detailEl.appendChild(hint);
+  matches.forEach(a => {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = abilityEntryHtml(a);
+    detailEl.appendChild(wrap);
+  });
+}
+
+function renderStats() {
+  const totalCards = abilities.reduce((n, a) => n + (a.cards ? a.cards.length : 0), 0);
+  document.getElementById('stats-bar').textContent =
+    abilities.length + ' unique abilities \u00b7 ' + totalCards + ' ability-bearing cards';
+}
+
+// ═══════════════ Init ═══════════════
+async function init() {
+  const [abResp, cardResp] = await Promise.all([
+    fetch('cards/abilities.json'),
+    fetch('cards/cards.json')
+  ]);
+  if (!abResp.ok) throw new Error('Failed to load abilities.json: ' + abResp.status);
+  abilities = (await abResp.json()).unique_abilities || [];
+  if (cardResp.ok) {
+    const cards = await cardResp.json();
+    for (const c of Object.values(cards)) if (c && c.card_no) cardNames[c.card_no] = c.name;
+  }
+  renderStats();
+  const root = buildTree();
+  renderNode(treeEl, root, 0, []);
+}
+
+init().catch(err => {
+  document.getElementById('tree').innerHTML =
+    `<div style="color:#e94560;padding:10px;font-size:12px;">Failed: ${err.message}</div>`;
+});
+</script>
+</body>
+</html>

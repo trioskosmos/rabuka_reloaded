@@ -207,12 +207,12 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
     // General check: do the current choice actions have card images?
     // ChoiceOption actions with card_id → image grid. Otherwise → text fallback.
     // Image mode is the default for SelectCard prompts (board-highlight picker).
-    let has_image_choice = gs.has_pending_choice()
+    let mut has_image_choice = gs.has_pending_choice()
         && matches!(
             gs.get_pending_choice(),
             Some(rabuka_engine::ability::types::Choice::SelectCard { .. })
         );
-    let has_text_choice = gs.has_pending_choice()
+    let mut has_text_choice = gs.has_pending_choice()
         && acts_cache
             .iter()
             .any(|a| a.action_type == game_setup::ActionType::ChoiceOption);
@@ -347,6 +347,22 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
             }
         }
         display_pos = display_order.iter().position(|&fi| fi == cur).unwrap_or(0);
+
+        // Recompute the choice-mode flags off the freshly regenerated
+        // acts_cache + pending choice. The flags computed earlier in the frame
+        // reflect the pre-input state; after a choice is confirmed the pending
+        // choice (and thus the mode) changes, so render must use the new values
+        // on the very same frame instead of leaving a stale mode on screen until
+        // the player presses a key to force a redraw.
+        has_image_choice = gs.has_pending_choice()
+            && matches!(
+                gs.get_pending_choice(),
+                Some(rabuka_engine::ability::types::Choice::SelectCard { .. })
+            );
+        has_text_choice = gs.has_pending_choice()
+            && acts_cache
+                .iter()
+                .any(|a| a.action_type == game_setup::ActionType::ChoiceOption);
 
         // Debug: dump acts_cache when there's a pending choice
         if dirty && gs.has_pending_choice() {
@@ -727,7 +743,7 @@ pub fn play_step(p: PlayState, keys: u32) -> Step {
             unsafe {
                 _3ds_top_queue_text(
                     4.0,
-                    215.0,
+                    203.0,
                     0xFFFFFF00,
                     SCALE_BODY,
                     format!(

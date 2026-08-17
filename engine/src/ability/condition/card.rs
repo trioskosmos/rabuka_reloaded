@@ -1992,10 +1992,8 @@ impl<'a> ConditionContext<'a> {
                     .turn_movements
                     .iter()
                     .filter(|m| {
-                        let src_ok = source_zone.is_empty()
-                            || m.source_zone == source_zone
-                            || (source_zone == "discard" && m.source_zone == "waitroom")
-                            || (source_zone == "waitroom" && m.source_zone == "discard");
+                        let src_ok =
+                            source_zone.is_empty() || m.source_zone.matches_source(source_zone);
                         let cause_ok = (condition.get_self_target().unwrap_or(false)
                             && !require_self_effect)
                             || m.cause_player_id == target_id;
@@ -2021,9 +2019,7 @@ impl<'a> ConditionContext<'a> {
                             return true;
                         }
                         tm.iter().any(|m| {
-                            let src_ok = m.source_zone == source_zone
-                                || (source_zone == "discard" && m.source_zone == "waitroom")
-                                || (source_zone == "waitroom" && m.source_zone == "discard");
+                            let src_ok = m.source_zone.matches_source(source_zone);
                             let cause_ok = (condition.get_self_target().unwrap_or(false)
                                 && !require_self_effect)
                                 || m.cause_player_id == target_id;
@@ -2047,10 +2043,8 @@ impl<'a> ConditionContext<'a> {
                     .turn_movements
                     .iter()
                     .filter(|m| {
-                        let src_ok = source_zone.is_empty()
-                            || m.source_zone == source_zone
-                            || (source_zone == "discard" && m.source_zone == "waitroom")
-                            || (source_zone == "waitroom" && m.source_zone == "discard");
+                        let src_ok =
+                            source_zone.is_empty() || m.source_zone.matches_source(source_zone);
                         let cause_ok = (condition.get_self_target().unwrap_or(false)
                             && !require_self_effect)
                             || m.cause_player_id == target_id;
@@ -2202,9 +2196,7 @@ impl<'a> ConditionContext<'a> {
                             .collect();
                         if !card_movements.is_empty() {
                             let src_match = card_movements.iter().any(|m| {
-                                let src_ok = m.source_zone == src_zone
-                                    || (src_zone == "discard" && m.source_zone == "waitroom")
-                                    || (src_zone == "waitroom" && m.source_zone == "discard");
+                                let src_ok = m.source_zone.matches_source(src_zone);
                                 src_ok
                                     && (m.dest_zone == *dest
                                         || (*dest == "discard" && m.dest_zone == "waitroom")

@@ -18,6 +18,7 @@ from parser import (
     _try_shi_sequential,
     _try_te_sequential,
     _try_implicit_sequential,
+    _try_zone_placement,
     extract_name_exclusions,
     extract_cost_operator,
 )
@@ -178,6 +179,33 @@ def test_extract_cost_operator_none():
 
 def test_extract_cost_operator_lt():
     assert extract_cost_operator("2枚未満") == "<"
+
+
+# ─── zone placement source (deck) ─────────────────────────────────────────────
+
+
+def test_zone_placement_deck_to_discard():
+    result = _try_zone_placement("このカードがデッキから控え室に置かれたとき")
+    assert result is not None
+    assert result.get("source") == "deck", f"expected source=deck, got {result.get('source')}"
+    assert result.get("destination") == "discard"
+    te = result.get("trigger_event", {})
+    assert te.get("source") == "deck"
+    assert te.get("destination") == "discard"
+
+
+def test_zone_placement_hand_to_discard_source():
+    result = _try_zone_placement("このカードが手札から控え室に置かれたとき")
+    assert result is not None
+    assert result.get("source") == "hand"
+    assert result.get("destination") == "discard"
+
+
+def test_zone_placement_deck_to_hand():
+    result = _try_zone_placement("このカードがデッキから手札に加えられたとき")
+    assert result is not None
+    assert result.get("source") == "deck"
+    assert result.get("destination") == "hand"
 
 
 # ─── run all ──────────────────────────────────────────────────────────────────
