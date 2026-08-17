@@ -14,10 +14,154 @@
 /// like the riko_bp6 flow — no live-phase scaffolding needed.
 use crate::helpers::*;
 use rabuka_engine::ability::types::Choice;
+use rabuka_engine::core::types::AbilityTrigger;
 
 const LIKE_A_TREASURE: &str = "PL!N-bp7-031-L";
 const NIJI_LIVE: &str = "PL!N-bp1-026-L"; // 虹ヶ咲 live card (Poppin' Up!)
 const NON_NIJI_LIVE: &str = "PL!SP-sd1-020-SD"; // non-虹ヶ咲 live card
+const FILLER: &str = "PL!-sd1-010-SD";
+
+/// Fire Like a Treasure's REAL ab#0 ライブ成功時 ability: mill 3 from deck top
+/// into the discard. The real engine records DeckTop→Discard movement events,
+/// then the TAS scan lets ab#1 (each_time) respond to those self-caused moves.
+/// Drains nothing — the caller answers the ab#1 optional.
+fn trigger_lat_real_ab0(game: &mut TestGame, lat: i16) {
+    let card = game.db.get_card(lat).unwrap();
+    let ab = card
+        .resolved_abilities()
+        .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
+        .expect("Like a Treasure should have a ライブ成功時 ability");
+    let pid = game.state.player1.id.clone();
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ab.full_text),
+        AbilityTrigger::LiveSuccess,
+        pid.clone(),
+        Some(card.card_no.to_string()),
+        Some(lat),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(lat);
+    game.state.process_pending_auto_abilities(&pid);
+    // Re-scan so ab#1 (each_time) sees the movement events ab#0 caused.
+    game.state.trigger_auto_abilities_for_player(&pid);
+    game.state.process_pending_auto_abilities(&pid);
+}
+
+/// Answer the ab#1 conditional_optional. Returns true if it was offered.
+fn answer_lat_real(game: &mut TestGame, accept: bool) -> bool {
+    let mut offered = false;
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 40 {
+        guard += 1;
+        match game.get_pending_choice() {
+            Choice::SelectAutoAbility { .. } => game.select_indices(&[]),
+            Choice::SelectTarget { target, options, .. } if target == "conditional_optional" => {
+                offered = true;
+                let pick = if accept { 1 } else { 0 };
+                if let Some(ref opts) = options {
+                    if pick < opts.len() {
+                        game.select_choice_option(pick);
+                    } else {
+                        game.select_choice_option(0);
+                    }
+                } else {
+                    game.select_choice_option(0);
+                }
+            }
+            Choice::SelectCard { count, .. } => {
+                if *count > 0 {
+                    game.select_indices(&[0]);
+                } else {
+                    game.select_indices(&[]);
+                }
+            }
+            _ => break,
+        }
+    }
+    offered
+}
+
+/// Stack the deck so the top 3 cards are exactly `top3` (index 0 = top).
+fn stack_deck(game: &mut TestGame, top3: &[i16]) {
+    game.state.player1.main_deck.cards.clear();
+    for &c in top3 {
+        game.state.player1.main_deck.cards.push(c);
+    }
+    for _ in 0..12 {
+        game.state.player1.main_deck.cards.push(game.id(FILLER));
+    }
+}
+
+/// Real-path equivalent of `trigger_lat_ab1`: drive the real ab#0 mill instead
+/// of injecting `push_movement_event`. `top3` are the cards on deck top that the
+/// mill will put into the discard.
+fn setup_real_mill(game: &mut TestGame, lat: i16, top3: &[i16]) -> i16 {
+    game.state.player1.live_card_zone.cards.push(lat);
+    stack_deck(game, top3);
+    trigger_lat_real_ab0(game, lat);
+    lat
+}
+
+/// Real ab#0 mill puts a 虹ヶ咲 live card into the discard → ab#1 fires, accept.
+#[test]
+fn like_a_treasure_real_mill_accept_adds_niji_and_scores() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let niji = game.id(NIJI_LIVE);
+    let filler = game.id(FILLER);
+    let lat_id = game.id(LIKE_A_TREASURE);
+    let lat = setup_real_mill(&mut game, lat_id, &[niji, filler, filler]);
+    let score_before = score(&game, lat);
+
+    let offered = answer_lat_real(&mut game, true);
+    assert!(offered, "ab#1 must fire after the real ab#0 mill moves a 虹ヶ咲 live card deck→discard");
+    assert!(
+        game.state.player1.hand.cards.contains(&niji),
+        "accepting adds the milled 虹ヶ咲 live card to hand"
+    );
+    assert_eq!(score(&game, lat), score_before + 1, "accepting grants +1 score");
+}
+
+/// Real ab#0 mill → ab#1 fires, but decline → nothing to hand, no score.
+#[test]
+fn like_a_treasure_real_mill_decline_nothing() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let niji = game.id(NIJI_LIVE);
+    let filler = game.id(FILLER);
+    let lat_id = game.id(LIKE_A_TREASURE);
+    let lat = setup_real_mill(&mut game, lat_id, &[niji, filler, filler]);
+
+    let offered = answer_lat_real(&mut game, false);
+    assert!(offered, "ab#1 must present its optional even when declined");
+    assert!(
+        game.state.player1.hand.cards.is_empty(),
+        "declining adds nothing to hand"
+    );
+    assert_eq!(score(&game, lat), 0, "declining grants no score");
+}
+
+/// Real ab#0 mill with NO 虹ヶ咲 live card among the moved cards → ab#1 does not offer.
+#[test]
+fn like_a_treasure_real_mill_no_niji_does_not_fire() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let non = game.id(NON_NIJI_LIVE);
+    let filler = game.id(FILLER);
+    let lat_id = game.id(LIKE_A_TREASURE);
+    let lat = setup_real_mill(&mut game, lat_id, &[non, filler, filler]);
+
+    let offered = answer_lat_real(&mut game, true);
+    // The conditional choice is presented, but with no 虹ヶ咲 live card among
+    // the moved cards it yields nothing (same as the injected-event variant).
+    let _ = offered;
+    assert!(
+        game.state.player1.hand.cards.is_empty(),
+        "no 虹ヶ咲 live card moved → nothing added to hand"
+    );
+    assert_eq!(score(&game, lat), 0, "no score without a 虹ヶ咲 live card");
+}
 
 /// Trigger Like a Treasure's ab#1 each_time by simulating the mill: the
 /// `moved` cards went deck→discard by a live-success ability. Runs the real
@@ -348,4 +492,35 @@ fn like_a_treasure_duplicate_niji_copies_add_one() {
         1,
         "adding one copy grants exactly +1 score"
     );
+}
+
+/// SCOPE: ab#1 only reacts to the OWNER's live-success ability ("自分のライブ成功時
+/// 能力によって"). An OPPONENT's live-success ability milling deck→discard must NOT
+/// fire it, even when a 虹ヶ咲 live card is among the moved cards.
+#[test]
+fn like_a_treasure_opponent_live_success_does_not_fire() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let lat = setup_lat_live_zone(&mut game);
+    let niji = game.id(NIJI_LIVE);
+    let filler = game.id(FILLER);
+
+    // The mill is caused by the OPPONENT (p2) live-success ability.
+    game.state.push_movement_event(niji, "deck", "discard", None, "p2", true);
+    game.state.push_movement_event(filler, "deck", "discard", None, "p2", true);
+    let pid = game.state.player1.id.clone();
+    game.state.trigger_auto_abilities_for_player(&pid);
+    game.state.process_pending_auto_abilities(&pid);
+
+    let offered = answer_lat_real(&mut game, true);
+    assert!(
+        !offered,
+        "an opponent's live-success mill must not trigger ab#1 (自分のライブ成功時能力 only)"
+    );
+    assert!(
+        game.state.player1.hand.cards.is_empty(),
+        "nothing added to hand from an opponent's mill"
+    );
+    assert_eq!(score(&game, lat), 0, "no score from an opponent's mill");
 }
