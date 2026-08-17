@@ -189,6 +189,34 @@ fn kasumi_stage_to_discard_adds_niji_live() {
     );
 }
 
+/// SELF-TARGET exclusivity: かすみ's text is "このメンバーがステージから控え室に置かれた
+/// とき" — only when SHE moves. If a DIFFERENT member is baton-touched off (she stays on
+/// stage), her auto must NOT fire and the 虹ヶ咲 live card must not be added.
+#[test]
+fn kasumi_other_member_moves_does_not_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let kasumi = game.id("PL!N-bp7-014-N");
+    let other = game.id("PL!S-sd1-001-SD"); // a different member to move
+    let niji = game.id(NIJI_LIVE);
+    let arriver = game.id("PL!-sd1-002-SD");
+    game.state.player1.waitroom.cards.push(niji);
+    // かすみ stays on stage; the OTHER member is the one baton-touched off.
+    game.state.player1.stage.set_area(MemberArea::LeftSide, kasumi);
+
+    baton_touch_off(&mut game, other, arriver, MemberArea::Center);
+    drain_auto(&mut game);
+
+    assert!(
+        game.state.player1.stage.get_area(MemberArea::LeftSide) == Some(kasumi),
+        "かすみ should still be on stage"
+    );
+    assert!(
+        !game.state.player1.hand.cards.contains(&niji),
+        "かすみ ab#0 must NOT fire when a DIFFERENT member moves (self-target as written)"
+    );
+}
+
 /// 藤島慈: このメンバーがステージから控え室に置かれたとき、カードを2枚引き、
 /// 手札を1枚控え室に置く。(net hand +1)
 #[test]
@@ -398,6 +426,10 @@ fn yell_reveal_and_scan(game: &mut TestGame, count: u8) -> Vec<i16> {
     let pid = game.state.player1.id.clone();
     game.state.perform_cheer_check(&pid, count).unwrap();
     let revealed: Vec<i16> = game.state.resolution_zone.cards.iter().copied().collect();
+    assert!(
+        !revealed.is_empty(),
+        "yell should reveal at least one card (test must be meaningful)"
+    );
     for &cid in &revealed {
         game.state.push_revealed_card(cid, None, false, Some(0), "yell");
     }
@@ -430,6 +462,31 @@ fn natsumi_yell_no_blade_heart_gains_heart02() {
         heart_mod(&game, natsumi, HeartColor::Heart02),
         1,
         "鬼塚夏美 ab#0 should gain heart02 when a yell reveals no blade-heart card"
+    );
+}
+
+/// NEGATIVE / "as written": 鬼塚夏美's text is "…ブレードハートを持つカードが【ない】とき"
+/// (negation). So if a yell reveals a card WITH a blade heart, she must NOT gain heart02.
+#[test]
+fn natsumi_yell_with_blade_heart_does_not_gain() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let natsumi = game.id("PL!SP-bp2-020-N");
+    game.state.player1.stage.set_area(MemberArea::Center, natsumi);
+
+    // The standard FILLER (PL!-sd1-010-SD) HAS a blade heart (b_heart03), so a yell
+    // revealing it must violate the "no blade-heart card" negation.
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(game.id(FILLER));
+    }
+
+    yell_reveal_and_scan(&mut game, 3);
+
+    assert_eq!(
+        heart_mod(&game, natsumi, HeartColor::Heart02),
+        0,
+        "鬼塚夏美 must NOT gain heart02 when a blade-heart card is revealed (negation as written)"
     );
 }
 
