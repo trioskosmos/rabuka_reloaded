@@ -12371,6 +12371,32 @@ def _validate_semantic(abilities):
             or _json_has_field(e.get("cost", {}), "card_property"),
             "Card property (blade heart / score icon) but no card_property field",
         ),
+        # ─── OR location (zone1 か zone2) ───
+        (
+            "or_location",
+            r"(?:成功)?ライブカード置き場(?:か(?!ら)|又は)",
+            lambda e, eff: len(
+                (eff.get("condition") or {}).get("locations", [])
+            )
+            >= 2,
+            "OR location pattern but fewer than 2 locations in condition",
+        ),
+        # ─── Heart content (required heart N in card filter) ───
+        (
+            "heart_content",
+            r"必要ハートに含まれる\{\{heart_\d+\.png\|heart\d+\}\}が\d+",
+            lambda e, eff: _json_has_field(eff, "heart_colors")
+            and _json_has_field(eff, "count"),
+            "Heart content pattern but missing heart_colors or count",
+        ),
+        # ─── State change (ウェイト/レスト/スタンド にする) ───
+        (
+            "state_change",
+            r"(ウェイト|レスト|スタンド)(状態)?(にす|にで)(る|き)",
+            lambda e, eff: _json_has_field(eff, "state_change")
+            or _json_has_field(e.get("cost", {}), "state_change"),
+            "State change described but no state_change field",
+        ),
     ]
 
     seen_by_rule = {}  # rule_name -> set of frozenset(cards)
