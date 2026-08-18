@@ -5144,6 +5144,102 @@ def _try_discard_hand_recover_self_optional(text):
     }
 
 
+def _extract_comparison_fields(condition, text):
+    """Extract comparison_target, comparison_type, aggregate, operator from text."""
+    contiguous_found = False
+    for tgt_text, tgt in COMPARISON_TARGETS.items():
+        if tgt_text in text:
+            condition["comparison_target"] = tgt
+            contiguous_found = True
+            break
+    if not contiguous_found:
+        for tgt_text, tgt in COMPARISON_TARGETS.items():
+            if tgt_text.endswith("より") and len(tgt_text) >= 4:
+                noun = tgt_text[:-2]
+                if noun in text and "より" in text:
+                    noun_pos = text.find(noun)
+                    marker_pos = text.find("より", noun_pos + len(noun))
+                    if noun_pos >= 0 and marker_pos > noun_pos:
+                        if not re.search(r"\d+[枚人個種類つ]?より", text):
+                            condition["comparison_target"] = tgt
+                            break
+    if condition.get("target") == "both" and condition.get("comparison_target"):
+        condition["target"] = "self"
+    for op_text, op in COMPARISON_OPERATORS.items():
+        if op_text in text:
+            condition["operator"] = op
+            break
+    for kw, ct in COMPARISON_TYPES.items():
+        if kw in text:
+            condition["comparison_type"] = ct
+            break
+    if "合計" in text:
+        condition["aggregate"] = "total"
+    if "自分と相手の" in text and "合計" in text and "同じ" in text:
+        condition["target"] = "self"
+        condition["comparison_target"] = "opponent"
+        if "成功ライブカード" in text:
+            condition["location"] = "success_live_zone"
+        elif "ライブカード" in text or "ライブ" in text:
+            condition["location"] = "live_card_zone"
+        if "スコア" in text:
+            condition["comparison_type"] = "score"
+            condition["resource_type"] = "score"
+        elif "コスト" in text:
+            condition["resource_type"] = "cost"
+    if "ちょうど" in text or "同じ" in text:
+        condition["operator"] = "="
+        if "同じ" in text and condition.get("comparison_type") != "score":
+            condition["comparison_type"] = "equality"
+            condition["type"] = "comparison_condition"
+
+
+def _extract_resource_fields(condition, text):
+    """Extract heart count, heart_colors, energy, surplus_heart from text."""
+    if "heart" in text and (
+        "つ以上持つ" in text or "枚持つ" in text or "つ持つ" in text
+    ):
+        hc = extract_count(text)
+        if hc:
+            condition["count"] = hc
+            if re.search(r"heart_\d+.*?heart_\d+", text):
+                hts = []
+                for i in range(1, 7):
+                    if f"heart_0{i}" in text:
+                        hts.append(f"heart_0{i}")
+                if hts:
+                    condition["resource_type"] = "heart"
+                    condition["heart_types"] = hts
+                    tm = re.search(r"合計(\d+)種類以上", text)
+                    if tm:
+                        condition["types_count"] = int(tm.group(1))
+                        condition["operator"] = ">="
+            else:
+                for pat, rt in [
+                    ("heart_01", "heart_01"),
+                    ("heart_02", "heart_02"),
+                    ("heart_06", "heart_06"),
+                ]:
+                    if pat in text:
+                        condition["resource_type"] = rt
+                        break
+                else:
+                    condition["resource_type"] = "heart"
+    hc = extract_heart_colors_from_text(text)
+    if hc:
+        condition["heart_colors"] = hc
+    if "エネルギー" in text:
+        condition["resource_type"] = "energy"
+        ec = extract_count(text)
+        if ec:
+            condition["count"] = ec
+    if "余剰ハート" in text:
+        condition["resource_type"] = "surplus_heart"
+        sc = extract_count(text)
+        if sc:
+            condition["count"] = sc
+
+
 def _extract_generic_fields(condition, text):
     """Extract all generic fields from text into condition dict (no early return)."""
     # Character names: 「A」か「B」か「C」がいる, 「A」と「B」がいる,
@@ -5235,55 +5331,7 @@ def _extract_generic_fields(condition, text):
     if "失っている" in text and "これにより" in text:
         condition["delta"] = True
 
-    # Heart count
-    if "heart" in text and (
-        "つ以上持つ" in text or "枚持つ" in text or "つ持つ" in text
-    ):
-        hc = extract_count(text)
-        if hc:
-            condition["count"] = hc
-            if re.search(r"heart_\d+.*?heart_\d+", text):
-                hts = []
-                for i in range(1, 7):
-                    if f"heart_0{i}" in text:
-                        hts.append(f"heart_0{i}")
-                if hts:
-                    condition["resource_type"] = "heart"
-                    condition["heart_types"] = hts
-                    tm = re.search(r"合計(\d+)種類以上", text)
-                    if tm:
-                        condition["types_count"] = int(tm.group(1))
-                        condition["operator"] = ">="
-            else:
-                for pat, rt in [
-                    ("heart_01", "heart_01"),
-                    ("heart_02", "heart_02"),
-                    ("heart_06", "heart_06"),
-                ]:
-                    if pat in text:
-                        condition["resource_type"] = rt
-                        break
-                else:
-                    condition["resource_type"] = "heart"
-    # Extract heart_colors from any condition text with {{heart_XX.png}} icons
-    # Used by location_condition to check collective presence of specific heart colors
-    hc = extract_heart_colors_from_text(text)
-    if hc:
-        condition["heart_colors"] = hc
-
-    # Energy count
-    if "エネルギー" in text:
-        condition["resource_type"] = "energy"
-        ec = extract_count(text)
-        if ec:
-            condition["count"] = ec
-
-    # Surplus heart
-    if "余剰ハート" in text:
-        condition["resource_type"] = "surplus_heart"
-        sc = extract_count(text)
-        if sc:
-            condition["count"] = sc
+    _extract_resource_fields(condition, text)
 
     # Card type, count, operator
     ct = extract_card_type(text)
@@ -5299,75 +5347,7 @@ def _extract_generic_fields(condition, text):
     if op:
         condition["operator"] = op
 
-    # Comparison targets/operators/types
-    # First check contiguous matches (e.g. "自分より" as one substring),
-    # then fall back to non-contiguous "Noun...より" patterns.
-    # This prevents "相手の...自分より" from matching "相手" with the wrong "より".
-    contiguous_found = False
-    for tgt_text, tgt in COMPARISON_TARGETS.items():
-        if tgt_text in text:
-            condition["comparison_target"] = tgt
-            contiguous_found = True
-            break
-    if not contiguous_found:
-        for tgt_text, tgt in COMPARISON_TARGETS.items():
-            if tgt_text.endswith("より") and len(tgt_text) >= 4:
-                noun = tgt_text[:-2]
-                if noun in text and "より" in text:
-                    noun_pos = text.find(noun)
-                    marker_pos = text.find("より", noun_pos + len(noun))
-                    if noun_pos >= 0 and marker_pos > noun_pos:
-                        # G6: "自分のエネルギーが6枚より多い" — the "より" belongs to a
-                        # NUMERIC THRESHOLD ("6枚より"), not to "自分". A "N<unit>より"
-                        # is a count-vs-threshold comparison, not a player-vs-player
-                        # comparison_target. Don't set comparison_target for those.
-                        if not re.search(r"\d+[枚人個種類つ]?より", text):
-                            condition["comparison_target"] = tgt
-                            break
-    # Fix: when target=both AND comparison_target is set, the comparison_target
-    # already handles the opponent side, so target should be self
-    if condition.get("target") == "both" and condition.get("comparison_target"):
-        condition["target"] = "self"
-    for op_text, op in COMPARISON_OPERATORS.items():
-        if op_text in text:
-            condition["operator"] = op
-            break
-    for kw, ct in COMPARISON_TYPES.items():
-        if kw in text:
-            condition["comparison_type"] = ct
-            break
-
-    # Aggregate
-    if "合計" in text:
-        condition["aggregate"] = "total"
-
-    # Two-sided "self vs opponent total X" pattern (e.g. メビウスループ:
-    # "自分と相手のライブの合計スコアが同じ場合"). Provide enough fields for
-    # the engine to compute both sides generically.
-    if "自分と相手の" in text and "合計" in text and "同じ" in text:
-        condition["target"] = "self"
-        condition["comparison_target"] = "opponent"
-        if "成功ライブカード" in text:
-            condition["location"] = "success_live_zone"
-        elif "ライブカード" in text or "ライブ" in text:
-            condition["location"] = "live_card_zone"
-        if "スコア" in text:
-            # Use "score" comparison_type so the engine sums live card
-            # scores on each side generically.
-            condition["comparison_type"] = "score"
-            condition["resource_type"] = "score"
-        elif "コスト" in text:
-            condition["resource_type"] = "cost"
-        # Keep operator "=" from the 同じ check below for the equality test.
-
-    # Exact match — set operator and type. The "equality" comparison_type
-    # is the default for "Xが同じ" patterns; specific two-sided patterns
-    # (like メビウスループ's 合計スコアが同じ) override this in the block above.
-    if "ちょうど" in text or "同じ" in text:
-        condition["operator"] = "="
-        if "同じ" in text and condition.get("comparison_type") != "score":
-            condition["comparison_type"] = "equality"
-            condition["type"] = "comparison_condition"
+    _extract_comparison_fields(condition, text)
 
     # Negation (〜がない / 〜がなく / 〜が〜ない / 〜いない / 〜を持たない)
     if (
