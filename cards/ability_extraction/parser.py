@@ -1574,10 +1574,6 @@ def parse_effect(text: str) -> Dict[str, Any]:
         elif "引く" in fallback_text:
             effect["action"] = "draw_card"
 
-    # Apply duration prefix
-    if "duration" in effect and "duration" not in locals().get("dur_effect", {}):
-        pass  # Already handled inline
-
     return effect
 
 
@@ -2247,36 +2243,7 @@ _register_action(
         }
     ),
 )
-_register_action(
-    lambda t: "もう一度エール" in t or "もう1度エール" in t,
-    "re_yell",
-    lambda t, a: None
-    if "できない" in t
-    else (
-        a.update({"lose_blade_hearts": True}),
-        a.update(
-            {
-                "action": "sequential",
-                "actions": [
-                    {
-                        "text": t.split("、")[0] if "、" in t else t,
-                        "action": "re_yell",
-                        "lose_blade_hearts": True,
-                        "target": "self",
-                    },
-                    {
-                        "text": t.split("、")[-1] if "、" in t else t,
-                        "action": "perform_yell",
-                        "count": 1,
-                        "target": "self",
-                    },
-                ],
-            }
-        )
-        if "ブレードハートを失い" in t
-        else (a.update({"lose_blade_hearts": True}),),
-    ),
-)
+
 _register_action(ActionRule(match="以下から1つを選ぶ", action="choice"))
 _register_action(
     ActionRule(
