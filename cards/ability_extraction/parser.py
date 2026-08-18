@@ -9794,14 +9794,6 @@ def _walk_propagate_text_context_fields(d, d_ctx, ctx_text):
     ):
         d["distinct"] = "card_name"
 
-    # Propagate same_name from text context
-    if (
-        "same_name" not in d
-        and d_ctx
-        and ("相同的名前" in d_ctx or ("同じ名前" in d_ctx and "持つ" in d_ctx))
-    ):
-        d["same_name"] = True
-
     # Propagate original_value from text context (元々持つ for blade/heart comparisons)
     if "original_value" not in d and d_ctx and _has_original_modifier(d_ctx):
         d["original_value"] = True
@@ -10513,37 +10505,6 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
 
     action = node.get("action")
     ct = node.get("condition_type") or node.get("type")
-
-    # Apply operator inference for condition-type nodes
-    if ct in (
-        "comparison_condition",
-        "card_count_condition",
-        "location_condition",
-    ):
-        _text = node.get("text", "")
-        if node.get("count") is not None and not node.get("comparison_target"):
-            if "以下" in _text:
-                node["operator"] = "<="
-            elif "以上" in _text:
-                node["operator"] = ">="
-            elif "operator" not in node:
-                node["operator"] = "="
-        if "operator" not in node:
-            if node.get("values"):
-                node["operator"] = "in"
-            elif node.get("comparison_target"):
-                if "高い" in _text or "多い" in _text or "大きい" in _text:
-                    node["operator"] = ">"
-                elif "低い" in _text or "少ない" in _text or "小さい" in _text:
-                    node["operator"] = "<"
-        # Infer count from cost_limit for score-based comparisons
-        if (
-            ct == "comparison_condition"
-            and "count" not in node
-            and node.get("cost_limit") is not None
-            and node.get("comparison_type") != "cost"
-        ):
-            node["count"] = node["cost_limit"]
 
     # Inherit location into conditions
     if isinstance(node.get("condition"), dict):
