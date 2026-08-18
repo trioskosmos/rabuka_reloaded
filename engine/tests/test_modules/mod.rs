@@ -426,3 +426,4 @@ pub mod sumire_bp2_center_cost_test;
 // Rule/ability structured logging: bounded buffers, no "pending" residue after
 // resolution, and ChoiceOffered/ChoiceResolved capture.
 pub mod logging_test;
+pub mod pl_s_bp7_007_test;

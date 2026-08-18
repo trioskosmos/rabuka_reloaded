@@ -20,7 +20,7 @@ from parser import (
     _try_implicit_sequential,
     _try_zone_placement,
     extract_name_exclusions,
-    extract_cost_operator,
+    extract_operator,
 )
 
 passed = 0
@@ -165,20 +165,20 @@ def test_extract_name_exclusions_exclude():
     assert "マリ" not in inc
 
 
-def test_extract_cost_operator_le():
-    assert extract_cost_operator("2枚以下") == "<="
+def test_extract_operator_le():
+    assert extract_operator("2枚以下") == "<="
 
 
-def test_extract_cost_operator_ge():
-    assert extract_cost_operator("3枚以上") == ">="
+def test_extract_operator_ge():
+    assert extract_operator("3枚以上") == ">="
 
 
-def test_extract_cost_operator_none():
-    assert extract_cost_operator("カードを引く") is None
+def test_extract_operator_none():
+    assert extract_operator("カードを引く") is None
 
 
-def test_extract_cost_operator_lt():
-    assert extract_cost_operator("2枚未満") == "<"
+def test_extract_operator_lt():
+    assert extract_operator("2枚未満") == "<"
 
 
 # ─── zone placement source (deck) ─────────────────────────────────────────────
