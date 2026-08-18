@@ -5802,9 +5802,247 @@ def infer_count_from_icons(d, text):
         return
 
 
+def _fill_defaults_count_and_refine(action, text, action_text, a):
+    """under_member promotion, revealed_cards defaults, count extraction, custom refinement. Returns updated action type."""
+    if action.get("source") == "under_member" and a != "place_energy_under_member":
+        action["action"] = "place_energy_under_member"
+        a = "place_energy_under_member"
+        action.setdefault("energy_count", 1)
+        action.setdefault("target_member", "this_member")
+        if action.get("destination") == "energy_deck":
+            action["card_type"] = "energy_card"
+    if (
+        a == "move_cards"
+        and action.get("source") in ("revealed_remaining", "revealed_cards")
+        and "dynamic_count" not in action
+    ):
+        action["dynamic_count"] = {
+            "type": "revealed_cards",
+            "reference": "previous_reveal",
+        }
+    if (
+        a == "move_cards"
+        and action.get("source") in ("revealed_card", "revealed_cards")
+        and action.get("count") is None
+    ):
+        action["count"] = 1
+    if "non_stackable" not in action and "この効果は重複しない" in text:
+        action["non_stackable"] = True
+    if not action.get("all") and re.search(
+        r"すべての|全ての|全部の|全て|全員|全体|カードをすべて", text
+    ):
+        action["all"] = True
+    if (
+        action.get("all")
+        and action.get("action") == "invalidate_ability"
+        and action.get("count") == 1
+    ):
+        action["all"] = False
+    if action.get("all"):
+        action.pop("count", None)
+    if "それぞれ" in text or "ずつ" in text:
+        action["multiple_targets"] = True
+    if (
+        action.get("count") is None
+        and "dynamic_count" not in action
+        and not action.get("any_number")
+        and not action.get("all")
+    ):
+        extracted = extract_count(text)
+        if extracted is not None:
+            action["count"] = extracted
+        else:
+            if a == "modify_required_hearts":
+                target_colors = action.get("heart_colors", [])
+                color_counts = {}
+                for m in re.finditer(r"\|(heart\d+)}", action_text):
+                    h = m.group(1)
+                    if not target_colors or h in target_colors:
+                        color_counts[h] = color_counts.get(h, 0) + 1
+                if color_counts:
+                    counts = list(color_counts.values())
+                    action["count"] = (
+                        counts[0] if len(set(counts)) == 1 else min(counts)
+                    )
+            else:
+                icon_count = _count_resource_icons(action_text)
+                if icon_count > 0:
+                    action["count"] = icon_count
+            if action.get("count") is None and a in (
+                "move_cards",
+                "draw_card",
+                "gain_resource",
+                "reveal",
+                "look_at",
+                "change_state",
+                "restriction",
+            ):
+                if a == "change_state" and action.get("group_names"):
+                    pass
+                elif a == "draw_card" and (
+                    "置いた枚数分" in text
+                    or "置いた枚数" in text
+                    or bool(re.search(r"置いた.*枚数分", text))
+                ):
+                    action["dynamic_count"] = {
+                        "type": "drawn_cards",
+                        "reference": "previous_draw",
+                    }
+                else:
+                    action["count"] = 1
+    if action.get("action") == "custom":
+        if action.get("ability_gain"):
+            action["action"] = "gain_ability"
+        elif re.search(r"枚数.*\d*枚増やす", text) or re.search(
+            r"枚数.*\d*枚増え", text
+        ):
+            action["action"] = "modify_limit"
+            action.setdefault("operation", "increase")
+            cnt = extract_count(text)
+            if cnt:
+                action["count"] = cnt
+        elif re.search(r"枚数.*\d*枚減らす", text) or re.search(
+            r"枚数.*\d*枚減る", text
+        ):
+            action["action"] = "modify_limit"
+            action.setdefault("operation", "decrease")
+            cnt = extract_count(text)
+            if cnt:
+                action["count"] = cnt
+        elif re.search(r"スコアを[+＋]\d+する", text):
+            action["action"] = "modify_score"
+            action.setdefault("operation", "add")
+            vm = re.search(r"([+＋])(\d+)", text)
+            if vm:
+                action["value"] = int(vm.group(2))
+    return action.get("action")
+
+
+def _fill_defaults_move_cards(action, text, action_text, _cached_source, _cached_dest):
+    """Source/destination/card_type inference for move_cards actions. Returns updated action type."""
+    a = action.get("action")
+    if (
+        a == "move_cards"
+        and action.get("destination") == "hand"
+        and "source" not in action
+    ):
+        action["source"] = "discard"
+    if a != "move_cards":
+        return a
+    if "source" not in action:
+        s = _cached_source if _cached_source is not None else extract_source(text)
+        if s:
+            action["source"] = s
+    if action.get("source") is None and "控え室から" in text:
+        action["source"] = "discard"
+    if "source" not in action:
+        dest = action.get("destination", "")
+        if "それらのカード" in text:
+            action["source"] = "revealed_cards"
+        elif "それら" in text:
+            action["source"] = "selected_cards"
+        elif dest in ("deck_top", "deck_bottom", "deck"):
+            if "メンバー" not in text and "選ぶ" not in text and "選び" not in text:
+                action["source"] = "hand"
+        elif dest in ("discard",):
+            if "このカード" in text:
+                action["source"] = "deck_top"
+            elif "そのカード" in text:
+                action["source"] = "looked_at"
+            elif "エネルギー" not in text:
+                action["source"] = "hand"
+    if "destination" not in action:
+        d = _cached_dest if _cached_dest is not None else extract_destination(text)
+        if d:
+            action["destination"] = d
+    if (
+        action.get("source") == "discard"
+        and action.get("destination") == "same_area"
+        and "そのメンバーのコストに" in text
+        and "足した数に等しいコスト" in text
+    ):
+        m = re.search(r"コストに(\d+)を足した数に等しいコスト", text)
+        if m:
+            action["cost_reference"] = "previous_moved_card"
+            action["cost_offset"] = int(m.group(1))
+            action.setdefault("cost_limit_operator", "=")
+    if "card_type" not in action and "or_card_types" not in action:
+        ct = _infer_card_type(text, action)
+        if ct:
+            action["card_type"] = ct
+    if "card_property" not in action:
+        if "ブレードハートを持たない" in text:
+            action["card_property"] = "has_blade_heart"
+            action["negation"] = True
+        elif "ブレードハートを持つ" in text:
+            action["card_property"] = "has_blade_heart"
+        elif "{{icon_score.png|スコア}}を持つ" in text:
+            action["card_property"] = "has_score_icon"
+    if "state_change" not in action and "ウェイト状態" in text:
+        action["state_change"] = "wait"
+    has_source = action.get("source") is not None
+    has_dest = action.get("destination") is not None
+    dest_val = action.get("destination", "")
+    zone_only_dest = (
+        dest_val in ("live_card_zone", "success_live_zone", "stage")
+        and not has_source
+    )
+    if (not has_source and not has_dest) or zone_only_dest:
+        action["action"] = "custom"
+        return "custom"
+    card_type_kws = [
+        ("live_card", "ライブカード"),
+        ("member_card", "メンバーカード"),
+        ("energy_card", "エネルギーカード"),
+    ]
+    if action.get("card_type") and re.search(
+        r"(ライブカード|メンバーカード|エネルギーカード).*か.*(ライブカード|メンバーカード|エネルギーカード)",
+        text,
+    ):
+        or_types = [t for t, kw in card_type_kws if kw in text]
+        if len(or_types) >= 2:
+            action["or_card_types"] = or_types
+            action.pop("card_type", None)
+    if action.get("card_type") and re.search(
+        r"(ライブカード|メンバーカード|エネルギーカード).*と.*(ライブカード|メンバーカード|エネルギーカード)",
+        text,
+    ):
+        and_types = [
+            t
+            for kw, t in sorted(
+                [(kw, t) for t, kw in card_type_kws if kw in text],
+                key=lambda x: text.index(x[0]),
+            )
+        ]
+        if (
+            len(and_types) >= 2
+            and action.get("source")
+            and action.get("destination")
+        ):
+            sub_actions = []
+            for ct in and_types:
+                sub = {
+                    "text": action.get("text", ""),
+                    "action": "move_cards",
+                    "source": action["source"],
+                    "destination": action["destination"],
+                    "card_type": ct,
+                    "count": action.get("count", 1),
+                    "max": True,
+                    "target": action.get("target", "self"),
+                }
+                if action.get("optional") is not None:
+                    sub["optional"] = action["optional"]
+                sub_actions.append(sub)
+            action["action"] = "sequential"
+            action["actions"] = sub_actions
+            action.pop("card_type", None)
+            action.pop("multiple_targets", None)
+    return action.get("action")
+
+
 def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
     """Consolidated post-dispatch normalization. Fills defaults every action needs."""
-    # Use the action's own text field if available — it may be trimmed of condition/duration
     action_text = action.get("text", text) or text
     a = action.get("action")
     # Normalize "revealed_card" (singular) to "revealed_cards" (plural) for consistency
@@ -5931,132 +6169,7 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
             if kw in text:
                 action["position"] = pos
                 break
-    if (
-        a == "move_cards"
-        and action.get("destination") == "hand"
-        and "source" not in action
-    ):
-        action["source"] = "discard"
-    if a == "move_cards":
-        if "source" not in action:
-            s = _cached_source if _cached_source is not None else extract_source(text)
-            if s:
-                action["source"] = s
-        # Handle explicit "控え室から" even when extract_source missed due to
-        # the action body being a sub-expression after "加える".
-        if action.get("source") is None and "控え室から" in text:
-            action["source"] = "discard"
-        if "source" not in action:
-            # Fallback: infer source from destination common patterns
-            dest = action.get("destination", "")
-            # "それらのカード" refers to cards from a preceding reveal/yell
-            if "それらのカード" in text:
-                action["source"] = "revealed_cards"
-            elif "それら" in text:
-                action["source"] = "selected_cards"
-            elif dest in ("deck_top", "deck_bottom", "deck"):
-                if "メンバー" not in text and "選ぶ" not in text and "選び" not in text:
-                    action["source"] = "hand"
-            elif dest in ("discard",):
-                if "このカード" in text:
-                    action["source"] = "deck_top"
-                elif "そのカード" in text:
-                    action["source"] = "looked_at"
-                elif "エネルギー" not in text:
-                    action["source"] = "hand"
-        if "destination" not in action:
-            d = _cached_dest if _cached_dest is not None else extract_destination(text)
-            if d:
-                action["destination"] = d
-        # Relative cost search: "そのメンバーのコストに2を足した数に等しいコスト"
-        # This references the card moved by the previous sub-action.
-        if (
-            action.get("source") == "discard"
-            and action.get("destination") == "same_area"
-            and "そのメンバーのコストに" in text
-            and "足した数に等しいコスト" in text
-        ):
-            m = re.search(r"コストに(\d+)を足した数に等しいコスト", text)
-            if m:
-                action["cost_reference"] = "previous_moved_card"
-                action["cost_offset"] = int(m.group(1))
-                action.setdefault("cost_limit_operator", "=")
-        if "card_type" not in action and "or_card_types" not in action:
-            ct = _infer_card_type(text, action)
-            if ct:
-                action["card_type"] = ct
-        if "card_property" not in action:
-            if "ブレードハートを持たない" in text:
-                action["card_property"] = "has_blade_heart"
-                action["negation"] = True
-            elif "ブレードハートを持つ" in text:
-                action["card_property"] = "has_blade_heart"
-            elif "{{icon_score.png|スコア}}を持つ" in text:
-                action["card_property"] = "has_score_icon"
-        if "state_change" not in action and "ウェイト状態" in text:
-            action["state_change"] = "wait"
-        # If after inference source and destination are both missing/None,
-        # or destination is a zone-only reference without source,
-        # this isn't really a move_cards — demote to custom
-        has_source = action.get("source") is not None
-        has_dest = action.get("destination") is not None
-        dest_val = action.get("destination", "")
-        zone_only_dest = (
-            dest_val in ("live_card_zone", "success_live_zone", "stage")
-            and not has_source
-        )
-        if (not has_source and not has_dest) or zone_only_dest:
-            action["action"] = "custom"
-            a = "custom"
-        card_type_kws = [
-            ("live_card", "ライブカード"),
-            ("member_card", "メンバーカード"),
-            ("energy_card", "エネルギーカード"),
-        ]
-        if action.get("card_type") and re.search(
-            r"(ライブカード|メンバーカード|エネルギーカード).*か.*(ライブカード|メンバーカード|エネルギーカード)",
-            text,
-        ):
-            or_types = [t for t, kw in card_type_kws if kw in text]
-            if len(or_types) >= 2:
-                action["or_card_types"] = or_types
-                action.pop("card_type", None)
-        # AND card types: "ライブカードとメンバーカード" → split into sequential sub-actions
-        if action.get("card_type") and re.search(
-            r"(ライブカード|メンバーカード|エネルギーカード).*と.*(ライブカード|メンバーカード|エネルギーカード)",
-            text,
-        ):
-            and_types = [
-                t
-                for kw, t in sorted(
-                    [(kw, t) for t, kw in card_type_kws if kw in text],
-                    key=lambda x: text.index(x[0]),
-                )
-            ]
-            if (
-                len(and_types) >= 2
-                and action.get("source")
-                and action.get("destination")
-            ):
-                sub_actions = []
-                for ct in and_types:
-                    sub = {
-                        "text": action.get("text", ""),
-                        "action": "move_cards",
-                        "source": action["source"],
-                        "destination": action["destination"],
-                        "card_type": ct,
-                        "count": action.get("count", 1),
-                        "max": True,
-                        "target": action.get("target", "self"),
-                    }
-                    if action.get("optional") is not None:
-                        sub["optional"] = action["optional"]
-                    sub_actions.append(sub)
-                action["action"] = "sequential"
-                action["actions"] = sub_actions
-                action.pop("card_type", None)
-                action.pop("multiple_targets", None)
+    a = _fill_defaults_move_cards(action, text, action_text, _cached_source, _cached_dest)
     if (
         "cost_limit" not in action
         and "cost_total" not in action
@@ -6081,122 +6194,7 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
             or_types = [t for t, kw in card_type_kws if kw in text]
             if len(or_types) >= 2:
                 action["or_card_types"] = or_types
-    if action.get("source") == "under_member" and a != "place_energy_under_member":
-        action["action"] = "place_energy_under_member"
-        a = "place_energy_under_member"
-        action.setdefault("energy_count", 1)
-        action.setdefault("target_member", "this_member")
-        # Cards under a member going to energy_deck are energy cards.
-        # Cards going elsewhere (e.g. empty_area for member deployment)
-        # keep whatever card_type the text parsing determined.
-        if action.get("destination") == "energy_deck":
-            action["card_type"] = "energy_card"
-    if (
-        a == "move_cards"
-        and action.get("source") in ("revealed_remaining", "revealed_cards")
-        and "dynamic_count" not in action
-    ):
-        action["dynamic_count"] = {
-            "type": "revealed_cards",
-            "reference": "previous_reveal",
-        }
-    if (
-        a == "move_cards"
-        and action.get("source") in ("revealed_card", "revealed_cards")
-        and action.get("count") is None
-    ):
-        action["count"] = 1
-    if "non_stackable" not in action and "この効果は重複しない" in text:
-        action["non_stackable"] = True
-    if not action.get("all") and re.search(
-        r"すべての|全ての|全部の|全て|全員|全体|カードをすべて", text
-    ):
-        action["all"] = True
-    if (
-        action.get("all")
-        and action.get("action") == "invalidate_ability"
-        and action.get("count") == 1
-    ):
-        action["all"] = False
-    if action.get("all"):
-        action.pop("count", None)
-    if "それぞれ" in text or "ずつ" in text:
-        action["multiple_targets"] = True
-    if (
-        action.get("count") is None
-        and "dynamic_count" not in action
-        and not action.get("any_number")
-        and not action.get("all")
-    ):
-        extracted = extract_count(text)
-        if extracted is not None:
-            action["count"] = extracted
-        else:
-            if a == "modify_required_hearts":
-                # Per-color count, not total (e.g. 3 each, not 12 total)
-                target_colors = action.get("heart_colors", [])
-                color_counts = {}
-                for m in re.finditer(r"\|(heart\d+)}", action_text):
-                    h = m.group(1)
-                    if not target_colors or h in target_colors:
-                        color_counts[h] = color_counts.get(h, 0) + 1
-                if color_counts:
-                    counts = list(color_counts.values())
-                    action["count"] = (
-                        counts[0] if len(set(counts)) == 1 else min(counts)
-                    )
-            else:
-                icon_count = _count_resource_icons(action_text)
-                if icon_count > 0:
-                    action["count"] = icon_count
-            if action.get("count") is None and a in (
-                "move_cards",
-                "draw_card",
-                "gain_resource",
-                "reveal",
-                "look_at",
-                "change_state",
-                "restriction",
-            ):
-                if a == "change_state" and action.get("group_names"):
-                    pass
-                elif a == "draw_card" and (
-                    "置いた枚数分" in text
-                    or "置いた枚数" in text
-                    or bool(re.search(r"置いた.*枚数分", text))
-                ):
-                    action["dynamic_count"] = {
-                        "type": "drawn_cards",
-                        "reference": "previous_draw",
-                    }
-                else:
-                    action["count"] = 1
-    # Fix remaining custom actions that have enough parsed info
-    if action.get("action") == "custom":
-        if action.get("ability_gain"):
-            action["action"] = "gain_ability"
-        elif re.search(r"枚数.*\d*枚増やす", text) or re.search(
-            r"枚数.*\d*枚増え", text
-        ):
-            action["action"] = "modify_limit"
-            action.setdefault("operation", "increase")
-            cnt = extract_count(text)
-            if cnt:
-                action["count"] = cnt
-        elif re.search(r"枚数.*\d*枚減らす", text) or re.search(
-            r"枚数.*\d*枚減る", text
-        ):
-            action["action"] = "modify_limit"
-            action.setdefault("operation", "decrease")
-            cnt = extract_count(text)
-            if cnt:
-                action["count"] = cnt
-        elif re.search(r"スコアを[+＋]\d+する", text):
-            action["action"] = "modify_score"
-            action.setdefault("operation", "add")
-            vm = re.search(r"([+＋])(\d+)", text)
-            if vm:
-                action["value"] = int(vm.group(2))
+    a = _fill_defaults_count_and_refine(action, text, action_text, a)
 
     if "optional" not in action and extract_optional(text):
         action["optional"] = True
