@@ -19,30 +19,30 @@
 - [x] Replace handler path enrichment block → `_enrich_condition_common(result, text)`
 - [x] Replace fallthrough path enrichment block → `_enrich_condition_common(condition, text)`
 
-## Phase 3: Break `_fill_defaults` into helpers — DEFERRED
-- [ ] Extract `_fill_defaults_source_dest(action, text)`
-- [ ] Extract `_fill_defaults_card_type(action, text)`
-- [ ] Extract `_fill_defaults_resource(action, text)`
-- [ ] Extract `_fill_defaults_per_unit(action, text)`
-- [ ] Extract `_fill_defaults_misc(action, text)`
+## Phase 3: Break `_fill_defaults` into helpers ✅ DONE
+- [x] Extract `_fill_defaults_move_cards()` (~125 lines)
+- [x] Extract `_fill_defaults_count_and_refine()` (~90 lines)
+- `_fill_defaults` reduced from 498 to ~260 lines
 
-## Phase 4: Break `_extract_generic_fields` into helpers — DEFERRED
-- [ ] Extract `_extract_target_location_fields(d, text)`
-- [ ] Extract `_extract_card_resource_fields(d, text)`
-- [ ] Extract `_extract_comparison_fields(d, text)`
-- [ ] Extract `_extract_temporal_fields(d, text)`
+## Phase 4: Break `_extract_generic_fields` into helpers ✅ DONE
+- [x] Extract `_extract_comparison_fields()` (~68 lines)
+- [x] Extract `_extract_resource_fields()` (~49 lines)
+- `_extract_generic_fields` reduced from 366 to ~250 lines
 
-## Phase 5: Break `_process_pre_fix` into named fix functions — DEFERRED
-- [ ] Extract each numbered FIX block into `_fix_N_name(eff, fix_stats)` functions
+## Phase 5: Break `_process_pre_fix` into named fix functions ✅ DONE
+- [x] Extract `_fix_sequential_chain()` (~63 lines)
+- [x] Extract `_fix_condition_enrichment()` (~70 lines)
+- `_process_pre_fix` reduced from 476 to ~340 lines
 
-## Phase 6: Break `_process_post_fixes` into named fix functions — DEFERRED
-- [ ] Extract heart_colors stripping, cost card_property, primary_effect cleanup,
-  conditional_on_result restructuring into separate functions
+## Phase 6: Break `_process_post_fixes` into named fix functions ✅ DONE
+- [x] Extract `_fix_conditional_on_result()` (~163 lines)
+- `_process_post_fixes` reduced from ~338 to ~175 lines
 
 ## Phase 7: Remove dead code ✅ DONE
 - [x] Remove duplicate re_yell registration (was at ~2250-2279)
 - [x] Remove dead `locals().get("dur_effect")` check in parse_effect
 
-## Phase 8: Standardize _ACTION_RULES format — DEFERRED
-- [ ] Convert tuple-format entries to ActionRule objects
-- [ ] Remove try/except TypeError arity workaround
+## Phase 8: Standardize _ACTION_RULES format — NOT DONE (33 tuple entries remain)
+- [ ] Convert 33 tuple-format entries to ActionRule objects
+- [ ] Remove try/except TypeError arity workaround in dispatch
+- Low priority: mechanical work, no behavioral change

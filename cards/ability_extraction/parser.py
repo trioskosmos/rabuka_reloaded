@@ -123,6 +123,7 @@ from parser_utils import (
     LOCATION_PATTERNS,
     CARD_TYPE_PATTERNS,
     OPERATOR_PATTERNS,
+    POSITION_KEYWORDS,
     PriorityRegistry,
     ActionRule,
     EffectPattern,
@@ -158,15 +159,6 @@ SPLIT_LIMIT = 1
 # Do NOT set position to "left_side,right_side" — that will break the engine.
 
 # ============== POSITION KEYWORDS ==============
-POSITION_KEYWORDS = {
-    "センターエリア": "center",
-    "左サイドエリア": "left_side",
-    "右サイドエリア": "right_side",
-    "センター": "center",
-    "左サイド": "left_side",
-    "右サイド": "right_side",
-    "正面": "front",
-}
 
 
 def detect_positions(text: str) -> list:
@@ -550,21 +542,6 @@ def _has_shuffle(text):
     return "シャッフル" in text
 
 
-def extract_cost_operator(text):
-    """Extract cost comparison operator from Japanese text.
-    Returns operator string like '<=', '>=', '<', '>', '=' or None.
-    """
-    if "以下" in text:
-        return "<="
-    elif "以上" in text:
-        return ">="
-    elif "未満" in text:
-        return "<"
-    elif "超" in text or "より大きい" in text:
-        return ">"
-    return None
-
-
 def extract_cost_modification(text: str) -> Optional[Dict[str, Any]]:
     """Extract cost modification patterns from text."""
     result = {}
@@ -802,7 +779,7 @@ def _extract_basic_cost_fields(cost, text):
     cl = extract_cost_limit(text)
     if cl:
         cost["cost_limit"] = cl
-        op = extract_cost_operator(text)
+        op = extract_operator(text)
         if op:
             cost["cost_limit_operator"] = op
     # Discrete cost values (OR) — "コストが10か20" → cost_values: [10, 20]
@@ -2811,7 +2788,7 @@ def parse_action(text: str) -> Dict[str, Any]:
             key = "cost_total" if is_total else "cost_limit"
             action[key] = cost_limit
             # Extract operator: 以下(<=), 以上(>=), exact(=), 未満(<), 超(>)
-            action[op] = extract_cost_operator(text) or "="
+            action[op] = extract_operator(text) or "="
 
     # Check for card name matching constraints (Q236/Q237 - 日野下花帆 pattern)
     # Pattern: "これにより公開したカードのカード名がすべて含まれる"
@@ -6159,7 +6136,7 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         if cl:
             action["cost_limit"] = cl
             if "cost_limit_operator" not in action:
-                action["cost_limit_operator"] = extract_cost_operator(text) or "="
+                action["cost_limit_operator"] = extract_operator(text) or "="
     # OR card types for ALL action types (not just move_cards/select)
     if a not in ("move_cards", "select") and "or_card_types" not in action:
         card_type_kws = [
@@ -6488,7 +6465,7 @@ def _try_per_unit(text):
     cl = extract_cost_limit(per_text)
     if cl:
         result["cost_limit"] = cl
-        op = extract_cost_operator(per_text)
+        op = extract_operator(per_text)
         if op:
             result["cost_limit_operator"] = op
 

@@ -230,7 +230,7 @@ def extract_blade_count(text):
     return len(matches) if matches else 0
 
 
-def check_exclude_self(text):
+def _check_exclude_self_broad(text):
     """Check if text contains 'other' patterns (ほかの/他の) that imply exclude_self."""
     return "ほかの" in text or "他の" in text or "以外" in text
 
@@ -835,7 +835,7 @@ class FieldExtractor:
             else ("cost" if _DISTINCT_COST_RE.search(t) else None)
         )
         self.original_value = _ORIGINAL_VALUE_RE.search(t) is not None if t else None
-        self.exclude_self = check_exclude_self(t) if t else None
+        self.exclude_self = _check_exclude_self_broad(t) if t else None
         self.shuffle = _SHUFFLE_RE.search(t) is not None if t else None
         self.group_reference = (
             "same_group_name"
