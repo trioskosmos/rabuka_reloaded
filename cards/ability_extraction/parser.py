@@ -2562,6 +2562,15 @@ _register_action(
     )
 )
 
+# "メンバーのいないエリアに登場" → move_cards to empty stage slot
+_register_action(
+    ActionRule(
+        condition=lambda t: "メンバーのいないエリア" in t and "登場" in t,
+        action="move_cards",
+        setter=lambda t, a: a.update({"empty_slot": True}),
+    )
+)
+
 
 def _blade_icon_is_target_filter(text: str) -> bool:
     """True when the {{icon_blade.png|ブレード}} icon describes the TARGET member's
