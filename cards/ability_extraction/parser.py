@@ -1581,6 +1581,30 @@ def parse_effect(text: str) -> Dict[str, Any]:
     return effect
 
 
+def _enrich_condition_common(d: Dict[str, Any], text: str) -> None:
+    """Apply shared enrichments that both the handler path and fallthrough path need."""
+    if "scope" not in d and "自分と相手" in text:
+        d["scope"] = "both"
+    if "position" not in d and "positions_characters" not in d:
+        set_cross_position_fields(d, text)
+    elif (
+        "position_compare" not in d
+        and d.get("comparison_type") == "equality"
+    ):
+        matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in text}
+        matched.discard(d.get("position"))
+        if matched:
+            d["position_compare"] = sorted(matched)[0]
+    if d.get("position") and d.get("position_compare"):
+        if re.search(
+            r"(?:センターエリア|左サイドエリア|右サイドエリア|センター|左サイド|右サイド).*にいる",
+            text,
+        ):
+            d["require_position_cards"] = True
+    _enrich_or_location(d, text)
+    _enrich_heart_content(d, text)
+
+
 def parse_condition(text: str) -> Dict[str, Any]:
     """Parse a condition text using priority-ordered handler cascade.
 
@@ -1626,38 +1650,9 @@ def parse_condition(text: str) -> Dict[str, Any]:
                     result["card_property"] = cp[0]
                     if cp[1]:
                         result["negation"] = True
-            # Add scope/aggregate fields for "自分と相手" conditions
-            if "scope" not in result and "自分と相手" in text:
-                result["scope"] = "both"
             if "aggregate" not in result and "合計" in text:
                 result["aggregate"] = "total"
-            # Add position only when exactly one keyword matches (avoids overriding
-            # _try_appearance's intentional multi-position detection).
-            # Skip when positions_characters already encodes per-position mappings.
-            if "position" not in result and "positions_characters" not in result:
-                set_cross_position_fields(result, text)
-            elif (
-                "position_compare" not in result
-                and result.get("comparison_type") == "equality"
-            ):
-                # Handler already set position — check for cross-position equality
-                matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in text}
-                matched.discard(result["position"])
-                if matched:
-                    result["position_compare"] = sorted(matched)[0]
-            # require_position_cards: when text says members "are in" multiple
-            # positions (e.g. "右サイドエリアと左サイドエリアにいる"), both
-            # positions must have cards.  Empty slot should not count as cost 0.
-            if result.get("position") and result.get("position_compare"):
-                if re.search(
-                    r"(?:センターエリア|左サイドエリア|右サイドエリア|センター|左サイド|右サイド).*にいる",
-                    text,
-                ):
-                    result["require_position_cards"] = True
-            # OR-location: zone1かzone2 pattern → add locations array
-            _enrich_or_location(result, text)
-            # Heart-content filter: 必要ハートに含まれるheartXXがN → add heart_colors
-            _enrich_heart_content(result, text)
+            _enrich_condition_common(result, text)
             # G11 blade-max comparison flag (handler path skips _extract_generic_fields)
             if "より多くの" in text and "ブレード" in text and "持つ" in text:
                 result["blade_greater_than_all"] = True
@@ -1666,31 +1661,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     # Fall-through: generic field extraction + type inference
     condition: Dict[str, Any] = {"text": text}
     _extract_generic_fields(condition, text)
-    # Add scope for conditions that span both players
-    if "scope" not in condition and "自分と相手" in text:
-        condition["scope"] = "both"
-    # Extract position from POSITION_KEYWORDS for fall-through conditions
-    # Skip when positions_characters already encodes per-position mappings.
-    if "position" not in condition and "positions_characters" not in condition:
-        set_cross_position_fields(condition, text)
-    elif (
-        "position_compare" not in condition
-        and condition.get("comparison_type") == "equality"
-    ):
-        matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in text}
-        matched.discard(condition.get("position"))
-        if matched:
-            condition["position_compare"] = sorted(matched)[0]
-    # require_position_cards: same detection as handler path above
-    if condition.get("position") and condition.get("position_compare"):
-        if re.search(
-            r"(?:センターエリア|左サイドエリア|右サイドエリア|センター|左サイド|右サイド).*にいる",
-            text,
-        ):
-            condition["require_position_cards"] = True
-    # OR-location and heart-content enrichment for fallthrough path
-    _enrich_or_location(condition, text)
-    _enrich_heart_content(condition, text)
+    _enrich_condition_common(condition, text)
     _DEBUG_LOG.append(
         f"parse_condition({text!r})\n"
         f"  → no handler matched, fallthrough\n"

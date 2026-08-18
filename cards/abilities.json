@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-18T14:23:53.969769",
+  "generated_at": "2026-08-18T14:25:23.709243",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "52522c27",
+  "engine_commit": "90a3d690",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -3254,8 +3254,8 @@
           "text": "自分と相手のエネルギーの合計が15枚以上あるかぎり",
           "target": "both",
           "location": "energy_zone",
-          "scope": "both",
-          "aggregate": "total"
+          "aggregate": "total",
+          "scope": "both"
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -10430,8 +10430,8 @@
           "text": "自分と相手の成功ライブカード置き場にカードが合計4枚以上あるかぎり",
           "location": "success_live_card_zone",
           "target": "both",
-          "scope": "both",
-          "aggregate": "total"
+          "aggregate": "total",
+          "scope": "both"
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -13226,8 +13226,8 @@
           "text": "自分と相手の成功ライブカード置き場にカードが合計3枚以上ある場合",
           "location": "success_live_card_zone",
           "target": "both",
-          "scope": "both",
-          "aggregate": "total"
+          "aggregate": "total",
+          "scope": "both"
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -18829,8 +18829,8 @@
           "operator": ">=",
           "text": "これにより自分と相手のカードが合計20枚以上デッキの下に置かれた場合",
           "target": "both",
-          "scope": "both",
           "aggregate": "total",
+          "scope": "both",
           "source": "preceding_moved"
         },
         "followup_action": {
