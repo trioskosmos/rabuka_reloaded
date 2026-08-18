@@ -2486,13 +2486,7 @@ _register_action(
     )
 )
 _register_action(ActionRule(match="必要ハートを選ぶ", action="choose_required_hearts"))
-_register_action(
-    ActionRule(
-        match="好きな順番で",
-        action="move_cards",
-        defaults={"placement_order": "any_order"},
-    )
-)
+_register_action(ActionRule(match="登場させ", action="move_cards", defaults={"destination": "stage"}))
 _register_action(
     ActionRule(
         match_all=[
@@ -2559,15 +2553,6 @@ _register_action(
         condition=lambda t: bool(re.search(r"［[^］]+ハート］", t)),
         action="gain_resource",
         setter=_set_heart_selection_resource,
-    )
-)
-
-# "メンバーのいないエリアに登場" → move_cards to empty stage slot
-_register_action(
-    ActionRule(
-        condition=lambda t: "メンバーのいないエリア" in t and "登場" in t,
-        action="move_cards",
-        setter=lambda t, a: a.update({"empty_slot": True}),
     )
 )
 
@@ -5949,6 +5934,15 @@ def _fill_defaults_move_cards(action, text, action_text, _cached_source, _cached
     has_source = action.get("source") is not None
     has_dest = action.get("destination") is not None
     dest_val = action.get("destination", "")
+    # "メンバーのいないエリアに登場" → appear to empty stage slot (not a regular move)
+    # Only when a source is present (standalone fragments without source should stay as custom)
+    if (
+        has_source
+        and "メンバーのいないエリア" in (action.get("text") or "")
+        and dest_val == "stage"
+    ):
+        action["destination"] = "empty_area"
+        dest_val = "empty_area"
     zone_only_dest = (
         dest_val in ("live_card_zone", "success_live_zone", "stage")
         and not has_source
@@ -10798,6 +10792,7 @@ def _fix_sequential_chain(eff):
     prev_was_select = False
     prev_was_look_at = False
     prev_was_baton_touch = False
+    prev_source = None
     for sub in eff.get("actions", []):
         if not isinstance(sub, dict):
             prev_was_select = prev_was_look_at = prev_was_baton_touch = False
@@ -10853,6 +10848,16 @@ def _fix_sequential_chain(eff):
             prev_was_select = False
         else:
             prev_was_select = prev_was_look_at = prev_was_baton_touch = False
+        # Track source for empty_area propagation (e.g. "メンバーのいないエリアに登場")
+        if sub.get("source"):
+            prev_source = sub["source"]
+        elif (
+            sub.get("action") == "move_cards"
+            and sub.get("destination") == "empty_area"
+            and not sub.get("source")
+            and prev_source
+        ):
+            sub["source"] = prev_source
 
 
 def _fix_condition_enrichment(eff, t, fix_stats):

@@ -2161,13 +2161,13 @@ impl AbilityResolver {
                 Choice::select_cards(
                     Zone::UnderMember.to_str(),
                     choice_count,
-                    "Select energy cards to move from under member to energy deck",
+                    "Select a card to move from under member",
                     optional,
                 )
                 .description_ja(Some(
-                    "メンバーの下からエネルギーデッキに戻すエネルギーカードを選択".to_string(),
+                    "メンバーの下からカードを選択".to_string(),
                 ))
-                .card_type(Some("energy_card".to_string()))
+                .card_type(effect.card_type_any().map(|s| s.to_string()))
                 .target_player_id(Some(target.to_string()))
                 .build(),
             );
