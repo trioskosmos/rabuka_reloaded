@@ -10843,6 +10843,134 @@ def _apply_recursive_fixes(d, fix_stats):
                 _apply_recursive_fixes(item, fix_stats)
 
 
+def _fix_sequential_chain(eff):
+    """Propagate card_type, infer missing actions, chain select/look_at → move_cards sources."""
+    if eff.get("action") != "sequential":
+        return
+    parent_card_type = eff.get("card_type")
+    prev_was_select = False
+    prev_was_look_at = False
+    prev_was_baton_touch = False
+    for sub in eff.get("actions", []):
+        if not isinstance(sub, dict):
+            prev_was_select = prev_was_look_at = prev_was_baton_touch = False
+            continue
+        if not sub.get("card_type") and parent_card_type:
+            sub["card_type"] = parent_card_type
+        if not sub.get("action"):
+            if sub.get("source") and sub.get("destination"):
+                sub["action"] = "move_cards"
+            elif sub.get("actions"):
+                sub["action"] = "sequential"
+        if sub.get("action") in ("select_cards", "look_and_select", "select"):
+            prev_was_select = True
+            prev_was_look_at = prev_was_baton_touch = False
+        elif sub.get("action") == "look_at":
+            prev_was_look_at = True
+            prev_was_select = prev_was_baton_touch = False
+        elif sub.get("action") == "play_baton_touch":
+            prev_was_baton_touch = True
+            prev_was_select = prev_was_look_at = False
+        elif sub.get("action") == "move_cards" and prev_was_look_at:
+            if sub.get("source") != "looked_at":
+                sub["source"] = "looked_at"
+            if (
+                sub.get("destination") == "discard"
+                and sub.get("discard_remaining") is not False
+            ):
+                sub["discard_remaining"] = False
+            prev_was_look_at = False
+        elif sub.get("action") == "move_cards" and prev_was_select:
+            if sub.get("source") != "selected_cards":
+                sub["source"] = "selected_cards"
+            if sub.get("count") is not None and "count" not in sub.get("text", ""):
+                sub.pop("count", None)
+            prev_was_select = False
+        elif sub.get("action") == "move_cards" and prev_was_baton_touch:
+            if sub.get("source") != "those_cards":
+                sub["source"] = "those_cards"
+            if not sub.get("group_names") and eff.get("group_names"):
+                sub["group_names"] = eff["group_names"]
+            prev_was_baton_touch = False
+        elif (
+            sub.get("action") == "gain_resource"
+            and sub.get("resource") == "heart"
+            and prev_was_select
+        ):
+            sub_text = sub.get("text", "")
+            if (
+                "選んだカードが持つ色" in sub_text
+                or "これにより選んだカード" in sub_text
+            ):
+                sub["heart_colors_from_selected_card"] = True
+            prev_was_select = False
+        else:
+            prev_was_select = prev_was_look_at = prev_was_baton_touch = False
+
+
+def _fix_condition_enrichment(eff, t, fix_stats):
+    """FIX 8/8e/8f: condition card_property, temporal aggregate, need_heart_total."""
+    cond = eff.get("condition")
+    if isinstance(cond, dict):
+        ct = cond.get("text", "") or t
+        if cond.get("type") == "card_count_condition":
+            if "ブレードハート" in ct:
+                cond["card_property"] = "has_blade_heart"
+                if "持たない" in ct or "ない" in ct:
+                    cond["negation"] = True
+                fix_stats["card_property"] += 1
+            if "{{icon_score.png|スコア}}を持つ" in ct and not cond.get(
+                "card_property"
+            ):
+                cond["card_property"] = "has_score_icon"
+                fix_stats["card_property"] += 1
+            _infer_heart_source(cond, ct)
+            _infer_baton_touch(cond, ct)
+        if cond.get("type") == "temporal_condition":
+            changed = False
+            has_req_heart = "必要ハート" in ct
+            has_aggregate_keyword = "含まれ" in ct or "のうち" in ct
+            has_total_or_each = "合計" in ct or "それぞれ" in ct
+            if has_req_heart and has_aggregate_keyword and has_total_or_each:
+                cond["aggregate"] = "total"
+                changed = True
+            if not cond.get("heart_colors"):
+                hm = re.findall(
+                    r"{{heart_(\d+)\.png\|heart\d+}}", cond.get("text", "") or ct
+                )
+                if hm:
+                    cond["heart_colors"] = sorted(set(f"heart{m.zfill(2)}" for m in hm))
+                    changed = True
+            ct2 = cond.get("text", "") or ct
+            if not cond.get("count"):
+                cm = re.search(r"(\d+)以上", ct2)
+                if cm:
+                    cond["count"] = int(cm.group(1))
+                    changed = True
+            if changed:
+                fix_stats["temporal"] += 1
+    if "{{icon_score.png|スコア}}を持つ" in t:
+        if eff.get("action") in ("move_cards", "select") and not eff.get(
+            "card_property"
+        ):
+            eff["card_property"] = "has_score_icon"
+            fix_stats["card_property"] += 1
+        cond = eff.get("condition")
+        if isinstance(cond, dict) and not cond.get("card_property"):
+            cond["card_property"] = "has_score_icon"
+            fix_stats["card_property"] += 1
+    if (
+        eff.get("per_unit")
+        and not eff.get("need_heart_total")
+        and not eff.get("dynamic_count")
+    ):
+        nh = re.search(r"ハートを(\d+)つ以上持つ", t)
+        if nh:
+            eff["need_heart_total"] = int(nh.group(1))
+            eff["need_heart_operator"] = ">="
+            fix_stats["need_heart"] = fix_stats.get("need_heart", 0) + 1
+
+
 def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None:
     """Pre-fix pass: condition re-parse, target fix, action inference, sequential chain fixes, targeted fixes."""
     # ─── Pre-fix pass (merged from 3 separate loops) ───────────────────────────
@@ -10906,69 +11034,7 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
         elif eff.get("opponent_action"):
             eff["action"] = "opponent_action"
 
-    # --- 4. Sequential chain fixes ---
-    if eff.get("action") == "sequential":
-        parent_card_type = eff.get("card_type")
-        prev_was_select = False
-        prev_was_look_at = False
-        prev_was_baton_touch = False
-        for sub in eff.get("actions", []):
-            if not isinstance(sub, dict):
-                prev_was_select = prev_was_look_at = prev_was_baton_touch = False
-                continue
-            # Propagate card_type from parent and infer missing sub-action.
-            if not sub.get("card_type") and parent_card_type:
-                sub["card_type"] = parent_card_type
-            if not sub.get("action"):
-                if sub.get("source") and sub.get("destination"):
-                    sub["action"] = "move_cards"
-                elif sub.get("actions"):
-                    sub["action"] = "sequential"
-            # Chain select→move, look_at→move, and play_baton_touch→move source inference.
-            if sub.get("action") in ("select_cards", "look_and_select", "select"):
-                prev_was_select = True
-                prev_was_look_at = prev_was_baton_touch = False
-            elif sub.get("action") == "look_at":
-                prev_was_look_at = True
-                prev_was_select = prev_was_baton_touch = False
-            elif sub.get("action") == "play_baton_touch":
-                prev_was_baton_touch = True
-                prev_was_select = prev_was_look_at = False
-            elif sub.get("action") == "move_cards" and prev_was_look_at:
-                if sub.get("source") != "looked_at":
-                    sub["source"] = "looked_at"
-                if (
-                    sub.get("destination") == "discard"
-                    and sub.get("discard_remaining") is not False
-                ):
-                    sub["discard_remaining"] = False
-                prev_was_look_at = False
-            elif sub.get("action") == "move_cards" and prev_was_select:
-                if sub.get("source") != "selected_cards":
-                    sub["source"] = "selected_cards"
-                if sub.get("count") is not None and "count" not in sub.get("text", ""):
-                    sub.pop("count", None)
-                prev_was_select = False
-            elif sub.get("action") == "move_cards" and prev_was_baton_touch:
-                if sub.get("source") != "those_cards":
-                    sub["source"] = "those_cards"
-                if not sub.get("group_names") and eff.get("group_names"):
-                    sub["group_names"] = eff["group_names"]
-                prev_was_baton_touch = False
-            elif (
-                sub.get("action") == "gain_resource"
-                and sub.get("resource") == "heart"
-                and prev_was_select
-            ):
-                sub_text = sub.get("text", "")
-                if (
-                    "選んだカードが持つ色" in sub_text
-                    or "これにより選んだカード" in sub_text
-                ):
-                    sub["heart_colors_from_selected_card"] = True
-                prev_was_select = False
-            else:
-                prev_was_select = prev_was_look_at = prev_was_baton_touch = False
+    _fix_sequential_chain(eff)
 
     # --- 2. Targeted fixes logic ---
     t = ability.get("triggerless_text", "")
@@ -11032,80 +11098,7 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
                     _enrich_from_text(sub, sub_text)
                     fix_stats["ability_filter"] += 1
 
-    # FIX 8: Condition fixes — card_property + enrichment
-    cond = eff.get("condition")
-    if isinstance(cond, dict):
-        ct = cond.get("text", "") or t
-
-        # 8b: card_property enrichment for card_count_condition
-        if cond.get("type") == "card_count_condition":
-            if "ブレードハート" in ct:
-                cond["card_property"] = "has_blade_heart"
-                if "持たない" in ct or "ない" in ct:
-                    cond["negation"] = True
-                fix_stats["card_property"] += 1
-            if "{{icon_score.png|スコア}}を持つ" in ct and not cond.get(
-                "card_property"
-            ):
-                cond["card_property"] = "has_score_icon"
-                fix_stats["card_property"] += 1
-            _infer_heart_source(cond, ct)
-            _infer_baton_touch(cond, ct)
-
-        # 8d: Enrich temporal_condition with aggregate
-        if cond.get("type") == "temporal_condition":
-            changed = False
-            hc = len(re.findall(r"\{\{heart_\d+\.png", ct))
-            has_req_heart = "必要ハート" in ct
-            has_aggregate_keyword = "含まれ" in ct or "のうち" in ct
-            has_total_or_each = "合計" in ct or "それぞれ" in ct
-            if has_req_heart and has_aggregate_keyword and has_total_or_each:
-                cond["aggregate"] = "total"
-                changed = True
-            if not cond.get("heart_colors"):
-                hm = re.findall(
-                    r"{{heart_(\d+)\.png\|heart\d+}}", cond.get("text", "") or ct
-                )
-                if hm:
-                    cond["heart_colors"] = sorted(set(f"heart{m.zfill(2)}" for m in hm))
-                    changed = True
-            ct2 = cond.get("text", "") or ct
-            if not cond.get("count"):
-                cm = re.search(r"(\d+)以上", ct2)
-                if cm:
-                    cond["count"] = int(cm.group(1))
-                    changed = True
-            if changed:
-                fix_stats["temporal"] += 1
-
-        # Remove check_self (reference doesn't have it)
-
-    # FIX 8e: card_property: has_score_icon for effects/conditions with score icon
-    if "{{icon_score.png|スコア}}を持つ" in t:
-        # Set on the effect for move_cards/select actions
-        if eff.get("action") in ("move_cards", "select") and not eff.get(
-            "card_property"
-        ):
-            eff["card_property"] = "has_score_icon"
-            fix_stats["card_property"] += 1
-        # Also set on the condition (any action type including modify_score)
-        cond = eff.get("condition")
-        if isinstance(cond, dict) and not cond.get("card_property"):
-            cond["card_property"] = "has_score_icon"
-            fix_stats["card_property"] += 1
-
-    # FIX 8f: need_heart_total from "ハートをNつ以上持つ" (heart threshold)
-    # Only in per_unit contexts (move_cards already handled by _try_virtuoso_move_cards).
-    if (
-        eff.get("per_unit")
-        and not eff.get("need_heart_total")
-        and not eff.get("dynamic_count")
-    ):
-        nh = re.search(r"ハートを(\d+)つ以上持つ", t)
-        if nh:
-            eff["need_heart_total"] = int(nh.group(1))
-            eff["need_heart_operator"] = ">="
-            fix_stats["need_heart"] = fix_stats.get("need_heart", 0) + 1
+    _fix_condition_enrichment(eff, t, fix_stats)
 
     # FIX 9: Result condition enrichment in conditional_on_result
     rc = eff.get("result_condition")

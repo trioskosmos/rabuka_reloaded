@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-18T14:36:06.826481",
+  "generated_at": "2026-08-18T14:37:44.408814",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "b2752d7a",
+  "engine_commit": "f9bcc0fe",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
