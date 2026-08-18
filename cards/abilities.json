@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-18T16:31:03.852765",
+  "generated_at": "2026-08-18T16:34:30.782918",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "36014ab5",
+  "engine_commit": "5a4f29bf",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -6476,11 +6476,13 @@
         },
         "followup_action": {
           "text": "そのカードを自分のステージのメンバーのいないエリアに登場させてもよい",
-          "destination": "stage",
+          "destination": "empty_area",
           "card_type": "member_card",
           "target": "self",
           "optional": true,
-          "action": "custom"
+          "action": "move_cards",
+          "source": "preceding_moved",
+          "count": 1
         }
       }
     },

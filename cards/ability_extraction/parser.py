@@ -5935,14 +5935,16 @@ def _fill_defaults_move_cards(action, text, action_text, _cached_source, _cached
     has_dest = action.get("destination") is not None
     dest_val = action.get("destination", "")
     # "メンバーのいないエリアに登場" → appear to empty stage slot (not a regular move)
-    # Only when a source is present (standalone fragments without source should stay as custom)
-    if (
-        has_source
-        and "メンバーのいないエリア" in (action.get("text") or "")
-        and dest_val == "stage"
-    ):
-        action["destination"] = "empty_area"
-        dest_val = "empty_area"
+    # "そのカード" refers to a card from a preceding action — use preceding_moved source
+    if "メンバーのいないエリア" in (action.get("text") or "") and dest_val == "stage":
+        if "そのカード" in (action.get("text") or ""):
+            action["source"] = "preceding_moved"
+            has_source = True
+            action["destination"] = "empty_area"
+            dest_val = "empty_area"
+        elif has_source:
+            action["destination"] = "empty_area"
+            dest_val = "empty_area"
     zone_only_dest = (
         dest_val in ("live_card_zone", "success_live_zone", "stage")
         and not has_source
