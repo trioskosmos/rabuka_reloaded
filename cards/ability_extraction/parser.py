@@ -560,7 +560,7 @@ def extract_cost_operator(text):
         return ">="
     elif "未満" in text:
         return "<"
-    elif "超" in text:
+    elif "超" in text or "より大きい" in text:
         return ">"
     return None
 
@@ -590,6 +590,35 @@ def extract_cost_modification(text: str) -> Optional[Dict[str, Any]]:
         result["threshold_operator"] = "<="
 
     return result if result else None
+
+
+def detect_exclude_self(text: str) -> bool:
+    """Return True if text contains 'exclude other members' patterns.
+    Core patterns shared across all call sites: このメンバー以外, ほかのメンバー.
+    Sites needing このカード以外 or 「name」以外 add those explicitly.
+    """
+    if "このメンバー以外" in text:
+        return True
+    if re.search(r"ほかの.*?(?:メンバー|カード)", text):
+        return True
+    return False
+
+
+def extract_heart_colors_from_text(text: str) -> list:
+    """Extract heart color list from {{heart_XX.png|heartXX}} icon patterns."""
+    hm = re.findall(r"\{\{heart_(\d+)\.png\|heart\d+\}\}", text)
+    if hm:
+        return sorted(set(f"heart{m.zfill(2)}" for m in hm))
+    return []
+
+
+def detect_duration_code(text: str) -> Optional[str]:
+    """Detect duration patterns and return the duration code, or None."""
+    if "ライブ終了時まで" in text:
+        return "live_end"
+    if "ターン終了時まで" in text or "そのターンの間" in text:
+        return "turn_end"
+    return None
 
 
 # ====================================================================
@@ -773,23 +802,20 @@ def _extract_basic_cost_fields(cost, text):
     cl = extract_cost_limit(text)
     if cl:
         cost["cost_limit"] = cl
-        for kw, op in [("以下", "<="), ("以上", ">="), ("未満", "<"), ("超", ">")]:
-            if kw in text:
-                cost["cost_limit_operator"] = op
-                break
+        op = extract_cost_operator(text)
+        if op:
+            cost["cost_limit_operator"] = op
     # Discrete cost values (OR) — "コストが10か20" → cost_values: [10, 20]
     cv = extract_cost_values(text)
     if cv:
         cost["cost_values"] = cv
         cost.pop("cost_limit", None)
     # Exclude self / self cost
-    if "このメンバー以外" in text or bool(re.search(r"ほかの.*?メンバー", text)):
+    if detect_exclude_self(text):
         cost["exclude_self"] = True
     # Same unit name
     if "同じユニット名" in text:
         cost["same_unit_name"] = True
-    if re.search(r"「.+」以外", text):
-        cost["exclude_self"] = True
     if (
         "このメンバー" in text
         and "このメンバー以外" not in text
@@ -2847,16 +2873,7 @@ def parse_action(text: str) -> Dict[str, Any]:
             key = "cost_total" if is_total else "cost_limit"
             action[key] = cost_limit
             # Extract operator: 以下(<=), 以上(>=), exact(=), 未満(<), 超(>)
-            if "以下" in text:
-                action[op] = "<="
-            elif "以上" in text:
-                action[op] = ">="
-            elif "未満" in text:
-                action[op] = "<"
-            elif "超" in text:
-                action[op] = ">"
-            else:
-                action[op] = "="  # bare number → exact match
+            action[op] = extract_cost_operator(text) or "="
 
     # Check for card name matching constraints (Q236/Q237 - 日野下花帆 pattern)
     # Pattern: "これにより公開したカードのカード名がすべて含まれる"
@@ -2905,9 +2922,7 @@ def parse_action(text: str) -> Dict[str, Any]:
 
     # Extract exclude_self for actions (e.g., "このメンバー以外の" or "「character name」以外")
     # Only for filtering actions, NOT for gain_resource/select (self-buffs)
-    if (
-        "このメンバー以外" in text or bool(re.search(r"ほかの.*?メンバー", text))
-    ) and action.get("action") not in ("gain_resource", "select", "heart_selection"):
+    if detect_exclude_self(text) and action.get("action") not in ("gain_resource", "select", "heart_selection"):
         action["exclude_self"] = True
     # Also check for specific character name exclusions like "「鬼塚冬毬」以外"
     if re.search(r"「.+」以外", text):
@@ -3040,7 +3055,7 @@ def parse_action(text: str) -> Dict[str, Any]:
         and not _blade_icon_is_target_filter(text)
     ):
         blade_count = text.count("{{icon_blade.png|ブレード}}")
-        heart_matches = re.findall(r"\{\{heart_(\d+)\.png\|heart\d+\}\}", text)
+        heart_colors = extract_heart_colors_from_text(text)
         actions = []
         if blade_count:
             actions.append(
@@ -3050,14 +3065,13 @@ def parse_action(text: str) -> Dict[str, Any]:
                     "count": blade_count,
                 }
             )
-        if heart_matches:
-            colors = sorted(set(f"heart{m.zfill(2)}" for m in heart_matches))
+        if heart_colors:
             actions.append(
                 {
                     "action": "gain_resource",
                     "resource": "heart",
-                    "heart_colors": colors,
-                    "count": len(heart_matches),
+                    "heart_colors": heart_colors,
+                    "count": len(heart_colors),
                 }
             )
         if actions:
@@ -3445,11 +3459,7 @@ def _enrich_card_count_condition(result, text):
     if u == "人":
         result["card_type"] = "member_card"
     # Extract exclude_self for "このメンバー以外" pattern
-    if (
-        "このメンバー以外" in text
-        or "このカード以外" in text
-        or bool(re.search(r"ほかの.*?メンバー", text))
-    ):
+    if detect_exclude_self(text) or "このカード以外" in text:
         result["exclude_self"] = True
         result["card_type"] = "member_card"
     # Detect negation
@@ -3901,7 +3911,7 @@ def _try_baton_touch(text):
             "operator": "<" if "低い" in text else ">",
             "relative_to": "activating",
         }
-    if "このメンバー以外" in text or bool(re.search(r"ほかの.*?メンバー", text)):
+    if detect_exclude_self(text):
         result["exclude_self"] = True
     if "能力を持たない" in text or "能力も持たない" in text:
         result["ability_filter"] = "no_ability"
@@ -4358,12 +4368,8 @@ def _try_appearance(text):
             result["characters"] = [c for c in result["characters"] if c != ref]
     if "エリアすべて" in text:
         result["all_areas"] = True
-    # Exclude self for "このメンバー以外" / "このカード以外" patterns
-    if (
-        "このメンバー以外" in text
-        or "このカード以外" in text
-        or re.search(r"ほかの.*?メンバー", text)
-    ):
+    # Exclude self
+    if detect_exclude_self(text) or "このカード以外" in text:
         result["exclude_self"] = True
     gns = extract_group_names(text)
     if gns:
@@ -4685,12 +4691,8 @@ def _try_heart_possession(text):
         result["original_value"] = True
         result["operator"] = ">"
         result["count"] = 1
-    # Exclude self for "他のメンバー" / "ほかのメンバー" / "このメンバー以外" patterns
-    if (
-        "このメンバー以外" in text
-        or "このカード以外" in text
-        or re.search(r"ほかの.*?メンバー", text)
-    ):
+    # Exclude self
+    if detect_exclude_self(text) or "このカード以外" in text:
         result["exclude_self"] = True
     return result
 
@@ -5327,13 +5329,9 @@ def _extract_generic_fields(condition, text):
                     condition["resource_type"] = "heart"
     # Extract heart_colors from any condition text with {{heart_XX.png}} icons
     # Used by location_condition to check collective presence of specific heart colors
-    hm = re.findall(r"{{heart_(\d+)\.png\|heart\d+}}", text)
-    if hm:
-        colors = sorted(set(f"heart{m.zfill(2)}" for m in hm))
-        condition["heart_colors"] = colors
-        # DEBUG: trace heart_colors extraction
-        import sys
-        print(f"[HEART_DEBUG] text={text[:100]!r}", file=sys.stderr)
+    hc = extract_heart_colors_from_text(text)
+    if hc:
+        condition["heart_colors"] = hc
 
     # Energy count
     if "エネルギー" in text:
@@ -5509,18 +5507,7 @@ def _extract_generic_fields(condition, text):
         condition["all_areas"] = True
 
     # Exclude self
-    has_exclude_self_kw = any(
-        kw in text
-        for kw in [
-            "このメンバー以外",
-            "このメンバー以外の",
-            "このカード以外",
-            "このカード以外の",
-        ]
-    )
-    if not has_exclude_self_kw:
-        has_exclude_self_kw = bool(re.search(r"ほかの.*?メンバー", text))
-    if has_exclude_self_kw:
+    if detect_exclude_self(text) or "このカード以外" in text:
         condition["exclude_self"] = True
 
     # Exclude specific card names (e.g. 「MY舞☆TONIGHT」以外)
@@ -5940,10 +5927,9 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         action["same_name"] = True
     # Extract heart_colors for ALL action types, not just gain_resource
     if "heart_colors" not in action:
-        hm = re.findall(r"\{\{heart_(\d+)\.png\|heart\d+\}\}", text)
-        if hm:
-            colors = sorted(set(f"heart{m.zfill(2)}" for m in hm))
-            action["heart_colors"] = colors
+        hc = extract_heart_colors_from_text(text)
+        if hc:
+            action["heart_colors"] = hc
             if detect_require_all_hearts(text):
                 action["require_all_heart_colors"] = True
     if a == "modify_required_hearts" and "operation" not in action:
@@ -6142,16 +6128,7 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         if cl:
             action["cost_limit"] = cl
             if "cost_limit_operator" not in action:
-                if "以下" in text:
-                    action["cost_limit_operator"] = "<="
-                elif "以上" in text:
-                    action["cost_limit_operator"] = ">="
-                elif "未満" in text:
-                    action["cost_limit_operator"] = "<"
-                elif "より大きい" in text:
-                    action["cost_limit_operator"] = ">"
-                else:
-                    action["cost_limit_operator"] = "="
+                action["cost_limit_operator"] = extract_cost_operator(text) or "="
     # OR card types for ALL action types (not just move_cards/select)
     if a not in ("move_cards", "select") and "or_card_types" not in action:
         card_type_kws = [
@@ -6583,10 +6560,9 @@ def _try_per_unit(text):
 
     # Extract exclude_self from per_text (self-referential "other" patterns)
     if (
-        "このメンバー以外" in per_text
+        detect_exclude_self(per_text)
         or "このカード以外" in per_text
         or "自分以外" in per_text
-        or re.search(r"ほかの.*?(?:メンバー|カード)", per_text)
         or re.search(r"他の.*?(?:メンバー|カード)", per_text)
         or "これを除く" in per_text
     ):
@@ -6596,14 +6572,9 @@ def _try_per_unit(text):
     cl = extract_cost_limit(per_text)
     if cl:
         result["cost_limit"] = cl
-        if "以下" in per_text:
-            result["cost_limit_operator"] = "<="
-        elif "以上" in per_text:
-            result["cost_limit_operator"] = ">="
-        elif "未満" in per_text:
-            result["cost_limit_operator"] = "<"
-        elif "超" in per_text:
-            result["cost_limit_operator"] = ">"
+        op = extract_cost_operator(per_text)
+        if op:
+            result["cost_limit_operator"] = op
 
     if "このターン中に登場" in per_text and "エリアを移動した" in per_text:
         result["timing_condition"] = "appeared_or_moved_this_turn"

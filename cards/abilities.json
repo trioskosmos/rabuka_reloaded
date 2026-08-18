@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-17T21:52:34.194850",
+  "generated_at": "2026-08-18T14:23:53.969769",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "2f29fb5f",
+  "engine_commit": "52522c27",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -11807,7 +11807,6 @@
           "Liella!"
         ],
         "optional": true,
-        "exclude_self": true,
         "exclude_characters": [
           "鬼塚冬毬"
         ],
