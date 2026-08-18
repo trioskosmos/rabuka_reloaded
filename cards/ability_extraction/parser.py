@@ -6302,43 +6302,14 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
 # and returns a complete effect dict or None.
 
 
-def _try_per_unit(text):
-    """Check for per-unit scaling (Xにつき) effects."""
-    excludes = (
-        "各グループ名につき",
-        "グループ名につき",
-        "グループ名",
-        "グループ名1種類につき",
-    )
-    if not ("につき" in text or "ごとに" in text):
-        return None
-    if any(e in text for e in excludes):
-        return None
-    if "この能力を起動するためのコストは" in text:
-        return None
-    if "コストは" in text and ("減る" in text or "少なくなる" in text):
-        return None
-
-    m = re.search(r"(.+?)(につき|ごとに)", text)
-    if not m:
-        return None
-    per_text = m.group(1).strip()
-    # If per_text contains a sentence boundary (。), the structure is likely
-    # "choice/action。per_unit_effect" — defer to sequential/choice handlers
-    if "。" in per_text:
-        return None
-    result = {"text": text, "per_unit": True}
-
-    # Extract condition from per_text if present
-    # Pattern: "条件場合、per_unit_reference" e.g.
-    # "自分のセンターエリアに『μ's』のメンバーがいる場合、そのメンバーが持つheart03 2つ"
+def _extract_per_unit_condition(per_text, result):
+    """Extract condition from per_unit text (場合/とき/時 patterns). Returns updated per_text."""
     cond_part, remaining = split_condition_action(per_text)
     if cond_part and remaining:
         parsed_cond = parse_condition(cond_part)
         if parsed_cond and parsed_cond.get("type") != "custom":
             result["condition"] = parsed_cond
-            per_text = remaining  # Use remaining for per-unit extraction
-    # Also check for とき、/時、pattern not inside ライブ終了時まで
+            per_text = remaining
     if "condition" not in result:
         for mark in ("とき、", "時、"):
             t_pos = per_text.find(mark)
@@ -6353,19 +6324,22 @@ def _try_per_unit(text):
                             result["condition"] = cond
                         per_text = remaining
                     break
-    # Also check for 時、pattern (any form, kanji) at a position not inside ライブ終了時まで
     if "condition" not in result:
         t_pos = per_text.find("時、")
         if t_pos > 0 and "ライブ終了時まで" not in per_text[: t_pos + 2]:
-            cond_text = per_text[: t_pos + 1].strip()  # Include 時
+            cond_text = per_text[: t_pos + 1].strip()
             remaining = per_text[t_pos + 2 :].strip()
             if cond_text and remaining:
                 cond = parse_condition(cond_text)
                 if cond and cond.get("type") != "custom":
                     result["condition"] = cond
                 per_text = remaining
+    return per_text
 
-    # Extract duration from per_text (e.g., "ライブ終了時まで、カード1枚につき")
+
+def _extract_per_unit_fields(per_text, text, result):
+    """Extract per_unit_type, groups, hearts, card_property, exclude_self, cost_limit, timing, state, target, card_type, location from per_text."""
+    # Duration
     for prefix, code in [
         ("ライブ終了時まで", "live_end"),
         ("このターンの間", "turn_end"),
@@ -6376,6 +6350,7 @@ def _try_per_unit(text):
             per_text = per_text[len(prefix) :].lstrip("、").strip()
             break
 
+    # Count + type
     pm = re.search(r"(\d+)(人|枚|つ)(につき|ごとに)", text)
     if pm:
         result["per_unit_count"] = int(pm.group(1))
@@ -6383,40 +6358,28 @@ def _try_per_unit(text):
         if "ライブ中のカード" in text or "ライブ中のライブカード" in text:
             result["per_unit_type"] = "live_card_zone"
     else:
-        # Handle "コストNにつき" (cost-based scaling without explicit counter unit)
         cm = re.search(r"コスト(\d+)(につき|ごとに)", text)
         if cm:
             result["per_unit_count"] = int(cm.group(1))
             result["per_unit_type"] = "cost"
         for kw, t in [
-            ("メンバー", "member"),
-            ("人", "member"),
-            ("カード", "card"),
-            ("枚", "card"),
-            ("ブレード", "blade"),
-            ("ハート", "heart"),
-            ("スコア", "score"),
-            ("コスト", "cost"),
+            ("メンバー", "member"), ("人", "member"), ("カード", "card"),
+            ("枚", "card"), ("ブレード", "blade"), ("ハート", "heart"),
+            ("スコア", "score"), ("コスト", "cost"),
         ]:
             if kw in per_text:
                 result["per_unit_type"] = t
                 break
 
-    # "控え室に置いた" (active) / "控え室に置かれた" (passive) = placed in waitroom → count in discard
     if "控え室に置" in per_text:
         result["per_unit_type"] = "discard"
-
-    # "これによって置いたエネルギーカード" = energy cards placed by this effect
-    # → count from recently_moved_cards (energy_deck destination)
     if "これによって置いた" in per_text and "エネルギーカード" in per_text:
         result["per_unit_type"] = "energy_deck"
 
-    # Check for excluded groups: 『group』以外
+    # Groups + hearts
     exc_gns = re.findall(r"『([^』]+)』以外", per_text)
     if exc_gns:
         result["exclude_group_names"] = exc_gns
-    # Extract exclude_heart_colors from per_text
-    # Pattern: "{{heart_01.png|heart01}}と{{heart_06.png|heart06}}以外の色のハートを持つ"
     if "以外" in per_text:
         before_igai = per_text.split("以外")[0]
         hc_ids = re.findall(r"heart_(\d+)", before_igai)
@@ -6424,23 +6387,17 @@ def _try_per_unit(text):
             result["exclude_heart_colors"] = [
                 f"heart{m.zfill(2)}" for m in dict.fromkeys(hc_ids)
             ]
-    # Extract included groups only (groups NOT followed by 以外)
     remaining_per_text = re.sub(r"『[^』]+』以外", "", per_text)
     gm = re.search(r"『([^』]+)』", remaining_per_text)
     if gm:
         result["group_names"] = [gm.group(1)]
-    # Extract heart colors from per_text for per-unit counting (e.g. heart03 from "そのメンバーが持つ{{heart_03.png|heart03}}2つ")
-    # Exclude heart colors in exclusion patterns (e.g. "heart01とheart06以外の色" — those are excluded colors, not counted)
     per_heart_matches = re.findall(r"\{\{heart_(\d+)\.png\|heart(\d+)\}\}", per_text)
     if per_heart_matches:
         colors = sorted(set(f"heart{m.zfill(2)}" for _, m in per_heart_matches))
-        # Remove colors that appear in "以外" exclusion context
         igai_before = per_text.split("以外")[0] if "以外" in per_text else ""
         excluded_colors = set()
         if igai_before:
-            exc_matches = re.findall(
-                r"\{\{heart_(\d+)\.png\|heart(\d+)\}\}", igai_before
-            )
+            exc_matches = re.findall(r"\{\{heart_(\d+)\.png\|heart(\d+)\}\}", igai_before)
             excluded_colors = set(f"heart{m.zfill(2)}" for _, m in exc_matches)
         counted_colors = [c for c in colors if c not in excluded_colors]
         if counted_colors:
@@ -6448,15 +6405,11 @@ def _try_per_unit(text):
 
     if "名前の異なる" in per_text or "カード名の異なる" in per_text:
         result["distinct"] = "card_name"
-
-    # Extract card_property from per_text (e.g. "ブレードハートを持たない")
     if "ブレードハートを持たない" in per_text:
         result["card_property"] = "has_blade_heart"
         result["negation"] = True
     elif "ブレードハートを持つ" in per_text:
         result["card_property"] = "has_blade_heart"
-
-    # Extract exclude_self from per_text (self-referential "other" patterns)
     if (
         detect_exclude_self(per_text)
         or "このカード以外" in per_text
@@ -6465,43 +6418,31 @@ def _try_per_unit(text):
         or "これを除く" in per_text
     ):
         result["exclude_self"] = True
-
-    # Extract cost_limit from per-text (e.g., "コスト4以上")
     cl = extract_cost_limit(per_text)
     if cl:
         result["cost_limit"] = cl
         op = extract_operator(per_text)
         if op:
             result["cost_limit_operator"] = op
-
     if "このターン中に登場" in per_text and "エリアを移動した" in per_text:
         result["timing_condition"] = "appeared_or_moved_this_turn"
     elif "このターン中に登場" in per_text:
         result["timing_condition"] = "appeared_this_turn"
     elif "エリアを移動した" in per_text:
         result["timing_condition"] = "moved_this_turn"
-
     if "ウェイト状態" in per_text:
         result["state"] = "wait"
     elif "アクティブ状態" in per_text:
         result["state"] = "active"
-
-    # Extract target from per_text
     tgt = extract_target(per_text)
     if tgt:
         result["target"] = tgt
-
-    # Extract card_type from per_text
     if "エネルギーカード" in per_text:
         result["card_type"] = "energy_card"
     elif "メンバーカード" in per_text:
         result["card_type"] = "member_card"
-    # "そのメンバー" (that member) targets a stage member, not energy cards.
-    # Override card_type to member_card for targeting — per_unit counting
-    # uses per_unit_type (e.g. "energy_deck") independently.
     if per_text.startswith("そのメンバー"):
         result["card_type"] = "member_card"
-
     for kw, loc in [
         ("成功ライブカード置き場にある", "success_live_zone"),
         ("メンバーの下に置かれている", "under_member"),
@@ -6515,10 +6456,12 @@ def _try_per_unit(text):
         if kw in per_text:
             result["location"] = loc
             break
+    return per_text
 
-    action_text = text.split("につき", 1)[1].strip().lstrip("、")
 
-    # Sequential pattern in action (Aし、B) — comma-separated
+def _parse_per_unit_action(action_text, text, result):
+    """Parse the action part of a per-unit effect. Returns the action dict or sequential."""
+    # Sequential: comma + し
     if "、" in action_text and "し" in action_text:
         parts = [p.strip().rstrip("、") for p in action_text.split("、")]
         if len(parts) >= 2 and "し" in parts[0]:
@@ -6530,9 +6473,7 @@ def _try_per_unit(text):
                     actions.append(pa)
             if len(actions) >= 2:
                 return {"text": text, "action": "sequential", "actions": actions}
-
-    # Sequential pattern in action: Aし(て)B — te-form without comma
-    # (e.g. コストを+4してheart05を得る)
+    # Sequential: して (te-form)
     if "して" in action_text:
         idx = action_text.find("して")
         left = action_text[:idx].rstrip()
@@ -6546,53 +6487,30 @@ def _try_per_unit(text):
                 _propagate(result, fa)
                 _propagate(result, sa)
                 return {"text": text, "action": "sequential", "actions": [fa, sa]}
-
+    # Single action
     action = parse_action(action_text)
     _propagate(result, action)
-    # Propagate resource_icon_count from the parsed action back to result,
-    # so it reaches sub-actions via the sequential propagation below.
     if (
         "resource_icon_count" not in result
         and action.get("count")
         and action.get("action") in ("gain_resource", "gain_heart")
     ):
         result["resource_icon_count"] = action["count"]
-    # When action is a sequential, propagate per-unit config into each sub-action
-    # so the engine can resolve per-unit counts for each sub-action individually.
-    # Exclude condition — it should remain on the sequential wrapper only.
+    # Propagate per-unit config into sequential sub-actions
     if action.get("action") == "sequential":
         first_put = None
         for sub in action.get("actions", []):
             for k in (
-                "per_unit",
-                "per_unit_count",
-                "per_unit_type",
-                "per_unit_heart_colors",
-                "card_type",
-                "group_names",
-                "exclude_group_names",
-                "exclude_heart_colors",
-                "distinct",
-                "timing_condition",
-                "state",
-                "location",
-                "cost_limit",
-                "cost_limit_operator",
-                "duration",
-                "target",
-                "exclude_self",
-                "card_property",
-                "negation",
-                "resource_icon_count",
+                "per_unit", "per_unit_count", "per_unit_type", "per_unit_heart_colors",
+                "card_type", "group_names", "exclude_group_names", "exclude_heart_colors",
+                "distinct", "timing_condition", "state", "location", "cost_limit",
+                "cost_limit_operator", "duration", "target", "exclude_self",
+                "card_property", "negation", "resource_icon_count",
             ):
                 if k in result and k not in sub:
                     sub[k] = result[k]
             if first_put is None and sub.get("per_unit_type"):
                 first_put = sub
-        # When the first per-unit sub-action counts from discard (e.g. replaced by
-        # baton touch → placed in waitroom), propagate to subsequent per-unit
-        # sub-actions that only have a generic ("member"/"枚") per_unit_type.
-        # Both sub-effects refer to the same set of cards.
         if first_put and first_put.get("per_unit_type") in ("discard",):
             proto_type = first_put["per_unit_type"]
             for sub in action.get("actions", []):
@@ -6602,8 +6520,7 @@ def _try_per_unit(text):
                     and sub.get("per_unit_type") in ("member", "枚")
                 ):
                     sub["per_unit_type"] = proto_type
-
-    # Detect cost reduction per unit patterns (コストが～につき～少なくなる/減る)
+    # Cost reduction per unit
     if (
         action.get("action") == "custom"
         and result.get("location") == "hand"
@@ -6612,14 +6529,11 @@ def _try_per_unit(text):
         if "少なくなる" in action_text or "減る" in action_text:
             action["action"] = "modify_cost"
             action["operation"] = "subtract"
-
-    # Sequential after per-unit (その後)
+    # その後 (sequential after per-unit)
     if "その後" in action_text:
         parts = action_text.split("その後", 1)
         if len(parts) == 2:
             fa_text = parts[0].strip()
-            # When fa_text contains "。" + another per-unit（につき),
-            # split on "。" to handle compound sub-effects (e.g. reveal + per-unit score)
             if "。" in fa_text:
                 sub_texts = [t.strip() for t in fa_text.split("。") if t.strip()]
                 sub_actions = []
@@ -6639,19 +6553,42 @@ def _try_per_unit(text):
                 _propagate(result, fa)
             sa = parse_action(parts[1].strip())
             return {"text": text, "action": "sequential", "actions": [fa, sa]}
-
-    # Issue 15: Extract per_unit_source from "これにより控え室に置いた" patterns
+    # per_unit_source + max_repeats
     if "これにより" in text and ("置いた" in text or "置かれた" in text):
         action["per_unit_source"] = "previous_moved_cards"
-    # Issue 15: Extract max_repeats from "N枚/回/つまでしか" patterns
     max_m = re.search(r"(\d+)(?:枚|回|つ)までしか", text)
     if not max_m:
         max_m = re.search(r"(\d+)までしか", text)
     if max_m:
         action["max_repeats"] = int(max_m.group(1))
-
     action["text"] = text
     return action
+
+
+def _try_per_unit(text):
+    """Check for per-unit scaling (Xにつき) effects."""
+    excludes = (
+        "各グループ名につき", "グループ名につき", "グループ名", "グループ名1種類につき",
+    )
+    if not ("につき" in text or "ごとに" in text):
+        return None
+    if any(e in text for e in excludes):
+        return None
+    if "この能力を起動するためのコストは" in text:
+        return None
+    if "コストは" in text and ("減る" in text or "少なくなる" in text):
+        return None
+    m = re.search(r"(.+?)(につき|ごとに)", text)
+    if not m:
+        return None
+    per_text = m.group(1).strip()
+    if "。" in per_text:
+        return None
+    result = {"text": text, "per_unit": True}
+    per_text = _extract_per_unit_condition(per_text, result)
+    per_text = _extract_per_unit_fields(per_text, text, result)
+    action_text = text.split("につき", 1)[1].strip().lstrip("、")
+    return _parse_per_unit_action(action_text, text, result)
 
 
 _PROPAGATE_FIELDS = (
