@@ -366,6 +366,7 @@ pub mod hs_bp2_018_live_card_zone_test;
 pub mod kanon_bp5_constant_test;
 pub mod live_card_zone_movement_test;
 pub mod ll_bp2_001_cost_reduction_test;
+pub mod maki_pb1_006_debut_test;
 pub mod maki_bp6_006_reveal_test;
 pub mod maki_pb1_test;
 pub mod nozomi_bp4_aggregate_test;

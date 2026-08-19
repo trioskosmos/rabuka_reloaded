@@ -968,6 +968,8 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         # Fill missing condition from text — unified single field
         trigger_condition = None
         txt = remaining_text
+        if SEQUENTIAL_MARKER in txt:
+            txt = txt.split(SEQUENTIAL_MARKER)[-1].lstrip("、").strip()
         for sep in ["とき、", "場合、", "たび、", "なら、"]:
             idx = txt.find(sep)
             if idx >= 0:
@@ -1015,24 +1017,26 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
                 "conditions": [trigger_condition, existing],
             }
         elif not existing and trigger_condition:
-            effect["condition"] = trigger_condition
+            if effect.get("action") != "sequential":
+                effect["condition"] = trigger_condition
         elif not existing:
-            for key in ("actions", "primary_effect", "conditional_action"):
-                sub = effect.get(key)
-                if isinstance(sub, dict):
-                    sv = sub.get("condition")
-                    if sv and isinstance(sv, dict):
-                        effect["condition"] = copy.deepcopy(sv)
-                        break
-                elif isinstance(sub, list):
-                    for item in sub:
-                        if isinstance(item, dict):
-                            sv = item.get("condition")
-                            if sv and isinstance(sv, dict):
-                                effect["condition"] = copy.deepcopy(sv)
-                                break
-                    if effect.get("condition"):
-                        break
+            if effect.get("action") != "sequential":
+                for key in ("actions", "primary_effect", "conditional_action"):
+                    sub = effect.get(key)
+                    if isinstance(sub, dict):
+                        sv = sub.get("condition")
+                        if sv and isinstance(sv, dict):
+                            effect["condition"] = copy.deepcopy(sv)
+                            break
+                    elif isinstance(sub, list):
+                        for item in sub:
+                            if isinstance(item, dict):
+                                sv = item.get("condition")
+                                if sv and isinstance(sv, dict):
+                                    effect["condition"] = copy.deepcopy(sv)
+                                    break
+                        if effect.get("condition"):
+                            break
 
         # Apply activation_position from cost text to the effect
         if extra_pos_from_cost and "activation_position" not in effect:
@@ -1768,19 +1772,26 @@ def _handle_required_hearts(t, a):
 # ======================================================================
 # ACTION RULE REGISTRY
 # Every action phrase the parser recognizes is registered here. Adding a
-# new action phrase = append one rule. Rules are tried in list order
-# (first match wins) — order IS the priority. Use an ActionRule(...) for a
-# declarative rule, or a (condition, action_type, setter) tuple where
-# condition is a substring string or a callable (text[, action]) -> bool.
+# new action phrase = append one rule. Rules are now explicitly
+# priority-ordered via PriorityRegistry (lower priority number = higher
+# precedence). Previously order IS priority (first match wins) – now
+# explicit to avoid silent mis-parse when inserting in wrong place.
 # ======================================================================
 
-_ACTION_RULES: List[Any] = []
+_ACTION_REGISTRY = PriorityRegistry("action_rules")
+_ACTION_RULES: List[Any] = []  # populated from registry on first use
+_ACTION_RULE_NEXT_PRIORITY = 0
 
-
-def _register_action(cond, act=None, setter=None):
+def _register_action(cond, act=None, setter=None, priority: Optional[int] = None):
+    global _ACTION_RULE_NEXT_PRIORITY
+    if priority is None:
+        priority = _ACTION_RULE_NEXT_PRIORITY
+        _ACTION_RULE_NEXT_PRIORITY += 10
     if isinstance(cond, ActionRule):
+        _ACTION_REGISTRY.register(priority, f"action_{priority}", cond)
         _ACTION_RULES.append(cond)
     else:
+        _ACTION_REGISTRY.register(priority, f"action_{priority}", (cond, act, setter))
         _ACTION_RULES.append((cond, act, setter))
 
 
@@ -4285,6 +4296,22 @@ def _try_state(text):
                 result["all"] = True
     if result is None:
         return None
+    tgt = extract_target(text)
+    if tgt:
+        result["target"] = tgt
+    loc = extract_location(text)
+    if loc:
+        result["location"] = loc
+    elif "ステージ" in text:
+        result["location"] = "stage"
+    ct = extract_card_type(text)
+    if ct:
+        result["card_type"] = ct
+    elif "メンバー" in text:
+        result["card_type"] = "member_card"
+    if "いる場合" in text or "いる" in text:
+        result["count"] = 1
+        result["operator"] = ">="
     gns = extract_all_groups(text)
     if gns:
         result["group_names"] = gns
@@ -10235,6 +10262,19 @@ def _normalize_effect_tree(effect, original_text=None):
     _full_text = effect.get("text") or original_text or ""
     effect = _walk(effect, _full_text, original_text, original_text)
     effect = _collapse_position_changes(effect)
+    # Strip leaked group from draw that doesn't contain the group in its own text
+    def _strip_leaked_draw_g(node):
+        if isinstance(node, dict):
+            if node.get("action") == "draw_card" and node.get("group_names"):
+                txt = node.get("text") or ""
+                if not any(g in txt for g in node["group_names"]):
+                    node.pop("group_names", None)
+            for v in node.values():
+                _strip_leaked_draw_g(v)
+        elif isinstance(node, list):
+            for it in node:
+                _strip_leaked_draw_g(it)
+    _strip_leaked_draw_g(effect)
     _enrich_gain_abilities(effect)
     _enrich_characters(effect)
     _clean_gain_resource(effect)

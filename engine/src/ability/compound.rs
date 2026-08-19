@@ -205,11 +205,8 @@ impl AbilityResolver {
                         // against stale state (e.g. revealed_cards emptied by
                         // the first action's execution).
                         let same_as_prev = i > 0
-                            && repeat_actions[i - 1]
-                                .condition
-                                .as_ref()
-                                .and_then(|c| c.get_text())
-                                == action.condition.as_ref().and_then(|c| c.get_text());
+                            && repeat_actions[i - 1].condition.as_ref()
+                                == action.condition.as_ref();
                         if same_as_prev {
                             if condition_failed == Some(true) {
                                 continue 'action_loop;

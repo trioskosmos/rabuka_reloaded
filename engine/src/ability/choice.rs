@@ -18,6 +18,13 @@ use alloc::{
 use core::sync::atomic::Ordering;
 use smallvec::SmallVec;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Continuation {
+    Immediate,
+    DeferredSelectCard,
+    DeferredOther,
+}
+
 pub(crate) struct SelectionContext {
     pub card_type: Option<String>,
     pub count: usize,
@@ -181,8 +188,27 @@ impl super::resolver::AbilityResolver {
             self.pending_choice = None;
         }
         self.resume_execution(gs, context.clone())?;
-        if !sub_choice {
-            self.resume_pending_actions(gs)?;
+        let has_pending = gs.ability_queue.has_pending_actions();
+        let was_select_card = matches!(self.pending_choice, Some(Choice::SelectCard { .. }));
+        let cont = match (sub_choice, has_pending, was_select_card) {
+            (true, _, _) => Continuation::Immediate, // sub-choice will handle resume
+            (false, true, true) => Continuation::DeferredSelectCard,
+            (false, true, false) => Continuation::DeferredOther,
+            (false, false, _) => Continuation::Immediate,
+        };
+        match cont {
+            Continuation::DeferredSelectCard => {
+                self.pending_choice = None;
+                self.resume_pending_actions(gs)?;
+            }
+            Continuation::DeferredOther => {
+                self.resume_pending_actions(gs)?;
+            }
+            Continuation::Immediate => {
+                if !sub_choice {
+                    self.resume_pending_actions(gs)?;
+                }
+            }
         }
         // If a deferred cost (is_select_action=true stage selection) just had
         // its state change applied during handle_stage_selection, mark the cost

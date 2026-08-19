@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-19T12:55:12.492859",
+  "generated_at": "2026-08-19T22:12:58.170072",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "d6c169ea",
+  "engine_commit": "e351df6c",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -3549,10 +3549,7 @@
             "source": "deck",
             "destination": "hand",
             "position": "center",
-            "activation_position": "center",
-            "group_names": [
-              "Liella!"
-            ]
+            "activation_position": "center"
           },
           {
             "text": "自分の控え室にあるコスト4以下の『Liella!』のメンバーカード1枚を自分のステージのメンバーのいないエリアに登場させる",
@@ -11870,6 +11867,7 @@
               "text": "自分のエネルギーがすべてアクティブ状態の場合",
               "resource_type": "energy",
               "all": true,
+              "target": "self",
               "location": "stage"
             },
             "action": "modify_score",
@@ -14563,15 +14561,17 @@
             "condition": {
               "type": "state_condition",
               "state": "wait",
-              "text": "相手のステージにウェイト状態のメンバーがいる場合"
+              "text": "相手のステージにウェイト状態のメンバーがいる場合",
+              "target": "opponent",
+              "location": "stage",
+              "card_type": "member_card",
+              "count": 1,
+              "operator": ">="
             },
             "action": "draw_card",
             "count": 1,
             "source": "deck",
-            "destination": "hand",
-            "group_names": [
-              "μ's"
-            ]
+            "destination": "hand"
           }
         ],
         "group_names": [
@@ -15071,10 +15071,7 @@
             "count": 1,
             "action": "draw_card",
             "source": "deck",
-            "destination": "hand",
-            "group_names": [
-              "Printemps"
-            ]
+            "destination": "hand"
           },
           {
             "text": "手札を1枚控え室に置く",
@@ -16520,10 +16517,7 @@
             "count": 1,
             "action": "draw_card",
             "source": "deck",
-            "destination": "hand",
-            "group_names": [
-              "虹ヶ咲"
-            ]
+            "destination": "hand"
           },
           {
             "text": "自分のステージにいる『虹ヶ咲』のメンバー1人は{{icon_blade.png|ブレード}}を得る",
@@ -16796,6 +16790,11 @@
           "type": "state_condition",
           "state": "wait",
           "text": "自分のステージにウェイト状態の『虹ヶ咲』のメンバーがいるかぎり",
+          "target": "self",
+          "location": "stage",
+          "card_type": "member_card",
+          "count": 1,
+          "operator": ">=",
           "group_names": [
             "虹ヶ咲"
           ]
@@ -17807,7 +17806,8 @@
         "condition": {
           "type": "state_condition",
           "state": "wait",
-          "text": "このメンバーがウェイト状態であるかぎり"
+          "text": "このメンバーがウェイト状態であるかぎり",
+          "card_type": "member_card"
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -18238,10 +18238,7 @@
             },
             "action": "draw_card",
             "source": "deck",
-            "destination": "hand",
-            "group_names": [
-              "みらくらぱーく！"
-            ]
+            "destination": "hand"
           }
         ],
         "group_names": [
@@ -20068,10 +20065,7 @@
             "per_unit": true,
             "per_unit_count": 1,
             "per_unit_type": "discard",
-            "card_type": "member_card",
-            "group_names": [
-              "Liella!"
-            ]
+            "card_type": "member_card"
           },
           {
             "text": "ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -21441,7 +21435,12 @@
           "type": "state_condition",
           "state": "active",
           "text": "自分のステージにいるすべてのメンバーがアクティブ状態の場合",
-          "all": true
+          "all": true,
+          "target": "self",
+          "location": "stage",
+          "card_type": "member_card",
+          "count": 1,
+          "operator": ">="
         },
         "action": "modify_required_hearts",
         "heart_colors": [
@@ -27004,7 +27003,12 @@
         "condition": {
           "type": "state_condition",
           "state": "wait",
-          "text": "相手のステージにウェイト状態のメンバーがいる場合"
+          "text": "相手のステージにウェイト状態のメンバーがいる場合",
+          "target": "opponent",
+          "location": "stage",
+          "card_type": "member_card",
+          "count": 1,
+          "operator": ">="
         },
         "action": "modify_required_hearts",
         "heart_colors": [
@@ -28536,6 +28540,7 @@
           "type": "state_condition",
           "state": "wait",
           "text": "このターン、自分の『虹ヶ咲』のカードの効果によってウェイト状態の自分のエネルギーをアクティブにしていた場合",
+          "target": "self",
           "group_names": [
             "虹ヶ咲"
           ]
@@ -28926,10 +28931,7 @@
                 "target": "both",
                 "action": "draw_card",
                 "source": "deck",
-                "destination": "hand",
-                "group_names": [
-                  "μ's"
-                ]
+                "destination": "hand"
               },
               {
                 "text": "手札を1枚控え室に置く",
@@ -32005,9 +32007,6 @@
             "per_unit": true,
             "per_unit_count": 1,
             "per_unit_type": "人",
-            "group_names": [
-              "Aqours"
-            ],
             "location": "stage",
             "target": "self"
           },
@@ -33045,10 +33044,7 @@
             "action": "draw_card",
             "count": 1,
             "source": "deck",
-            "destination": "hand",
-            "group_names": [
-              "μ's"
-            ]
+            "destination": "hand"
           },
           {
             "text": "自分の成功ライブカード置き場に『μ's』のカードがある場合、カードを1枚引く",
@@ -33622,10 +33618,7 @@
             "count": 1,
             "action": "draw_card",
             "source": "deck",
-            "destination": "hand",
-            "group_names": [
-              "DOLLCHESTRA"
-            ]
+            "destination": "hand"
           },
           {
             "text": "自分のステージにいる『DOLLCHESTRA』のメンバー1人の{{icon_energy.png|E}}を+5する",
@@ -37515,12 +37508,7 @@
               "action": "draw_card",
               "count": 1,
               "source": "deck",
-              "destination": "hand",
-              "group_names": [
-                "CatChu!",
-                "KALEIDOSCORE",
-                "5yncri5e!"
-              ]
+              "destination": "hand"
             }
           ],
           "text": "自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードをそれぞれ1枚ずつ選び、それらを好きな順番でデッキの下に置いてもよい。そうしたとき、カードを1枚引く",
