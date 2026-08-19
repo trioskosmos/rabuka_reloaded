@@ -157,6 +157,7 @@ pub mod kanon_pb2_test;
 pub mod kanon_test;
 pub mod kasumi_energy_under_test;
 pub mod kasumi_test;
+pub mod karin_bp4_004_live_start_test;
 pub mod keke_bp5_test;
 pub mod kinako_bp5_test;
 pub mod kinako_each_time_blade_test;
