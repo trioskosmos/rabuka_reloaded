@@ -182,7 +182,7 @@ fn decode_condition_field(
             "values" => { l.values = bc.read_opt_u8_vec_value(); return Some(true); }
             "yell_trigger" => { l.yell_trigger = bc.read_bool_value(); return Some(true); }
             "type" => { bc.skip_value()?; return Some(true); }
-            _ => { bc.skip_value()?; return Some(true); }
+            _ => { log::warn!("[bytecode] unknown condition field: {}", key); bc.skip_value()?; return Some(true); }
         }
     }
 
@@ -1352,6 +1352,6 @@ fn decode_condition_direct(
         17 => build_alwaystrue(&l),
         18 => build_anyof(&l),
         19 => build_allrevealedmatchheartcolor(&l),
-        _ => return None,
+        _ => { log::warn!("[bytecode] unknown condition variant: {}", variant); return None; }
     })
 }

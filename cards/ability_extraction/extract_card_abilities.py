@@ -41,6 +41,7 @@ from parser import (
     parse_cost,
     parse_effect,
     extract_phase_gate,
+    split_cost_effect,
     _normalize_effect_tree,
     _enrich_effect_type,
     _validate_semantic,
@@ -211,15 +212,46 @@ def extract_abilities_from_card(card_id: str, card: dict) -> list:
             continue
 
         # Check if this is a parenthetical note (wrapped in parentheses)
-        # These should be appended to the previous ability
+        # Standalone ALL blade substitution is a real 常時 effect and must not be dropped.
         if (line.startswith("(") and line.endswith(")")) or (
             line.startswith("（") and line.endswith("）")
         ):
+            inner = line[1:-1].strip()
+            if "として扱う" in inner and "ALLブレード" in inner:
+                action_text = inner
+                if "、" in inner and inner.startswith("必要ハートを確認する時"):
+                    action_text = inner.split("、", 1)[1].strip()
+                abilities.append(
+                    {
+                        "card_id": card_id,
+                        "full_text": line,
+                        "triggerless_text": action_text,
+                        "use_limit": None,
+                        "triggers": ["常時"],
+                        "trigger_count": 1,
+                        "ability_index": i,
+                        "is_null": False,
+                    }
+                )
+                continue
+            if "1つにつき" in inner and "スコアの合計に" in inner and "加算" in inner and "スコア" in inner:
+                abilities.append(
+                    {
+                        "card_id": card_id,
+                        "full_text": line,
+                        "triggerless_text": inner,
+                        "use_limit": None,
+                        "triggers": ["常時"],
+                        "trigger_count": 1,
+                        "ability_index": i,
+                        "is_null": False,
+                    }
+                )
+                continue
             if abilities:
                 abilities[-1]["full_text"] += "\n" + line
                 abilities[-1]["triggerless_text"] += "\n" + line
             else:
-                # Standalone parenthetical note - treat as null ability (no-op)
                 abilities.append(
                     {
                         "card_id": card_id,
@@ -379,9 +411,12 @@ def extract_all_abilities(cards_file: Path) -> dict:
         # Split cost and effect
         cost_text = None
         if "：" in remaining_text:
-            parts = remaining_text.split("：", 1)
-            cost_text = parts[0].strip()
-            effect_text = parts[1].strip()
+            c_text, e_text = split_cost_effect(remaining_text)
+            if c_text:
+                cost_text = c_text
+                effect_text = e_text
+            else:
+                effect_text = remaining_text
         else:
             effect_text = remaining_text
 

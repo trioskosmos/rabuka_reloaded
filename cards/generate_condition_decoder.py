@@ -264,7 +264,7 @@ def main():
                 f'            "{fname}" => {{ bc.skip_value()?; return Some(true); }}'
             )
     lines.append('            "type" => { bc.skip_value()?; return Some(true); }')
-    lines.append("            _ => { bc.skip_value()?; return Some(true); }")
+    lines.append('            _ => { log::warn!("[bytecode] unknown condition field: {}", key); bc.skip_value()?; return Some(true); }')
     lines.append("        }")
     lines.append("    }")
     lines.append("")
@@ -300,7 +300,7 @@ def main():
     lines.append("    Some(match variant {")
     for i, vname in enumerate(variants):
         lines.append(f"        {i} => build_{vname.lower()}(&l),")
-    lines.append("        _ => return None,")
+    lines.append('        _ => { log::warn!("[bytecode] unknown condition variant: {}", variant); return None; }')
     lines.append("    })")
     lines.append("}")
     lines.append("")

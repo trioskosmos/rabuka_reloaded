@@ -81,6 +81,11 @@ impl AbilityResolver {
 
             let matching_count = matching_indices.len();
             if matching_count == 0 {
+                log::warn!(
+                    "[look] no matching cards among {} looked-at; discarding all to waitroom (effect: {})",
+                    gs.looked_at_cards.len(),
+                    effect.text
+                );
                 let cards = core::mem::take(&mut gs.looked_at_cards);
                 let player_target = effect.target_name();
                 let player = gs.resolve_target_player_mut(player_target);

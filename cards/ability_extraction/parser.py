@@ -487,6 +487,8 @@ def normalize(text: str) -> str:
     """Canonicalize variant patterns before parsing."""
     text = re.sub(r"'([^']{1,10})'", r"『\1』", text)
     text = text.replace("ライブ終了まで", "ライブ終了時まで")
+    text = normalize_fullwidth_digits(text)
+    text = re.sub(r"\s+", " ", text).strip()
     return text
 
 
@@ -598,34 +600,42 @@ def detect_duration_code(text: str) -> Optional[str]:
 
 
 def split_cost_effect(text: str) -> Tuple[str, str]:
-    """Split text into cost and effect parts, skipping colons inside parentheses and quotes."""
+    """Split text into cost and effect parts, skipping colons inside brackets/templates."""
     if "：" not in text:
         return "", text
-
-    # Find the first colon that's not inside parentheses or quotes
-    paren_depth = 0
-    quote_depth = 0
+    paren_depth = 0  # （） and ()
+    bracket_depth = 0  # 「」『』
+    template_depth = 0  # {{ }}
     split_index = -1
-
-    for i, char in enumerate(text):
-        if char == "（" or char == "(":
+    i = 0
+    while i < len(text):
+        if text[i : i + 2] == "{{":
+            template_depth += 1
+            i += 2
+            continue
+        if text[i : i + 2] == "}}":
+            template_depth = max(0, template_depth - 1)
+            i += 2
+            continue
+        c = text[i]
+        if c in ("（", "("):
             paren_depth += 1
-        elif char == "）" or char == ")":
-            paren_depth -= 1
-        elif char == '"' or char == '"':
-            quote_depth += 1 if quote_depth == 0 else -1
-        elif char == "：":
-            # Only split if not inside parentheses or quotes
-            if paren_depth == 0 and quote_depth == 0:
+        elif c in ("）", ")"):
+            paren_depth = max(0, paren_depth - 1)
+        elif c in ("「", "『"):
+            bracket_depth += 1
+        elif c in ("」", "』"):
+            bracket_depth = max(0, bracket_depth - 1)
+        elif c == "：":
+            if paren_depth == 0 and bracket_depth == 0 and template_depth == 0:
                 split_index = i
                 break
-
+        i += 1
     if split_index >= 0:
         cost = text[:split_index].strip()
         effect = text[split_index + 1 :].strip()
         return cost, effect
     else:
-        # No valid split point found
         return "", text
 
 
@@ -2419,6 +2429,17 @@ _register_action(
 )
 _register_action(
     ActionRule(
+        match_all=["1つにつき", "スコアの合計に", "加算"],
+        condition=lambda t: "スコア" in t,
+        action="modify_score",
+        defaults={"operation": "add", "value": 1, "per_unit": True, "per_unit_type": "score"},
+        setter=lambda t, a: a.update(
+            {"per_unit_count": 1, "location": "revealed_cards" if "エールで出た" in t else None}
+        ),
+    )
+)
+_register_action(
+    ActionRule(
         match="スコアを",
         action="modify_score",
         setter=lambda t, a: (_set_score_op(t, a), a)[-1],
@@ -2492,7 +2513,6 @@ _register_action(ActionRule(match="登場させ", action="move_cards", defaults=
 _register_action(
     ActionRule(
         match_all=[
-            "必要ハートを確認する時",
             "ALLブレード",
             "任意の色のハートとして扱う",
         ],
@@ -9542,6 +9562,19 @@ _register_effect_rule(
 )
 # _EFFECT_HANDLERS cascade (100+). Explicit priorities keep both additive.
 _effect_registry = PriorityRegistry("effect_handlers")
+# Score per-unit: "エールで出たスコア1つにつき、成功したライブのスコアの合計に1を加算する"
+_register_effect_rule(
+    EffectPattern(
+        match_all=["1つにつき", "スコアの合計に", "加算"],
+        condition=lambda t: "スコア" in t,
+        action="modify_score",
+        defaults={"operation": "add", "value": 1, "per_unit": True, "per_unit_type": "score"},
+        setter=lambda t, r: r.update(
+            {"per_unit_count": 1, "location": "revealed_cards" if "エールで出た" in t else None}
+        ),
+    )
+)
+
 for _ri, _h in enumerate(_EFFECT_RULES):
     _hn = getattr(_h, "__name__", f"effect_rule_{_ri}")
     _effect_registry.register(_ri, _hn, _h)

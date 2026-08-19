@@ -309,7 +309,7 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
                 f'            "{alias}" => {{ ek.{target} = {reader}; return Some(true); }}'
             )
 
-    lines.append("            _ => { bc.skip_value()?; return Some(true); }")
+    lines.append('            _ => { log::warn!("[bytecode] unknown effect field: {}", key); bc.skip_value()?; return Some(true); }')
     lines.append("        }")
     lines.append("    }")
     lines.append("")

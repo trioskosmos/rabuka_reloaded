@@ -197,3 +197,139 @@ python -c "import json; s=json.load(open('cards/ability_schema.json',encoding='u
 #   python audit_tmp.py   (ephemeral — recreated from FRESH_AUDIT_2026-08-19.md § "Scripts used")
 #   python jp_mine_tmp.py
 ```
+
+---
+
+## Fixes Applied — Follow-up (2026-08-19)
+
+This section documents what was actually changed after the audit, why the old code was wrong, and why some proposed fixes were reverted.
+
+### Fix 1: Opcode collisions (`cards/ability_schema.json`) — DONE
+
+**Before:** 13 opcode collisions (e.g. `0: sequential/choice`, `20: move_cards/rotation`, `21: pay_energy/set_cost`, `28: shuffle/repeat_procedure`, `35: set_cost_to_use/set_blade_count`, `41: conditional_alternative/choose_required_hearts`, plus `29: restriction/reveal_until_chosen_card`, `17: activation_cost/activation_restriction` etc.). `engine/src/ability/enums.rs: ActionType::from_str` dispatches on *name*, so collisions were invisible at runtime, but any future `no_std` bytecode dispatch on `opcode` alone would alias two actions and make `ability_schema.json` invalid as contract.
+
+**Why wrong:** Schema claimed to be "single source of truth" but violated its own uniqueness invariant. `cards/compile_abilities.py` worked around it by ignoring opcode, hiding the bug.
+
+**After:** Reassigned all duplicate opcodes to fresh values `43..57` (next free after max `42`). Verified `58` actions → `58` unique opcodes. CI should assert uniqueness (`python -c "assert len(set(opcodes))==len(opcodes)"`).
+
+**File:** `cards/ability_schema.json:252` (`choice:0→43`, `rotation:20→44`, `set_cost:21→45`, `shuffle:28→46`, `set_cost_to_use:35→47`, `choose_required_hearts:41→48`, `sequential:0→49`, `restriction:29→50`, etc.)
+
+### Fix 2: Silent decoder swallowing (`engine/src/ability/*_decoder_gen.rs`, `cards/generate_*.py`) — DONE
+
+**Before:** `effect_decoder_gen.rs:207`, `condition_decoder_gen.rs:185`, `vm.rs:207` all did `_ => { bc.skip_value()?; return Some(true); }`. A typo'd key in `abilities.json` (e.g. `cost_limt`) would compile to bytecode, decode would skip the value and *succeed* — the ability would silently do the wrong thing. Same for unknown condition variant `condition_decoder_gen.rs:303: _ => return None` → caller treated as "no condition" → ability became unconditional. 92 stranded fields (keys in JSON not in schema) were carried through `compile_abilities.py` and then dropped without trace.
+
+**Why wrong:** Decoder was designed as permissive for forward-compat, but without logging it became a correctness hole. CI (2349 tests) stayed green while parser emitted ad-hoc fields like `all_areas`, `yell_source`, `temporal_scope` that were invisible bugs.
+
+**After:** Generators now emit `log::warn!("[bytecode] unknown effect field: {}", key)` and `log::warn!("[bytecode] unknown condition field: {}", key)` plus `unknown condition variant` warn. With `RUST_LOG=warn` in CI, any stranded field now surfaces. Follow-up: add `cargo test` that asserts warning count == 0.
+
+**Files:** `cards/generate_effect_decoder.py:312`, `cards/generate_condition_decoder.py:267`, `engine/src/ability/effect_decoder_gen.rs:207`, `engine/src/ability/condition_decoder_gen.rs:185,303`
+
+### Fix 3: `look.rs` silent discard (`engine/src/ability/look.rs:83`) — DONE
+
+**Before:** `look_and_select` with `matching_count==0` did `take(&mut looked_at_cards); waitroom.add_card` for all cards and returned `Ok(())` with no log. A deck-search that filtered for `『Aqours』` but found none would silently dump all 5 looked-at cards to waitroom — player had no feedback why the choice never appeared. Same path swallowed `followup_action` handling.
+
+**Why wrong:** Silent success on edge case made debugging impossible; `ability_queue` tests that checked `choice pool` leaks could not distinguish "no match" from "bug".
+
+**After:** Added `log::warn!("[look] no matching cards among {} looked-at; discarding all to waitroom (effect: {})")`. No behavioral change, but now diagnosable under `RUST_LOG=debug`.
+
+**File:** `engine/src/ability/look.rs:83-96`
+
+### Fix 4: Parser structural fixes — DONE (dangerous but proven safe)
+
+**What we changed:**
+
+* `parser.py:486` `normalize()` now also calls `normalize_fullwidth_digits()` + whitespace collapse. **Before:** `３枚` (fullwidth) in conditions mismatched `3枚` in effects; `extract_count` with `\d+` missed fullwidth, causing `cost_limit`/`count` to be `None` for 12 cards that use fullwidth in `cards.json`. After: both sides canonicalize, counts agree.
+
+* `parser.py:602` `split_cost_effect()` now tracks depth for `「」『』` + `{{}}` in addition to `（）()`. **Before:** a cost like `「A：B」` or `{{center.png|センター}}：効果` could split at the inner colon. In practice no current card has `：` inside `「」`/`{{}}`, so old code was accidentally correct, but the fix is forward-safe and was verified: `2349 passed` after change.
+
+* `extract_card_abilities.py:40,381` now imports and uses `split_cost_effect` instead of naive `split("：",1)`. **Before:** two implementations diverged; a future card with `（コストはA：B）効果` would split differently depending on code path. After: single source of truth.
+
+**Why these were considered dangerous:** Any change to the splitter changes the `cost_text`/`effect_text` boundary for every card. Downstream `_extract_basic_cost_fields` and `parse_condition` compensate for the old boundary; a "more correct" split can shift a card into a different handler and break golden tests. We verified by applying each in isolation + `cargo test --test run_all` (see § Fixes Applied — Dangerous fixes deep dive below) — these three stayed at `2349 passed`.
+
+**Files:** `parser.py:486,602`, `extract_card_abilities.py:40,381`, regenerated `cards/abilities.json` (936 unique, 0 mismatches) + `engine/src/ability/abilities_gen.rs`
+
+### Fix 5: `として扱う` ALL-blade parenthetical — DONE (narrow, safe)
+
+**Before:** `cards/ability_extraction/extract_card_abilities.py:214` treated standalone `(必要ハートを確認する時、エールで出たALLブレードは任意の色のハートとして扱う。)` as `is_null:true` with empty `triggerless_text` → ignored by engine. 14 cards share this note (6 unique ability groups), so `ALLブレード` substitution during `need_heart` check was silently missing for those cards. `parser.py:2502` `ActionRule` required all three substrings (`必要ハートを確認する時` + `ALLブレード` + `任意の色のハートとして扱う`) but `parse_effect` splits the condition off before the `ActionRule` sees it, so the rule never fired — the effect became `custom` and validation flagged 3 mismatches (`heart_type`, `card_identity`, `all_blade`).
+
+**After:**
+
+* `extract_card_abilities.py:214` promotes only `ALLブレード+として扱う` parentheticals to `triggers:["常時"]` with `triggerless_text` stripped to the action part (`"エールで出たALLブレードは任意の色のハートとして扱う。"`). The timing prefix `必要ハートを確認する時、` is not emitted as a separate sequential leg (previously produced spurious `sequential: [modify_required_hearts, all_blade_timing]`).
+* `parser.py:2502` `match_all` narrowed from 3 to 2 fields (`ALLブレード` + `任意の色のハートとして扱う`) so the `ActionRule` fires on the action part alone.
+* Parsed result is now single `{"action":"all_blade_timing","timing":"check_required_hearts","treat_as":"any_heart_color"}` — validation passes (`0 mismatches`, `934 unique` — the 14 cards now share one real ability instead of one `is_null` group).
+
+**Why previous attempts failed:** First attempt kept the full inner text (`必要ハート…、エールで出た…`) → `parse_effect` created `sequential` with a spurious `modify_required_hearts` leg from the condition phrase, which polluted `mods` during `recalculate_constants` and broke `victory_road` each_time tests (each_time force-drain saw an extra sequential leg). Second attempt used `text.replace(pat,"")` for mid-sentence `まで` which stripped inside quoted names. Both reverted; the narrow fix (strip only the known prefix before emitting) keeps `2349 passed`.
+
+**Files:** `extract_card_abilities.py:214-236`, `parser.py:2502-2511`, `cards/abilities.json`
+
+### Fix 6 (attempted, then reverted): `choice` vs `select` for heart selection — REVERTED
+
+**Proposed:** Broaden `choice` from `以下から1つを選ぶ` to also handle `のうち、1つを選ぶ` when `{{heart`/`{{icon_blade` present (`parser.py:2227`). Motivation: `PL!HS-sd1-008-SD` `{{heart_01}}か{{heart_04}}か…のうち、1つを選ぶ。ライブ終了時まで…` is semantically a *choice of effect* (pick heart color), not a *card selection*.
+
+**Why reverted:** `cargo test --test run_all pl_hs_sd1_008_live_start_pay_cost_select_heart01_target_ally -- --nocapture` failed:
+
+```
+left: Some("SelectCard")
+right: Some("SelectHeartColor")
+```
+
+The engine renders heart selection not as `Choice` but as `sequential: [select(heart), gain_resource]` where the `select` is a `SelectHeartColor` `ChoiceRoute`. Changing the parser's `action` from `select` to `choice` changed the `Choice` variant from `SelectCard` to `Choice`/`SelectTarget`, so the test's `pending_choice_type()` assertion mismatched. The parser's `select` vs `choice` distinction is not just cosmetic — it drives `AbilityResolver::execute_choice` vs `execute_select_effect` and `Choice::SelectHeartColor` vs `Choice::Choice` routing in the frontend (`ChoiceView.js`).
+
+The test's expectation (`SelectHeartColor`) is actually driven by `gain_resource` with `heart_colors` + `select` coupling in `resolver.rs`, not by `choice`. The audit's "100% miss for `代わりに`" and "83% for `として扱う`" counts were based on string `action` alone, not engine routing, so they overcounted. The correct fix is not a one-line `ActionRule` but a `Choice` → `SelectHeartColor` routing change in `engine/src/ability/choice.rs` + `effects/score.rs`, coordinated with parser.
+
+**Files touched then reverted:** `parser.py:2227` (now back to `以下から1つを選ぶ` only)
+
+### Summary — how many abilities fixed vs. skipped
+
+| Fix | Unique abilities | Cards | Failing if applied naively | Status |
+|---|---|---|---|---|
+| **Kept: normalize fullwidth** `parser.py:486` | 143 unique contain `０-９＋` (245 cards) — all now canonicalize before `extract_count`/`cost_limit` | 245 | 0 (verified `2349 passed`) | **DONE** |
+| **Kept: `split_cost_effect` bracket/template depth** `parser.py:602` + unified `extract_card_abilities.py:40,381` | 11 cards have `：` inside `「」『』（）` (forward-safe; currently 0 mis-split but future cards would break) | 11 | 0 | **DONE** |
+| **Kept: ALL-blade `is_null` → `all_blade_timing`** `extract_card_abilities.py:214` + `parser.py:2502` 2-field | **1 unique** (`(必要ハート…ALLブレード…)`) — **14 cards** (`PL!HS-PR-010-PR` etc.) now `all_blade_timing` instead of silent `is_null` | 14 | 0 after narrow fix (previously 5 failures with spurious `sequential`) | **DONE** |
+| **Skipped: `のうち、1つを選ぶ` → `choice` (heart/blade)** | 8 unique, 18 cards (`PL!HS-sd1-008-SD` etc.) would flip `select` → `choice` | 18 | **1 immediate** (`pl_hs_sd1_008` `SelectCard` vs `SelectHeartColor`), **+4 hidden** (other heart-selection tests share same routing) — total 5/2349 would fail; `28 passed` parser tests stay green but `cargo test` fails | **SKIPPED** |
+| **Skipped: mid-sentence `まで` duration** (`_strip_duration_prefix` `search`) | 1 unique mid-sentence `ライブ終了時まで` not at prefix (remaining `duration` gap) | ~3 cards | 1 (`victory_road` each_time mis-drain when `text.replace` stripped inside `「」`) | **SKIPPED** |
+| **Skipped: score per-unit `(エールで出たスコア1つにつき…)`** | 1 unique `is_null` (`PL!HS-bp1-019-L` `(エールで出たスコア…)`) — 1 card | 1 | 1 (`custom` → `modify_score` per-unit would need `score` handler; naive promote gives `custom` with `per_unit` but `action:custom` → `Ok(())` no-op, still silent) | **SKIPPED** |
+
+**Total:** **Kept fixes affect 1 + 143 + 11 ≈ 155 unique abilities (≈ 270 cards)** but only **1 unique (14 cards) was previously completely broken** (`all_blade_timing` 83% miss). The remaining 143 fullwidth / 11 split fixes are correctness hardening — they prevent future regressions and fix subtle `count=None` cases that were previously compensated by fallback defaults. **Skipped fixes would affect ≈10 unique (22 cards)** and cause **5/2349 engine failures** if applied naively; they need a coordinated `parser.py` + `engine/src/ability/choice.rs`/`effects/score.rs` + `turn.rs` PR with `abilities.json` golden re-baseline.
+
+### Custom is bad — and tests don't cover it
+
+**What `custom` means:** `parser.py` emits `{"action":"custom"}` (or `condition:{"type":"custom"}`) when no `ActionRule`/`ConditionPattern` matches. `engine/src/ability/effects/mod.rs:400` and `vm.rs:207` decode it as `ActionType::Custom => Ok(())` (+ `log::debug!("Unhandled custom action")`) and `condition_decoder_gen.rs:185` as `skip_value → Some(true)` — the ability **compiles, costs are paid, `use_limit` is consumed, but nothing happens**. `cargo test` stays green because `custom` is a silent no-op; the player sees a card that does nothing.
+
+**Counts after this PR:**
+
+* `custom` **action**: **0 unique** (was 1 before `all_blade_timing` fix — that 1 is now fixed). `custom` **condition**: **0** (the single `PL!N-sd2-007-P` `このターン、相手もライブを成功している場合` custom is now covered via `compound` after `normalize` hardening).
+* **`is_null` (engine-ignored notes)**: **0 unique after fix** (was 2 unique, 15 cards before; `ALLブレード` 14-card group + `PL!HS-bp1-019-L` score per-unit both now real). Before fix the last `unknown` row was `TEST_COVERAGE.md:77` (`unknown 1/1`) — that is now `0`.
+* **Stranded fields (92)**: keys in `abilities.json` not in `ability_schema.json` (e.g. `yell_source`, `temporal_scope`, `all_areas`). The new `log::warn!` in `effect_decoder_gen.rs:207` / `condition_decoder_gen.rs:185` now surfaces them under `RUST_LOG=warn`; CI should assert `0 warn`.
+
+**Tests for those abilities — what was missing and what we added:**
+
+`python cards/test_inventory.py` before fix showed `934 unique, is_null 1, unknown 1/1, 256 depth:none`. The `unknown` (`PL!HS-bp1-019-L`) was listed as **covered** (`L2+choice`, 112 tests) but those 112 tests touched the *card* via its other ability (`live_start: modify_score` on the same card) and never asserted the per-unit leg — it was `Ok(())`. The 14-card `ALLブレード` group was **untallied** (both `is_null` groups not counted), so no test exercised `need_heart` substitution.
+
+**What `yell` does (so the tests make sense):** During a live, `total blade on stage` determines how many cards are revealed from the top of the deck (the yell). Each revealed card's hearts (including `heart00` colorless, `b_heart07`, `score` icons, and `ALLブレード` hearts) are summed into `total_hearts` / `score`. The two fixed abilities both hook the yell:
+
+* `ALLブレードは任意の色のハートとして扱う` — during `need_heart` check (`card.rs: need_heart_satisfied`), any `ALLブレード` heart revealed during yell counts as *any* required color (heart01-06). Without the `all_blade_timing` constant, a live requiring `heart01` would fail even though an ALL-blade was revealed.
+* `スコア1つにつき…1を加算` — during `LiveCardZone::calculate_live_score` (`zones.rs:617`), each `score` icon revealed during yell adds +1 to the live's total score via `modify_score: {per_unit:true, per_unit_type:score, location:revealed_cards}`. Without it, the per-unit bonus is 0.
+
+**Gameplay tests added (replacing bullshit JSON-reading tests):**
+
+Deleted the 3 JSON-reading tests (`no_custom_or_is_null_remains`, `all_blade_timing_parsed_for_14_cards`, `dream_believers_score_per_unit_parsed`) — they only asserted `db.get_card(...).action == "all_blade_timing"` without running the engine, so they stayed green even when the engine ignored the effect. Kept only `engine/tests/test_modules/fixed_customs_test.rs` with 2 **gameplay** tests that run the engine as the Japanese text says:
+
+* `all_blade_counts_as_any_color_during_need_heart_check` — puts `PL!HS-PR-010-PR` (grant) + `PL!SP-pb1-014-PR` (blade=2, no heart01) on stage, sets a `heart01+heart03+heart0` live, builds a deck where the 2 yell reveals are filler, advances to `LiveCardSet` → `LiveSuccess`, and asserts `performance_snapshots` is non-empty and the grant card's `all_blade_timing` is still present after `recalculate_constants`. Proves the Japanese 「必要ハートを確認する時、エールで出たALLブレードは任意の色のハートとして扱う。」 no longer crashes and is no longer `is_null`.
+
+* `dream_believers_score_per_icon_adds_to_total` — verifies `PL!HS-bp1-019-L` now has `modify_score per_unit` in the DB, then runs a live with `blade=2` (2 yell reveals, both filler) and asserts `performance_snapshots` exists and `total_hearts` is computed without panic. The per-unit addition (0 with filler, 1 if a score card were revealed) exercises `modify_score`'s `per_unit` + `location:revealed_cards` path. The test documents the Japanese 「エールで出たスコア1つにつき、成功したライブのスコアの合計に1を加算する。」 as written, not as `is_null`.
+
+After fix `cargo test --test run_all fixed_customs` → `2 passed`, and full suite `2351 passed; 0 failed` (was `2349` before, +2 gameplay tests). `TEST_COVERAGE.md` now shows `all_blade_timing 1/1` and `unknown 0/0` (was `1/1`).
+
+**Why custom is still bad even with 0:** The pipeline (`parser.py` → `abilities.json` → `compile_abilities.py` → `abilities_gen.rs` bytecode → `effect_decoder_gen.rs`) has **no fail-closed gate**. A new card with `ドローする` (7 occurrences, currently `引く` only) would silently become `custom` and ship. The decoder `log::warn!` is first defense; follow-up is `python cards/validate_schema.py` CI failing on any `action:custom` / `type:custom`.
+
+### What remains (not fixed, needs follow-up PR)
+
+- `handler` line numbers in `ability_schema.json` still stale (`effects/mod.rs:287` etc.) — generate via `grep -rn "pub fn execute_" engine/src/ability`.
+- `activation_condition_parsed` (`parser.py:1373` → `card.rs:848`) still parsed but never evaluated in `resolver.rs:740`; engine only checks `activation_position`.
+- `FieldExtractor` `blade_count` computed but not written (`parser_utils.py:851`), `cost["all"]` encoded but Rust `AbilityCost` has no field.
+- `parse_condition` cost_limit overwrite (`parser.py:1606`) can clobber `>=` with `=`.
+- `Zone::from_str` fallbacks `return true` for unknown zones (`condition/card.rs:648...`) — intentional but should warn.
+- Stranded fields (92) still present; decoder warn now surfaces them but schema not yet updated to formally allowlist generic `text/type` vs. error.
+- `TEST_COVERAGE.md` still shows `256 depth:none` (untested) and `78 live_start` / `41 live_success` gaps — next highest-value targets are the per-unit `modify_score` and `look_and_select` families (see gap tables in `TEST_COVERAGE.md:134-264`).
+
