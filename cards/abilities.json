@@ -1,16 +1,16 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-20T00:10:35.190284",
+  "generated_at": "2026-08-20T00:23:24.123301",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "9d937953",
+  "engine_commit": "75d8691c",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
-    "total_abilities": 2016,
-    "unique_abilities": 933
+    "total_abilities": 2011,
+    "unique_abilities": 936
   },
   "unique_abilities": [
     {
@@ -282,34 +282,25 @@
     },
     {
       "full_text": "(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
-      "triggerless_text": "エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。",
-      "card_count": 14,
+      "triggerless_text": "",
+      "card_count": 10,
       "cards": [
         "PL!HS-PR-010-PR | Reflection in the mirror (ab#0)",
         "PL!HS-PR-011-PR | Sparkly Spot (ab#0)",
         "PL!HS-PR-012-PR | アイデンティティ (ab#0)",
         "PL!N-bp1-025-L | 虹色Passions！ (ab#0)",
-        "PL!N-bp1-026-L | Poppin' Up! (ab#2)",
-        "PL!SP-bp1-024-L | Tiny Stars (ab#3)",
         "PL!SP-bp1-025-L | Starlight Prologue (ab#0)",
         "PL!HS-bp1-020-L | 365 Days (ab#0)",
-        "PL!HS-bp1-021-L | Holiday∞Holiday (ab#2)",
-        "PL!HS-bp1-023-L | ド！ド！ド！ (ab#2)",
         "PL!N-sd1-026-SD | 夢が僕らの太陽さ (ab#0)",
         "PL!N-sd1-027-SD | Just Believe!!! (ab#0)",
         "PL!SP-sd1-024-SD | シェキラ☆☆☆ (ab#0)",
         "PL!SP-sd1-025-SD | 未来は風のように (ab#0)"
       ],
-      "triggers": "常時",
+      "triggers": null,
       "use_limit": null,
-      "is_null": false,
+      "is_null": true,
       "cost": null,
-      "effect": {
-        "text": "エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う",
-        "action": "all_blade_timing",
-        "timing": "check_required_hearts",
-        "treat_as": "any_heart_color"
-      }
+      "effect": null
     },
     {
       "full_text": "{{toujyou.png|登場}}このメンバーをウェイトにしてもよい：自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）",
@@ -1223,31 +1214,6 @@
         "card_type": "live_card",
         "target": "self",
         "action": "move_cards"
-      }
-    },
-    {
-      "full_text": "(エールで出た{{icon_score.png|スコア}}1つにつき、成功したライブのスコアの合計に1を加算する。)",
-      "triggerless_text": "エールで出た{{icon_score.png|スコア}}1つにつき、成功したライブのスコアの合計に1を加算する。",
-      "card_count": 4,
-      "cards": [
-        "PL!SP-bp1-023-L | START!! True dreams (ab#2)",
-        "PL!HS-bp1-019-L | Dream Believers (ab#0)",
-        "PL!N-sd1-025-SD | Colorful Dreams! Colorful Smiles! (ab#0)",
-        "PL!SP-sd1-023-SD | WE WILL!! (ab#0)"
-      ],
-      "triggers": "常時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "エールで出た{{icon_score.png|スコア}}1つにつき、成功したライブのスコアの合計に1を加算する",
-        "action": "modify_score",
-        "operation": "add",
-        "value": 1,
-        "per_unit": true,
-        "per_unit_type": "score",
-        "per_unit_count": 1,
-        "location": "revealed_cards"
       }
     },
     {
@@ -8120,6 +8086,21 @@
       }
     },
     {
+      "full_text": "(エールで出た{{icon_score.png|スコア}}1つにつき、成功したライブのスコアの合計に1を加算する。)",
+      "triggerless_text": "",
+      "card_count": 3,
+      "cards": [
+        "PL!HS-bp1-019-L | Dream Believers (ab#0)",
+        "PL!N-sd1-025-SD | Colorful Dreams! Colorful Smiles! (ab#0)",
+        "PL!SP-sd1-023-SD | WE WILL!! (ab#0)"
+      ],
+      "triggers": null,
+      "use_limit": null,
+      "is_null": true,
+      "cost": null,
+      "effect": null
+    },
+    {
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを5枚見る。その中から『虹ヶ咲』のライブカードを1枚まで公開して手札に加えてもよい。残りを控え室に置く。",
       "triggerless_text": "自分のデッキの上からカードを5枚見る。その中から『虹ヶ咲』のライブカードを1枚まで公開して手札に加えてもよい。残りを控え室に置く。",
       "card_count": 3,
@@ -10983,43 +10964,6 @@
       }
     },
     {
-      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える。",
-      "triggerless_text": "ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える。",
-      "card_count": 2,
-      "cards": [
-        "PL!N-bp1-026-L | Poppin' Up! (ab#0)",
-        "PL!N-bp1-026-SECL | Poppin' Up! (ab#0)"
-      ],
-      "triggers": "ライブ成功時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える",
-        "condition": {
-          "text": "ライブの合計スコアが相手より高い場合",
-          "comparison_target": "opponent",
-          "operator": ">",
-          "comparison_type": "score",
-          "aggregate": "total",
-          "type": "comparison_condition"
-        },
-        "source": "revealed_cards",
-        "dynamic_count": {
-          "type": "revealed_cards",
-          "reference": "previous_reveal"
-        },
-        "destination": "hand",
-        "count": 1,
-        "target": "self",
-        "group_names": [
-          "虹ヶ咲"
-        ],
-        "action": "move_cards",
-        "card_type": "card"
-      }
-    },
-    {
       "full_text": "{{jyouji.png|常時}}自分のステージにほかのメンバーがいない場合、自分はライブできない。",
       "triggerless_text": "自分のステージにほかのメンバーがいない場合、自分はライブできない。",
       "card_count": 2,
@@ -11240,37 +11184,6 @@
       }
     },
     {
-      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
-      "triggerless_text": "ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
-      "card_count": 2,
-      "cards": [
-        "PL!SP-bp1-023-L | START!! True dreams (ab#0)",
-        "PL!SP-bp1-023-SRL | START!! True dreams (ab#0)"
-      ],
-      "triggers": "ライブ成功時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
-        "condition": {
-          "text": "ライブの合計スコアが相手より高い場合",
-          "comparison_target": "opponent",
-          "operator": ">",
-          "comparison_type": "score",
-          "aggregate": "total",
-          "type": "comparison_condition"
-        },
-        "source": "energy_deck",
-        "destination": "energy_zone",
-        "state_change": "wait",
-        "count": 1,
-        "card_type": "energy_card",
-        "target": "self",
-        "action": "move_cards"
-      }
-    },
-    {
       "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。",
       "triggerless_text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。",
       "card_count": 2,
@@ -11346,36 +11259,6 @@
           "heart05",
           "heart01"
         ]
-      }
-    },
-    {
-      "full_text": "{{live_success.png|ライブ成功時}}自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。",
-      "triggerless_text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。",
-      "card_count": 2,
-      "cards": [
-        "PL!SP-bp1-024-L | Tiny Stars (ab#1)",
-        "PL!SP-bp1-024-SRL | Tiny Stars (ab#1)"
-      ],
-      "triggers": "ライブ成功時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く",
-        "condition": {
-          "text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合",
-          "characters": [
-            "澁谷かのん",
-            "唐可可"
-          ],
-          "target": "self",
-          "location": "stage",
-          "type": "location_condition"
-        },
-        "action": "draw_card",
-        "count": 1,
-        "source": "deck",
-        "destination": "hand"
       }
     },
     {
@@ -22585,10 +22468,27 @@
           {
             "text": "このターン、相手もライブを成功している場合、カードを1枚引き、手札を1枚控え室に置く",
             "condition": {
-              "text": "このターン、相手もライブを成功している場合",
-              "temporal": "this_turn",
-              "temporal_scope": "this_turn",
-              "type": "custom"
+              "type": "compound",
+              "operator": "and",
+              "conditions": [
+                {
+                  "type": "temporal_condition",
+                  "temporal": "this_turn",
+                  "text": "このターン",
+                  "trigger_event": {
+                    "type": "temporal",
+                    "temporal": "this_turn"
+                  }
+                },
+                {
+                  "type": "opponent_live_success",
+                  "text": "相手もライブを成功している場合",
+                  "trigger_event": {
+                    "type": "opponent_live_success"
+                  }
+                }
+              ],
+              "text": "このターン、相手もライブを成功している場合"
             },
             "action": "sequential",
             "actions": [
@@ -24105,6 +24005,45 @@
       }
     },
     {
+      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
+      "triggerless_text": "ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
+      "card_count": 1,
+      "cards": [
+        "PL!N-bp1-026-L | Poppin' Up! (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える",
+        "condition": {
+          "text": "ライブの合計スコアが相手より高い場合",
+          "comparison_target": "opponent",
+          "operator": ">",
+          "comparison_type": "score",
+          "aggregate": "total",
+          "type": "comparison_condition"
+        },
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
+        "destination": "hand",
+        "count": 1,
+        "target": "self",
+        "group_names": [
+          "虹ヶ咲"
+        ],
+        "action": "move_cards",
+        "card_type": "card",
+        "parenthetical": [
+          "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
+        ]
+      }
+    },
+    {
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいる『虹ヶ咲』のメンバーが持つ{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち1色につき、このカードのスコアを＋１する。\n(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)",
       "triggerless_text": "自分のステージにいる『虹ヶ咲』のメンバーが持つ{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち1色につき、このカードのスコアを＋１する。\n(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)",
       "card_count": 1,
@@ -24220,6 +24159,71 @@
       }
     },
     {
+      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n(エールで出た{{icon_score.png|スコア}}1つにつき、成功したライブのスコアの合計に1を加算する。)",
+      "triggerless_text": "ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n(エールで出た{{icon_score.png|スコア}}1つにつき、成功したライブのスコアの合計に1を加算する。)",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-bp1-023-L | START!! True dreams (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
+        "condition": {
+          "text": "ライブの合計スコアが相手より高い場合",
+          "comparison_target": "opponent",
+          "operator": ">",
+          "comparison_type": "score",
+          "aggregate": "total",
+          "type": "comparison_condition"
+        },
+        "source": "energy_deck",
+        "destination": "energy_zone",
+        "state_change": "wait",
+        "count": 1,
+        "card_type": "energy_card",
+        "target": "self",
+        "action": "move_cards",
+        "parenthetical": [
+          "エールで出た{{icon_score.png|スコア}}1つにつき、成功したライブのスコアの合計に1を加算する。"
+        ]
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
+      "triggerless_text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-bp1-024-L | Tiny Stars (ab#1)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く",
+        "condition": {
+          "text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合",
+          "characters": [
+            "澁谷かのん",
+            "唐可可"
+          ],
+          "target": "self",
+          "location": "stage",
+          "type": "location_condition"
+        },
+        "action": "draw_card",
+        "count": 1,
+        "source": "deck",
+        "destination": "hand",
+        "parenthetical": [
+          "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
+        ]
+      }
+    },
+    {
       "full_text": "{{live_start.png|ライブ開始時}}自分のエネルギーが12枚以上ある場合、このカードのスコアを＋１する。\n(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)",
       "triggerless_text": "自分のエネルギーが12枚以上ある場合、このカードのスコアを＋１する。\n(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)",
       "card_count": 1,
@@ -24250,8 +24254,8 @@
       }
     },
     {
-      "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、『蓮ノ空』のライブカードを1枚手札に加える。",
-      "triggerless_text": "エールにより公開された自分のカードの中から、『蓮ノ空』のライブカードを1枚手札に加える。",
+      "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、『蓮ノ空』のライブカードを1枚手札に加える。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
+      "triggerless_text": "エールにより公開された自分のカードの中から、『蓮ノ空』のライブカードを1枚手札に加える。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
       "card_count": 1,
       "cards": [
         "PL!HS-bp1-021-L | Holiday∞Holiday (ab#0)"
@@ -24274,7 +24278,10 @@
         "group_names": [
           "蓮ノ空"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "parenthetical": [
+          "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
+        ]
       }
     },
     {
@@ -24312,8 +24319,8 @@
       }
     },
     {
-      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高く、かつ自分のステージに『蓮ノ空』のメンバーがいる場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
-      "triggerless_text": "ライブの合計スコアが相手より高く、かつ自分のステージに『蓮ノ空』のメンバーがいる場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
+      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高く、かつ自分のステージに『蓮ノ空』のメンバーがいる場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
+      "triggerless_text": "ライブの合計スコアが相手より高く、かつ自分のステージに『蓮ノ空』のメンバーがいる場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
       "card_count": 1,
       "cards": [
         "PL!HS-bp1-023-L | ド！ド！ド！ (ab#0)"
@@ -24362,7 +24369,10 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "parenthetical": [
+          "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
+        ]
       }
     },
     {
@@ -35188,6 +35198,65 @@
       }
     },
     {
+      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
+      "triggerless_text": "ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-bp1-023-SRL | START!! True dreams (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
+        "condition": {
+          "text": "ライブの合計スコアが相手より高い場合",
+          "comparison_target": "opponent",
+          "operator": ">",
+          "comparison_type": "score",
+          "aggregate": "total",
+          "type": "comparison_condition"
+        },
+        "source": "energy_deck",
+        "destination": "energy_zone",
+        "state_change": "wait",
+        "count": 1,
+        "card_type": "energy_card",
+        "target": "self",
+        "action": "move_cards"
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。",
+      "triggerless_text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-bp1-024-SRL | Tiny Stars (ab#1)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く",
+        "condition": {
+          "text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合",
+          "characters": [
+            "澁谷かのん",
+            "唐可可"
+          ],
+          "target": "self",
+          "location": "stage",
+          "type": "location_condition"
+        },
+        "action": "draw_card",
+        "count": 1,
+        "source": "deck",
+        "destination": "hand"
+      }
+    },
+    {
       "full_text": "{{live_start.png|ライブ開始時}}自分のエネルギーが12枚以上ある場合、このカードのスコアを＋１する。",
       "triggerless_text": "自分のエネルギーが12枚以上ある場合、このカードのスコアを＋１する。",
       "card_count": 1,
@@ -36585,6 +36654,42 @@
           }
         ],
         "count": 1
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える。",
+      "triggerless_text": "ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える。",
+      "card_count": 1,
+      "cards": [
+        "PL!N-bp1-026-SECL | Poppin' Up! (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える",
+        "condition": {
+          "text": "ライブの合計スコアが相手より高い場合",
+          "comparison_target": "opponent",
+          "operator": ">",
+          "comparison_type": "score",
+          "aggregate": "total",
+          "type": "comparison_condition"
+        },
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
+        "destination": "hand",
+        "count": 1,
+        "target": "self",
+        "group_names": [
+          "虹ヶ咲"
+        ],
+        "action": "move_cards",
+        "card_type": "card"
       }
     },
     {

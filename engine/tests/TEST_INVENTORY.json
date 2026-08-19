@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-19T14:11:16.868982+00:00",
+  "generated_at": "2026-08-19T14:31:41.645816+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
-    "total_abilities": 2016,
-    "unique_abilities": 933
+    "total_abilities": 2011,
+    "unique_abilities": 936
   },
   "n_files": 399,
   "n_tests": 2385,
-  "total_cards": 770,
-  "covered_cards": 527,
-  "abilities_on_covered": 677,
+  "total_cards": 771,
+  "covered_cards": 530,
+  "abilities_on_covered": 682,
   "trigger_counts": {
     "起動": [
       74,
@@ -25,13 +25,17 @@
       187,
       268
     ],
-    "常時": [
-      85,
-      119
+    "(none)": [
+      2,
+      2
     ],
     "ライブ成功時": [
-      78,
-      119
+      83,
+      122
+    ],
+    "常時": [
+      83,
+      117
     ],
     "自動": [
       75,
@@ -40,8 +44,8 @@
   },
   "action_counts": {
     "move_cards": [
-      106,
-      144
+      109,
+      146
     ],
     "look_and_select": [
       40,
@@ -55,13 +59,13 @@
       150,
       217
     ],
-    "all_blade_timing": [
-      1,
-      1
+    "unknown": [
+      2,
+      2
     ],
     "draw_card": [
-      26,
-      43
+      27,
+      44
     ],
     "change_state": [
       50,
@@ -78,10 +82,6 @@
     "gain_ability": [
       9,
       11
-    ],
-    "modify_score": [
-      56,
-      74
     ],
     "conditional_on_result": [
       17,
@@ -102,6 +102,10 @@
     "draw_until_count": [
       2,
       2
+    ],
+    "modify_score": [
+      56,
+      73
     ],
     "conditional_alternative": [
       5,
@@ -170,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      391,
+      393,
       545
     ],
     "temporal_condition": [
@@ -186,16 +190,16 @@
       13
     ],
     "comparison_condition": [
-      32,
-      58
+      34,
+      60
     ],
     "card_count_condition": [
       66,
       88
     ],
     "location_condition": [
-      55,
-      72
+      56,
+      73
     ],
     "movement:baton_touch": [
       13,
@@ -260,15 +264,15 @@
       52
     ],
     "bp1": [
-      46,
-      53
+      49,
+      56
     ],
     "bp3": [
-      51,
+      52,
       66
     ],
     "bp2": [
-      54,
+      55,
       68
     ],
     "bp4": [
@@ -305,9 +309,9 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 498,
-    "none": 256,
-    "L1+choice": 125,
+    "L2+choice": 501,
+    "none": 254,
+    "L1+choice": 127,
     "L2": 38,
     "L1": 16
   },
@@ -373,7 +377,6 @@
         "engine/tests/test_modules/duplicate_id_mulligan_test.rs",
         "engine/tests/test_modules/emma_test.rs",
         "engine/tests/test_modules/energy_and_member_under_test.rs",
-        "engine/tests/test_modules/fixed_customs_test.rs",
         "engine/tests/test_modules/fuyumari_test.rs",
         "engine/tests/test_modules/gameplay_test.rs",
         "engine/tests/test_modules/kanata_bp1_test.rs",
@@ -402,7 +405,6 @@
         "ai_screeam_answer_both_draw",
         "ai_screeam_answer_both_gain_blade",
         "ai_screeam_soreigai_all_members_on_both_sides_gain_blade",
-        "all_blade_counts_as_any_color_during_need_heart_check",
         "all_members_excluded_no_reduction",
         "awakening_move_1_of_2",
         "awakening_move_all_energy",
@@ -427,9 +429,10 @@
         "choice_condition_shows_proper_labels_in_actions",
         "dia_choose_blade",
         "dia_position_change_no_saintsnow_skips_gracefully",
-        "dia_position_change_saintsnow_source_any_destination"
+        "dia_position_change_saintsnow_source_any_destination",
+        "dia_position_change_two_saintsnow_both_selectable"
       ],
-      "covering_test_count": 311,
+      "covering_test_count": 309,
       "is_null": false
     },
     {
@@ -495,6 +498,7 @@
         "engine/tests/test_modules/constant_edge_case_test.rs",
         "engine/tests/test_modules/dream_with_you_test.rs",
         "engine/tests/test_modules/eli_test.rs",
+        "engine/tests/test_modules/fixed_customs_test.rs",
         "engine/tests/test_modules/gameplay_test.rs",
         "engine/tests/test_modules/hanano_test.rs",
         "engine/tests/test_modules/joint_card_live_start_test.rs",
@@ -551,7 +555,7 @@
         "c5_bytecode_carries_explicit_offset",
         "c5_cost_moves_one_energy_from_zone_under_member"
       ],
-      "covering_test_count": 335,
+      "covering_test_count": 337,
       "is_null": false
     },
     {
@@ -815,11 +819,11 @@
     {
       "idx": 5,
       "full_text": "(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
-      "triggers": "常時",
+      "triggers": "",
       "trigger_list": [
-        "常時"
+        "(none)"
       ],
-      "action": "all_blade_timing",
+      "action": "unknown",
       "condition": "none",
       "set": "PR",
       "cards": [
@@ -827,12 +831,8 @@
         "PL!HS-PR-011-PR",
         "PL!HS-PR-012-PR",
         "PL!N-bp1-025-L",
-        "PL!N-bp1-026-L",
-        "PL!SP-bp1-024-L",
         "PL!SP-bp1-025-L",
         "PL!HS-bp1-020-L",
-        "PL!HS-bp1-021-L",
-        "PL!HS-bp1-023-L",
         "PL!N-sd1-026-SD",
         "PL!N-sd1-027-SD",
         "PL!SP-sd1-024-SD",
@@ -845,32 +845,14 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/aurora_flower_identity_test.rs",
-        "engine/tests/test_modules/b9_more_test.rs",
-        "engine/tests/test_modules/bp7_auto_gap_test.rs",
-        "engine/tests/test_modules/bp7_cooking_with_love_test.rs",
-        "engine/tests/test_modules/bp7_kanata_choice_test.rs",
-        "engine/tests/test_modules/bp7_like_a_treasure_optional_test.rs",
-        "engine/tests/test_modules/card_ability_tests.rs",
         "engine/tests/test_modules/energy_and_member_under_test.rs",
-        "engine/tests/test_modules/fixed_customs_test.rs",
         "engine/tests/test_modules/himeno_test.rs",
-        "engine/tests/test_modules/kanon_bp5_constant_test.rs",
         "engine/tests/test_modules/live_success_rules_test.rs",
-        "engine/tests/test_modules/poppin_test.rs",
         "engine/tests/test_modules/rurino_test.rs",
-        "engine/tests/test_modules/score_condition_integration_test.rs",
-        "engine/tests/test_modules/untested_choice_change_target_test.rs"
+        "engine/tests/test_modules/score_condition_integration_test.rs"
       ],
       "covering_tests": [
-        "aiko_target_self_looks_at_top_card",
-        "all_blade_counts_as_any_color_during_need_heart_check",
         "any_card_fails_hearts_all_fail",
-        "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
-        "aoku_haruka_live_start_no_score_when_aurora_missing",
-        "aoku_haruka_live_start_scores_with_aurora_in_discard",
-        "aurora_flower_does_not_match_unrelated_groups",
-        "aurora_flower_treated_as_three_groups_in_stage",
         "awakening_move_1_of_2",
         "awakening_move_all_energy",
         "awakening_no_energy_nothing_happens",
@@ -879,23 +861,30 @@
         "ayumu_bp3n_debut_skip_no_draw",
         "ayumu_bp3n_q157_wait_energy_placed_under",
         "ayumu_bp5n_heart01_condition_passes_but_modifier_not_found",
-        "azuna_target_self_puts_members_on_deck_bottom",
         "both_players_have_live_cards",
         "both_players_live_score_compared",
-        "chisato_area_move_gains_blade",
         "compound_dododo_hasunosora_on_stage_passes",
         "compound_dododo_no_hasunosora_fails",
         "compound_dododo_tied_score_with_hasunosora_fails",
-        "cooking_accept_gives_heart01_to_all_niji_members",
-        "cooking_accept_shuffles_discard_to_deck_bottom",
-        "cooking_both_in_discard_offers_optional",
-        "cooking_condition_checks_discard_not_stage",
-        "cooking_decline_does_nothing",
-        "cooking_live_plus_member_with_blade_no_offer",
-        "cooking_non_niji_in_discard_no_offer"
+        "daydream_mermaid_no_niji_in_success_pick_one",
+        "daydream_mermaid_q191_niji_in_success_pick_both",
+        "hasunosora_group_member_present_passes",
+        "hasunosora_group_mixed_stage_passes",
+        "hasunosora_group_no_member_fails",
+        "himeno_bp6_cost_no_reduction_without_mirakura",
+        "himeno_bp6_cost_reduced_by_mirakura_on_stage",
+        "himeno_bp6_cost_reduced_by_two_mirakura",
+        "himeno_bp6_delayed_cannot_active_blocks_activation",
+        "himeno_bp6_delayed_cannot_active_stack_resets_on_second_set",
+        "himeno_bp6_q249_cost_reduced_by_three_mirakura",
+        "himeno_edge_no_mirakura_skips",
+        "himeno_q82_dodo_live_card_selectable",
+        "himeno_q82_identity_live_card_selectable",
+        "kasumi_debut_place_two_energy_under",
+        "kasumi_debut_skip_optional_no_energy_moved"
       ],
-      "covering_test_count": 196,
-      "is_null": false
+      "covering_test_count": 67,
+      "is_null": true
     },
     {
       "idx": 6,
@@ -2121,85 +2110,6 @@
     },
     {
       "idx": 29,
-      "full_text": "(エールで出た{{icon_score.png|スコア}}1つにつき、成功したライブのスコアの合計に1を加算する。)",
-      "triggers": "常時",
-      "trigger_list": [
-        "常時"
-      ],
-      "action": "modify_score",
-      "condition": "none",
-      "set": "bp1",
-      "cards": [
-        "PL!SP-bp1-023-L",
-        "PL!HS-bp1-019-L",
-        "PL!N-sd1-025-SD",
-        "PL!SP-sd1-023-SD"
-      ],
-      "base": "PL!SP-bp1-023",
-      "covered": true,
-      "depth": "L2+choice",
-      "has_assert": true,
-      "has_choice": true,
-      "has_negative": true,
-      "covering_files": [
-        "engine/tests/test_modules/aurora_flower_identity_test.rs",
-        "engine/tests/test_modules/blade_heart_colorless_test.rs",
-        "engine/tests/test_modules/bp7_auto_gap_test.rs",
-        "engine/tests/test_modules/fixed_customs_test.rs",
-        "engine/tests/test_modules/hinoshita_test.rs",
-        "engine/tests/test_modules/kanon_bp5_constant_test.rs",
-        "engine/tests/test_modules/live_cards_disappear_test.rs",
-        "engine/tests/test_modules/mari_bp2_test.rs",
-        "engine/tests/test_modules/mebius_loop_test.rs",
-        "engine/tests/test_modules/natsumi_bp5_test.rs",
-        "engine/tests/test_modules/performance_pipeline_test.rs",
-        "engine/tests/test_modules/performance_snapshot_audit_test.rs",
-        "engine/tests/test_modules/pl_hs_bp1_003_test.rs",
-        "engine/tests/test_modules/q46_kanako_all_heart_timing_test.rs",
-        "engine/tests/test_modules/qa_new_tests209.rs",
-        "engine/tests/test_modules/qa_new_tests251.rs",
-        "engine/tests/test_modules/qa_new_tests256.rs",
-        "engine/tests/test_modules/qa_new_tests257.rs",
-        "engine/tests/test_modules/shioriko_bp4_swap_test.rs",
-        "engine/tests/test_modules/start_true_dreams_test.rs"
-      ],
-      "covering_tests": [
-        "all_areas_aqours_diff_names_gains_ability",
-        "all_areas_hasunosora_with_multiname_gains_score",
-        "all_blade_counts_as_any_color_during_need_heart_check",
-        "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
-        "aoku_haruka_live_start_no_score_when_aurora_missing",
-        "aoku_haruka_live_start_scores_with_aurora_in_discard",
-        "audit_additive_modifier_can_cause_failure",
-        "audit_additive_modifier_stacks_on_base",
-        "audit_allocations_match_filled",
-        "audit_both_players_fail_no_winner",
-        "audit_no_need_heart_always_passes",
-        "audit_p1_passes_p2_fails_p1_wins",
-        "audit_set_zero_removes_requirement",
-        "audit_sufficient_hearts_passes",
-        "audit_two_cards_second_fails",
-        "audit_zero_stage_live_card_must_fail",
-        "aurora_flower_does_not_match_unrelated_groups",
-        "aurora_flower_treated_as_three_groups_in_stage",
-        "b_heart07_parses_to_colorless_heart00",
-        "b_heart07_yell_contributes_two_colorless_hearts_each",
-        "butterfly_to_butterfly_wing_matches",
-        "butterfly_wing_to_butterfly_no_match",
-        "chisato_area_move_gains_blade",
-        "colorless_hearts_cannot_fill_colored_requirement",
-        "colorless_hearts_fill_heart0_when_colored_hearts_present",
-        "dream_believers_104_to_105_no_match",
-        "dream_believers_105_to_104_no_match",
-        "dream_believers_105_to_base_no_match",
-        "dream_believers_score_per_icon_adds_to_total",
-        "dream_believers_to_105_matches"
-      ],
-      "covering_test_count": 138,
-      "is_null": false
-    },
-    {
-      "idx": 30,
       "full_text": "{{jyouji.png|常時}}自分のステージのエリアすべてに『蓮ノ空』のメンバーが登場しており、かつ名前が異なる場合、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -2260,7 +2170,7 @@
       "is_null": false
     },
     {
-      "idx": 31,
+      "idx": 30,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}：自分の控え室から4コスト以下の『蓮ノ空』のメンバーカードを1枚手札に加える。",
       "triggers": "起動",
       "trigger_list": [
@@ -2321,7 +2231,7 @@
       "is_null": false
     },
     {
-      "idx": 32,
+      "idx": 31,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}：自分の控え室から『蓮ノ空』のライブカードを1枚手札に加える。",
       "triggers": "起動",
       "trigger_list": [
@@ -2382,7 +2292,7 @@
       "is_null": false
     },
     {
-      "idx": 33,
+      "idx": 32,
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、自分のライブ中のカード1枚につき、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -2443,7 +2353,7 @@
       "is_null": false
     },
     {
-      "idx": 34,
+      "idx": 33,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：自分のステージにほかのメンバーがいる場合、好きなハートの色を1つ指定する。ライブ終了時まで、そのハートを1つ得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -2493,7 +2403,7 @@
       "is_null": false
     },
     {
-      "idx": 35,
+      "idx": 34,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを7枚見る。その中から{{heart_02.png|heart02}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}を持つメンバーカードを3枚まで公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -2554,7 +2464,7 @@
       "is_null": false
     },
     {
-      "idx": 36,
+      "idx": 35,
       "full_text": "{{jidou.png|自動}}［ターン1回］エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、自分の手札が7枚以下の場合、カードを1枚引く。",
       "triggers": "自動",
       "trigger_list": [
@@ -2606,7 +2516,7 @@
       "is_null": false
     },
     {
-      "idx": 37,
+      "idx": 36,
       "full_text": "{{live_start.png|ライブ開始時}}手札のライブカードを1枚公開し、デッキの一番下に置いてもよい：自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -2658,7 +2568,7 @@
       "is_null": false
     },
     {
-      "idx": 38,
+      "idx": 37,
       "full_text": "{{toujyou.png|登場}}自分の控え室からライブカードを1枚までデッキの一番下に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -2720,7 +2630,7 @@
       "is_null": false
     },
     {
-      "idx": 39,
+      "idx": 38,
       "full_text": "{{jyouji.png|常時}}自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合、「{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを＋１する。ライブカードが3枚以上ある場合、代わりに合計スコアを＋２する。」を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -2782,7 +2692,7 @@
       "is_null": false
     },
     {
-      "idx": 40,
+      "idx": 39,
       "full_text": "{{toujyou.png|登場}}自分のステージにいる『Liella!』のメンバー1人のすべての{{live_start.png|ライブ開始時}}能力を、ライブ終了時まで、無効にしてもよい。これにより無効にした場合、自分の控え室から『Liella!』のカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -2845,7 +2755,7 @@
       "is_null": false
     },
     {
-      "idx": 41,
+      "idx": 40,
       "full_text": "{{toujyou.png|登場}}バトンタッチして登場した場合、このバトンタッチで控え室に置かれた『Liella!』のメンバーカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -2907,7 +2817,7 @@
       "is_null": false
     },
     {
-      "idx": 42,
+      "idx": 41,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}手札のコスト4以下の『Liella!』のメンバーカードを1枚控え室に置く：これにより控え室に置いたメンバーカードの{{toujyou.png|登場}}能力1つを発動させる。\n({{toujyou.png|登場}}能力がコストを持つ場合、支払って発動させる。)",
       "triggers": "起動",
       "trigger_list": [
@@ -2969,7 +2879,7 @@
       "is_null": false
     },
     {
-      "idx": 43,
+      "idx": 42,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -2996,7 +2906,7 @@
       "is_null": false
     },
     {
-      "idx": 44,
+      "idx": 43,
       "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分の手札2枚につき、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -3057,7 +2967,7 @@
       "is_null": false
     },
     {
-      "idx": 45,
+      "idx": 44,
       "full_text": "{{jyouji.png|常時}}相手のライブカード置き場にあるすべてのライブカードは、成功させるための必要ハートが{{heart_00.png|heart0}}多くなる。",
       "triggers": "常時",
       "trigger_list": [
@@ -3119,7 +3029,7 @@
       "is_null": false
     },
     {
-      "idx": 46,
+      "idx": 45,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにこのメンバー以外のメンバーが1人以上いる場合、ライブ終了時まで、エールによって公開される自分のカードの枚数が8枚減る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -3181,7 +3091,7 @@
       "is_null": false
     },
     {
-      "idx": 47,
+      "idx": 46,
       "full_text": "{{toujyou.png|登場}}自分の控え室からコスト2以下のメンバーカードを2枚まで手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -3208,7 +3118,7 @@
       "is_null": false
     },
     {
-      "idx": 48,
+      "idx": 47,
       "full_text": "{{jyouji.png|常時}}自分のステージに、このメンバーよりコストの大きいメンバーがいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -3235,7 +3145,7 @@
       "is_null": false
     },
     {
-      "idx": 49,
+      "idx": 48,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のステージにほかのメンバーがいる場合、自分の控え室から『みらくらぱーく！』のカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -3296,7 +3206,7 @@
       "is_null": false
     },
     {
-      "idx": 50,
+      "idx": 49,
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}支払ってもよい：自分のステージのエリアすべてにメンバーが登場している場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -3357,7 +3267,7 @@
       "is_null": false
     },
     {
-      "idx": 51,
+      "idx": 50,
       "full_text": "{{toujyou.png|登場}}このメンバーよりコストが低い『スリーズブーケ』のメンバーからバトンタッチして登場した場合、自分の控え室から『蓮ノ空』のライブカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -3407,7 +3317,7 @@
       "is_null": false
     },
     {
-      "idx": 52,
+      "idx": 51,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：これにより控え室に置いたカードがメンバーカードの場合、控え室に置いたカードと同じ名前を持つメンバー1人は、ライブ終了時まで、{{heart_04.png|heart04}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -3457,7 +3367,7 @@
       "is_null": false
     },
     {
-      "idx": 53,
+      "idx": 52,
       "full_text": "{{toujyou.png|登場}}自分のステージにいるメンバー1人につき、カードを1枚引く。その後、手札を1枚控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -3492,7 +3402,7 @@
       "is_null": false
     },
     {
-      "idx": 54,
+      "idx": 53,
       "full_text": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場にカードがある場合、手札を1枚控え室に置いてもよい。そうした場合、自分の控え室から『μ's』のライブカードを1枚手札に加える。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -3527,7 +3437,7 @@
       "is_null": false
     },
     {
-      "idx": 55,
+      "idx": 54,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにする：自分の控え室から『μ's』のライブカードを1枚手札に加える。",
       "triggers": "起動",
       "trigger_list": [
@@ -3587,7 +3497,7 @@
       "is_null": false
     },
     {
-      "idx": 56,
+      "idx": 55,
       "full_text": "{{live_start.png|ライブ開始時}}『μ's』のメンバー1人をウェイトにしてもよい：ライブ終了時まで、{{heart_03.png|heart03}}{{heart_03.png|heart03}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -3647,7 +3557,7 @@
       "is_null": false
     },
     {
-      "idx": 57,
+      "idx": 56,
       "full_text": "{{toujyou.png|登場}}自分のステージにコスト13以上のメンバーがいる場合、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -3674,7 +3584,7 @@
       "is_null": false
     },
     {
-      "idx": 58,
+      "idx": 57,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにする：{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、選んだハートを1つ得る。",
       "triggers": "起動",
       "trigger_list": [
@@ -3701,7 +3611,7 @@
       "is_null": false
     },
     {
-      "idx": 59,
+      "idx": 58,
       "full_text": "{{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}メンバー1人をウェイトにする：ライブ終了時まで、これによってウェイト状態になったメンバーは、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。（この能力はセンターエリアに登場している場合のみ起動できる。）",
       "triggers": "起動",
       "trigger_list": [
@@ -3751,7 +3661,7 @@
       "is_null": false
     },
     {
-      "idx": 60,
+      "idx": 59,
       "full_text": "{{toujyou.png|登場}}手札のライブカードを1枚控え室に置いてもよい：カードを3枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -3786,7 +3696,7 @@
       "is_null": false
     },
     {
-      "idx": 61,
+      "idx": 60,
       "full_text": "{{live_start.png|ライブ開始時}}手札を2枚まで控え室に置いてもよい：ライブ終了時まで、これによって控え室に置いたカード1枚につき、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -3821,7 +3731,7 @@
       "is_null": false
     },
     {
-      "idx": 62,
+      "idx": 61,
       "full_text": "{{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーがいたエリアに登場させる。（この能力はセンターエリアに登場している場合のみ起動できる。）",
       "triggers": "起動",
       "trigger_list": [
@@ -3892,7 +3802,7 @@
       "is_null": false
     },
     {
-      "idx": 63,
+      "idx": 62,
       "full_text": "{{live_start.png|ライブ開始時}}自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。そうした場合、カードを1枚引き、ライブ終了時まで、自分のステージにいるメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。（メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。）",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -3927,7 +3837,7 @@
       "is_null": false
     },
     {
-      "idx": 64,
+      "idx": 63,
       "full_text": "{{jidou.png|自動}}このターン、自分のステージにメンバーが3回登場したとき、手札が5枚になるまでカードを引く。",
       "triggers": "自動",
       "trigger_list": [
@@ -3965,7 +3875,7 @@
       "is_null": false
     },
     {
-      "idx": 65,
+      "idx": 64,
       "full_text": "{{live_start.png|ライブ開始時}}このターン、自分のステージにメンバーが2回以上登場している場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -4003,7 +3913,7 @@
       "is_null": false
     },
     {
-      "idx": 66,
+      "idx": 65,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバー以外の『虹ヶ咲』のメンバー1人をウェイトにする：カードを1枚引く。",
       "triggers": "起動",
       "trigger_list": [
@@ -4040,7 +3950,7 @@
       "is_null": false
     },
     {
-      "idx": 67,
+      "idx": 66,
       "full_text": "{{live_start.png|ライブ開始時}}手札を2枚控え室に置いてもよい：自分のステージにいるこのメンバー以外のウェイト状態のメンバー1人をアクティブにする。そうした場合、ライブ終了時まで、これによりアクティブにしたメンバーと、このメンバーは、それぞれ{{heart_04.png|heart04}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -4077,7 +3987,7 @@
       "is_null": false
     },
     {
-      "idx": 68,
+      "idx": 67,
       "full_text": "{{live_start.png|ライブ開始時}}控え室にあるメンバーカード2枚を好きな順番でデッキの一番下に置いてもよい：それらのカードのコストの合計が、6の場合、カードを1枚引く。合計が8の場合、ライブ終了時まで、{{icon_all.png|ハート}}を得る。合計が25の場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -4140,7 +4050,7 @@
       "is_null": false
     },
     {
-      "idx": 69,
+      "idx": 68,
       "full_text": "{{jyouji.png|常時}}自分のライブ中のライブカードに、{{live_start.png|ライブ開始時}}能力も{{live_success.png|ライブ成功時}}能力も持たないカードがあるかぎり、{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -4173,7 +4083,7 @@
       "is_null": false
     },
     {
-      "idx": 70,
+      "idx": 69,
       "full_text": "{{toujyou.png|登場}}自分の控え室からコスト2以下のメンバーカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -4212,7 +4122,7 @@
       "is_null": false
     },
     {
-      "idx": 71,
+      "idx": 70,
       "full_text": "{{jyouji.png|常時}}{{center.png|センター}}ライブの合計スコアを＋１する。",
       "triggers": "常時",
       "trigger_list": [
@@ -4251,7 +4161,7 @@
       "is_null": false
     },
     {
-      "idx": 72,
+      "idx": 71,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージに{{icon_blade.png|ブレード}}を5つ以上持つ『μ's』のメンバーがいない場合、このメンバーはセンターエリア以外にポジションチェンジする。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。)",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -4290,7 +4200,7 @@
       "is_null": false
     },
     {
-      "idx": 73,
+      "idx": 72,
       "full_text": "{{live_start.png|ライブ開始時}}カードを1枚引く。相手のステージにいるコスト9以下のメンバーを1人までウェイトにする。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -4352,7 +4262,7 @@
       "is_null": false
     },
     {
-      "idx": 74,
+      "idx": 73,
       "full_text": "{{live_start.png|ライブ開始時}}相手のステージにいるウェイト状態のメンバーの数まで、自分の控え室にある『虹ヶ咲』のメンバーカードを選ぶ。それらを好きな順番でデッキの上に置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -4414,7 +4324,7 @@
       "is_null": false
     },
     {
-      "idx": 75,
+      "idx": 74,
       "full_text": "{{toujyou.png|登場}}自分と相手はそれぞれ、自身の控え室からライブカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -4470,7 +4380,7 @@
       "is_null": false
     },
     {
-      "idx": 76,
+      "idx": 75,
       "full_text": "{{jyouji.png|常時}}自分と相手のエネルギーの合計が15枚以上あるかぎり、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -4526,7 +4436,7 @@
       "is_null": false
     },
     {
-      "idx": 77,
+      "idx": 76,
       "full_text": "{{live_success.png|ライブ成功時}}自分と相手はそれぞれ、自身のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -4582,7 +4492,7 @@
       "is_null": false
     },
     {
-      "idx": 78,
+      "idx": 77,
       "full_text": "{{toujyou.png|登場}}自分の成功ライブカード置き場にある『虹ヶ咲』のライブカードを1枚控え室に置いてもよい。そうした場合、自分の控え室にある『虹ヶ咲』のライブカードを1枚成功ライブカード置き場に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -4641,7 +4551,7 @@
       "is_null": false
     },
     {
-      "idx": 79,
+      "idx": 78,
       "full_text": "{{live_start.png|ライブ開始時}}自分のライブ中の『虹ヶ咲』のライブカードを1枚選ぶ。それと同じカード名のカードが自分の成功ライブカード置き場にある場合、ライブ終了時まで、{{heart_04.png|heart04}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -4700,7 +4610,7 @@
       "is_null": false
     },
     {
-      "idx": 80,
+      "idx": 79,
       "full_text": "{{live_start.png|ライブ開始時}}手札のライブカードを1枚控え室に置いてもよい：好きなハートの色を1つ指定する。ライブ終了時まで、そのハートを1つ得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -4731,7 +4641,7 @@
       "is_null": false
     },
     {
-      "idx": 81,
+      "idx": 80,
       "full_text": "{{live_success.png|ライブ成功時}}自分のデッキの上からカードを5枚控え室に置く。その後、自分の控え室にカード名の異なる『虹ヶ咲』のライブカードが3枚以上ある場合、自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -4762,7 +4672,7 @@
       "is_null": false
     },
     {
-      "idx": 82,
+      "idx": 81,
       "full_text": "{{toujyou.png|登場}}{{center.png|センター}}『Liella!』のメンバー2人からバトンタッチして登場している場合、カードを2枚引き、自分の控え室にあるコスト4以下の『Liella!』のメンバーカード1枚を自分のステージのメンバーのいないエリアに登場させる。",
       "triggers": "登場",
       "trigger_list": [
@@ -4819,7 +4729,7 @@
       "is_null": false
     },
     {
-      "idx": 83,
+      "idx": 82,
       "full_text": "{{toujyou.png|登場}}『Liella!』のメンバーからバトンタッチして登場しており、かつ自分のエネルギーが7枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを2枚ウェイト状態で置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -4852,7 +4762,7 @@
       "is_null": false
     },
     {
-      "idx": 84,
+      "idx": 83,
       "full_text": "{{jyouji.png|常時}}自分のエネルギーが10枚以上あるかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -4885,7 +4795,7 @@
       "is_null": false
     },
     {
-      "idx": 85,
+      "idx": 84,
       "full_text": "{{toujyou.png|登場}}{{leftside.png|左サイド}}カードを2枚引き、手札を1枚控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -4918,7 +4828,7 @@
       "is_null": false
     },
     {
-      "idx": 86,
+      "idx": 85,
       "full_text": "{{toujyou.png|登場}}{{rightside.png|右サイド}}エネルギーを2枚アクティブにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -4951,7 +4861,7 @@
       "is_null": false
     },
     {
-      "idx": 87,
+      "idx": 86,
       "full_text": "{{live_start.png|ライブ開始時}}このメンバーをポジションチェンジしてもよい。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。)",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -4984,7 +4894,7 @@
       "is_null": false
     },
     {
-      "idx": 88,
+      "idx": 87,
       "full_text": "{{jidou.png|自動}}このメンバーが登場か、エリアを移動したとき、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする。",
       "triggers": "自動",
       "trigger_list": [
@@ -5031,7 +4941,7 @@
       "is_null": false
     },
     {
-      "idx": 89,
+      "idx": 88,
       "full_text": "{{live_success.png|ライブ成功時}}手札を1枚控え室に置いてもよい：自分のデッキの上から、自分のライブの合計スコアに2を足した数に等しい枚数見る。その中からカードを1枚手札に加える。残りを控え室に置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -5092,7 +5002,7 @@
       "is_null": false
     },
     {
-      "idx": 90,
+      "idx": 89,
       "full_text": "{{jyouji.png|常時}}自分のステージに名前が異なるメンバーが3人以上いるかぎり、{{heart_03.png|heart03}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -5155,7 +5065,7 @@
       "is_null": false
     },
     {
-      "idx": 91,
+      "idx": 90,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く：これにより控え室に置いたカードが『μ's』のカードの場合、自分のデッキの上からカードを4枚見る。その中からカードを2枚手札に加える。残りを控え室に置く。『μ's』のカード以外の場合、自分の控え室からライブカードを1枚手札に加える。",
       "triggers": "起動",
       "trigger_list": [
@@ -5218,7 +5128,7 @@
       "is_null": false
     },
     {
-      "idx": 92,
+      "idx": 91,
       "full_text": "{{kidou.png|起動}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}：相手のステージにいるコスト10以下のメンバー1人をウェイトにする。この能力を起動するためのコストは自分のステージにいるメンバーの中のグループ名1種類につき、{{icon_energy.png|E}}減る。",
       "triggers": "起動",
       "trigger_list": [
@@ -5258,7 +5168,7 @@
       "is_null": false
     },
     {
-      "idx": 93,
+      "idx": 92,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分がエールしたとき、エールにより公開された自分のカードの中にブレードハートを持たないメンバーカードが3枚以上ある場合、ライブ終了時まで、{{icon_all.png|ハート}}を得る。",
       "triggers": "自動",
       "trigger_list": [
@@ -5298,7 +5208,7 @@
       "is_null": false
     },
     {
-      "idx": 94,
+      "idx": 93,
       "full_text": "{{toujyou.png|登場}}能力を持たないメンバーからバトンタッチして登場した場合、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -5360,7 +5270,7 @@
       "is_null": false
     },
     {
-      "idx": 95,
+      "idx": 94,
       "full_text": "{{jyouji.png|常時}}能力を持たないメンバーカードを自分の手札から登場させるためのコストは1減る。",
       "triggers": "常時",
       "trigger_list": [
@@ -5422,7 +5332,7 @@
       "is_null": false
     },
     {
-      "idx": 96,
+      "idx": 95,
       "full_text": "{{live_start.png|ライブ開始時}}{{center.png|センター}}自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のすべてのメンバーをウェイトにする。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -5459,7 +5369,7 @@
       "is_null": false
     },
     {
-      "idx": 97,
+      "idx": 96,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：{{heart_03.png|heart03}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}のうち、1つを選ぶ。ライブ終了時まで、自分のステージにいるこのターンに登場したメンバーのうち、『Aqours』以外のすべてのメンバーは選んだハートを1つ得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -5520,7 +5430,7 @@
       "is_null": false
     },
     {
-      "idx": 98,
+      "idx": 97,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分がエールしたとき、エールにより公開された自分のカードが持つブレードハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}、{{icon_all.png|ハート}}のうち、3種類以上ある場合、ライブ終了時まで、{{heart_01.png|heart01}}を得る。6種類以上ある場合、さらにライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。",
       "triggers": "自動",
       "trigger_list": [
@@ -5568,7 +5478,7 @@
       "is_null": false
     },
     {
-      "idx": 99,
+      "idx": 98,
       "full_text": "{{jidou.png|自動}}このメンバーがステージから控え室に置かれたとき、このメンバーがコスト10以上のブレードハートを持たない『虹ヶ咲』のメンバーとバトンタッチしていた場合、エネルギーを2枚アクティブにする。コスト15以上のブレードハートを持たない『虹ヶ咲』のメンバーの場合、さらにカードを1枚引く。",
       "triggers": "自動",
       "trigger_list": [
@@ -5603,7 +5513,7 @@
       "is_null": false
     },
     {
-      "idx": 100,
+      "idx": 99,
       "full_text": "{{live_start.png|ライブ開始時}}自分と相手の成功ライブカード置き場にあるカードの枚数が同じ場合、ライブ終了時まで、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -5640,7 +5550,7 @@
       "is_null": false
     },
     {
-      "idx": 101,
+      "idx": 100,
       "full_text": "{{live_success.png|ライブ成功時}}自分が余剰ハートを1つ以上持っている場合、カードを2枚引き、手札を1枚控え室に置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -5677,7 +5587,7 @@
       "is_null": false
     },
     {
-      "idx": 102,
+      "idx": 101,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：カードを1枚引き、ライブ終了時まで、{{heart_01.png|heart01}}を得る。",
       "triggers": "起動",
       "trigger_list": [
@@ -5723,7 +5633,7 @@
       "is_null": false
     },
     {
-      "idx": 103,
+      "idx": 102,
       "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、このメンバーの下にあるエネルギーカードの枚数に1を足した枚数のエネルギーカードをウェイト状態で置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -5769,7 +5679,7 @@
       "is_null": false
     },
     {
-      "idx": 104,
+      "idx": 103,
       "full_text": "{{live_success.png|ライブ成功時}}カードを1枚引き、手札を1枚控え室に置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -5796,7 +5706,7 @@
       "is_null": false
     },
     {
-      "idx": 105,
+      "idx": 104,
       "full_text": "{{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}支払ってもよい：以下から1つを選ぶ。\n・相手のステージにいるコスト4以下のメンバー1人をウェイトにする。\n・カードを1枚引く。",
       "triggers": "ライブ開始時, 登場",
       "trigger_list": [
@@ -5858,7 +5768,7 @@
       "is_null": false
     },
     {
-      "idx": 106,
+      "idx": 105,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにするか、手札を1枚控え室に置く：エネルギーを1枚アクティブにする。",
       "triggers": "起動",
       "trigger_list": [
@@ -5919,7 +5829,7 @@
       "is_null": false
     },
     {
-      "idx": 107,
+      "idx": 106,
       "full_text": "{{kidou.png|起動}}{{leftside.png|左サイド}}{{turn1.png|ターン1回}}このメンバーをウェイトにする：カードを3枚引き、手札を2枚控え室に置く。これにより控え室に置いたカードの中にブレードハートを持たないメンバーカードが1枚以上ある場合、このメンバーをアクティブにする。2枚ある場合、さらにライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "起動",
       "trigger_list": [
@@ -5957,7 +5867,7 @@
       "is_null": false
     },
     {
-      "idx": 108,
+      "idx": 107,
       "full_text": "{{jyouji.png|常時}}コスト10の『Liella!』のメンバーカードを自分の手札から登場させるためのコストは2減る。",
       "triggers": "常時",
       "trigger_list": [
@@ -5994,7 +5904,7 @@
       "is_null": false
     },
     {
-      "idx": 109,
+      "idx": 108,
       "full_text": "{{live_start.png|ライブ開始時}}{{center.png|センター}}自分のステージにいるすべての『Liella!』のメンバーと、自分のすべてのエネルギーをアクティブにする。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -6031,7 +5941,7 @@
       "is_null": false
     },
     {
-      "idx": 110,
+      "idx": 109,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のカードの効果によって、このメンバーがエリアを移動するか自分のエネルギー置き場にエネルギーが置かれたとき、カードを1枚引き、ライブ終了時まで、{{heart_02.png|heart02}}を得る。",
       "triggers": "自動",
       "trigger_list": [
@@ -6084,7 +5994,7 @@
       "is_null": false
     },
     {
-      "idx": 111,
+      "idx": 110,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}デッキの上からカードを3枚控え室に置く：ライブ終了時まで、これにより控え室に置いた『Liella!』のメンバーカード1枚につき、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "起動",
       "trigger_list": [
@@ -6132,7 +6042,7 @@
       "is_null": false
     },
     {
-      "idx": 112,
+      "idx": 111,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のメインフェイズの間、自分のカードが1枚以上いずれかの領域から控え室に置かれるたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、それらのカードの中から1枚手札に加える。",
       "triggers": "自動",
       "trigger_list": [
@@ -6180,7 +6090,7 @@
       "is_null": false
     },
     {
-      "idx": 113,
+      "idx": 112,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを4枚控え室に置く。それらの中にライブカードがある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -6225,7 +6135,7 @@
       "is_null": false
     },
     {
-      "idx": 114,
+      "idx": 113,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}手札のライブカードを1枚公開する：自分の控え室から、これにより公開したカードのカード名がすべて含まれるライブカードを1枚手札に加える。",
       "triggers": "起動",
       "trigger_list": [
@@ -6270,7 +6180,7 @@
       "is_null": false
     },
     {
-      "idx": 115,
+      "idx": 114,
       "full_text": "{{jyouji.png|常時}}自分のステージにコストがそれぞれ異なるメンバーが3人以上いるかぎり、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -6331,7 +6241,7 @@
       "is_null": false
     },
     {
-      "idx": 116,
+      "idx": 115,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}：自分の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアに登場させる。",
       "triggers": "起動",
       "trigger_list": [
@@ -6392,7 +6302,7 @@
       "is_null": false
     },
     {
-      "idx": 117,
+      "idx": 116,
       "full_text": "{{jidou.png|自動}}このメンバーがステージから控え室に置かれたとき、メンバー1人をポジションチェンジさせてもよい。",
       "triggers": "自動",
       "trigger_list": [
@@ -6456,7 +6366,7 @@
       "is_null": false
     },
     {
-      "idx": 118,
+      "idx": 117,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：ライブ終了時まで、これにより控え室に置いたカードと同じグループ名を持つメンバー1人は、{{heart_01.png|heart01}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -6520,7 +6430,7 @@
       "is_null": false
     },
     {
-      "idx": 119,
+      "idx": 118,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}：このメンバーを『Aqours』か『SaintSnow』のメンバーがいるエリアにポジションチェンジする。",
       "triggers": "起動",
       "trigger_list": [
@@ -6584,7 +6494,7 @@
       "is_null": false
     },
     {
-      "idx": 120,
+      "idx": 119,
       "full_text": "{{jyouji.png|常時}}自分のエネルギーがちょうど8枚あるかぎり、ライブの合計スコアを＋１する。",
       "triggers": "常時",
       "trigger_list": [
@@ -6645,7 +6555,7 @@
       "is_null": false
     },
     {
-      "idx": 121,
+      "idx": 120,
       "full_text": "{{live_start.png|ライブ開始時}}{{center.png|センター}}自分のライブカード置き場に『µ's』のカードがある場合、ライブ終了時まで、自分のステージにいるすべての『μ's』のメンバーは{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -6686,7 +6596,7 @@
       "is_null": false
     },
     {
-      "idx": 122,
+      "idx": 121,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に、ブレードハートを持たない『μ's』のメンバーカードがある場合、カードを1枚引き、手札を1枚控え室に置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -6727,7 +6637,7 @@
       "is_null": false
     },
     {
-      "idx": 123,
+      "idx": 122,
       "full_text": "{{live_start.png|ライブ開始時}}{{center.png|センター}}手札にあるコスト2以下の『μ's』のメンバーカードを1枚公開し、このメンバーの下に置いてもよい。そうした場合、好きなハートの色を1つ指定する。ライブ終了時まで、そのハートを1つ得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -6775,7 +6685,7 @@
       "is_null": false
     },
     {
-      "idx": 124,
+      "idx": 123,
       "full_text": "{{live_success.png|ライブ成功時}}このメンバーの下にあるコスト2以下の『μ's』のメンバーカードを1枚、メンバーのいないエリアに登場させてもよい。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -6823,7 +6733,7 @@
       "is_null": false
     },
     {
-      "idx": 125,
+      "idx": 124,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}手札を1枚控え室に置く：好きなハートの色を1つ指定する。その後、自分のデッキの上からカードを5枚公開する。公開されたカードの中に指定した色のハートを持つメンバーカードと必要ハートに指定した色を含むライブカードが合計5枚含まれる場合、その中から『μ's』のカードを1枚手札に加え、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。公開した残りのカードを控え室に置く。",
       "triggers": "起動",
       "trigger_list": [
@@ -6869,7 +6779,7 @@
       "is_null": false
     },
     {
-      "idx": 126,
+      "idx": 125,
       "full_text": "{{live_success.png|ライブ成功時}}自分のデッキの一番上のカードを公開し、手札に加える。それがブレードハートを持たないメンバーカードの場合、ライブの合計スコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -6922,7 +6832,7 @@
       "is_null": false
     },
     {
-      "idx": 127,
+      "idx": 126,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}『Aqours』のライブカードが自分のライブカード置き場から控え室に置かれたとき、そのライブカードをデッキの一番上か一番下に置いてもよい。",
       "triggers": "自動",
       "trigger_list": [
@@ -6983,7 +6893,7 @@
       "is_null": false
     },
     {
-      "idx": 128,
+      "idx": 127,
       "full_text": "{{live_start.png|ライブ開始時}}自分のライブカード置き場にあるカードが『Aqours』のみで、かつそれらの必要ハートに含まれる{{heart_02.png|heart02}}と{{heart_04.png|heart04}}と{{heart_05.png|heart05}}の合計が12以上の場合、ライブ終了時まで、{{icon_all.png|ハート}}{{icon_all.png|ハート}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -7044,7 +6954,7 @@
       "is_null": false
     },
     {
-      "idx": 129,
+      "idx": 128,
       "full_text": "{{live_start.png|ライブ開始時}}自分のライブカード置き場にカードが2枚以上ある場合、その中から{{live_start.png|ライブ開始時}}能力を持たない『Aqours』のライブカードを1枚選び、デッキの一番上に置いてもよい。そうした場合、ライブ終了時まで、{{heart_02.png|heart02}}と{{heart_04.png|heart04}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -7105,7 +7015,7 @@
       "is_null": false
     },
     {
-      "idx": 130,
+      "idx": 129,
       "full_text": "{{jyouji.png|常時}}相手の成功ライブカード置き場にあるカードの枚数が自分より多いかぎり、その差に等しい数の{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -7132,7 +7042,7 @@
       "is_null": false
     },
     {
-      "idx": 131,
+      "idx": 130,
       "full_text": "{{live_success.png|ライブ成功時}}{{center.png|センター}}エールにより公開された自分のカードの中に、{{icon_score.png|スコア}}を持つ『Aqours』のライブカードがある場合、ライブの合計スコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -7159,7 +7069,7 @@
       "is_null": false
     },
     {
-      "idx": 132,
+      "idx": 131,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上から、自分のステージにいるメンバーの数に2を足した数に等しい枚数見る。その中から1枚をデッキの一番上に置き、残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -7201,7 +7111,7 @@
       "is_null": false
     },
     {
-      "idx": 133,
+      "idx": 132,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、カードを1枚デッキの一番上に置いてもよい。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -7243,7 +7153,7 @@
       "is_null": false
     },
     {
-      "idx": 134,
+      "idx": 133,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：ライブ終了時まで、このメンバーのコストを＋６する。その後、自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合、さらにライブ終了時まで、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -7304,7 +7214,7 @@
       "is_null": false
     },
     {
-      "idx": 135,
+      "idx": 134,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、『DOLLCHESTRA』のメンバーカードを1枚手札に加える。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -7365,7 +7275,7 @@
       "is_null": false
     },
     {
-      "idx": 136,
+      "idx": 135,
       "full_text": "{{jyouji.png|常時}}手札にあるこのメンバーカードのコストは、自分のステージにいる『みらくらぱーく！』のメンバー1人につき、2少なくなる。",
       "triggers": "常時",
       "trigger_list": [
@@ -7404,7 +7314,7 @@
       "is_null": false
     },
     {
-      "idx": 137,
+      "idx": 136,
       "full_text": "{{jyouji.png|常時}}このメンバーは『みらくらぱーく！』以外のメンバーカードとのバトンタッチで控え室に置けない。",
       "triggers": "常時",
       "trigger_list": [
@@ -7443,7 +7353,7 @@
       "is_null": false
     },
     {
-      "idx": 138,
+      "idx": 137,
       "full_text": "{{live_success.png|ライブ成功時}}このメンバーをウェイトにし、次のターンのアクティブフェイズにアクティブしない。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -7482,7 +7392,7 @@
       "is_null": false
     },
     {
-      "idx": 139,
+      "idx": 138,
       "full_text": "{{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}自分のデッキの一番上のカードを見る。それをデッキの一番下に置いてもよい。",
       "triggers": "ライブ開始時, 登場",
       "trigger_list": [
@@ -7534,7 +7444,7 @@
       "is_null": false
     },
     {
-      "idx": 140,
+      "idx": 139,
       "full_text": "{{toujyou.png|登場}}以下から1つを選ぶ。\n・ライブ終了時まで、自分のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下の『Aqours』のメンバーは、相手の効果によってはウェイトしない。\n・このメンバーを『Aqours』か『SaintSnow』のメンバーがいるエリアにポジションチェンジする。",
       "triggers": "登場",
       "trigger_list": [
@@ -7585,7 +7495,7 @@
       "is_null": false
     },
     {
-      "idx": 141,
+      "idx": 140,
       "full_text": "{{toujyou.png|登場}}自分の控え室にあるメンバーカード1枚を、自分のステージにいるメンバー1人の下に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -7633,7 +7543,7 @@
       "is_null": false
     },
     {
-      "idx": 142,
+      "idx": 141,
       "full_text": "{{jyouji.png|常時}}自分のステージにいる、メンバーカードが下に置かれている『Aqours』のメンバーは、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -7681,7 +7591,7 @@
       "is_null": false
     },
     {
-      "idx": 143,
+      "idx": 142,
       "full_text": "{{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}手札を2枚控え室に置く：このメンバーと自分のステージにいるほかの『Aqours』のメンバー1人を選ぶ。それらが持つ{{toujyou.png|登場}}能力それぞれ1つを発動させる。",
       "triggers": "起動",
       "trigger_list": [
@@ -7729,7 +7639,7 @@
       "is_null": false
     },
     {
-      "idx": 144,
+      "idx": 143,
       "full_text": "{{toujyou.png|登場}}自分の控え室からコスト2以下のメンバーカードを1枚手札に加える。これによって「津島善子」か「黒澤ルビィ」を手札に加えた場合、そのカードを自分のステージのメンバーのいないエリアに登場させてもよい。",
       "triggers": "登場",
       "trigger_list": [
@@ -7768,7 +7678,7 @@
       "is_null": false
     },
     {
-      "idx": 145,
+      "idx": 144,
       "full_text": "{{live_start.png|ライブ開始時}}自分の控え室から『Aqours』のメンバーカードを3枚まで好きな順番でデッキの下に置く。ライブ終了時まで、これによりデッキに置かれたカード1枚につき、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -7807,7 +7717,7 @@
       "is_null": false
     },
     {
-      "idx": 146,
+      "idx": 145,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}デッキの上からカードを5枚控え室に置く：自分の控え室にあるコスト17以下の『虹ヶ咲』のメンバーカード1枚をこのメンバーの下に置く。そうしたとき、ライブ終了時まで、このメンバーが元々持つハートは、これにより下に置いたメンバーカードが持つハートと同じになる。",
       "triggers": "起動",
       "trigger_list": [
@@ -7857,7 +7767,7 @@
       "is_null": false
     },
     {
-      "idx": 147,
+      "idx": 146,
       "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、このメンバーの下に置かれている名前の異なるメンバーカード1枚につき、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -7907,7 +7817,7 @@
       "is_null": false
     },
     {
-      "idx": 148,
+      "idx": 147,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}：自分のデッキの上からカードを4枚見る。その後、それらを好きな順番でデッキの上に置く。",
       "triggers": "起動",
       "trigger_list": [
@@ -7946,7 +7856,7 @@
       "is_null": false
     },
     {
-      "idx": 149,
+      "idx": 148,
       "full_text": "{{kidou.png|起動}}{{turn2.png|ターン2回}}デッキの上からカードを3枚控え室に置く：これにより控え室に置いたカードの中に『虹ヶ咲』のライブカードかブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合、以下から1つを選ぶ。\n・エネルギーを2枚アクティブにする。\n・ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "起動",
       "trigger_list": [
@@ -7985,7 +7895,7 @@
       "is_null": false
     },
     {
-      "idx": 150,
+      "idx": 149,
       "full_text": "{{jyouji.png|常時}}このメンバーの下にあるエネルギーカード1枚につき、{{heart_02.png|heart02}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -8046,7 +7956,7 @@
       "is_null": false
     },
     {
-      "idx": 151,
+      "idx": 150,
       "full_text": "{{jyouji.png|常時}}自分のエネルギーが6枚より多いかぎり、その差に等しい数の{{heart_02.png|heart02}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -8107,7 +8017,7 @@
       "is_null": false
     },
     {
-      "idx": 152,
+      "idx": 151,
       "full_text": "{{live_success.png|ライブ成功時}}自分のエネルギーデッキから、エネルギーカード1枚をこのメンバーの下に置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -8168,7 +8078,7 @@
       "is_null": false
     },
     {
-      "idx": 153,
+      "idx": 152,
       "full_text": "{{jidou.png|自動}}このカードがデッキから控え室に置かれたとき、手札を1枚控え室に置いてもよい。そうしたとき、控え室からこのカードを手札に加える。",
       "triggers": "自動",
       "trigger_list": [
@@ -8219,7 +8129,7 @@
       "is_null": false
     },
     {
-      "idx": 154,
+      "idx": 153,
       "full_text": "{{jyouji.png|常時}}このカードをプレイする際、自分の控え室にあるすべてのメンバーカードをシャッフルし、デッキの下に置いてもよい。そうしたとき、このカードのコストは２減る。",
       "triggers": "常時",
       "trigger_list": [
@@ -8270,7 +8180,7 @@
       "is_null": false
     },
     {
-      "idx": 155,
+      "idx": 154,
       "full_text": "{{live_success.png|ライブ成功時}}自分の控え室にある『虹ヶ咲』のカード1枚をデッキの一番上に置いてもよい。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -8321,7 +8231,7 @@
       "is_null": false
     },
     {
-      "idx": 156,
+      "idx": 155,
       "full_text": "{{jyouji.png|常時}}このメンバーの下に置かれているメンバーカード1枚につき、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -8363,7 +8273,7 @@
       "is_null": false
     },
     {
-      "idx": 157,
+      "idx": 156,
       "full_text": "{{jyouji.png|常時}}このメンバーの下にメンバーカードが3枚以上置かれているかぎり、ライブの合計スコアを＋１する。",
       "triggers": "常時",
       "trigger_list": [
@@ -8405,7 +8315,7 @@
       "is_null": false
     },
     {
-      "idx": 158,
+      "idx": 157,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}手札のコストが10か20のメンバーカードを1枚公開する：これにより公開したカードをこのメンバーの下に置く。その後、カードを2枚引く。",
       "triggers": "起動",
       "trigger_list": [
@@ -8447,7 +8357,7 @@
       "is_null": false
     },
     {
-      "idx": 159,
+      "idx": 158,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}このメンバーが登場するか、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれたとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。そのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない。",
       "triggers": "自動",
       "trigger_list": [
@@ -8494,7 +8404,7 @@
       "is_null": false
     },
     {
-      "idx": 160,
+      "idx": 159,
       "full_text": "{{jidou.png|自動}}{{turn2.png|ターン2回}}自分のカードの効果によって、自分のエネルギー置き場にエネルギーが置かれたとき、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "自動",
       "trigger_list": [
@@ -8541,7 +8451,7 @@
       "is_null": false
     },
     {
-      "idx": 161,
+      "idx": 160,
       "full_text": "{{toujyou.png|登場}}エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい：自分の控え室にある『Liella!』のメンバーカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -8582,7 +8492,7 @@
       "is_null": false
     },
     {
-      "idx": 162,
+      "idx": 161,
       "full_text": "{{live_success.png|ライブ成功時}}{{center.png|センター}}このターン、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれていた場合、ライブの合計スコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -8623,7 +8533,7 @@
       "is_null": false
     },
     {
-      "idx": 163,
+      "idx": 162,
       "full_text": "{{live_start.png|ライブ開始時}}エネルギー置き場にあるエネルギー2枚をエネルギーデッキに置いてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -8656,7 +8566,7 @@
       "is_null": false
     },
     {
-      "idx": 164,
+      "idx": 163,
       "full_text": "{{live_success.png|ライブ成功時}}自分のエネルギーデッキから、エネルギーカードを2枚ウェイト状態で置く。それらのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -8689,7 +8599,7 @@
       "is_null": false
     },
     {
-      "idx": 165,
+      "idx": 164,
       "full_text": "{{live_success.png|ライブ成功時}}自分のエネルギーが相手より多い場合、エネルギーを6枚アクティブにする。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -8722,7 +8632,7 @@
       "is_null": false
     },
     {
-      "idx": 166,
+      "idx": 165,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -8784,7 +8694,7 @@
       "is_null": false
     },
     {
-      "idx": 167,
+      "idx": 166,
       "full_text": "{{toujyou.png|登場}}以下から1つを選ぶ。\n・カードを1枚引き、手札を1枚控え室に置く。\n・相手のステージにいるすべてのコスト2以下のメンバーをウェイトにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -8823,7 +8733,7 @@
       "is_null": false
     },
     {
-      "idx": 168,
+      "idx": 167,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：カードを1枚引く。",
       "triggers": "起動",
       "trigger_list": [
@@ -8859,7 +8769,7 @@
       "is_null": false
     },
     {
-      "idx": 169,
+      "idx": 168,
       "full_text": "{{jyouji.png|常時}}相手のエネルギーが自分より多い場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -8919,7 +8829,7 @@
       "is_null": false
     },
     {
-      "idx": 170,
+      "idx": 169,
       "full_text": "{{toujyou.png|登場}}ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -8951,7 +8861,7 @@
       "is_null": false
     },
     {
-      "idx": 171,
+      "idx": 170,
       "full_text": "{{jyouji.png|常時}}自分か相手のステージにコスト13以上のメンバーがいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -8982,7 +8892,7 @@
       "is_null": false
     },
     {
-      "idx": 172,
+      "idx": 171,
       "full_text": "{{kidou.png|起動}}{{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く：自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる。その後、自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く。（メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。）",
       "triggers": "起動",
       "trigger_list": [
@@ -9015,7 +8925,7 @@
       "is_null": false
     },
     {
-      "idx": 173,
+      "idx": 172,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}手札をすべて公開する：自分のステージにほかのメンバーがおり、かつこれにより公開した手札の中にライブカードがない場合、自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "起動",
       "trigger_list": [
@@ -9081,7 +8991,7 @@
       "is_null": false
     },
     {
-      "idx": 174,
+      "idx": 173,
       "full_text": "{{live_success.png|ライブ成功時}}手札を1枚控え室に置いてもよい：エールにより公開された自分のカードの中から、コスト2以下のメンバーカードか、スコア２以下のライブカードを1枚手札に加える。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -9120,7 +9030,7 @@
       "is_null": false
     },
     {
-      "idx": 175,
+      "idx": 174,
       "full_text": "{{jyouji.png|常時}}ステージのセンターエリアにいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -9183,7 +9093,7 @@
       "is_null": false
     },
     {
-      "idx": 176,
+      "idx": 175,
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払わないかぎり、自分の手札を2枚控え室に置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -9249,7 +9159,7 @@
       "is_null": false
     },
     {
-      "idx": 177,
+      "idx": 176,
       "full_text": "{{live_success.png|ライブ成功時}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブの合計スコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -9315,7 +9225,7 @@
       "is_null": false
     },
     {
-      "idx": 178,
+      "idx": 177,
       "full_text": "{{toujyou.png|登場}}自分のエネルギーが7枚以上ある場合、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -9378,7 +9288,7 @@
       "is_null": false
     },
     {
-      "idx": 179,
+      "idx": 178,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。これによりライブカードを控え室に置いた場合、さらにカードを1枚引く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -9421,7 +9331,7 @@
       "is_null": false
     },
     {
-      "idx": 180,
+      "idx": 179,
       "full_text": "{{toujyou.png|登場}}手札を3枚まで控え室に置いてもよい：これにより置いた枚数分カードを引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -9486,7 +9396,7 @@
       "is_null": false
     },
     {
-      "idx": 181,
+      "idx": 180,
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -9544,7 +9454,7 @@
       "is_null": false
     },
     {
-      "idx": 182,
+      "idx": 181,
       "full_text": "{{toujyou.png|登場}}{{icon_energy.png|E}}支払ってもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -9583,7 +9493,7 @@
       "is_null": false
     },
     {
-      "idx": 183,
+      "idx": 182,
       "full_text": "{{live_start.png|ライブ開始時}}自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる場合、このカードを成功させるための必要ハートは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_03.png|heart03}}{{heart_03.png|heart03}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}になる。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -9642,6 +9552,81 @@
       ],
       "covering_test_count": 73,
       "is_null": false
+    },
+    {
+      "idx": 183,
+      "full_text": "(エールで出た{{icon_score.png|スコア}}1つにつき、成功したライブのスコアの合計に1を加算する。)",
+      "triggers": "",
+      "trigger_list": [
+        "(none)"
+      ],
+      "action": "unknown",
+      "condition": "none",
+      "set": "bp1",
+      "cards": [
+        "PL!HS-bp1-019-L",
+        "PL!N-sd1-025-SD",
+        "PL!SP-sd1-023-SD"
+      ],
+      "base": "PL!HS-bp1-019",
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/aurora_flower_identity_test.rs",
+        "engine/tests/test_modules/blade_heart_colorless_test.rs",
+        "engine/tests/test_modules/fixed_customs_test.rs",
+        "engine/tests/test_modules/hinoshita_test.rs",
+        "engine/tests/test_modules/live_cards_disappear_test.rs",
+        "engine/tests/test_modules/mari_bp2_test.rs",
+        "engine/tests/test_modules/mebius_loop_test.rs",
+        "engine/tests/test_modules/natsumi_bp5_test.rs",
+        "engine/tests/test_modules/performance_pipeline_test.rs",
+        "engine/tests/test_modules/performance_snapshot_audit_test.rs",
+        "engine/tests/test_modules/pl_hs_bp1_003_test.rs",
+        "engine/tests/test_modules/q46_kanako_all_heart_timing_test.rs",
+        "engine/tests/test_modules/qa_new_tests209.rs",
+        "engine/tests/test_modules/qa_new_tests251.rs",
+        "engine/tests/test_modules/qa_new_tests256.rs",
+        "engine/tests/test_modules/qa_new_tests257.rs",
+        "engine/tests/test_modules/shioriko_bp4_swap_test.rs"
+      ],
+      "covering_tests": [
+        "all_areas_aqours_diff_names_gains_ability",
+        "all_areas_hasunosora_with_multiname_gains_score",
+        "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
+        "aoku_haruka_live_start_no_score_when_aurora_missing",
+        "aoku_haruka_live_start_scores_with_aurora_in_discard",
+        "audit_additive_modifier_can_cause_failure",
+        "audit_additive_modifier_stacks_on_base",
+        "audit_allocations_match_filled",
+        "audit_both_players_fail_no_winner",
+        "audit_no_need_heart_always_passes",
+        "audit_p1_passes_p2_fails_p1_wins",
+        "audit_set_zero_removes_requirement",
+        "audit_sufficient_hearts_passes",
+        "audit_two_cards_second_fails",
+        "audit_zero_stage_live_card_must_fail",
+        "aurora_flower_does_not_match_unrelated_groups",
+        "aurora_flower_treated_as_three_groups_in_stage",
+        "b_heart07_parses_to_colorless_heart00",
+        "b_heart07_yell_contributes_two_colorless_hearts_each",
+        "butterfly_to_butterfly_wing_matches",
+        "butterfly_wing_to_butterfly_no_match",
+        "colorless_hearts_cannot_fill_colored_requirement",
+        "colorless_hearts_fill_heart0_when_colored_hearts_present",
+        "dream_believers_104_to_105_no_match",
+        "dream_believers_105_to_104_no_match",
+        "dream_believers_105_to_base_no_match",
+        "dream_believers_to_105_matches",
+        "duplicate_names_fails_condition",
+        "duplicate_names_fails_distinct_condition",
+        "empty_area_fails_all_areas_condition"
+      ],
+      "covering_test_count": 114,
+      "is_null": true
     },
     {
       "idx": 184,
@@ -12489,70 +12474,6 @@
     },
     {
       "idx": 257,
-      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える。",
-      "triggers": "ライブ成功時",
-      "trigger_list": [
-        "ライブ成功時"
-      ],
-      "action": "move_cards",
-      "condition": "comparison_condition",
-      "set": "bp1",
-      "cards": [
-        "PL!N-bp1-026-L",
-        "PL!N-bp1-026-SECL"
-      ],
-      "base": "PL!N-bp1-026",
-      "covered": true,
-      "depth": "L2+choice",
-      "has_assert": true,
-      "has_choice": true,
-      "has_negative": true,
-      "covering_files": [
-        "engine/tests/test_modules/bp7_auto_gap_test.rs",
-        "engine/tests/test_modules/bp7_cooking_with_love_test.rs",
-        "engine/tests/test_modules/bp7_kanata_choice_test.rs",
-        "engine/tests/test_modules/bp7_like_a_treasure_optional_test.rs",
-        "engine/tests/test_modules/card_ability_tests.rs",
-        "engine/tests/test_modules/poppin_test.rs",
-        "engine/tests/test_modules/untested_choice_change_target_test.rs"
-      ],
-      "covering_tests": [
-        "aiko_target_self_looks_at_top_card",
-        "azuna_target_self_puts_members_on_deck_bottom",
-        "chisato_area_move_gains_blade",
-        "cooking_accept_gives_heart01_to_all_niji_members",
-        "cooking_accept_shuffles_discard_to_deck_bottom",
-        "cooking_both_in_discard_offers_optional",
-        "cooking_condition_checks_discard_not_stage",
-        "cooking_decline_does_nothing",
-        "cooking_live_plus_member_with_blade_no_offer",
-        "cooking_non_niji_in_discard_no_offer",
-        "cooking_only_live_card_no_offer",
-        "cooking_only_member_with_blade_no_offer",
-        "cooking_only_member_without_blade_no_offer",
-        "fu_pb1_debut_heart06_member_auto_gains_heart06",
-        "fu_pb1_debut_no_heart06_member_no_effect",
-        "fu_pb1_debut_two_heart06_members_prompts_choice",
-        "fuyumari_area_move_gains_heart03",
-        "hanayo_no_mus_member_skips_cost_prompt",
-        "hanayo_pay_optional_cost_waits_member_and_gains_hearts",
-        "hanayo_skip_optional_cost_no_effect",
-        "kanata_cost_mills_top_three",
-        "kanata_live_card_in_discard_offers_choice",
-        "kanata_member_with_blade_heart_does_not_offer_choice",
-        "kanata_member_without_blade_heart_offers_choice",
-        "kanata_no_matching_card_does_not_offer_choice",
-        "kanata_option_activate_two_energy",
-        "kanata_option_gain_blade_two",
-        "kanata_preexisting_live_in_discard_does_not_count",
-        "kanata_use_limit_twice_per_turn",
-        "kanon_area_move_gains_heart02"
-      ],
-      "covering_test_count": 100,
-      "is_null": false
-    },
-    {
-      "idx": 258,
       "full_text": "{{jyouji.png|常時}}自分のステージにほかのメンバーがいない場合、自分はライブできない。",
       "triggers": "常時",
       "trigger_list": [
@@ -12614,7 +12535,7 @@
       "is_null": false
     },
     {
-      "idx": 259,
+      "idx": 258,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『Liella!』のカードを1枚まで公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -12661,7 +12582,7 @@
       "is_null": false
     },
     {
-      "idx": 260,
+      "idx": 259,
       "full_text": "{{toujyou.png|登場}}カードを1枚引く。自分のステージに「米女メイ」がいる場合、さらにカードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -12686,7 +12607,7 @@
       "is_null": false
     },
     {
-      "idx": 261,
+      "idx": 260,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}：カードを1枚引き、手札を1枚控え室に置く。",
       "triggers": "起動",
       "trigger_list": [
@@ -12711,7 +12632,7 @@
       "is_null": false
     },
     {
-      "idx": 262,
+      "idx": 261,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く：自分のデッキの上からカードを5枚見る。その中から『Liella!』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "起動",
       "trigger_list": [
@@ -12736,61 +12657,7 @@
       "is_null": false
     },
     {
-      "idx": 263,
-      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
-      "triggers": "ライブ成功時",
-      "trigger_list": [
-        "ライブ成功時"
-      ],
-      "action": "move_cards",
-      "condition": "comparison_condition",
-      "set": "bp1",
-      "cards": [
-        "PL!SP-bp1-023-L",
-        "PL!SP-bp1-023-SRL"
-      ],
-      "base": "PL!SP-bp1-023",
-      "covered": true,
-      "depth": "L2+choice",
-      "has_assert": true,
-      "has_choice": true,
-      "has_negative": true,
-      "covering_files": [
-        "engine/tests/test_modules/bp7_auto_gap_test.rs",
-        "engine/tests/test_modules/kanon_bp5_constant_test.rs",
-        "engine/tests/test_modules/start_true_dreams_test.rs"
-      ],
-      "covering_tests": [
-        "chisato_area_move_gains_blade",
-        "fuyumari_area_move_gains_heart03",
-        "kanon_area_move_gains_heart02",
-        "kanon_constant_bonus_removed_when_cards_leaves_zone",
-        "kanon_constant_empty_live_card_zone_no_bonus",
-        "kanon_constant_liella_live_need_heart_4_no_bonus",
-        "kanon_constant_liella_live_need_heart_8_gains_bonus",
-        "kanon_constant_non_liella_live_no_bonus",
-        "kanon_constant_success_zone_does_not_count",
-        "kanon_constant_two_liella_live_cards_sum_to_8",
-        "kasumi_other_member_moves_does_not_trigger",
-        "kasumi_stage_to_discard_adds_niji_live",
-        "may_area_move_adds_liella_live",
-        "natsumi_yell_no_blade_heart_gains_heart02",
-        "natsumi_yell_with_blade_heart_does_not_gain",
-        "rurino_stage_to_discard_draws_2_discards_2",
-        "sayaka_stage_to_discard_buffs_member",
-        "setsuna_baton_touch_debut_draws",
-        "setsuna_bp7_baton_touch_places_energy_under_arriver",
-        "shiki_wait_then_area_move_reactivates",
-        "shioriko_live_phase_wait_discard_activates",
-        "start_true_dreams_q66_opponent_no_card_score_higher",
-        "toko_stage_to_discard_draws_2_discards_1",
-        "yuiguri_stage_to_discard_adds_live"
-      ],
-      "covering_test_count": 24,
-      "is_null": false
-    },
-    {
-      "idx": 264,
+      "idx": 262,
       "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -12841,58 +12708,7 @@
       "is_null": false
     },
     {
-      "idx": 265,
-      "full_text": "{{live_success.png|ライブ成功時}}自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。",
-      "triggers": "ライブ成功時",
-      "trigger_list": [
-        "ライブ成功時"
-      ],
-      "action": "draw_card",
-      "condition": "location_condition",
-      "set": "bp1",
-      "cards": [
-        "PL!SP-bp1-024-L",
-        "PL!SP-bp1-024-SRL"
-      ],
-      "base": "PL!SP-bp1-024",
-      "covered": true,
-      "depth": "L2+choice",
-      "has_assert": true,
-      "has_choice": true,
-      "has_negative": true,
-      "covering_files": [
-        "engine/tests/test_modules/b9_more_test.rs",
-        "engine/tests/test_modules/kanon_bp5_constant_test.rs"
-      ],
-      "covering_tests": [
-        "cutie_panther_live_start_reduce_hearts",
-        "kaguya_live_success_cheer_recover",
-        "kaguya_live_success_recover",
-        "kanan_live_success_timing",
-        "kanon_constant_bonus_removed_when_cards_leaves_zone",
-        "kanon_constant_empty_live_card_zone_no_bonus",
-        "kanon_constant_liella_live_need_heart_4_no_bonus",
-        "kanon_constant_liella_live_need_heart_8_gains_bonus",
-        "kanon_constant_non_liella_live_no_bonus",
-        "kanon_constant_success_zone_does_not_count",
-        "kanon_constant_two_liella_live_cards_sum_to_8",
-        "mijuku_dreamer_no_refresh_no_bonus",
-        "mijuku_dreamer_refresh_via_mill_gets_bonus",
-        "tiny_stars_basic",
-        "tiny_stars_duplicate_kanon",
-        "tiny_stars_duplicate_kanon_select_second",
-        "tiny_stars_duplicate_kanon_with_keke_select_second",
-        "tiny_stars_duplicate_keke",
-        "tiny_stars_duplicate_keke_select_second",
-        "tiny_stars_kanon_only",
-        "tiny_stars_keke_only",
-        "tiny_stars_none"
-      ],
-      "covering_test_count": 22,
-      "is_null": false
-    },
-    {
-      "idx": 266,
+      "idx": 263,
       "full_text": "{{kidou.png|起動}}{{icon_energy.png|E}}{{icon_energy.png|E}}、このメンバーをステージから控え室に置く：自分の控え室からコスト15以下の『蓮ノ空』のメンバーカードを1枚、このメンバーがいたエリアに登場させる。",
       "triggers": "起動",
       "trigger_list": [
@@ -12954,7 +12770,7 @@
       "is_null": false
     },
     {
-      "idx": 267,
+      "idx": 264,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを3枚控え室に置く。それらがすべてメンバーカードの場合、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -12979,7 +12795,7 @@
       "is_null": false
     },
     {
-      "idx": 268,
+      "idx": 265,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『みらくらぱーく！』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -13038,7 +12854,7 @@
       "is_null": false
     },
     {
-      "idx": 269,
+      "idx": 266,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。",
       "triggers": "起動",
       "trigger_list": [
@@ -13076,7 +12892,7 @@
       "is_null": false
     },
     {
-      "idx": 270,
+      "idx": 267,
       "full_text": "{{jyouji.png|常時}}自分のエネルギーが12枚以上ある場合、ライブの合計スコアを＋１する。",
       "triggers": "常時",
       "trigger_list": [
@@ -13101,7 +12917,7 @@
       "is_null": false
     },
     {
-      "idx": 271,
+      "idx": 268,
       "full_text": "{{toujyou.png|登場}}自分のステージにいるメンバーが『5yncri5e!』のみの場合、自分と対戦相手は、センターエリアのメンバーを左サイドエリアに、左サイドエリアのメンバーを右サイドエリアに、右サイドエリアのメンバーをセンターエリアに、それぞれ移動させる。",
       "triggers": "登場",
       "trigger_list": [
@@ -13159,7 +12975,7 @@
       "is_null": false
     },
     {
-      "idx": 272,
+      "idx": 269,
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -13184,7 +13000,7 @@
       "is_null": false
     },
     {
-      "idx": 273,
+      "idx": 270,
       "full_text": "{{live_success.png|ライブ成功時}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：カードを1枚引く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -13209,7 +13025,7 @@
       "is_null": false
     },
     {
-      "idx": 274,
+      "idx": 271,
       "full_text": "{{toujyou.png|登場}}自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -13264,7 +13080,7 @@
       "is_null": false
     },
     {
-      "idx": 275,
+      "idx": 272,
       "full_text": "{{jidou.png|自動}}このメンバーが登場か、エリアを移動するたび、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。\n(対戦相手のカードの効果でも発動する。)",
       "triggers": "自動",
       "trigger_list": [
@@ -13298,7 +13114,7 @@
       "is_null": false
     },
     {
-      "idx": 276,
+      "idx": 273,
       "full_text": "{{live_start.png|ライブ開始時}}エネルギーを2枚アクティブにする。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -13330,7 +13146,7 @@
       "is_null": false
     },
     {
-      "idx": 277,
+      "idx": 274,
       "full_text": "{{toujyou.png|登場}}カードを1枚引く。その後、登場したエリアとは別の自分のエリア1つを選ぶ。このメンバーをそのエリアに移動する。選んだエリアにメンバーがいる場合、そのメンバーは、このメンバーがいたエリアに移動させる。",
       "triggers": "登場",
       "trigger_list": [
@@ -13389,7 +13205,7 @@
       "is_null": false
     },
     {
-      "idx": 278,
+      "idx": 275,
       "full_text": "{{toujyou.png|登場}}自分のステージにほかの『5yncri5e!』のメンバーがいる場合、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -13448,7 +13264,7 @@
       "is_null": false
     },
     {
-      "idx": 279,
+      "idx": 276,
       "full_text": "{{jyouji.png|常時}}自分のエネルギーが10枚以上ある場合、ステージにいるこのメンバーのコストを＋４する。",
       "triggers": "常時",
       "trigger_list": [
@@ -13480,7 +13296,7 @@
       "is_null": false
     },
     {
-      "idx": 280,
+      "idx": 277,
       "full_text": "{{toujyou.png|登場}}「鬼塚冬毬」以外の『Liella!』のメンバー1人をステージから控え室に置いてもよい：自分の控え室から、これにより控え室に置いたメンバーカードを1枚、そのメンバーがいたエリアに登場させる。",
       "triggers": "登場",
       "trigger_list": [
@@ -13513,7 +13329,7 @@
       "is_null": false
     },
     {
-      "idx": 281,
+      "idx": 278,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを＋１する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -13571,7 +13387,7 @@
       "is_null": false
     },
     {
-      "idx": 282,
+      "idx": 279,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージに名前の異なる『KALEIDOSCORE』のメンバーが2人以上いる場合、このカードのスコアを＋１する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -13596,7 +13412,7 @@
       "is_null": false
     },
     {
-      "idx": 283,
+      "idx": 280,
       "full_text": "{{jyouji.png|常時}}自分の成功ライブカード置き場のカードが0枚で、かつ相手の成功ライブカード置き場にカードが1枚以上ある場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -13670,7 +13486,7 @@
       "is_null": false
     },
     {
-      "idx": 284,
+      "idx": 281,
       "full_text": "{{jidou.png|自動}}このメンバーがステージから控え室に置かれたとき、手札を1枚控え室に置いてもよい。そうした場合、自分の控え室から『Aqours』のライブカードを1枚手札に加える。",
       "triggers": "自動",
       "trigger_list": [
@@ -13740,7 +13556,7 @@
       "is_null": false
     },
     {
-      "idx": 285,
+      "idx": 282,
       "full_text": "{{jidou.png|自動}}［ターン1回］エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、{{heart_04.png|heart04}}を得る。",
       "triggers": "自動",
       "trigger_list": [
@@ -13778,7 +13594,7 @@
       "is_null": false
     },
     {
-      "idx": 286,
+      "idx": 283,
       "full_text": "{{jidou.png|自動}}［ターン1回］エールにより公開された自分のカードの中にライブカードがないとき、それらのカードをすべて控え室に置いてもよい。これにより1枚以上のカードが控え室に置かれた場合、そのエールで得たブレードハートを失い、もう一度エールを行う。",
       "triggers": "自動",
       "trigger_list": [
@@ -13843,7 +13659,7 @@
       "is_null": false
     },
     {
-      "idx": 287,
+      "idx": 284,
       "full_text": "{{toujyou.png|登場}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分の控え室から、コストの合計が4以下になるようにメンバーカードを2枚までステージに登場させる。",
       "triggers": "登場",
       "trigger_list": [
@@ -13878,7 +13694,7 @@
       "is_null": false
     },
     {
-      "idx": 288,
+      "idx": 285,
       "full_text": "{{live_start.png|ライブ開始時}}自分のライブカード置き場に「MY舞☆TONIGHT」以外の『Aqours』のライブカードがある場合、ライブ終了時まで、自分のステージのメンバーは{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -13915,7 +13731,7 @@
       "is_null": false
     },
     {
-      "idx": 289,
+      "idx": 286,
       "full_text": "{{jyouji.png|常時}}このカードは成功ライブカード置き場に置くことができない。",
       "triggers": "常時",
       "trigger_list": [
@@ -13976,7 +13792,7 @@
       "is_null": false
     },
     {
-      "idx": 290,
+      "idx": 287,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを3枚見る。その中からコスト11以上のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -14035,7 +13851,7 @@
       "is_null": false
     },
     {
-      "idx": 291,
+      "idx": 288,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}このメンバーがエリアを移動したとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
       "triggers": "自動",
       "trigger_list": [
@@ -14097,7 +13913,7 @@
       "is_null": false
     },
     {
-      "idx": 292,
+      "idx": 289,
       "full_text": "{{jyouji.png|常時}}自分のステージにいるメンバーのうち、センターエリアにいるメンバーが最も大きいコストを持つ場合、{{heart_03.png|heart03}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -14136,7 +13952,7 @@
       "is_null": false
     },
     {
-      "idx": 293,
+      "idx": 290,
       "full_text": "{{toujyou.png|登場}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分のデッキの上からカードを7枚見る。その中から『Liella!』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -14161,7 +13977,7 @@
       "is_null": false
     },
     {
-      "idx": 294,
+      "idx": 291,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}：このメンバーがいるエリアとは別の自分のエリア1つを選ぶ。このメンバーをそのエリアに移動する。選んだエリアにメンバーがいる場合、そのメンバーは、このメンバーがいたエリアに移動させる。",
       "triggers": "起動",
       "trigger_list": [
@@ -14219,7 +14035,7 @@
       "is_null": false
     },
     {
-      "idx": 295,
+      "idx": 292,
       "full_text": "{{toujyou.png|登場}}自分の控え室にある、カード名の異なるライブカードを2枚選ぶ。そうした場合、相手はそれらのカードのうち1枚を選ぶ。これにより相手に選ばれたカードを自分の手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -14266,7 +14082,7 @@
       "is_null": false
     },
     {
-      "idx": 296,
+      "idx": 293,
       "full_text": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場のカード枚数が相手より少ない場合、このカードのスコアを＋１する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -14291,7 +14107,7 @@
       "is_null": false
     },
     {
-      "idx": 297,
+      "idx": 294,
       "full_text": "{{live_success.png|ライブ成功時}}自分のステージに「澁谷かのん」、「ウィーン・マルガレーテ」、「鬼塚冬毬」のうち、名前の異なるメンバーが2人以上いる場合、エールにより公開された自分のカードの中から、カードを1枚手札に加える。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -14316,7 +14132,7 @@
       "is_null": false
     },
     {
-      "idx": 298,
+      "idx": 295,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}：自分の控え室からスコア3以下の『蓮ノ空』のライブカードを1枚手札に加える。",
       "triggers": "起動",
       "trigger_list": [
@@ -14346,7 +14162,7 @@
       "is_null": false
     },
     {
-      "idx": 299,
+      "idx": 296,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -14371,7 +14187,7 @@
       "is_null": false
     },
     {
-      "idx": 300,
+      "idx": 297,
       "full_text": "{{toujyou.png|登場}}自分のステージにいるメンバーを、それぞれ好きなエリアに移動させてもよい。",
       "triggers": "登場",
       "trigger_list": [
@@ -14435,7 +14251,7 @@
       "is_null": false
     },
     {
-      "idx": 301,
+      "idx": 298,
       "full_text": "{{jyouji.png|常時}}自分のステージにいるほかの『みらくらぱーく！』のメンバー1人につき、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -14499,7 +14315,7 @@
       "is_null": false
     },
     {
-      "idx": 302,
+      "idx": 299,
       "full_text": "{{toujyou.png|登場}}このメンバーよりコストが低い『DOLLCHESTRA』のメンバーからバトンタッチして登場した場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -14524,7 +14340,7 @@
       "is_null": false
     },
     {
-      "idx": 303,
+      "idx": 300,
       "full_text": "{{toujyou.png|登場}}{{icon_energy.png|E}}支払ってもよい：このメンバーよりコストが低い『みらくらぱーく！』のメンバーからバトンタッチして登場した場合、ライブ終了時まで、{{heart_01.png|heart01}}{{heart_01.png|heart01}}を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -14562,7 +14378,7 @@
       "is_null": false
     },
     {
-      "idx": 304,
+      "idx": 301,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -14602,7 +14418,7 @@
       "is_null": false
     },
     {
-      "idx": 305,
+      "idx": 302,
       "full_text": "{{live_start.png|ライブ開始時}}自分の控え室に『スリーズブーケ』のライブカードが3枚以上ある場合、このカードのスコアを＋１する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -14635,7 +14451,7 @@
       "is_null": false
     },
     {
-      "idx": 306,
+      "idx": 303,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージに「徒町小鈴」が登場しており、かつ「徒町小鈴」よりコストの大きい「村野さやか」が登場している場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らす。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -14665,7 +14481,7 @@
       "is_null": false
     },
     {
-      "idx": 307,
+      "idx": 304,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージの右サイドエリアに「大沢瑠璃乃」が、左サイドエリアに「安養寺姫芽」が、センターエリアに「藤島慈」がそれぞれ登場している場合、このカードのスコアを＋２する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -14706,7 +14522,7 @@
       "is_null": false
     },
     {
-      "idx": 308,
+      "idx": 305,
       "full_text": "{{toujyou.png|登場}}相手の手札の枚数が自分より2枚以上多い場合、自分の控え室からライブカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -14742,7 +14558,7 @@
       "is_null": false
     },
     {
-      "idx": 309,
+      "idx": 306,
       "full_text": "{{toujyou.png|登場}}相手は手札からライブカードを1枚控え室に置いてもよい。そうしなかった場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -14774,7 +14590,7 @@
       "is_null": false
     },
     {
-      "idx": 310,
+      "idx": 307,
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、このメンバーが元々持つハートはすべて{{heart_04.png|heart04}}になる。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -14835,7 +14651,7 @@
       "is_null": false
     },
     {
-      "idx": 311,
+      "idx": 308,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、ライブカードを1枚手札に加える。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -14896,7 +14712,7 @@
       "is_null": false
     },
     {
-      "idx": 312,
+      "idx": 309,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}手札のライブカードを1枚公開する：相手は手札を1枚控え室に置いてもよい。そうしなかった場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "起動",
       "trigger_list": [
@@ -14935,7 +14751,7 @@
       "is_null": false
     },
     {
-      "idx": 313,
+      "idx": 310,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -14960,7 +14776,7 @@
       "is_null": false
     },
     {
-      "idx": 314,
+      "idx": 311,
       "full_text": "{{live_start.png|ライブ開始時}}自分か相手を選ぶ。自分は、そのプレイヤーのデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -14993,7 +14809,7 @@
       "is_null": false
     },
     {
-      "idx": 315,
+      "idx": 312,
       "full_text": "{{jyouji.png|常時}}自分と相手の成功ライブカード置き場にカードが合計3枚以上ある場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -15018,7 +14834,7 @@
       "is_null": false
     },
     {
-      "idx": 316,
+      "idx": 313,
       "full_text": "{{live_success.png|ライブ成功時}}このターン、ライブに勝利するプレイヤーを決定するとき、自分と相手のライブの合計スコアが同じ場合、ライブ終了時まで、自分と相手は成功ライブカード置き場にカードを置くことができない。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -15048,7 +14864,7 @@
       "is_null": false
     },
     {
-      "idx": 317,
+      "idx": 314,
       "full_text": "{{live_success.png|ライブ成功時}}カードを2枚引き、手札を2枚控え室に置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -15073,7 +14889,7 @@
       "is_null": false
     },
     {
-      "idx": 318,
+      "idx": 315,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにする：カードを1枚引き、手札を1枚控え室に置く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）",
       "triggers": "起動",
       "trigger_list": [
@@ -15098,7 +14914,7 @@
       "is_null": false
     },
     {
-      "idx": 319,
+      "idx": 316,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるメンバーを1人までアクティブにする。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -15123,7 +14939,7 @@
       "is_null": false
     },
     {
-      "idx": 320,
+      "idx": 317,
       "full_text": "{{jyouji.png|常時}}相手のステージにいるウェイト状態のメンバー1人につき、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -15182,7 +14998,7 @@
       "is_null": false
     },
     {
-      "idx": 321,
+      "idx": 318,
       "full_text": "{{toujyou.png|登場}}このメンバーをウェイトにしてもよい：自分の控え室から『μ's』のメンバーカードを1枚手札に加える。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）",
       "triggers": "登場",
       "trigger_list": [
@@ -15242,7 +15058,7 @@
       "is_null": false
     },
     {
-      "idx": 322,
+      "idx": 319,
       "full_text": "{{toujyou.png|登場}}自分のステージにいるすべてのメンバーをアクティブにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -15267,7 +15083,7 @@
       "is_null": false
     },
     {
-      "idx": 323,
+      "idx": 320,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：ライブ終了時まで、自分の成功ライブカード置き場にあるカード1枚につき、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -15292,7 +15108,7 @@
       "is_null": false
     },
     {
-      "idx": 324,
+      "idx": 321,
       "full_text": "{{live_start.png|ライブ開始時}}手札を2枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、1枚をデッキの上に置き、1枚を控え室に置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -15317,7 +15133,7 @@
       "is_null": false
     },
     {
-      "idx": 325,
+      "idx": 322,
       "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、このカードを手札に加えてもよい。この能力は、このカードが自分のエールによって公開されている場合のみ発動する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -15348,7 +15164,7 @@
       "is_null": false
     },
     {
-      "idx": 326,
+      "idx": 323,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを4枚見る。その中からメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -15379,7 +15195,7 @@
       "is_null": false
     },
     {
-      "idx": 327,
+      "idx": 324,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの枚数が、相手がエールによって公開したカードの枚数より少ない場合、カードを1枚引く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -15410,7 +15226,7 @@
       "is_null": false
     },
     {
-      "idx": 328,
+      "idx": 325,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}：自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。そうした場合、自分はカードを1枚引く。",
       "triggers": "起動",
       "trigger_list": [
@@ -15435,7 +15251,7 @@
       "is_null": false
     },
     {
-      "idx": 329,
+      "idx": 326,
       "full_text": "{{kidou.png|起動}}このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。それがスコア6以上の『Aqours』のライブカードの場合、エネルギーを4枚アクティブにする。",
       "triggers": "起動",
       "trigger_list": [
@@ -15460,7 +15276,7 @@
       "is_null": false
     },
     {
-      "idx": 330,
+      "idx": 327,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを6枚見る。その中から『Aqours』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -15499,7 +15315,7 @@
       "is_null": false
     },
     {
-      "idx": 331,
+      "idx": 328,
       "full_text": "{{toujyou.png|登場}}自分のステージにいるメンバーを1人までアクティブにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -15546,7 +15362,7 @@
       "is_null": false
     },
     {
-      "idx": 332,
+      "idx": 329,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：好きなハートの色を1つ指定する。ライブ終了時まで、自分のステージにいるこのメンバー以外の『虹ヶ咲』のメンバー1人は、そのハートを1つ得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -15571,7 +15387,7 @@
       "is_null": false
     },
     {
-      "idx": 333,
+      "idx": 330,
       "full_text": "{{toujyou.png|登場}}自分の控え室にあるコスト4以下の『虹ヶ咲』のメンバーカードを1枚選ぶ。そのカードの{{toujyou.png|登場}}能力1つを発動させる。\n（{{toujyou.png|登場}}能力がコストを持つ場合、支払って発動させる。）",
       "triggers": "登場",
       "trigger_list": [
@@ -15600,7 +15416,7 @@
       "is_null": false
     },
     {
-      "idx": 334,
+      "idx": 331,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。",
       "triggers": "起動",
       "trigger_list": [
@@ -15625,7 +15441,7 @@
       "is_null": false
     },
     {
-      "idx": 335,
+      "idx": 332,
       "full_text": "{{toujyou.png|登場}}このメンバーをウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）",
       "triggers": "登場",
       "trigger_list": [
@@ -15650,7 +15466,7 @@
       "is_null": false
     },
     {
-      "idx": 336,
+      "idx": 333,
       "full_text": "{{live_start.png|ライブ開始時}}自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるメンバーカードを2枚まで、好きな順番でデッキの一番下に置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -15685,7 +15501,7 @@
       "is_null": false
     },
     {
-      "idx": 337,
+      "idx": 334,
       "full_text": "{{toujyou.png|登場}}相手のステージにいる「ミア・テイラー」以外のメンバーを1人選ぶ。そのメンバーが持つハートと、このメンバーが持つハートの中に同じ色のハートがある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。それぞれのメンバーのコストが同じ場合、元々の{{icon_blade.png|ブレード}}の数が同じ場合についても同じことを行う。",
       "triggers": "登場",
       "trigger_list": [
@@ -15733,7 +15549,7 @@
       "is_null": false
     },
     {
-      "idx": 338,
+      "idx": 335,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを4枚見る。その中から『虹ヶ咲』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -15758,7 +15574,7 @@
       "is_null": false
     },
     {
-      "idx": 339,
+      "idx": 336,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいる『虹ヶ咲』のメンバー1人につき、自分のデッキの上からカードを1枚見る。その中から1枚までをデッキの上に置き、残りを控え室に置く。その後、自分のデッキの一番上のカードを1枚公開する。これによりライブカードを公開した場合、このカードのスコアを＋１する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -15817,7 +15633,7 @@
       "is_null": false
     },
     {
-      "idx": 340,
+      "idx": 337,
       "full_text": "{{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを１枚ずつ公開する。そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く。",
       "triggers": "起動",
       "trigger_list": [
@@ -15854,7 +15670,7 @@
       "is_null": false
     },
     {
-      "idx": 341,
+      "idx": 338,
       "full_text": "{{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}このメンバーをウェイトにしてもよい：自分のステージにいるメンバーが『BiBi』のみの場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする。",
       "triggers": "ライブ開始時, 登場",
       "trigger_list": [
@@ -15889,7 +15705,7 @@
       "is_null": false
     },
     {
-      "idx": 342,
+      "idx": 339,
       "full_text": "{{jyouji.png|常時}}相手のステージにいるウェイト状態のメンバー1人につき、{{heart_06.png|heart06}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -15923,7 +15739,7 @@
       "is_null": false
     },
     {
-      "idx": 343,
+      "idx": 340,
       "full_text": "{{toujyou.png|登場}}このメンバーをウェイトにしてもよい：自分のステージにいる『Printemps』のメンバー1人につき、エネルギーを1枚アクティブにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -15948,7 +15764,7 @@
       "is_null": false
     },
     {
-      "idx": 344,
+      "idx": 341,
       "full_text": "{{toujyou.png|登場}}{{center.png|センター}}自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードが1枚ある場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。2枚以上ある場合、代わりに「{{jyouji.png|常時}}ライブの合計スコアを＋２する。」を得る。（この能力はセンターエリアに登場した場合のみ発動する。）",
       "triggers": "登場",
       "trigger_list": [
@@ -15981,7 +15797,7 @@
       "is_null": false
     },
     {
-      "idx": 345,
+      "idx": 342,
       "full_text": "{{toujyou.png|登場}}自分の成功ライブカード置き場にカードがある場合、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -16006,7 +15822,7 @@
       "is_null": false
     },
     {
-      "idx": 346,
+      "idx": 343,
       "full_text": "{{toujyou.png|登場}}自分の控え室から『μ's』のライブカードを1枚までデッキの一番上に置く。その後、相手のステージにウェイト状態のメンバーがいる場合、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -16044,7 +15860,7 @@
       "is_null": false
     },
     {
-      "idx": 347,
+      "idx": 344,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}手札を3枚控え室に置く：自分のステージにほかの『lilywhite』のメンバーがいる場合、自分の控え室から『μ's』のライブカードを1枚手札に加える。この能力を起動するためのコストは、自分の成功ライブカード置き場にあるカード1枚につき、控え室に置く手札の数が1枚減る。",
       "triggers": "起動",
       "trigger_list": [
@@ -16069,7 +15885,7 @@
       "is_null": false
     },
     {
-      "idx": 348,
+      "idx": 345,
       "full_text": "{{toujyou.png|登場}}メンバーを3人までウェイトにしてもよい：これによりウェイト状態にしたメンバー1人につき、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -16098,7 +15914,7 @@
       "is_null": false
     },
     {
-      "idx": 349,
+      "idx": 346,
       "full_text": "{{toujyou.png|登場}}相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が1つ以下のメンバー1人をウェイトにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -16136,7 +15952,7 @@
       "is_null": false
     },
     {
-      "idx": 350,
+      "idx": 347,
       "full_text": "{{toujyou.png|登場}}このターン、自分と相手のステージにいるメンバーは、効果によってはアクティブにならない。",
       "triggers": "登場",
       "trigger_list": [
@@ -16174,7 +15990,7 @@
       "is_null": false
     },
     {
-      "idx": 351,
+      "idx": 348,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：ライブ終了時まで、自分のステージにいるほかのメンバーは{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -16199,7 +16015,7 @@
       "is_null": false
     },
     {
-      "idx": 352,
+      "idx": 349,
       "full_text": "{{toujyou.png|登場}}自分のステージに名前の異なる『BiBi』のメンバーが2人以上いる場合、相手のステージにいるコスト4以下のメンバー1人をウェイトにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -16250,7 +16066,7 @@
       "is_null": false
     },
     {
-      "idx": 353,
+      "idx": 350,
       "full_text": "{{toujyou.png|登場}}自分のステージにいる『Printemps』のメンバーを1人までアクティブにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -16281,7 +16097,7 @@
       "is_null": false
     },
     {
-      "idx": 354,
+      "idx": 351,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}：自分の手札を、相手は見ないで1枚選び公開する。これにより公開されたカードがライブカードの場合、ライブ終了時まで、このメンバーは「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。",
       "triggers": "起動",
       "trigger_list": [
@@ -16320,7 +16136,7 @@
       "is_null": false
     },
     {
-      "idx": 355,
+      "idx": 352,
       "full_text": "{{jyouji.png|常時}}自分の成功ライブカード置き場に『lilywhite』のカードがある場合、手札にあるこのメンバーカードのコストは2減る。",
       "triggers": "常時",
       "trigger_list": [
@@ -16380,7 +16196,7 @@
       "is_null": false
     },
     {
-      "idx": 356,
+      "idx": 353,
       "full_text": "{{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}{{center.png|センター}}『BiBi』のメンバー1人をウェイトにしてもよい：相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。（この能力はセンターエリアにいる場合のみ発動する。）",
       "triggers": "ライブ開始時, 登場",
       "trigger_list": [
@@ -16420,7 +16236,7 @@
       "is_null": false
     },
     {
-      "idx": 357,
+      "idx": 354,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のカードの効果によって、相手のステージにいるアクティブ状態のコスト4以下のメンバーがウェイト状態になったとき、カードを1枚引く。",
       "triggers": "自動",
       "trigger_list": [
@@ -16459,7 +16275,7 @@
       "is_null": false
     },
     {
-      "idx": 358,
+      "idx": 355,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを4枚見る。その中から『lilywhite』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -16484,7 +16300,7 @@
       "is_null": false
     },
     {
-      "idx": 359,
+      "idx": 356,
       "full_text": "{{toujyou.png|登場}}このメンバーをウェイトにしてもよい：カードを1枚引く。その後、このメンバーが『Printemps』のメンバーからバトンタッチして登場していないかぎり、手札を1枚控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -16509,7 +16325,7 @@
       "is_null": false
     },
     {
-      "idx": 360,
+      "idx": 357,
       "full_text": "{{toujyou.png|登場}}自分と相手はそれぞれ、自身の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。（この効果で登場したメンバーのいるエリアには、このターンにメンバーは登場できない。）",
       "triggers": "登場",
       "trigger_list": [
@@ -16568,7 +16384,7 @@
       "is_null": false
     },
     {
-      "idx": 361,
+      "idx": 358,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるメンバーのコストの合計が相手より低い場合、カードを1枚引く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -16593,7 +16409,7 @@
       "is_null": false
     },
     {
-      "idx": 362,
+      "idx": 359,
       "full_text": "{{toujyou.png|登場}}自分の成功ライブカード置き場にあるカードのスコアの合計が６以上の場合、エネルギーを2枚アクティブにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -16618,7 +16434,7 @@
       "is_null": false
     },
     {
-      "idx": 363,
+      "idx": 360,
       "full_text": "{{toujyou.png|登場}}自分の成功ライブカード置き場にあるカードのスコアの合計が３以上の場合、自分のデッキの上からカードを5枚見る。その中から『μ's』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -16643,7 +16459,7 @@
       "is_null": false
     },
     {
-      "idx": 364,
+      "idx": 361,
       "full_text": "{{toujyou.png|登場}}自分の成功ライブカード置き場にカードが1枚以上あり、かつスコアの合計が１以下の場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -16675,7 +16491,7 @@
       "is_null": false
     },
     {
-      "idx": 365,
+      "idx": 362,
       "full_text": "{{jyouji.png|常時}}自分の成功ライブカード置き場にあるカードのスコアの合計が６以上であるかぎり、ステージにいるこのメンバーのコストを＋３する。",
       "triggers": "常時",
       "trigger_list": [
@@ -16715,7 +16531,7 @@
       "is_null": false
     },
     {
-      "idx": 366,
+      "idx": 363,
       "full_text": "{{toujyou.png|登場}}相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -16747,7 +16563,7 @@
       "is_null": false
     },
     {
-      "idx": 367,
+      "idx": 364,
       "full_text": "{{toujyou.png|登場}}自分の成功ライブカード置き場にあるカードのスコアの合計が３以上の場合、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -16786,7 +16602,7 @@
       "is_null": false
     },
     {
-      "idx": 368,
+      "idx": 365,
       "full_text": "{{live_start.png|ライブ開始時}}自分のセンターエリアに{{icon_blade.png|ブレード}}を9つ以上持つ『μ's』のメンバーがいる場合、このカードのスコアを＋２する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -16819,7 +16635,7 @@
       "is_null": false
     },
     {
-      "idx": 369,
+      "idx": 366,
       "full_text": "{{live_success.png|ライブ成功時}}自分のエネルギーが相手より少ない場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -16880,7 +16696,7 @@
       "is_null": false
     },
     {
-      "idx": 370,
+      "idx": 367,
       "full_text": "{{live_start.png|ライブ開始時}}自分か相手を選ぶ。自分は、そのプレイヤーのデッキの一番上のカードを見る。自分はそのカードを控え室に置いてもよい。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -16915,7 +16731,7 @@
       "is_null": false
     },
     {
-      "idx": 371,
+      "idx": 368,
       "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、カードを1枚引く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -16954,7 +16770,7 @@
       "is_null": false
     },
     {
-      "idx": 372,
+      "idx": 369,
       "full_text": "{{toujyou.png|登場}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分の手札からコスト4以下の『虹ヶ咲』のメンバーカードを1枚ステージに登場させる。これにより登場したメンバーがブレードハートを持つ場合、このメンバーをウェイトにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -16986,7 +16802,7 @@
       "is_null": false
     },
     {
-      "idx": 373,
+      "idx": 370,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}手札を1枚控え室に置く：エネルギー1枚か『虹ヶ咲』のメンバー1人をアクティブにする。",
       "triggers": "起動",
       "trigger_list": [
@@ -17011,7 +16827,7 @@
       "is_null": false
     },
     {
-      "idx": 374,
+      "idx": 371,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるメンバーのコストの合計が相手より低い場合、カードを2枚引き、自分の手札を1枚デッキの一番上に置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -17036,7 +16852,7 @@
       "is_null": false
     },
     {
-      "idx": 375,
+      "idx": 372,
       "full_text": "{{jyouji.png|常時}}相手の成功ライブカード置き場にあるカードのスコアの合計が６以上であるかぎり、ライブの合計スコアを＋１する。",
       "triggers": "常時",
       "trigger_list": [
@@ -17087,7 +16903,7 @@
       "is_null": false
     },
     {
-      "idx": 376,
+      "idx": 373,
       "full_text": "{{toujyou.png|登場}}自分のステージにいるメンバーが『Liella!』のみで、かつ自分のエネルギーが7枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -17112,7 +16928,7 @@
       "is_null": false
     },
     {
-      "idx": 377,
+      "idx": 374,
       "full_text": "{{toujyou.png|登場}}このメンバーをウェイトにしてもよい：自分のデッキの上からカードを4枚見る。その中から必要ハートの合計が8以上の『Liella!』のライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -17146,7 +16962,7 @@
       "is_null": false
     },
     {
-      "idx": 378,
+      "idx": 375,
       "full_text": "{{toujyou.png|登場}}{{leftside.png|左サイド}}{{rightside.png|右サイド}}カードを2枚引き、手札を2枚控え室に置く。（この能力は左サイドエリアか右サイドエリアに登場した場合のみ発動する。）",
       "triggers": "登場",
       "trigger_list": [
@@ -17180,7 +16996,7 @@
       "is_null": false
     },
     {
-      "idx": 379,
+      "idx": 376,
       "full_text": "{{jyouji.png|常時}}{{center.png|センター}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -17214,7 +17030,7 @@
       "is_null": false
     },
     {
-      "idx": 380,
+      "idx": 377,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に、名前が異なる『Liella!』のメンバーカードが3枚以上ある場合、エールにより公開された自分のカードの中から『Liella!』のライブカードを1枚手札に加える。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -17239,7 +17055,7 @@
       "is_null": false
     },
     {
-      "idx": 381,
+      "idx": 378,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}このメンバーがエリアを移動したとき、自分の控え室から、スコア3以下の『Liella!』のライブカードを1枚手札に加える。",
       "triggers": "自動",
       "trigger_list": [
@@ -17283,7 +17099,7 @@
       "is_null": false
     },
     {
-      "idx": 382,
+      "idx": 379,
       "full_text": "{{jyouji.png|常時}}自分のステージにいるメンバーのコストの合計が相手より低いかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -17308,7 +17124,7 @@
       "is_null": false
     },
     {
-      "idx": 383,
+      "idx": 380,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}このメンバーをウェイトにする：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
       "triggers": "起動",
       "trigger_list": [
@@ -17333,7 +17149,7 @@
       "is_null": false
     },
     {
-      "idx": 384,
+      "idx": 381,
       "full_text": "{{jyouji.png|常時}}自分のエネルギーが相手より多いかぎり、{{heart_06.png|heart06}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -17391,7 +17207,7 @@
       "is_null": false
     },
     {
-      "idx": 385,
+      "idx": 382,
       "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -17429,7 +17245,7 @@
       "is_null": false
     },
     {
-      "idx": 386,
+      "idx": 383,
       "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -17467,7 +17283,7 @@
       "is_null": false
     },
     {
-      "idx": 387,
+      "idx": 384,
       "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージのセンターエリアにいる『Liella!』のメンバーが元々持つ{{icon_blade.png|ブレード}}の数は3つになる。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -17509,7 +17325,7 @@
       "is_null": false
     },
     {
-      "idx": 388,
+      "idx": 385,
       "full_text": "{{live_success.png|ライブ成功時}}自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合、このカードのスコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -17551,7 +17367,7 @@
       "is_null": false
     },
     {
-      "idx": 389,
+      "idx": 386,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に名前が異なる『Liella!』のメンバーカードが5枚以上ある場合、このカードのスコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -17576,7 +17392,7 @@
       "is_null": false
     },
     {
-      "idx": 390,
+      "idx": 387,
       "full_text": "{{live_success.png|ライブ成功時}}自分のエネルギーが11枚以上ある場合、カードを2枚引き、手札を1枚控え室に置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -17601,7 +17417,7 @@
       "is_null": false
     },
     {
-      "idx": 391,
+      "idx": 388,
       "full_text": "{{live_success.png|ライブ成功時}}自分のステージにいるメンバーが『Liella!』のみの場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。)",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -17640,7 +17456,7 @@
       "is_null": false
     },
     {
-      "idx": 392,
+      "idx": 389,
       "full_text": "{{live_start.png|ライブ開始時}}アクティブ状態の自分のエネルギーがある場合、このカードのスコアを＋１する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -17665,7 +17481,7 @@
       "is_null": false
     },
     {
-      "idx": 393,
+      "idx": 390,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のステージにこのメンバー以外のコスト11のメンバーがいる場合、自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -17727,7 +17543,7 @@
       "is_null": false
     },
     {
-      "idx": 394,
+      "idx": 391,
       "full_text": "{{jyouji.png|常時}}自分のライブ中のライブカードが2枚以上あるかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -17789,7 +17605,7 @@
       "is_null": false
     },
     {
-      "idx": 395,
+      "idx": 392,
       "full_text": "{{toujyou.png|登場}}自分のエネルギー置き場にあるエネルギー2枚をこのメンバーの下に置いてもよい。",
       "triggers": "登場",
       "trigger_list": [
@@ -17850,7 +17666,7 @@
       "is_null": false
     },
     {
-      "idx": 396,
+      "idx": 393,
       "full_text": "{{jyouji.png|常時}}このメンバーの下にエネルギーカードが2枚以上置かれているかぎり、ライブの合計スコアを＋１する。\n(メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに戻す。)",
       "triggers": "常時",
       "trigger_list": [
@@ -17911,7 +17727,7 @@
       "is_null": false
     },
     {
-      "idx": 397,
+      "idx": 394,
       "full_text": "{{kidou.png|起動}}{{icon_energy.png|E}}{{icon_energy.png|E}}このカードを手札から控え室に置く：カードを1枚引き、ライブ終了時まで、自分のステージにいる『虹ヶ咲』のメンバー1人は{{icon_blade.png|ブレード}}を得る。この能力は、このカードが手札にある場合のみ起動できる。",
       "triggers": "起動",
       "trigger_list": [
@@ -17949,7 +17765,7 @@
       "is_null": false
     },
     {
-      "idx": 398,
+      "idx": 395,
       "full_text": "{{jyouji.png|常時}}このターンにこのメンバーが移動していないかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -18009,7 +17825,7 @@
       "is_null": false
     },
     {
-      "idx": 399,
+      "idx": 396,
       "full_text": "{{live_start.png|ライブ開始時}}自分のデッキの一番上のカードを公開する。公開したカードがコスト9以下のメンバーカードの場合、公開したカードを手札に加え、このメンバーはポジションチェンジする。それ以外の場合、公開したカードを控え室に置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -18069,7 +17885,7 @@
       "is_null": false
     },
     {
-      "idx": 400,
+      "idx": 397,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のステージにコスト10のメンバーが登場したとき、カードを1枚引く。",
       "triggers": "自動",
       "trigger_list": [
@@ -18114,7 +17930,7 @@
       "is_null": false
     },
     {
-      "idx": 401,
+      "idx": 398,
       "full_text": "{{kidou.png|起動}}このメンバーをウェイトにする：エネルギーを1枚アクティブにする。",
       "triggers": "起動",
       "trigger_list": [
@@ -18161,7 +17977,7 @@
       "is_null": false
     },
     {
-      "idx": 402,
+      "idx": 399,
       "full_text": "{{jyouji.png|常時}}自分のライブ中のライブカードの必要ハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がそれぞれ1以上含まれるかぎり、{{icon_all.png|ハート}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -18203,7 +18019,7 @@
       "is_null": false
     },
     {
-      "idx": 403,
+      "idx": 400,
       "full_text": "{{jyouji.png|常時}}自分のステージにウェイト状態の『虹ヶ咲』のメンバーがいるかぎり、手札にあるこのメンバーカードのコストは2減る。",
       "triggers": "常時",
       "trigger_list": [
@@ -18262,7 +18078,7 @@
       "is_null": false
     },
     {
-      "idx": 404,
+      "idx": 401,
       "full_text": "{{toujyou.png|登場}}自分のステージにいるメンバー1人か、エネルギーを2枚アクティブにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -18321,7 +18137,7 @@
       "is_null": false
     },
     {
-      "idx": 405,
+      "idx": 402,
       "full_text": "{{live_start.png|ライブ開始時}}このターン、ブレードハートを持たないメンバーカードが自分のライブカード置き場から控え室に置かれている場合、カードを1枚引き、ライブ終了時まで、{{heart_03.png|heart03}}{{heart_05.png|heart05}}{{heart_06.png|heart06}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -18354,7 +18170,7 @@
       "is_null": false
     },
     {
-      "idx": 406,
+      "idx": 403,
       "full_text": "{{toujyou.png|登場}}以下から1つを選ぶ。\n・エネルギーを1枚アクティブにする。\n・自分の控え室にある『虹ヶ咲』のライブカードを2枚まで好きな順番でデッキの上に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -18389,7 +18205,7 @@
       "is_null": false
     },
     {
-      "idx": 407,
+      "idx": 404,
       "full_text": "{{jyouji.png|常時}}このメンバーの下にあるエネルギーカード1枚につき、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -18448,7 +18264,7 @@
       "is_null": false
     },
     {
-      "idx": 408,
+      "idx": 405,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。\n(メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに戻す。)",
       "triggers": "起動",
       "trigger_list": [
@@ -18507,7 +18323,7 @@
       "is_null": false
     },
     {
-      "idx": 409,
+      "idx": 406,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のステージにこのメンバー以外のコスト11のメンバーが登場したとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
       "triggers": "自動",
       "trigger_list": [
@@ -18551,7 +18367,7 @@
       "is_null": false
     },
     {
-      "idx": 410,
+      "idx": 407,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、『虹ヶ咲』のメンバーカードを1枚手札に加える。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -18595,7 +18411,7 @@
       "is_null": false
     },
     {
-      "idx": 411,
+      "idx": 408,
       "full_text": "{{toujyou.png|登場}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：手札からコスト4以下の「上原歩夢」のメンバーカードを1枚ステージに登場させる。",
       "triggers": "登場",
       "trigger_list": [
@@ -18630,7 +18446,7 @@
       "is_null": false
     },
     {
-      "idx": 412,
+      "idx": 409,
       "full_text": "{{toujyou.png|登場}}「中須かすみ」からバトンタッチして登場した場合、カードを2枚引き、手札を1枚控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -18655,7 +18471,7 @@
       "is_null": false
     },
     {
-      "idx": 413,
+      "idx": 410,
       "full_text": "{{toujyou.png|登場}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：手札からコスト4以下の「桜坂しずく」のメンバーカードを1枚ステージに登場させる。",
       "triggers": "登場",
       "trigger_list": [
@@ -18685,7 +18501,7 @@
       "is_null": false
     },
     {
-      "idx": 414,
+      "idx": 411,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを2枚見る。その中から「朝香果林」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -18710,7 +18526,7 @@
       "is_null": false
     },
     {
-      "idx": 415,
+      "idx": 412,
       "full_text": "{{toujyou.png|登場}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：手札からコスト4以下の「宮下愛」のメンバーカードを1枚ステージに登場させる。",
       "triggers": "登場",
       "trigger_list": [
@@ -18742,7 +18558,7 @@
       "is_null": false
     },
     {
-      "idx": 416,
+      "idx": 413,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを2枚見る。その中から「近江彼方」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -18767,7 +18583,7 @@
       "is_null": false
     },
     {
-      "idx": 417,
+      "idx": 414,
       "full_text": "{{toujyou.png|登場}}「優木せつ菜」からバトンタッチして登場した場合、カードを2枚引き、手札を2枚控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -18792,7 +18608,7 @@
       "is_null": false
     },
     {
-      "idx": 418,
+      "idx": 415,
       "full_text": "{{toujyou.png|登場}}「エマ・ヴェルデ」からバトンタッチして登場した場合、カードを2枚引き、手札を2枚控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -18817,7 +18633,7 @@
       "is_null": false
     },
     {
-      "idx": 419,
+      "idx": 416,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを2枚見る。その中から「天王寺璃奈」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -18842,7 +18658,7 @@
       "is_null": false
     },
     {
-      "idx": 420,
+      "idx": 417,
       "full_text": "{{toujyou.png|登場}}「三船栞子」からバトンタッチして登場した場合、カードを2枚引き、手札を1枚控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -18880,7 +18696,7 @@
       "is_null": false
     },
     {
-      "idx": 421,
+      "idx": 418,
       "full_text": "{{toujyou.png|登場}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：手札からコスト4以下の「ミア・テイラー」のメンバーカードを1枚ステージに登場させる。",
       "triggers": "登場",
       "trigger_list": [
@@ -18912,7 +18728,7 @@
       "is_null": false
     },
     {
-      "idx": 422,
+      "idx": 419,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを2枚見る。その中から「鐘嵐珠」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -18937,7 +18753,7 @@
       "is_null": false
     },
     {
-      "idx": 423,
+      "idx": 420,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを2枚見る。その中から1枚を手札に加え、残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -18962,7 +18778,7 @@
       "is_null": false
     },
     {
-      "idx": 424,
+      "idx": 421,
       "full_text": "{{toujyou.png|登場}}カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -18987,7 +18803,7 @@
       "is_null": false
     },
     {
-      "idx": 425,
+      "idx": 422,
       "full_text": "{{jyouji.png|常時}}自分のステージにいるこのメンバー以外の『A-RISE』のメンバー1人につき、{{heart_05.png|heart05}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -19047,7 +18863,7 @@
       "is_null": false
     },
     {
-      "idx": 426,
+      "idx": 423,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}手札を1枚控え室に置く：ウェイト状態のメンバー1人をアクティブにする。これにより相手のステージにいるメンバーをアクティブにした場合、自分の控え室からライブカードを1枚手札に加える。",
       "triggers": "起動",
       "trigger_list": [
@@ -19107,7 +18923,7 @@
       "is_null": false
     },
     {
-      "idx": 427,
+      "idx": 424,
       "full_text": "{{toujyou.png|登場}}このメンバーをウェイトにし、手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加える。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -19132,7 +18948,7 @@
       "is_null": false
     },
     {
-      "idx": 428,
+      "idx": 425,
       "full_text": "{{toujyou.png|登場}}このメンバーをウェイトにしてもよい：相手のステージにいるコスト9以下のメンバー1人をウェイトにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -19165,7 +18981,7 @@
       "is_null": false
     },
     {
-      "idx": 429,
+      "idx": 426,
       "full_text": "{{jyouji.png|常時}}このメンバーがウェイト状態であるかぎり、{{heart_05.png|heart05}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -19198,7 +19014,7 @@
       "is_null": false
     },
     {
-      "idx": 430,
+      "idx": 427,
       "full_text": "{{jidou.png|自動}}このメンバーがエリアを移動したとき、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。",
       "triggers": "自動",
       "trigger_list": [
@@ -19243,7 +19059,7 @@
       "is_null": false
     },
     {
-      "idx": 431,
+      "idx": 428,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}このメンバーがエリアを移動したとき、エネルギーを2枚アクティブにする。",
       "triggers": "自動",
       "trigger_list": [
@@ -19298,7 +19114,7 @@
       "is_null": false
     },
     {
-      "idx": 432,
+      "idx": 429,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}エネルギー2枚をエネルギーデッキに置く：自分の控え室にあるライブカードを1枚手札に加える。",
       "triggers": "起動",
       "trigger_list": [
@@ -19357,7 +19173,7 @@
       "is_null": false
     },
     {
-      "idx": 433,
+      "idx": 430,
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}支払ってもよい：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -19382,7 +19198,7 @@
       "is_null": false
     },
     {
-      "idx": 434,
+      "idx": 431,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージに『蓮ノ空』のメンバーが3人以上いて、かつ自分の控え室にカード名に「DreamBelievers」を含むライブカードがある場合、このカードのスコアを＋１する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -19425,7 +19241,7 @@
       "is_null": false
     },
     {
-      "idx": 435,
+      "idx": 432,
       "full_text": "{{jidou.png|自動}}{{turn2.png|ターン2回}}自分のステージにほかの『スリーズブーケ』のメンバーが登場するたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、エネルギーを2枚アクティブにする。",
       "triggers": "自動",
       "trigger_list": [
@@ -19483,7 +19299,7 @@
       "is_null": false
     },
     {
-      "idx": 436,
+      "idx": 433,
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{heart_04.png|heart04}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -19541,7 +19357,7 @@
       "is_null": false
     },
     {
-      "idx": 437,
+      "idx": 434,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}手札の「村野さやか」のメンバーカードを1枚公開する：これにより公開したカードをこのメンバーの下に置く。",
       "triggers": "起動",
       "trigger_list": [
@@ -19596,7 +19412,7 @@
       "is_null": false
     },
     {
-      "idx": 438,
+      "idx": 435,
       "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、このメンバーの下にあるメンバーカード1枚につき、このカードのコストを＋４して{{heart_05.png|heart05}}を得る。この能力では下にあるメンバーカードは3枚までしか数えない。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -19651,7 +19467,7 @@
       "is_null": false
     },
     {
-      "idx": 439,
+      "idx": 436,
       "full_text": "{{toujyou.png|登場}}手札の『みらくらぱーく！』のメンバーカードを好きな枚数控え室に置き、その後、その枚数に1を足した枚数のカードを引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -19711,7 +19527,7 @@
       "is_null": false
     },
     {
-      "idx": 440,
+      "idx": 437,
       "full_text": "{{jidou.png|自動}}{{turn2.png|ターン2回}}自分の手札からカードが1枚以上控え室に置かれるたび、ライブ終了時まで、{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "自動",
       "trigger_list": [
@@ -19771,7 +19587,7 @@
       "is_null": false
     },
     {
-      "idx": 441,
+      "idx": 438,
       "full_text": "{{toujyou.png|登場}}{{icon_energy.png|E}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚控え室に置く。その後、自分の控え室から『スリーズブーケ』のライブカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -19796,7 +19612,7 @@
       "is_null": false
     },
     {
-      "idx": 442,
+      "idx": 439,
       "full_text": "{{live_start.png|ライブ開始時}}数1つを選ぶ。自分のデッキの一番上のカードを公開する。公開したカードがメンバーカードで、かつコストが選んだ数以上の場合、公開したカードを手札に加える。選んだ数以下の場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。\n(公開したカードがメンバーカード以外の場合、何も起こらない。)",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -19855,7 +19671,7 @@
       "is_null": false
     },
     {
-      "idx": 443,
+      "idx": 440,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるほかの『みらくらぱーく！』のメンバーがいるエリアにポジションチェンジしてもよい。そうした場合、ライブ終了時まで、{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。)",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -19909,7 +19725,7 @@
       "is_null": false
     },
     {
-      "idx": 444,
+      "idx": 441,
       "full_text": "{{toujyou.png|登場}}{{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置いてもよい：自分の控え室から『蓮ノ空』のカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -19940,7 +19756,7 @@
       "is_null": false
     },
     {
-      "idx": 445,
+      "idx": 442,
       "full_text": "{{jyouji.png|常時}}自分のステージにメンバーがちょうど2人おり、かつ相手のステージにメンバーが3人以上いるかぎり、{{heart_06.png|heart06}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -19971,7 +19787,7 @@
       "is_null": false
     },
     {
-      "idx": 446,
+      "idx": 443,
       "full_text": "{{toujyou.png|登場}}自分と相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のすべてのメンバーをウェイトにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -20022,7 +19838,7 @@
       "is_null": false
     },
     {
-      "idx": 447,
+      "idx": 444,
       "full_text": "{{jyouji.png|常時}}相手のステージにいるメンバーはアクティブフェイズにアクティブにならない。",
       "triggers": "常時",
       "trigger_list": [
@@ -20073,7 +19889,7 @@
       "is_null": false
     },
     {
-      "idx": 448,
+      "idx": 445,
       "full_text": "{{jidou.png|自動}}{{center.png|センター}}{{turn2.png|ターン2回}}自分のステージに『蓮ノ空』のメンバーが登場するたび、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "自動",
       "trigger_list": [
@@ -20110,7 +19926,7 @@
       "is_null": false
     },
     {
-      "idx": 449,
+      "idx": 446,
       "full_text": "{{live_start.png|ライブ開始時}}このメンバーが持つ{{icon_blade.png|ブレード}}の数が8つ以上の場合、カードを2枚引き、手札を1枚控え室に置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -20147,7 +19963,7 @@
       "is_null": false
     },
     {
-      "idx": 450,
+      "idx": 447,
       "full_text": "{{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}自分のステージにコスト10以上のメンバーがいる場合、相手のステージにいるコスト4以下のメンバー1人をウェイトにする。",
       "triggers": "ライブ開始時, 登場",
       "trigger_list": [
@@ -20173,7 +19989,7 @@
       "is_null": false
     },
     {
-      "idx": 451,
+      "idx": 448,
       "full_text": "{{toujyou.png|登場}}自分と相手はそれぞれ、自身の控え室にあるすべてのメンバーカードをシャッフルし、自身のデッキの下に置く。これにより自分と相手のカードが合計20枚以上デッキの下に置かれた場合、自分の控え室からライブカードを1枚手札に加え、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -20224,7 +20040,7 @@
       "is_null": false
     },
     {
-      "idx": 452,
+      "idx": 449,
       "full_text": "{{live_start.png|ライブ開始時}}自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -20249,7 +20065,7 @@
       "is_null": false
     },
     {
-      "idx": 453,
+      "idx": 450,
       "full_text": "{{live_success.png|ライブ成功時}}自分のステージに、このメンバーよりコストが高いメンバーがいる場合、カードを1枚引く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -20274,7 +20090,7 @@
       "is_null": false
     },
     {
-      "idx": 454,
+      "idx": 451,
       "full_text": "{{toujyou.png|登場}}自分のステージにいるメンバーが『みらくらぱーく！』のみの場合、相手のステージにいるメンバー1人をこのメンバーの正面のエリアにポジションチェンジさせる。",
       "triggers": "登場",
       "trigger_list": [
@@ -20310,7 +20126,7 @@
       "is_null": false
     },
     {
-      "idx": 455,
+      "idx": 452,
       "full_text": "{{jyouji.png|常時}}このメンバーの正面のエリアにいる相手のメンバーのコストが、このメンバーのコストより高いかぎり、{{heart_01.png|heart01}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -20346,7 +20162,7 @@
       "is_null": false
     },
     {
-      "idx": 456,
+      "idx": 453,
       "full_text": "{{jyouji.png|常時}}自分のステージにほかのメンバーがいないかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を失う。",
       "triggers": "常時",
       "trigger_list": [
@@ -20371,7 +20187,7 @@
       "is_null": false
     },
     {
-      "idx": 457,
+      "idx": 454,
       "full_text": "{{toujyou.png|登場}}自分のステージにいるこのメンバー以外の{{heart_06.png|heart06}}を持つメンバー1人は、ライブ終了時まで、{{heart_06.png|heart06}}を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -20430,7 +20246,7 @@
       "is_null": false
     },
     {
-      "idx": 458,
+      "idx": 455,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを2枚見る。その中から能力を持たない『μ's』のカードか{{jyouji.png|常時}}能力を持つ『μ's』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -20465,7 +20281,7 @@
       "is_null": false
     },
     {
-      "idx": 459,
+      "idx": 456,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『μ's』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -20500,7 +20316,7 @@
       "is_null": false
     },
     {
-      "idx": 460,
+      "idx": 457,
       "full_text": "{{toujyou.png|登場}}手札を2枚控え室に置いてもよい：自分の控え室にある{{heart_03.png|heart03}}を持つメンバーカード1枚までと、必要ハートに{{heart_03.png|heart03}}を含むライブカード1枚までを手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -20539,7 +20355,7 @@
       "is_null": false
     },
     {
-      "idx": 461,
+      "idx": 458,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにする：自分のステージにいるほかのメンバー1人をアクティブにする。",
       "triggers": "起動",
       "trigger_list": [
@@ -20571,7 +20387,7 @@
       "is_null": false
     },
     {
-      "idx": 462,
+      "idx": 459,
       "full_text": "{{jyouji.png|常時}}{{center.png|センター}}自分のステージの右サイドエリアと左サイドエリアに、元々持つ{{icon_blade.png|ブレード}}の数が2つのメンバーがいるかぎり、ライブの合計スコアを＋１する。",
       "triggers": "常時",
       "trigger_list": [
@@ -20596,7 +20412,7 @@
       "is_null": false
     },
     {
-      "idx": 463,
+      "idx": 460,
       "full_text": "{{toujyou.png|登場}}控え室から登場している場合、相手のステージの右サイドエリアか左サイドエリアにいるコスト13以上のメンバー1人をウェイトにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -20631,7 +20447,7 @@
       "is_null": false
     },
     {
-      "idx": 464,
+      "idx": 461,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く：このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーがいたエリアに登場させる。",
       "triggers": "起動",
       "trigger_list": [
@@ -20656,7 +20472,7 @@
       "is_null": false
     },
     {
-      "idx": 465,
+      "idx": 462,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを2枚見る。その中から{{heart_02.png|heart02}}と{{heart_04.png|heart04}}と{{heart_05.png|heart05}}をすべて持つメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -20707,7 +20523,7 @@
       "is_null": false
     },
     {
-      "idx": 466,
+      "idx": 463,
       "full_text": "{{toujyou.png|登場}}カードを2枚引く。その後、控え室から登場している場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -20737,7 +20553,7 @@
       "is_null": false
     },
     {
-      "idx": 467,
+      "idx": 464,
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払うか手札を2枚控え室に置いてもよい：自分の成功ライブカード置き場にカードがなく、かつ相手の成功ライブカード置き場にカードが2枚以上ある場合、ライブ終了時まで、自分のステージにいる『Aqours』のメンバー2人までは「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -20762,7 +20578,7 @@
       "is_null": false
     },
     {
-      "idx": 468,
+      "idx": 465,
       "full_text": "{{kidou.png|起動}}{{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く：自分の控え室からコスト17以下の『Aqours』のメンバーカードを1枚、このメンバーがいたエリアに登場させる。",
       "triggers": "起動",
       "trigger_list": [
@@ -20792,7 +20608,7 @@
       "is_null": false
     },
     {
-      "idx": 469,
+      "idx": 466,
       "full_text": "{{toujyou.png|登場}}相手のステージにいるコスト2以下のメンバー1人をウェイトにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -20822,7 +20638,7 @@
       "is_null": false
     },
     {
-      "idx": 470,
+      "idx": 467,
       "full_text": "{{jyouji.png|常時}}自分のステージにほかのメンバーがいないかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -20847,7 +20663,7 @@
       "is_null": false
     },
     {
-      "idx": 471,
+      "idx": 468,
       "full_text": "{{toujyou.png|登場}}自分のステージにいるウェイト状態の『みらくらぱーく！』のメンバー1人をアクティブにしてもよい。そうした場合、自分の控え室から『みらくらぱーく！』のライブカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -20880,7 +20696,7 @@
       "is_null": false
     },
     {
-      "idx": 472,
+      "idx": 469,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：ライブ終了時まで、自分のステージにいる『みらくらぱーく！』のメンバー1人は、{{heart_01.png|heart01}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -20913,7 +20729,7 @@
       "is_null": false
     },
     {
-      "idx": 473,
+      "idx": 470,
       "full_text": "{{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}相手のステージにいるコスト9以下のメンバー1人をウェイトにする。",
       "triggers": "ライブ開始時, 登場",
       "trigger_list": [
@@ -20946,7 +20762,7 @@
       "is_null": false
     },
     {
-      "idx": 474,
+      "idx": 471,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。これにより「百生吟子」のメンバーカードを控え室に置いた場合、さらに{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -20978,7 +20794,7 @@
       "is_null": false
     },
     {
-      "idx": 475,
+      "idx": 472,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のステージに『EdelNote』のメンバーが登場したとき、相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。",
       "triggers": "自動",
       "trigger_list": [
@@ -21041,7 +20857,7 @@
       "is_null": false
     },
     {
-      "idx": 476,
+      "idx": 473,
       "full_text": "{{toujyou.png|登場}}このメンバーをウェイトにする。その後、自分の控え室からスコア４以下の『蓮ノ空』のライブカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -21073,7 +20889,7 @@
       "is_null": false
     },
     {
-      "idx": 477,
+      "idx": 474,
       "full_text": "{{live_start.png|ライブ開始時}}自分のライブ中のカードにスコア２以下のライブカードがある場合、このメンバーをアクティブにする。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -21105,7 +20921,7 @@
       "is_null": false
     },
     {
-      "idx": 478,
+      "idx": 475,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}：このメンバーをポジションチェンジする。",
       "triggers": "起動",
       "trigger_list": [
@@ -21135,7 +20951,7 @@
       "is_null": false
     },
     {
-      "idx": 479,
+      "idx": 476,
       "full_text": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場にカードが2枚以上ある場合、このカードのスコアを＋５し、必要ハートは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_03.png|heart03}}{{heart_03.png|heart03}}{{heart_03.png|heart03}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}{{heart_00.png|heart0}}{{heart_00.png|heart0}}{{heart_00.png|heart0}}になる。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -21194,7 +21010,7 @@
       "is_null": false
     },
     {
-      "idx": 480,
+      "idx": 477,
       "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる、このターン中にエリアを移動したすべての『Liella!』のメンバーは、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -21239,7 +21055,7 @@
       "is_null": false
     },
     {
-      "idx": 481,
+      "idx": 478,
       "full_text": "{{toujyou.png|登場}}バトンタッチして登場した場合、このバトンタッチによって控え室に置かれた『Liella!』のメンバーカード1枚につき、カードを1枚引く。ブレードハートを持たない『Liella!』のメンバーカード1枚につき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -21274,7 +21090,7 @@
       "is_null": false
     },
     {
-      "idx": 482,
+      "idx": 479,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からコスト4以下の『Liella!』のメンバーカードを1枚まで公開する。そのカードを自分のステージのメンバーのいないエリアに登場させるか、手札に加える。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -21310,7 +21126,7 @@
       "is_null": false
     },
     {
-      "idx": 483,
+      "idx": 480,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}手札の『Liella!』のカードを1枚控え室に置く：以下から1つを選ぶ。これにより控え室に置いたカードがブレードハートを持たないメンバーカードの場合、代わりに1つ以上を選ぶ。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n・ライブ終了時まで、自分のステージにいるこのメンバー以外の『Liella!』のメンバー1人は、{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る。",
       "triggers": "起動",
       "trigger_list": [
@@ -21343,7 +21159,7 @@
       "is_null": false
     },
     {
-      "idx": 484,
+      "idx": 481,
       "full_text": "{{live_success.png|ライブ成功時}}このターン、自分の『Liella!』のカードの効果によってこのメンバーがエリアを移動していた場合、ライブの合計スコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -21378,7 +21194,7 @@
       "is_null": false
     },
     {
-      "idx": 485,
+      "idx": 482,
       "full_text": "{{live_success.png|ライブ成功時}}自分のライブカード置き場の中に元々のスコアより高いスコアのライブカードがあるか、エールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードがある場合、カードを1枚引く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -21403,7 +21219,7 @@
       "is_null": false
     },
     {
-      "idx": 486,
+      "idx": 483,
       "full_text": "{{toujyou.png|登場}}バトンタッチして登場した場合、このバトンタッチで控え室に置かれた『Liella!』のメンバーカードを1枚、このメンバーの下に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -21440,7 +21256,7 @@
       "is_null": false
     },
     {
-      "idx": 487,
+      "idx": 484,
       "full_text": "{{jyouji.png|常時}}このメンバーは、このメンバーの下に置かれている『Liella!』のメンバーカードが持つ{{kidou.png|起動}}能力をすべて得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -21477,7 +21293,7 @@
       "is_null": false
     },
     {
-      "idx": 488,
+      "idx": 485,
       "full_text": "{{jyouji.png|常時}}このメンバーの下にある『Liella!』のメンバーカード1枚につき、このメンバーのコストを＋１する。",
       "triggers": "常時",
       "trigger_list": [
@@ -21509,7 +21325,7 @@
       "is_null": false
     },
     {
-      "idx": 489,
+      "idx": 486,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のライブが成功するか、このメンバーがエリアを移動したとき、自分の控え室にある『Liella!』のメンバーカードを1枚、このメンバーの下に置く。",
       "triggers": "自動",
       "trigger_list": [
@@ -21541,7 +21357,7 @@
       "is_null": false
     },
     {
-      "idx": 490,
+      "idx": 487,
       "full_text": "{{live_success.png|ライブ成功時}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分の控え室から『Liella!』のライブカードを1枚手札に加える。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -21566,7 +21382,7 @@
       "is_null": false
     },
     {
-      "idx": 491,
+      "idx": 488,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にあるブレードハートを持たない『Liella!』のメンバーカード2枚につき、ライブの合計スコアを＋１する。この能力では合計スコアは２までしか増えない。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -21597,7 +21413,7 @@
       "is_null": false
     },
     {
-      "idx": 492,
+      "idx": 489,
       "full_text": "{{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}『Liella!』のメンバー1人をウェイトにしてもよい：相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数がこれによりウェイトにしたメンバーが元々持つ{{icon_blade.png|ブレード}}の数より2つ以上少ないメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）",
       "triggers": "ライブ開始時, 登場",
       "trigger_list": [
@@ -21631,7 +21447,7 @@
       "is_null": false
     },
     {
-      "idx": 493,
+      "idx": 490,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置かないかぎり、自分のエネルギー1枚をエネルギーデッキに置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -21660,7 +21476,7 @@
       "is_null": false
     },
     {
-      "idx": 494,
+      "idx": 491,
       "full_text": "{{live_success.png|ライブ成功時}}以下から1つを選ぶ。\n・カードを2枚引く。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -21689,7 +21505,7 @@
       "is_null": false
     },
     {
-      "idx": 495,
+      "idx": 492,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のステージのセンターエリアにいるメンバーがエリアを移動したとき、以下から1つを選ぶ。\n・ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。\n・相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。\n・カードを1枚引く。",
       "triggers": "自動",
       "trigger_list": [
@@ -21721,7 +21537,7 @@
       "is_null": false
     },
     {
-      "idx": 496,
+      "idx": 493,
       "full_text": "{{live_start.png|ライブ開始時}}このメンバーをポジションチェンジしてもよい。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -21753,7 +21569,7 @@
       "is_null": false
     },
     {
-      "idx": 497,
+      "idx": 494,
       "full_text": "{{toujyou.png|登場}}手札の『KALEIDOSCORE』のカードを1枚控え室に置いてもよい：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。これにより控え室に置いたカードがブレードハートを持たない場合、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -21784,7 +21600,7 @@
       "is_null": false
     },
     {
-      "idx": 498,
+      "idx": 495,
       "full_text": "{{toujyou.png|登場}}自分のステージにいるメンバーが『5yncri5e!』のみの場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させてもよい。)",
       "triggers": "登場",
       "trigger_list": [
@@ -21809,7 +21625,7 @@
       "is_null": false
     },
     {
-      "idx": 499,
+      "idx": 496,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分の控え室から『CatChu!』のカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -21834,7 +21650,7 @@
       "is_null": false
     },
     {
-      "idx": 500,
+      "idx": 497,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるこのメンバーと名前の異なる『CatChu!』のメンバー1人につき、エネルギーを1枚アクティブにする。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -21870,7 +21686,7 @@
       "is_null": false
     },
     {
-      "idx": 501,
+      "idx": 498,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分の控え室から『5yncri5e!』のカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -21895,7 +21711,7 @@
       "is_null": false
     },
     {
-      "idx": 502,
+      "idx": 499,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分がエールしたとき、手札にある『Liella!』のライブカードを1枚控え室に置いてもよい。そうした場合、追加で2枚エールを行う。",
       "triggers": "自動",
       "trigger_list": [
@@ -21937,7 +21753,7 @@
       "is_null": false
     },
     {
-      "idx": 503,
+      "idx": 500,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分の控え室から『KALEIDOSCORE』のカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -21962,7 +21778,7 @@
       "is_null": false
     },
     {
-      "idx": 504,
+      "idx": 501,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のステージにいる『5yncri5e!』のメンバーがセンターエリアに移動したとき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "自動",
       "trigger_list": [
@@ -21997,7 +21813,7 @@
       "is_null": false
     },
     {
-      "idx": 505,
+      "idx": 502,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分の控え室からコスト10以上のメンバーカードを1枚手札に加える。これにより「桜内梨子」か「渡辺曜」を手札に加えた場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -22028,7 +21844,7 @@
       "is_null": false
     },
     {
-      "idx": 506,
+      "idx": 503,
       "full_text": "{{toujyou.png|登場}}自分のステージにコスト9以上の『Aqours』のメンバーがいる場合、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -22053,7 +21869,7 @@
       "is_null": false
     },
     {
-      "idx": 507,
+      "idx": 504,
       "full_text": "{{toujyou.png|登場}}『Aqours』のメンバーからバトンタッチして登場した場合、自分と相手はそれぞれ、自身の手札のカードを3枚まで選び、選んだカード以外のカードをシャッフルし、自身のデッキの下に置く。その後、自分と相手はそれぞれカードを3枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -22106,7 +21922,7 @@
       "is_null": false
     },
     {
-      "idx": 508,
+      "idx": 505,
       "full_text": "{{live_start.png|ライブ開始時}}自分のデッキの下からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの下に置き、残りを控え室に置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -22159,7 +21975,7 @@
       "is_null": false
     },
     {
-      "idx": 509,
+      "idx": 506,
       "full_text": "{{live_start.png|ライブ開始時}}自分のデッキの下からカードを3枚控え室に置く。それらがすべて『Aqours』のメンバーカードの場合、ライブ終了時まで、{{heart_04.png|heart04}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -22201,7 +22017,7 @@
       "is_null": false
     },
     {
-      "idx": 510,
+      "idx": 507,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを好きな順番でデッキの下に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -22241,7 +22057,7 @@
       "is_null": false
     },
     {
-      "idx": 511,
+      "idx": 508,
       "full_text": "{{live_start.png|ライブ開始時}}自分のデッキの一番下のカードを控え室に置いてもよい。それが「松浦果南」か「黒澤ダイヤ」の場合、それを手札に加える。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -22281,7 +22097,7 @@
       "is_null": false
     },
     {
-      "idx": 512,
+      "idx": 509,
       "full_text": "{{jyouji.png|常時}}このメンバーの正面のエリアにいるコスト4以下のメンバーは、{{icon_blade.png|ブレード}}を1つ失う。",
       "triggers": "常時",
       "trigger_list": [
@@ -22319,7 +22135,7 @@
       "is_null": false
     },
     {
-      "idx": 513,
+      "idx": 510,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるすべてのメンバーがアクティブ状態の場合、このカードの必要ハートを{{heart_00.png|heart0}}減らす。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -22344,7 +22160,7 @@
       "is_null": false
     },
     {
-      "idx": 514,
+      "idx": 511,
       "full_text": "{{live_start.png|ライブ開始時}}自分のデッキの下からカードを1枚控え室に置く。それが『Aqours』のメンバーカードの場合、このカードの必要ハートを{{heart_00.png|heart0}}減らす。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -22369,7 +22185,7 @@
       "is_null": false
     },
     {
-      "idx": 515,
+      "idx": 512,
       "full_text": "{{jyouji.png|常時}}自分のエールは、デッキの上から行う代わりにデッキの下から行う。",
       "triggers": "常時",
       "trigger_list": [
@@ -22404,7 +22220,7 @@
       "is_null": false
     },
     {
-      "idx": 516,
+      "idx": 513,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に、{{heart_02.png|heart02}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}を持つ『Aqours』のメンバーカードがそれぞれある場合、このカードのスコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -22439,7 +22255,7 @@
       "is_null": false
     },
     {
-      "idx": 517,
+      "idx": 514,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のエネルギー置き場にあるエネルギーがメンバーの下に置かれたとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
       "triggers": "自動",
       "trigger_list": [
@@ -22495,7 +22311,7 @@
       "is_null": false
     },
     {
-      "idx": 518,
+      "idx": 515,
       "full_text": "{{toujyou.png|登場}}自分のステージに『QU4RTZ』のメンバーが3人以上いる場合、自分の控え室からカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -22527,7 +22343,7 @@
       "is_null": false
     },
     {
-      "idx": 519,
+      "idx": 516,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：相手のステージにいる、元々持つ{{icon_blade.png|ブレード}}の数がこのメンバーの下にあるエネルギーカードの枚数に1を足した数以下のメンバー1人をウェイトにする。",
       "triggers": "起動",
       "trigger_list": [
@@ -22588,7 +22404,7 @@
       "is_null": false
     },
     {
-      "idx": 520,
+      "idx": 517,
       "full_text": "{{toujyou.png|登場}}自分のステージに名前の異なる『DiverDiva』のメンバーが2人いる場合、以下から1つを選ぶ。\n・エネルギーを2枚アクティブにする。\n・自分のエネルギーデッキから、エネルギーカード1枚を自分のステージにいる『虹ヶ咲』のメンバーの下に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -22621,7 +22437,7 @@
       "is_null": false
     },
     {
-      "idx": 521,
+      "idx": 518,
       "full_text": "{{toujyou.png|登場}}自分の控え室からブレードハートを持たないメンバーカードを4枚まで好きな順番でデッキの下に置いてもよい。これによりデッキに置いたカード1枚につき、エネルギーを1枚アクティブにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -22646,7 +22462,7 @@
       "is_null": false
     },
     {
-      "idx": 522,
+      "idx": 519,
       "full_text": "{{toujyou.png|登場}}自分と相手はそれぞれ、自身のデッキの上からカードを7枚控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -22678,7 +22494,7 @@
       "is_null": false
     },
     {
-      "idx": 523,
+      "idx": 520,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：自分の控え室からコスト2以下の『虹ヶ咲』のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。（この効果で登場したメンバーのいるエリアには、このターンにメンバーは登場できない。）",
       "triggers": "起動",
       "trigger_list": [
@@ -22725,7 +22541,7 @@
       "is_null": false
     },
     {
-      "idx": 524,
+      "idx": 521,
       "full_text": "{{live_start.png|ライブ開始時}}『虹ヶ咲』のメンバー1人をウェイトにしてもよい：好きなハートの色を1つ指定する。ライブ終了時まで、そのハートを1つ得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -22750,7 +22566,7 @@
       "is_null": false
     },
     {
-      "idx": 525,
+      "idx": 522,
       "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる『虹ヶ咲』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -22787,7 +22603,7 @@
       "is_null": false
     },
     {
-      "idx": 526,
+      "idx": 523,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}のうち、3種類以上ある場合、このカードのスコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -22824,7 +22640,7 @@
       "is_null": false
     },
     {
-      "idx": 527,
+      "idx": 524,
       "full_text": "{{live_start.png|ライブ開始時}}手札を2枚まで控え室に置いてもよい：自分のステージにいる『虹ヶ咲』のメンバーを、これにより控え室に置いたカードの枚数に等しい数まで選ぶ。ライブ終了時まで、それらは{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -22862,7 +22678,7 @@
       "is_null": false
     },
     {
-      "idx": 528,
+      "idx": 525,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に、ブレードハートを持たないメンバーカードが2枚以上ある場合、このカードのスコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -22900,7 +22716,7 @@
       "is_null": false
     },
     {
-      "idx": 529,
+      "idx": 526,
       "full_text": "{{jyouji.png|常時}}このカードが『Liella!』のメンバーの下に置かれているかぎり、そのメンバーは{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -22944,7 +22760,7 @@
       "is_null": false
     },
     {
-      "idx": 530,
+      "idx": 527,
       "full_text": "{{jidou.png|自動}}このメンバーがステージから控え室に置かれたとき、バトンタッチしていた場合、このカードをそのバトンタッチで登場したメンバーの下に置く。",
       "triggers": "自動",
       "trigger_list": [
@@ -22988,7 +22804,7 @@
       "is_null": false
     },
     {
-      "idx": 531,
+      "idx": 528,
       "full_text": "{{jyouji.png|常時}}自分のエネルギーが7枚以上あり、かつ自分のエネルギーが相手より多いかぎり、ステージにいるこのメンバーのコストを＋２する。",
       "triggers": "常時",
       "trigger_list": [
@@ -23028,7 +22844,7 @@
       "is_null": false
     },
     {
-      "idx": 532,
+      "idx": 529,
       "full_text": "{{live_start.png|ライブ開始時}}自分の控え室から『Liella!』のメンバーカード3枚を好きな順番でデッキの一番下に置いてもよい。これによりデッキの下に置いたカードの中にブレードハートを持たないメンバーカードが1枚以上ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -23061,7 +22877,7 @@
       "is_null": false
     },
     {
-      "idx": 533,
+      "idx": 530,
       "full_text": "{{kidou.png|起動}}このメンバーをウェイトにする：カードを1枚引く。",
       "triggers": "起動",
       "trigger_list": [
@@ -23105,7 +22921,7 @@
       "is_null": false
     },
     {
-      "idx": 534,
+      "idx": 531,
       "full_text": "{{jidou.png|自動}}ウェイト状態のこのメンバーがエリアを移動したとき、このメンバーをアクティブにする。",
       "triggers": "自動",
       "trigger_list": [
@@ -23149,7 +22965,7 @@
       "is_null": false
     },
     {
-      "idx": 535,
+      "idx": 532,
       "full_text": "{{jyouji.png|常時}}{{leftside.png|左サイド}}{{rightside.png|右サイド}}{{heart_02.png|heart02}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -23174,7 +22990,7 @@
       "is_null": false
     },
     {
-      "idx": 536,
+      "idx": 533,
       "full_text": "{{live_start.png|ライブ開始時}}{{center.png|センター}}相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -23199,7 +23015,7 @@
       "is_null": false
     },
     {
-      "idx": 537,
+      "idx": 534,
       "full_text": "{{kidou.png|起動}}このメンバーをステージから控え室に置く：自分のエネルギー置き場にあるエネルギー1枚をエネルギーデッキに置く。その後、自分の控え室からカードを1枚手札に加える。",
       "triggers": "起動",
       "trigger_list": [
@@ -23238,7 +23054,7 @@
       "is_null": false
     },
     {
-      "idx": 538,
+      "idx": 535,
       "full_text": "{{toujyou.png|登場}}手札をすべて控え室に置いてもよい：カードを6枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -23269,7 +23085,7 @@
       "is_null": false
     },
     {
-      "idx": 539,
+      "idx": 536,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、『Liella!』のカードを1枚デッキの一番上に置いてもよい。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -23294,7 +23110,7 @@
       "is_null": false
     },
     {
-      "idx": 540,
+      "idx": 537,
       "full_text": "{{live_success.png|ライブ成功時}}自分のエネルギーが相手より2枚以上多い場合、このカードのスコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -23329,7 +23145,7 @@
       "is_null": false
     },
     {
-      "idx": 541,
+      "idx": 538,
       "full_text": "{{live_success.png|ライブ成功時}}カードを1枚引く。このターン、相手もライブを成功している場合、さらにカードを1枚引き、手札を1枚控え室に置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -23354,7 +23170,7 @@
       "is_null": false
     },
     {
-      "idx": 542,
+      "idx": 539,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から『虹ヶ咲』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -23379,7 +23195,7 @@
       "is_null": false
     },
     {
-      "idx": 543,
+      "idx": 540,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいる『虹ヶ咲』のメンバー1人をアクティブにする。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -23404,7 +23220,7 @@
       "is_null": false
     },
     {
-      "idx": 544,
+      "idx": 541,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいる{{icon_blade.png|ブレード}}を4つ以上持つ『虹ヶ咲』のメンバー1人は、ライブ終了時まで、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -23440,7 +23256,7 @@
       "is_null": false
     },
     {
-      "idx": 545,
+      "idx": 542,
       "full_text": "{{live_start.png|ライブ開始時}}『虹ヶ咲』のメンバーを3人までウェイトにしてもよい：これによりウェイトにしたメンバー1人につき、このカードのスコアを＋１する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -23465,7 +23281,7 @@
       "is_null": false
     },
     {
-      "idx": 546,
+      "idx": 543,
       "full_text": "{{toujyou.png|登場}}自分の成功ライブカード置き場にカードが2枚以上ある場合、自分の控え室からライブカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -23574,7 +23390,7 @@
       "is_null": false
     },
     {
-      "idx": 547,
+      "idx": 544,
       "full_text": "{{jyouji.png|常時}}自分の成功ライブカード置き場にあるカード1枚につき、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -23683,7 +23499,7 @@
       "is_null": false
     },
     {
-      "idx": 548,
+      "idx": 545,
       "full_text": "{{toujyou.png|登場}}自分の控え室からコスト4以下の『μ's』のメンバーカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -23750,7 +23566,7 @@
       "is_null": false
     },
     {
-      "idx": 549,
+      "idx": 546,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、選んだハートを1つ得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -23817,7 +23633,7 @@
       "is_null": false
     },
     {
-      "idx": 550,
+      "idx": 547,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを5枚見る。その中から『μ's』のライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -23870,7 +23686,7 @@
       "is_null": false
     },
     {
-      "idx": 551,
+      "idx": 548,
       "full_text": "{{toujyou.png|登場}}手札のライブカードを1枚公開してもよい：自分の成功ライブカード置き場にあるカードを1枚手札に加える。そうした場合、これにより公開したカードを自分の成功ライブカード置き場に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -23933,7 +23749,7 @@
       "is_null": false
     },
     {
-      "idx": 552,
+      "idx": 549,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを5枚控え室に置く。それらの中にライブカードがある場合、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -23984,7 +23800,7 @@
       "is_null": false
     },
     {
-      "idx": 553,
+      "idx": 550,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}：自分のデッキの上からカードを10枚控え室に置く。",
       "triggers": "起動",
       "trigger_list": [
@@ -24051,7 +23867,7 @@
       "is_null": false
     },
     {
-      "idx": 554,
+      "idx": 551,
       "full_text": "{{live_start.png|ライブ開始時}}自分の控え室に『μ's』のカードが25枚以上ある場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -24112,7 +23928,7 @@
       "is_null": false
     },
     {
-      "idx": 555,
+      "idx": 552,
       "full_text": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場にあるカード1枚につき、このカードを成功させるための必要ハートは{{heart_00.png|heart0}}{{heart_00.png|heart0}}少なくなる。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -24151,7 +23967,7 @@
       "is_null": false
     },
     {
-      "idx": 556,
+      "idx": 553,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}手札を2枚控え室に置く：自分の控え室から必要ハートに{{heart_03.png|heart03}}を3以上含むライブカードを1枚手札に加える。",
       "triggers": "起動",
       "trigger_list": [
@@ -24209,7 +24025,7 @@
       "is_null": false
     },
     {
-      "idx": 557,
+      "idx": 554,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}手札を2枚控え室に置く：自分の控え室から必要ハートに{{heart_01.png|heart01}}を3以上含むライブカードを1枚手札に加える。",
       "triggers": "起動",
       "trigger_list": [
@@ -24233,7 +24049,7 @@
       "is_null": false
     },
     {
-      "idx": 558,
+      "idx": 555,
       "full_text": "{{toujyou.png|登場}}相手の手札を、自分は見ないで3枚選び公開する。これにより公開されたカードの中にライブカードがない場合、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -24292,7 +24108,7 @@
       "is_null": false
     },
     {
-      "idx": 559,
+      "idx": 556,
       "full_text": "{{kidou.png|起動}}このメンバーをステージから控え室に置く：自分の控え室から『μ's』のライブカードを1枚手札に加える。自分の成功ライブカード置き場にあるカードのスコアの合計が９以上の場合、エネルギーを2枚アクティブにする。",
       "triggers": "起動",
       "trigger_list": [
@@ -24316,7 +24132,7 @@
       "is_null": false
     },
     {
-      "idx": 560,
+      "idx": 557,
       "full_text": "{{toujyou.png|登場}}自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。そうした場合、自分はカードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -24354,7 +24170,7 @@
       "is_null": false
     },
     {
-      "idx": 561,
+      "idx": 558,
       "full_text": "{{jyouji.png|常時}}自分と相手のステージにメンバーが合計6人いるかぎり、{{heart_02.png|heart02}}{{heart_04.png|heart04}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -24378,7 +24194,7 @@
       "is_null": false
     },
     {
-      "idx": 562,
+      "idx": 559,
       "full_text": "{{toujyou.png|登場}}自分の控え室にあるカードの枚数が8枚未満の場合、その差に等しい枚数分自分のデッキの上からカードを控え室に置く。その後、これにより控え室に置いたカードの中から、ライブカード1枚をデッキの一番上に置いてもよい。",
       "triggers": "登場",
       "trigger_list": [
@@ -24402,7 +24218,7 @@
       "is_null": false
     },
     {
-      "idx": 563,
+      "idx": 560,
       "full_text": "{{toujyou.png|登場}}コスト7のメンバーからバトンタッチして登場した場合、カードを2枚引き、手札を1枚控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -24426,7 +24242,7 @@
       "is_null": false
     },
     {
-      "idx": 564,
+      "idx": 561,
       "full_text": "{{toujyou.png|登場}}直前のターンに相手がライブをし、それが成功していない場合、相手にエマパンチ打つ？と聞いてもよい。\n回答がお願いしますの場合、自分は相手にエマパンチする。ライブ終了時まで、相手のステージにいるすべてのメンバーは、{{icon_blade.png|ブレード}}を得る。\n回答がそれ以外の場合、何もしない。\n（相手を傷つけないよう、やさしく、愛をこめて魔法のパンチをすること。）",
       "triggers": "登場",
       "trigger_list": [
@@ -24463,7 +24279,7 @@
       "is_null": false
     },
     {
-      "idx": 565,
+      "idx": 562,
       "full_text": "{{jidou.png|自動}}{{turn2.png|ターン2回}}自分のステージに、このメンバーか、ほかのメンバーがバトンタッチして登場したとき、カードを1枚引く。",
       "triggers": "自動",
       "trigger_list": [
@@ -24506,7 +24322,7 @@
       "is_null": false
     },
     {
-      "idx": 566,
+      "idx": 563,
       "full_text": "{{toujyou.png|登場}}自分の控え室からコスト9以下の『虹ヶ咲』のメンバーカード1枚をこのメンバーの下に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -24564,7 +24380,7 @@
       "is_null": false
     },
     {
-      "idx": 567,
+      "idx": 564,
       "full_text": "{{jyouji.png|常時}}このメンバーは、このメンバーの下に置かれているコスト9以下の『虹ヶ咲』のメンバーカードが持つ{{live_success.png|ライブ成功時}}能力をすべて得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -24622,7 +24438,7 @@
       "is_null": false
     },
     {
-      "idx": 568,
+      "idx": 565,
       "full_text": "{{jyouji.png|常時}}自分と相手のステージにメンバーが合計6人いるかぎり、{{heart_02.png|heart02}}{{heart_05.png|heart05}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -24655,7 +24471,7 @@
       "is_null": false
     },
     {
-      "idx": 569,
+      "idx": 566,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に『Liella!』のカードが7枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -24679,7 +24495,7 @@
       "is_null": false
     },
     {
-      "idx": 570,
+      "idx": 567,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるメンバーが持つハートが合計5つ以上ある場合、相手のステージにいるコスト2以下のメンバー1人をウェイトにする。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -24713,7 +24529,7 @@
       "is_null": false
     },
     {
-      "idx": 571,
+      "idx": 568,
       "full_text": "{{jyouji.png|常時}}自分と相手のステージにメンバーが合計6人いるかぎり、{{heart_02.png|heart02}}{{heart_03.png|heart03}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -24737,7 +24553,7 @@
       "is_null": false
     },
     {
-      "idx": 572,
+      "idx": 569,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分がエールしたとき、エールにより公開された自分のカードの中に、{{icon_score.png|スコア}}を持つ『Liella!』のライブカードが1枚以上ある場合、ライブ終了時まで、{{heart_06.png|heart06}}を得る。",
       "triggers": "自動",
       "trigger_list": [
@@ -24774,7 +24590,7 @@
       "is_null": false
     },
     {
-      "idx": 573,
+      "idx": 570,
       "full_text": "{{live_start.png|ライブ開始時}}手札の同じユニット名を持つカード2枚を控え室に置いてもよい：ライブ終了時まで、{{heart_04.png|heart04}}{{heart_04.png|heart04}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -24804,7 +24620,7 @@
       "is_null": false
     },
     {
-      "idx": 574,
+      "idx": 571,
       "full_text": "{{live_start.png|ライブ開始時}}手札の同じユニット名を持つカード2枚を控え室に置いてもよい：ライブ終了時まで、{{heart_05.png|heart05}}{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -24828,7 +24644,7 @@
       "is_null": false
     },
     {
-      "idx": 575,
+      "idx": 572,
       "full_text": "{{live_success.png|ライブ成功時}}自分のステージに、元々持つハートの数より多い数のハートを持つメンバーがいる場合、カードを1枚引く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -24852,7 +24668,7 @@
       "is_null": false
     },
     {
-      "idx": 576,
+      "idx": 573,
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{heart_01.png|heart01}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -24876,7 +24692,7 @@
       "is_null": false
     },
     {
-      "idx": 577,
+      "idx": 574,
       "full_text": "{{toujyou.png|登場}}相手の控え室にあるメンバーカードを3枚選び、相手のデッキの下に好きな順番で置いてもよい。そうした場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする。",
       "triggers": "登場",
       "trigger_list": [
@@ -24904,7 +24720,7 @@
       "is_null": false
     },
     {
-      "idx": 578,
+      "idx": 575,
       "full_text": "{{live_start.png|ライブ開始時}}相手に何が好き？と聞く。\n回答がチョコミントかストロベリーフレイバーかクッキー＆クリームの場合、自分と相手は手札を1枚控え室に置く。\n回答があなたの場合、自分と相手はカードを1枚引く。\n回答がそれ以外の場合、ライブ終了時まで、自分と相手のステージにいるメンバーは{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -24961,7 +24777,7 @@
       "is_null": false
     },
     {
-      "idx": 579,
+      "idx": 576,
       "full_text": "{{toujyou.png|登場}}自分の控え室からメンバーカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -25029,7 +24845,7 @@
       "is_null": false
     },
     {
-      "idx": 580,
+      "idx": 577,
       "full_text": "{{live_start.png|ライブ開始時}}手札の「上原歩夢」と「澁谷かのん」と「日野下花帆」を、好きな組み合わせで合計3枚、控え室に置いてもよい：ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋３する。」を得る。\n（手札のこのカードもこの効果で控え室に置ける。）",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -25097,7 +24913,70 @@
       "is_null": false
     },
     {
-      "idx": 581,
+      "idx": 578,
+      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
+      "triggers": "ライブ成功時",
+      "trigger_list": [
+        "ライブ成功時"
+      ],
+      "action": "move_cards",
+      "condition": "comparison_condition",
+      "set": "bp1",
+      "cards": [
+        "PL!N-bp1-026-L"
+      ],
+      "base": "PL!N-bp1-026",
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/bp7_auto_gap_test.rs",
+        "engine/tests/test_modules/bp7_cooking_with_love_test.rs",
+        "engine/tests/test_modules/bp7_kanata_choice_test.rs",
+        "engine/tests/test_modules/bp7_like_a_treasure_optional_test.rs",
+        "engine/tests/test_modules/card_ability_tests.rs",
+        "engine/tests/test_modules/poppin_test.rs",
+        "engine/tests/test_modules/untested_choice_change_target_test.rs"
+      ],
+      "covering_tests": [
+        "aiko_target_self_looks_at_top_card",
+        "azuna_target_self_puts_members_on_deck_bottom",
+        "chisato_area_move_gains_blade",
+        "cooking_accept_gives_heart01_to_all_niji_members",
+        "cooking_accept_shuffles_discard_to_deck_bottom",
+        "cooking_both_in_discard_offers_optional",
+        "cooking_condition_checks_discard_not_stage",
+        "cooking_decline_does_nothing",
+        "cooking_live_plus_member_with_blade_no_offer",
+        "cooking_non_niji_in_discard_no_offer",
+        "cooking_only_live_card_no_offer",
+        "cooking_only_member_with_blade_no_offer",
+        "cooking_only_member_without_blade_no_offer",
+        "fu_pb1_debut_heart06_member_auto_gains_heart06",
+        "fu_pb1_debut_no_heart06_member_no_effect",
+        "fu_pb1_debut_two_heart06_members_prompts_choice",
+        "fuyumari_area_move_gains_heart03",
+        "hanayo_no_mus_member_skips_cost_prompt",
+        "hanayo_pay_optional_cost_waits_member_and_gains_hearts",
+        "hanayo_skip_optional_cost_no_effect",
+        "kanata_cost_mills_top_three",
+        "kanata_live_card_in_discard_offers_choice",
+        "kanata_member_with_blade_heart_does_not_offer_choice",
+        "kanata_member_without_blade_heart_offers_choice",
+        "kanata_no_matching_card_does_not_offer_choice",
+        "kanata_option_activate_two_energy",
+        "kanata_option_gain_blade_two",
+        "kanata_preexisting_live_in_discard_does_not_count",
+        "kanata_use_limit_twice_per_turn",
+        "kanon_area_move_gains_heart02"
+      ],
+      "covering_test_count": 100,
+      "is_null": false
+    },
+    {
+      "idx": 579,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいる『虹ヶ咲』のメンバーが持つ{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち1色につき、このカードのスコアを＋１する。\n(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -25158,7 +25037,7 @@
       "is_null": false
     },
     {
-      "idx": 582,
+      "idx": 580,
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分のステージに『虹ヶ咲』のメンバーがいる場合、このカードのスコアを＋１する。\n(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -25216,7 +25095,7 @@
       "is_null": false
     },
     {
-      "idx": 583,
+      "idx": 581,
       "full_text": "{{live_start.png|ライブ開始時}}自分のライブ中のカードが3枚以上ある場合、このカードのスコアを＋２する。\n(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -25243,6 +25122,109 @@
         "rainbow_q38_member_on_stage_per_live_card_blade"
       ],
       "covering_test_count": 3,
+      "is_null": false
+    },
+    {
+      "idx": 582,
+      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n(エールで出た{{icon_score.png|スコア}}1つにつき、成功したライブのスコアの合計に1を加算する。)",
+      "triggers": "ライブ成功時",
+      "trigger_list": [
+        "ライブ成功時"
+      ],
+      "action": "move_cards",
+      "condition": "comparison_condition",
+      "set": "bp1",
+      "cards": [
+        "PL!SP-bp1-023-L"
+      ],
+      "base": "PL!SP-bp1-023",
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/bp7_auto_gap_test.rs",
+        "engine/tests/test_modules/kanon_bp5_constant_test.rs",
+        "engine/tests/test_modules/start_true_dreams_test.rs"
+      ],
+      "covering_tests": [
+        "chisato_area_move_gains_blade",
+        "fuyumari_area_move_gains_heart03",
+        "kanon_area_move_gains_heart02",
+        "kanon_constant_bonus_removed_when_cards_leaves_zone",
+        "kanon_constant_empty_live_card_zone_no_bonus",
+        "kanon_constant_liella_live_need_heart_4_no_bonus",
+        "kanon_constant_liella_live_need_heart_8_gains_bonus",
+        "kanon_constant_non_liella_live_no_bonus",
+        "kanon_constant_success_zone_does_not_count",
+        "kanon_constant_two_liella_live_cards_sum_to_8",
+        "kasumi_other_member_moves_does_not_trigger",
+        "kasumi_stage_to_discard_adds_niji_live",
+        "may_area_move_adds_liella_live",
+        "natsumi_yell_no_blade_heart_gains_heart02",
+        "natsumi_yell_with_blade_heart_does_not_gain",
+        "rurino_stage_to_discard_draws_2_discards_2",
+        "sayaka_stage_to_discard_buffs_member",
+        "setsuna_baton_touch_debut_draws",
+        "setsuna_bp7_baton_touch_places_energy_under_arriver",
+        "shiki_wait_then_area_move_reactivates",
+        "shioriko_live_phase_wait_discard_activates",
+        "start_true_dreams_q66_opponent_no_card_score_higher",
+        "toko_stage_to_discard_draws_2_discards_1",
+        "yuiguri_stage_to_discard_adds_live"
+      ],
+      "covering_test_count": 24,
+      "is_null": false
+    },
+    {
+      "idx": 583,
+      "full_text": "{{live_success.png|ライブ成功時}}自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
+      "triggers": "ライブ成功時",
+      "trigger_list": [
+        "ライブ成功時"
+      ],
+      "action": "draw_card",
+      "condition": "location_condition",
+      "set": "bp1",
+      "cards": [
+        "PL!SP-bp1-024-L"
+      ],
+      "base": "PL!SP-bp1-024",
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/b9_more_test.rs",
+        "engine/tests/test_modules/kanon_bp5_constant_test.rs"
+      ],
+      "covering_tests": [
+        "cutie_panther_live_start_reduce_hearts",
+        "kaguya_live_success_cheer_recover",
+        "kaguya_live_success_recover",
+        "kanan_live_success_timing",
+        "kanon_constant_bonus_removed_when_cards_leaves_zone",
+        "kanon_constant_empty_live_card_zone_no_bonus",
+        "kanon_constant_liella_live_need_heart_4_no_bonus",
+        "kanon_constant_liella_live_need_heart_8_gains_bonus",
+        "kanon_constant_non_liella_live_no_bonus",
+        "kanon_constant_success_zone_does_not_count",
+        "kanon_constant_two_liella_live_cards_sum_to_8",
+        "mijuku_dreamer_no_refresh_no_bonus",
+        "mijuku_dreamer_refresh_via_mill_gets_bonus",
+        "tiny_stars_basic",
+        "tiny_stars_duplicate_kanon",
+        "tiny_stars_duplicate_kanon_select_second",
+        "tiny_stars_duplicate_kanon_with_keke_select_second",
+        "tiny_stars_duplicate_keke",
+        "tiny_stars_duplicate_keke_select_second",
+        "tiny_stars_kanon_only",
+        "tiny_stars_keke_only",
+        "tiny_stars_none"
+      ],
+      "covering_test_count": 22,
       "is_null": false
     },
     {
@@ -25293,7 +25275,7 @@
     },
     {
       "idx": 585,
-      "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、『蓮ノ空』のライブカードを1枚手札に加える。",
+      "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、『蓮ノ空』のライブカードを1枚手札に加える。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
       "triggers": "ライブ成功時",
       "trigger_list": [
         "ライブ成功時"
@@ -25355,7 +25337,7 @@
     },
     {
       "idx": 587,
-      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高く、かつ自分のステージに『蓮ノ空』のメンバーがいる場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
+      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高く、かつ自分のステージに『蓮ノ空』のメンバーがいる場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
       "triggers": "ライブ成功時",
       "trigger_list": [
         "ライブ成功時"
@@ -25975,14 +25957,19 @@
         "PL!S-bp2-021-L"
       ],
       "base": "PL!S-bp2-021",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/fixed_customs_test.rs"
+      ],
+      "covering_tests": [
+        "live_success_per_wait_member_adds_score",
+        "live_success_yell_reveal_live_to_deck_bottom"
+      ],
+      "covering_test_count": 2,
       "is_null": false
     },
     {
@@ -28038,14 +28025,19 @@
         "PL!N-bp3-031-L"
       ],
       "base": "PL!N-bp3-031",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/fixed_customs_test.rs"
+      ],
+      "covering_tests": [
+        "live_success_per_wait_member_adds_score",
+        "live_success_yell_reveal_live_to_deck_bottom"
+      ],
+      "covering_test_count": 2,
       "is_null": false
     },
     {
@@ -35347,6 +35339,109 @@
     },
     {
       "idx": 851,
+      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
+      "triggers": "ライブ成功時",
+      "trigger_list": [
+        "ライブ成功時"
+      ],
+      "action": "move_cards",
+      "condition": "comparison_condition",
+      "set": "bp1",
+      "cards": [
+        "PL!SP-bp1-023-SRL"
+      ],
+      "base": "PL!SP-bp1-023",
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/bp7_auto_gap_test.rs",
+        "engine/tests/test_modules/kanon_bp5_constant_test.rs",
+        "engine/tests/test_modules/start_true_dreams_test.rs"
+      ],
+      "covering_tests": [
+        "chisato_area_move_gains_blade",
+        "fuyumari_area_move_gains_heart03",
+        "kanon_area_move_gains_heart02",
+        "kanon_constant_bonus_removed_when_cards_leaves_zone",
+        "kanon_constant_empty_live_card_zone_no_bonus",
+        "kanon_constant_liella_live_need_heart_4_no_bonus",
+        "kanon_constant_liella_live_need_heart_8_gains_bonus",
+        "kanon_constant_non_liella_live_no_bonus",
+        "kanon_constant_success_zone_does_not_count",
+        "kanon_constant_two_liella_live_cards_sum_to_8",
+        "kasumi_other_member_moves_does_not_trigger",
+        "kasumi_stage_to_discard_adds_niji_live",
+        "may_area_move_adds_liella_live",
+        "natsumi_yell_no_blade_heart_gains_heart02",
+        "natsumi_yell_with_blade_heart_does_not_gain",
+        "rurino_stage_to_discard_draws_2_discards_2",
+        "sayaka_stage_to_discard_buffs_member",
+        "setsuna_baton_touch_debut_draws",
+        "setsuna_bp7_baton_touch_places_energy_under_arriver",
+        "shiki_wait_then_area_move_reactivates",
+        "shioriko_live_phase_wait_discard_activates",
+        "start_true_dreams_q66_opponent_no_card_score_higher",
+        "toko_stage_to_discard_draws_2_discards_1",
+        "yuiguri_stage_to_discard_adds_live"
+      ],
+      "covering_test_count": 24,
+      "is_null": false
+    },
+    {
+      "idx": 852,
+      "full_text": "{{live_success.png|ライブ成功時}}自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。",
+      "triggers": "ライブ成功時",
+      "trigger_list": [
+        "ライブ成功時"
+      ],
+      "action": "draw_card",
+      "condition": "location_condition",
+      "set": "bp1",
+      "cards": [
+        "PL!SP-bp1-024-SRL"
+      ],
+      "base": "PL!SP-bp1-024",
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/b9_more_test.rs",
+        "engine/tests/test_modules/kanon_bp5_constant_test.rs"
+      ],
+      "covering_tests": [
+        "cutie_panther_live_start_reduce_hearts",
+        "kaguya_live_success_cheer_recover",
+        "kaguya_live_success_recover",
+        "kanan_live_success_timing",
+        "kanon_constant_bonus_removed_when_cards_leaves_zone",
+        "kanon_constant_empty_live_card_zone_no_bonus",
+        "kanon_constant_liella_live_need_heart_4_no_bonus",
+        "kanon_constant_liella_live_need_heart_8_gains_bonus",
+        "kanon_constant_non_liella_live_no_bonus",
+        "kanon_constant_success_zone_does_not_count",
+        "kanon_constant_two_liella_live_cards_sum_to_8",
+        "mijuku_dreamer_no_refresh_no_bonus",
+        "mijuku_dreamer_refresh_via_mill_gets_bonus",
+        "tiny_stars_basic",
+        "tiny_stars_duplicate_kanon",
+        "tiny_stars_duplicate_kanon_select_second",
+        "tiny_stars_duplicate_kanon_with_keke_select_second",
+        "tiny_stars_duplicate_keke",
+        "tiny_stars_duplicate_keke_select_second",
+        "tiny_stars_kanon_only",
+        "tiny_stars_keke_only",
+        "tiny_stars_none"
+      ],
+      "covering_test_count": 22,
+      "is_null": false
+    },
+    {
+      "idx": 853,
       "full_text": "{{live_start.png|ライブ開始時}}自分のエネルギーが12枚以上ある場合、このカードのスコアを＋１する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -35392,7 +35487,7 @@
       "is_null": false
     },
     {
-      "idx": 852,
+      "idx": 854,
       "full_text": "{{jyouji.png|常時}}自分のエネルギーが6枚以上あるかぎり、{{heart_02.png|heart02}}を得る。8枚以上あるかぎり、さらに{{heart_02.png|heart02}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -35416,7 +35511,7 @@
       "is_null": false
     },
     {
-      "idx": 853,
+      "idx": 855,
       "full_text": "{{jyouji.png|常時}}自分のアクティブ状態のエネルギーがあるかぎり、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -35440,7 +35535,7 @@
       "is_null": false
     },
     {
-      "idx": 854,
+      "idx": 856,
       "full_text": "{{jyouji.png|常時}}自分のエネルギーが6枚以上あるかぎり、{{heart_03.png|heart03}}を得る。8枚以上あるかぎり、さらに{{heart_03.png|heart03}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -35464,7 +35559,7 @@
       "is_null": false
     },
     {
-      "idx": 855,
+      "idx": 857,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のメインフェイズの間、このメンバーがエリアを移動したとき、エネルギーを2枚アクティブにする。",
       "triggers": "自動",
       "trigger_list": [
@@ -35496,7 +35591,7 @@
       "is_null": false
     },
     {
-      "idx": 856,
+      "idx": 858,
       "full_text": "{{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}相手のステージにいるコスト2以下のメンバー1人をウェイトにする。",
       "triggers": "ライブ開始時, 登場",
       "trigger_list": [
@@ -35521,7 +35616,7 @@
       "is_null": false
     },
     {
-      "idx": 857,
+      "idx": 859,
       "full_text": "{{live_start.png|ライブ開始時}}{{heart_02.png|heart02}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち1つを選ぶ。ライブ終了時まで、このメンバーが元々持つハートは選んだハートになる。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -35545,7 +35640,7 @@
       "is_null": false
     },
     {
-      "idx": 858,
+      "idx": 860,
       "full_text": "{{jyouji.png|常時}}自分のエネルギーが6枚以上あるかぎり、{{heart_06.png|heart06}}を得る。8枚以上あるかぎり、さらに{{heart_06.png|heart06}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -35591,7 +35686,7 @@
       "is_null": false
     },
     {
-      "idx": 859,
+      "idx": 861,
       "full_text": "{{jyouji.png|常時}}{{leftside.png|左サイド}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -35615,7 +35710,7 @@
       "is_null": false
     },
     {
-      "idx": 860,
+      "idx": 862,
       "full_text": "{{toujyou.png|登場}}{{rightside.png|右サイド}}カードを2枚引き、手札を2枚控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -35639,7 +35734,7 @@
       "is_null": false
     },
     {
-      "idx": 861,
+      "idx": 863,
       "full_text": "{{toujyou.png|登場}}{{leftside.png|左サイド}}カードを2枚引き、手札を2枚控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -35663,7 +35758,7 @@
       "is_null": false
     },
     {
-      "idx": 862,
+      "idx": 864,
       "full_text": "{{jyouji.png|常時}}{{rightside.png|右サイド}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -35687,7 +35782,7 @@
       "is_null": false
     },
     {
-      "idx": 863,
+      "idx": 865,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるハートを4つ以上持つ『Liella!』のメンバー1人につき、このカードのスコアを＋１する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -35718,7 +35813,7 @@
       "is_null": false
     },
     {
-      "idx": 864,
+      "idx": 866,
       "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：自分のステージにいるメンバーが『Liella!』のみの場合、相手のステージにいるコスト2以下のメンバー1人をウェイトにする。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -35742,7 +35837,7 @@
       "is_null": false
     },
     {
-      "idx": 865,
+      "idx": 867,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいる名前の異なる『CatChu!』のメンバー1人につき、このカードの必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らし、{{heart_02.png|heart02}}増やす。その後、このカードの必要ハートに含まれる{{heart_02.png|heart02}}が9以上の場合、このカードのスコアを＋１する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -35766,7 +35861,7 @@
       "is_null": false
     },
     {
-      "idx": 866,
+      "idx": 868,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に『KALEIDOSCORE』のカードが5枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -35799,7 +35894,7 @@
       "is_null": false
     },
     {
-      "idx": 867,
+      "idx": 869,
       "full_text": "{{live_success.png|ライブ成功時}}自分のエネルギーが11枚以上ある場合、このカードのスコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -35832,7 +35927,7 @@
       "is_null": false
     },
     {
-      "idx": 868,
+      "idx": 870,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージに『5yncri5e!』のメンバーが2人以上いる場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させてもよい。)",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -35856,7 +35951,7 @@
       "is_null": false
     },
     {
-      "idx": 869,
+      "idx": 871,
       "full_text": "{{live_start.png|ライブ開始時}}自分のエネルギーが9枚以上ある場合、このカードのスコアを＋１する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -35880,7 +35975,7 @@
       "is_null": false
     },
     {
-      "idx": 870,
+      "idx": 872,
       "full_text": "{{jyouji.png|常時}}自分のステージにいるメンバーが持つ{{live_start.png|ライブ開始時}}能力は発動しない。",
       "triggers": "常時",
       "trigger_list": [
@@ -35927,7 +36022,7 @@
       "is_null": false
     },
     {
-      "idx": 871,
+      "idx": 873,
       "full_text": "{{live_success.png|ライブ成功時}}自分のステージに{{live_start.png|ライブ開始時}}能力を持つメンバーがいる場合、このカードのスコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -35974,7 +36069,7 @@
       "is_null": false
     },
     {
-      "idx": 872,
+      "idx": 874,
       "full_text": "{{toujyou.png|登場}}自分のデッキの一番下のカードを見る。それをデッキの上から4番目に置いてもよい。",
       "triggers": "登場",
       "trigger_list": [
@@ -35998,7 +36093,7 @@
       "is_null": false
     },
     {
-      "idx": 873,
+      "idx": 875,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにする：自分のデッキの下からカードを2枚控え室に置く。それらがすべて『Aqours』のメンバーカードの場合、このメンバーをアクティブにし、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "起動",
       "trigger_list": [
@@ -36029,7 +36124,7 @@
       "is_null": false
     },
     {
-      "idx": 874,
+      "idx": 876,
       "full_text": "{{toujyou.png|登場}}自分のステージに『Aqours』か『SaintSnow』のメンバーのみがいる場合、フォーメーションチェンジしてもよい。この効果によって『SaintSnow』のメンバーが移動した場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -36059,7 +36154,7 @@
       "is_null": false
     },
     {
-      "idx": 875,
+      "idx": 877,
       "full_text": "{{toujyou.png|登場}}自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるメンバーカードを2枚まで好きな順番でデッキの下に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -36083,7 +36178,7 @@
       "is_null": false
     },
     {
-      "idx": 876,
+      "idx": 878,
       "full_text": "{{jyouji.png|常時}}相手のエネルギーが自分より多いかぎり、{{heart_02.png|heart02}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -36107,7 +36202,7 @@
       "is_null": false
     },
     {
-      "idx": 877,
+      "idx": 879,
       "full_text": "{{live_start.png|ライブ開始時}}自分のデッキの下からカードを1枚控え室に置く。それがライブカードの場合、ライブ終了時まで、{{heart_02.png|heart02}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -36138,7 +36233,7 @@
       "is_null": false
     },
     {
-      "idx": 878,
+      "idx": 880,
       "full_text": "{{jyouji.png|常時}}自分のステージにメンバーが3人以上いるかぎり、{{heart_02.png|heart02}}{{heart_04.png|heart04}}{{heart_05.png|heart05}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -36162,7 +36257,7 @@
       "is_null": false
     },
     {
-      "idx": 879,
+      "idx": 881,
       "full_text": "{{toujyou.png|登場}}自分のデッキの一番下のカードを控え室に置く。それがコスト10以上のメンバーカードの場合、ライブ終了時まで、{{heart_02.png|heart02}}{{heart_05.png|heart05}}を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -36193,7 +36288,7 @@
       "is_null": false
     },
     {
-      "idx": 880,
+      "idx": 882,
       "full_text": "{{toujyou.png|登場}}自分のステージにいるメンバー1人をセンターエリアにポジションチェンジさせる。",
       "triggers": "登場",
       "trigger_list": [
@@ -36229,7 +36324,7 @@
       "is_null": false
     },
     {
-      "idx": 881,
+      "idx": 883,
       "full_text": "{{live_success.png|ライブ成功時}}自分の控え室から『Aqours』のカードを2枚まで好きな順番でデッキの下に置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -36253,7 +36348,7 @@
       "is_null": false
     },
     {
-      "idx": 882,
+      "idx": 884,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージにメンバーが3人以上いる場合、自分のデッキの下からカードを5枚控え室に置く。それらの中にメンバーカードが3枚以上ある場合、カードを1枚引く。それらがすべてメンバーカードの場合、さらにこのカードのスコアを＋１する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -36277,7 +36372,7 @@
       "is_null": false
     },
     {
-      "idx": 883,
+      "idx": 885,
       "full_text": "{{live_start.png|ライブ開始時}}自分のステージに『Aqours』のメンバーが2人以上いる場合、自分のエネルギー1枚をエネルギーデッキに置いてもよい。そうしたとき、相手のエネルギーが自分より1枚多い場合、このカードのスコアを＋１する。2枚以上多い場合、代わりにスコアを＋２する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -36301,7 +36396,7 @@
       "is_null": false
     },
     {
-      "idx": 884,
+      "idx": 886,
       "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる『Aqours』のメンバー1人は、元々持つハートがすべて{{heart_04.png|heart04}}になる。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -36325,7 +36420,7 @@
       "is_null": false
     },
     {
-      "idx": 885,
+      "idx": 887,
       "full_text": "{{live_success.png|ライブ成功時}}以下から1つを選ぶ。\n・相手のステージにいるコスト4以下のメンバーを2人までウェイトにする。そのメンバーは次のターンのアクティブフェイズにアクティブしない。\n・カードを1枚引く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -36349,7 +36444,70 @@
       "is_null": false
     },
     {
-      "idx": 886,
+      "idx": 888,
+      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える。",
+      "triggers": "ライブ成功時",
+      "trigger_list": [
+        "ライブ成功時"
+      ],
+      "action": "move_cards",
+      "condition": "comparison_condition",
+      "set": "bp1",
+      "cards": [
+        "PL!N-bp1-026-SECL"
+      ],
+      "base": "PL!N-bp1-026",
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/bp7_auto_gap_test.rs",
+        "engine/tests/test_modules/bp7_cooking_with_love_test.rs",
+        "engine/tests/test_modules/bp7_kanata_choice_test.rs",
+        "engine/tests/test_modules/bp7_like_a_treasure_optional_test.rs",
+        "engine/tests/test_modules/card_ability_tests.rs",
+        "engine/tests/test_modules/poppin_test.rs",
+        "engine/tests/test_modules/untested_choice_change_target_test.rs"
+      ],
+      "covering_tests": [
+        "aiko_target_self_looks_at_top_card",
+        "azuna_target_self_puts_members_on_deck_bottom",
+        "chisato_area_move_gains_blade",
+        "cooking_accept_gives_heart01_to_all_niji_members",
+        "cooking_accept_shuffles_discard_to_deck_bottom",
+        "cooking_both_in_discard_offers_optional",
+        "cooking_condition_checks_discard_not_stage",
+        "cooking_decline_does_nothing",
+        "cooking_live_plus_member_with_blade_no_offer",
+        "cooking_non_niji_in_discard_no_offer",
+        "cooking_only_live_card_no_offer",
+        "cooking_only_member_with_blade_no_offer",
+        "cooking_only_member_without_blade_no_offer",
+        "fu_pb1_debut_heart06_member_auto_gains_heart06",
+        "fu_pb1_debut_no_heart06_member_no_effect",
+        "fu_pb1_debut_two_heart06_members_prompts_choice",
+        "fuyumari_area_move_gains_heart03",
+        "hanayo_no_mus_member_skips_cost_prompt",
+        "hanayo_pay_optional_cost_waits_member_and_gains_hearts",
+        "hanayo_skip_optional_cost_no_effect",
+        "kanata_cost_mills_top_three",
+        "kanata_live_card_in_discard_offers_choice",
+        "kanata_member_with_blade_heart_does_not_offer_choice",
+        "kanata_member_without_blade_heart_offers_choice",
+        "kanata_no_matching_card_does_not_offer_choice",
+        "kanata_option_activate_two_energy",
+        "kanata_option_gain_blade_two",
+        "kanata_preexisting_live_in_discard_does_not_count",
+        "kanata_use_limit_twice_per_turn",
+        "kanon_area_move_gains_heart02"
+      ],
+      "covering_test_count": 100,
+      "is_null": false
+    },
+    {
+      "idx": 889,
       "full_text": "{{toujyou.png|登場}}自分のステージに『A・ZU・NA』のメンバーが3人いる場合、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -36383,7 +36541,7 @@
       "is_null": false
     },
     {
-      "idx": 887,
+      "idx": 890,
       "full_text": "{{jidou.png|自動}}このメンバーがステージから控え室に置かれたとき、自分の控え室にある『虹ヶ咲』のライブカードを1枚手札に加える。",
       "triggers": "自動",
       "trigger_list": [
@@ -36426,7 +36584,7 @@
       "is_null": false
     },
     {
-      "idx": 888,
+      "idx": 891,
       "full_text": "{{toujyou.png|登場}}自分のエネルギーデッキから、エネルギーカード1枚を自分のステージにいる『虹ヶ咲』のメンバーの下に置いてもよい。",
       "triggers": "登場",
       "trigger_list": [
@@ -36456,7 +36614,7 @@
       "is_null": false
     },
     {
-      "idx": 889,
+      "idx": 892,
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からブレードハートを持たない『虹ヶ咲』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -36487,7 +36645,7 @@
       "is_null": false
     },
     {
-      "idx": 890,
+      "idx": 893,
       "full_text": "{{jidou.png|自動}}このメンバーがステージから控え室に置かれたとき、このメンバーが『虹ヶ咲』のメンバーとバトンタッチしていた場合、自分のエネルギーデッキから、エネルギーカード1枚をこのバトンタッチで登場したメンバーの下に置く。",
       "triggers": "自動",
       "trigger_list": [
@@ -36530,7 +36688,7 @@
       "is_null": false
     },
     {
-      "idx": 891,
+      "idx": 894,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを3枚控え室に置く。それらのメンバーカードの中に2種類以上のブレードハートの色がある場合、ライブ終了時まで、{{heart_04.png|heart04}}を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -36567,7 +36725,7 @@
       "is_null": false
     },
     {
-      "idx": 892,
+      "idx": 895,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}ライブフェイズの間、自分のステージにいる『虹ヶ咲』のメンバー1人がウェイト状態になったとき、手札を1枚控え室に置いてもよい。そうしたとき、そのメンバーをアクティブにする。",
       "triggers": "自動",
       "trigger_list": [
@@ -36610,7 +36768,7 @@
       "is_null": false
     },
     {
-      "idx": 893,
+      "idx": 896,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにする：カードを2枚引き、手札を2枚控え室に置く。",
       "triggers": "起動",
       "trigger_list": [
@@ -36634,7 +36792,7 @@
       "is_null": false
     },
     {
-      "idx": 894,
+      "idx": 897,
       "full_text": "{{toujyou.png|登場}}自分のステージに『R3BIRTH』のメンバーが3人いる場合、ライブ終了時まで、{{heart_01.png|heart01}}を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -36658,7 +36816,7 @@
       "is_null": false
     },
     {
-      "idx": 895,
+      "idx": 898,
       "full_text": "{{live_success.png|ライブ成功時}}自分のステージにいる『虹ヶ咲』のメンバー1人を選ぶ。そのメンバーが、自分と相手のステージにいるほかのすべてのメンバーより多くの{{icon_blade.png|ブレード}}を持つ場合、このカードのスコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -36690,7 +36848,7 @@
       "is_null": false
     },
     {
-      "idx": 896,
+      "idx": 899,
       "full_text": "{{live_start.png|ライブ開始時}}自分の控え室に『虹ヶ咲』のライブカードと、ブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合、自分の控え室にあるすべてのカードをシャッフルし、デッキの下に置いてもよい。そうしたとき、ライブ終了時まで、自分のステージにいるすべての『虹ヶ咲』のメンバーは{{heart_01.png|heart01}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -36727,7 +36885,7 @@
       "is_null": false
     },
     {
-      "idx": 897,
+      "idx": 900,
       "full_text": "{{live_success.png|ライブ成功時}}自分のステージにいるメンバー1人の下にあるすべてのエネルギーカードを、自分のエネルギー置き場にウェイト状態で置いてもよい。これによりエネルギーカードを1枚以上置いており、かつ自分のエネルギーが10枚以上ある場合、このカードのスコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -36751,7 +36909,7 @@
       "is_null": false
     },
     {
-      "idx": 898,
+      "idx": 901,
       "full_text": "{{live_success.png|ライブ成功時}}このカードをライブカード置き場から手札に戻す。その後、手札を1枚控え室に置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -36787,7 +36945,7 @@
       "is_null": false
     },
     {
-      "idx": 899,
+      "idx": 902,
       "full_text": "{{live_success.png|ライブ成功時}}自分のデッキの上からカードを3枚控え室に置く。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -36827,7 +36985,7 @@
       "is_null": false
     },
     {
-      "idx": 900,
+      "idx": 903,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分の{{live_success.png|ライブ成功時}}能力によって、カードが自分のデッキから自分の控え室に置かれるたび、それらのカードの中から『虹ヶ咲』のライブカードを1枚手札に加えてもよい。そうしたとき、このカードのスコアを＋１する。",
       "triggers": "自動",
       "trigger_list": [
@@ -36867,7 +37025,7 @@
       "is_null": false
     },
     {
-      "idx": 901,
+      "idx": 904,
       "full_text": "{{toujyou.png|登場}}自分の控え室から、『CatChu!』と『KALEIDOSCORE』と『5yncri5e!』のカードをそれぞれ1枚ずつ選び、それらを好きな順番でデッキの下に置いてもよい。そうしたとき、カードを1枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -36905,7 +37063,7 @@
       "is_null": false
     },
     {
-      "idx": 902,
+      "idx": 905,
       "full_text": "{{jyouji.png|常時}}自分のステージに『KALEIDOSCORE』のメンバーが3人いるかぎり、{{heart_06.png|heart06}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -36929,7 +37087,7 @@
       "is_null": false
     },
     {
-      "idx": 903,
+      "idx": 906,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}このメンバーがエリアを移動したとき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "自動",
       "trigger_list": [
@@ -36972,7 +37130,7 @@
       "is_null": false
     },
     {
-      "idx": 904,
+      "idx": 907,
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}支払ってもよい：自分のステージに『CatChu!』のメンバーが3人いる場合、カードを1枚引く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -36996,7 +37154,7 @@
       "is_null": false
     },
     {
-      "idx": 905,
+      "idx": 908,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のカードの効果によって、自分のエネルギー置き場にエネルギーが置かれたとき、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
       "triggers": "自動",
       "trigger_list": [
@@ -37028,7 +37186,7 @@
       "is_null": false
     },
     {
-      "idx": 906,
+      "idx": 909,
       "full_text": "{{toujyou.png|登場}}自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。そのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない。",
       "triggers": "登場",
       "trigger_list": [
@@ -37052,7 +37210,7 @@
       "is_null": false
     },
     {
-      "idx": 907,
+      "idx": 910,
       "full_text": "{{toujyou.png|登場}}手札のライブカードを1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から1枚を手札に加え、残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -37076,7 +37234,7 @@
       "is_null": false
     },
     {
-      "idx": 908,
+      "idx": 911,
       "full_text": "{{toujyou.png|登場}}自分のステージに『5yncri5e!』のメンバーが3人以上いる場合、自分の控え室からライブカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -37100,7 +37258,7 @@
       "is_null": false
     },
     {
-      "idx": 909,
+      "idx": 912,
       "full_text": "{{jyouji.png|常時}}自分のエネルギーが相手より多いかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "常時",
       "trigger_list": [
@@ -37124,7 +37282,7 @@
       "is_null": false
     },
     {
-      "idx": 910,
+      "idx": 913,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置く：このメンバーはポジションチェンジする。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。)",
       "triggers": "起動",
       "trigger_list": [
@@ -37148,7 +37306,7 @@
       "is_null": false
     },
     {
-      "idx": 911,
+      "idx": 914,
       "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる「嵐千砂都」1人は{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -37172,7 +37330,7 @@
       "is_null": false
     },
     {
-      "idx": 912,
+      "idx": 915,
       "full_text": "{{live_start.png|ライブ開始時}}エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい：自分のステージに「葉月恋」がいる場合、カードを2枚引き、手札を1枚控え室に置く。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -37196,7 +37354,7 @@
       "is_null": false
     },
     {
-      "idx": 913,
+      "idx": 916,
       "full_text": "{{live_start.png|ライブ開始時}}エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい：自分のエネルギーが相手より多い場合、このカードのスコアを＋１する。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -37220,7 +37378,7 @@
       "is_null": false
     },
     {
-      "idx": 914,
+      "idx": 917,
       "full_text": "{{live_success.png|ライブ成功時}}自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。そのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -37244,7 +37402,7 @@
       "is_null": false
     },
     {
-      "idx": 915,
+      "idx": 918,
       "full_text": "{{live_start.png|ライブ開始時}}自分の控え室にある『Liella!』のメンバーカードを9枚選び、それらをシャッフルし、デッキの一番下に置いてもよい。そうしたとき、ライブ終了時まで、自分のステージにいるすべてのメンバーは{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -37276,7 +37434,7 @@
       "is_null": false
     },
     {
-      "idx": 916,
+      "idx": 919,
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードがすべて『Liella!』の場合、このカードのスコアを＋１する。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -37308,7 +37466,7 @@
       "is_null": false
     },
     {
-      "idx": 917,
+      "idx": 920,
       "full_text": "{{jyouji.png|常時}}このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは10になる。",
       "triggers": "常時",
       "trigger_list": [
@@ -37347,7 +37505,7 @@
       "is_null": false
     },
     {
-      "idx": 918,
+      "idx": 921,
       "full_text": "{{toujyou.png|登場}}自分の控え室からライブカードを1枚手札に加える。",
       "triggers": "登場",
       "trigger_list": [
@@ -37386,7 +37544,7 @@
       "is_null": false
     },
     {
-      "idx": 919,
+      "idx": 922,
       "full_text": "{{live_success.png|ライブ成功時}}自分の控え室からメンバーカードを1枚手札に加える。",
       "triggers": "ライブ成功時",
       "trigger_list": [
@@ -37425,7 +37583,7 @@
       "is_null": false
     },
     {
-      "idx": 920,
+      "idx": 923,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。",
       "triggers": "起動",
       "trigger_list": [
@@ -37457,7 +37615,7 @@
       "is_null": false
     },
     {
-      "idx": 921,
+      "idx": 924,
       "full_text": "{{jyouji.png|常時}}自分の成功ライブカード置き場に『虹ヶ咲』のカードがあるかぎり、手札にあるこのメンバーカードのコストは２減る。",
       "triggers": "常時",
       "trigger_list": [
@@ -37481,7 +37639,7 @@
       "is_null": false
     },
     {
-      "idx": 922,
+      "idx": 925,
       "full_text": "{{live_start.png|ライブ開始時}}手札を2枚控え室に置いてもよい：好きなハートの色を1つ指定する。ライブ終了時まで、そのハートを2つ得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -37505,7 +37663,7 @@
       "is_null": false
     },
     {
-      "idx": 923,
+      "idx": 926,
       "full_text": "{{live_start.png|ライブ開始時}}『虹ヶ咲』のメンバー1人をウェイトにしてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -37544,7 +37702,7 @@
       "is_null": false
     },
     {
-      "idx": 924,
+      "idx": 927,
       "full_text": "{{toujyou.png|登場}}自分のデッキの上からカードを3枚見る。その中から『虹ヶ咲』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
       "triggers": "登場",
       "trigger_list": [
@@ -37568,7 +37726,7 @@
       "is_null": false
     },
     {
-      "idx": 925,
+      "idx": 928,
       "full_text": "{{toujyou.png|登場}}カードを2枚引く。",
       "triggers": "登場",
       "trigger_list": [
@@ -37607,7 +37765,7 @@
       "is_null": false
     },
     {
-      "idx": 926,
+      "idx": 929,
       "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のステージにいる『虹ヶ咲』のメンバー1人がウェイト状態になったとき、手札を1枚控え室に置いてもよい。そうしたとき、そのメンバーをアクティブにし、ライブ終了時まで、そのメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggers": "自動",
       "trigger_list": [
@@ -37646,7 +37804,7 @@
       "is_null": false
     },
     {
-      "idx": 927,
+      "idx": 930,
       "full_text": "{{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}自分のステージにいるメンバーが『虹ヶ咲』のみの場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）",
       "triggers": "ライブ開始時, 登場",
       "trigger_list": [
@@ -37686,7 +37844,7 @@
       "is_null": false
     },
     {
-      "idx": 928,
+      "idx": 931,
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：カードを1枚引く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）",
       "triggers": "起動",
       "trigger_list": [
@@ -37725,7 +37883,7 @@
       "is_null": false
     },
     {
-      "idx": 929,
+      "idx": 932,
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}支払ってもよい：自分のステージにいるメンバー1人をアクティブにする。",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -37764,7 +37922,7 @@
       "is_null": false
     },
     {
-      "idx": 930,
+      "idx": 933,
       "full_text": "{{toujyou.png|登場}}ライブ終了時まで、{{heart_05.png|heart05}}を得る。",
       "triggers": "登場",
       "trigger_list": [
@@ -37803,7 +37961,7 @@
       "is_null": false
     },
     {
-      "idx": 931,
+      "idx": 934,
       "full_text": "{{live_start.png|ライブ開始時}}相手のステージにいるコスト2以下のメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）",
       "triggers": "ライブ開始時",
       "trigger_list": [
@@ -37842,7 +38000,7 @@
       "is_null": false
     },
     {
-      "idx": 932,
+      "idx": 935,
       "full_text": "{{toujyou.png|登場}}相手のステージにいるコスト4以下のメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）",
       "triggers": "登場",
       "trigger_list": [

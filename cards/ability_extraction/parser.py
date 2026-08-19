@@ -2429,17 +2429,6 @@ _register_action(
 )
 _register_action(
     ActionRule(
-        match_all=["1つにつき", "スコアの合計に", "加算"],
-        condition=lambda t: "スコア" in t,
-        action="modify_score",
-        defaults={"operation": "add", "value": 1, "per_unit": True, "per_unit_type": "score"},
-        setter=lambda t, a: a.update(
-            {"per_unit_count": 1, "location": "revealed_cards" if "エールで出た" in t else None}
-        ),
-    )
-)
-_register_action(
-    ActionRule(
         match="スコアを",
         action="modify_score",
         setter=lambda t, a: (_set_score_op(t, a), a)[-1],
@@ -2513,6 +2502,7 @@ _register_action(ActionRule(match="登場させ", action="move_cards", defaults=
 _register_action(
     ActionRule(
         match_all=[
+            "必要ハートを確認する時",
             "ALLブレード",
             "任意の色のハートとして扱う",
         ],
@@ -3043,6 +3033,39 @@ def parse_action(text: str) -> Dict[str, Any]:
 #     a more specific pattern about the change action, not position queries.
 #
 # Each _try_* function takes (text) and returns a complete condition dict or None.
+
+
+def _try_this_turn_opponent_live_success(text):
+    """「このターン、相手もライブを成功している場合」 — compound of this_turn + opponent success.
+    Also handles bare 「相手もライブを成功している場合」 (without このターン、)."""
+    if "相手もライブを成功している場合" in text:
+        has_this_turn = "このターン" in text
+        if has_this_turn:
+            return {
+                "type": "compound",
+                "operator": "and",
+                "conditions": [
+                    {
+                        "type": "temporal_condition",
+                        "temporal": "this_turn",
+                        "text": "このターン",
+                        "trigger_event": {"type": "temporal", "temporal": "this_turn"},
+                    },
+                    {
+                        "type": "opponent_live_success",
+                        "text": "相手もライブを成功している場合",
+                        "trigger_event": {"type": "opponent_live_success"},
+                    },
+                ],
+                "text": text,
+            }
+        else:
+            return {
+                "type": "opponent_live_success",
+                "text": text,
+                "trigger_event": {"type": "opponent_live_success"},
+            }
+    return None
 
 
 def _try_complex(text):
@@ -4630,6 +4653,11 @@ def _try_live_mid(text):
 # Annotations show representative Japanese text → JSON type produced.
 CONDITION_PATTERNS = [
     # Tier 1: Complex/compound patterns (most specific)
+    (
+        "this_turn_opponent_live_success",
+        1,
+        _try_this_turn_opponent_live_success,
+    ),  # "このターン、相手もライブを成功している場合" → compound this_turn + opponent success
     ("complex", 1, _try_complex),  # nested "AかつB、CかつD" → {type: "complex"}
     (
         "character_each",
@@ -9562,19 +9590,6 @@ _register_effect_rule(
 )
 # _EFFECT_HANDLERS cascade (100+). Explicit priorities keep both additive.
 _effect_registry = PriorityRegistry("effect_handlers")
-# Score per-unit: "エールで出たスコア1つにつき、成功したライブのスコアの合計に1を加算する"
-_register_effect_rule(
-    EffectPattern(
-        match_all=["1つにつき", "スコアの合計に", "加算"],
-        condition=lambda t: "スコア" in t,
-        action="modify_score",
-        defaults={"operation": "add", "value": 1, "per_unit": True, "per_unit_type": "score"},
-        setter=lambda t, r: r.update(
-            {"per_unit_count": 1, "location": "revealed_cards" if "エールで出た" in t else None}
-        ),
-    )
-)
-
 for _ri, _h in enumerate(_EFFECT_RULES):
     _hn = getattr(_h, "__name__", f"effect_rule_{_ri}")
     _effect_registry.register(_ri, _hn, _h)
