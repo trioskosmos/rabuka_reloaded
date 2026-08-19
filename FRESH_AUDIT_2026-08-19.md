@@ -296,32 +296,25 @@ The test's expectation (`SelectHeartColor`) is actually driven by `gain_resource
 
 **What `custom` means:** `parser.py` emits `{"action":"custom"}` (or `condition:{"type":"custom"}`) when no `ActionRule`/`ConditionPattern` matches. `engine/src/ability/effects/mod.rs:400` and `vm.rs:207` decode it as `ActionType::Custom => Ok(())` (+ `log::debug!("Unhandled custom action")`) and `condition_decoder_gen.rs:185` as `skip_value → Some(true)` — the ability **compiles, costs are paid, `use_limit` is consumed, but nothing happens**. `cargo test` stays green because `custom` is a silent no-op; the player sees a card that does nothing.
 
-**Counts after this PR:**
+**Counts after this PR (commit `057cd3ab` + follow-up):**
 
-* `custom` **action**: **0 unique** (was 1 before `all_blade_timing` fix — that 1 is now fixed). `custom` **condition**: **0** (the single `PL!N-sd2-007-P` `このターン、相手もライブを成功している場合` custom is now covered via `compound` after `normalize` hardening).
-* **`is_null` (engine-ignored notes)**: **0 unique after fix** (was 2 unique, 15 cards before; `ALLブレード` 14-card group + `PL!HS-bp1-019-L` score per-unit both now real). Before fix the last `unknown` row was `TEST_COVERAGE.md:77` (`unknown 1/1`) — that is now `0`.
+* `custom` **action/condition**: **0 unique** (was 1 `PL!N-sd2-007-P` `このターン、相手もライブを成功している場合` — now `compound{this_turn + opponent_live_success}` via `parser.py:_try_this_turn_opponent_live_success`). Verified `python -c "…custom…"` → `0`.
+* **`is_null` (engine-ignored explanatory notes, no trigger icon → not an ability)**: **2 unique, 2 cards** — `(必要ハート…ALLブレード…)` (14 cards share 1 unique) and `(エールで出たスコア…)` (`PL!HS-bp1-019-L`). As you noted, *if there is no trigger it is not an ability, it just explains*; we **reverted** the earlier promotion that incorrectly gave them `triggers:["常時"]`. They are correctly `is_null:true` with empty `triggerless_text`, not `custom`, and the engine correctly ignores them.
 * **Stranded fields (92)**: keys in `abilities.json` not in `ability_schema.json` (e.g. `yell_source`, `temporal_scope`, `all_areas`). The new `log::warn!` in `effect_decoder_gen.rs:207` / `condition_decoder_gen.rs:185` now surfaces them under `RUST_LOG=warn`; CI should assert `0 warn`.
 
-**Tests for those abilities — what was missing and what we added:**
+**Tests — deleted bullshit JSON, kept gameplay:**
 
-`python cards/test_inventory.py` before fix showed `934 unique, is_null 1, unknown 1/1, 256 depth:none`. The `unknown` (`PL!HS-bp1-019-L`) was listed as **covered** (`L2+choice`, 112 tests) but those 112 tests touched the *card* via its other ability (`live_start: modify_score` on the same card) and never asserted the per-unit leg — it was `Ok(())`. The 14-card `ALLブレード` group was **untallied** (both `is_null` groups not counted), so no test exercised `need_heart` substitution.
+Deleted the 3 JSON-reading tests that only did `db.get_card(...).action == "…"` — they stayed green even when the engine did `Ok(())`. `engine/tests/test_modules/fixed_customs_test.rs` now has **2 gameplay tests for real, triggered abilities** (not the `is_null` notes), each advancing through `yell` as Japanese says:
 
-**What `yell` does (so the tests make sense):** During a live, `total blade on stage` determines how many cards are revealed from the top of the deck (the yell). Each revealed card's hearts (including `heart00` colorless, `b_heart07`, `score` icons, and `ALLブレード` hearts) are summed into `total_hearts` / `score`. The two fixed abilities both hook the yell:
+* `live_success_per_wait_member_adds_score` — `PL!N-bp3-031-L` `{{live_success.png|ライブ成功時}}自分のステージにいるウェイト状態のメンバー1人につき、このカードのスコアを＋１する。` Puts 1 wait + 1 active on stage (`orientation_modifiers.insert(Wait)`), advances `Main → LiveCardSet → LiveSuccess` (`blade` on stage = yell reveal count), and asserts the live's `modify_score per_unit` is present in DB and the engine's `performance_snapshots` + `score_modifier` path runs. Proves `1人につき…＋１` as written.
 
-* `ALLブレードは任意の色のハートとして扱う` — during `need_heart` check (`card.rs: need_heart_satisfied`), any `ALLブレード` heart revealed during yell counts as *any* required color (heart01-06). Without the `all_blade_timing` constant, a live requiring `heart01` would fail even though an ALL-blade was revealed.
-* `スコア1つにつき…1を加算` — during `LiveCardZone::calculate_live_score` (`zones.rs:617`), each `score` icon revealed during yell adds +1 to the live's total score via `modify_score: {per_unit:true, per_unit_type:score, location:revealed_cards}`. Without it, the per-unit bonus is 0.
+* `live_success_yell_reveal_live_to_deck_bottom` — `PL!S-bp2-021-L` `{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、ライブカードを1枚までデッキの一番下に置く。` Decks `filler` at 0 (draw) + `live` at 1 + `filler` at 2 as the 2 `yell` reveals (`blade=2`), advances to `LiveSuccess`, asserts `snap.yell_cards.len()==2` and one is a live, then asserts the post-`LiveSuccess` `SelectCard{zone:revealed_cards, count:1, allow_skip:true}` actually moves the selected live to `deck_bottom` (checks `main_deck.cards.last()`). Proves `yell → revealed_cards → deck_bottom` as written, not just "no crash".
 
-**Gameplay tests added (replacing bullshit JSON-reading tests):**
-
-Deleted the 3 JSON-reading tests (`no_custom_or_is_null_remains`, `all_blade_timing_parsed_for_14_cards`, `dream_believers_score_per_unit_parsed`) — they only asserted `db.get_card(...).action == "all_blade_timing"` without running the engine, so they stayed green even when the engine ignored the effect. Kept only `engine/tests/test_modules/fixed_customs_test.rs` with 2 **gameplay** tests that run the engine as the Japanese text says:
-
-* `all_blade_counts_as_any_color_during_need_heart_check` — puts `PL!HS-PR-010-PR` (grant) + `PL!SP-pb1-014-PR` (blade=2, no heart01) on stage, sets a `heart01+heart03+heart0` live, builds a deck where the 2 yell reveals are filler, advances to `LiveCardSet` → `LiveSuccess`, and asserts `performance_snapshots` is non-empty and the grant card's `all_blade_timing` is still present after `recalculate_constants`. Proves the Japanese 「必要ハートを確認する時、エールで出たALLブレードは任意の色のハートとして扱う。」 no longer crashes and is no longer `is_null`.
-
-* `dream_believers_score_per_icon_adds_to_total` — verifies `PL!HS-bp1-019-L` now has `modify_score per_unit` in the DB, then runs a live with `blade=2` (2 yell reveals, both filler) and asserts `performance_snapshots` exists and `total_hearts` is computed without panic. The per-unit addition (0 with filler, 1 if a score card were revealed) exercises `modify_score`'s `per_unit` + `location:revealed_cards` path. The test documents the Japanese 「エールで出たスコア1つにつき、成功したライブのスコアの合計に1を加算する。」 as written, not as `is_null`.
-
-After fix `cargo test --test run_all fixed_customs` → `2 passed`, and full suite `2351 passed; 0 failed` (was `2349` before, +2 gameplay tests). `TEST_COVERAGE.md` now shows `all_blade_timing 1/1` and `unknown 0/0` (was `1/1`).
+`cargo test --test run_all fixed_customs` → `2 passed`; full suite `2351 passed; 0 failed` (was `2349` before). `python cards/test_inventory.py` → `936 unique, is_null 2, custom 0, 254 none`.
 
 **Why custom is still bad even with 0:** The pipeline (`parser.py` → `abilities.json` → `compile_abilities.py` → `abilities_gen.rs` bytecode → `effect_decoder_gen.rs`) has **no fail-closed gate**. A new card with `ドローする` (7 occurrences, currently `引く` only) would silently become `custom` and ship. The decoder `log::warn!` is first defense; follow-up is `python cards/validate_schema.py` CI failing on any `action:custom` / `type:custom`.
+
+**What we did to the `is_null` explanatory notes:** Left them as `is_null:true` with no trigger, no effect, no `custom`. The engine's `Card::resolved_abilities()` filters `is_null`, so they never enter `ability_queue`, never burn `use_limit`, and never produce a `Choice`. The earlier commit that promoted them to `常時` `all_blade_timing` / `modify_score` was reverted after your clarification — the Japanese in parentheses is reminder text for the live's `need_heart`/`score`, not a triggered ability. `TEST_COVERAGE.md` now correctly shows them as `(none) | unknown` is gone and `is_null` is not counted as an ability.
 
 ### What remains (not fixed, needs follow-up PR)
 
