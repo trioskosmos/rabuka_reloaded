@@ -241,8 +241,8 @@ def check_distinct_name(text):
 
 
 def check_original_value(text):
-    """Check if text contains 'original value' pattern (元々持つ)."""
-    return "元々持つ" in text
+    """Check if text contains 'original value' pattern (元々持つ or bare 元々)."""
+    return "元々持つ" in text or "元々" in text
 
 
 def split_commas_smartly(text):
@@ -357,8 +357,10 @@ def detect_group_type(group_name):
 
 
 def extract_all_groups(text):
-    """Extract all group names from text (『...』 patterns)."""
+    """Extract all group names from text (『...』 and mixed 『...」 patterns)."""
     matches = GROUP_PATTERN.findall(text)
+    # Also handle mixed brackets: 『name」 (opening 『 but closing 」)
+    matches += re.findall(r"『([^』」]+)」", text)
     return matches if matches else []
 
 

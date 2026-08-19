@@ -115,8 +115,11 @@ from parser_utils import (
     extract_cost_limit_with_operator,
     extract_cost_values,
     extract_picker,
+    extract_all_quoted_names,
+    extract_all_groups,
     detect_card_property,
     detect_require_all_hearts,
+    check_original_value,
     SOURCE_PATTERNS,
     DESTINATION_PATTERNS,
     STATE_CHANGE_PATTERNS,
@@ -443,22 +446,11 @@ def extract_optional(text: str) -> bool:
     return "もよい" in text or "てもよい" in text
 
 
-def extract_group_names(text: str) -> List[str]:
-    """Extract all group names within 『』 or mixed 『」 brackets."""
-    names = re.findall(r"『([^』」]+)』", text)
-    # Also handle mixed brackets: 『虹ヶ咲」 (opening 『, closing 」)
-    names += re.findall(r"『([^』」]+)」", text)
-    return names
-
-
 def extract_heart_types(text: str) -> List[str]:
     """Extract heart type identifiers (e.g. heart02, heart01) from icon markup."""
     return re.findall(r"heart_(\d+)\.png\|heart(\d+)", text)  # type: ignore[return-value]
 
 
-def extract_quoted_text(text: str) -> List[str]:
-    """Extract all text within 「」 quotes."""
-    return re.findall(r"「([^」]+)」", text)
 
 
 def extract_parenthetical(text: str) -> List[str]:
@@ -591,10 +583,9 @@ def extract_heart_colors_from_text(text: str) -> list:
 
 def detect_duration_code(text: str) -> Optional[str]:
     """Detect duration patterns and return the duration code, or None."""
-    if "ライブ終了時まで" in text:
-        return "live_end"
-    if "ターン終了時まで" in text or "そのターンの間" in text:
-        return "turn_end"
+    for pat, code in DURATION_PREFIX_MAP.items():
+        if pat in text:
+            return code
     return None
 
 
@@ -759,7 +750,7 @@ def _extract_basic_cost_fields(cost, text):
     if tgt:
         cost["target"] = tgt
     # Groups, names, flags
-    gns = extract_group_names(text)
+    gns = extract_all_groups(text)
     if gns:
         cost["group_names"] = gns
     if "同じグループ名" in text:
@@ -1188,7 +1179,7 @@ def _cost_reveal(text, cost):
     ct = extract_card_type(text)
     if ct:
         cost["card_type"] = ct
-    gns = extract_group_names(text)
+    gns = extract_all_groups(text)
     if gns:
         cost["group_names"] = gns
     return cost
@@ -1298,7 +1289,7 @@ def parse_cost(text: str) -> Dict[str, Any]:
         cost["exclude_characters"] = exclude_chars
     if "もよい" in text or "てもよい" in text:
         cost["optional"] = True
-    gns = extract_group_names(text)
+    gns = extract_all_groups(text)
     if gns:
         cost["group_names"] = gns
     cnt = extract_count(text)
@@ -2632,7 +2623,7 @@ def _extract_per_unit_info_from_text(text):
 
 def _check_ability_gain_from_text(text, action):
     """Check for ability gain pattern. Returns True if gain_ability (with early return)."""
-    quoted_text = extract_quoted_text(text)
+    quoted_text = extract_all_quoted_names(text)
     is_ability_gain = False
     if "を得る" in text and "能力" in text and quoted_text:
         is_ability_gain = True
@@ -2888,12 +2879,12 @@ def parse_action(text: str) -> Dict[str, Any]:
     if re.search(r"「.+」以外", text):
         action["exclude_self"] = True
         # Extract the quoted character names being excluded
-        quoted_exclusions = extract_quoted_text(text)
+        quoted_exclusions = extract_all_quoted_names(text)
         if quoted_exclusions:
             categorized = categorize_quoted_text(quoted_exclusions)
 
     # Extract group names from 『』 brackets
-    group_names = extract_group_names(text)
+    group_names = extract_all_groups(text)
     if group_names:
         action["group_names"] = group_names
         # Re-apply exclude_group_names if already set (line 2143 may have set it
@@ -2908,7 +2899,7 @@ def parse_action(text: str) -> Dict[str, Any]:
     if _check_ability_gain_from_text(text, action):
         return action
     # Extract quoted text from 「」 for other contexts
-    quoted_text = extract_quoted_text(text)
+    quoted_text = extract_all_quoted_names(text)
     if quoted_text:
         categorized = categorize_quoted_text(quoted_text)
         if categorized["characters"]:
@@ -3229,7 +3220,7 @@ def _try_distinct(text):
         result["count"] = int(m.group(1))
         result["operator"] = ">="
         result["unit"] = m.group(2) if len(m.groups()) >= 2 and m.group(2) else "人"
-    gns = extract_group_names(text)
+    gns = extract_all_groups(text)
     if gns:
         result["group_names"] = gns
     # Extract 「』-bracketed character names from のうち patterns
@@ -3406,7 +3397,7 @@ def _enrich_card_count_condition(result, text):
         if "location" in either_result:
             result["location"] = either_result["location"]
     # Group names
-    gns = extract_group_names(text)
+    gns = extract_all_groups(text)
     if gns and "を含む" not in text:
         result["group_names"] = gns
     # Cost limit
@@ -3619,7 +3610,7 @@ def _try_temporal_this_turn(text):
             ct = extract_card_type(text)
             if ct:
                 result["card_type"] = ct
-            gns = extract_group_names(text)
+            gns = extract_all_groups(text)
             if gns:
                 result["group_names"] = gns
             if (
@@ -3737,7 +3728,7 @@ def _try_baton_touch(text):
             result["characters"] = [m.group(1)]
     # と-form: also try 『X』のメンバーとバトンタッチ (group name before の)
     if is_teita:
-        gns = extract_group_names(text)
+        gns = extract_all_groups(text)
         if gns:
             result["group_names"] = gns
             if "characters" not in result:
@@ -3751,7 +3742,7 @@ def _try_baton_touch(text):
         result["cost_limit"] = cl_op[0]
         result["cost_limit_operator"] = cl_op[1]
     # Extract group_names (for から-form, this is handled below)
-    gns = extract_group_names(text)
+    gns = extract_all_groups(text)
     if gns:
         result["group_names"] = gns
     # Extract card_property
@@ -3813,7 +3804,7 @@ def _try_temporal_count(text):
         result["target"] = tgt
     if "エリアすべて" in text:
         result["all_areas"] = True
-    gns = extract_group_names(text)
+    gns = extract_all_groups(text)
     if gns:
         result["group_names"] = gns
     return result
@@ -4226,7 +4217,7 @@ def _try_appearance(text):
     # Exclude self
     if detect_exclude_self(text) or "このカード以外" in text:
         result["exclude_self"] = True
-    gns = extract_group_names(text)
+    gns = extract_all_groups(text)
     if gns:
         result["group_names"] = gns
     if "バトンタッチ" in text:
@@ -4294,7 +4285,7 @@ def _try_state(text):
                 result["all"] = True
     if result is None:
         return None
-    gns = extract_group_names(text)
+    gns = extract_all_groups(text)
     if gns:
         result["group_names"] = gns
     return result
@@ -4757,7 +4748,7 @@ def _try_placed_discard_live_or_member(text):
     if not ("控え室に置いた" in text or "置いたカード" in text):
         return None
     # Group name(s) from 『』 (e.g. 『虹ヶ咲』).
-    groups = list(dict.fromkeys(extract_group_names(text)))
+    groups = list(dict.fromkeys(extract_all_groups(text)))
     if not groups:
         return None
     # Only fire when the live-card alternative and the blade-heartless member
@@ -4811,7 +4802,7 @@ def _try_discard_live_and_member_optional(text):
         return None
     if "そうしたとき" not in text:
         return None
-    groups = list(dict.fromkeys(extract_group_names(text)))
+    groups = list(dict.fromkeys(extract_all_groups(text)))
     if not groups:
         return None
 
@@ -4885,7 +4876,7 @@ def _try_those_cards_add_hand_optional(text):
     opt_text, _, cons_text = text.partition("そうしたとき")
     opt_text = opt_text.strip()
     cons_text = cons_text.strip().lstrip("、")
-    groups = list(dict.fromkeys(extract_group_names(opt_text)))
+    groups = list(dict.fromkeys(extract_all_groups(opt_text)))
     m = re.search(r"(\d+)枚", opt_text)
     count = int(m.group(1)) if m else 1
     card_type = "live_card" if "ライブカード" in opt_text else "card"
@@ -4929,7 +4920,7 @@ def _try_discard_shuffle_to_bottom_optional(text):
     opt_text, _, cons_text = text.partition("そうしたとき")
     opt_text = opt_text.strip()
     cons_text = cons_text.strip().lstrip("、")
-    groups = list(dict.fromkeys(extract_group_names(opt_text)))
+    groups = list(dict.fromkeys(extract_all_groups(opt_text)))
     m = re.search(r"(\d+)枚", opt_text)
     # "それぞれ1枚ずつ" = 1 from EACH group → the total count equals the number of groups.
     per_each = "それぞれ" in opt_text or "ずつ" in opt_text
@@ -5193,7 +5184,7 @@ def _extract_generic_fields(condition, text):
         condition["card_names"] = [cn_exact.group(1)]
 
     # Group/unit names: 『虹ヶ咲』 etc.
-    gns = extract_group_names(text)
+    gns = extract_all_groups(text)
     if gns:
         condition["group_names"] = gns
 
@@ -5361,7 +5352,7 @@ def _extract_generic_fields(condition, text):
         condition["values"] = [int(v) for v in re.findall(r"\d+", vm.group(0))]
 
     # Group
-    gns = extract_group_names(text)
+    gns = extract_all_groups(text)
     if gns:
         condition["group_names"] = gns
     # Exclude group (以外)
@@ -7145,7 +7136,7 @@ def _build_reveal_add_discard(fp, sa_text, select_text):
         result["max"] = True
     if extract_optional(select_text):
         result["optional"] = True
-    gns = extract_group_names(select_text)
+    gns = extract_all_groups(select_text)
     if gns:
         result["group_names"] = gns
     _apply_card_property_filter(result, select_text)
@@ -7219,7 +7210,7 @@ def _enrich_from_text(d, text):
             d["require_all_heart_colors"] = True
     if extract_optional(text):
         d["optional"] = True
-    gns = extract_group_names(text)
+    gns = extract_all_groups(text)
     if gns:
         d["group_names"] = gns
     # Extract 「」-bracketed character names (e.g. 「朝香果林」のメンバーカード)
@@ -7283,7 +7274,7 @@ def _apply_or_select_criteria(result, select_text):
 
     for p in parts:
         p_dict = {}
-        gns = extract_group_names(p)
+        gns = extract_all_groups(p)
         if gns:
             p_dict["group_names"] = gns
         ct = extract_card_type(p)
@@ -7819,7 +7810,7 @@ def _try_self_and_other(text):
     tc_match = re.search(r"(\d+)人", other_part)
     other_count = int(tc_match.group(1)) if tc_match else 1
     # Extract group names from the other-target part
-    other_groups = extract_group_names(other_part)
+    other_groups = extract_all_groups(other_part)
     # Extract duration prefix
     effect_clean, duration = _strip_duration_prefix(effect_part)
     # Parse the effect action
@@ -9007,7 +8998,7 @@ def _try_restriction_effect(text):
         bl = extract_blade_limit(text)
         if bl:
             result.update(bl)
-        gns = extract_group_names(text)
+        gns = extract_all_groups(text)
         if gns:
             result["group_names"] = gns
         if "元々" in text:
@@ -9537,18 +9528,12 @@ for _i, _h in enumerate(_EFFECT_HANDLERS):
 
 
 def _has_position_keywords(text):
-    positions = []
-    for keyword, position in POSITION_KEYWORDS.items():
-        if keyword in text and position not in positions:
-            positions.append(position)
+    positions = detect_positions(text)
     if not positions and "center" in text.lower():
         return "center"
     return ",".join(positions) if positions else None
 
 
-def _has_original_modifier(text):
-    """Check if text contains 元々持つ (original/natural value)."""
-    return "元々持つ" in text or "元々" in text
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -9746,7 +9731,7 @@ def _walk_propagate_text_context_fields(d, d_ctx, ctx_text):
         d["distinct"] = "card_name"
 
     # Propagate original_value from text context (元々持つ for blade/heart comparisons)
-    if "original_value" not in d and d_ctx and _has_original_modifier(d_ctx):
+    if "original_value" not in d and d_ctx and check_original_value(d_ctx):
         d["original_value"] = True
 
     # Propagate group_names from text context (including parent context) to any dict node
@@ -10097,7 +10082,7 @@ def _walk_propagate_position(d, d_ctx, d_text):
         ).strip()
 
     # Mark original_value flag for 元々持つ patterns
-    if "original_value" not in d and d_text and _has_original_modifier(d_text):
+    if "original_value" not in d and d_text and check_original_value(d_text):
         d["original_value"] = True
 
 
@@ -11630,7 +11615,7 @@ def _fix_mari_gain_ability(data: Dict[str, Any], fix_stats: Dict[str, int]) -> N
         tt = ability.get("triggerless_text", "")
         if "得る" not in tt:
             continue
-        q = extract_quoted_text(tt)
+        q = extract_all_quoted_names(tt)
         if not q:
             continue
         cat = categorize_quoted_text(q)
