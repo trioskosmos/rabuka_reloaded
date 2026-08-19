@@ -48,8 +48,8 @@ pub fn load_real_database() -> Arc<CardDatabase> {
         let tids: Vec<i16> = db.cards.keys().copied().collect();
         let mut pool: HashMap<i16, Vec<i16>> = HashMap::new();
         for &tid in &tids {
-            let mut v = Vec::with_capacity(5);
-            for _ in 0..5 {
+            let mut v = Vec::with_capacity(11);
+            for _ in 0..11 {
                 v.push(db.create_copy(tid));
             }
             pool.insert(tid, v);
@@ -285,6 +285,12 @@ impl TestGame {
     /// Each call returns a distinct ID so multiple copies of the same card on stage
     /// get per-card modifier tracking instead of sharing modifiers.
     /// Store the result in a variable if you need to reference the same card later.
+    ///
+    /// LIMITATION: The pool has 11 pre-created copies per template (max for i16).
+    /// If exhausted, falls back to the template ID — this silently causes card ID
+    /// collisions and modifier sharing bugs (e.g. clear_all_for_card on a moved
+    /// copy wiping the stage copy's blade). If you hit this, restructure the test
+    /// to reuse variables instead of calling id() repeatedly for the same card.
     pub fn id(&self, card_no: &str) -> i16 {
         let template_id = card_id(&self.db, card_no);
         let pool = &PRELOADED.get().unwrap().pool;
