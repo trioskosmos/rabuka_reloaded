@@ -167,6 +167,7 @@ pub mod kinako_sakurakoji_test;
 pub mod kinako_test;
 pub mod konata_bp4_test;
 pub mod konata_test;
+pub mod kotori_bp5_003_test;
 pub mod kotori_test;
 pub mod kuroe_dia_bp6_test;
 pub mod ladybug_test;
