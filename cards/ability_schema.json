@@ -1354,7 +1354,7 @@
       }
     },
     "rotation": {
-      "opcode": 20,
+      "opcode": 44,
       "rust_variant": "Rotation",
       "effect_kind": "PositionOp",
       "handler": "effects/state.rs",
@@ -1502,7 +1502,7 @@
       }
     },
     "choose_required_hearts": {
-      "opcode": 41,
+      "opcode": 48,
       "rust_variant": "ChooseRequiredHearts",
       "effect_kind": "MiscOp",
       "handler": "effects/misc.rs:3520",
@@ -1527,7 +1527,7 @@
       }
     },
     "sequential": {
-      "opcode": 0,
+      "opcode": 49,
       "rust_variant": "Sequential",
       "effect_kind": "CompoundEffect",
       "handler": "compound.rs:43",
@@ -1636,7 +1636,7 @@
       }
     },
     "choice": {
-      "opcode": 0,
+      "opcode": 43,
       "rust_variant": "Choice",
       "effect_kind": "CompoundEffect",
       "handler": "effects/misc.rs:3224",
@@ -1681,7 +1681,7 @@
       }
     },
     "restriction": {
-      "opcode": 29,
+      "opcode": 50,
       "rust_variant": "Restriction",
       "effect_kind": "RestrictionOp",
       "handler": "effects/misc.rs:3416",
@@ -1793,7 +1793,7 @@
       }
     },
     "set_cost": {
-      "opcode": 21,
+      "opcode": 45,
       "rust_variant": "SetCost",
       "effect_kind": "ChangeState",
       "handler": "effects/state.rs:769",
@@ -1806,7 +1806,7 @@
       }
     },
     "set_cost_to_use": {
-      "opcode": 35,
+      "opcode": 47,
       "rust_variant": "SetCostToUse",
       "effect_kind": "ChangeState",
       "handler": "effects/state.rs:1151",
@@ -1862,7 +1862,7 @@
       }
     },
     "activation_cost": {
-      "opcode": 17,
+      "opcode": 51,
       "rust_variant": "ActivationCost",
       "effect_kind": "ChangeState",
       "handler": "effects/state.rs:963",
@@ -1902,7 +1902,7 @@
       }
     },
     "shuffle": {
-      "opcode": 28,
+      "opcode": 46,
       "rust_variant": "Shuffle",
       "effect_kind": "MiscOp",
       "handler": "effects/misc.rs:3557",
@@ -1969,7 +1969,7 @@
       }
     },
     "play_baton_touch": {
-      "opcode": 24,
+      "opcode": 52,
       "rust_variant": "PlayBatonTouch",
       "effect_kind": "MiscOp",
       "handler": "effects/misc.rs:1772",
@@ -2044,7 +2044,7 @@
       }
     },
     "reduce_live_card_set_limit": {
-      "opcode": 27,
+      "opcode": 53,
       "rust_variant": "ReduceLiveCardSetLimit",
       "effect_kind": "MiscOp",
       "handler": "effects/state.rs:1011",
@@ -2061,7 +2061,7 @@
       }
     },
     "set_card_identity_all_regions": {
-      "opcode": 43,
+      "opcode": 54,
       "rust_variant": "SetCardIdentityAllRegions",
       "effect_kind": "ChangeState",
       "handler": "effects/state.rs:1126",
@@ -2074,7 +2074,7 @@
       }
     },
     "modify_required_hearts_success": {
-      "opcode": 20,
+      "opcode": 55,
       "rust_variant": "ModifyRequiredHeartsSuccess",
       "effect_kind": "ModifyHearts",
       "handler": "effects/score.rs:587",
@@ -2101,7 +2101,7 @@
       }
     },
     "custom": {
-      "opcode": 44,
+      "opcode": 56,
       "rust_variant": "Custom",
       "effect_kind": "CustomOp",
       "handler": "effects/misc.rs:88",
@@ -2135,7 +2135,7 @@
       "fields": {}
     },
     "modify_required_hearts_global": {
-      "opcode": 17,
+      "opcode": 57,
       "rust_variant": "ModifyRequiredHearts",
       "effect_kind": "ModifyHearts",
       "handler": "effects/score.rs:488",

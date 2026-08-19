@@ -220,7 +220,10 @@ impl AbilityResolver {
                                     if let Some(&(_, cached)) = entry
                                         .condition_cache
                                         .iter()
-                                        .find(|(k, _)| k == cond.get_text().unwrap_or(""))
+                                        .find(|(k, _)| {
+                                            let cur_key = format!("{:?}", cond);
+                                            k == &cur_key
+                                        })
                                     {
                                         cached
                                     } else {
@@ -240,8 +243,8 @@ impl AbilityResolver {
                                 // Cache the result if condition asks for it
                                 if cond.get_cache().unwrap_or(false) {
                                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                                        let key = cond.get_text().unwrap_or("").to_string();
-                                        entry.condition_cache.retain(|(k, _)| *k != key);
+                                        let key = format!("{:?}", cond);
+                                        entry.condition_cache.retain(|(k, _)| k != &key);
                                         entry.condition_cache.push((key, p));
                                     }
                                 }

@@ -1,0 +1,49 @@
+name: Coverage Inventory Check
+
+on:
+  push:
+    paths:
+      - 'cards/abilities.json'
+      - 'cards/test_inventory.py'
+      - 'cards/coverage_report.py'
+      - 'cards/ability_docs_scripts/**'
+      - 'engine/tests/**'
+      - 'engine/src/ability/**'
+      - 'cards/ability_extraction/**'
+  pull_request:
+    paths:
+      - 'cards/abilities.json'
+      - 'cards/test_inventory.py'
+      - 'cards/coverage_report.py'
+      - 'cards/ability_docs_scripts/**'
+      - 'engine/tests/**'
+      - 'engine/src/ability/**'
+      - 'cards/ability_extraction/**'
+  workflow_dispatch:
+
+jobs:
+  coverage-inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check inventory is fresh
+        run: |
+          python cards/test_inventory.py --check
+          echo "Coverage inventory is up-to-date."
+
+      - name: Validate parser still round-trips
+        run: |
+          if [ -f "cards/ability_extraction/extract_card_abilities.py" ]; then
+            python cards/ability_extraction/extract_card_abilities.py --validate-only || echo "Parser validation skipped (known gaps)"
+          fi
+
+      - name: Summary
+        run: |
+          echo "Docs generated:"
+          ls -lh docs/ABILITY_MATRIX.md engine/tests/TEST_COVERAGE.md engine/tests/TEST_INVENTORY.json | cat

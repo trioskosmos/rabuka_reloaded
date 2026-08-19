@@ -5,16 +5,21 @@ Tools for analyzing `cards/abilities.json` and tracking test coverage for card a
 ## Quick Start
 
 ```bash
-# Single command — regenerates everything:
-python ability_docs_scripts/generate_report.py
+# Single command — regenerates coverage docs (canonical):
+python ../test_inventory.py
+# (or from repo root: python cards/test_inventory.py)
 
-# Invert abilities.json — map JSON back to source texts:
+# Legacy aliases (deprecated shims → test_inventory.py):
+python ../coverage_report.py
+python ability_docs_scripts/generate_report.py  # now -> test_inventory
+
+# Invert abilities.json — map JSON back to source texts (parser introspection):
 python ability_docs_scripts/invert_abilities.py
 ```
 
 ## What It Analyzes
 
-The main report (`FULL_REPORT.md`) covers:
+The canonical report (`engine/tests/TEST_COVERAGE.md` + `docs/ABILITY_MATRIX.md` + `TEST_INVENTORY.json`) covers:
 - **Coverage by action type** — which effect actions have tests
 - **Coverage by trigger type** — 登場, ライブ開始時, 常時, etc.
 - **Coverage by action+cost pairing** — e.g. `move_cards + pay_energy`
@@ -26,14 +31,17 @@ The inverted index (`INVERTED_ABILITIES_CONDENSED.md`, `INVERTED_ABILITIES_ABSTR
 
 ## Scripts
 
-| Script | Description |
-|--------|-------------|
-| `generate_report.py` | Main report generator, produces `FULL_REPORT.md` and `untested_card_ids.txt` |
-| `analyze_abilities.py` | Field usage stats (cost keys, effect keys by type/action) |
-| `cross_reference_tests.py` | Action-to-test-file mapping |
-| `find_untested_abilities.py` | Per-ability untested report with card IDs |
-| `key_combo_analysis.py` | Key-combination-level coverage analysis |
-| `invert_abilities.py` | JSON-to-text inversion: produces `INVERTED_ABILITIES_CONDENSED.md` and `INVERTED_ABILITIES_ABSTRACT.md` |
+| Script | Description | Status |
+|--------|-------------|--------|
+| `../test_inventory.py` | **Canonical** coverage inventory — generates `TEST_COVERAGE.md`, `ABILITY_MATRIX.md`, `TEST_INVENTORY.json/.md` | **Use this** |
+| `../coverage_report.py` | Alias for `test_inventory.py` | Deprecated shim |
+| `generate_report.py` | Old `FULL_REPORT.md` generator | Deprecated shim → `test_inventory.py` |
+| `cross_reference_tests.py` | Old action→test mapping | Deprecated shim |
+| `find_untested_abilities.py` | Old untested report | Deprecated shim |
+| `find_unique_untested.py` | Old unique-pattern finder | Deprecated shim |
+| `key_combo_analysis.py` | Old key-combo analysis | Deprecated shim |
+| `analyze_abilities.py` | Field usage stats (cost/effect keys) | Kept (parser introspection, not coverage) |
+| `invert_abilities.py` | JSON-to-text inversion (`INVERTED_ABILITIES*.md`, `--card/--diff/--query`) | Kept (parser introspection) |
 
 ## Output Files
 
@@ -58,9 +66,9 @@ but it's an effective first-pass filter for finding gaps.
 
 ## Typical Workflow
 
-1. Run `python ability_docs_scripts/generate_report.py`
-2. Open `FULL_REPORT.md` and look at **Top Coverage Gaps** and **Untested Key Combinations**
-3. Use `untested_card_ids.txt` to find cards to write tests for
-4. Check `ABILITY_DOCUMENTATION.md` for the ability schema
+1. Run `python cards/test_inventory.py` (from repo root)
+2. Open `docs/ABILITY_MATRIX.md` for **Gaps to prioritize** or `engine/tests/TEST_INVENTORY.md` for per-ability depth
+3. Use `engine/tests/TEST_COVERAGE.md` gap tables to pick target cards
+4. Check `INVERTED_ABILITIES*.md` / `python ability_docs_scripts/invert_abilities.py --card PL!…` for parser introspection
 5. Write tests in `engine/tests/test_modules/`
-6. Re-run `generate_report.py` to verify coverage improved
+6. Re-run `python cards/test_inventory.py` and verify `python cards/test_inventory.py --check` passes

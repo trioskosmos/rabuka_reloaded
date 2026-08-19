@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """DEPRECATED — merged into `python cards/test_inventory.py`.
 
-Old script: mapped action → covering test files. New canonical output:
-  * docs/ABILITY_MATRIX.md  (trigger×action matrix)
-  * engine/tests/TEST_INVENTORY.json
+Old script: found unique untested action patterns. New canonical output:
+  * docs/ABILITY_MATRIX.md  (gaps to prioritize)
+  * engine/tests/TEST_INVENTORY.json  (per-ability depth)
 
 Just run `python cards/test_inventory.py`.
 """
@@ -18,5 +18,5 @@ assert spec.loader is not None
 spec.loader.exec_module(mod)
 
 if __name__ == "__main__":
-    sys.stderr.write("[DEPRECATED] ability_docs_scripts/cross_reference_tests.py -> use `python cards/test_inventory.py`\n")
+    sys.stderr.write("[DEPRECATED] ability_docs_scripts/find_unique_untested.py -> use `python cards/test_inventory.py`\n")
     sys.exit(mod.main())

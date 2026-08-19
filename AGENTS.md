@@ -10,3 +10,4 @@
 - To run a single module: `cargo test --test run_all <module_name>`.
 - To run a single test with debug logs: `$env:RUST_LOG="debug"; cargo test --test run_all <test_name> -- --nocapture`.
 - Tests load the real card database from `cards/cards.json` via the baked bytecode; regenerate card abilities with `python ability_extraction/extract_card_abilities.py` from the `cards` directory when the parser changes, then run the engine suite.
+- Coverage inventory is automated: `python cards/test_inventory.py` regenerates `engine/tests/TEST_COVERAGE.md`, `docs/ABILITY_MATRIX.md`, `engine/tests/TEST_INVENTORY.{json,md}` from `cards/abilities.json` + `engine/tests`. CI checks it via `python cards/test_inventory.py --check`. Old script `python cards/coverage_report.py` is an alias. Do not hand-edit the generated markdown.

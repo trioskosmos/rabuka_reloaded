@@ -531,6 +531,43 @@ You should see a few thousand `passed; 0 failed`. The exact count varies as test
 
 ---
 
+## Coverage Inventory (automated)
+
+Do not hand-edit coverage docs — they are generated from `cards/abilities.json` + the test suite:
+
+```bash
+python cards/test_inventory.py          # regenerate all
+python cards/test_inventory.py --check  # CI: verify fresh
+```
+
+Outputs:
+
+| File | Content |
+|------|---------|
+| `engine/tests/TEST_COVERAGE.md` | By trigger/action/condition/set + gap tables (wraps old `coverage_report.py`) |
+| `docs/ABILITY_MATRIX.md` | Trigger×action matrix + prioritized gaps |
+| `engine/tests/TEST_INVENTORY.json` | Machine-readable per-ability rows (for tooling) |
+| `engine/tests/TEST_INVENTORY.md` | Human-readable per-ability index |
+
+`depth` is inferred automatically:
+
+- **L0** — `game.id("PL!…")` appears
+- **L1** — plus `assert` in covering file
+- **L2** — plus negative hint in file/test name (`cannot`, `negative`, `immune`, `already_waited`, `zero_tested`)
+- **+choice** — plus `has_pending_choice` / `SelectCard` signals
+
+Optional override: add a comment above a test to pin depth:
+
+```rust
+/// @covers PL!N-bp7-021-N depth=L2
+#[test]
+fn mia_cost_reduction_blocked_when_not_debut() { ... }
+```
+
+The alias `python cards/coverage_report.py` still works (deprecated shim → `test_inventory.py`). Legacy scripts in `cards/ability_docs_scripts/` (`generate_report.py`, `cross_reference_tests.py`, etc.) are now deprecated shims to the same command — use the single `test_inventory.py` entry point.
+
+---
+
 ## Involved Patterns (recurring — reuse, don't re-derive)
 
 These are non-obvious setups that keep coming up. Copy them.

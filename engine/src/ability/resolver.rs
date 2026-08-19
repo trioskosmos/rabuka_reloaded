@@ -276,18 +276,17 @@ impl AbilityResolver {
                 // (e.g. revealed_cards modified by a prior select_cards filter).
                 if condition.get_cache().unwrap_or(false) {
                     if let Some(entry) = gs.ability_queue.current_entry() {
-                        if let Some(text) = condition.get_text() {
-                            if let Some(cached) = entry
-                                .condition_cache
-                                .iter()
-                                .find(|(k, _)| k == text)
-                                .map(|(_, v)| *v)
-                            {
-                                if cached {
-                                    return true;
-                                }
-                                return false;
+                        let key = format!("{:?}", condition);
+                        if let Some(cached) = entry
+                            .condition_cache
+                            .iter()
+                            .find(|(k, _)| k == &key)
+                            .map(|(_, v)| *v)
+                        {
+                            if cached {
+                                return true;
                             }
+                            return false;
                         }
                     }
                 }
@@ -341,10 +340,9 @@ impl AbilityResolver {
                 // Cache the result if the condition asks for it
                 if condition.get_cache().unwrap_or(false) {
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        if let Some(text) = condition.get_text() {
-                            entry.condition_cache.retain(|(k, _)| k != text);
-                            entry.condition_cache.push((text.to_string(), passed));
-                        }
+                        let key = format!("{:?}", condition);
+                        entry.condition_cache.retain(|(k, _)| k != &key);
+                        entry.condition_cache.push((key, passed));
                     }
                 }
                 if !passed {
