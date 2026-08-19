@@ -38,14 +38,9 @@ fn activate_and_resolve(game: &mut TestGame, card: i16) {
     }
 }
 
-/// 条件充足: デッキ上5枚が全て同一カード(heart01あり) → μ's選択カードが手札に加わる
-///
-/// BUG: gain_resource blade+3 in conditional_on_result followup has no
-/// activating_card context, so blade is NOT applied. The select_cards
-/// followup DOES work (card added to hand), and remaining revealed cards
-/// DO go to discard. Only blade gain is broken.
+/// 条件充足: デッキ上5枚が全て同一カード(heart01あり) → μ's選択カードが手札に加わり、ブレード+3
 #[test]
-fn all_5_match_selects_muse_card_to_hand() {
+fn all_5_match_selects_muse_card_and_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let maki = game.id(MAKI);
@@ -55,9 +50,10 @@ fn all_5_match_selects_muse_card_to_hand() {
     game.state.player1.hand.cards.push(filler);
     game.state.player1.hand.cards.push(filler);
 
-    // 5 copies of Maki on deck top — all have heart01:2, heart03:2, heart06:3
+    // 5 copies of Maki on deck top — each gets a unique copy ID
+    // so move_cards.clear_all_for_card doesn't wipe the stage card's blade
     for _ in 0..5 {
-        game.state.player1.main_deck.cards.push(maki);
+        game.state.player1.main_deck.cards.push(game.id(MAKI));
     }
     fill_deck(&mut game, "p1", 10);
     fill_deck(&mut game, "p2", 10);
@@ -72,23 +68,19 @@ fn all_5_match_selects_muse_card_to_hand() {
     let hand_has_maki = hand_names.iter().any(|n| n.contains("西木野真姫"));
     assert!(hand_has_maki, "A Maki card should have been added to hand from revealed cards, hand={:?}", hand_names);
 
+    // gain_resource blade+3 applied to activating card
+    let blade = game.state.mods.get_blade_modifier(maki);
+    assert_eq!(blade, 3, "blade+3 from gain_resource should apply to Maki");
+
     // Remaining 4 revealed cards + 1 cost discard = 5 in discard
     assert!(game.state.player1.waitroom.cards.len() >= 5,
         "At least 5 cards in discard (4 remaining revealed + 1 cost), got {}",
         game.state.player1.waitroom.cards.len());
 }
 
-/// BUG DOCUMENTATION: gain_resource blade+3 in conditional_on_result followup
-/// has no activating_card context, so blade is NOT applied.
-///
-/// Root cause: when conditional_on_result saves/resumes the followup sequential,
-/// the ability queue entry's activating_card is lost (set to None).
-/// The gain_resource effect at misc.rs:1630 checks:
-///   `if let Some(card_id) = activating_card_id` — but it's None, so no blade.
-///
-/// Expected behavior: blade+3 should be applied to the activating card (Maki).
+/// 条件充足時: gain_resource blade+3 should apply to activating card (Maki).
 #[test]
-fn gain_resource_blade_bug_activating_card_lost() {
+fn gain_resource_blade_applied_to_activating_card() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let maki = game.id(MAKI);
@@ -99,7 +91,7 @@ fn gain_resource_blade_bug_activating_card_lost() {
     game.state.player1.hand.cards.push(filler);
 
     for _ in 0..5 {
-        game.state.player1.main_deck.cards.push(maki);
+        game.state.player1.main_deck.cards.push(game.id(MAKI));
     }
     fill_deck(&mut game, "p1", 10);
     fill_deck(&mut game, "p2", 10);
@@ -107,12 +99,8 @@ fn gain_resource_blade_bug_activating_card_lost() {
 
     activate_and_resolve(&mut game, maki);
 
-    // BUG: blade should be +3 but activating_card is lost in followup
     let blade = game.state.mods.get_blade_modifier(maki);
-    // When fixed, change this to: assert_eq!(blade, 3, "blade+3 from gain_resource");
-    assert_eq!(blade, 0,
-        "Known bug: gain_resource blade+3 not applied — activating_card is None in \
-         conditional_on_result followup. When fixed, assert blade==3");
+    assert_eq!(blade, 3, "blade+3 from gain_resource should apply to Maki");
 }
 
 /// 条件不充足: デッキ上5枚が全てランダムカード → ブレードなし、残り控え室
@@ -178,7 +166,7 @@ fn use_limit_once() {
     game.state.player1.hand.cards.push(filler);
 
     for _ in 0..5 {
-        game.state.player1.main_deck.cards.push(maki);
+        game.state.player1.main_deck.cards.push(game.id(MAKI));
     }
     fill_deck(&mut game, "p1", 10);
     fill_deck(&mut game, "p2", 10);

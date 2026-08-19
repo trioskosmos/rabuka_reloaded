@@ -1032,6 +1032,11 @@ impl super::TurnEngine {
                 effect_started,
                 had_pending_sequential
             );
+            // Save activating_card before clearing — it must be restored when
+            // the ability continues processing (needs_reprocess), otherwise
+            // gain_resource etc. in nested sequentials lose their target.
+            let saved_activating_card = game_state.activating_card;
+            let saved_activating_ability_index = game_state.activating_ability_index;
             game_state.activating_card = None;
             game_state.activating_ability_index = None;
 
@@ -1082,6 +1087,9 @@ impl super::TurnEngine {
                 game_state.just_completed_ability_key = None;
                 game_state.clear_movement_tracking();
             } else if needs_reprocess {
+                // Restore activating_card — the ability is still executing.
+                game_state.activating_card = saved_activating_card;
+                game_state.activating_ability_index = saved_activating_ability_index;
                 log::debug!("[RWC] needs_reprocess=true: storing resolver and calling PCA");
                 game_state.ability_queue.set_resolver(resolver);
                 game_state.process_current_ability();
