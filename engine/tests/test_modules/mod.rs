@@ -360,6 +360,7 @@ pub mod dive_auto_trigger_test;
 pub mod dive_edge_test;
 pub mod dive_live_card_test;
 pub mod emotion_bp4_test;
+pub mod hs_bp2_018_live_card_zone_test;
 pub mod kanon_bp5_constant_test;
 pub mod live_card_zone_movement_test;
 pub mod ll_bp2_001_cost_reduction_test;
@@ -427,3 +428,4 @@ pub mod sumire_bp2_center_cost_test;
 // resolution, and ChoiceOffered/ChoiceResolved capture.
 pub mod logging_test;
 pub mod pl_s_bp7_007_test;
+pub mod untested_choice_change_target_test;
