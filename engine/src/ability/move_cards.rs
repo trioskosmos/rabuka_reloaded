@@ -1612,12 +1612,136 @@ impl AbilityResolver {
         gs: &mut GameState,
         c: &MoveSourceContext,
     ) -> Result<Vec<i16>, String> {
-        // Move from under_member to destination needs a choice.
-        // Delegate to place_energy_under_member for choice creation.
-        let mut modified = c.effect.clone();
-        modified.source =
-            Some(crate::ability::enums::Zone::UnderMember.to_str().into());
-        self.execute_place_energy_under_member(gs, &modified);
+        log::debug!("[UNDER_MEMBER] called selected={:?} pending={:?}", self.selected_cards, self.pending_choice.is_some());
+        let target = c.effect.target.as_deref().unwrap_or("self");
+        // If this is a resumed call after the player selected a stage member,
+        // self.selected_cards will contain that member's ID.
+        if !self.selected_cards.is_empty() {
+            log::debug!("[UNDER_MEMBER] second call selected={:?}", self.selected_cards);
+            let selected_member_id = self.selected_cards[0];
+            let idx_opt = {
+                let player = gs.resolve_target_player(target);
+                player.stage.stage.iter().position(|&id| id == selected_member_id)
+            };
+            if let Some(idx) = idx_opt {
+                let under_cards = {
+                    let player = gs.resolve_target_player_mut(target);
+                    core::mem::take(&mut player.stage.under_cards[idx])
+                };
+                let mut moved: Vec<i16> = Vec::new();
+                for cid in under_cards {
+                    let is_energy = gs.card_database.get_card(cid).is_some_and(|card| card.is_energy());
+                    if is_energy {
+                        let player = gs.resolve_target_player_mut(target);
+                        player.energy_zone.cards.push(cid);
+                        gs.mods.add_orientation_modifier(cid, "wait");
+                        moved.push(cid);
+                    } else {
+                        let player = gs.resolve_target_player_mut(target);
+                        player.waitroom.add_card(cid);
+                        moved.push(cid);
+                    }
+                }
+                gs.mark_constants_dirty();
+                gs.recalculate_constants();
+                self.moved_cards.extend(moved.iter().copied());
+                self.last_move_moved_any = Some(!moved.is_empty());
+                for &cid in &moved {
+                    gs.push_movement_event(
+                        cid,
+                        "under_member",
+                        "energy_zone",
+                        gs.activating_card,
+                        &gs.ability_queue
+                            .current_entry()
+                            .map(|e| e.player_id.clone())
+                            .unwrap_or_else(|| "p1".to_string()),
+                        true,
+                    );
+                }
+                if !moved.is_empty() {
+                    gs.recently_moved_cards = Some(moved.clone().into());
+                    gs.recently_moved_from_zone = Some("under_member".to_string());
+                }
+                self.selected_cards.clear();
+                return Ok(moved);
+            }
+            self.selected_cards.clear();
+            return Ok(vec![]);
+        }
+
+        // First call: find candidates and optionally prompt
+        let player = gs.resolve_target_player(target);
+        let candidates: Vec<usize> = (0..3)
+            .filter(|&i| {
+                !player.stage.under_cards[i].is_empty()
+                    && player.stage.under_cards[i]
+                        .iter()
+                        .any(|&cid| gs.card_database.get_card(cid).is_some_and(|card| card.is_energy()))
+            })
+            .collect();
+        if candidates.is_empty() {
+            self.last_move_moved_any = Some(false);
+            return Ok(vec![]);
+        }
+        if candidates.len() == 1 {
+            let idx = candidates[0];
+            let under_cards = {
+                let player = gs.resolve_target_player_mut(target);
+                core::mem::take(&mut player.stage.under_cards[idx])
+            };
+            let mut moved: Vec<i16> = Vec::new();
+            for cid in under_cards {
+                let is_energy = gs.card_database.get_card(cid).is_some_and(|card| card.is_energy());
+                if is_energy {
+                    let player = gs.resolve_target_player_mut(target);
+                    player.energy_zone.cards.push(cid);
+                    gs.mods.add_orientation_modifier(cid, "wait");
+                    moved.push(cid);
+                } else {
+                    let player = gs.resolve_target_player_mut(target);
+                    player.waitroom.add_card(cid);
+                    moved.push(cid);
+                }
+            }
+            gs.mark_constants_dirty();
+            gs.recalculate_constants();
+            self.moved_cards.extend(moved.iter().copied());
+            self.last_move_moved_any = Some(!moved.is_empty());
+            for &cid in &moved {
+                gs.push_movement_event(
+                    cid,
+                    "under_member",
+                    "energy_zone",
+                    gs.activating_card,
+                    &gs.ability_queue
+                        .current_entry()
+                        .map(|e| e.player_id.clone())
+                        .unwrap_or_else(|| "p1".to_string()),
+                    true,
+                );
+            }
+            if !moved.is_empty() {
+                gs.recently_moved_cards = Some(moved.clone().into());
+                gs.recently_moved_from_zone = Some("under_member".to_string());
+            }
+            return Ok(moved);
+        }
+        // Multiple candidates, non-optional: prompt to choose
+        self.pending_choice = Some(
+            crate::ability::types::Choice::select_cards(
+                crate::ability::enums::Zone::Stage.to_str(),
+                1,
+                "Choose a member whose under energies to move".to_string(),
+                c.effect.optional.unwrap_or(false),
+            )
+            .description_ja(Some("下のエネルギーを移動するメンバーを選択".to_string()))
+            .card_type(Some("member_card".to_string()))
+            .filtered_indices(Some(candidates))
+            .target_player_id(Some(target.to_string()))
+            .build(),
+        );
+        self.execution_context = crate::ability::types::ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(vec![])
     }
 

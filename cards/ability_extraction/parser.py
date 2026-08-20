@@ -11778,6 +11778,28 @@ def _fix_ll_bp7_001_play_cost(data: Dict[str, Any]) -> None:
         }
 
 
+def _fix_burn_under_move(data: Dict[str, Any]) -> None:
+    """Fix PL!N-bp7-029-L Burn!!: parser mis-labels the under_member→energy_zone move
+    as place_energy_under_member (which is for placing *under*). Correct to move_cards.
+    """
+    for ability in data.get("unique_abilities", []):
+        if not any("N-bp7-029-L" in c for c in ability.get("cards", [])):
+            continue
+        eff = ability.get("effect")
+        if not isinstance(eff, dict) or eff.get("action") != "conditional_on_result":
+            continue
+        prim = eff.get("primary_effect")
+        if isinstance(prim, dict) and prim.get("source") == "under_member":
+            # This is the move from under_member to energy_zone, not a place-under
+            if prim.get("action") == "place_energy_under_member":
+                prim["action"] = "move_cards"
+            prim["source"] = "under_member"
+            prim["destination"] = "energy_zone"
+            # energy cards, all, wait state should remain
+            prim.setdefault("card_type", "energy_card")
+            prim.setdefault("all", True)
+
+
 def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     """Post-process already-parsed abilities: infer actions, apply targeted fixes."""
 
@@ -11805,6 +11827,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
         _process_pre_fix(ability, fix_stats)
     _process_post_fixes(data, fix_stats)
     _fix_ll_bp7_001_play_cost(data)
+    _fix_burn_under_move(data)
     # Final invariant pass: strip card_type from self-appearance conditions
     # across every ability (single source of truth for this rule).
     for ability in data["unique_abilities"]:
