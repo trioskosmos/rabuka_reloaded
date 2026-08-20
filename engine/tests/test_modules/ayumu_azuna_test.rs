@@ -68,9 +68,11 @@ fn azuna_q158_blade_all_members() {
     game.set_live_card(filler_live);
     advance_to_live_start(&mut game);
 
-    if game.has_pending_choice() {
-        game.select_energy_from_zone(1);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "Azuna LiveStart must offer energy select (conditional_on_optional)"
+    );
+    game.select_energy_from_zone(1);
 
     assert_eq!(
         game.state.mods.get_blade_modifier(member_left),
@@ -114,14 +116,16 @@ fn azuna_q158_blade_single_member() {
     game.set_live_card(filler_live);
     advance_to_live_start(&mut game);
 
-    if game.has_pending_choice() {
-        game.select_energy_from_zone(1);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "Azuna single member must offer energy select"
+    );
+    game.select_energy_from_zone(1);
 
     assert_eq!(game.state.mods.get_blade_modifier(ayumu), 2);
 }
 
-/// select_option(0) = skip → no place_energy → no conditional (blade stays 0)
+ /// select_option(0) = skip → no place_energy → no conditional (blade stays 0)
 #[test]
 fn azuna_q158_blade_not_gained_if_energy_not_placed() {
     let db = load_real_database();
@@ -146,9 +150,21 @@ fn azuna_q158_blade_not_gained_if_energy_not_placed() {
     game.set_live_card(filler_live);
     advance_to_live_start(&mut game);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
+    assert!(
+        game.has_pending_choice(),
+        "Azuna skip must offer energy select"
+    );
+    let ch = game.state.get_pending_choice().cloned().unwrap();
+    if let rabuka_engine::ability::types::Choice::SelectCard {
+        zone, allow_skip, ..
+    } = ch
+    {
+        assert_eq!(zone, "energy", "energy select zone should be energy, got {}", zone);
+        assert!(allow_skip, "energy select must be optional");
+    } else {
+        panic!("Expected SelectCard for energy, got {:?}", ch);
     }
+    game.select_indices(&[]);
 
     assert_eq!(game.state.mods.get_blade_modifier(ayumu), 0);
 }
@@ -184,9 +200,11 @@ fn azuna_q157_energy_under_member_uses_any_energy() {
     game.set_live_card(filler_live);
     advance_to_live_start(&mut game);
 
-    if game.has_pending_choice() {
-        game.select_energy_from_zone(1);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "Q157 must offer energy select"
+    );
+    game.select_energy_from_zone(1);
 
     assert_eq!(
         game.state.mods.get_blade_modifier(ayumu),
@@ -223,9 +241,11 @@ fn azuna_q184_energy_under_member_not_counted() {
     game.set_live_card(filler_live);
     advance_to_live_start(&mut game);
 
-    if game.has_pending_choice() {
-        game.select_energy_from_zone(1);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "Q184 must offer energy select"
+    );
+    game.select_energy_from_zone(1);
 
     assert_eq!(
         game.state.player1.energy_zone.cards.len(),

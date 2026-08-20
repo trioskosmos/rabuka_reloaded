@@ -8772,6 +8772,34 @@ def _try_baton_touch_effect(text):
     return result
 
 
+PLACEMENT_MARKERS = ("置いた", "置かれ", "置いて", "置く")
+
+
+def _fix_placement_condition(cond, cp):
+    """Issue 11 helper: placement-referencing conditions (置いた/置かれ/置いて/置く)
+    refer to preceding_moved, not the whole zone. For compound (AかつB) only the
+    placement half is fixed (e.g. Burn!! first half energy_card置いており→preceding_moved,
+    second half total>=10 stays energy_zone)."""
+    if not cond or not any(m in cp for m in PLACEMENT_MARKERS):
+        return cond
+    if cond.get("type") == "compound" and cond.get("conditions"):
+        for sub in cond["conditions"]:
+            sub_text = sub.get("text", "")
+            if any(m in sub_text for m in PLACEMENT_MARKERS):
+                sub["source"] = "preceding_moved"
+                sub.pop("location", None)
+                if sub.get("type") in ("location_condition",):
+                    sub["type"] = "card_count_condition"
+        cond.pop("location", None)
+        cond.pop("source", None)
+    else:
+        cond["source"] = "preceding_moved"
+        cond.pop("location", None)
+        if cond.get("type") in ("location_condition",):
+            cond["type"] = "card_count_condition"
+    return cond
+
+
 def _try_kore_niyori_result(text):
     """これにより/これによって～した場合/とき — conditional on result (invalidation follow-up, discard follow-up, etc.)."""
     marker = None
@@ -8808,28 +8836,7 @@ def _try_kore_niyori_result(text):
     # Infer location from context: "公開された" means revealed_cards
     if cond and "公開された" in cp and not cond.get("location"):
         cond["location"] = "revealed_cards"
-    # Issue 11: If the condition describes cards placed somewhere ("デッキの下に置いた"),
-    # it references the cards moved by the preceding action, not the entire deck.
-    # Burn!! uses "置いており" (te-form continuative), so also match "置いて" / "置く".
-    _placement_markers = ("置いた", "置かれ", "置いて", "置く")
-    if cond and any(m in cp for m in _placement_markers):
-        # Compound (AかつB): only the placement-referencing half should become
-        # preceding_moved; the other half (e.g. total energy 10+) stays zone-count.
-        if cond.get("type") == "compound" and cond.get("conditions"):
-            for sub in cond["conditions"]:
-                sub_text = sub.get("text", "")
-                if any(m in sub_text for m in _placement_markers):
-                    sub["source"] = "preceding_moved"
-                    sub.pop("location", None)
-                    if sub.get("type") in ("location_condition",):
-                        sub["type"] = "card_count_condition"
-            cond.pop("location", None)
-            cond.pop("source", None)
-        else:
-            cond["source"] = "preceding_moved"
-            cond.pop("location", None)
-            if cond.get("type") in ("location_condition",):
-                cond["type"] = "card_count_condition"
+    cond = _fix_placement_condition(cond, cp)
     # Extract character names from 「X」のメンバーカード/ライブカード patterns
     if cond and isinstance(cond, dict) and not cond.get("characters"):
         char_m = re.search(r"「([^」]+)」の(?:メンバーカード|ライブカード)", cond_raw)

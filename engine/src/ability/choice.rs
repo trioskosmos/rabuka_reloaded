@@ -1941,21 +1941,6 @@ impl super::resolver::AbilityResolver {
             // is used to choose which member's under energies to move. The actual
             // energy movement must happen here, not in a second resolve call which
             // is never re-entered for conditional_on_result.
-            // Debug: log entry effect for under_member detection
-            log::debug!(
-                "[CHECK_UNDER] cards={:?} entry_eff={:?} cur_eff={:?}",
-                cards,
-                gs.ability_queue
-                    .current_entry()
-                    .and_then(|e| e.ability.effect.as_ref())
-                    .map(|eff| format!("action={} src={:?} primary_src={:?}", eff.action, eff.source, eff.compound.primary_effect.as_ref().and_then(|pe| pe.source.as_ref().map(|z| z.to_str())))),
-                self.current_effect.as_ref().map(|eff| format!(
-                    "action={} src={:?} primary_src={:?}",
-                    eff.action,
-                    eff.source,
-                    eff.compound.primary_effect.as_ref().and_then(|pe| pe.source.as_ref().map(|z| z.to_str()))
-                ))
-            );
             if !cards.is_empty()
                 && (gs.ability_queue.current_entry().is_some_and(|e| {
                     e.ability
@@ -1992,18 +1977,19 @@ impl super::resolver::AbilityResolver {
                                         .is_some_and(|z| z.to_str() == "under_member")
                                 })
                     }) || {
-                        // Fallback: if Stage selection has filtered_indices and any selected member has under energies, treat as under_member move
-                        let has_under = cards.iter().any(|&mid| {
+                        // Fallback: any Stage is_select_action where selected member has under cards → treat as under_member move
+                        cards.iter().any(|&mid| {
                             gs.resolve_target_player("self")
                                 .stage
                                 .stage
                                 .iter()
                                 .position(|&id| id == mid)
-                                .map(|idx| !gs.player1.stage.under_cards[idx].is_empty() || !gs.player2.stage.under_cards[idx].is_empty())
+                                .map(|idx| {
+                                    !gs.player1.stage.under_cards[idx].is_empty()
+                                        || !gs.player2.stage.under_cards[idx].is_empty()
+                                })
                                 .unwrap_or(false)
-                        });
-                        log::debug!("[CHECK_UNDER_FALLBACK] has_under={}", has_under);
-                        has_under
+                        })
                     })
             {
                 if let Some(entry) = gs.ability_queue.current_entry().cloned() {
@@ -2022,42 +2008,13 @@ impl super::resolver::AbilityResolver {
                             .iter()
                             .position(|&id| id == mid)
                         {
-                            let under = core::mem::take(
-                                &mut gs
-                                    .resolve_target_player_mut(target)
-                                    .stage
-                                    .under_cards[idx],
-                            );
-                            for ucid in under {
-                                let is_energy = gs
-                                    .card_database
-                                    .get_card(ucid)
-                                    .is_some_and(|c| c.is_energy());
-                                if is_energy {
-                                    gs.resolve_target_player_mut(target)
-                                        .energy_zone
-                                        .cards
-                                        .push(ucid);
-                                    gs.mods.add_orientation_modifier(ucid, "wait");
-                                } else {
-                                    gs.resolve_target_player_mut(target)
-                                        .waitroom
-                                        .add_card(ucid);
-                                }
-                                moved.push(ucid);
-                                gs.push_movement_event(
-                                    ucid,
-                                    "under_member",
-                                    "energy_zone",
-                                    gs.activating_card,
-                                    &entry.player_id,
-                                    true,
+                            let mut m =
+                                crate::ability::move_cards::drain_under_cards_to_energy_zone(
+                                    gs, target, idx,
                                 );
-                            }
+                            moved.append(&mut m);
                         }
                     }
-                    gs.mark_constants_dirty();
-                    gs.recalculate_constants();
                     if !moved.is_empty() {
                         self.moved_cards.extend(moved.iter().copied());
                         gs.recently_moved_cards = Some(moved.clone().into());

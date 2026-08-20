@@ -234,7 +234,8 @@ g.state.player1.stage.stage = [outsider, -1, -1]; // non-虹 ally at show window
     g.add_to_hand(ayumu);
     g.give_energy(20);
     seed_decks(&mut g);
-    g.try_play_to_stage(ayumu, MemberArea::Center);
+    g.try_play_to_stage(ayumu, MemberArea::Center)
+        .expect("ayumu play to center should succeed (cost 4, 20 energy, center empty)");
     drain(&mut g, true);
     assert!(
         !is_waited(&g, opp),

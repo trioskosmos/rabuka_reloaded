@@ -311,7 +311,7 @@ fn ruby_move_left_to_occupied_center_swaps_and_records() {
     let mut game = TestGame::new(db);
 
     let ruby = ruby_id(&game);
-    let left = filler_id(&game);
+    let _left = filler_id(&game);
     let center = filler_id(&game);
     let right = filler_id(&game);
     // center already occupied by `center`; ruby will debut to left.

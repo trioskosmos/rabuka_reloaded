@@ -19,7 +19,6 @@
 ///   5. SELF CONTROL!! fires: only Seira A and Seira B get blade; filler does not.
 use crate::helpers::*;
 use crate::test_modules::bp7_wait_immunity_helpers::*;
-use rabuka_engine::zones::MemberArea;
 
 /// 聖良's ab#1 (area-move trigger) wait is blocked by wait-immunity.
 #[test]

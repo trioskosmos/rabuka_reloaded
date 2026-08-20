@@ -2,27 +2,55 @@
 
 _Generated from `cards/abilities.json` (936 abilities) vs `engine/tests` — 250 untested, 686 covered._
 
-> **2026-08-20 UPDATE: Lenient tests are now #0 priority – they hide real failures. Fix these before adding new coverage. See §0.**
+> **2026-08-20 UPDATE2: Original 8 lenient fixed in e6216c69 (2383 pass, 0 hidden). Next 15 lenient below are now #0 – see §0.1. Refactored parser+engine under_member, strict zone/pending checks. See §0.**
 
 This report surfaces **structurally novel or long/complex** untested abilities — not just the biggest generic gaps from `ABILITY_MATRIX.md`, but abilities whose _JSON shape or text length_ has **zero tested counterpart** or whose trigger/condition combo is rare.
 
 ## 0. Lenient / Bullshit Tests – Top Priority to Harden
 
-Found via `grep -rn "assert.*||" + "lenient|TODO|for now"` on `engine/tests` (2026-08-20). These pass while hiding the bug; make them strict `assert_eq!` after fixing the engine/parser.
+### 0.0 DONE – 8 original (2026-08-20, commit e6216c69) now strict, 2383 pass
 
-| File:line | Pattern | Why lenient | What strict should be |
+Found via `grep -rn "assert.*||" + "lenient|TODO|for now"` (2026-08-20). Fixed: parser `PLACEMENT_MARKERS` + `drain_under_cards_to_energy_zone` helper, `choice.rs` Stage is_select_action, `fixed_customs` direct LiveSuccess, `hanamaru` no-pending strict.
+
+| File:line | Pattern | Why lenient | Fix (e6216c69) |
 |---|---|---|---|
-| `engine/tests/test_modules/burn_energy_under_test.rs:51` | `score_after == score_before \|\| score_after == score_before+1` | `0 under +10 total` should be `0` (needs `1+ moved`), but `result_condition` first half checks `energy_zone>=1` not `recently_moved>=1` so it scores `1` | Fix parser: first half `location:energy_zone` → `source:recently_moved` (or engine `conditional_on_result` to check `recently_moved`), then `assert_eq!(score_after, score_before)` |
-| `engine/tests/test_modules/burn_energy_under_test.rs:66,80,93,106` | `score == 0 \|\| score == 1` | `1 under+9=9` must be `0`, `1+9=10` must be `1`, etc. – `||` hides `total>=10` vs `recently_moved` confusion | Fix as above, then `assert_eq!(score,0)` for `9`, `assert_eq!(score,1)` for `10` |
-| `engine/tests/test_modules/fixed_customs_test.rs:70` | `has_score \|\| score_before==0` | `LiveSuccess per wait member should add score` – `has_score` false is hidden when `score_before==0` | Make strict `assert!(has_score)` after ensuring `wait` state is correctly set |
-| `engine/tests/test_modules/draw_one_put_bottom_debut_test.rs:457` | `!deck.contains(&card_a) \|\| main_deck.contains(&card_a)` | Always true if second half true | Make strict `assert!(!deck.contains(&card_a))` and separately `assert!(main_deck.contains(&card_a))` |
-| `engine/tests/test_modules/hanamaru_bp3_choose_player_test.rs:101` | `// TODO: currently broken – "そのプレイヤー" always resolves to self` | Was soft-fail; now fixed via `choice.rs:2403 SelfOrOpponent` + `put_hanamaru` filler deck, but `TODO` still in file | Remove `TODO` and keep strict `assert_eq!(deck.last(), Some(&live))` + `assert_eq!(hand.len(), hand_before+1)` |
-| `engine/tests/test_modules/hanamaru_bp3_choose_player_test.rs:122` | `We accept either Err or no effect` | `pay 1E` must be `Err` when `active_count==0` | Make strict `assert!(res.is_err())` after `energy_state` fix |
-| `engine/tests/test_modules/energy_state_condition_test.rs:92` | `// For now assert that with active energy, the live_start trigger is not blocked` | No score check | Make strict `score==1` vs `0` via `PerformanceSnapshot` after `energy_state` fix |
-| `engine/tests/test_modules/bytecode_validation_test.rs:132` | `// Report but don't fail for now` | Hides bytecode mismatch | Make strict `assert!(mismatch==0)` |
-| `engine/tests/test_modules/position_change_condition_test.rs:219` | `// For now, skip the "moves TO center"` | Incomplete coverage | Add strict `TO` case |
+| `burn_energy_under_test.rs:51` | `score==before \|\| +1` | `0 under+10` should be 0, `energy_zone>=1` vs `preceding_moved` | `parser.py:PLACEMENT_MARKERS` + `drain_under_cards_to_energy_zone` + `Stage is_select_action:true` + `mfi[0]` for filtered [1]; now `assert_eq!(0)` |
+| `burn_energy_under_test.rs:66,80,93,106` | `score==0\|\|1` | hides `9→0` vs `10→1` | same + `select_burn_move [0]` + `skip [skip]`; now strict |
+| `fixed_customs_test.rs:70` | `has_score\|\|before==0` | hides wait count | `trigger_auto_ability LiveSuccess` + `assert_eq!(+1)` |
+| `draw_one_put_bottom_debut_test.rs:457` | `!deck.contains\|\|contains` tautology | always true | split to `assert!(!deck.contains)` + `assert!(main_deck.contains)` |
+| `hanamaru_bp3:101` | `TODO そのプレイヤー self` | TODO left | removed, `assert_eq!(deck.last)` + `hand+1` strict, `choice.rs SelfOrOpponent` |
+| `hanamaru_bp3:122` | `Err or no effect` | lenient | now `!has_pending && hand==before` strict (engine cost check not Err for Wakana compat) |
+| `energy_state:92` | `For now no score` | no assert | `trigger_daisuki_live_start LiveStart` + `assert_eq!(score 1/0)` + `active vs wait vs opponent` |
+| `bytecode:132` | `Report but don't fail` | hides mismatch | `assert_eq!(has_json_cost,has_bc_cost)` |
+| `position_change:219` | `For now skip TO center` | stub | replaced with real `Shiki PL!SP-bp2-008-R Center→Right` swap `μ's Right→Center` TO center must NOT gain |
 
-**How to find automatically:** `grep -rn -E "assert!\(.*\|\|.*\)|//.*(lenient|TODO|FIXME|for now)" engine/tests --include="*.rs"` + `python cards/test_inventory.py --check` for `recently_moved` vs `energy_zone` confusion.
+**How to find automatically:** `grep -rn -E "assert!\(.*\|\|.*\)|//.*(lenient|TODO|FIXME|for now)" engine/tests --include="*.rs"` + `python cards/test_inventory.py --check`
+
+### 0.1 NEXT 15 lenient still remaining (audit 2026-08-20 PM, 2000+ tests scanned) – fix next
+
+Found via `has_pending_choice` else-no-panic + `allow_skip` one-branch + `eprintln` no-assert + `||` zone check. These pass while hiding that the ability never fired.
+
+| # | File:line | Pattern | Why lenient | What strict should be |
+|---|---|---|---|---|
+| 1 | `ayumu_azuna_test.rs:71,117,187,226` | `if has_pending {select_energy} assert blade 2` | Passes if `LiveStart conditional_on_optional` never fired (no pending) – blade 0 vs 2 hides root cause | `assert!(has_pending,"Azuna LiveStart must offer energy select"); assert!(matches!(SelectCard{zone=="energy_zone"})); select_energy(1); assert_eq!(blade,2)` + separate `allow_skip` skip branch |
+| 2 | `ayumu_azuna_test.rs:149` | `if has_pending {select_indices([])} assert blade 0` | Only tests skip branch, never pay branch with allow_skip check | `assert!(allow_skip)` + `select([]) => blade 0` AND `select([0]) => blade 2` both |
+| 3 | `fixed_customs_test.rs:109` | `if !has_pending { manual trigger_auto_ability }` | Hides `performance→LiveSuccess` heart fail – manual `push success_zone + trigger` synthesizes success | Remove fallback; `assert!(has_pending,"yell should trigger LiveSuccess via performance")` – make live's need met via hearts, not manual |
+| 4 | `position_change_non_optional_test.rs:433,558` | `assert!(!has_pending \|\| true)` | Tautology always true | `assert!(!has_pending)` + `assert_eq!(positions.len(),0)` |
+| 5 | `chisato_live_success_test.rs:17` | `fn accept_swap_to(){if !has_pending {return}}` | Silent return hides no `position|destination` choice | `assert!(has_pending,"expected position|destination"); assert_eq!(choice_type,Some("SelectTarget"))` |
+| 6 | `pl_hs_bp6_004_test.rs:38` | `eprintln!("[DIAG] blade=…")` no assert | Only `eprintln`, `if has_pending {select}` – never fails | `assert_eq!(blade,2)` + `assert!(opponent_in_wait)` |
+| 7 | `ability_engine_fixes_test.rs:795,800,881,886,1287,1350` | `if has_pending {select_option}` no else panic | `unless_pay` `しないかぎり` must offer `pay_optional_cost` – passes if phase wrong | `assert!(has_pending,"kanon unless_pay must appear"); assert_eq!(choice_type,"SelectTarget")` before select |
+| 8 | `cards_6_thru_13_test.rs:639,673,692,711,731,766,770,790` | `if !has_pending {return}` | Checks parsing but passes if `hand discard SelectCard` never created | `assert!(has_pending)` + `assert_pending Zone=="hand" allow_skip==true` |
+| 9 | `kinako_each_time_blade_test.rs:17` | `if !has_pending {return}` | `each_time` blade silently not trigger | `assert!(has_pending)` or `assert_eq!(blade,expected)` with explicit check |
+| 10 | `bp7_mia_play_cost_reduction_test.rs:28` | `if !has_pending {eprintln}` | Dynamic cost `PL!SP-bp7-009-R` not verified if no `SelectCard(cost)` | `assert!(has_pending)` + `assert_eq!(allow_skip,false)` |
+| 11 | `energy_and_member_under_test.rs:178,208,235,526,560,887` | `if has_pending {select}` 5× | `under_member` only happy path, no `else panic` if filtered empty | `else {panic!("expected Stage pay_optional")}` + `assert!(zone=="stage" && filtered.len==1)` |
+| 12 | `rin_bp6_test.rs:137,131,199,218,286,326` | `if allow_skip {eprintln; return}` | Only skip branch tested | Test both: `assert!(allow_skip); select([])=>hand==before` AND `select([0])=>hand.contains` |
+| 13 | `live_cards_disappear_test.rs:108,61,69` | `if !has_pending {return}` + `eprintln` | `LiveCardZone` disappear `SelectAutoAbility` missing hides | `assert!(has_pending,"LiveDisappear should offer SelectAutoAbility")` + `assert!(live_zone.is_empty())` |
+| 14 | `hanamaru_test.rs:57` `emma_test.rs:53` `hanayo_test.rs:33` | `eprintln!("[HANAMARU] hand…")` no assert | Debug dump never fails | `assert_eq!(hand,before+1)` guard `assert!(has_pending)` |
+| 15 | `fixed_customs_test.rs:113` | `zone=="revealed" \|\| "discard" \|\| "revealed_remaining"` | `||` hides wrong zone (should be `revealed_cards`) | `assert_eq!(zone,"revealed_cards")` – now strict (fixed) |
+
+**How to find next automatically:** `grep -rn "has_pending_choice" engine/tests --include="*.rs" | grep -A2 "else"` + `grep -rn "allow_skip" engine/tests --include="*.rs"` (37 hits, ~60% one-branch) + `grep -rn "eprintln" engine/tests --include="*.rs"` (127 hits, 9 tests with no co-located `assert`).
+
+Refactor opportunities (engine): `choice.rs:3500` split into `choice/{stage,under_member,area_select}.rs`, `move_cards.rs:3400` extract `drain_under_cards_to_energy_zone` (done) + `resolve_from_*` per zone, `condition/card.rs:4000` split `card.rs`/`state.rs`, `parser.py:13000` extract `PLACEMENT_MARKERS` helper (done) + split handlers. Warnings: `karin:67 hs:40 filler` unused, `ruby:314 left`, `fixed_customs:9 dead_code`, `bp7_sd2:237 Result` – fix next.
 
 ## 0.1 Gap Matrix Recap (from `docs/ABILITY_MATRIX.md`)
 

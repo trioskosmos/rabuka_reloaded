@@ -430,9 +430,9 @@ fn non_optional_pc_with_all_positions_excluded_fizzles() {
     game.select_generated(0);
     game.drain_auto_ability_choices();
     assert!(
-        !game.has_pending_choice() || true,
-        "Ability should complete"
-    ); // just checking no crash
+        !game.has_pending_choice(),
+        "Ability should complete without pending choice"
+    );
 }
 
 // ====================================================================
@@ -555,11 +555,10 @@ fn optional_pc_excludes_self_but_can_skip() {
         }
     }
     if found_choice {
-        // Should have the ability to skip (allow_skip=true)
-        // The empty valid_destinations means the ability auto-skips
+        // Empty valid_destinations means the ability auto-skips
         assert!(
-            !game.has_pending_choice() || true,
-            "Should complete cleanly"
+            !game.has_pending_choice(),
+            "Should complete cleanly without pending choice after skip"
         );
     }
 }

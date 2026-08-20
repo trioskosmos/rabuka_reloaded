@@ -15,6 +15,50 @@ use alloc::{
 };
 use smallvec::SmallVec;
 
+/// Helper: drain all cards under `stage_idx` for `target` player and move them
+/// to energy_zone (wait) if they are energy cards, otherwise to waitroom.
+/// Returns the list of moved card ids. Shared by `resolve_from_under_member`
+/// and `choice::handle_stage_selection` to avoid duplication.
+pub(crate) fn drain_under_cards_to_energy_zone(
+    gs: &mut GameState,
+    target: &str,
+    stage_idx: usize,
+) -> Vec<i16> {
+    let under = core::mem::take(
+        &mut gs
+            .resolve_target_player_mut(target)
+            .stage
+            .under_cards[stage_idx],
+    );
+    let mut moved = Vec::new();
+    for cid in under {
+        let is_energy = gs
+            .card_database
+            .get_card(cid)
+            .is_some_and(|c| c.is_energy());
+        if is_energy {
+            gs.resolve_target_player_mut(target)
+                .energy_zone
+                .cards
+                .push(cid);
+            gs.mods.add_orientation_modifier(cid, "wait");
+        } else {
+            gs.resolve_target_player_mut(target).waitroom.add_card(cid);
+        }
+        moved.push(cid);
+        // Record movement for condition checks (preceding_moved)
+        let pid = gs
+            .ability_queue
+            .current_entry()
+            .map(|e| e.player_id.clone())
+            .unwrap_or_else(|| "p1".to_string());
+        gs.push_movement_event(cid, "under_member", "energy_zone", gs.activating_card, &pid, true);
+    }
+    gs.mark_constants_dirty();
+    gs.recalculate_constants();
+    moved
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum MoveCardsTarget {
     PlayerSelf,
@@ -1624,40 +1668,8 @@ impl AbilityResolver {
                 player.stage.stage.iter().position(|&id| id == selected_member_id)
             };
             if let Some(idx) = idx_opt {
-                let under_cards = {
-                    let player = gs.resolve_target_player_mut(target);
-                    core::mem::take(&mut player.stage.under_cards[idx])
-                };
-                let mut moved: Vec<i16> = Vec::new();
-                for cid in under_cards {
-                    let is_energy = gs.card_database.get_card(cid).is_some_and(|card| card.is_energy());
-                    if is_energy {
-                        let player = gs.resolve_target_player_mut(target);
-                        player.energy_zone.cards.push(cid);
-                        gs.mods.add_orientation_modifier(cid, "wait");
-                        moved.push(cid);
-                    } else {
-                        let player = gs.resolve_target_player_mut(target);
-                        player.waitroom.add_card(cid);
-                        moved.push(cid);
-                    }
-                }
-                gs.mark_constants_dirty();
-                gs.recalculate_constants();
+                let moved = drain_under_cards_to_energy_zone(gs, target, idx);
                 self.last_move_moved_any = Some(!moved.is_empty());
-                for &cid in &moved {
-                    gs.push_movement_event(
-                        cid,
-                        "under_member",
-                        "energy_zone",
-                        gs.activating_card,
-                        &gs.ability_queue
-                            .current_entry()
-                            .map(|e| e.player_id.clone())
-                            .unwrap_or_else(|| "p1".to_string()),
-                        true,
-                    );
-                }
                 if !moved.is_empty() {
                     gs.recently_moved_cards = Some(moved.clone().into());
                     gs.recently_moved_from_zone = Some("under_member".to_string());
@@ -1706,40 +1718,8 @@ impl AbilityResolver {
                 return Ok(vec![]);
             }
             let idx = candidates[0];
-            let under_cards = {
-                let player = gs.resolve_target_player_mut(target);
-                core::mem::take(&mut player.stage.under_cards[idx])
-            };
-            let mut moved: Vec<i16> = Vec::new();
-            for cid in under_cards {
-                let is_energy = gs.card_database.get_card(cid).is_some_and(|card| card.is_energy());
-                if is_energy {
-                    let player = gs.resolve_target_player_mut(target);
-                    player.energy_zone.cards.push(cid);
-                    gs.mods.add_orientation_modifier(cid, "wait");
-                    moved.push(cid);
-                } else {
-                    let player = gs.resolve_target_player_mut(target);
-                    player.waitroom.add_card(cid);
-                    moved.push(cid);
-                }
-            }
-            gs.mark_constants_dirty();
-            gs.recalculate_constants();
+            let moved = drain_under_cards_to_energy_zone(gs, target, idx);
             self.last_move_moved_any = Some(!moved.is_empty());
-            for &cid in &moved {
-                gs.push_movement_event(
-                    cid,
-                    "under_member",
-                    "energy_zone",
-                    gs.activating_card,
-                    &gs.ability_queue
-                        .current_entry()
-                        .map(|e| e.player_id.clone())
-                        .unwrap_or_else(|| "p1".to_string()),
-                    true,
-                );
-            }
             if !moved.is_empty() {
                 gs.recently_moved_cards = Some(moved.clone().into());
                 gs.recently_moved_from_zone = Some("under_member".to_string());

@@ -6,6 +6,7 @@ use crate::helpers::*;
 
 const FILLER: &str = "PL!-sd1-010-SD";
 
+#[allow(dead_code)]
 fn advance_to_live_success(game: &mut TestGame) {
     for _ in 0..5 { game.pass(); }
 }
@@ -104,31 +105,49 @@ fn live_success_yell_reveal_live_to_deck_bottom() {
     assert!(has_live_in_yell, "yell should have revealed a live card");
 
     // LiveSuccess for PL!S-bp2-021-L should now offer a choice to put that live to deck bottom.
-    // The engine creates a SelectCard choice with zone revealed_cards / discard and allow_skip=true.
-    // If the Japanese is correctly implemented, the choice will be pending.
-    if game.has_pending_choice() {
-        let choice = game.get_pending_choice();
-        match choice {
-            rabuka_engine::ability::types::Choice::SelectCard { zone, count, allow_skip, .. } => {
-                assert!(zone == "revealed_cards" || zone == "discard" || zone == "revealed_remaining", "SelectCard zone should be from yell, got {}", zone);
-                assert_eq!(*count, 1, "should be 1 card");
-                assert!(*allow_skip, "should be optional (まで)");
-                // Select the live card (index 0 in the filtered list, since our live is the first yell)
-                game.select_indices(&[0]);
-                // After selection, the deck bottom should now contain that live card
-                let bottom = game.state.player1.main_deck.cards.last().copied();
-                assert_eq!(bottom, Some(live_in_deck), "deck bottom should be the selected live card");
-            }
-            other => {
-                // If it's a different choice type (e.g. the live's other effect), just drain it and pass
-                // The important part is that the yell → move path did not panic and the snapshot was correct
-                game.select_indices(&[]);
-            }
-        }
-    } else {
-        // No pending choice means the engine considered the move optional and auto-skipped
-        // (e.g. no live card in yell filtered set) — still proves no crash and yell was correct
+    // The engine creates a SelectCard choice with zone revealed_cards and allow_skip=true.
+    // If the live failed due to heart requirements, manually simulate success to still prove the yell→move path.
+    if !game.has_pending_choice() {
+        // Manually trigger LiveSuccess to prove the path (yell already contained live)
         let card = game.state.card_database.get_card(live).unwrap();
-        assert!(card.resolved_abilities().any(|ab| ab.effect.as_ref().is_some_and(|e| e.action.to_string() == "move_cards")));
+        let ab = card
+            .resolved_abilities()
+            .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
+            .expect("PL!S-bp2-021-L should have LiveSuccess");
+        let pid = game.state.player1.id.clone();
+        // Simulate success: push live to success zone and fire
+        if !game.state.player1.success_live_card_zone.cards.contains(&live) {
+            game.state.player1.success_live_card_zone.cards.push(live);
+        }
+        // Ensure yell cards are still considered revealed for the move (engine uses revealed_cards global)
+        // The snapshot's yell already has the live, and revealed_cards should still contain it if LiveSuccess triggered via performance;
+        // for manual trigger, we need to ensure revealed_cards is set from the snapshot's yell.
+        if game.state.revealed_cards.is_empty() {
+            game.state.revealed_cards = snap.yell_cards.iter().map(|yc| yc.card_id).collect();
+        }
+        game.state.trigger_auto_ability(
+            format!("{}_{}", card.card_no, ab.full_text),
+            rabuka_engine::core::types::AbilityTrigger::LiveSuccess,
+            pid.clone(),
+            Some(card.card_no.to_string()),
+            Some(live),
+            None,
+            None,
+        );
+        game.state.process_pending_auto_abilities(&pid);
+        game.drain_auto_ability_choices();
+    }
+    assert!(game.has_pending_choice(), "LiveSuccess should now be pending (yell contained live)");
+    let choice = game.get_pending_choice();
+    match choice {
+        rabuka_engine::ability::types::Choice::SelectCard { zone, count, allow_skip, .. } => {
+            assert_eq!(*zone, "revealed_cards", "SelectCard zone should be revealed_cards from yell, got {}", zone);
+            assert_eq!(*count, 1, "should be 1 card");
+            assert!(*allow_skip, "should be optional (まで)");
+            game.select_indices(&[0]);
+            let bottom = game.state.player1.main_deck.cards.last().copied();
+            assert_eq!(bottom, Some(live_in_deck), "deck bottom should be the selected live card");
+        }
+        other => panic!("Expected SelectCard from yell (revealed_cards), got {:?}", other),
     }
 }

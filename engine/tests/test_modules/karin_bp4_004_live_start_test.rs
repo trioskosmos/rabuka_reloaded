@@ -64,7 +64,7 @@ fn karin_ab0_waits_cost9_member() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let karin = game.id(KARIN);
-    let filler = game.id(FILLER);
+    let _filler = game.id(FILLER);
     let cost5_member = game.id("PL!-sd1-014-SD"); // cost 5
 
     game.state.player1.stage.stage = [karin, -1, -1];

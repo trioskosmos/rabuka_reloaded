@@ -37,7 +37,7 @@ fn setup() -> (TestGame, i16, i16) {
     let mut game = TestGame::new(db);
     let member = game.id(HS_BP2_018);
     let live = game.id(LIVE_A);
-    let filler = game.id(FILLER);
+    let _filler = game.id(FILLER);
 
     // Member in hand
     game.state.player1.hand.cards.push(member);
