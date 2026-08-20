@@ -212,15 +212,17 @@ mod bytecode_validation {
 
     #[test]
     fn every_card_ability_index_is_valid() {
-        use rabuka_engine::ability::abilities_gen::{CARD_ABILITY_PAIRS, NUM_ABILITIES, STRINGS};
+        use rabuka_engine::ability::abilities_gen::{
+            CARD_ABILITY_PAIRS, NUM_ABILITIES, STRINGS_OFFSETS, get_string,
+        };
         let mut i = 0;
         while i + 1 < CARD_ABILITY_PAIRS.len() {
             let str_idx = CARD_ABILITY_PAIRS[i] as usize;
             let ability_idx = CARD_ABILITY_PAIRS[i + 1] as usize;
             assert!(
-                str_idx < STRINGS.len(),
+                get_string(str_idx).is_some(),
                 "CARD_ABILITY_PAIRS[{i}]: string index {str_idx} out of range (max {})",
-                STRINGS.len()
+                STRINGS_OFFSETS.len() - 1
             );
             assert!(
                 ability_idx < NUM_ABILITIES,
@@ -228,7 +230,7 @@ mod bytecode_validation {
                 i + 1,
                 ability_idx,
                 NUM_ABILITIES,
-                STRINGS[str_idx]
+                get_string(str_idx).unwrap_or("?")
             );
             i += 2;
         }

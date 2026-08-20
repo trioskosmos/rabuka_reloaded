@@ -4322,7 +4322,7 @@ def _try_energy_state(text):
     if has_negative:
         result["negation"] = True
     if "アクティブ状態" in text:
-        result["state"] = "active"
+        result["energy_state"] = "active"
     return result
 
 

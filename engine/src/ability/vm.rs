@@ -1,7 +1,7 @@
 #[cfg(not(feature = "snes"))]
-use super::abilities_gen::{BYTECODE, NUM_ABILITIES, OFFSET_DELTAS, STRINGS};
+use super::abilities_gen::{COMPRESSED_BYTECODE, DECOMPRESSED_LEN, NUM_ABILITIES, OFFSET_DELTAS, STRINGS_OFFSETS, get_string};
 #[cfg(feature = "snes")]
-use super::abilities_gen::{ABILITY_LOCS, NUM_ABILITIES, STRINGS, bytecode_slice};
+use super::abilities_gen::{ABILITY_LOCS, NUM_ABILITIES, STRINGS_OFFSETS, bytecode_slice, get_string};
 use super::enums::EffectState;
 use crate::ability::enums::{ActionType, Zone};
 #[cfg_attr(not(feature = "debug_conditions"), allow(unused_imports))]
@@ -91,6 +91,37 @@ fn offset_of(idx: usize) -> usize {
     OFFSET_DELTAS[..idx].iter().map(|&d| d as usize).sum()
 }
 
+#[cfg(all(not(feature = "snes"), not(feature = "no_std")))]
+fn get_decompressed_bytecode() -> &'static [u8] {
+    use std::sync::OnceLock;
+    static CACHE: OnceLock<Vec<u8>> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        miniz_oxide::inflate::decompress_to_vec_zlib(COMPRESSED_BYTECODE).expect("bytecode decompress failed")
+    })
+}
+
+#[cfg(all(not(feature = "snes"), feature = "no_std"))]
+fn get_decompressed_bytecode() -> &'static [u8] {
+    use core::cell::UnsafeCell;
+    struct SyncUnsafeCell<T>(UnsafeCell<T>);
+    unsafe impl<T> Sync for SyncUnsafeCell<T> {}
+    static CACHE: SyncUnsafeCell<Option<Vec<u8>>> = SyncUnsafeCell(UnsafeCell::new(None));
+    static INIT: SyncUnsafeCell<bool> = SyncUnsafeCell(UnsafeCell::new(false));
+    unsafe {
+        if !*INIT.0.get() {
+            let decompressed = miniz_oxide::inflate::decompress_to_vec_zlib(COMPRESSED_BYTECODE).expect("bytecode decompress failed");
+            *CACHE.0.get() = Some(decompressed);
+            *INIT.0.get() = true;
+        }
+        (*CACHE.0.get()).as_ref().unwrap().as_slice()
+    }
+}
+
+#[cfg(not(feature = "snes"))]
+fn decompressed_len() -> usize {
+    DECOMPRESSED_LEN
+}
+
 pub fn get_ability(idx: usize) -> Result<Ability, DecodeError> {
     if idx >= NUM_ABILITIES {
         return Err(DecodeError::IndexOutOfRange {
@@ -105,7 +136,8 @@ pub fn get_ability(idx: usize) -> Result<Ability, DecodeError> {
         if start >= end {
             return Ok(Ability::default());
         }
-        (&BYTECODE[start..end], start, end)
+        let decompressed = get_decompressed_bytecode();
+        (&decompressed[start..end], start, end)
     };
     #[cfg(feature = "snes")]
     let (slice, start, end) = {
@@ -222,10 +254,7 @@ impl<'a> BcReader<'a> {
 
     fn key(&mut self) -> Option<&'a str> {
         let idx = self.read_idx()?;
-        if idx >= STRINGS.len() {
-            return None;
-        }
-        Some(STRINGS[idx])
+        get_string(idx)
     }
 
     fn read_idx(&mut self) -> Option<usize> {
@@ -248,10 +277,7 @@ impl<'a> BcReader<'a> {
             TAG_NULL => None,
             TAG_STR => {
                 let idx = self.read_idx()?;
-                if idx >= STRINGS.len() {
-                    return None;
-                }
-                Some(STRINGS[idx].to_string())
+                Some(get_string(idx)?.to_string())
             }
             _ => None,
         }
@@ -263,10 +289,7 @@ impl<'a> BcReader<'a> {
             TAG_NULL => None,
             TAG_STR => {
                 let idx = self.read_idx()?;
-                if idx >= STRINGS.len() {
-                    return None;
-                }
-                Some(ArcStr::from(STRINGS[idx]))
+                Some(ArcStr::from(get_string(idx)?))
             }
             _ => None,
         }
@@ -278,10 +301,7 @@ impl<'a> BcReader<'a> {
             TAG_NULL => None,
             TAG_STR => {
                 let idx = self.read_idx()?;
-                if idx >= STRINGS.len() {
-                    return None;
-                }
-                Some(Zone::from_source_str(STRINGS[idx]))
+                Some(Zone::from_source_str(get_string(idx)?))
             }
             _ => None,
         }
@@ -325,10 +345,7 @@ impl<'a> BcReader<'a> {
             TAG_NULL => None,
             TAG_STR => {
                 let idx = self.read_idx()?;
-                if idx >= STRINGS.len() {
-                    return None;
-                }
-                crate::card::CardType::from_card_str(STRINGS[idx])
+                crate::card::CardType::from_card_str(get_string(idx)?)
             }
             _ => None,
         }
@@ -340,10 +357,8 @@ impl<'a> BcReader<'a> {
             TAG_NULL => None,
             TAG_STR => {
                 let idx = self.read_idx()?;
-                if idx >= STRINGS.len() {
-                    return None;
-                }
-                match STRINGS[idx] {
+                let s = get_string(idx)?;
+                match s {
                     ">=" => Some(crate::card::Operator::Gte),
                     "<=" => Some(crate::card::Operator::Lte),
                     ">" => Some(crate::card::Operator::Gt),
@@ -362,10 +377,10 @@ impl<'a> BcReader<'a> {
             TAG_NULL => None,
             TAG_STR => {
                 let idx = self.read_idx()?;
-                if idx >= STRINGS.len() {
+                if idx >= (STRINGS_OFFSETS.len() - 1) {
                     return None;
                 }
-                crate::card::parse_operation(STRINGS[idx])
+                crate::card::parse_operation(get_string(idx).unwrap_or(""))
             }
             _ => None,
         }
@@ -456,11 +471,11 @@ impl<'a> BcReader<'a> {
             TAG_TRUE => Some(Box::new(crate::card::DistinctInfo::Boolean(true))),
             TAG_STR => {
                 let idx = self.read_idx()?;
-                if idx >= STRINGS.len() {
+                if idx >= (STRINGS_OFFSETS.len() - 1) {
                     return None;
                 }
                 Some(Box::new(crate::card::DistinctInfo::String(
-                    STRINGS[idx].to_string(),
+                    get_string(idx).unwrap_or("").to_string(),
                 )))
             }
             _ => None,
@@ -490,11 +505,8 @@ impl<'a> BcReader<'a> {
                     let mut character = String::new();
                     for _ in 0..count {
                         let kidx = self.read_idx()?;
-                        if kidx >= STRINGS.len() {
-                            self.skip_value()?;
-                            continue;
-                        }
-                        match STRINGS[kidx] {
+                        let kstr = get_string(kidx)?;
+                        match kstr {
                             "position" => {
                                 position = self.read_string_value().unwrap_or_default();
                             }
@@ -533,11 +545,8 @@ impl<'a> BcReader<'a> {
                 let mut cost_limit_operator = None;
                 for _ in 0..count {
                     let kidx = self.read_idx()?;
-                    if kidx >= STRINGS.len() {
-                        self.skip_value()?;
-                        continue;
-                    }
-                    match STRINGS[kidx] {
+                        let kstr = get_string(kidx)?;
+                        match kstr {
                         "operator" => {
                             operator = self.read_operator_value();
                         }
@@ -579,11 +588,8 @@ impl<'a> BcReader<'a> {
                 let mut te = crate::card::TriggerEvent::default();
                 for _ in 0..count {
                     let kidx = self.read_idx()?;
-                    if kidx >= STRINGS.len() {
-                        self.skip_value()?;
-                        continue;
-                    }
-                    match STRINGS[kidx] {
+                        let kstr = get_string(kidx)?;
+                        match kstr {
                         "type" => {
                             te.event_type = self.read_arc_str_value();
                         }
@@ -674,11 +680,8 @@ impl<'a> BcReader<'a> {
                 let mut lsc = crate::card::LocationSubChecks::default();
                 for _ in 0..count {
                     let kidx = self.read_idx()?;
-                    if kidx >= STRINGS.len() {
-                        self.skip_value()?;
-                        continue;
-                    }
-                    match STRINGS[kidx] {
+                        let kstr = get_string(kidx)?;
+                        match kstr {
                         "card_property" => {
                             let s = self.read_arc_str_value();
                             lsc.card_property = s.map(|s| crate::card::CardProperty::from_str(&s));
@@ -786,11 +789,11 @@ impl<'a> BcReader<'a> {
             TAG_NULL => None,
             TAG_STR => {
                 let idx = self.read_idx()?;
-                if idx >= STRINGS.len() {
+                if idx >= (STRINGS_OFFSETS.len() - 1) {
                     return None;
                 }
                 Some(Box::new(crate::card::PositionInfo::String(
-                    STRINGS[idx].to_string(),
+                    get_string(idx).unwrap_or("").to_string(),
                 )))
             }
             TAG_OBJECT | TAG_OBJECT_VARIANT => {
@@ -802,11 +805,8 @@ impl<'a> BcReader<'a> {
                 let mut target = None;
                 for _ in 0..count {
                     let kidx = self.read_idx()?;
-                    if kidx >= STRINGS.len() {
-                        self.skip_value()?;
-                        continue;
-                    }
-                    match STRINGS[kidx] {
+                        let kstr = get_string(kidx)?;
+                        match kstr {
                         "position" => {
                             position = self.read_arc_str_value();
                         }
@@ -844,11 +844,8 @@ impl<'a> BcReader<'a> {
                 let mut calculation_value = None;
                 for _ in 0..count {
                     let kidx = self.read_idx()?;
-                    if kidx >= STRINGS.len() {
-                        self.skip_value()?;
-                        continue;
-                    }
-                    match STRINGS[kidx] {
+                        let kstr = get_string(kidx)?;
+                        match kstr {
                         "type" => {
                             count_type = self.read_string_value().unwrap_or_default();
                         }
@@ -891,10 +888,10 @@ impl<'a> BcReader<'a> {
             TAG_NULL => None,
             TAG_STR => {
                 let idx = self.read_idx()?;
-                if idx >= STRINGS.len() {
+                if idx >= (STRINGS_OFFSETS.len() - 1) {
                     return None;
                 }
-                Some(Box::new(super::enums::EffectState::from_str(STRINGS[idx])))
+                Some(Box::new(super::enums::EffectState::from_str(get_string(idx).unwrap_or(""))))
             }
             TAG_OBJECT | TAG_OBJECT_VARIANT => {
                 if tag == TAG_OBJECT_VARIANT {
@@ -918,10 +915,10 @@ impl<'a> BcReader<'a> {
             TAG_TRUE => Some(Box::new(crate::card::DistinctType::True)),
             TAG_STR => {
                 let idx = self.read_idx()?;
-                if idx >= STRINGS.len() {
+                if idx >= (STRINGS_OFFSETS.len() - 1) {
                     return None;
                 }
-                Some(Box::new(match STRINGS[idx] {
+                Some(Box::new(match get_string(idx).unwrap_or("") {
                     "card_name" => crate::card::DistinctType::CardName,
                     "true" | "distinct" => crate::card::DistinctType::True,
                     _ => crate::card::DistinctType::CardName,
@@ -937,10 +934,10 @@ impl<'a> BcReader<'a> {
             TAG_NULL => Some(AbilityFilter::NoAbility),
             TAG_STR => {
                 let idx = self.read_idx()?;
-                if idx >= STRINGS.len() {
+                if idx >= (STRINGS_OFFSETS.len() - 1) {
                     return None;
                 }
-                Some(match STRINGS[idx] {
+                Some(match get_string(idx).unwrap_or("") {
                     "has_ability" => AbilityFilter::HasAbility,
                     "has_ability_type" => AbilityFilter::HasAbilityType,
                     "no_ability_type" => AbilityFilter::NoAbilityType,
@@ -969,11 +966,8 @@ impl<'a> BcReader<'a> {
                         let mut aft = None;
                         for _ in 0..count {
                             let kidx = self.read_idx()?;
-                            if kidx >= STRINGS.len() {
-                                self.skip_value()?;
-                                continue;
-                            }
-                            match STRINGS[kidx] {
+                        let kstr = get_string(kidx)?;
+                        match kstr {
                                 "ability_filter" => {
                                     af = Some(self.read_ability_filter_value()?);
                                 }
@@ -1005,10 +999,8 @@ impl<'a> BcReader<'a> {
             TAG_NULL => None,
             TAG_STR => {
                 let idx = self.read_idx()?;
-                if idx >= STRINGS.len() {
-                    return None;
-                }
-                match STRINGS[idx] {
+                let s = get_string(idx)?;
+                match s {
                     "any_order" => Some(crate::card::PlacementOrder::AnyOrder),
                     _ => None,
                 }
@@ -1030,11 +1022,8 @@ impl<'a> BcReader<'a> {
                 let mut quoted_type = String::new();
                 for _ in 0..count {
                     let kidx = self.read_idx()?;
-                    if kidx >= STRINGS.len() {
-                        self.skip_value()?;
-                        continue;
-                    }
-                    match STRINGS[kidx] {
+                        let kstr = get_string(kidx)?;
+                        match kstr {
                         "text" => {
                             text = self.read_string_value().unwrap_or_default();
                         }

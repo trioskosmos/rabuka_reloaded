@@ -1,6 +1,6 @@
 """Auto-compiler: scans abilities.json, discovers field types, generates bytecode + Rust decoder."""
 
-import json, struct, re, hashlib
+import json, struct, re, hashlib, zlib
 from pathlib import Path
 
 # ── Value vocabulary tables for type inference ──
@@ -828,7 +828,28 @@ def generate_abilities_gen(bytecode, offsets, strings, card_ability_pairs, build
         chunk = bytecode[i : i + 24]
         hex_lines.append("    " + ", ".join(f"0x{b:02x}" for b in chunk) + ",")
 
-    str_lits = ", ".join(json.dumps(s, ensure_ascii=False) for s in strings)
+    # Compressed bytecode for host (not snes) - saves ~60% via zlib
+    compressed = zlib.compress(bytes(bytecode), level=9)
+    comp_hex_lines = []
+    for i in range(0, len(compressed), 24):
+        chunk = compressed[i:i+24]
+        comp_hex_lines.append("    " + ", ".join(f"0x{b:02x}" for b in chunk) + ",")
+
+    # Build string blob + offsets for compact storage (saves ~68KB vs &[&str] fat pointers)
+    # Instead of &[&str] (16 bytes per entry + data), store as single &[u8] blob + u32 offsets
+    blob_bytes = b"".join(s.encode('utf-8') for s in strings)
+    blob_hex_lines = []
+    for i in range(0, len(blob_bytes), 24):
+        chunk = blob_bytes[i:i+24]
+        blob_hex_lines.append("    " + ", ".join(f"0x{b:02x}" for b in chunk) + ",")
+    # Offsets: start of each string in blob, plus sentinel end
+    str_offsets = []
+    cur = 0
+    for s in strings:
+        str_offsets.append(cur)
+        cur += len(s.encode('utf-8'))
+    str_offsets.append(cur)
+    offsets_hex_str = ", ".join(str(o) for o in str_offsets)
     pair_strs = ", ".join(f"{s},{a}" for s, a in card_ability_pairs)
 
     # Delta-encode offsets: offsets are monotonically increasing absolute byte
@@ -883,9 +904,11 @@ def generate_abilities_gen(bytecode, offsets, strings, card_ability_pairs, build
 pub const NUM_ABILITIES: usize = {len(offsets) - 1};
 
 #[cfg(not(feature = "snes"))]
-pub const BYTECODE: &[u8] = &[
-{chr(10).join(hex_lines)}
+pub const COMPRESSED_BYTECODE: &[u8] = &[
+{chr(10).join(comp_hex_lines)}
 ];
+#[cfg(not(feature = "snes"))]
+pub const DECOMPRESSED_LEN: usize = {len(bytecode)};
 
 /// Per-ability byte lengths (deltas between consecutive absolute offsets).
 /// `OFFSET_DELTAS[i]` is the size of the binary-JSON slice for
@@ -913,9 +936,21 @@ pub fn bytecode_slice(ci: u8, start: usize, len: usize) -> &'static [u8] {{
     }}
 }}
 
-/// Interned strings: object keys and string values. Indexed by the 2-byte
-/// `u16` references inside `BYTECODE`.
-pub const STRINGS: &[&str] = &[{str_lits}];
+/// Interned strings: object keys and string values. Stored as a single blob
+/// with u32 offsets to save the 16-byte per-entry fat pointer overhead of
+/// `&[&str]` (saves ~68KB for 5695 strings). Indexed by the 2-byte `u16`
+/// references inside `BYTECODE` via `get_string(idx)`.
+pub const STRINGS_BLOB: &[u8] = &[
+{chr(10).join(blob_hex_lines)}
+];
+pub const STRINGS_OFFSETS: &[u32] = &[{offsets_hex_str}];
+#[inline]
+pub fn get_string(idx: usize) -> Option<&'static str> {{
+    if idx + 1 >= STRINGS_OFFSETS.len() {{ return None; }}
+    let start = STRINGS_OFFSETS[idx] as usize;
+    let end = STRINGS_OFFSETS[idx + 1] as usize;
+    unsafe {{ Some(core::str::from_utf8_unchecked(&STRINGS_BLOB[start..end])) }}
+}}
 
 /// Card_no → ability index pairs. Each entry is (card_no_string_index, ability_index).
 /// Generated from the `cards` field of `unique_abilities`. Used at load time by
@@ -959,7 +994,10 @@ def main():
     build_dir.mkdir(parents=True, exist_ok=True)
 
     (build_dir / "abilities.bin").write_bytes(bytecode)
+    compressed = zlib.compress(bytes(bytecode), level=9)
+    (build_dir / "abilities.bin.z").write_bytes(compressed)
     print(f"\n  abilities.bin: {len(bytecode)} bytes ({len(bytecode) / 1024:.1f}KB)")
+    print(f"  compressed: {len(compressed)} bytes ({len(compressed) / 1024:.1f}KB) ({100*(1-len(compressed)/len(bytecode)):.1f}% smaller)")
     print(f"  interned strings: {len(strings)}")
     print(f"  card→ability pairs: {len(card_ability_pairs)}")
 
@@ -987,6 +1025,7 @@ def main():
     except Exception:
         pass
 
+    compressed = zlib.compress(bytes(bytecode), level=9)
     manifest = {
         "schema": "compiled_abilities.v1",
         "compiler": "cards/compile_abilities.py",
@@ -998,9 +1037,11 @@ def main():
         },
         "output": {
             "bytecode_bytes": len(bytecode),
+            "compressed_bytes": len(compressed),
             "interned_strings": len(strings),
             "card_ability_pairs": len(card_ability_pairs),
             "sha256": bytecode_hash,
+            "compressed_sha256": hashlib.sha256(compressed).hexdigest()[:16],
         },
     }
     (build_dir / "generation_manifest.json").write_text(

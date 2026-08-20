@@ -381,7 +381,13 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(crate) fn evaluate_energy_state_condition(&self, condition: &Condition) -> bool {
-        let energy_state = condition.get_energy_state().unwrap_or("");
+        let mut energy_state = condition.get_energy_state().unwrap_or("");
+        if energy_state.is_empty() {
+            // abilities.json for idx 389/855 emits "state":"active" not "energy_state"
+            if condition.get_text().map(|t| t.contains("アクティブ")).unwrap_or(false) {
+                energy_state = "active";
+            }
+        }
         let target = condition.get_target().unwrap_or("self");
         let player = self.resolve_condition_player(target);
         match energy_state {

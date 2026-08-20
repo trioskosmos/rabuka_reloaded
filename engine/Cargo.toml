@@ -8,6 +8,7 @@ test = false
 doctest = false
 
 [dependencies]
+miniz_oxide = { version = "0.7", default-features = false, features = ["with-alloc"] }
 log = { version = "=0.4.22", default-features = false }
 env_logger = { version = "0.11", optional = true }
 serde = { version = "=1.0.228", default-features = false, features = ["derive", "alloc", "rc"], optional = true }

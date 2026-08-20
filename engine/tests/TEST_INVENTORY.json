@@ -1,28 +1,28 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-19T14:31:41.645816+00:00",
+  "generated_at": "2026-08-20T07:37:02.580877+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 399,
-  "n_tests": 2385,
+  "n_files": 402,
+  "n_tests": 2411,
   "total_cards": 771,
-  "covered_cards": 530,
-  "abilities_on_covered": 682,
+  "covered_cards": 537,
+  "abilities_on_covered": 689,
   "trigger_counts": {
     "起動": [
-      74,
+      76,
       96
     ],
     "登場": [
-      188,
+      190,
       269
     ],
     "ライブ開始時": [
-      187,
+      188,
       268
     ],
     "(none)": [
@@ -34,7 +34,7 @@
       122
     ],
     "常時": [
-      83,
+      85,
       117
     ],
     "自動": [
@@ -44,7 +44,7 @@
   },
   "action_counts": {
     "move_cards": [
-      109,
+      110,
       146
     ],
     "look_and_select": [
@@ -52,7 +52,7 @@
       72
     ],
     "gain_resource": [
-      112,
+      114,
       160
     ],
     "sequential": [
@@ -64,7 +64,7 @@
       2
     ],
     "draw_card": [
-      27,
+      28,
       44
     ],
     "change_state": [
@@ -76,7 +76,7 @@
       1
     ],
     "position_change": [
-      16,
+      17,
       19
     ],
     "gain_ability": [
@@ -104,7 +104,7 @@
       2
     ],
     "modify_score": [
-      56,
+      57,
       73
     ],
     "conditional_alternative": [
@@ -120,8 +120,8 @@
       6
     ],
     "choice": [
-      17,
-      22
+      19,
+      24
     ],
     "conditional_on_optional": [
       9,
@@ -144,8 +144,8 @@
       3
     ],
     "choose_target_player": [
-      4,
-      6
+      3,
+      4
     ],
     "set_blade_type": [
       2,
@@ -174,16 +174,16 @@
   },
   "cond_counts": {
     "none": [
-      393,
-      545
+      396,
+      546
     ],
     "temporal_condition": [
-      15,
+      16,
       20
     ],
     "compound": [
-      31,
-      35
+      30,
+      34
     ],
     "appearance_condition": [
       10,
@@ -194,7 +194,7 @@
       60
     ],
     "card_count_condition": [
-      66,
+      67,
       88
     ],
     "location_condition": [
@@ -210,7 +210,7 @@
       2
     ],
     "group_condition": [
-      28,
+      29,
       43
     ],
     "or_condition": [
@@ -238,7 +238,7 @@
       1
     ],
     "energy_state_condition": [
-      0,
+      2,
       2
     ],
     "state_condition": [
@@ -256,7 +256,7 @@
   },
   "set_counts": {
     "sd1": [
-      50,
+      51,
       58
     ],
     "PR": [
@@ -268,7 +268,7 @@
       56
     ],
     "bp3": [
-      52,
+      53,
       66
     ],
     "bp2": [
@@ -276,11 +276,11 @@
       68
     ],
     "bp4": [
-      61,
+      62,
       88
     ],
     "bp5": [
-      97,
+      98,
       134
     ],
     "bp6": [
@@ -288,7 +288,7 @@
       82
     ],
     "bp7": [
-      80,
+      81,
       111
     ],
     "pb1": [
@@ -300,7 +300,7 @@
       31
     ],
     "pb2": [
-      25,
+      27,
       43
     ],
     "cl1": [
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 501,
-    "none": 254,
-    "L1+choice": 127,
-    "L2": 38,
+    "L2+choice": 514,
+    "none": 247,
+    "L1+choice": 122,
+    "L2": 37,
     "L1": 16
   },
   "abilities": [
@@ -432,7 +432,7 @@
         "dia_position_change_saintsnow_source_any_destination",
         "dia_position_change_two_saintsnow_both_selectable"
       ],
-      "covering_test_count": 309,
+      "covering_test_count": 320,
       "is_null": false
     },
     {
@@ -555,7 +555,7 @@
         "c5_bytecode_carries_explicit_offset",
         "c5_cost_moves_one_energy_from_zone_under_member"
       ],
-      "covering_test_count": 337,
+      "covering_test_count": 348,
       "is_null": false
     },
     {
@@ -2481,10 +2481,10 @@
       ],
       "base": "PL!S-bp2-007",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/hanamaru_test.rs",
         "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs",
@@ -2496,23 +2496,33 @@
         "dia_bp2_yell_with_live_card_and_hand_under_7_draws_one",
         "hanamaru_q120_hand7_auto_condition_checked_after_blade_draws",
         "hanamaru_q120_no_live_in_revealed_no_draw",
-        "triple_cost_set_to_10_when_all_three_in_discard",
-        "triple_cost_unchanged_with_duplicate_character",
-        "triple_cost_unchanged_with_named_in_hand",
-        "triple_cost_unchanged_with_one_of_three",
-        "triple_cost_unchanged_with_two_of_three",
-        "triple_cost_unchanged_without_named_discards",
+        "triple_10_energy_minimum_cost_is_10",
+        "triple_combinatorial_variant_fuzz",
+        "triple_cost_cleared_after_play_and_second_play_costs_15",
         "triple_debut_adds_live_card_from_waitroom",
         "triple_debut_no_live_card_in_waitroom",
-        "triple_gameplay_play_costs_10_when_all_three_in_discard",
-        "triple_gameplay_play_costs_15_without_named_discards",
+        "triple_gameplay_accept_cost10_discards_hand",
+        "triple_gameplay_decline_pays15_keeps_hand",
+        "triple_gameplay_energy10_with_hand_can_play_for10",
+        "triple_gameplay_incomplete_hand_no_choice",
+        "triple_gameplay_no_hand_cards_no_choice_pays15",
+        "triple_gameplay_waitroom_has_three_but_hand_empty_no_choice",
         "triple_live_success_adds_member_from_waitroom",
         "triple_live_success_ignores_live_cards_in_waitroom",
+        "triple_many_duplicates_still_finds_assignment",
+        "triple_non_member_dual_name_does_not_count",
+        "triple_one_card_cannot_cover_two_slots",
+        "triple_optimal_assignment_with_multi_name",
+        "triple_passive_cost_not_set_by_discard",
+        "triple_passive_cost_not_set_with_hand_cards",
+        "triple_played_card_not_counted_as_fodder",
+        "triple_second_copy_can_be_used_as_one_fodder",
+        "triple_stage_member_not_counted_as_hand_fodder",
+        "triple_with_extra_unrelated_cards_still_offers_choice",
         "umi_bp5_three_members_with_blade_heart_no_gain",
-        "umi_bp5_three_members_without_blade_heart_gains_all_hearts",
-        "umi_bp5_two_members_no_heart_gain"
+        "umi_bp5_three_members_without_blade_heart_gains_all_hearts"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 31,
       "is_null": false
     },
     {
@@ -2533,10 +2543,10 @@
       ],
       "base": "PL!S-bp2-007",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/hanamaru_test.rs",
         "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs",
@@ -2548,23 +2558,33 @@
         "dia_bp2_yell_with_live_card_and_hand_under_7_draws_one",
         "hanamaru_q120_hand7_auto_condition_checked_after_blade_draws",
         "hanamaru_q120_no_live_in_revealed_no_draw",
-        "triple_cost_set_to_10_when_all_three_in_discard",
-        "triple_cost_unchanged_with_duplicate_character",
-        "triple_cost_unchanged_with_named_in_hand",
-        "triple_cost_unchanged_with_one_of_three",
-        "triple_cost_unchanged_with_two_of_three",
-        "triple_cost_unchanged_without_named_discards",
+        "triple_10_energy_minimum_cost_is_10",
+        "triple_combinatorial_variant_fuzz",
+        "triple_cost_cleared_after_play_and_second_play_costs_15",
         "triple_debut_adds_live_card_from_waitroom",
         "triple_debut_no_live_card_in_waitroom",
-        "triple_gameplay_play_costs_10_when_all_three_in_discard",
-        "triple_gameplay_play_costs_15_without_named_discards",
+        "triple_gameplay_accept_cost10_discards_hand",
+        "triple_gameplay_decline_pays15_keeps_hand",
+        "triple_gameplay_energy10_with_hand_can_play_for10",
+        "triple_gameplay_incomplete_hand_no_choice",
+        "triple_gameplay_no_hand_cards_no_choice_pays15",
+        "triple_gameplay_waitroom_has_three_but_hand_empty_no_choice",
         "triple_live_success_adds_member_from_waitroom",
         "triple_live_success_ignores_live_cards_in_waitroom",
+        "triple_many_duplicates_still_finds_assignment",
+        "triple_non_member_dual_name_does_not_count",
+        "triple_one_card_cannot_cover_two_slots",
+        "triple_optimal_assignment_with_multi_name",
+        "triple_passive_cost_not_set_by_discard",
+        "triple_passive_cost_not_set_with_hand_cards",
+        "triple_played_card_not_counted_as_fodder",
+        "triple_second_copy_can_be_used_as_one_fodder",
+        "triple_stage_member_not_counted_as_hand_fodder",
+        "triple_with_extra_unrelated_cards_still_offers_choice",
         "umi_bp5_three_members_with_blade_heart_no_gain",
-        "umi_bp5_three_members_without_blade_heart_gains_all_hearts",
-        "umi_bp5_two_members_no_heart_gain"
+        "umi_bp5_three_members_without_blade_heart_gains_all_hearts"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 31,
       "is_null": false
     },
     {
@@ -5535,6 +5555,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs",
         "engine/tests/test_modules/setsuna_bp5_test.rs"
       ],
       "covering_tests": [
@@ -5544,9 +5565,32 @@
         "setsuna_q230_both_zero_heart02_gained",
         "setsuna_surplus_heart_draw_2_discard_1_net_plus_1",
         "setsuna_surplus_heart_draw_and_discard_net_plus_1",
-        "setsuna_unequal_success_cards_no_heart"
+        "setsuna_unequal_success_cards_no_heart",
+        "triple_10_energy_minimum_cost_is_10",
+        "triple_combinatorial_variant_fuzz",
+        "triple_cost_cleared_after_play_and_second_play_costs_15",
+        "triple_debut_adds_live_card_from_waitroom",
+        "triple_debut_no_live_card_in_waitroom",
+        "triple_gameplay_accept_cost10_discards_hand",
+        "triple_gameplay_decline_pays15_keeps_hand",
+        "triple_gameplay_energy10_with_hand_can_play_for10",
+        "triple_gameplay_incomplete_hand_no_choice",
+        "triple_gameplay_no_hand_cards_no_choice_pays15",
+        "triple_gameplay_waitroom_has_three_but_hand_empty_no_choice",
+        "triple_live_success_adds_member_from_waitroom",
+        "triple_live_success_ignores_live_cards_in_waitroom",
+        "triple_many_duplicates_still_finds_assignment",
+        "triple_non_member_dual_name_does_not_count",
+        "triple_one_card_cannot_cover_two_slots",
+        "triple_optimal_assignment_with_multi_name",
+        "triple_passive_cost_not_set_by_discard",
+        "triple_passive_cost_not_set_with_hand_cards",
+        "triple_played_card_not_counted_as_fodder",
+        "triple_second_copy_can_be_used_as_one_fodder",
+        "triple_stage_member_not_counted_as_hand_fodder",
+        "triple_with_extra_unrelated_cards_still_offers_choice"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 30,
       "is_null": false
     },
     {
@@ -5572,6 +5616,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs",
         "engine/tests/test_modules/setsuna_bp5_test.rs"
       ],
       "covering_tests": [
@@ -5581,9 +5626,32 @@
         "setsuna_q230_both_zero_heart02_gained",
         "setsuna_surplus_heart_draw_2_discard_1_net_plus_1",
         "setsuna_surplus_heart_draw_and_discard_net_plus_1",
-        "setsuna_unequal_success_cards_no_heart"
+        "setsuna_unequal_success_cards_no_heart",
+        "triple_10_energy_minimum_cost_is_10",
+        "triple_combinatorial_variant_fuzz",
+        "triple_cost_cleared_after_play_and_second_play_costs_15",
+        "triple_debut_adds_live_card_from_waitroom",
+        "triple_debut_no_live_card_in_waitroom",
+        "triple_gameplay_accept_cost10_discards_hand",
+        "triple_gameplay_decline_pays15_keeps_hand",
+        "triple_gameplay_energy10_with_hand_can_play_for10",
+        "triple_gameplay_incomplete_hand_no_choice",
+        "triple_gameplay_no_hand_cards_no_choice_pays15",
+        "triple_gameplay_waitroom_has_three_but_hand_empty_no_choice",
+        "triple_live_success_adds_member_from_waitroom",
+        "triple_live_success_ignores_live_cards_in_waitroom",
+        "triple_many_duplicates_still_finds_assignment",
+        "triple_non_member_dual_name_does_not_count",
+        "triple_one_card_cannot_cover_two_slots",
+        "triple_optimal_assignment_with_multi_name",
+        "triple_passive_cost_not_set_by_discard",
+        "triple_passive_cost_not_set_with_hand_cards",
+        "triple_played_card_not_counted_as_fodder",
+        "triple_second_copy_can_be_used_as_one_fodder",
+        "triple_stage_member_not_counted_as_hand_fodder",
+        "triple_with_extra_unrelated_cards_still_offers_choice"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 30,
       "is_null": false
     },
     {
@@ -7419,9 +7487,11 @@
         "engine/tests/test_modules/bp7_kanan_wait_immunity_test.rs",
         "engine/tests/test_modules/bp7_q274_immune_still_selectable_test.rs",
         "engine/tests/test_modules/bp7_q275_forcepick_wait_test.rs",
-        "engine/tests/test_modules/bp7_wait_immunity_helpers.rs"
+        "engine/tests/test_modules/bp7_wait_immunity_helpers.rs",
+        "engine/tests/test_modules/kanan_bp7_debut_queue_test.rs"
       ],
       "covering_tests": [
+        "kanan_bp7_both_debut_abilities_in_queue_from_start",
         "kanan_immunity_blocks_opponent_karin_wait",
         "kanan_immunity_blocks_umis_debut_cost_wait",
         "kanan_immunity_does_not_block_self_wait",
@@ -7440,7 +7510,7 @@
         "q275_single_legal_target_auto_resolves_no_prompt",
         "q275_without_immunity_immune_member_is_offered_and_waited"
       ],
-      "covering_test_count": 17,
+      "covering_test_count": 18,
       "is_null": false
     },
     {
@@ -7470,9 +7540,11 @@
         "engine/tests/test_modules/bp7_kanan_wait_immunity_test.rs",
         "engine/tests/test_modules/bp7_q274_immune_still_selectable_test.rs",
         "engine/tests/test_modules/bp7_q275_forcepick_wait_test.rs",
-        "engine/tests/test_modules/bp7_wait_immunity_helpers.rs"
+        "engine/tests/test_modules/bp7_wait_immunity_helpers.rs",
+        "engine/tests/test_modules/kanan_bp7_debut_queue_test.rs"
       ],
       "covering_tests": [
+        "kanan_bp7_both_debut_abilities_in_queue_from_start",
         "kanan_immunity_blocks_opponent_karin_wait",
         "kanan_immunity_blocks_umis_debut_cost_wait",
         "kanan_immunity_does_not_block_self_wait",
@@ -7491,7 +7563,7 @@
         "q275_single_legal_target_auto_resolves_no_prompt",
         "q275_without_immunity_immune_member_is_offered_and_waited"
       ],
-      "covering_test_count": 17,
+      "covering_test_count": 18,
       "is_null": false
     },
     {
@@ -9357,6 +9429,7 @@
         "engine/tests/test_modules/dream_believers_test.rs",
         "engine/tests/test_modules/himeno_bp_versions_test.rs",
         "engine/tests/test_modules/himeno_test.rs",
+        "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/victory_road_test.rs"
       ],
@@ -9392,7 +9465,7 @@
         "himeno_bp6_cost_no_reduction_without_mirakura",
         "himeno_bp6_cost_reduced_by_mirakura_on_stage"
       ],
-      "covering_test_count": 128,
+      "covering_test_count": 151,
       "is_null": false
     },
     {
@@ -15232,7 +15305,7 @@
       "trigger_list": [
         "起動"
       ],
-      "action": "choose_target_player",
+      "action": "choice",
       "condition": "none",
       "set": "bp3",
       "cards": [
@@ -15240,14 +15313,24 @@
         "PL!S-bp3-007-P"
       ],
       "base": "PL!S-bp3-007",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/hanamaru_bp3_choose_player_test.rs"
+      ],
+      "covering_tests": [
+        "hanamaru_cannot_activate_without_energy",
+        "hanamaru_choose_opponent_moves_opponent_live",
+        "hanamaru_choose_self_moves_own_live_and_draws",
+        "hanamaru_no_live_in_chosen_discard_no_move_no_draw",
+        "hanamaru_opponent_no_live_no_draw",
+        "hanamaru_targeted_player_determines_deck_bottom_owner",
+        "hanamaru_turn_limit_once"
+      ],
+      "covering_test_count": 7,
       "is_null": false
     },
     {
@@ -17470,14 +17553,24 @@
         "PL!SP-bp4-028-SRL"
       ],
       "base": "PL!SP-bp4-028",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/energy_state_condition_test.rs"
+      ],
+      "covering_tests": [
+        "daisuki_opponent_active_does_not_satisfy_self",
+        "daisuki_score_not_added_when_no_active_energy",
+        "daisuki_score_plus_one_when_active_energy_exists",
+        "sumire_inactive_energy_does_not_count",
+        "sumire_no_active_energy_no_hearts",
+        "sumire_toggling_active_recalculates",
+        "sumire_with_one_active_energy_gains_two_hearts"
+      ],
+      "covering_test_count": 7,
       "is_null": false
     },
     {
@@ -21614,14 +21707,40 @@
         "PL!SP-pb2-014-P＋"
       ],
       "base": "PL!SP-pb2-014",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs"
+      ],
+      "covering_tests": [
+        "triple_10_energy_minimum_cost_is_10",
+        "triple_combinatorial_variant_fuzz",
+        "triple_cost_cleared_after_play_and_second_play_costs_15",
+        "triple_debut_adds_live_card_from_waitroom",
+        "triple_debut_no_live_card_in_waitroom",
+        "triple_gameplay_accept_cost10_discards_hand",
+        "triple_gameplay_decline_pays15_keeps_hand",
+        "triple_gameplay_energy10_with_hand_can_play_for10",
+        "triple_gameplay_incomplete_hand_no_choice",
+        "triple_gameplay_no_hand_cards_no_choice_pays15",
+        "triple_gameplay_waitroom_has_three_but_hand_empty_no_choice",
+        "triple_live_success_adds_member_from_waitroom",
+        "triple_live_success_ignores_live_cards_in_waitroom",
+        "triple_many_duplicates_still_finds_assignment",
+        "triple_non_member_dual_name_does_not_count",
+        "triple_one_card_cannot_cover_two_slots",
+        "triple_optimal_assignment_with_multi_name",
+        "triple_passive_cost_not_set_by_discard",
+        "triple_passive_cost_not_set_with_hand_cards",
+        "triple_played_card_not_counted_as_fodder",
+        "triple_second_copy_can_be_used_as_one_fodder",
+        "triple_stage_member_not_counted_as_hand_fodder",
+        "triple_with_extra_unrelated_cards_still_offers_choice"
+      ],
+      "covering_test_count": 23,
       "is_null": false
     },
     {
@@ -24138,7 +24257,7 @@
       "trigger_list": [
         "登場"
       ],
-      "action": "choose_target_player",
+      "action": "choice",
       "condition": "none",
       "set": "PR",
       "cards": [
@@ -25399,14 +25518,40 @@
         "PL!N-sd1-007-SD"
       ],
       "base": "PL!N-sd1-007",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs"
+      ],
+      "covering_tests": [
+        "triple_10_energy_minimum_cost_is_10",
+        "triple_combinatorial_variant_fuzz",
+        "triple_cost_cleared_after_play_and_second_play_costs_15",
+        "triple_debut_adds_live_card_from_waitroom",
+        "triple_debut_no_live_card_in_waitroom",
+        "triple_gameplay_accept_cost10_discards_hand",
+        "triple_gameplay_decline_pays15_keeps_hand",
+        "triple_gameplay_energy10_with_hand_can_play_for10",
+        "triple_gameplay_incomplete_hand_no_choice",
+        "triple_gameplay_no_hand_cards_no_choice_pays15",
+        "triple_gameplay_waitroom_has_three_but_hand_empty_no_choice",
+        "triple_live_success_adds_member_from_waitroom",
+        "triple_live_success_ignores_live_cards_in_waitroom",
+        "triple_many_duplicates_still_finds_assignment",
+        "triple_non_member_dual_name_does_not_count",
+        "triple_one_card_cannot_cover_two_slots",
+        "triple_optimal_assignment_with_multi_name",
+        "triple_passive_cost_not_set_by_discard",
+        "triple_passive_cost_not_set_with_hand_cards",
+        "triple_played_card_not_counted_as_fodder",
+        "triple_second_copy_can_be_used_as_one_fodder",
+        "triple_stage_member_not_counted_as_hand_fodder",
+        "triple_with_extra_unrelated_cards_still_offers_choice"
+      ],
+      "covering_test_count": 23,
       "is_null": false
     },
     {
@@ -27416,13 +27561,14 @@
       ],
       "base": "PL!S-bp3-016",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/b7_constant_ability_test.rs",
-        "engine/tests/test_modules/batch5_test.rs"
+        "engine/tests/test_modules/batch5_test.rs",
+        "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs"
       ],
       "covering_tests": [
         "constant_blade_per_unit_with_exclude_self",
@@ -27438,17 +27584,25 @@
         "music_start_does_not_reduce_non_mus_member",
         "music_start_reduces_high_cost_mus_member",
         "music_start_removed_from_success_zone_stops_reduction",
-        "wien_eight_energy_two_heart",
-        "wien_energy_changes_dynamically",
-        "wien_five_energy_no_heart",
-        "wien_heart_not_wrong_color",
-        "wien_seven_energy_one_heart",
-        "wien_six_energy_one_heart",
-        "wien_ten_energy_two_heart",
-        "wien_zero_energy_no_heart",
-        "you_s3_q153_live_success_draw_if_fewer_revealed"
+        "triple_10_energy_minimum_cost_is_10",
+        "triple_combinatorial_variant_fuzz",
+        "triple_cost_cleared_after_play_and_second_play_costs_15",
+        "triple_debut_adds_live_card_from_waitroom",
+        "triple_debut_no_live_card_in_waitroom",
+        "triple_gameplay_accept_cost10_discards_hand",
+        "triple_gameplay_decline_pays15_keeps_hand",
+        "triple_gameplay_energy10_with_hand_can_play_for10",
+        "triple_gameplay_incomplete_hand_no_choice",
+        "triple_gameplay_no_hand_cards_no_choice_pays15",
+        "triple_gameplay_waitroom_has_three_but_hand_empty_no_choice",
+        "triple_live_success_adds_member_from_waitroom",
+        "triple_live_success_ignores_live_cards_in_waitroom",
+        "triple_many_duplicates_still_finds_assignment",
+        "triple_non_member_dual_name_does_not_count",
+        "triple_one_card_cannot_cover_two_slots",
+        "triple_optimal_assignment_with_multi_name"
       ],
-      "covering_test_count": 22,
+      "covering_test_count": 45,
       "is_null": false
     },
     {
@@ -30537,14 +30691,40 @@
         "PL!SP-bp5-014-N"
       ],
       "base": "PL!SP-bp5-014",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs"
+      ],
+      "covering_tests": [
+        "triple_10_energy_minimum_cost_is_10",
+        "triple_combinatorial_variant_fuzz",
+        "triple_cost_cleared_after_play_and_second_play_costs_15",
+        "triple_debut_adds_live_card_from_waitroom",
+        "triple_debut_no_live_card_in_waitroom",
+        "triple_gameplay_accept_cost10_discards_hand",
+        "triple_gameplay_decline_pays15_keeps_hand",
+        "triple_gameplay_energy10_with_hand_can_play_for10",
+        "triple_gameplay_incomplete_hand_no_choice",
+        "triple_gameplay_no_hand_cards_no_choice_pays15",
+        "triple_gameplay_waitroom_has_three_but_hand_empty_no_choice",
+        "triple_live_success_adds_member_from_waitroom",
+        "triple_live_success_ignores_live_cards_in_waitroom",
+        "triple_many_duplicates_still_finds_assignment",
+        "triple_non_member_dual_name_does_not_count",
+        "triple_one_card_cannot_cover_two_slots",
+        "triple_optimal_assignment_with_multi_name",
+        "triple_passive_cost_not_set_by_discard",
+        "triple_passive_cost_not_set_with_hand_cards",
+        "triple_played_card_not_counted_as_fodder",
+        "triple_second_copy_can_be_used_as_one_fodder",
+        "triple_stage_member_not_counted_as_hand_fodder",
+        "triple_with_extra_unrelated_cards_still_offers_choice"
+      ],
+      "covering_test_count": 23,
       "is_null": false
     },
     {
@@ -35524,14 +35704,24 @@
         "PL!SP-pb2-026-N"
       ],
       "base": "PL!SP-pb2-026",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/energy_state_condition_test.rs"
+      ],
+      "covering_tests": [
+        "daisuki_opponent_active_does_not_satisfy_self",
+        "daisuki_score_not_added_when_no_active_energy",
+        "daisuki_score_plus_one_when_active_energy_exists",
+        "sumire_inactive_energy_does_not_count",
+        "sumire_no_active_energy_no_hearts",
+        "sumire_toggling_active_recalculates",
+        "sumire_with_one_active_energy_gains_two_hearts"
+      ],
+      "covering_test_count": 7,
       "is_null": false
     },
     {
@@ -36246,14 +36436,40 @@
         "PL!S-bp7-016-N"
       ],
       "base": "PL!S-bp7-016",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs"
+      ],
+      "covering_tests": [
+        "triple_10_energy_minimum_cost_is_10",
+        "triple_combinatorial_variant_fuzz",
+        "triple_cost_cleared_after_play_and_second_play_costs_15",
+        "triple_debut_adds_live_card_from_waitroom",
+        "triple_debut_no_live_card_in_waitroom",
+        "triple_gameplay_accept_cost10_discards_hand",
+        "triple_gameplay_decline_pays15_keeps_hand",
+        "triple_gameplay_energy10_with_hand_can_play_for10",
+        "triple_gameplay_incomplete_hand_no_choice",
+        "triple_gameplay_no_hand_cards_no_choice_pays15",
+        "triple_gameplay_waitroom_has_three_but_hand_empty_no_choice",
+        "triple_live_success_adds_member_from_waitroom",
+        "triple_live_success_ignores_live_cards_in_waitroom",
+        "triple_many_duplicates_still_finds_assignment",
+        "triple_non_member_dual_name_does_not_count",
+        "triple_one_card_cannot_cover_two_slots",
+        "triple_optimal_assignment_with_multi_name",
+        "triple_passive_cost_not_set_by_discard",
+        "triple_passive_cost_not_set_with_hand_cards",
+        "triple_played_card_not_counted_as_fodder",
+        "triple_second_copy_can_be_used_as_one_fodder",
+        "triple_stage_member_not_counted_as_hand_fodder",
+        "triple_with_extra_unrelated_cards_still_offers_choice"
+      ],
+      "covering_test_count": 23,
       "is_null": false
     },
     {
@@ -36664,7 +36880,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/bp7_auto_gap_test.rs"
+        "engine/tests/test_modules/bp7_auto_gap_test.rs",
+        "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs"
       ],
       "covering_tests": [
         "chisato_area_move_gains_blade",
@@ -36682,9 +36899,23 @@
         "shiki_wait_then_area_move_reactivates",
         "shioriko_live_phase_wait_discard_activates",
         "toko_stage_to_discard_draws_2_discards_1",
-        "yuiguri_stage_to_discard_adds_live"
+        "triple_10_energy_minimum_cost_is_10",
+        "triple_combinatorial_variant_fuzz",
+        "triple_cost_cleared_after_play_and_second_play_costs_15",
+        "triple_debut_adds_live_card_from_waitroom",
+        "triple_debut_no_live_card_in_waitroom",
+        "triple_gameplay_accept_cost10_discards_hand",
+        "triple_gameplay_decline_pays15_keeps_hand",
+        "triple_gameplay_energy10_with_hand_can_play_for10",
+        "triple_gameplay_incomplete_hand_no_choice",
+        "triple_gameplay_no_hand_cards_no_choice_pays15",
+        "triple_gameplay_waitroom_has_three_but_hand_empty_no_choice",
+        "triple_live_success_adds_member_from_waitroom",
+        "triple_live_success_ignores_live_cards_in_waitroom",
+        "triple_many_duplicates_still_finds_assignment",
+        "triple_non_member_dual_name_does_not_count"
       ],
-      "covering_test_count": 16,
+      "covering_test_count": 39,
       "is_null": false
     },
     {
@@ -37106,7 +37337,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/bp7_auto_gap_test.rs"
+        "engine/tests/test_modules/bp7_auto_gap_test.rs",
+        "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs"
       ],
       "covering_tests": [
         "chisato_area_move_gains_blade",
@@ -37124,9 +37356,23 @@
         "shiki_wait_then_area_move_reactivates",
         "shioriko_live_phase_wait_discard_activates",
         "toko_stage_to_discard_draws_2_discards_1",
-        "yuiguri_stage_to_discard_adds_live"
+        "triple_10_energy_minimum_cost_is_10",
+        "triple_combinatorial_variant_fuzz",
+        "triple_cost_cleared_after_play_and_second_play_costs_15",
+        "triple_debut_adds_live_card_from_waitroom",
+        "triple_debut_no_live_card_in_waitroom",
+        "triple_gameplay_accept_cost10_discards_hand",
+        "triple_gameplay_decline_pays15_keeps_hand",
+        "triple_gameplay_energy10_with_hand_can_play_for10",
+        "triple_gameplay_incomplete_hand_no_choice",
+        "triple_gameplay_no_hand_cards_no_choice_pays15",
+        "triple_gameplay_waitroom_has_three_but_hand_empty_no_choice",
+        "triple_live_success_adds_member_from_waitroom",
+        "triple_live_success_ignores_live_cards_in_waitroom",
+        "triple_many_duplicates_still_finds_assignment",
+        "triple_non_member_dual_name_does_not_count"
       ],
-      "covering_test_count": 16,
+      "covering_test_count": 39,
       "is_null": false
     },
     {
@@ -37473,35 +37719,46 @@
         "常時"
       ],
       "action": "modify_cost",
-      "condition": "compound",
+      "condition": "none",
       "set": "bp7",
       "cards": [
         "LL-bp7-001-R＋"
       ],
       "base": "LL-bp7-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs"
       ],
       "covering_tests": [
-        "triple_cost_set_to_10_when_all_three_in_discard",
-        "triple_cost_unchanged_with_duplicate_character",
-        "triple_cost_unchanged_with_named_in_hand",
-        "triple_cost_unchanged_with_one_of_three",
-        "triple_cost_unchanged_with_two_of_three",
-        "triple_cost_unchanged_without_named_discards",
+        "triple_10_energy_minimum_cost_is_10",
+        "triple_combinatorial_variant_fuzz",
+        "triple_cost_cleared_after_play_and_second_play_costs_15",
         "triple_debut_adds_live_card_from_waitroom",
         "triple_debut_no_live_card_in_waitroom",
-        "triple_gameplay_play_costs_10_when_all_three_in_discard",
-        "triple_gameplay_play_costs_15_without_named_discards",
+        "triple_gameplay_accept_cost10_discards_hand",
+        "triple_gameplay_decline_pays15_keeps_hand",
+        "triple_gameplay_energy10_with_hand_can_play_for10",
+        "triple_gameplay_incomplete_hand_no_choice",
+        "triple_gameplay_no_hand_cards_no_choice_pays15",
+        "triple_gameplay_waitroom_has_three_but_hand_empty_no_choice",
         "triple_live_success_adds_member_from_waitroom",
-        "triple_live_success_ignores_live_cards_in_waitroom"
+        "triple_live_success_ignores_live_cards_in_waitroom",
+        "triple_many_duplicates_still_finds_assignment",
+        "triple_non_member_dual_name_does_not_count",
+        "triple_one_card_cannot_cover_two_slots",
+        "triple_optimal_assignment_with_multi_name",
+        "triple_passive_cost_not_set_by_discard",
+        "triple_passive_cost_not_set_with_hand_cards",
+        "triple_played_card_not_counted_as_fodder",
+        "triple_second_copy_can_be_used_as_one_fodder",
+        "triple_stage_member_not_counted_as_hand_fodder",
+        "triple_with_extra_unrelated_cards_still_offers_choice"
       ],
-      "covering_test_count": 12,
+      "covering_test_count": 23,
       "is_null": false
     },
     {
@@ -37519,28 +37776,39 @@
       ],
       "base": "LL-bp7-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs"
       ],
       "covering_tests": [
-        "triple_cost_set_to_10_when_all_three_in_discard",
-        "triple_cost_unchanged_with_duplicate_character",
-        "triple_cost_unchanged_with_named_in_hand",
-        "triple_cost_unchanged_with_one_of_three",
-        "triple_cost_unchanged_with_two_of_three",
-        "triple_cost_unchanged_without_named_discards",
+        "triple_10_energy_minimum_cost_is_10",
+        "triple_combinatorial_variant_fuzz",
+        "triple_cost_cleared_after_play_and_second_play_costs_15",
         "triple_debut_adds_live_card_from_waitroom",
         "triple_debut_no_live_card_in_waitroom",
-        "triple_gameplay_play_costs_10_when_all_three_in_discard",
-        "triple_gameplay_play_costs_15_without_named_discards",
+        "triple_gameplay_accept_cost10_discards_hand",
+        "triple_gameplay_decline_pays15_keeps_hand",
+        "triple_gameplay_energy10_with_hand_can_play_for10",
+        "triple_gameplay_incomplete_hand_no_choice",
+        "triple_gameplay_no_hand_cards_no_choice_pays15",
+        "triple_gameplay_waitroom_has_three_but_hand_empty_no_choice",
         "triple_live_success_adds_member_from_waitroom",
-        "triple_live_success_ignores_live_cards_in_waitroom"
+        "triple_live_success_ignores_live_cards_in_waitroom",
+        "triple_many_duplicates_still_finds_assignment",
+        "triple_non_member_dual_name_does_not_count",
+        "triple_one_card_cannot_cover_two_slots",
+        "triple_optimal_assignment_with_multi_name",
+        "triple_passive_cost_not_set_by_discard",
+        "triple_passive_cost_not_set_with_hand_cards",
+        "triple_played_card_not_counted_as_fodder",
+        "triple_second_copy_can_be_used_as_one_fodder",
+        "triple_stage_member_not_counted_as_hand_fodder",
+        "triple_with_extra_unrelated_cards_still_offers_choice"
       ],
-      "covering_test_count": 12,
+      "covering_test_count": 23,
       "is_null": false
     },
     {
@@ -37558,28 +37826,39 @@
       ],
       "base": "LL-bp7-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs"
       ],
       "covering_tests": [
-        "triple_cost_set_to_10_when_all_three_in_discard",
-        "triple_cost_unchanged_with_duplicate_character",
-        "triple_cost_unchanged_with_named_in_hand",
-        "triple_cost_unchanged_with_one_of_three",
-        "triple_cost_unchanged_with_two_of_three",
-        "triple_cost_unchanged_without_named_discards",
+        "triple_10_energy_minimum_cost_is_10",
+        "triple_combinatorial_variant_fuzz",
+        "triple_cost_cleared_after_play_and_second_play_costs_15",
         "triple_debut_adds_live_card_from_waitroom",
         "triple_debut_no_live_card_in_waitroom",
-        "triple_gameplay_play_costs_10_when_all_three_in_discard",
-        "triple_gameplay_play_costs_15_without_named_discards",
+        "triple_gameplay_accept_cost10_discards_hand",
+        "triple_gameplay_decline_pays15_keeps_hand",
+        "triple_gameplay_energy10_with_hand_can_play_for10",
+        "triple_gameplay_incomplete_hand_no_choice",
+        "triple_gameplay_no_hand_cards_no_choice_pays15",
+        "triple_gameplay_waitroom_has_three_but_hand_empty_no_choice",
         "triple_live_success_adds_member_from_waitroom",
-        "triple_live_success_ignores_live_cards_in_waitroom"
+        "triple_live_success_ignores_live_cards_in_waitroom",
+        "triple_many_duplicates_still_finds_assignment",
+        "triple_non_member_dual_name_does_not_count",
+        "triple_one_card_cannot_cover_two_slots",
+        "triple_optimal_assignment_with_multi_name",
+        "triple_passive_cost_not_set_by_discard",
+        "triple_passive_cost_not_set_with_hand_cards",
+        "triple_played_card_not_counted_as_fodder",
+        "triple_second_copy_can_be_used_as_one_fodder",
+        "triple_stage_member_not_counted_as_hand_fodder",
+        "triple_with_extra_unrelated_cards_still_offers_choice"
       ],
-      "covering_test_count": 12,
+      "covering_test_count": 23,
       "is_null": false
     },
     {

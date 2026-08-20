@@ -15,7 +15,7 @@ use std::string::String;
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
-use crate::ability::abilities_gen::{CARD_ABILITY_PAIRS, STRINGS};
+use crate::ability::abilities_gen::{CARD_ABILITY_PAIRS, get_string};
 use crate::ability::ability_store::AbilityRef;
 use crate::card::Card;
 use crate::{HashMap, HashSet};
@@ -127,8 +127,7 @@ impl CardLoader {
         while i + 1 < CARD_ABILITY_PAIRS.len() {
             let str_idx = CARD_ABILITY_PAIRS[i] as usize;
             let ability_idx = CARD_ABILITY_PAIRS[i + 1];
-            if str_idx < STRINGS.len() {
-                let card_no = STRINGS[str_idx];
+            if let Some(card_no) = get_string(str_idx) {
                 if wanted.contains(card_no) {
                     map.entry(card_no.to_string())
                         .or_default()
@@ -155,8 +154,7 @@ impl CardLoader {
         while i + 1 < CARD_ABILITY_PAIRS.len() {
             let str_idx = CARD_ABILITY_PAIRS[i] as usize;
             let ability_idx = CARD_ABILITY_PAIRS[i + 1];
-            if str_idx < STRINGS.len() {
-                let card_no = STRINGS[str_idx];
+            if let Some(card_no) = get_string(str_idx) {
                 map.entry(card_no.to_string())
                     .or_default()
                     .push(AbilityRef::index(ability_idx));

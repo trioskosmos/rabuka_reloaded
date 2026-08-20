@@ -1386,9 +1386,13 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         None
     }
 
+    #[inline]
+    fn normalize_member_name(s: &str) -> String {
+        s.replace(' ', "").replace('　', "")
+    }
+
     fn has_ll_bp7_001_hand_cards(game_state: &GameState, card_id: i16, chars: &[String]) -> bool {
-        let player = game_state.active_player();
-        let hand_ids: Vec<i16> = player.hand.cards.to_vec();
+        let hand_ids: Vec<i16> = game_state.active_player().hand.cards.to_vec();
         Self::can_assign_hand_for_ll(game_state, &hand_ids, chars, Some(card_id))
     }
 
@@ -1398,30 +1402,44 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         chars: &[String],
         exclude_id: Option<i16>,
     ) -> bool {
-        let mut candidates: Vec<Vec<i16>> = Vec::new();
-        for name in chars {
-            let needle = name.replace(' ', "").replace('　', "");
-            let mut v = Vec::new();
+        Self::build_ll_candidates(game_state, hand_ids, chars, exclude_id)
+            .map(|c| Self::has_distinct_assignment(&c))
+            .unwrap_or(false)
+    }
+
+    fn build_ll_candidates(
+        game_state: &GameState,
+        hand_ids: &[i16],
+        chars: &[String],
+        exclude_id: Option<i16>,
+    ) -> Option<[Vec<i16>; 3]> {
+        let mut out: [Vec<i16>; 3] = [Vec::new(), Vec::new(), Vec::new()];
+        for (i, name) in chars.iter().enumerate().take(3) {
+            let needle = Self::normalize_member_name(name);
             for &cid in hand_ids {
                 if Some(cid) == exclude_id {
                     continue;
                 }
                 if game_state.card_database.get_card(cid).is_some_and(|c| {
-                    c.is_member()
-                        && c.name.replace(' ', "").replace('　', "").contains(needle.as_str())
+                    c.is_member() && Self::normalize_member_name(&c.name).contains(&needle)
                 }) {
-                    v.push(cid);
+                    out[i].push(cid);
                 }
             }
-            candidates.push(v);
+            if out[i].is_empty() {
+                return None;
+            }
         }
-        // Brute-force distinct assignment (3! =6 permutations)
-        for &a in &candidates[0] {
-            for &b in &candidates[1] {
+        Some(out)
+    }
+
+    fn has_distinct_assignment(cands: &[Vec<i16>; 3]) -> bool {
+        for &a in &cands[0] {
+            for &b in &cands[1] {
                 if b == a {
                     continue;
                 }
-                for &c in &candidates[2] {
+                for &c in &cands[2] {
                     if c == a || c == b {
                         continue;
                     }
@@ -1432,62 +1450,47 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         false
     }
 
+    fn find_distinct_assignment(cands: &[Vec<i16>; 3]) -> Option<[i16; 3]> {
+        for &a in &cands[0] {
+            for &b in &cands[1] {
+                if b == a {
+                    continue;
+                }
+                for &c in &cands[2] {
+                    if c == a || c == b {
+                        continue;
+                    }
+                    return Some([a, b, c]);
+                }
+            }
+        }
+        None
+    }
+
     fn discard_ll_bp7_001_cost(
         game_state: &mut GameState,
         player_id: &str,
         played_card_id: i16,
         chars: &[String],
     ) -> bool {
-        let hand_snapshot = if player_id == game_state.player1.id {
-            game_state.player1.hand.cards.clone()
+        let hand_snapshot: Vec<i16> = if player_id == game_state.player1.id {
+            game_state.player1.hand.cards.to_vec()
         } else {
-            game_state.player2.hand.cards.clone()
+            game_state.player2.hand.cards.to_vec()
         };
-        // Build candidates per char (excluding the card being played itself)
-        let mut cand: Vec<Vec<i16>> = Vec::new();
-        for name in chars {
-            let needle = name.replace(' ', "").replace('　', "");
-            let mut v = Vec::new();
-            for &cid in &hand_snapshot {
-                if cid == played_card_id {
-                    continue;
-                }
-                if game_state.card_database.get_card(cid).is_some_and(|c| {
-                    c.is_member()
-                        && c.name.replace(' ', "").replace('　', "").contains(needle.as_str())
-                }) {
-                    v.push(cid);
-                }
-            }
-            cand.push(v);
-        }
-        // Find distinct assignment (handle multi-name optimal, e.g. dual-name chisato)
-        let mut to_discard: Vec<i16> = Vec::new();
-        let mut found = false;
-        for &a in &cand[0] {
-            for &b in &cand[1] {
-                if b == a {
-                    continue;
-                }
-                for &c in &cand[2] {
-                    if c == a || c == b {
-                        continue;
-                    }
-                    to_discard = vec![a, b, c];
-                    found = true;
-                    break;
-                }
-                if found {
-                    break;
-                }
-            }
-            if found {
-                break;
-            }
-        }
-        if !found {
-            return false;
-        }
+        let cands = match Self::build_ll_candidates(
+            game_state,
+            &hand_snapshot,
+            chars,
+            Some(played_card_id),
+        ) {
+            Some(c) => c,
+            None => return false,
+        };
+        let to_discard = match Self::find_distinct_assignment(&cands) {
+            Some(a) => a.to_vec(),
+            None => return false,
+        };
         // Remove from hand first, collect events, then push movements without double borrow
         let mut removed: Vec<i16> = Vec::new();
         {

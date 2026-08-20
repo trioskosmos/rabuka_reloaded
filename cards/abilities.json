@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-20T16:18:52.919632",
+  "generated_at": "2026-08-20T17:31:26.355272",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
-  "source_file": "cards\\cards.json",
-  "engine_commit": "b6998096",
+  "source_file": "cards/cards.json",
+  "engine_commit": "f60933bb",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -13664,30 +13664,53 @@
       },
       "effect": {
         "text": "自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。そうした場合、自分はカードを1枚引く",
-        "action": "choose_target_player",
-        "choice_options": [
-          "自分",
-          "相手"
-        ],
-        "effect_steps": [
+        "action": "choice",
+        "choice_type": "choose_target_player",
+        "options": [
           {
-            "text": "自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。そうした場合、自分はカードを1枚引く",
+            "text": "自分を選んだ場合: 自分のライブをデッキ下へ、そうした場合ドロー",
             "action": "sequential",
             "actions": [
               {
-                "text": "自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。",
+                "text": "そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く",
+                "action": "move_cards",
                 "source": "discard",
                 "destination": "deck_bottom",
                 "count": 1,
                 "card_type": "live_card",
-                "action": "move_cards"
+                "target": "self"
               },
               {
                 "text": "自分はカードを1枚引く",
-                "count": 1,
                 "action": "draw_card",
+                "count": 1,
                 "source": "deck",
-                "destination": "hand"
+                "destination": "hand",
+                "target": "self"
+              }
+            ],
+            "conditional": true
+          },
+          {
+            "text": "相手を選んだ場合: 相手のライブをデッキ下へ、そうした場合ドロー",
+            "action": "sequential",
+            "actions": [
+              {
+                "text": "そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く",
+                "action": "move_cards",
+                "source": "discard",
+                "destination": "deck_bottom",
+                "count": 1,
+                "card_type": "live_card",
+                "target": "opponent"
+              },
+              {
+                "text": "自分はカードを1枚引く",
+                "action": "draw_card",
+                "count": 1,
+                "source": "deck",
+                "destination": "hand",
+                "target": "self"
               }
             ],
             "conditional": true
@@ -16344,7 +16367,7 @@
         "condition": {
           "type": "energy_state_condition",
           "text": "アクティブ状態の自分のエネルギーがある場合",
-          "state": "active"
+          "energy_state": "active"
         },
         "action": "modify_score",
         "value": 1,
@@ -23176,30 +23199,53 @@
       "cost": null,
       "effect": {
         "text": "自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。そうした場合、自分はカードを1枚引く",
-        "action": "choose_target_player",
-        "choice_options": [
-          "自分",
-          "相手"
-        ],
-        "effect_steps": [
+        "action": "choice",
+        "choice_type": "choose_target_player",
+        "options": [
           {
-            "text": "自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。そうした場合、自分はカードを1枚引く",
+            "text": "自分を選んだ場合: 自分のライブをデッキ下へ、そうした場合ドロー",
             "action": "sequential",
             "actions": [
               {
-                "text": "自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。",
+                "text": "そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く",
+                "action": "move_cards",
                 "source": "discard",
                 "destination": "deck_bottom",
                 "count": 1,
                 "card_type": "live_card",
-                "action": "move_cards"
+                "target": "self"
               },
               {
                 "text": "自分はカードを1枚引く",
-                "count": 1,
                 "action": "draw_card",
+                "count": 1,
                 "source": "deck",
-                "destination": "hand"
+                "destination": "hand",
+                "target": "self"
+              }
+            ],
+            "conditional": true
+          },
+          {
+            "text": "相手を選んだ場合: 相手のライブをデッキ下へ、そうした場合ドロー",
+            "action": "sequential",
+            "actions": [
+              {
+                "text": "そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く",
+                "action": "move_cards",
+                "source": "discard",
+                "destination": "deck_bottom",
+                "count": 1,
+                "card_type": "live_card",
+                "target": "opponent"
+              },
+              {
+                "text": "自分はカードを1枚引く",
+                "action": "draw_card",
+                "count": 1,
+                "source": "deck",
+                "destination": "hand",
+                "target": "self"
               }
             ],
             "conditional": true
@@ -35358,7 +35404,7 @@
         "condition": {
           "type": "energy_state_condition",
           "text": "自分のアクティブ状態のエネルギーがあるかぎり",
-          "state": "active"
+          "energy_state": "active"
         },
         "duration": "as_long_as",
         "conditional": true,
