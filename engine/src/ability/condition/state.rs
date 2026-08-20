@@ -168,12 +168,10 @@ impl<'a> ConditionContext<'a> {
                         if crate::ability::debug::ABILITY_DEBUG
                             .load(core::sync::atomic::Ordering::Relaxed)
                         {
-                            eprintln!(
-                                "[TEMP_DIAG] checking zone={} {} cards={:?}",
+                            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[TEMP_DIAG] checking zone={} {} cards={:?}",
                                 zone_name,
                                 cards.len(),
-                                cards
-                            );
+                                cards); }
                         }
                         for &cid in &cards {
                             if let Some(card) = self.game_state.card_database.get_card(cid) {
@@ -189,10 +187,8 @@ impl<'a> ConditionContext<'a> {
                                 if crate::ability::debug::ABILITY_DEBUG
                                     .load(core::sync::atomic::Ordering::Relaxed)
                                 {
-                                    eprintln!(
-                                        "[TEMP_DIAG]   card={} name={} group_ok={} nh={:?}",
-                                        cid, card.name, group_ok, card.need_heart
-                                    );
+                                    if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[TEMP_DIAG]   card={} name={} group_ok={} nh={:?}",
+                                        cid, card.name, group_ok, card.need_heart); }
                                 }
                                 if !group_ok {
                                     continue;
@@ -208,10 +204,8 @@ impl<'a> ConditionContext<'a> {
                                         if crate::ability::debug::ABILITY_DEBUG
                                             .load(core::sync::atomic::Ordering::Relaxed)
                                         {
-                                            eprintln!(
-                                                "[TEMP_DIAG]   all_hearts_present={}",
-                                                all_hearts_present
-                                            );
+                                            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[TEMP_DIAG]   all_hearts_present={}",
+                                                all_hearts_present); }
                                         }
                                         if all_hearts_present {
                                             found_match = true;
@@ -221,7 +215,7 @@ impl<'a> ConditionContext<'a> {
                                         if crate::ability::debug::ABILITY_DEBUG
                                             .load(core::sync::atomic::Ordering::Relaxed)
                                         {
-                                            eprintln!("[TEMP_DIAG]   no need_heart on card");
+                                            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[TEMP_DIAG]   no need_heart on card"); }
                                         }
                                     }
                                 } else {
@@ -235,14 +229,14 @@ impl<'a> ConditionContext<'a> {
                         if crate::ability::debug::ABILITY_DEBUG
                             .load(core::sync::atomic::Ordering::Relaxed)
                         {
-                            eprintln!("[TEMP_DIAG] CONDITION FAILED: no matching card in zones");
+                            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[TEMP_DIAG] CONDITION FAILED: no matching card in zones"); }
                         }
                         return false;
                     }
                     if crate::ability::debug::ABILITY_DEBUG
                         .load(core::sync::atomic::Ordering::Relaxed)
                     {
-                        eprintln!("[TEMP_DIAG] CONDITION PASSED");
+                        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[TEMP_DIAG] CONDITION PASSED"); }
                     }
                 }
                 true

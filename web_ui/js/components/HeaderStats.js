@@ -82,24 +82,20 @@ export const HeaderStats = {
         return hearts;
     },
 
-    // Compute total score from locally selected live cards (during set phase).
-    // Returns { base: N, bonus: N, total: N } where bonus comes from score_modifiers
-    // that are already active (e.g. from stage members or global effects).
+    // Live-score preview for the perspective player's currently selected live
+    // cards (during the live set phase). Returns the running total = the stage's
+    // existing live bonuses (current_score) + the sum of each selected card's
+    // own score. Returns current_score when nothing is selected.
     computeLocalLiveScore: (player) => {
-        let base = 0;
+        let selected = 0;
         State.localLiveCardSelection.forEach(idx => {
             const handCard = player?.hand?.cards?.[idx];
             if (!handCard) return;
             const cardData = State.resolveCardData(handCard.card_no || handCard.card_id);
             if (!cardData) return;
-            base += cardData.score || 0;
+            selected += cardData.score || 0;
         });
-        // current_score = stage base + all modifiers. The bonuses come from
-        // already-active effects (stage member abilities, global modifiers).
-        // We don't try to separate them out here — just add the new live card
-        // base scores on top since those cards aren't in the score yet.
-        const current = player.current_score || 0;
-        return { base, bonus: 0, total: current + base };
+        return (player.current_score || 0) + selected;
     },
 
     render: (state, _p0, _p1, getPhaseKey) => {
@@ -141,16 +137,21 @@ export const HeaderStats = {
             }
         }
 
-        // Score display — col-p1 = perspective, col-p2 = opponent
-        const formatScore = (p, isPerspective) => {
-            const total = p.current_score ?? 0;
-            return `${total}`;
+        // Score display — col-p1 = perspective, col-p2 = opponent.
+        // During the live set phase, the perspective player's score previews the
+        // live total of their currently selected live cards (e.g. three score-2
+        // cards => 6). Otherwise fall back to the engine's current_score.
+        const scoreFor = (p, isPerspective) => {
+            if (isSetPhase && isPerspective && State.localLiveCardSelection.size > 0) {
+                return `${HeaderStats.computeLocalLiveScore(p)}`;
+            }
+            return `${p.current_score ?? 0}`;
         };
         if (HeaderStats.cache.player1Score) {
-            HeaderStats.cache.player1Score.textContent = formatScore(pPerspective, true);
+            HeaderStats.cache.player1Score.textContent = scoreFor(pPerspective, true);
         }
         if (HeaderStats.cache.player2Score) {
-            HeaderStats.cache.player2Score.textContent = formatScore(pOpponent, false);
+            HeaderStats.cache.player2Score.textContent = scoreFor(pOpponent, false);
         }
 
         // Energy — col-p1 = perspective, col-p2 = opponent

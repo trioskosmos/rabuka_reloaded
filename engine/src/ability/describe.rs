@@ -687,6 +687,46 @@ fn duration_label_ja(d: Option<&str>) -> &str {
     }
 }
 
+/// Canonical English choice-prompt templates. Used by the startup self-check
+/// (`i18n_self_check` in main.rs) to assert that every generic instruction has a
+/// Japanese translation. Keep this in sync with the templates handled below.
+pub const CHOICE_PROMPT_TEMPLATES_EN: &[&str] = &[
+    "Select up to 3 card(s) to keep",
+    "Select up to 3 more card(s) from hand to keep",
+    "Select up to 1 member(s) to change state",
+    "Select up to 3 card(s) from the 5 looked-at cards (or skip)",
+    "Select up to 2 more card(s) from the 4 remaining looked-at cards",
+    "Repeat effect?",
+    "Pay optional cost or skip",
+];
+
+/// Single source of truth for translating a generic English choice *instruction*
+/// prompt into Japanese. Handles the parameterized templates (e.g. "Select up to
+/// N card(s) to keep") that an exact-match table cannot, since the number varies.
+/// Returns `None` only for prompts it does not recognise (so callers can warn).
+pub fn translate_choice_prompt_en_to_ja(en: &str) -> Option<String> {
+    let s = en.trim();
+    if let Some(rest) = s.strip_prefix("Select up to ") {
+        let num_end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
+        let n: &str = &rest[..num_end];
+        let after = &rest[num_end..];
+        if after.contains("to keep") {
+            return Some(format!("最大{}枚まで手札に残すカードを選択", n));
+        }
+        if after.contains("member(s) to change state") {
+            return Some(format!("状態を変更するメンバーを最大{}体選択", n));
+        }
+        if after.contains("looked-at cards") {
+            return Some(format!("見たカードから最大{}枚を選択（スキップ可）", n));
+        }
+    }
+    match s {
+        "Repeat effect?" => Some("効果を繰り返しますか？".to_string()),
+        "Pay optional cost or skip" => Some("オプションコストを支払うかスキップ".to_string()),
+        _ => None,
+    }
+}
+
 pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
     let action = effect.action.to_str();
     let ct_binding = effect.card_type_any();
@@ -1080,5 +1120,42 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
             }
         }
         _ => effect.text.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn choice_prompt_templates_all_have_japanese() {
+        for tpl in CHOICE_PROMPT_TEMPLATES_EN {
+            assert!(
+                translate_choice_prompt_en_to_ja(tpl).is_some(),
+                "choice prompt template missing Japanese translation: {:?}",
+                tpl
+            );
+        }
+    }
+
+    #[test]
+    fn choice_prompt_translator_handles_parameterized_prompts() {
+        assert_eq!(
+            translate_choice_prompt_en_to_ja("Select up to 3 card(s) to keep"),
+            Some("最大3枚まで手札に残すカードを選択".to_string())
+        );
+        assert_eq!(
+            translate_choice_prompt_en_to_ja("Select up to 1 member(s) to change state"),
+            Some("状態を変更するメンバーを最大1体選択".to_string())
+        );
+        assert_eq!(
+            translate_choice_prompt_en_to_ja("Select up to 3 card(s) from the 5 looked-at cards (or skip)"),
+            Some("見たカードから最大3枚を選択（スキップ可）".to_string())
+        );
+        assert_eq!(
+            translate_choice_prompt_en_to_ja("Repeat effect?"),
+            Some("効果を繰り返しますか？".to_string())
+        );
+        assert_eq!(translate_choice_prompt_en_to_ja("Some unrelated text"), None);
     }
 }

@@ -352,28 +352,13 @@ impl GameState {
                                                 } else {
                                                     &self.player2
                                                 };
-                                            let loc_b = effect.location_any();
-                                            let per_b = effect.per_unit_type_any();
-                                            let zone =
-                                                loc_b.or(per_b).unwrap_or(Zone::Hand.to_str());
-                                            let mut filter = effect.filter_subset();
-                                            // Per-unit counts exclude the activating card
-                                            // (resolve_per_unit_count also uses exclude_self
-                                            // for self-exclusion in stage/hand counts), and
-                                            // host_card_id scopes under-member counts.
-                                            filter.exclude_self = Some(card_id);
-                                            let per_count =
-                                                crate::ability::util::resolve_per_unit_count(
-                                                    true,
-                                                    Some(zone),
-                                                    player,
-                                                    &self.card_database,
-                                                    &filter,
-                                                    &[],
-                                                    effect.state_any().as_deref(),
-                                                    &self.mods.orientation_modifiers,
-                                                    Some(card_id),
-                                                );
+                                            let units = crate::ability::util::constant_per_unit_units(
+                                                effect,
+                                                player,
+                                                &self.card_database,
+                                                &self.mods.orientation_modifiers,
+                                                card_id,
+                                            );
                                             let base = if effect.max.unwrap_or(false) {
                                                 1
                                             } else {
@@ -381,14 +366,6 @@ impl GameState {
                                                     .resource_icon_count_any()
                                                     .unwrap_or(effect.count_any().unwrap_or(1))
                                             };
-                                            let mut units = per_count as i32
-                                                / effect.per_unit_count_any().unwrap_or(1).max(1)
-                                                    as i32;
-                                            if effect.max.unwrap_or(false) {
-                                                if let Some(cap) = effect.count_any() {
-                                                    units = units.min(cap as i32);
-                                                }
-                                            }
                                             units * base as i32
                                         } else {
                                             effect
@@ -472,53 +449,34 @@ impl GameState {
                                                 } else {
                                                     &self.player2
                                                 };
-                                            let loc_b = effect.location_any();
-                                            let per_b = effect.per_unit_type_any();
-                                            let zone =
-                                                loc_b.or(per_b).unwrap_or(Zone::Hand.to_str());
-                                            let mut filter = effect.filter_subset();
-                                            // Per-unit counts exclude the activating card
-                                            // (resolve_per_unit_count also uses exclude_self
-                                            // for self-exclusion in stage/hand counts), and
-                                            // host_card_id scopes under-member counts.
-                                            filter.exclude_self = Some(card_id);
-                                            let per_count =
-                                                crate::ability::util::resolve_per_unit_count(
-                                                    true,
-                                                    Some(zone),
-                                                    player,
-                                                    &self.card_database,
-                                                    &filter,
-                                                    &[],
-                                                    effect.state_any().as_deref(),
-                                                    &self.mods.orientation_modifiers,
-                                                    Some(card_id),
-                                                );
-                                            let mut units = per_count as i32
-                                                / effect.per_unit_count_any().unwrap_or(1).max(1)
-                                                    as i32;
-                                            if effect.max.unwrap_or(false) {
-                                                if let Some(cap) = effect.count_any() {
-                                                    units = units.min(cap as i32);
-                                                }
-                                            }
-                                            units
+                                            crate::ability::util::constant_per_unit_units(
+                                                effect,
+                                                player,
+                                                &self.card_database,
+                                                &self.mods.orientation_modifiers,
+                                                card_id,
+                                            )
                                         } else {
                                             effect.count_any().unwrap_or(1) as i32
                                         };
-                                        if effect.heart_type_any().as_deref() == Some("all") {
+                                        if crate::ability::util::is_all_heart_type(effect) {
                                             *exp_heart
                                                 .entry(card_id)
                                                 .or_default()
-                                                .entry("heart00".to_string())
+                                                .entry(crate::ability::util::HEART_ALL_KEY.to_string())
                                                 .or_insert(0) += n as i16;
                                         } else {
-                                            for hc in effect.heart_colors_any() {
+                                            let hc_list = effect.heart_colors_any().to_vec();
+                                            let per_entry = crate::ability::util::heart_gain_per_entry(
+                                                n,
+                                                &hc_list,
+                                            ) as i16;
+                                            for hc in &hc_list {
                                                 *exp_heart
                                                     .entry(card_id)
                                                     .or_default()
                                                     .entry(hc.clone())
-                                                    .or_insert(0) += n as i16;
+                                                    .or_insert(0) += per_entry;
                                             }
                                         }
                                     }
@@ -694,7 +652,7 @@ impl GameState {
                                     _ => value,
                                 };
                                 let colors: Vec<String> = if effect.heart_colors_any().is_empty() {
-                                    vec!["heart00".to_string()]
+                                    vec![crate::ability::util::HEART_ALL_KEY.to_string()]
                                 } else {
                                     effect.heart_colors_any().to_vec()
                                 };
@@ -732,12 +690,18 @@ impl GameState {
                                                 }
                                                 "heart" | "ハート" => {
                                                     let n = sub.count.unwrap_or(1) as i32;
-                                                    for hc in sub.heart_colors_any() {
+                                                    let hc_list: Vec<String> =
+                                                        sub.heart_colors_any().to_vec();
+                                                    let per_color = crate::ability::util::heart_gain_per_entry(
+                                                        n,
+                                                        &hc_list,
+                                                    ) as i16;
+                                                    for hc in &hc_list {
                                                         *exp_heart
                                                             .entry(card_id)
                                                             .or_default()
                                                             .entry(hc.clone())
-                                                            .or_insert(0) += n as i16;
+                                                            .or_insert(0) += per_color;
                                                     }
                                                 }
                                                 _ => {}
@@ -1669,17 +1633,19 @@ impl GameState {
                         } else {
                             effect.heart_colors_any().to_vec()
                         };
+                        let per_color =
+                            crate::ability::util::heart_gain_per_entry(amount, &heart_colors) as i16;
                         for &target_id in &candidates {
                             for color_str in &heart_colors {
                                 let hc = crate::card::parse_heart_color(color_str);
-                                self.mods.add_heart_modifier(target_id, hc, amount as i16);
+                                self.mods.add_heart_modifier(target_id, hc, per_color);
                                 *self
                                     .mods
                                     .success_zone_heart_bonuses
                                     .entry(target_id)
                                     .or_default()
                                     .entry(color_str.clone())
-                                    .or_insert(0) += amount as i16;
+                                    .or_insert(0) += per_color;
                             }
                         }
                     }

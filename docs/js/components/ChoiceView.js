@@ -381,9 +381,7 @@ export const ChoiceView = {
         }
 
         // Render prompt/instruction between ability text and options
-        const prompt = State.currentLang === 'en'
-            ? (choice.prompt_en || choice.title || '')
-            : (choice.prompt_ja || choice.prompt_en || choice.title || '');
+        const prompt = i18n.getChoicePrompt(choice, State.currentLang);
         if (prompt) {
             const displayPrompt = State.currentLang === 'en' && window.translateAbility
                 ? window.translateAbility(prompt, 'en')

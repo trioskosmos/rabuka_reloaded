@@ -3,5 +3,7 @@ pub mod deck_parser;
 pub mod display;
 pub mod game_setup;
 pub mod platform_ui;
+pub mod menu;
+pub mod match_runner;
 #[cfg(feature = "server")]
 pub mod web_server;

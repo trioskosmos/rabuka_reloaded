@@ -61,13 +61,12 @@ impl AbilityResolver {
             })
             .unwrap_or_default();
         #[cfg(not(feature = "no_std"))]
-        eprintln!(
-            "[DEBUG_SEQ] execute_sequential_effect called! action={} n_actions={} actions=[{}] effect_ptr={:p}",
+        if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[DEBUG_SEQ] execute_sequential_effect called! action={} n_actions={} actions=[{}] effect_ptr={:p}",
             effect.action,
             effect.compound.actions.as_ref().map(|a| a.len()).unwrap_or(0),
             actions_str,
             effect
-        );
+        ); }
         // Trace sequential compound effect
         let seq_label = if conditional {
             "sequential_conditional".to_string()
@@ -147,12 +146,11 @@ impl AbilityResolver {
                 // cause the next iteration's actions to be skipped.
                 condition_failed = None;
                 'action_loop: for (i, action) in repeat_actions.iter().enumerate() {
-                    eprintln!(
-                        "[DEBUG_RA] i={} action={} len={}",
+                    if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[DEBUG_RA] i={} action={} len={}",
                         i,
                         action.action,
                         repeat_actions.len()
-                    );
+                    ); }
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
                         log::debug!(
                             "[SEQ_TRACE] _repeat={} i={} action={}",

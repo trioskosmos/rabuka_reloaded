@@ -2,9 +2,12 @@
 
 extern crate alloc;
 
-pub mod board;
-pub mod card_art_gen;
+mod board;
+mod card_art_gen;
+mod display;
+mod font_tiles_gen;
+
 pub mod decks_baked;
-pub mod display;
-pub mod font_tiles_gen;
 pub mod input;
+pub mod menu;
+pub mod ui;

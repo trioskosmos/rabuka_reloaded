@@ -62,6 +62,7 @@ fn main() {
                     } else {
                         None
                     };
+                    i18n_self_check();
                     run_web_server(ngrok_token);
                 }
                 #[cfg(not(feature = "server"))]
@@ -276,6 +277,28 @@ fn choose_deck(deck_lists: &[deck_parser::DeckList], player_name: &str) -> deck_
     // In a real implementation, this would prompt the player for their choice
     println!("{} chose: {}", player_name, deck_lists[0].name);
     deck_lists[0].clone()
+}
+
+/// Startup guard: verify every canonical English choice-prompt template has a
+/// Japanese translation. Loudly logs any gap at boot so missing i18n is caught
+/// before it ever reaches the UI.
+fn i18n_self_check() {
+    use crate::ability::describe::{translate_choice_prompt_en_to_ja, CHOICE_PROMPT_TEMPLATES_EN};
+    let mut missing = 0;
+    for tpl in CHOICE_PROMPT_TEMPLATES_EN {
+        if translate_choice_prompt_en_to_ja(tpl).is_none() {
+            log::warn!("[i18n] missing Japanese translation for choice prompt template: {:?}", tpl);
+            missing += 1;
+        }
+    }
+    if missing > 0 {
+        log::warn!(
+            "[i18n] {} choice-prompt template(s) lack Japanese — JA mode will show English for these",
+            missing
+        );
+    } else {
+        log::info!("[i18n] all canonical choice-prompt templates have Japanese translations");
+    }
 }
 
 #[cfg(feature = "server")]

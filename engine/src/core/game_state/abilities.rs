@@ -152,41 +152,12 @@ impl GameState {
         }
     }
 
-    /// Like collect_constant_stage_effect_ids but for hand cards.
-    pub(crate) fn collect_constant_hand_effect_ids(&self) -> Vec<(i16, usize)> {
+    fn collect_constant_ids_for(
+        &self,
+        cids: impl IntoIterator<Item = i16>,
+    ) -> Vec<(i16, usize)> {
         let mut ids = Vec::new();
-        for cid in self
-            .player1
-            .hand
-            .cards
-            .iter()
-            .chain(self.player2.hand.cards.iter())
-        {
-            let card = match self.card_database.get_card(*cid) {
-                Some(card) => card,
-                None => continue,
-            };
-            for (idx, ar) in card.abilities.iter().enumerate() {
-                let ability = ar.resolve();
-                if Self::ability_matches_trigger(
-                    &ability,
-                    &crate::game_state::AbilityTrigger::Constant,
-                ) {
-                    if ability.effect.is_some() {
-                        ids.push((*cid, idx));
-                    }
-                }
-            }
-        }
-        ids
-    }
-
-    /// Collect (card_id, ability_index) pairs for constant abilities on stage.
-    /// Returns lightweight index pairs instead of cloned AbilityEffects —
-    /// callers re-lookup through the card_database Arc to avoid 152B × N clones.
-    pub(crate) fn collect_constant_stage_effect_ids(&self) -> Vec<(i16, usize)> {
-        let mut ids = Vec::new();
-        for cid in self.stage_card_ids() {
+        for cid in cids {
             let card = match self.card_database.get_card(cid) {
                 Some(card) => card,
                 None => continue,
@@ -204,6 +175,25 @@ impl GameState {
             }
         }
         ids
+    }
+
+    /// Like collect_constant_stage_effect_ids but for hand cards.
+    pub(crate) fn collect_constant_hand_effect_ids(&self) -> Vec<(i16, usize)> {
+        self.collect_constant_ids_for(
+            self.player1
+                .hand
+                .cards
+                .iter()
+                .chain(self.player2.hand.cards.iter())
+                .copied(),
+        )
+    }
+
+    /// Collect (card_id, ability_index) pairs for constant abilities on stage.
+    /// Returns lightweight index pairs instead of cloned AbilityEffects —
+    /// callers re-lookup through the card_database Arc to avoid 152B × N clones.
+    pub(crate) fn collect_constant_stage_effect_ids(&self) -> Vec<(i16, usize)> {
+        self.collect_constant_ids_for(self.stage_card_ids())
     }
 
     /// Helper: look up and resolve a constant ability by (card_id, ability_index).
@@ -1808,25 +1798,35 @@ impl GameState {
                     } else {
                         existing_title.clone()
                     };
-                    obj.insert("prompt_en".into(), serde_json::Value::String(prompt_en));
+                    obj.insert("prompt_en".into(), serde_json::Value::String(prompt_en.clone()));
                 }
+                // Always derive a Japanese prompt so the UI never silently falls back to
+                // English in Japanese mode. Engine is the single source of truth:
+                //   1. generic instruction template translator (parameterized prompts)
+                //   2. effect-backed Japanese description
+                //   3. English prompt (last resort) — and we WARN so the gap is caught.
                 if !obj.contains_key("prompt_ja") {
-                    // Only inject prompt_ja when we can generate actual Japanese text.
-                    // If the choice has a card-backed effect_text, describe_effect_ja provides
-                    // real Japanese. Otherwise leave prompt_ja absent so the frontend
-                    // falls back to prompt_en/title instead of getting fake Japanese.
-                    if let Some(ref choice_text) = entry.choice_effect_text {
-                        if !choice_text.is_empty() {
-                            if let Some(ref effect) = entry.ability.effect {
-                                let prompt_ja =
-                                    crate::ability::describe::describe_effect_ja(effect);
-                                obj.insert(
-                                    "prompt_ja".into(),
-                                    serde_json::Value::String(prompt_ja),
-                                );
+                    let prompt_en = obj
+                        .get("prompt_en")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let prompt_ja = crate::ability::describe::translate_choice_prompt_en_to_ja(&prompt_en)
+                        .or_else(|| {
+                            if entry.choice_effect_text.as_deref().map_or(false, |t| !t.is_empty()) {
+                                entry.ability.effect.as_ref().map(|e| crate::ability::describe::describe_effect_ja(e))
+                            } else {
+                                None
                             }
-                        }
+                        })
+                        .unwrap_or_else(|| prompt_en.clone());
+                    if !prompt_en.is_empty() && prompt_ja == prompt_en {
+                        log::warn!(
+                            "[i18n] choice prompt has no Japanese translation (English shown): {:?}",
+                            prompt_en
+                        );
                     }
+                    obj.insert("prompt_ja".into(), serde_json::Value::String(prompt_ja));
                 }
                 obj.insert(
                     "trigger_type".into(),

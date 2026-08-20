@@ -2685,7 +2685,11 @@ def _check_heart_blade_split_from_text(text, action):
     ):
         return None
     blade_count = text.count("{{icon_blade.png|ブレード}}")
-    heart_colors = extract_heart_colors_from_text(text)
+    heart_colors = [
+        f"heart{m.group(1).zfill(2)}"
+        for m in re.finditer(r"{{heart_(\d+)\.png\|heart\d+}}", text)
+        if "持つ" not in text[m.end() : m.end() + 12]
+    ]
     actions = []
     if blade_count:
         actions.append({"action": "gain_resource", "resource": "blade", "count": blade_count})
@@ -5714,6 +5718,59 @@ def infer_resource(d, text):
         d["resource"] = "generic"
 
 
+def _is_heart_gain(d, text):
+    """True when the action is a heart (ハート) resource gain."""
+    res = d.get("resource")
+    if res in ("heart", "ハート"):
+        return True
+    if isinstance(res, str) and res.startswith("heart0"):
+        return True
+    if d.get("action") == "gain_resource" and "{{heart_" in text:
+        return True
+    return False
+
+
+def _enrich_heart_gain_multiset(d, effect_text):
+    """Represent a heart gain's quantity as a multiset of heart-color tokens.
+
+    One entry is emitted per granted heart so the engine grants exactly that
+    many hearts of each color. This fixes the prior behaviour where ``count``
+    collapsed the ``{{heart_XX}}`` icons into a distinct set and the constant-
+    ability grant path multiplied ``count`` across every color (giving N of
+    EACH color instead of one of each).
+    """
+    # Only count heart icons that are actually GAINED. A heart icon that is
+    # part of a "Xを持つ" (target HAS heart X) filter clause is a condition,
+    # not a gain — otherwise e.g. "...heart06を持つメンバーはheart06×4を得る"
+    # would over-count to 5.
+    icons = []
+    for m in re.finditer(r"{{heart_(\d+)\.png\|heart\d+}}", effect_text):
+        after = effect_text[m.end() : m.end() + 12]
+        if "持つ" in after:
+            continue
+        icons.append(m.group(1))
+    if icons:
+        colors = [f"heart{m.zfill(2)}" for m in icons]
+        m_nts = re.search(r"(\d+)つ得る", effect_text)
+        if m_nts:
+            n = int(m_nts.group(1))
+            distinct = list(dict.fromkeys(colors))
+            if len(distinct) == 1:
+                # "heart02を3つ得る" -> 3 tokens of heart02
+                colors = [distinct[0]] * n
+            # (distinct > 1 with Nつ is ambiguous; keep tokens as written)
+        d["heart_colors"] = colors
+        d["count"] = len(colors)
+        if detect_require_all_hearts(effect_text):
+            d["require_all_heart_colors"] = True
+        return
+    # No explicit heart icons: a color-choice / generic heart gain. Preserve an
+    # explicit "Nつ" count (e.g. "選んだハートを2つ得る").
+    m_nts = re.search(r"(\d+)つ得る", effect_text)
+    if m_nts:
+        d["count"] = int(m_nts.group(1))
+
+
 def infer_count_from_icons(d, text):
     """Infer count for gain_resource from icon occurrences."""
     # Use only the effect portion (last segment after comma / duration)
@@ -5724,6 +5781,11 @@ def infer_count_from_icons(d, text):
             if len(parts) == 2 and parts[1].strip():
                 effect_text = parts[1].strip().lstrip("、")
                 break
+    # Heart gains use a multiset representation; handled separately so a single
+    # heart icon used as a condition is not miscounted as a gain.
+    if _is_heart_gain(d, effect_text):
+        _enrich_heart_gain_multiset(d, effect_text)
+        return
     # Issue 9: Prefer explicit numeric count (e.g. "2つ得る") over icon counting
     # so that "ハートを2つ得る" with a single heart icon correctly gets count=2
     count_match = re.search(r"(\d+)つ", effect_text)
@@ -6075,13 +6137,31 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         "と同じ名前" in text or ("同じ名前" in text and "持つ" in text)
     ):
         action["same_name"] = True
-    # Extract heart_colors for ALL action types, not just gain_resource
-    if "heart_colors" not in action:
+    # Heart gains already have their multiset set by infer_count_from_icons
+    # (above). For those, do NOT re-derive heart_colors from the full text,
+    # which would leak condition/requirement hearts onto the gain effect.
+    if "heart_colors" not in action and not _is_heart_gain(action, text):
         hc = extract_heart_colors_from_text(text)
         if hc:
             action["heart_colors"] = hc
             if detect_require_all_hearts(text):
                 action["require_all_heart_colors"] = True
+    # Strip heart_colors that leak from condition/filter clauses. Only a heart
+    # gain (resource heart) legitimately carries heart_colors; for non-heart
+    # resources (blade/energy) it is leakage, and for heart_type="all" gains the
+    # icon_all already encodes every color so the list is redundant.
+    if action.get("action") == "gain_resource":
+        res = action.get("resource")
+        if res in ("heart", "ハート") or (
+            isinstance(res, str) and res.startswith("heart0")
+        ):
+            if action.get("heart_type") == "all" and action.get("heart_colors"):
+                action.pop("heart_colors", None)
+                action.pop("require_all_heart_colors", None)
+        else:
+            if action.get("heart_colors"):
+                action.pop("heart_colors", None)
+                action.pop("require_all_heart_colors", None)
     if a == "modify_required_hearts" and "operation" not in action:
         if "減らす" in text or "減る" in text:
             action["operation"] = "decrease"
@@ -10466,6 +10546,12 @@ def _clean_gain_resource(node):
             res = node.get("resource")
             if res in ("blade", "ブレード"):
                 node.pop("heart_colors", None)
+            elif res in ("heart", "ハート") and node.get("heart_type") == "all":
+                # icon_all already encodes every color; any heart_colors here is
+                # leakage from a condition clause (e.g. "heart02とheart04とheart05
+                # の合計が12以上の場合、ハートを得る").
+                node.pop("heart_colors", None)
+            node.pop("source", None)
             node.pop("source", None)
             # Remove position from gain_resource when the condition has the same
             # position. Position on gain_resource tells the engine which card
@@ -12051,7 +12137,16 @@ def _enrich_effect_type(effect, triggerless=""):
         if h not in seen:
             seen.add(h)
             heart_colors.append(h)
-    if heart_colors and "heart_colors" not in effect:
+    # Never patch heart_colors onto a gain_resource effect. Heart-gain colors
+    # must come from the parser's multiset logic (one token per granted heart);
+    # the full-text heart icons here belong to a CONDITION/requirement clause
+    # (e.g. "heart01..06がすべてある場合、ブレードを得る") and would otherwise
+    # leak onto the gain.
+    if (
+        heart_colors
+        and "heart_colors" not in effect
+        and effect.get("action") != "gain_resource"
+    ):
         effect["heart_colors"] = heart_colors
     if "heart_colors" in effect and "condition" in effect:
         cond = effect["condition"]

@@ -13,5 +13,6 @@ export {
     translateProduct,
     translateSeries,
     translateChoiceDescription,
-    getCurrentTranslations
+    getCurrentTranslations,
+    getChoicePrompt
 } from './translator.js';

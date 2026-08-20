@@ -332,8 +332,8 @@ impl AbilityQueue {
                     trigger_moved_cards: None,
                     triggering_member_id: None,
                     snapshot_movements: SmallVec::new(),
-                    choice_effect_text: None,
-                    condition_cache: SmallVec::new(),
+            choice_effect_text: None,
+            condition_cache: SmallVec::new(),
                 };
                 self.entries.push(dummy_entry);
                 self.state = QueueState::WaitingForChoice {
@@ -618,6 +618,7 @@ mod tests {
             triggering_member_id: None,
             snapshot_movements: SmallVec::new(),
             choice_effect_text: None,
+            optional_moves_all_moved: None,
             condition_cache: SmallVec::new(),
         }
     }

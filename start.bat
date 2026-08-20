@@ -6,10 +6,15 @@ echo Adding firewall rule for port 8080...
 powershell -NoProfile -Command "Start-Process netsh -Verb RunAs -ArgumentList 'advfirewall firewall add rule name=RabukaGameServer dir=in protocol=tcp localport=8080 action=allow' -WindowStyle Hidden" >nul 2>&1
 
 echo Starting Rust Backend on http://127.0.0.1:8080...
+echo [i18n] missing Japanese choice prompts are logged at WARN level -- watch the server output.
 cd /d "%~dp0engine"
 
 REM Enable structured verdict items in the in-game rule log
 set RABUKA_RULE_LOG=1
+
+REM Surface i18n gaps (missing Japanese choice prompts) loudly in the server log.
+REM The engine logs these at WARN on boot (i18n_self_check) and at runtime.
+set RUST_LOG=warn
 
 REM If --ngrok specified, save its auth token argument
 if "%1"=="--ngrok" set NGROK_AUTHTOKEN=%2

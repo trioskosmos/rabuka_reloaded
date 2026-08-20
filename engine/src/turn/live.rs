@@ -99,9 +99,9 @@ impl super::TurnEngine {
                 }
             }
         }
-        eprintln!("[LIVE-DBG] === STAGE HEARTS AFTER YELL ===");
-        eprintln!("[LIVE-DBG] P1 stage_hearts={:?}", p1_stage.hearts);
-        eprintln!("[LIVE-DBG] P2 stage_hearts={:?}", p2_stage.hearts);
+        if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] === STAGE HEARTS AFTER YELL ==="); }
+        if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] P1 stage_hearts={:?}", p1_stage.hearts); }
+        if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] P2 stage_hearts={:?}", p2_stage.hearts); }
         game_state.player1.stage_hearts = Some(p1_stage);
         game_state.player2.stage_hearts = Some(p2_stage);
 
@@ -279,12 +279,10 @@ impl super::TurnEngine {
         // is populated and can be used to decide who won.
         // (Q47/Q48: score is not a reliable proxy — score can be 0 and still win.)
         for snap in game_state.performance_snapshots.iter_mut() {
-            eprintln!(
-                "[LIVE-DBG] === PASS/FAIL CHECK player={} lives={} total_hearts={:?} ===",
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] === PASS/FAIL CHECK player={} lives={} total_hearts={:?} ===",
                 snap.player_id,
                 snap.lives.len(),
-                snap.total_hearts
-            );
+                snap.total_hearts); }
             for i in 0..snap.lives.len() {
                 let lc_id = snap.lives[i].card_id;
                 if let Some(card) = game_state.card_database.get_card(lc_id) {
@@ -297,28 +295,22 @@ impl super::TurnEngine {
                                 filled[alloc.color as usize] += alloc.amount;
                             }
                         }
-                        eprintln!(
-                            "[LIVE-DBG] live[{}] card={} filled_from_allocs={:?}",
-                            i, card.card_no, filled
-                        );
+                        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] card={} filled_from_allocs={:?}",
+                            i, card.card_no, filled); }
                         let mut required_arr = EMPTY_H8;
                         for (color, needed) in &nh.hearts {
                             required_arr[color.index()] = *needed;
                         }
-                        eprintln!("[LIVE-DBG] live[{}] base_required={:?}", i, required_arr);
+                        if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] base_required={:?}", i, required_arr); }
                         if let Some(card_mods) = game_state.mods.need_heart_modifiers.get(&lc_id) {
                             // Q115/Q127: Set-to-X applies first (per-color), then additive stacks.
                             // A set modifier on one color does NOT erase other colors' requirements.
-                            eprintln!(
-                                "[LIVE-DBG] live[{}] applying {} modifiers",
+                            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] applying {} modifiers",
                                 i,
-                                card_mods.len()
-                            );
+                                card_mods.len()); }
                             for (color, me) in card_mods {
-                                eprintln!(
-                                    "[LIVE-DBG] live[{}]   modifier color={:?} set={} additive={}",
-                                    i, color, me.set, me.additive
-                                );
+                                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}]   modifier color={:?} set={} additive={}",
+                                    i, color, me.set, me.additive); }
                                 if me.set != 0 {
                                     required_arr[color.index()] = me.set as u8;
                                 }
@@ -330,12 +322,10 @@ impl super::TurnEngine {
                                     required_arr[idx] = (current + me.additive as i32).max(0) as u8;
                                 }
                             }
-                            eprintln!(
-                                "[LIVE-DBG] live[{}] after_modifiers required={:?}",
-                                i, required_arr
-                            );
+                            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] after_modifiers required={:?}",
+                                i, required_arr); }
                         } else {
-                            eprintln!("[LIVE-DBG] live[{}] no modifiers", i);
+                            if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] no modifiers", i); }
                         }
                         let passed = {
                             // COLORLESS hearts (filled[0], e.g. from b_heart07) count
@@ -346,20 +336,18 @@ impl super::TurnEngine {
                             let mut ok = true;
                             let total_filled: u8 = filled.iter().sum();
                             let total_required: u8 = required_arr.iter().sum();
-                            eprintln!(
-                                "[LIVE-DBG] live[{}] total_filled={} total_required={} icon_all={}",
-                                i, total_filled, total_required, icon_all
-                            );
+                            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] total_filled={} total_required={} icon_all={}",
+                                i, total_filled, total_required, icon_all); }
                             if total_filled < total_required {
-                                eprintln!("[LIVE-DBG] live[{}] FAIL: total_filled({}) < total_required({})",
-                                    i, total_filled, total_required);
+                                if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] FAIL: total_filled({}) < total_required({})",
+                                    i, total_filled, total_required); }
                                 ok = false;
                             }
                             if ok && required_arr[0] > 0 {
                                 let any_hearts: u8 = filled[1..7].iter().sum::<u8>() + filled[0];
                                 if any_hearts + icon_all < required_arr[0] {
-                                    eprintln!("[LIVE-DBG] live[{}] FAIL: h00_req={} any_hearts={} icon_all={}",
-                                        i, required_arr[0], any_hearts, icon_all);
+                                    if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] FAIL: h00_req={} any_hearts={} icon_all={}",
+                                        i, required_arr[0], any_hearts, icon_all); }
                                     ok = false;
                                 } else {
                                     let used = required_arr[0].saturating_sub(any_hearts);
@@ -370,23 +358,21 @@ impl super::TurnEngine {
                                 for idx in 1..7 {
                                     if filled[idx] < required_arr[idx] {
                                         let deficit = required_arr[idx] - filled[idx];
-                                        eprintln!("[LIVE-DBG] live[{}] color[{}] deficit={} icon_all_remaining={}",
-                                            i, idx, deficit, icon_all);
+                                        if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] color[{}] deficit={} icon_all_remaining={}",
+                                            i, idx, deficit, icon_all); }
                                         if icon_all >= deficit {
                                             icon_all -= deficit;
                                         } else {
-                                            eprintln!("[LIVE-DBG] live[{}] FAIL: color[{}] deficit={} can't cover with icon_all={}",
-                                                i, idx, deficit, icon_all);
+                                            if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] FAIL: color[{}] deficit={} can't cover with icon_all={}",
+                                                i, idx, deficit, icon_all); }
                                             ok = false;
                                             break;
                                         }
                                     }
                                 }
                             }
-                            eprintln!(
-                                "[LIVE-DBG] live[{}] VERDICT: passed={} filled={:?} required={:?}",
-                                i, ok, filled, required_arr
-                            );
+                            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] VERDICT: passed={} filled={:?} required={:?}",
+                                i, ok, filled, required_arr); }
                             ok
                         };
                         // Populate adjustments and requirements from need_heart_modifiers
@@ -488,47 +474,37 @@ impl super::TurnEngine {
                 .map_or(false, |s| {
                     !s.lives.is_empty() && s.lives.iter().all(|l| l.passed)
                 });
-        eprintln!("[LIVE-DBG] === VICTORY DETERMINATION ===");
-        eprintln!(
-            "[LIVE-DBG] P1 score={} has_cards={} all_reqs_met={} live_zone={:?}",
+        if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] === VICTORY DETERMINATION ==="); }
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] P1 score={} has_cards={} all_reqs_met={} live_zone={:?}",
             player1_score,
             player1_has_cards,
             player1_all_passed,
-            game_state.player1.live_card_zone.cards
-        );
-        eprintln!(
-            "[LIVE-DBG] P2 score={} has_cards={} all_reqs_met={} live_zone={:?}",
+            game_state.player1.live_card_zone.cards); }
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] P2 score={} has_cards={} all_reqs_met={} live_zone={:?}",
             player2_score,
             player2_has_cards,
             player2_all_passed,
-            game_state.player2.live_card_zone.cards
-        );
+            game_state.player2.live_card_zone.cards); }
         let (player1_won, player2_won) = if !player1_all_passed && !player2_all_passed {
-            eprintln!("[LIVE-DBG] RESULT: neither player passed → neither wins");
+            if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] RESULT: neither player passed → neither wins"); }
             (false, false)
         } else if player1_all_passed && !player2_all_passed {
-            eprintln!("[LIVE-DBG] RESULT: only P1 passed → P1 wins");
+            if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] RESULT: only P1 passed → P1 wins"); }
             (true, false)
         } else if !player1_all_passed && player2_all_passed {
-            eprintln!("[LIVE-DBG] RESULT: only P2 passed → P2 wins");
+            if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] RESULT: only P2 passed → P2 wins"); }
             (false, true)
         } else if player1_score > player2_score {
-            eprintln!(
-                "[LIVE-DBG] RESULT: P1 score({}) > P2 score({}) → P1 wins",
-                player1_score, player2_score
-            );
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] RESULT: P1 score({}) > P2 score({}) → P1 wins",
+                player1_score, player2_score); }
             (true, false)
         } else if player2_score > player1_score {
-            eprintln!(
-                "[LIVE-DBG] RESULT: P2 score({}) > P1 score({}) → P2 wins",
-                player2_score, player1_score
-            );
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] RESULT: P2 score({}) > P1 score({}) → P2 wins",
+                player2_score, player1_score); }
             (false, true)
         } else {
-            eprintln!(
-                "[LIVE-DBG] RESULT: equal scores ({}) → both win (Rule 8.4.6.2)",
-                player1_score
-            );
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] RESULT: equal scores ({}) → both win (Rule 8.4.6.2)",
+                player1_score); }
             (true, true)
         };
 
@@ -579,22 +555,18 @@ impl super::TurnEngine {
                 game_state.player2.live_card_zone.cards.is_empty()
             };
             if zone_empty {
-                eprintln!(
-                    "[LIVE-DBG] player={} live_card_zone empty → total_score forced to 0",
-                    snap.player_id
-                );
+                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] player={} live_card_zone empty → total_score forced to 0",
+                    snap.player_id); }
                 snap.total_score = 0;
             }
             // Rule 8.3.16: If ANY live card's need_heart could not be satisfied,
             // ALL live cards fail. Success requires ALL cards to pass.
             snap.success = snap.lives.iter().all(|l| l.passed) && snap.total_score > 0;
-            eprintln!(
-                "[LIVE-DBG] player={} SUCCESS={} total_score={} all_passed={}",
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] player={} SUCCESS={} total_score={} all_passed={}",
                 snap.player_id,
                 snap.success,
                 snap.total_score,
-                snap.lives.iter().all(|l| l.passed)
-            );
+                snap.lives.iter().all(|l| l.passed)); }
 
             // Pre-computed score breakdown for the UI display layer.
             snap.base_score_total = snap

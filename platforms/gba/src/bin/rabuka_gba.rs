@@ -6,8 +6,6 @@
 
 extern crate alloc;
 
-use alloc::format;
-use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use rabuka_engine::card::Card;
@@ -16,10 +14,9 @@ use rabuka_engine::game::platform_ui;
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::rng;
 
-use rabuka_gba::board::Board;
 use rabuka_gba::decks_baked::DECKS;
-use rabuka_gba::display::Display;
 use rabuka_gba::input::{Button, Input};
+use rabuka_gba::ui::{Board, Display};
 
 struct GbaUi<'u, 'd> {
     display: &'u mut Display<'d>,
@@ -66,7 +63,8 @@ impl<'u, 'd> platform_ui::PlatformUi for GbaUi<'u, 'd> {
         self.display.wait();
     }
     fn render_board(&mut self, gs: &GameState) -> bool {
-        // Select toggles between the Board view and the Action view.
+        // Select toggles between the Board view and the Action view
+        // (the GBA's two-pane flow on one screen, vs the 3DS's two screens).
         if self.input.just_pressed(Button::Select) {
             self.board_view = !self.board_view;
         }
@@ -80,12 +78,15 @@ impl<'u, 'd> platform_ui::PlatformUi for GbaUi<'u, 'd> {
                 .text()
                 .lines()
                 .filter(|l| !l.trim().is_empty())
-                .map(|l| l.to_string())
+                .map(|l| {
+                    use alloc::string::ToString;
+                    l.to_string()
+                })
                 .collect();
             let frame = self.board.build(gs, up, down, left, right, action_lines);
             if self.input.just_pressed(Button::R) {
                 if let Some(cn) = &frame.focused_card {
-                    self.card_detail(gs, cn.clone());
+                    rabuka_gba::menu::show_card_detail(self.display, self.input, gs, cn.clone());
                     return true;
                 }
             }
@@ -98,33 +99,6 @@ impl<'u, 'd> platform_ui::PlatformUi for GbaUi<'u, 'd> {
     }
 }
 
-impl<'u, 'd> GbaUi<'u, 'd> {
-    /// Show the focused card's art + stats until A/B/L/R is pressed.
-    fn card_detail(&mut self, gs: &GameState, card_no: alloc::string::String) {
-        use rabuka_gba::card_art_gen::CARD_ART;
-        let art = CARD_ART.iter().find(|a| a.card_no == card_no);
-        let mut lines: alloc::vec::Vec<alloc::string::String> = alloc::vec::Vec::new();
-        if let Some(card) = gs.card_database.get_card_by_no(&card_no) {
-            lines.push(format!("[{}] {}", card.card_no, card.name));
-            lines.push(stat_line(card));
-        } else {
-            lines.push(card_no);
-        }
-        self.display.render_card_detail(art, &lines);
-        loop {
-            self.input.poll();
-            if self.input.just_pressed(Button::A)
-                || self.input.just_pressed(Button::B)
-                || self.input.just_pressed(Button::L)
-                || self.input.just_pressed(Button::R)
-            {
-                return;
-            }
-            self.display.wait();
-        }
-    }
-}
-
 fn load_deck_cards(
     _decks: &[rabuka_gba::decks_baked::DeckInfo],
     idx1: usize,
@@ -133,43 +107,6 @@ fn load_deck_cards(
     let mut cards = rabuka_engine::game::deck_parser::load_two_decks(idx1, idx2);
     CardLoader::attach_abilities(&mut cards);
     cards
-}
-
-/// Compact single-line card stats, mirroring the 3DS stat line.
-fn stat_line(card: &Card) -> alloc::string::String {
-    use rabuka_engine::card::CardType;
-    let mut s = alloc::string::String::new();
-    match card.card_type {
-        CardType::Member => {
-            if let Some(cost) = card.cost {
-                if cost > 0 {
-                    s.push_str(&format!("E{} ", cost));
-                }
-            }
-            if let Some(bh) = &card.base_heart {
-                for (c, v) in bh.hearts.iter() {
-                    s.push_str(&format!("{}{} ", c.short_label(), v));
-                }
-            }
-            if card.blade > 0 {
-                s.push_str(&format!("BL{}", card.blade));
-            }
-        }
-        CardType::Live => {
-            if let Some(score) = card.score {
-                if score > 0 {
-                    s.push_str(&format!("SC{} ", score));
-                }
-            }
-            if let Some(nh) = &card.need_heart {
-                for (c, v) in nh.hearts.iter() {
-                    s.push_str(&format!("{}{} ", c.short_label(), v));
-                }
-            }
-        }
-        CardType::Energy => {}
-    }
-    s
 }
 
 #[agb::entry]

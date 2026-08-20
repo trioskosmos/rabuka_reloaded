@@ -1,7 +1,7 @@
 import { State } from '../state.js';
 
 const AI_ACTION_DELAY = 0;
-const AI_IDLE_DELAY = 0;
+const AI_IDLE_DELAY = 200;
 
 function aiHeaders(token) {
     return {

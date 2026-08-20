@@ -382,9 +382,7 @@ export const ChoiceView = {
         }
 
         // Render prompt/instruction between ability text and options
-        const prompt = State.currentLang === 'en'
-            ? (choice.prompt_en || choice.title || '')
-            : (choice.prompt_ja || choice.prompt_en || choice.title || '');
+        const prompt = i18n.getChoicePrompt(choice, State.currentLang);
         if (prompt) {
             const displayPrompt = State.currentLang === 'en' && window.translateAbility
                 ? window.translateAbility(prompt, 'en')
@@ -565,9 +563,15 @@ export const ChoiceView = {
                 const optCard = opt.card_id !== undefined
                     ? (State.resolveCardData(opt.card_id) || Tooltips.findCardById(opt.card_id))
                     : (opt.card_no ? State.resolveCardData(opt.card_no) : null);
-                const action = state.legal_actions?.find(a =>
-                    a.parameters?.card_id === idx || a.description?.startsWith(cardName)
-                );
+                // The engine sets each auto-ability option's legal action
+                // `card_id` to the option index, so match on that exactly. Do NOT
+                // fall back to `description.startsWith(cardName)`: when several
+                // options come from the SAME card (e.g. a card with two [登場]
+                // debut abilities), every option's description starts with the
+                // same card name, so a startsWith match would always grab the
+                // FIRST option's action — collapsing all options onto it and,
+                // after dedup, showing only the first ability in the queue.
+                const action = state.legal_actions?.find(a => a.parameters?.card_id === idx);
                 items.push({ card: optCard, name: cardName, desc: abilityText, action: action || { index: idx } });
             });
             return items;

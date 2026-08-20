@@ -537,3 +537,20 @@ export function translateChoiceDescription(desc) {
 export function getCurrentTranslations() {
     return translations[currentLanguage];
 }
+
+// Single source of truth for which choice prompt to display. The engine always
+// sends `prompt_ja`/`prompt_en`; we just pick by language and warn loudly if the
+// active-language text is missing (so gaps are caught in devtools, not shipped silent).
+export function getChoicePrompt(choice, lang) {
+    if (!choice) return '';
+    const en = choice.prompt_en || choice.title || choice.text || '';
+    const ja = choice.prompt_ja || '';
+    if (lang === 'ja') {
+        if (!ja) {
+            console.warn('[i18n] choice prompt missing Japanese; showing English:', en);
+            return en;
+        }
+        return ja;
+    }
+    return en || ja;
+}

@@ -1096,8 +1096,8 @@ export const CardRenderer = {
         let headerHtml = "";
         if (overrideTitle) {
             headerHtml = `<div class="looked-cards-header">${overrideTitle}</div>`;
-        } else if (state.pending_choice && (state.pending_choice.title || state.pending_choice.text)) {
-            const title = state.pending_choice.title || state.pending_choice.text;
+        } else if (state.pending_choice && (state.pending_choice.title || state.pending_choice.text || state.pending_choice.prompt_en || state.pending_choice.prompt_ja)) {
+            const title = i18n.getChoicePrompt(state.pending_choice, State.currentLang);
             headerHtml = `<div class="looked-cards-header">${Tooltips.enrichAbilityText(title)}</div>`;
         }
 

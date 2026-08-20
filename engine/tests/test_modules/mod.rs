@@ -150,6 +150,7 @@ pub mod jellyfish_test;
 pub mod jimo_ai_dash_test;
 pub mod joint_card_live_start_test;
 pub mod kagayaiteru_test;
+pub mod kanan_bp7_debut_queue_test;
 pub mod kanata_bp1_test;
 pub mod kanata_restrict_test;
 pub mod kanon_invalidate_test;

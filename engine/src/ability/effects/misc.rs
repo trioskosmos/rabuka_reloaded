@@ -619,24 +619,22 @@ impl AbilityResolver {
             .collect();
         let _ = player;
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            eprintln!("[GR_SELECTED_CARD] entering branch. selected_cards={:?} target_ids={:?} gs.activating={:?}",
-                self.selected_cards, target_ids, gs.activating_card);
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[GR_SELECTED_CARD] entering branch. selected_cards={:?} target_ids={:?} gs.activating={:?}",
+                self.selected_cards, target_ids, gs.activating_card); }
         }
         if let Some(&selected_id) = self.selected_cards.first() {
             if let Some(selected_card) = card_db.get_card(selected_id) {
                 if crate::ability::debug::ABILITY_DEBUG
                     .load(core::sync::atomic::Ordering::Relaxed)
                 {
-                    eprintln!(
-                        "[GR_SELECTED_BH] selected_id={} has_base_heart={} hearts_count={}",
+                    if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[GR_SELECTED_BH] selected_id={} has_base_heart={} hearts_count={}",
                         selected_id,
                         selected_card.base_heart.is_some(),
                         selected_card
                             .base_heart
                             .as_ref()
                             .map(|bh| bh.hearts.len())
-                            .unwrap_or(0)
-                    );
+                            .unwrap_or(0)); }
                 }
                 if let Some(ref base_heart) = selected_card.base_heart {
                     for &(color, _) in &base_heart.hearts {
@@ -644,12 +642,10 @@ impl AbilityResolver {
                             if crate::ability::debug::ABILITY_DEBUG
                                 .load(core::sync::atomic::Ordering::Relaxed)
                             {
-                                eprintln!(
-                                    "[GR_APPLY] target={} color={:?} before={}",
+                                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[GR_APPLY] target={} color={:?} before={}",
                                     target_id,
                                     color,
-                                    gs.mods.get_heart_modifier(target_id, color)
-                                );
+                                    gs.mods.get_heart_modifier(target_id, color)); }
                             }
                             gs.mods.add_heart_modifier_with_trace(
                                 target_id,
@@ -662,12 +658,10 @@ impl AbilityResolver {
                             if crate::ability::debug::ABILITY_DEBUG
                                 .load(core::sync::atomic::Ordering::Relaxed)
                             {
-                                eprintln!(
-                                    "[GR_APPLY] target={} color={:?} after={}",
+                                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[GR_APPLY] target={} color={:?} after={}",
                                     target_id,
                                     color,
-                                    gs.mods.get_heart_modifier(target_id, color)
-                                );
+                                    gs.mods.get_heart_modifier(target_id, color)); }
                             }
                             if effect.duration_any().as_deref() == Some("live_end") {
                                 let effect_data = crate::core::types::EffectData::SingleCard {
@@ -1476,19 +1470,23 @@ impl AbilityResolver {
         } else {
             final_count as i16
         };
-        let heart_color_val =
-            crate::card::parse_heart_color(heart_color_str.as_deref().unwrap_or("heart00"));
+        let heart_color_val = crate::card::parse_heart_color(
+            heart_color_str
+                .as_deref()
+                .unwrap_or(crate::ability::util::HEART_ALL_KEY),
+        );
 
         // Build heart distribution: for fixed multi-color grants, distribute count
         // across all specified colors instead of using a single color.
         let heart_distribution: Vec<(crate::card::HeartColor, u8)> = if resource == "heart"
             && !heart_selection
-            && effect.heart_colors_any().len() > 1
-            && final_count >= effect.heart_colors_any().len() as u8
+            && !effect.heart_colors_any().is_empty()
+            && (final_count as usize) >= effect.heart_colors_any().len()
         {
-            let per_color = final_count / effect.heart_colors_any().len() as u8;
-            effect
-                .heart_colors_any()
+            let colors = effect.heart_colors_any();
+            let per_color =
+                crate::ability::util::heart_gain_per_entry(final_count as i32, colors) as u8;
+            colors
                 .iter()
                 .map(|c| (crate::card::parse_heart_color(c), per_color))
                 .collect()

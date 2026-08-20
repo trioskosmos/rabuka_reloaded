@@ -36,13 +36,11 @@ impl AbilityResolver {
         let self_target = effect.is_self_target();
         let heart_colors = effect.heart_colors_any();
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            eprintln!(
-                "[SCORE_DIAG] execute_modify_score called: value={} target={} op={} condition={:?}",
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[SCORE_DIAG] execute_modify_score called: value={} target={} op={} condition={:?}",
                 value,
                 target,
                 operation,
-                effect.condition.is_some()
-            );
+                effect.condition.is_some()); }
         }
         let card_db = self.card_db();
         let exclude_self_id = if effect.exclude_self_any().unwrap_or(false) {
