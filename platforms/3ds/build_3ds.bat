@@ -13,15 +13,31 @@ if not exist "C:\devkitPro\devkitARM\bin\arm-none-eabi-gcc.exe" (
 )
 echo [1/7] devkitPro found
 
+REM Fix link.exe shadowing: devkitPro msys2 'link' (hardlink util) shadows MSVC's
+REM link.exe, breaking cargo's host build-script link step. Strip msys2 bins first.
+set "PATH=%PATH:C:\devkitPro\msys2\usr\bin;=%"
+set "PATH=%PATH:C:\devkitPro\msys2\mingw64\bin;=%"
+set "PATH=%PATH:C:\devkitPro\msys2\mingw32\bin;=%"
+set "PATH=%PATH:C:/devkitPro/msys2/usr/bin;=%"
 set DEVKITPRO=C:\devkitPro
 set DEVKITARM=%DEVKITPRO%\devkitARM
 set "PATH=%DEVKITARM%\bin;%DEVKITPRO%\tools\bin;%PATH%"
 
 echo [2/7] Checking Rust nightly (pinned to nightly-2025-05-23 for 3DS)...
-rustup toolchain list 2>nul | findstr /c:"nightly-2025-05-23" >nul
-if %errorlevel% neq 0 ( rustup toolchain install nightly-2025-05-23 )
-rustup component add rust-src --toolchain nightly-2025-05-23-x86_64-pc-windows-msvc 2>nul
-echo [2/7] Rust nightly-2025-05-23 + rust-src ready
+where link.exe >nul 2>&1
+if %errorlevel% neq 0 (
+  echo [2/7] MSVC link.exe not found, using GNU host toolchain
+  rustup toolchain list 2>nul | findstr /c:"nightly-2025-05-23-x86_64-pc-windows-gnu" >nul
+  if %errorlevel% neq 0 ( rustup toolchain install nightly-2025-05-23-x86_64-pc-windows-gnu --no-self-update )
+  rustup component add rust-src --toolchain nightly-2025-05-23-x86_64-pc-windows-gnu 2>nul
+  set "CARGO_3DS_TOOLCHAIN=+nightly-2025-05-23-x86_64-pc-windows-gnu"
+) else (
+  rustup toolchain list 2>nul | findstr /c:"nightly-2025-05-23" >nul
+  if %errorlevel% neq 0 ( rustup toolchain install nightly-2025-05-23 )
+  rustup component add rust-src --toolchain nightly-2025-05-23-x86_64-pc-windows-msvc 2>nul
+  set "CARGO_3DS_TOOLCHAIN=+nightly-2025-05-23-x86_64-pc-windows-msvc"
+)
+echo [2/7] Rust nightly-2025-05-23 + rust-src ready [!CARGO_3DS_TOOLCHAIN!]
 
 echo [3/7] Checking cargo-3ds...
 cargo 3ds --version >nul 2>&1
@@ -35,7 +51,7 @@ call :need_bake "%~dp0romfs\cards.bin"
 if errorlevel 1 (
     echo [4/7] Baking cards.bin...
     cd /d "%~dp0..\..\tools\bake"
-    cargo run --release -- 3ds "%~dp0romfs"
+    cargo %CARGO_3DS_TOOLCHAIN% run --release -- 3ds "%~dp0romfs"
     if !errorlevel! neq 0 (
         echo [FAIL] bake failed.
         pause
@@ -103,7 +119,7 @@ cd /d "%~dp0"
 set RUSTFLAGS=
 set CARGO_PROFILE_RELEASE_LTO=false
 set CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16
-cargo 3ds build --bin rabuka_3ds --release --features 3ds
+cargo %CARGO_3DS_TOOLCHAIN% 3ds build --bin rabuka_3ds --release --features 3ds
 if %errorlevel% neq 0 (
     echo Build FAILED.
     pause

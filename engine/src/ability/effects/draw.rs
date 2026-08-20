@@ -235,24 +235,33 @@ impl AbilityResolver {
             return Ok(());
         }
         if phase == 1 {
-            // Self's selection is in self.selected_cards. Move self's non-selected
-            // hand cards under self's deck (shuffled).
-            let snapshot = self.keep_shuffle_under_snapshots[0].clone();
-            self.move_non_selected_hand_to_deck_bottom(gs, "self", &snapshot);
-            let player = gs.resolve_target_player_mut("opponent");
-            self.keep_shuffle_under_snapshots
-                .push(player.hand.cards.to_vec());
-            let c = self.make_hand_selection_choice(gs, "opponent", count, effect);
-            self.keep_shuffle_under_phase = 2;
-            self.pending_choice = Some(c);
-            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+            // Phase 1 is now handled directly in choice.rs::handle_hand_selection
+            // (moves self's non-selected under deck and prompts opponent).
+            // This fallback only runs if choice.rs did not already advance the
+            // phase (e.g. legacy path / direct re-entry). Guard against double
+            // move by checking snapshot count.
+            if self.keep_shuffle_under_snapshots.len() == 1 {
+                let snapshot = self.keep_shuffle_under_snapshots[0].clone();
+                self.move_non_selected_hand_to_deck_bottom(gs, "self", &snapshot);
+                self.keep_shuffle_selected.clear();
+                let player = gs.resolve_target_player_mut("opponent");
+                self.keep_shuffle_under_snapshots
+                    .push(player.hand.cards.to_vec());
+                let c = self.make_hand_selection_choice(gs, "opponent", count, effect);
+                self.keep_shuffle_under_phase = 2;
+                self.pending_choice = Some(c);
+                self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+            }
             return Ok(());
         }
         // phase == 2: opponent's selection resolved.
-        let snapshot = self.keep_shuffle_under_snapshots[1].clone();
-        self.move_non_selected_hand_to_deck_bottom(gs, "opponent", &snapshot);
+        if self.keep_shuffle_under_snapshots.len() >= 2 {
+            let snapshot = self.keep_shuffle_under_snapshots[1].clone();
+            self.move_non_selected_hand_to_deck_bottom(gs, "opponent", &snapshot);
+        }
         self.keep_shuffle_under_phase = 0;
         self.keep_shuffle_under_snapshots.clear();
+        self.keep_shuffle_selected.clear();
         Ok(())
     }
 

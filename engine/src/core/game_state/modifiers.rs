@@ -821,6 +821,17 @@ impl GameState {
                 if effect.action != crate::ability::enums::ActionType::ModifyCost {
                     continue;
                 }
+                // LL-bp7-001 play-time cost (手札3枚捨てて10) is NOT a passive constant;
+                // it is handled via the pre-play choice hook in phases.rs.
+                // Detect by: set 10 + location hand + 3 characters + optional.
+                let is_ll_bp7_play_cost = effect.operation_any().as_deref() == Some("set")
+                    && effect.value_any() == Some(10)
+                    && effect.location_any().as_deref() == Some("hand")
+                    && effect.optional.unwrap_or(false)
+                    && effect.characters_any().map(|c| c.len() == 3).unwrap_or(false);
+                if is_ll_bp7_play_cost {
+                    continue;
+                }
                 // Resolve each card's OWNER so condition evaluators ("自分の..." /
                 // comparison_target: opponent) judge from the right player's
                 // perspective. A shared context would evaluate every copy as if

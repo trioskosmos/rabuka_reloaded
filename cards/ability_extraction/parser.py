@@ -11739,6 +11739,45 @@ def _strip_self_appearance_card_type(node):
             _strip_self_appearance_card_type(item)
 
 
+def _fix_ll_bp7_001_play_cost(data: Dict[str, Any]) -> None:
+    """Fix LL-bp7-001 ab#0: play-time discard cost mis-parsed as passive discard condition.
+
+    Correct: optional hand→discard of one member_card per named character,
+    if done cost becomes 10. Emit as modify_cost(set) with 3 characters +
+    location hand, marked optional. Engine treats this pattern as play-time
+    (not passive) via modifiers.rs skip + phases.rs hook.
+    """
+    for ability in data.get("unique_abilities", []):
+        cards = ability.get("cards", [])
+        if not any("LL-bp7-001" in c and "(ab#0)" in c for c in cards):
+            continue
+        tt = ability.get("triggerless_text", "")
+        ability["effect"] = {
+            "text": tt,
+            "action": "modify_cost",
+            "operation": "set",
+            "value": 10,
+            "source": "hand",
+            "location": "hand",
+            "card_type": "member_card",
+            "characters": ["国木田花丸", "優木せつ菜", "嵐千砂都"],
+            "count": 3,
+            "optional": True,
+        }
+        ability["cost"] = {
+            "text": "手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置く",
+            "type": "move_cards",
+            "source": "hand",
+            "zone": "hand",
+            "destination": "discard",
+            "card_type": "member_card",
+            "characters": ["国木田花丸", "優木せつ菜", "嵐千砂都"],
+            "count": 1,
+            "per_character": True,
+            "optional": True,
+        }
+
+
 def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     """Post-process already-parsed abilities: infer actions, apply targeted fixes."""
 
@@ -11765,6 +11804,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     for ability in data["unique_abilities"]:
         _process_pre_fix(ability, fix_stats)
     _process_post_fixes(data, fix_stats)
+    _fix_ll_bp7_001_play_cost(data)
     # Final invariant pass: strip card_type from self-appearance conditions
     # across every ability (single source of truth for this rule).
     for ability in data["unique_abilities"]:

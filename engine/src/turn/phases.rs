@@ -1230,6 +1230,10 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             game_state.process_pending_auto_abilities(&player_id);
         }
 
+        // LL-bp7-001: clear one-time set-cost after use (otherwise it would persist forever
+        // because recalculate_constants skips play_time costs).
+        game_state.mods.remove_cost_modifier_set(card_id);
+
         Ok(())
     }
 
@@ -1247,14 +1251,13 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
     ) -> Result<Option<crate::game_state::PlayTimeCostPlay>, String> {
         let player_id = game_state.active_player().id.clone();
         let reduction = Self::play_time_cost_reduction_amount(game_state, card_id);
+        let ll_chars = Self::ll_bp7_001_required_chars(game_state, card_id);
 
         // Re-entry: we already offered the choice and it was answered.
         if let Some(play) = game_state.play_time_cost_play.take() {
             let accepted = game_state.play_time_cost_reduction_accepted.take().unwrap_or(false);
             if accepted {
                 if let Some(red) = reduction {
-                    // compute_play_cost only reads the set-override for a
-                    // stateful play cost; express the -2 as an absolute cost.
                     let base = game_state
                         .card_database
                         .get_card(card_id)
@@ -1266,9 +1269,18 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                         "{} uses play-time cost reduction: {} cost reduced by {}, waitroom members shuffled to deck bottom",
                         player_id, card_id, red
                     ));
+                } else if let Some(chars) = ll_chars.clone() {
+                    // LL-bp7-001: discard 3 named members from hand, set cost to 10
+                    if !Self::discard_ll_bp7_001_cost(game_state, &player_id, card_id, &chars) {
+                        return Err("Required hand cards for LL-bp7-001 cost not found".to_string());
+                    }
+                    game_state.mods.set_cost_modifier(card_id, 10);
+                    game_state.push_rule_log(format!(
+                        "{} uses LL-bp7-001 alternative cost: discarded 3 members, cost set to 10",
+                        player_id
+                    ));
                 }
             }
-            // `play` carries the original area; ensure the play continues at it.
             let _ = play;
             return Ok(None);
         }
@@ -1291,6 +1303,26 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                 },
             );
             return Ok(Some(play));
+        }
+        if let Some(chars) = ll_chars {
+            if Self::has_ll_bp7_001_hand_cards(game_state, card_id, &chars) {
+                let play = crate::game_state::PlayTimeCostPlay { card_id, area };
+                game_state.ability_queue.pause_for_choice(
+                    crate::ability::types::Choice::SelectTarget {
+                        target: "play_time_cost_reduction".into(),
+                        options: Some(vec!["15で出す".to_string(), "10で出す(手札3枚) ".to_string()]),
+                        allow_skip: true,
+                        description: "LL-bp7-001: 手札3枚を捨ててコスト10にしますか？".to_string(),
+                        description_en: Some(
+                            "LL-bp7-001: Discard 3 named members to set cost to 10?".to_string(),
+                        ),
+                        description_ja: Some(
+                            "手札から「国木田花丸」「優木せつ菜」「嵐千砂都」を各1枚捨ててコスト10にしますか？".to_string(),
+                        ),
+                    },
+                );
+                return Ok(Some(play));
+            }
         }
 
         Ok(None)
@@ -1325,6 +1357,157 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             }
             effect.count_any().map(|c| c as i8)
         })
+    }
+
+    fn ll_bp7_001_required_chars(game_state: &GameState, card_id: i16) -> Option<Vec<String>> {
+        use crate::ability::enums::ActionType;
+        let card = game_state.card_database.get_card(card_id)?;
+        for ab in card.resolved_abilities() {
+            let triggers = ab.triggers.as_deref().unwrap_or("");
+            if !triggers.contains("常時") {
+                continue;
+            }
+            let effect = ab.effect.as_ref()?;
+            if effect.action != ActionType::ModifyCost {
+                continue;
+            }
+            if effect.operation_any().as_deref() != Some("set") || effect.value_any() != Some(10) {
+                continue;
+            }
+            if effect.location_any().as_deref() != Some("hand") || !effect.optional.unwrap_or(false) {
+                continue;
+            }
+            if let Some(chars) = effect.characters_any() {
+                if chars.len() == 3 {
+                    return Some(chars.to_vec());
+                }
+            }
+        }
+        None
+    }
+
+    fn has_ll_bp7_001_hand_cards(game_state: &GameState, card_id: i16, chars: &[String]) -> bool {
+        let player = game_state.active_player();
+        let hand_ids: Vec<i16> = player.hand.cards.to_vec();
+        Self::can_assign_hand_for_ll(game_state, &hand_ids, chars, Some(card_id))
+    }
+
+    fn can_assign_hand_for_ll(
+        game_state: &GameState,
+        hand_ids: &[i16],
+        chars: &[String],
+        exclude_id: Option<i16>,
+    ) -> bool {
+        let mut candidates: Vec<Vec<i16>> = Vec::new();
+        for name in chars {
+            let needle = name.replace(' ', "").replace('　', "");
+            let mut v = Vec::new();
+            for &cid in hand_ids {
+                if Some(cid) == exclude_id {
+                    continue;
+                }
+                if game_state.card_database.get_card(cid).is_some_and(|c| {
+                    c.is_member()
+                        && c.name.replace(' ', "").replace('　', "").contains(needle.as_str())
+                }) {
+                    v.push(cid);
+                }
+            }
+            candidates.push(v);
+        }
+        // Brute-force distinct assignment (3! =6 permutations)
+        for &a in &candidates[0] {
+            for &b in &candidates[1] {
+                if b == a {
+                    continue;
+                }
+                for &c in &candidates[2] {
+                    if c == a || c == b {
+                        continue;
+                    }
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn discard_ll_bp7_001_cost(
+        game_state: &mut GameState,
+        player_id: &str,
+        played_card_id: i16,
+        chars: &[String],
+    ) -> bool {
+        let hand_snapshot = if player_id == game_state.player1.id {
+            game_state.player1.hand.cards.clone()
+        } else {
+            game_state.player2.hand.cards.clone()
+        };
+        // Build candidates per char (excluding the card being played itself)
+        let mut cand: Vec<Vec<i16>> = Vec::new();
+        for name in chars {
+            let needle = name.replace(' ', "").replace('　', "");
+            let mut v = Vec::new();
+            for &cid in &hand_snapshot {
+                if cid == played_card_id {
+                    continue;
+                }
+                if game_state.card_database.get_card(cid).is_some_and(|c| {
+                    c.is_member()
+                        && c.name.replace(' ', "").replace('　', "").contains(needle.as_str())
+                }) {
+                    v.push(cid);
+                }
+            }
+            cand.push(v);
+        }
+        // Find distinct assignment (handle multi-name optimal, e.g. dual-name chisato)
+        let mut to_discard: Vec<i16> = Vec::new();
+        let mut found = false;
+        for &a in &cand[0] {
+            for &b in &cand[1] {
+                if b == a {
+                    continue;
+                }
+                for &c in &cand[2] {
+                    if c == a || c == b {
+                        continue;
+                    }
+                    to_discard = vec![a, b, c];
+                    found = true;
+                    break;
+                }
+                if found {
+                    break;
+                }
+            }
+            if found {
+                break;
+            }
+        }
+        if !found {
+            return false;
+        }
+        // Remove from hand first, collect events, then push movements without double borrow
+        let mut removed: Vec<i16> = Vec::new();
+        {
+            let player = if player_id == game_state.player1.id {
+                &mut game_state.player1
+            } else {
+                &mut game_state.player2
+            };
+            for &cid in &to_discard {
+                if let Some(pos) = player.hand.cards.iter().position(|&c| c == cid) {
+                    player.hand.cards.remove(pos);
+                    player.waitroom.cards.push(cid);
+                    removed.push(cid);
+                }
+            }
+        }
+        for cid in removed {
+            game_state.push_movement_event(cid, "hand", "waitroom", None, player_id, false);
+        }
+        true
     }
 
     /// Shuffle all member cards in the player's waitroom to the bottom of the deck.

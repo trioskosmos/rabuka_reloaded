@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-20T13:00:00.069760",
+  "generated_at": "2026-08-20T16:18:52.919632",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
-  "source_file": "cards/cards.json",
-  "engine_commit": "d9497769",
+  "source_file": "cards\\cards.json",
+  "engine_commit": "b6998096",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -38125,61 +38125,37 @@
       "triggers": "常時",
       "use_limit": null,
       "is_null": false,
-      "cost": null,
+      "cost": {
+        "text": "手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置く",
+        "type": "move_cards",
+        "source": "hand",
+        "zone": "hand",
+        "destination": "discard",
+        "card_type": "member_card",
+        "characters": [
+          "国木田花丸",
+          "優木せつ菜",
+          "嵐千砂都"
+        ],
+        "count": 1,
+        "per_character": true,
+        "optional": true
+      },
       "effect": {
-        "text": "このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは10になる",
-        "condition": {
-          "type": "compound",
-          "operator": "and",
-          "conditions": [
-            {
-              "type": "location_condition",
-              "characters": [
-                "国木田花丸"
-              ],
-              "location": "discard",
-              "count": 1,
-              "operator": ">=",
-              "target": "self",
-              "text": "「国木田花丸」のメンバーカードが控え室にある"
-            },
-            {
-              "type": "location_condition",
-              "characters": [
-                "優木せつ菜"
-              ],
-              "location": "discard",
-              "count": 1,
-              "operator": ">=",
-              "target": "self",
-              "text": "「優木せつ菜」のメンバーカードが控え室にある"
-            },
-            {
-              "type": "location_condition",
-              "characters": [
-                "嵐千砂都"
-              ],
-              "location": "discard",
-              "count": 1,
-              "operator": ">=",
-              "target": "self",
-              "text": "「嵐千砂都」のメンバーカードが控え室にある"
-            }
-          ],
-          "text": "このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき",
-          "location": "discard",
-          "characters": [
-            "嵐千砂都"
-          ]
-        },
+        "text": "このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは10になる。",
         "action": "modify_cost",
         "operation": "set",
         "value": 10,
         "source": "hand",
         "location": "hand",
         "card_type": "member_card",
-        "self_target": true,
-        "count": 1
+        "characters": [
+          "国木田花丸",
+          "優木せつ菜",
+          "嵐千砂都"
+        ],
+        "count": 3,
+        "optional": true
       }
     },
     {

@@ -1124,8 +1124,6 @@ impl super::resolver::AbilityResolver {
                 .filter(|i| !self.keep_shuffle_selected.contains(&(*i as u8)))
                 .collect();
             if hand_idx.len() < count && !hand_idx.is_empty() && !available_idxs.is_empty() {
-                // Still selecting (up to N) and more cards remain: re-prompt for
-                // the remaining, excluding positions already kept.
                 let remaining = count.saturating_sub(self.keep_shuffle_selected.len().min(count));
                 let fi = Some(available_idxs);
                 let desc = format!(
@@ -1150,6 +1148,32 @@ impl super::resolver::AbilityResolver {
                 self.store_pending_choice(gs);
                 return Ok(());
             }
+            if self.keep_shuffle_under_phase == 1 {
+                // Self's selection completed (including empty "keep 0" which
+                // correctly shuffles the entire hand under). Move self's
+                // non-selected cards, then prompt opponent.
+                let snapshot = self.keep_shuffle_under_snapshots[0].clone();
+                self.move_non_selected_hand_to_deck_bottom(gs, "self", &snapshot);
+                self.keep_shuffle_selected.clear();
+                // Snapshot opponent hand before prompting
+                let opp_hand = gs.resolve_target_player_mut("opponent").hand.cards.to_vec();
+                self.keep_shuffle_under_snapshots.push(opp_hand);
+                let opp_hand_len = self.keep_shuffle_under_snapshots[1].len();
+                let pick = (count).min(opp_hand_len);
+                let c = crate::ability::types::Choice::select_cards(
+                    Zone::Hand.to_str(),
+                    pick,
+                    format!("Select up to {} card(s) to keep", count),
+                    true,
+                )
+                .target_player_id(Some("opponent".to_string()))
+                .build();
+                self.keep_shuffle_under_phase = 2;
+                self.spawn_context.target = Some("opponent".to_string());
+                self.pending_choice = Some(c);
+                self.store_pending_choice(gs);
+                return Ok(());
+            }
             // Opponent's selection is recorded (phase 2). The effect does not
             // re-enter at phase 2 (sub-choice resolution), so move opponent's
             // non-selected hand cards under opponent's deck right here.
@@ -1158,6 +1182,30 @@ impl super::resolver::AbilityResolver {
                 self.move_non_selected_hand_to_deck_bottom(gs, "opponent", &snapshot);
                 self.keep_shuffle_under_phase = 0;
                 self.keep_shuffle_under_snapshots.clear();
+                self.keep_shuffle_selected.clear();
+                self.spawn_context.target = None;
+                // The sequential's second action is "draw 3 for both". The
+                // pending queue may be corrupted (observed n=2 [select,draw]),
+                // so perform the draw directly here and clear any pending draw
+                // to avoid double-draw.
+                let card_db = gs.card_database.clone();
+                for player in [&mut gs.player1, &mut gs.player2] {
+                    let _ = crate::ability::effects::draw::draw_cards_for_player(
+                        player,
+                        3,
+                        "deck",
+                        "hand",
+                        None,
+                        false,
+                        None,
+                        &card_db,
+                        None,
+                    );
+                }
+                // Clear any pending sequential actions (the draw is now
+                // performed directly). This prevents the corrupted
+                // [select,draw] pending from restarting a second keep_shuffle.
+                gs.ability_queue.take_pending_actions();
             }
             return self.handle_selection_epilogue(gs, _context);
         }
