@@ -11,6 +11,10 @@ fn put_hanamaru(game: &mut TestGame) -> i16 {
     let cid = game.id(HANAMARU);
     game.add_to_stage(MemberArea::Center, cid);
     game.give_energy(1);
+    // ensure deck has at least 1 card so the "draw 1" after moving live to bottom doesn't just redraw the moved live
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state.player1.main_deck.cards.push(filler);
+    game.state.player2.main_deck.cards.push(game.id("PL!-sd1-010-SD"));
     cid
 }
 
@@ -21,20 +25,19 @@ fn hanamaru_choose_self_moves_own_live_and_draws() {
     let hanamaru = put_hanamaru(&mut g);
     let live = g.id(LIVE1);
     g.state.player1.waitroom.cards.push(live);
-    let deck_before = g.state.player1.main_deck.cards.len();
     let hand_before = g.state.player1.hand.cards.len();
     g.activate_ability(hanamaru);
-    // first choice: choose self (0) or opponent (1)
     g.select_choice_option(0); // self
-    // second choice: select live from discard (only one) - auto if single
     if g.has_pending_choice() {
         g.select_indices(&[0]);
     }
     g.drain_auto_ability_choices();
-    // TODO: engine currently does not move "そのプレイヤー" live correctly (known bug)
-    // For now just verify the ability completes without panic and cost was paid
+    // waitroom should no longer contain a live (the one we put)
+    assert!(!g.state.player1.waitroom.cards.iter().any(|&cid| g.db.get_card(cid).map_or(false, |c| c.is_live())), "live moved from discard");
+    let last = g.state.player1.main_deck.cards.last().copied();
+    assert!(last.is_some_and(|id| g.db.get_card(id).map_or(false, |c| c.is_live())), "deck bottom should be a live, got {:?}", last.map(|id| g.db.get_card(id).map(|c| c.card_no.clone())));
+    assert_eq!(g.state.player1.hand.cards.len(), hand_before + 1, "drew 1");
     assert!(g.state.player1.energy_zone.active_count() == 0, "paid 1E");
-    let _ = (deck_before, hand_before, live);
 }
 
 #[test]
@@ -48,12 +51,13 @@ fn hanamaru_choose_opponent_moves_opponent_live() {
     g.activate_ability(hanamaru);
     g.select_choice_option(1); // opponent
     if g.has_pending_choice() {
-        g.select_indices(&[0]); // opponent's live (auto if single)
+        g.select_indices(&[0]);
     }
     g.drain_auto_ability_choices();
-    // TODO: picks opponent's live but currently moves self's (bug) – verify at least no panic / draw attempt
-    let _ = p1_hand_before;
-    assert!(g.state.player1.energy_zone.active_count() == 0, "paid 1E");
+    assert!(!g.state.player2.waitroom.cards.iter().any(|&cid| g.db.get_card(cid).map_or(false, |c| c.is_live())), "opp live moved");
+    let last = g.state.player2.main_deck.cards.last().copied();
+    assert!(last.is_some_and(|id| g.db.get_card(id).map_or(false, |c| c.is_live())), "opp deck bottom should be live");
+    assert_eq!(g.state.player1.hand.cards.len(), p1_hand_before + 1, "self draws even when targeting opponent");
 }
 
 #[test]
