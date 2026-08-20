@@ -454,7 +454,11 @@ fn you_opponent_zones_unaffected() {
         p2_deck,
         "P2 deck unchanged"
     );
-    assert!(!deck.contains(&card_a) || game.state.player1.main_deck.cards.contains(&card_a));
+    assert!(!deck.contains(&card_a), "card_a not originally in deck");
+    assert!(
+        game.state.player1.main_deck.cards.contains(&card_a),
+        "card_a should be on deck bottom after debut"
+    );
 }
 
 /// Cost 4 is required to play the member; with only 3 energy the play fails.

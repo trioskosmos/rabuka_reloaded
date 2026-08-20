@@ -31,43 +31,36 @@ fn live_success_per_wait_member_adds_score() {
         rabuka_engine::core::game_modifiers::CardOrientation::Wait,
     );
 
-    game.add_to_hand(live);
-    for _ in 0..10 {
-        game.state.player1.main_deck.cards.push(game.id(FILLER));
-        game.state.player2.main_deck.cards.push(game.id(FILLER));
-    }
-    for _ in 0..5 { game.pass(); }
-    game.set_live_card(live);
-    for _ in 0..5 { game.pass(); }
-
-    // Need a successful live to trigger LiveSuccess. Give enough hearts/balde.
-    // MEMBER_NO_COLOR has blade=2, plus the wait member, total blade 2-3.
-    // Fill deck with filler so yell reveals are filler (no extra hearts needed for this live's need).
-    // The live's score modifier is per wait member: 1 wait → +1
-    // Check that the card's score modifier is applied after live success.
-    // If the live failed, no LiveSuccess fires, so we first ensure live succeeded
-    // by giving it enough hearts via deck setup (use a live that needs heart0:4 and filler provides it).
-    // For this card, need is not strict, so we just verify the score modifier exists after success.
+    // Stage already set with 1 wait member; directly trigger LiveSuccess to test per-unit scoring.
+    // Push live to success zone and fire its LiveSuccess ability without relying on yell/need_hearts.
+    game.state.player1.success_live_card_zone.cards.push(live);
+    let card = game.state.card_database.get_card(live).unwrap();
+    let ab = card
+        .resolved_abilities()
+        .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
+        .expect("PL!N-bp3-031-L should have LiveSuccess");
+    let pid = game.state.player1.id.clone();
     let score_before = game.state.mods.get_score_modifier(live);
-    // Force a successful live by ensuring need_heart is met: use a different live that is guaranteed?
-    // Instead, we directly trigger the LiveSuccess effect via the engine's live success path:
-    // advance through performance where the live's needs are checked.
-    // The wait-member count is 1, so score should be +1 if LiveSuccess fired.
-    // We check the modifier after the live success phase.
-    // If the engine correctly implemented the Japanese, the modifier will be 1.
-    // If not, it will be 0.
-    // This test documents the Japanese as written: "1人につき…＋１"
-    if game.state.performance_snapshots.is_empty() {
-        // No snapshot yet, just verify the card's ability is correctly parsed
-        let card = game.state.card_database.get_card(live).unwrap();
-        assert!(card.resolved_abilities().any(|ab| {
-            ab.effect.as_ref().is_some_and(|e| e.action.to_string() == "modify_score" && e.per_unit_any() == Some(true))
-        }));
-        return;
-    }
-    // If snapshot exists, check score
-    let has_score = game.state.mods.get_score_modifier(live) > score_before;
-    assert!(has_score || score_before == 0, "LiveSuccess per wait member should add score");
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ab.full_text),
+        rabuka_engine::core::types::AbilityTrigger::LiveSuccess,
+        pid.clone(),
+        Some(card.card_no.to_string()),
+        Some(live),
+        None,
+        None,
+    );
+    // Also ensure live_start path for Daisuki is not confused — this is LiveSuccess for N-bp3-031-L, correct.
+    game.state.process_pending_auto_abilities(&pid);
+    game.drain_auto_ability_choices();
+    let score_after = game.state.mods.get_score_modifier(live);
+    assert_eq!(
+        score_after,
+        score_before + 1,
+        "LiveSuccess per wait member should add score+1 (wait=1, before={}, after={})",
+        score_before,
+        score_after
+    );
 }
 
 /// PL!S-bp2-021-L — Aqours (LiveSuccess, gap list):

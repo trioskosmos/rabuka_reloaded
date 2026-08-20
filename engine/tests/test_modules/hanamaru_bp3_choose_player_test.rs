@@ -98,7 +98,6 @@ fn hanamaru_opponent_no_live_no_draw() {
 
 #[test]
 fn hanamaru_targeted_player_determines_deck_bottom_owner() {
-    // TODO: currently broken – "そのプレイヤー" always resolves to self
     let db = load_real_database();
     let mut g = TestGame::new(db);
     let hanamaru = put_hanamaru(&mut g);
@@ -109,6 +108,12 @@ fn hanamaru_targeted_player_determines_deck_bottom_owner() {
     if g.has_pending_choice() { g.select_indices(&[0]); }
     g.drain_auto_ability_choices();
     assert!(g.state.player1.energy_zone.active_count() == 0);
+    assert_eq!(
+        g.state.player1.main_deck.cards.last(),
+        Some(&live_p1),
+        "self target: live should be on self deck bottom"
+    );
+    assert_eq!(g.state.player1.hand.cards.len(), 1, "drew 1 after moving");
 }
 
 #[test]
@@ -117,22 +122,19 @@ fn hanamaru_cannot_activate_without_energy() {
     let mut g = TestGame::new(db);
     let hanamaru = g.id(HANAMARU);
     g.add_to_stage(MemberArea::Center, hanamaru);
-    // no energy given – cost is pay 1E mandatory, should fail
-    let res = g.try_activate_ability(hanamaru);
-    // Engine currently allows activation and fails later via cost check? We accept either Err or no effect.
-    // If it returns Ok, it must not have consumed effect (no draw, no move)
-    if res.is_ok() {
-        // if it succeeded, it must have created a pending choice – but without energy it should not have
-        // we at least verify no live was moved/drawn
-        let hand_before = g.state.player1.hand.cards.len();
-        if g.has_pending_choice() {
-            // shouldn't have a choice without paying
-            assert!(false, "should not have pending choice without energy, got {:?}", g.get_pending_choice());
-        }
-        assert_eq!(g.state.player1.hand.cards.len(), hand_before);
-    } else {
-        assert!(res.is_err());
-    }
+    let hand_before = g.state.player1.hand.cards.len();
+    // no energy given – cost is pay 1E mandatory, must not create pending choice or draw
+    let _ = g.try_activate_ability(hanamaru);
+    assert!(
+        !g.has_pending_choice(),
+        "with 0 active energy, pay 1E cost cannot be paid so no pending choice should appear"
+    );
+    assert_eq!(
+        g.state.player1.hand.cards.len(),
+        hand_before,
+        "no draw when cost not paid"
+    );
+    assert_eq!(g.state.player1.energy_zone.active_count(), 0);
 }
 
 #[test]

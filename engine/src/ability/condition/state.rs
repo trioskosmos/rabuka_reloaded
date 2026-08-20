@@ -390,10 +390,21 @@ impl<'a> ConditionContext<'a> {
         }
         let target = condition.get_target().unwrap_or("self");
         let player = self.resolve_condition_player(target);
-        match energy_state {
+        let result = match energy_state {
             "active" => player.energy_zone.active_count() > 0,
             _ => true,
-        }
+        };
+        log::debug!(
+            "[ENERGY_STATE] target={} energy_state={} active_count={} total={} result={} activating={:?} self_player={:?}",
+            target,
+            energy_state,
+            player.energy_zone.active_count(),
+            player.energy_zone.cards.len(),
+            result,
+            self.activating_card_id,
+            self.self_player.map(|p| p.id.as_str())
+        );
+        result
     }
 
     /// Evaluate movement condition — matches jidou auto trigger types:

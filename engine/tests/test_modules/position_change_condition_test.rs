@@ -155,73 +155,59 @@ fn other_syncrise_member_moves_to_center_ability_card_gains_blades() {
 }
 
 /// non-Syncri5e member moves to center → Syncri5e conditional does NOT fire.
+/// Uses a non-Syncri5e kidou mover (Shiki PL!SP-bp2-008-R, Liella!) to move μ's filler TO center.
+/// Previous stub was lazy (no movement); now exercises real position_change: Shiki Center→Right swaps filler Right→Center.
 #[test]
 fn non_syncrise_member_moves_to_center_no_trigger() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let conditional = game.id("PL!SP-pb2-022-R");
-    let filler = game.id("PL!-sd1-010-SD"); // Printemps, NOT Syncri5e
-                                            // Need きな子 as activator, but きな子 IS Syncri5e. Instead, use filler directly:
-                                            // Put conditional at left, filler at center. Activate filler? No — filler has no kidou.
-                                            // Instead: use a 3-card setup: conditional left, kinako right, filler center.
-    let kinako = game.id("PL!SP-bp5-006-R");
+    let conditional = game.id("PL!SP-pb2-022-R"); // 5yncri5e! needs Syncri5e to center
+    let filler = game.id("PL!-sd1-010-SD"); // μ's Printemps, NOT Syncri5e
+    let shiki = game.id("PL!SP-bp2-008-R"); // 若菜四季, Liella! (non-Syncri5e) generic position swap
+    // Setup: conditional Left, filler Right, shiki Center. Shiki's kidou: choose another area, swap.
     play_three(
         &mut game,
         conditional,
         MemberArea::LeftSide,
         filler,
-        MemberArea::Center,
-        kinako,
         MemberArea::RightSide,
+        shiki,
+        MemberArea::Center,
     );
     let before = game.state.mods.get_blade_modifier(conditional);
-    // Swap きな子 (right) → center, moving filler (center) → right
-    // conditional moves from left to... no, conditional is at left, stays put.
-    // filler (non-Syncri5e) moves from center to right. No card moves TO center.
-    // Instead: swap きな子 with conditional (conditional → center, kinako → left).
-    // But きな子 IS Syncri5e! So that would trigger the conditional.
-    // Need to move a non-Syncri5e card TO center while conditional is at center.
-    // Better: conditional at center, filler at left, kinako at right.
-    // Swap kinako (right) → left, moving filler (left) → right.
-    // Only filler (non-Syncri5e) moves. Nothing moves TO center. Conditional stays at center.
-    // Actually we need: something moves TO center while conditional is on stage.
-    // Redo: conditional center, filler left, kinako right. Swap kinako→left.
-    // No card moves TO center. Correct — test passes because nothing moves to center.
-    // Hmm, but the test name says "non-syncrise member MOVES TO CENTER".
-    // So: conditional at left, filler at center, kinako at right.
-    // Swap kinako (right) → center. Filler (center) → right.
-    // Filler (non-Syncri5e) moves from center to right. Nothing moves TO center.
-    // Wait, I need non-Syncri5e to move TO center. That means the non-Syncri5e card should
-    // end up in center after the swap.
-    // Setup: conditional at left, filler at right, kinako at center.
-    // Swap kinako (center) → left. Conditional (left) → center. Filler (right) stays.
-    // Conditional moved to center (it IS Syncri5e → triggers!). Filler didn't move.
-    // That tests the wrong thing.
-    // I need: non-Syncri5e card at some position, move it TO center.
-    // Setup: conditional at left, filler at center, kinako at right.
-    // Swap filler (center) → right AND kinako (right) → center.
-    // Filler (non-Syncri5e) moves from center to right — NOT to center.
-    // Kinako (Syncri5e) moves from right to center — this WOULD trigger the conditional.
-    // The problem: kinako IS Syncri5e so swapping it anywhere near center triggers the conditional.
-    // Solution: don't use kinako for this test. Use a non-Syncri5e position change activator.
-    // Find a position change kidou card from a non-Syncri5e group.
-    // Actually the existing test already shows this — just put filler at center with conditional
-    // and don't trigger a position change. But the test needs to VERIFY no trigger.
-    // Simplest approach: just play conditional and filler. No position change.
-    // The condition doesn't fire because no position change occurs.
-    // But that's what the "no_position_change_no_trigger" test checks.
-    // For this specific test: place conditional on stage, and a non-Syncri5e card at center.
-    // Move the non-Syncri5e card to a different position (away from center).
-    // The conditional should NOT trigger because the Syncri5e condition wasn't met.
-    // But how to move the non-Syncri5e card without moving a Syncri5e card?
-    // Use a non-Syncri5e kidou card if one exists... or use direct state manipulation.
-    // Direct approach: manually set stage state, then trigger auto abilities.
-    // For now, skip the "moves TO center" and test "moves from center" instead:
-    // Just play conditional and filler to stage. Verify no trigger without position change.
-    let final_blade = game.state.mods.get_blade_modifier(conditional);
+    // Activate Shiki at Center, choose Right (= filler's area). Result: Shiki Center→Right, filler Right→Center (μ's TO center)
+    game.activate_ability(shiki);
+    game.drain_auto_ability_choices();
+    assert!(
+        game.has_pending_choice(),
+        "Shiki position change should offer target areas"
+    );
+    let actions = game.generated_actions();
+    let target_idx = actions
+        .iter()
+        .position(|a| {
+            a.parameters
+                .as_ref()
+                .and_then(|p| p.stage_area.as_deref())
+                .is_some_and(|area| area == "right" || area == "right_side")
+        })
+        .expect("Right target not found for Shiki");
+    game.select_generated(target_idx);
+    game.drain_auto_ability_choices();
+    // Verify swap: filler should now be at Center, shiki at Right
     assert_eq!(
-        final_blade, before,
-        "No Syncri5e member moved → should NOT gain blades"
+        game.state.player1.stage.stage[1], filler,
+        "filler (μ's) should have moved TO center"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], shiki,
+        "shiki should have moved to Right"
+    );
+    let after = game.state.mods.get_blade_modifier(conditional);
+    assert_eq!(
+        after, before,
+        "non-Syncri5e member (μ's) moved TO center → Syncri5e conditional must NOT gain 4 blades (was {}, now {})",
+        before, after
     );
 }
 

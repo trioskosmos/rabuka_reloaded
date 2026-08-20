@@ -1644,7 +1644,6 @@ impl AbilityResolver {
                 }
                 gs.mark_constants_dirty();
                 gs.recalculate_constants();
-                self.moved_cards.extend(moved.iter().copied());
                 self.last_move_moved_any = Some(!moved.is_empty());
                 for &cid in &moved {
                     gs.push_movement_event(
@@ -1685,6 +1684,27 @@ impl AbilityResolver {
             return Ok(vec![]);
         }
         if candidates.len() == 1 {
+            if c.effect.optional.unwrap_or(false) {
+                // Single candidate with optional: prompt Stage selection with skip allowed
+                // so player can choose to move or skip. This mirrors the multiple-candidate
+                // path but with one entry, ensuring skip is possible.
+                self.pending_choice = Some(
+                    crate::ability::types::Choice::select_cards(
+                        crate::ability::enums::Zone::Stage.to_str(),
+                        1,
+                        "Choose a member whose under energies to move".to_string(),
+                        true,
+                    )
+                    .description_ja(Some("下のエネルギーを移動するメンバーを選択".to_string()))
+                    .card_type(Some("member_card".to_string()))
+                    .filtered_indices(Some(candidates.clone()))
+                    .target_player_id(Some(target.to_string()))
+                    .is_select_action(true)
+                    .build(),
+                );
+                self.execution_context = crate::ability::types::ExecutionContext::SingleEffect { effect_index: 0 };
+                return Ok(vec![]);
+            }
             let idx = candidates[0];
             let under_cards = {
                 let player = gs.resolve_target_player_mut(target);
@@ -1706,7 +1726,6 @@ impl AbilityResolver {
             }
             gs.mark_constants_dirty();
             gs.recalculate_constants();
-            self.moved_cards.extend(moved.iter().copied());
             self.last_move_moved_any = Some(!moved.is_empty());
             for &cid in &moved {
                 gs.push_movement_event(
@@ -1739,6 +1758,7 @@ impl AbilityResolver {
             .card_type(Some("member_card".to_string()))
             .filtered_indices(Some(candidates))
             .target_player_id(Some(target.to_string()))
+            .is_select_action(true)
             .build(),
         );
         self.execution_context = crate::ability::types::ExecutionContext::SingleEffect { effect_index: 0 };

@@ -129,10 +129,10 @@ mod bytecode_validation {
                 if json_cost_type == "choice_condition" {
                     continue; // choice conditions not yet compiled
                 }
-                // Report but don't fail for now
-                eprintln!(
-                    "Ability {}: JSON cost={} BC cost={}",
-                    i, has_json_cost, has_bc_cost
+                assert_eq!(
+                    has_json_cost, has_bc_cost,
+                    "Ability {}: JSON cost={} BC cost={} mismatch (type={})",
+                    i, has_json_cost, has_bc_cost, json_cost_type
                 );
             }
         }

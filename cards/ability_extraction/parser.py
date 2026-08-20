@@ -8810,11 +8810,26 @@ def _try_kore_niyori_result(text):
         cond["location"] = "revealed_cards"
     # Issue 11: If the condition describes cards placed somewhere ("デッキの下に置いた"),
     # it references the cards moved by the preceding action, not the entire deck.
-    if cond and ("置いた" in cp or "置かれ" in cp):
-        cond["source"] = "preceding_moved"
-        cond.pop("location", None)
-        if cond.get("type") in ("location_condition",):
-            cond["type"] = "card_count_condition"
+    # Burn!! uses "置いており" (te-form continuative), so also match "置いて" / "置く".
+    _placement_markers = ("置いた", "置かれ", "置いて", "置く")
+    if cond and any(m in cp for m in _placement_markers):
+        # Compound (AかつB): only the placement-referencing half should become
+        # preceding_moved; the other half (e.g. total energy 10+) stays zone-count.
+        if cond.get("type") == "compound" and cond.get("conditions"):
+            for sub in cond["conditions"]:
+                sub_text = sub.get("text", "")
+                if any(m in sub_text for m in _placement_markers):
+                    sub["source"] = "preceding_moved"
+                    sub.pop("location", None)
+                    if sub.get("type") in ("location_condition",):
+                        sub["type"] = "card_count_condition"
+            cond.pop("location", None)
+            cond.pop("source", None)
+        else:
+            cond["source"] = "preceding_moved"
+            cond.pop("location", None)
+            if cond.get("type") in ("location_condition",):
+                cond["type"] = "card_count_condition"
     # Extract character names from 「X」のメンバーカード/ライブカード patterns
     if cond and isinstance(cond, dict) and not cond.get("characters"):
         char_m = re.search(r"「([^」]+)」の(?:メンバーカード|ライブカード)", cond_raw)

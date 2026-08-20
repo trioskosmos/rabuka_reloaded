@@ -71,6 +71,27 @@ fn sumire_toggling_active_recalculates() {
 
 // --- 389: ライブ開始時 score gate ---
 
+fn trigger_daisuki_live_start(g: &mut TestGame, live: i16) {
+    let card = g.db.get_card(live).unwrap();
+    let ab = card
+        .resolved_abilities()
+        .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
+        .expect("DAISUKI should have live_start");
+    let pid = g.state.player1.id.clone();
+    g.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ab.full_text),
+        rabuka_engine::core::types::AbilityTrigger::LiveStart,
+        pid.clone(),
+        Some(card.card_no.to_string()),
+        Some(live),
+        None,
+        None,
+    );
+    g.state.activating_card = Some(live);
+    g.state.process_pending_auto_abilities(&pid);
+    g.drain_auto_ability_choices();
+}
+
 #[test]
 fn daisuki_score_plus_one_when_active_energy_exists() {
     let db = load_real_database();
@@ -78,19 +99,10 @@ fn daisuki_score_plus_one_when_active_energy_exists() {
     let live = g.id(DAISUKI);
     g.state.player1.live_card_zone.cards.push(live);
     g.give_energy(1);
-    // trigger live_start for p1
-    let pid = g.state.player1.id.clone();
-    g.state.trigger_auto_abilities_for_player(&pid);
-    g.state.process_pending_auto_abilities(&pid);
-    // DAISUKI's live_start should have fired, score+1 is applied via live_start resolution
-    // For live cards, score bonus is stored as success_zone/live expectation; we check via ability trace or direct score modifier
-    // Simpler: check that ability was considered passed (no pending choice, but score modified)
-    // Live_start modify_score for DAISUKI is self_target+1; it is applied as temporary effect during live.
-    // We verify by inspecting that the live_start condition evaluated true - the score line would be in performance snapshot,
-    // but here we just verify no crash and that energy_state check passed by checking heart-like: the ability did not get suppressed
-    // Instead we perform a live performance and check score.
-    // For now assert that with active energy, the live_start trigger is not blocked
+    trigger_daisuki_live_start(&mut g, live);
     assert!(!g.state.has_pending_choice());
+    let score = g.state.mods.get_score_modifier(live);
+    assert_eq!(score, 1, "active energy should give score+1, got {}", score);
 }
 
 #[test]
@@ -99,16 +111,13 @@ fn daisuki_score_not_added_when_no_active_energy() {
     let mut g = TestGame::new(db);
     let live = g.id(DAISUKI);
     g.state.player1.live_card_zone.cards.push(live);
-    // no energy or only wait
     g.give_energy(1);
     g.state.player1.energy_zone.pay_energy(1).unwrap(); // make it wait
-    let pid = g.state.player1.id.clone();
-    g.state.trigger_auto_abilities_for_player(&pid);
-    g.state.process_pending_auto_abilities(&pid);
+    trigger_daisuki_live_start(&mut g, live);
     assert!(!g.state.has_pending_choice());
-    // same structural check; the difference is internal condition evaluation
-    // We verify by checking energy_state directly
-    g.state.recalculate_constants(); // not needed but ensures no panic
+    let score = g.state.mods.get_score_modifier(live);
+    assert_eq!(score, 0, "wait energy should not satisfy active check, got {}", score);
+    g.state.recalculate_constants();
 }
 
 #[test]
@@ -117,12 +126,11 @@ fn daisuki_opponent_active_does_not_satisfy_self() {
     let mut g = TestGame::new(db);
     let live = g.id(DAISUKI);
     g.state.player1.live_card_zone.cards.push(live);
-    // p1 has no active, p2 has one active energy
     let eng = g.id("LL-E-001-SD");
     g.state.player2.energy_zone.cards.push(eng);
     g.state.player2.energy_zone.add_active(1);
-    let pid = g.state.player1.id.clone();
-    g.state.trigger_auto_abilities_for_player(&pid);
-    g.state.process_pending_auto_abilities(&pid);
+    trigger_daisuki_live_start(&mut g, live);
     assert!(!g.state.has_pending_choice());
+    let score = g.state.mods.get_score_modifier(live);
+    assert_eq!(score, 0, "opponent active should not satisfy self, got {}", score);
 }

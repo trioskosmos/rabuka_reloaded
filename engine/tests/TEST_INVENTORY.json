@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-20T07:37:02.580877+00:00",
+  "generated_at": "2026-08-20T15:33:10.390542+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 402,
-  "n_tests": 2411,
+  "n_files": 403,
+  "n_tests": 2417,
   "total_cards": 771,
-  "covered_cards": 537,
-  "abilities_on_covered": 689,
+  "covered_cards": 538,
+  "abilities_on_covered": 690,
   "trigger_counts": {
     "起動": [
       76,
@@ -30,7 +30,7 @@
       2
     ],
     "ライブ成功時": [
-      83,
+      84,
       122
     ],
     "常時": [
@@ -84,7 +84,7 @@
       11
     ],
     "conditional_on_result": [
-      17,
+      18,
       19
     ],
     "activate_ability": [
@@ -120,8 +120,8 @@
       6
     ],
     "choice": [
-      19,
-      24
+      17,
+      22
     ],
     "conditional_on_optional": [
       9,
@@ -144,8 +144,8 @@
       3
     ],
     "choose_target_player": [
-      3,
-      4
+      5,
+      6
     ],
     "set_blade_type": [
       2,
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      396,
+      397,
       546
     ],
     "temporal_condition": [
@@ -288,7 +288,7 @@
       82
     ],
     "bp7": [
-      81,
+      82,
       111
     ],
     "pb1": [
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 514,
-    "none": 247,
+    "L2+choice": 515,
+    "none": 246,
     "L1+choice": 122,
     "L2": 37,
     "L1": 16
@@ -604,6 +604,7 @@
         "engine/tests/test_modules/bp7_q270_emma_color_diversity_test.rs",
         "engine/tests/test_modules/bp7_q273_watanabe_cost_test.rs",
         "engine/tests/test_modules/bp7_tomari_discard_all_hand_test.rs",
+        "engine/tests/test_modules/burn_energy_under_test.rs",
         "engine/tests/test_modules/chika_bp7_conditional_result_test.rs",
         "engine/tests/test_modules/gameplay_test.rs",
         "engine/tests/test_modules/hasunosora_pb1_test.rs",
@@ -635,6 +636,12 @@
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "bella_q174_no_member_on_stage_ability_does_not_fire",
         "both_triggers_in_baton_touch",
+        "burn_multiple_under_all_moved_and_scores",
+        "burn_no_under_no_move_no_score",
+        "burn_one_under_but_total_9_no_score",
+        "burn_one_under_moves_and_scores_when_total_10",
+        "burn_skip_optional_no_score_even_with_10_total",
+        "burn_wait_state_verification",
         "center_equal_cost_no_heart",
         "center_highest_among_three_different_costs",
         "center_highest_cost_gains_heart",
@@ -645,15 +652,9 @@
         "chika_adds_non_matching_member_gets_no_blades",
         "chika_adds_riko_gets_2_blades",
         "chika_adds_yo_gets_2_blades",
-        "choice_condition_shows_proper_labels_in_actions",
-        "dia_bp2_hand_over_7_no_draw",
-        "dia_bp2_no_live_card_no_draw",
-        "dia_bp2_yell_with_live_card_and_hand_under_7_draws_one",
-        "dia_sd1_optional_draw_pay_then_deck_top",
-        "dia_sd1_optional_draw_skip_skips_movement",
-        "distortion_basic_energy_refresh_with_catchu"
+        "choice_condition_shows_proper_labels_in_actions"
       ],
-      "covering_test_count": 199,
+      "covering_test_count": 205,
       "is_null": false
     },
     {
@@ -14070,7 +14071,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/ability_engine_fixes_test.rs"
+        "engine/tests/test_modules/ability_engine_fixes_test.rs",
+        "engine/tests/test_modules/position_change_condition_test.rs"
       ],
       "covering_tests": [
         "chisato_003_rotation_condition_fails_with_non_5yncri5e",
@@ -14087,6 +14089,13 @@
         "natsumi_009_no_draw_when_alone",
         "natsumi_009_no_draw_with_duplicate_in_hand",
         "natsumi_009_no_draw_with_non_5yncri5e",
+        "no_position_change_no_trigger",
+        "non_syncrise_member_moves_to_center_no_trigger",
+        "other_card_moves_self_target_does_not_trigger",
+        "other_syncrise_member_moves_to_center_ability_card_gains_blades",
+        "self_target_card_moves_triggers_own_ability",
+        "syncrise_member_moves_to_center_triggers_blade_gain",
+        "syncrise_member_moves_to_non_center_no_trigger",
         "wakana_008_choice_is_select_target_not_yes_no",
         "wakana_008_debut_both_occupied_swap_either",
         "wakana_008_debut_center_swap_with_left_occupant",
@@ -14095,16 +14104,9 @@
         "wakana_008_debut_empty_deck_draw_noop_then_move",
         "wakana_008_debut_left_swap_with_center_occupant",
         "wakana_008_debut_left_to_empty_center",
-        "wakana_008_debut_move_to_empty_area",
-        "wakana_008_debut_move_to_occupied_area",
-        "wakana_008_debut_position_change_flag_empty",
-        "wakana_008_debut_position_change_flag_swap",
-        "wakana_008_debut_right_swap_with_center_occupant",
-        "wakana_008_debut_right_to_empty_center",
-        "wakana_bp2_008_activate_center_to_empty_left",
-        "wakana_bp2_008_activate_left_to_empty_right"
+        "wakana_008_debut_move_to_empty_area"
       ],
-      "covering_test_count": 37,
+      "covering_test_count": 44,
       "is_null": false
     },
     {
@@ -15305,7 +15307,7 @@
       "trigger_list": [
         "起動"
       ],
-      "action": "choice",
+      "action": "choose_target_player",
       "condition": "none",
       "set": "bp3",
       "cards": [
@@ -24257,7 +24259,7 @@
       "trigger_list": [
         "登場"
       ],
-      "action": "choice",
+      "action": "choose_target_player",
       "condition": "none",
       "set": "PR",
       "cards": [
@@ -37129,14 +37131,23 @@
         "PL!N-bp7-029-L"
       ],
       "base": "PL!N-bp7-029",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/burn_energy_under_test.rs"
+      ],
+      "covering_tests": [
+        "burn_multiple_under_all_moved_and_scores",
+        "burn_no_under_no_move_no_score",
+        "burn_one_under_but_total_9_no_score",
+        "burn_one_under_moves_and_scores_when_total_10",
+        "burn_skip_optional_no_score_even_with_10_total",
+        "burn_wait_state_verification"
+      ],
+      "covering_test_count": 6,
       "is_null": false
     },
     {

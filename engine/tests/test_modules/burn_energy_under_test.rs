@@ -36,6 +36,40 @@ fn trigger_burn_success(game: &mut TestGame, burn_id: i16) {
     game.drain_auto_ability_choices();
 }
 
+fn select_burn_move(game: &mut TestGame) {
+    use rabuka_engine::ability::types::Choice;
+    while game.has_pending_choice() {
+        let ch = game.state.get_pending_choice().cloned().unwrap();
+        match ch {
+            Choice::SelectTarget { target, .. } if target.contains("pay_optional_cost") => {
+                game.select_choice_option(1); // Move
+            }
+            Choice::SelectCard { zone, .. } if zone == "stage" => {
+                // filtered_indices = [1] for center, so index 0 selects center
+                game.select_indices(&[0]);
+            }
+            _ => {
+                game.select_indices(&[0]);
+            }
+        }
+        game.drain_auto_ability_choices();
+    }
+}
+
+fn select_burn_skip(game: &mut TestGame) {
+    use rabuka_engine::ability::types::Choice;
+    if game.has_pending_choice() {
+        let ch = game.state.get_pending_choice().cloned().unwrap();
+        match ch {
+            Choice::SelectTarget { target, .. } if target.contains("pay_optional_cost") => {
+                game.select_choice_option(0); // Skip
+            }
+            _ => game.select_indices(&[]),
+        }
+    }
+    game.drain_auto_ability_choices();
+}
+
 #[test]
 fn burn_no_under_no_move_no_score() {
     let (mut g, _mem) = stage_with_under(MEMBER, 0);
@@ -44,11 +78,9 @@ fn burn_no_under_no_move_no_score() {
     for _ in 0..10 { g.give_energy(1); }
     let score_before = g.state.mods.get_score_modifier(burn);
     trigger_burn_success(&mut g, burn);
-    if g.has_pending_choice() { g.select_indices(&[]); }
-    g.drain_auto_ability_choices();
+    select_burn_skip(&mut g);
     let score_after = g.state.mods.get_score_modifier(burn);
-    // Currently engine may give score even without move due to result condition checking total only – allow either
-    assert!(score_after == score_before || score_after == score_before + 1);
+    assert_eq!(score_after, score_before, "0 under +10 total should be 0 – needs 1+ moved");
 }
 
 #[test]
@@ -60,10 +92,9 @@ fn burn_one_under_moves_and_scores_when_total_10() {
     let burn = g.id(BURN);
     g.state.player1.success_live_card_zone.cards.push(burn);
     trigger_burn_success(&mut g, burn);
-    if g.has_pending_choice() { g.select_indices(&[1]); }
-    g.drain_auto_ability_choices();
+    select_burn_move(&mut g);
     let score = g.state.mods.get_score_modifier(burn);
-    assert!(score == 0 || score == 1);
+    assert_eq!(score, 1, "1 under+9=10 with 1 moved should be 1");
     let _ = mem;
 }
 
@@ -74,10 +105,9 @@ fn burn_one_under_but_total_9_no_score() {
     let burn = g.id(BURN);
     g.state.player1.success_live_card_zone.cards.push(burn);
     trigger_burn_success(&mut g, burn);
-    if g.has_pending_choice() { g.select_indices(&[1]); }
-    g.drain_auto_ability_choices();
+    select_burn_move(&mut g);
     let score = g.state.mods.get_score_modifier(burn);
-    assert!(score == 0 || score == 1);
+    assert_eq!(score, 0, "1 under+8=9 total should be 0");
 }
 
 #[test]
@@ -87,10 +117,9 @@ fn burn_skip_optional_no_score_even_with_10_total() {
     let burn = g.id(BURN);
     g.state.player1.success_live_card_zone.cards.push(burn);
     trigger_burn_success(&mut g, burn);
-    if g.has_pending_choice() { g.select_indices(&[]); }
-    g.drain_auto_ability_choices();
+    select_burn_skip(&mut g);
     let score = g.state.mods.get_score_modifier(burn);
-    assert!(score == 0 || score == 1);
+    assert_eq!(score, 0, "skip optional -> 0 moved => no score even with 10 total");
 }
 
 #[test]
@@ -100,10 +129,9 @@ fn burn_multiple_under_all_moved_and_scores() {
     let burn = g.id(BURN);
     g.state.player1.success_live_card_zone.cards.push(burn);
     trigger_burn_success(&mut g, burn);
-    if g.has_pending_choice() { g.select_indices(&[1]); }
-    g.drain_auto_ability_choices();
+    select_burn_move(&mut g);
     let score = g.state.mods.get_score_modifier(burn);
-    assert!(score == 0 || score == 1);
+    assert_eq!(score, 1, "3 under+7=10 with 3 moved should be 1");
 }
 
 #[test]
@@ -113,7 +141,6 @@ fn burn_wait_state_verification() {
     let burn = g.id(BURN);
     g.state.player1.success_live_card_zone.cards.push(burn);
     trigger_burn_success(&mut g, burn);
-    if g.has_pending_choice() { g.select_indices(&[1]); }
-    g.drain_auto_ability_choices();
+    select_burn_move(&mut g);
     assert!(g.state.player1.energy_zone.active_count() <= 8);
 }
