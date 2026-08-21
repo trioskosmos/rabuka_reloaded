@@ -103,6 +103,19 @@ fn deal_from_templates(
     gs
 }
 
+fn my_hand_lives(gs: &GameState, is_p1: bool, db: &Arc<CardDatabase>) -> usize {
+    let p = if is_p1 { &gs.player1 } else { &gs.player2 };
+    p.hand
+        .cards
+        .iter()
+        .filter(|&&c| {
+            db.get_card(c).map_or(false, |x| {
+                x.card_type == rabuka_engine::card::CardType::Live
+            })
+        })
+        .count()
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let p1_kind = parse_kind(args.get(1).map(|s| s.as_str()).unwrap_or("v2"));
@@ -170,7 +183,7 @@ fn main() {
                     .count()
             };
             format!(
-                "{},{},{},active={},live_p1={},live_p2={},succ_p1={},succ_p2={},hand_p1={} ({} lives),hand_p2={} ({} lives)",
+                "{},{},{},active={},live_p1={},live_p2={},succ_p1={},succ_p2={},hand_p1={} ({} lives),hand_p2={} ({} lives),en_p1={},en_p2={},cost_p1={},cost_p2={}",
                 games,
                 gs.turn_number,
                 tag,
@@ -183,6 +196,22 @@ fn main() {
                 lives_in_hand(&gs.player1),
                 gs.player2.hand.cards.len(),
                 lives_in_hand(&gs.player2),
+                gs.player1.energy_zone.active_count(),
+                gs.player2.energy_zone.active_count(),
+                gs.player1
+                    .stage
+                    .stage
+                    .iter()
+                    .filter(|&&c| c >= 0)
+                    .map(|&c| db.get_card(c).and_then(|x| x.cost).unwrap_or(0) as u32)
+                    .sum::<u32>(),
+                gs.player2
+                    .stage
+                    .stage
+                    .iter()
+                    .filter(|&&c| c >= 0)
+                    .map(|&c| db.get_card(c).and_then(|x| x.cost).unwrap_or(0) as u32)
+                    .sum::<u32>(),
             )
         };
 
@@ -293,12 +322,61 @@ fn main() {
                     }
                     BotKind::Random => actions[rng.range(actions.len())].clone(),
                 };
+                if trace {
+                    let card_no = a
+                        .parameters
+                        .as_ref()
+                        .and_then(|p| p.card_id)
+                        .and_then(|cid| db.get_card(cid))
+                        .map(|c| c.card_no.to_string())
+                        .unwrap_or_default();
+                    let sel: Vec<String> = gs
+                        .live_card_selected_indices
+                        .iter()
+                        .map(|i| i.to_string())
+                        .collect();
+                    trace_rows.push(format!(
+                        "{},{},{:?},{},CHOICE:{},{},sel=[{}],hand_lives={},live_p1={},live_p2={},succ_p1={},succ_p2={}",
+                        games,
+                        gs.turn_number,
+                        gs.current_phase,
+                        if active_is_p1 { "P1" } else { "P2" },
+                        a.action_type,
+                        card_no,
+                        sel.join("+"),
+                        my_hand_lives(&gs, active_is_p1, &db),
+                        gs.player1.live_card_zone.cards.len(),
+                        gs.player2.live_card_zone.cards.len(),
+                        gs.player1.success_live_card_zone.cards.len(),
+                        gs.player2.success_live_card_zone.cards.len(),
+                    ));
+                }
                 let _ = game_setup::execute_action(&mut gs, &a);
                 game_setup::settle_single_player_state(&mut gs);
                 continue;
             }
 
             // Main phase.
+            if trace && active_is_p1 {
+                for (ai, aa) in actions.iter().enumerate() {
+                    let cn = aa
+                        .parameters
+                        .as_ref()
+                        .and_then(|p| p.card_id)
+                        .and_then(|cid| db.get_card(cid))
+                        .map(|c| c.card_no.to_string())
+                        .unwrap_or_default();
+                    trace_rows.push(format!(
+                        "{},{},{:?},P1,OPT{},{},{},,,,,",
+                        games,
+                        gs.turn_number,
+                        gs.current_phase,
+                        ai,
+                        aa.action_type,
+                        cn
+                    ));
+                }
+            }
             let action = match kind {
                 BotKind::V1 => strategy::choose_action_heuristic(&gs, &actions, me),
                 BotKind::V2 => strategy_v2::choose_action_heuristic_v2(&gs, &actions, me),

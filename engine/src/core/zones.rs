@@ -848,6 +848,7 @@ impl MainDeck {
     /// Draw the top card (index 0). Returns None if deck is empty.
     pub fn draw(&mut self) -> Option<i16> {
         if self.cards.is_empty() {
+            log::warn!("[EMPTY_DECK_DRAW] main_deck.draw() on EMPTY deck — effect silently does nothing; test setups must stock main_deck");
             None
         } else {
             Some(self.cards.remove(0))
@@ -857,6 +858,7 @@ impl MainDeck {
     /// Draw the bottom card (last index). Returns None if deck is empty.
     pub fn draw_bottom(&mut self) -> Option<i16> {
         if self.cards.is_empty() {
+            log::warn!("[EMPTY_DECK_DRAW] main_deck.draw_bottom() on EMPTY deck — effect silently does nothing; test setups must stock main_deck");
             None
         } else {
             self.cards.pop()
@@ -905,6 +907,7 @@ impl EnergyDeck {
 
     pub fn draw(&mut self) -> Option<i16> {
         if self.cards.is_empty() {
+            log::warn!("[EMPTY_DECK_DRAW] energy_deck.draw() on EMPTY deck — effect silently does nothing; test setups must stock energy_deck (give_energy fills the ZONE, not the deck)");
             None
         } else {
             Some(self.cards.remove(0))

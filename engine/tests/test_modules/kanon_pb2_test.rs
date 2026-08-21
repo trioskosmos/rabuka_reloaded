@@ -161,6 +161,16 @@ fn kanon_cost_above_4_rejected() {
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
+    // Cost-11 Kanon copy is Liella! but above the cost≤4 filter → rejected,
+    // so nothing was selected and both looked_at cards end up discarded.
+    assert!(
+        !game.state.player1.hand.cards.contains(&kanon_self),
+        "Cost > 4 card must not be selectable/kept"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&kanon_self),
+        "Rejected card goes to the waitroom with the rest"
+    );
 }
 
 /// Non-Liella! rejected by group filter, then skip followup.
@@ -177,6 +187,15 @@ fn kanon_non_liella_cost4_rejected() {
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
+    // μ's member fails the 『Liella!』 group filter → rejected and discarded.
+    assert!(
+        !game.state.player1.hand.cards.contains(&non_liella),
+        "Non-Liella! card must not be selectable/kept"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&non_liella),
+        "Rejected card goes to the waitroom with the rest"
+    );
 }
 
 /// max=1: exactly 1 card from looked_at goes to hand.

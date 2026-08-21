@@ -671,7 +671,26 @@ def detect_card_property(text: str) -> Optional[Tuple[str, bool]]:
 
 
 def extract_source(text: str) -> Optional[str]:
-    """Extract source location (FROM zone)."""
+    """Extract source location (FROM zone).
+
+    Explicit FROM-markers (patterns containing から/からの) take priority over
+    located-at descriptors (e.g. メンバーの下にある). A phrase like
+    「このメンバーの下にあるエネルギーカードの枚数に1を足した枚数」 is a COUNT
+    reference, not the move's origin; the real origin is the earlier
+    「エネルギーデッキから」. When both kinds appear, the earliest FROM-marker
+    occurrence wins. With no FROM-marker anywhere, fall back to first match.
+    """
+    best_value: Optional[str] = None
+    best_pos = len(text)
+    for pattern, value in SOURCE_PATTERNS:
+        if "から" not in pattern:
+            continue
+        pos = text.find(pattern)
+        if pos != -1 and pos < best_pos:
+            best_value = value
+            best_pos = pos
+    if best_value is not None:
+        return best_value
     return extract_by_pattern(text, SOURCE_PATTERNS)
 
 

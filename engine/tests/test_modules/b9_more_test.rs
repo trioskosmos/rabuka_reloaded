@@ -12,6 +12,9 @@ fn cutie_panther_live_start_reduce_hearts() {
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.stage.stage = [member, -1, -1];
+    // Condition: opponent has a wait-state member on stage.
+    let opp = game.id("PL!-sd1-005-SD");
+    game.state.player2.stage.stage = [-1, opp, -1];
     game.state.player1.hand.cards.push(cutie);
     for _ in 0..10 {
         game.state.player1.main_deck.cards.push(filler);
@@ -21,11 +24,25 @@ fn cutie_panther_live_start_reduce_hearts() {
         game.pass();
     }
     game.set_live_card(cutie);
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
+    // Set wait AFTER the active phase, which would otherwise stand the member.
+    game.state
+        .mods
+        .add_orientation_modifier(opp, "wait");
+    for _ in 0..5 {
+        game.pass();
+        if game.has_pending_choice() {
+            eprintln!("[PROBE] pending after pass {}", game.state.current_phase);
+        }
+        while game.has_pending_choice() {
+            game.select_indices(&[]);
+        }
+    }
+    use rabuka_engine::card::HeartColor;
+    assert_eq!(
+        game.state.mods.get_need_heart_modifier(cutie, HeartColor::Heart00),
+        -2,
+        "Cutie Panther must reduce required heart00 by 2 when opponent has a wait member"
+    );
 }
 
 /// PL!-pb1-031-L (輝夜の城で踊りたい)

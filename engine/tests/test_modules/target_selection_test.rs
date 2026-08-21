@@ -79,21 +79,44 @@ fn distinct_card_name_prevents_same_card_twice() {
     game.state.player1.stage_hearts = Some(BaseHeart { hearts });
     game.state.current_phase = Phase::LiveCardSetFirstAttacker;
     process_abilities(&mut game);
-    // Just verify the ability processes without panic (card has distinct logic)
-    let score = game.state.mods.get_score_modifier(live_card);
-    // Should not crash — distinct logic should handle valid targets gracefully
-    eprintln!("distinct_card_name test: score={}", score);
+    // No members on stage/waitroom → the 5-distinct-Liella condition is unmet,
+    // so the required-hearts replacement must NOT apply.
+    let h02 = game
+        .state
+        .mods
+        .get_need_heart_modifier(live_card, rabuka_engine::card::HeartColor::Heart02);
+    assert_eq!(
+        h02, 0,
+        "condition unmet: required hearts must be unchanged, got modifier {h02}"
+    );
 }
 
 #[test]
 fn target_count_on_draw_until_count() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    // PL!N-PR-028-PR has draw_until_count with target_count=5
+    // PL!N-PR-028-PR: 登場, optional cost (discard 2 from hand) → draw to 5.
     let card = game.id("PL!N-PR-028-PR");
-    game.state.player1.stage.stage = [-1, card, -1];
-    game.state.recalculate_constants();
-    // Just verify no crash — the constant ability has target_count=5
-    let hand_size = game.state.player1.hand.cards.len();
-    eprintln!("draw_until target_count test: hand_size={}", hand_size);
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state.player1.hand.cards.clear();
+    game.state.player1.hand.cards.push(card);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+    game.give_energy(30);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.play_to_stage(card, rabuka_engine::zones::MemberArea::Center);
+    // Pay the optional cost with the two remaining hand cards.
+    if game.has_pending_choice() {
+        game.select_indices(&[0, 1]);
+    }
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        5,
+        "draw_until_count must fill the hand to target_count=5"
+    );
 }

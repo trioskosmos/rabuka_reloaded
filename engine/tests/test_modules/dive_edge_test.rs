@@ -342,10 +342,15 @@ fn ab1_no_niji_target_no_crash() {
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     g.state.process_pending_auto_abilities(&pid);
 
-    // Should not panic — ab#1 has no valid target
-    while g.has_pending_choice() {
-        g.select_indices(&[0]);
-    }
+    // No valid target → the ability must not fire at all.
+    assert!(
+        !g.has_pending_choice(),
+        "no Niji target means no selection choice"
+    );
+    assert!(
+        g.state.player1.hand.cards.contains(&filler),
+        "nothing may be added to hand without a valid target"
+    );
 }
 
 /// Non-main phase: DIVE! retrieved → ab#0 should NOT fire.

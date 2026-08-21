@@ -2071,6 +2071,16 @@ _register_action(
     "place_energy_under_member",
     lambda t, a: a.update({"energy_count": a.get("count") or 1}),
 )
+# Energy deck → energy zone in wait state while counting 「このメンバーの下に
+# あるエネルギーカードの枚数」 (e.g. bp5-012 嵐珠 LiveSuccess: under_count+1
+# from the deck). Routed to PlaceEnergyUnderMember so its executor resolves
+# the dynamic count against the member's under cards.
+_register_action(
+    lambda t, a: a.get("source") == "energy_deck"
+    and "このメンバーの下にある" in t,
+    "place_energy_under_member",
+    lambda t, a: a.update({"target_member": "this_member"}),
+)
 # Self-move under a member (e.g. "このカードを…登場したメンバーの下に置く"):
 # no explicit source, no energy → the activating card itself moves under another member.
 _register_action(
@@ -11661,7 +11671,24 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
 
 
 def _fix_conditional_on_result(eff, t):
-    """Restructure sequential+これにより into conditional_on_result."""
+    """Restructure sequential+そうした場合 into conditional_on_result."""
+
+    # "ウェイト状態のメンバー1人をアクティブにする。これにより相手の…アクティブに
+    # した場合、…" — the primary has no explicit owner, so ANY player's waited
+    # member may be chosen. Without a target the engine defaults to self and
+    # never offers the opponent's members, making the 相手 branch unreachable.
+    prim = eff.get("primary_effect")
+    rc = eff.get("result_condition")
+    if (
+        eff.get("action") == "conditional_on_result"
+        and isinstance(prim, dict)
+        and prim.get("action") == "change_state"
+        and not prim.get("target")
+        and isinstance(rc, dict)
+        and rc.get("target") == "opponent"
+    ):
+        prim["target"] = "both"
+
     _acts_pre = eff.get("actions", [])
     _has_blade_heart_seq = (
         eff.get("action") == "sequential"

@@ -160,17 +160,27 @@ fn hanabiko_hand_to_discard_no_trigger() {
     g.state.player1.hand.cards.retain(|c| *c != hanabiko);
     g.state.player1.waitroom.cards.push(hanabiko);
     g.state.recently_moved_cards = Some(vec![hanabiko].into());
+    // Record the real zone transition so the source filter can verify it.
+    use rabuka_engine::core::types::ZoneId;
+    g.state.turn_movements.push(rabuka_engine::types::MovementEvent {
+        moved_card_id: hanabiko,
+        source_zone: ZoneId::Hand,
+        dest_zone: ZoneId::Waitroom,
+        cause_card_id: None,
+        cause_player_id: "p1".to_string(),
+        effect_only: false,
+        timestamp: 1,
+    });
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     g.state.process_pending_auto_abilities(&pid);
 
-    while g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
-
     // Hanabiko's ability should NOT fire (source was hand, not stage)
-    // Note: the condition explicitly requires stage→discard
+    assert!(
+        !g.has_pending_choice(),
+        "hand-to-discard move must not trigger the stage→discard ability"
+    );
 }
 
 /// Does NOT trigger: hanabiko moves stage→deck (wrong destination zone).
@@ -191,16 +201,30 @@ fn hanabiko_stage_to_deck_no_trigger() {
     g.state.player1.stage.stage[1] = -1;
     g.state.player1.main_deck.cards.push(hanabiko);
     g.state.recently_moved_cards = Some(vec![hanabiko].into());
+    use rabuka_engine::core::types::ZoneId;
+    g.state.turn_movements.push(rabuka_engine::types::MovementEvent {
+        moved_card_id: hanabiko,
+        source_zone: ZoneId::Stage,
+        dest_zone: ZoneId::Deck,
+        cause_card_id: None,
+        cause_player_id: "p1".to_string(),
+        effect_only: false,
+        timestamp: 1,
+    });
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     g.state.process_pending_auto_abilities(&pid);
 
-    while g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
-
     // Her ability should NOT fire (destination was deck, not discard)
+    assert!(
+        !g.has_pending_choice(),
+        "stage-to-deck move must not trigger the stage→discard ability"
+    );
+    assert!(
+        !g.state.player1.hand.cards.contains(&hanabiko),
+        "no retrieval may happen without the trigger"
+    );
 }
 
 /// Two hanabiko copies: one on stage moves to discard, one static in discard.

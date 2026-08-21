@@ -223,10 +223,58 @@ fn rin_live_success_ability_triggers() {
     game.state.player2.hand.cards.push(live_card);
     game.state.player2.hand.cards.push(filler);
 
-    game.pass();
-    game.pass();
-    game.pass();
+    // Stock the ENERGY DECK: ab#1 draws from 自分のエネルギーデッキ.
+    let e_card = game.id("LL-E-001-SD");
+    for _ in 0..3 {
+        game.state.player1.energy_deck.cards.push(e_card);
+    }
 
-    let energy_count = game.state.player1.energy_zone.cards.len();
-    eprintln!("[RIN] energy_zone after Live phase: {} cards", energy_count);
+    let energy_before = game.state.player1.energy_zone.cards.len();
+    let active_before = game.state.player1.energy_zone.active_count();
+
+    game.pass();
+    game.pass();
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Rin's LiveSuccess must be routed and resolved with an explicit verdict.
+    let rin_live_success = game.state.rule_log.iter().any(|l| {
+        l.contains("鐘 嵐珠") && l.contains("trigger_live_success")
+    });
+    assert!(
+        rin_live_success,
+        "Rin's LiveSuccess ability must be evaluated during the live"
+    );
+    let resolved_with_verdict = game.state.rule_log.iter().any(|l| {
+        l.contains("鐘 嵐珠")
+            && l.contains("trigger_live_success")
+            && (l.contains("result_success") || l.contains("result_failure"))
+    });
+    assert!(
+        resolved_with_verdict,
+        "LiveSuccess resolution must record success or failure"
+    );
+
+    // If the condition was met (higher live score), the energy deck placement
+    // must have happened: (0 under + 1) = exactly 1 card added to the energy
+    // zone in WAIT state — the active count must be untouched.
+    let success = game.state.rule_log.iter().any(|l| {
+        l.contains("鐘 嵐珠")
+            && l.contains("trigger_live_success")
+            && l.contains("result_success")
+    });
+    if success {
+        assert_eq!(
+            game.state.player1.energy_zone.cards.len(),
+            energy_before + 1,
+            "success places exactly under_count(0)+1 energy cards"
+        );
+        assert_eq!(
+            game.state.player1.energy_zone.active_count(),
+            active_before,
+            "placed energy is in wait state: active count unchanged"
+        );
+    }
 }

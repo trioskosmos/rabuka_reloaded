@@ -44,14 +44,32 @@ fn you_s3_q153_live_success_draw_if_fewer_revealed() {
         game.pass();
     }
     game.set_live_card(live_card);
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
-
-    // LiveSuccess triggers — condition checks if self's revealed count
-    // is less than opponent's. At minimum, the ability fires without error.
+    for _ in 0..5 {
+        game.pass();
+    }
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    // The LiveSuccess ability must be routed and resolved with an explicit
+    // verdict — silence would mean the trigger never reached the resolver.
+    let you_live_success = game
+        .state
+        .rule_log
+        .iter()
+        .any(|l| l.contains("渡辺 曜") && l.contains("trigger_live_success"));
+    assert!(
+        you_live_success,
+        "You's LiveSuccess ability must be evaluated during the live"
+    );
+    let resolved_with_verdict = game.state.rule_log.iter().any(|l| {
+        l.contains("渡辺 曜")
+            && l.contains("trigger_live_success")
+            && (l.contains("result_success") || l.contains("result_failure"))
+    });
+    assert!(
+        resolved_with_verdict,
+        "LiveSuccess resolution must record success or failure"
+    );
 }
 
 /// PL!S-bp3-016-N (国木田花丸) Q155: Constant ability — each card in

@@ -1997,12 +1997,19 @@ impl AbilityResolver {
         let source = effect.source_any().map(|s| s.to_string());
         let any_number = effect.any_number_any().unwrap_or(false);
 
-        // Special case: source="under_member" + destination="energy_zone" means
-        // count from under member, but move from energy_deck → energy_zone (wait).
+        // Special case: place (dynamic_count) energy cards from the energy
+        // deck into the energy zone in WAIT state.
         // e.g. PL!N-bp5-012-R+ LiveSuccess: place (under_count + 1) from deck.
-        if source.as_deref() == Some("under_member")
+        // The parser historically encoded this inverted
+        // (source=under_member, destination=energy_zone); both encodings are
+        // accepted. No destination phrase in the text means the energy zone
+        // by rule; "ウェイト状態で置く" = inactive, so active count is untouched.
+        let wants_wait_energy_to_zone = source.as_deref() == Some("under_member")
+            && effect.destination == Some(Zone::Energy);
+        let canonical_energy_deck_to_zone = source.as_deref() == Some("energy_deck")
             && effect.destination == Some(Zone::Energy)
-        {
+            && effect.state_change_any().as_deref() == Some("wait");
+        if wants_wait_energy_to_zone || canonical_energy_deck_to_zone {
             let player = gs.resolve_target_player_mut(&target);
             for _ in 0..count {
                 if let Some(energy) = player.energy_deck.draw() {

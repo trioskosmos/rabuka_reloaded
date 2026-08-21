@@ -1,0 +1,8 @@
+﻿cargo : error: could not find `Cargo.toml` in `C:\Users\trios\OneDrive\Documents\rabuka_reloaded` or any parent directo
+ry
+発生場所 行:1 文字:1
++ cargo test --test run_all niji_bp5_004_weight_exact_4_blades 2>&1 | O ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (error: could no...arent directory:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

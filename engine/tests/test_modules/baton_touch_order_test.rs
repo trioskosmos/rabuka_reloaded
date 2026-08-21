@@ -1,6 +1,10 @@
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
+/// Q84: when auto abilities trigger simultaneously, the active player's
+/// resolve first (owner choosing their order), then the non-active player's.
+/// These tests pin the ordering of multiple triggers within one action.
+
 fn fill_deck(game: &mut TestGame) {
     let f = game.id("PL!-sd1-010-SD");
     for _ in 0..40 {
@@ -121,7 +125,7 @@ fn edelnote_appearance_waits_opponent() {
 /// EdelNote card (cost 4) replaces 花帆 — only セラス's appearance fires
 /// (花帆 requires cost 10+ partner).
 #[test]
-fn both_triggers_in_baton_touch() {
+fn q84_both_triggers_in_baton_touch_resolve_ordered() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 

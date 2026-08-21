@@ -443,3 +443,4 @@ pub mod energy_state_condition_test;
 pub mod ginko_baton_touch_hasu_search_test;
 pub mod miyata_draw_until_test;
 pub mod wien_yell_count_test;
+pub mod kasumi_turn_limit_test;

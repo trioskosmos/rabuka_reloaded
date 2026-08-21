@@ -147,12 +147,22 @@ fn himeno_front_no_opponent_skill_fails() {
 fn himeno_front_constant_evaluates() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
-    let himeno = game.id(HIMENO);
-    let opp = game.id(FILLER);
+    let himeno = game.id(HIMENO); // cost 9
 
     game.state.player1.stage.stage[1] = himeno;
+    // Opponent member at front with HIGHER cost (条件: 相手のコスト > 姫芽のコスト)
+    let opp = game.id("PL!HS-sd1-006-SD"); // cost 15
     game.state.player2.stage.stage[1] = opp;
     game.state.recalculate_constants();
+
+    let m = game
+        .state
+        .mods
+        .get_heart_modifier(himeno, rabuka_engine::card::parse_heart_color("heart01"));
+    assert_eq!(
+        m, 1,
+        "higher-cost opponent at front must grant exactly 1 heart01"
+    );
 }
 
 /// No opponent in front → no heart01.

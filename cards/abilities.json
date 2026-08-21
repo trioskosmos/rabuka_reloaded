@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-22T00:31:29.696671",
+  "generated_at": "2026-08-22T02:49:50.607923",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "3935215d",
+  "engine_commit": "44d228c6",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -4593,7 +4593,7 @@
           "aggregate": "total",
           "type": "comparison_condition"
         },
-        "source": "under_member",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "dynamic_count": {
@@ -4606,7 +4606,6 @@
         "card_type": "energy_card",
         "target": "self",
         "action": "place_energy_under_member",
-        "energy_count": 1,
         "target_member": "this_member"
       }
     },
@@ -5973,6 +5972,7 @@
         "look_action": {
           "text": "自分のデッキの上から、自分のステージにいるメンバーの数に2を足した数に等しい枚数見る。",
           "source": "deck_top",
+          "count": 1,
           "dynamic_count": {
             "type": "dynamic_count",
             "reference": "自分のステージにいるメンバーの数",
@@ -17711,7 +17711,8 @@
           "state_change": "active",
           "count": 1,
           "card_type": "member_card",
-          "action": "change_state"
+          "action": "change_state",
+          "target": "both"
         },
         "result_condition": {
           "text": "これにより相手のステージにいるメンバーをアクティブにした場合",

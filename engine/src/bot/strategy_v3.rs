@@ -1,4 +1,4 @@
-//! Experimental strategy bot v3  Egeneral planning.
+﻿//! Experimental strategy bot v3  Egeneral planning.
 //!
 //! Adds a planning layer on top of v2's yell-math live-set policy:
 //!
@@ -25,7 +25,7 @@ use crate::card::{CardDatabase, CardType};
 use crate::game_setup::{self, Action};
 use crate::game_state::GameState;
 use crate::bot::strategy::StrategyWeights;
-use crate::bot::strategy_v2::{self, V2Policy};
+use crate::bot::strategy_v2::V2Policy;
 
 /// Diagnostics counters (printed by the arena bin).
 pub static V3_STATS: [std::sync::atomic::AtomicU64; 5] = [
@@ -236,24 +236,17 @@ fn curve_term(gs: &GameState, me_player: u8, plan: &V3Plan, w: &StrategyWeights)
 /// wins ties. Mild weight: legitimate reservations for live-phase ability
 /// costs (【自動】(コスト) abilities fire outside the main phase) must not
 /// be punished into oblivion.
+/// V3 evaluation: v2 evaluation + curve adherence.
+///
+/// The absolute held-energy penalty was ablated: it measured neutral on
+/// wins while reallocating plays toward ability spam (game 1 t9–t22).
 pub fn evaluate_state_v3(
     gs: &GameState,
     me: u8,
     w: &StrategyWeights,
     plan: &V3Plan,
 ) -> f64 {
-    let base = crate::bot::strategy_v2::evaluate_state_v2(gs, me, w) + curve_term(gs, me, plan, w);
-    let my = if me == 0 {
-        &gs.player1
-    } else {
-        &gs.player2
-    };
-    let held = my.energy_zone.active_count() as f64;
-    // Stage growth from spending a point of energy nets +stage_cost (8.0)
-    // hearts-weighted; charge back half that per held point so "pass with
-    // full energy" loses to "upgrade the board" but keeps saving viable
-    // when no upgrade exists.
-    base - held * w.active_energy * 0.5
+    crate::bot::strategy_v2::evaluate_state_v2(gs, me, w) + curve_term(gs, me, plan, w)
 }
 
 /// V3 main-phase choice: v2's clone-and-eval plus acquisition deltas  E/// reward actions that obtain cards we want right now.
@@ -284,9 +277,32 @@ pub fn choose_action_heuristic_v3(
             continue;
         }
         game_setup::settle_single_player_state(&mut sim);
+
+        // No-op loop breaker (game 1, t9–t22): v3 re-ran the same retrieve
+        // 起動 14 turns straight because each step locally looked positive
+        // (+1 hand) while nothing progressed. If an action leaves every key
+        // quantity unchanged, it bought nothing — value it below Pass.
+        let my_sim = if me == 0 { &sim.player1 } else { &sim.player2 };
+        let my_now = if me == 0 { &gs.player1 } else { &gs.player2 };
+        let no_op = my_sim.hand.cards.len() == my_now.hand.cards.len()
+            && my_sim.energy_zone.active_count() == my_now.energy_zone.active_count()
+            && my_sim.stage.stage == my_now.stage.stage
+            && my_sim.main_deck.cards.len() == my_now.main_deck.cards.len()
+            && my_sim.waitroom.cards.len() == my_now.waitroom.cards.len();
+
         let mut val =
             crate::bot::strategy_v2::evaluate_state_v2(&sim, me, &StrategyWeights::fair())
                 + curve_term(&sim, me, plan, &StrategyWeights::fair());
+        if no_op {
+            val -= 1000.0;
+        }
+        // Hand-reserve discipline (game 14): v3 liquidated its whole hand on
+        // member spam (hand 3→0 at t9) and sat unable to set lives or pay
+        // discard costs for the rest of the game. A state with ≤1 hand card
+        // is functionally paralyzed.
+        if my_sim.hand.cards.len() <= 1 {
+            val -= 40.0;
+        }
 
         // Acquisition deltas (what did this action get me?).
         let my_after = if me == 0 {
@@ -301,8 +317,25 @@ pub fn choose_action_heuristic_v3(
             my_after.lives_in_waitroom as i32 - my_before.lives_in_waitroom as i32;
 
         // Lives into hand: strong want during the rush window (ammo for the
-        // flood), moderate otherwise.
-        val += d_lives as f64 * if rush { 60.0 } else { 25.0 };
+        // flood), moderate otherwise — and DESPERATION-scaled when the hand
+        // is already dry: game-6 autopsies showed v3 sitting at zero lives
+        // for 8 straight turns while retrieval abilities went unused because
+        // a flat +25 couldn't outbid other terms. With no ammo, retrieving
+        // one life is worth more than any single board upgrade.
+        let ammo_starved = my_before.lives_in_hand == 0;
+        let per_life = if ammo_starved {
+            150.0
+        } else if rush {
+            60.0
+        } else {
+            25.0
+        };
+        val += d_lives as f64 * per_life;
+        if d_lives < 0 && my_after.lives_in_hand == 0 {
+            // Never reward actions that burn the last life (costs that
+            // discard lives) — that's how game-6 starvation started.
+            val -= 150.0;
+        }
         // Recycled ammo (waitroom -> hand shows as wr decrease + hand gain);
         // slight extra credit because waitroom lives are "free" wins.
         if d_lives > 0 && d_wr_lives < 0 {
@@ -332,198 +365,61 @@ pub fn choose_live_set_action_v3(
     gs: &GameState,
     actions: &[Action],
     db: &CardDatabase,
-    policy: &V2Policy,
-    plan: &V3Plan,
+    _policy: &V2Policy,
+    _plan: &V3Plan,
 ) -> Action {
-    let v2_choice = if plan.in_rush_window(gs.turn_number) {
-        let relaxed = V2Policy {
-            mc_trials: policy.mc_trials,
-            gamble_floor: (policy.gamble_floor * 0.5).max(0.04),
-            urgent_gamble_floor: policy.urgent_gamble_floor * 0.5,
-        };
-        strategy_v2::choose_live_set_action_v2(gs, actions, db, &relaxed)
-    } else {
-        strategy_v2::choose_live_set_action_v2(gs, actions, db, policy)
-    };
-
+    // Score-escalating portfolio planner.
+    //
+    // Trace evidence (78 games): both bots set exactly ONE life 100% of the
+    // time and place only 0.33 successes/turn, even on 30-heart boards that
+    // support 4–6 point lives. v2's ladder ranks by pass-probability then
+    // smallest count — it can never discover the guides' escalating arc
+    // (1点→2点→3点→multi-life). Instead: maximize TOTAL SCORE subject to
+    // deterministic heart coverage from the stage pool, up to 3 lives.
     let me = if gs.active_player().id == gs.player1.id { 0u8 } else { 1u8 };
-    let opp = 1 - me;
-    let my_player = if me == 0 { &gs.player1 } else { &gs.player2 };
-    let opp_success = if opp == 0 {
-        gs.player1.success_live_card_zone.cards.len()
-    } else {
-        gs.player2.success_live_card_zone.cards.len()
-    };
-    let my_success = my_player.success_live_card_zone.cards.len();
-
-    // ── Match-point planner (my_success >= 2) ──
-    // Delegating to v2 here is fatal: its MC reads PRINTED requirements, so
-    // it will set 始まりは君の空 as a 3-heart life while the engine escalates
-    // it to 12 hearts at ライブ開始時 (Q254, mandatory) — all-or-nothing
-    // failure, game stalls at 2-2 forever. Plan with EFFECTIVE requirements
-    // and require DETERMINISTIC coverage from the heart pool (flips are
-    // upside, never load-bearing).
-    if my_success >= 2 {
-        return plan_match_point(gs, actions, db, me);
-    }
-
-    // ── Concede-a-turn (tree node 1.4) ──
-    // Only skip contesting when CLEARLY outclassed (≥2 score-band points).
-    // A tie places a card for us while we're below 2, so a 1-point deficit
-    // is still worth contesting — especially as second attacker, where the
-    // opponent's main phase always ran first and a naive board comparison
-    // reads slightly behind every single turn.
-    // Never concede when they're at 2 — failing to contest then loses the
-    // game outright.
-    if opp_success < 2 {
-        let my_est = estimate_max_score(gs, me, db);
-        let opp_est = estimate_max_score(gs, opp, db);
-        if my_est + 2 <= opp_est {
-            // Undo any selections v2 already made, then confirm empty.
-            let selected: Vec<usize> = gs
-                .live_card_selected_indices
-                .iter()
-                .map(|&i| i as usize)
-                .collect();
-            for &hi in &selected {
-                if let Some(a) = actions.iter().find(|a| {
-                    a.action_type == game_setup::ActionType::SelectLiveCard
-                        && a.selected == Some(true)
-                        && a.parameters.as_ref().and_then(|p| p.card_index) == Some(hi)
-                }) {
-                    return a.clone();
-                }
-            }
-            return confirm_live_set(actions);
-        }
-    }
-
-    // Behind or at their match point: don't waste slots on filtering —
-    // extra failed checks can hand them tie placements.
-    let filtering_allowed = my_success >= opp_success && !(my_success <= 2 && opp_success >= 2);
-
-    // v2 wants to deselect a card we deliberately dumped? That means our
-    // dump is in place but outside v2's plan  Ehold the line (confirm or
-    // add another dump), never undo it (that would ping-pong forever).
-    let deselecting_dead = v2_choice.action_type == game_setup::ActionType::SelectLiveCard
-        && v2_choice.selected == Some(true)
-        && v2_choice
-            .parameters
-            .as_ref()
-            .and_then(|p| p.card_index)
-            .map_or(false, |hi| analyze_hand(gs, me, db).is_dead(hi));
-
-    let planning_done = v2_choice.action_type == game_setup::ActionType::ConfirmLiveCardSet
-        || deselecting_dead;
-    if !planning_done {
-        return v2_choice;
-    }
-
-    let max_slots = (3i32 - i32::from(my_player.live_card_set_limit_reduction)).max(0) as usize;
-    let selected: Vec<usize> = gs
-        .live_card_selected_indices
-        .iter()
-        .map(|&i| i as usize)
-        .collect();
-    if !filtering_allowed || selected.len() >= max_slots {
-        return confirm_live_set(actions);
-    }
-
-    // Find a dead card to dump. ⚠ NON-LIVE cards only: a set non-live card
-    // is discarded at performance start (8.3.4) and replaced by a draw, but
-    // an uncovered LIVE added to the zone risks zeroing the WHOLE turn via
-    // all-or-nothing (any failed life fails every life).
-    let use_now = analyze_hand(gs, me, db);
-    let dump = use_now.dead_members.into_iter().find(|hi| !selected.contains(hi));
-    if let Some(hi) = dump {
-        if let Some(a) = actions.iter().find(|a| {
-            a.action_type == game_setup::ActionType::SelectLiveCard
-                && a.selected == Some(false)
-                && a.parameters.as_ref().and_then(|p| p.card_index) == Some(hi)
-        }) {
-            return a.clone();
-        }
-    }
-    confirm_live_set(actions)
+    plan_score_portfolio(gs, actions, db, me)
 }
 
-fn confirm_live_set(actions: &[Action]) -> Action {
-    actions
-        .iter()
-        .find(|a| a.action_type == game_setup::ActionType::ConfirmLiveCardSet)
-        .or_else(|| actions.first())
-        .cloned()
-        .expect("live set actions non-empty")
-}
-
-/// Allocate one life's requirements from a remaining heart pool.
-/// Mirrors 8.3.15: specific colors first, wildcards (All/BAll) cover
-/// deficits, grey bucket takes colorless + leftovers. Returns None if the
-/// life can't be satisfied from what remains.
-fn allocate_life(pool: &mut HeartAcc, need: &HeartAcc) -> bool {
-    let mut wildcard = pool[10] + pool[7];
-    let mut specific_surplus = 0i32;
-    for c in 1..=6 {
-        let deficit = need[c] - pool[c];
-        if deficit > 0 {
-            wildcard -= deficit;
-            if wildcard < 0 {
-                return false;
-            }
-        } else {
-            specific_surplus += -deficit;
-        }
-    }
-    // Grey bucket: colorless + leftover specifics/wildcards.
-    let leftover = specific_surplus + wildcard.max(0) + pool[0];
-    if leftover < need[0] {
-        return false;
-    }
-    // Commit: deduct specifics used, wildcards used, then grey bucket.
-    for c in 1..=6 {
-        let used = need[c].min(pool[c]);
-        pool[c] -= used;
-    }
-    let wild_used = (pool[10] + pool[7]) - wildcard.max(0);
-    // Deduct wildcards (BAll first, then All) for the deficits covered.
-    let mut to_take = wild_used;
-    let take_b = to_take.min(pool[7]);
-    pool[7] -= take_b;
-    to_take -= take_b;
-    pool[10] -= to_take;
-    // Grey bucket deduction: colorless first, then remaining surplus.
-    let mut grey_needed = need[0];
-    let take0 = grey_needed.min(pool[0]);
-    pool[0] -= take0;
-    grey_needed -= take0;
-    // Remaining grey comes out of whatever specific/wild is left; approximate
-    // by draining the largest colors first.
-    for c in (1..=10).rev() {
-        if grey_needed <= 0 {
-            break;
-        }
-        let t = grey_needed.min(pool[c]);
-        pool[c] -= t;
-        grey_needed -= t;
-    }
-    true
-}
-
-/// Match-point live-set planning: only set lives whose EFFECTIVE
-/// requirements are deterministically covered by the current heart pool.
-/// Spare slots may dump dead members (hand filtering). Never gamble here —
-/// a failed check at 2 successes stalls the game.
-fn plan_match_point(
+/// Greedy score-maximizing portfolio: sort hand lives by score desc, add
+/// each whose requirements still fit in the remaining heart pool (rule
+/// 8.3.15 order-aware allocation). Flips are upside, never load-bearing.
+fn plan_score_portfolio(
     gs: &GameState,
     actions: &[Action],
     db: &CardDatabase,
     me: u8,
 ) -> Action {
     let my = if me == 0 { &gs.player1 } else { &gs.player2 };
-    let success_count = my.success_live_card_zone.cards.len();
     let mut pool = stage_base_hearts(my, db);
 
-    // Candidate lives with effective reqs, highest score first.
+    // Expected yell hits join the pool as wildcard hearts (rule 8.3.15.1.1:
+    // flipped icons act as any-one-color). Without this buffer the planner
+    // refuses lives whose specific colors aren't already on stage — observed
+    // as v3 setting NOTHING turns 1–4 and again turns 9–22 of game 1 while
+    // holding perfectly playable lives.
+    let mut blades = 0i32;
+    for &cid in my.stage.stage.iter() {
+        if cid < 0 {
+            continue;
+        }
+        let waiting = gs.mods.get_orientation_modifier(cid) == Some("wait");
+        if !waiting {
+            if let Some(card) = db.get_card(cid) {
+                blades += card.blade as i32;
+            }
+        }
+    }
+    let deck_len = my.main_deck.cards.len().max(1);
+    let density = my
+        .main_deck
+        .cards
+        .iter()
+        .filter(|&&cid| db.get_card(cid).map_or(false, |c| c.blade_heart.is_some()))
+        .count() as f64
+        / deck_len.max(1) as f64;
+    let expected_hits = (blades as f64 * density).round() as i32;
+    pool[10] += expected_hits;
+
     let mut candidates: Vec<(usize, i32, [i32; 11])> = Vec::new();
     for (hand_index, &cid) in my.hand.cards.iter().enumerate() {
         let Some(card) = db.get_card(cid) else {
@@ -532,57 +428,63 @@ fn plan_match_point(
         if !matches!(card.card_type, CardType::Live) {
             continue;
         }
-        let mut base_need = [0i32; 11];
+        let mut need = [0i32; 11];
         if let Some(nh) = &card.need_heart {
-            acc_add_hearts(&mut base_need, &nh.hearts);
+            acc_add_hearts(&mut need, &nh.hearts);
         }
-        let score = card.score.unwrap_or(0) as i32;
-        candidates.push((hand_index, score, base_need));
+        candidates.push((hand_index, card.score.unwrap_or(0) as i32, need));
     }
     candidates.sort_by(|a, b| b.1.cmp(&a.1));
 
-    let max_slots = (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
-    let selected: Vec<usize> = gs
-        .live_card_selected_indices
-        .iter()
-        .map(|&i| i as usize)
-        .collect();
-
-    // Greedy portfolio: add lives while the POOL can still cover the group.
+    let max_slots =
+        (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
     let mut desired: Vec<usize> = Vec::new();
-    let mut trial_pool = pool;
     for &(hi, _score, ref need) in &candidates {
         if desired.len() >= max_slots {
             break;
         }
-        let mut next = trial_pool;
+        let mut next = pool;
         if allocate_life(&mut next, need) {
             desired.push(hi);
-            trial_pool = next;
+            pool = next;
         }
     }
 
-    // Hand filtering with spare slots: dead members only (non-lives are
-    // discarded at performance start; lives would poison all-or-nothing).
-    if desired.len() < max_slots && !desired.is_empty() {
-        let use_now = analyze_hand(gs, me, db);
-        for hi in use_now.dead_members {
-            if desired.len() >= max_slots {
-                break;
+    // Free-win discipline (rule 8.4.3.2): setting a life is how I win.
+    // Trace evidence (game 1 t9+): both bots confirmed EMPTY sets for 9
+    // straight turns — guaranteed stall. When the deterministic portfolio
+    // came up empty but I hold lives below match point, set the
+    // closest-to-coverable one instead of passing.
+    if desired.is_empty() && !candidates.is_empty() && my.success_live_card_zone.cards.len() < 2 {
+        let mut best: Option<(i32, usize)> = None; // (deficit, hand_index)
+        for &(hi, _score, ref need) in &candidates {
+            let d = requirement_deficit(&pool, need);
+            if best.map_or(true, |(bd, _)| d < bd) {
+                best = Some((d, hi));
             }
-            if !desired.contains(&hi) {
+        }
+        if let Some((deficit, hi)) = best {
+            // Allow a small shortfall: flips overshoot the density estimate
+            // half the time, and losing one life card is cheap next to a
+            // guaranteed pass-fest.
+            if deficit <= 3 {
                 desired.push(hi);
             }
         }
     }
 
-    // Emit one action toward `desired` (same protocol as v2).
-    let find_select = |hand_index: usize, want_selected: bool| -> Option<Action> {
+    // Emit one action toward `desired`.
+    let selected: Vec<usize> = gs
+        .live_card_selected_indices
+        .iter()
+        .map(|&i| i as usize)
+        .collect();
+    let find_select = |hand_index: usize, want: bool| -> Option<Action> {
         actions
             .iter()
             .find(|a| {
                 a.action_type == game_setup::ActionType::SelectLiveCard
-                    && a.selected == Some(want_selected)
+                    && a.selected == Some(want)
                     && a.parameters.as_ref().and_then(|p| p.card_index) == Some(hand_index)
             })
             .cloned()
@@ -603,38 +505,6 @@ fn plan_match_point(
     }
     confirm_live_set(actions)
 }
-
-// ── Hand usefulness model ────────────────────────────────────────────────
-
-/// Median total hearts required per score band, computed from all 291 lives
-/// in cards.json (see docs/BOT_STRATEGY_TREE.md §1.3 table).
-const SCORE_BAND_HEARTS: [i32; 10] = [
-    0, // score 0 (unused index)
-    3, // 1点
-    5, // 2点
-    7, // 3点
-    10, // 4点
-    12, // 5点
-    14, // 6点
-    16, // 7点
-    19, // 8点
-    21, // 9点
-];
-
-/// Largest score band whose median heart requirement fits `total_hearts`.
-fn band_ceiling(total_hearts: i32) -> i32 {
-    let mut best = 0;
-    for (s, &need) in SCORE_BAND_HEARTS.iter().enumerate().skip(1) {
-        if need <= total_hearts {
-            best = s as i32;
-        }
-    }
-    best
-}
-
-/// Rough max live score a player's PUBLIC board can support this turn.
-/// Stage hearts (all members) + expected yell hits (active blades × own
-/// deck's blade-heart density), mapped through the exact score-band table.
 pub fn estimate_max_score(
     gs: &GameState,
     me_player: u8,
@@ -676,7 +546,110 @@ pub fn estimate_max_score(
         0.0
     };
     let total = hearts + (blades as f64 * density).round() as i32;
-    band_ceiling(total)
+    // Largest score band whose median requirement fits (exact table from
+    // cards.json; see docs/BOT_STRATEGY_TREE.md §1.3).
+    const BAND: [i32; 10] = [0, 3, 5, 7, 10, 12, 14, 16, 19, 21];
+    let mut best = 0;
+    for (s, &need) in BAND.iter().enumerate().skip(1) {
+        if need <= total {
+            best = s as i32;
+        }
+    }
+    best
+}
+
+/// Allocate one life's requirements from a remaining heart pool.
+/// Mirrors 8.3.15: specific colors first, wildcards (All/BAll) cover
+/// deficits, grey bucket takes colorless + leftovers. Returns false if the
+/// life can't be satisfied from what remains.
+fn allocate_life(pool: &mut HeartAcc, need: &HeartAcc) -> bool {
+    // Work on a copy; commit only if fully satisfiable.
+    let mut p = *pool;
+
+    // 1) Specific colors Heart01–06: own color first, wildcards (All + BAll)
+    //    cover deficits.
+    let mut wildcard_used = 0i32;
+    let mut wildcard = p[7] + p[10];
+    for c in 1..=6 {
+        let have = p[c];
+        let want = need[c];
+        if have >= want {
+            p[c] = have - want;
+        } else {
+            let deficit = want - have;
+            if deficit > wildcard {
+                return false;
+            }
+            wildcard_used += deficit;
+            wildcard -= deficit;
+            p[c] = 0;
+        }
+    }
+    let from_ball = wildcard_used.min(p[7]);
+    p[7] -= from_ball;
+    p[10] -= wildcard_used - from_ball;
+
+    // 2) Grey bucket (Heart00): colorless hearts + any leftover specific or
+    //    wildcard hearts (rule 8.3.15 order-aware leftovers).
+    let mut grey = need[0];
+    let t0 = grey.min(p[0]);
+    p[0] -= t0;
+    grey -= t0;
+    for c in (1..=6).rev() {
+        if grey <= 0 {
+            break;
+        }
+        let t = grey.min(p[c]);
+        p[c] -= t;
+        grey -= t;
+    }
+    if grey > 0 {
+        let w = p[7] + p[10];
+        if grey > w {
+            return false;
+        }
+        let b2 = grey.min(p[7]);
+        p[7] -= b2;
+        p[10] -= grey - b2;
+    }
+
+    *pool = p;
+    true
+}
+
+fn confirm_live_set(actions: &[Action]) -> Action {
+    actions
+        .iter()
+        .find(|a| a.action_type == game_setup::ActionType::ConfirmLiveCardSet)
+        .or_else(|| actions.first())
+        .cloned()
+        .expect("live set actions non-empty")
+}
+
+/// How many heart icons short `pool` is of satisfying `need` (rough, for
+/// fallback gambles): specific-color shortfalls beyond wildcards, plus grey
+/// bucket shortfall after colorless+leftovers.
+fn requirement_deficit(pool: &HeartAcc, need: &HeartAcc) -> i32 {
+    let mut wildcard = pool[10] + pool[7];
+    let mut deficit = 0i32;
+    let mut leftover = 0i32;
+    for c in 1..=6 {
+        let d = need[c] - pool[c];
+        if d > 0 {
+            if d > wildcard {
+                deficit += d - wildcard;
+            }
+            wildcard -= d.min(wildcard);
+        } else {
+            leftover += -d;
+        }
+    }
+    // Grey bucket: colorless + leftovers + unused wildcards.
+    let available_grey = pool[0] + leftover + wildcard.max(0);
+    if need[0] > available_grey {
+        deficit += need[0] - available_grey;
+    }
+    deficit
 }
 
 /// Classification of every hand card by whether it is usable *now*.

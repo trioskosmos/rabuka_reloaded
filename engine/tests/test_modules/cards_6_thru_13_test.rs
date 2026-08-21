@@ -382,6 +382,22 @@ fn c9_arise_constant_heart_with_other_arise() {
     deck(&mut g, f);
     g.give_energy(5);
     g.state.recalculate_constants();
+    use rabuka_engine::card::HeartColor;
+    // No other A-RISE member → no heart05 bonus.
+    assert_eq!(
+        g.state.mods.get_heart_modifier(c, HeartColor::Heart05),
+        0,
+        "no other A-RISE means no heart05"
+    );
+    // Another A-RISE member on stage → +1 heart05 per such member.
+    let anju = g.id("PL!-bp5-222-R"); // 優木あんじゅ, A-RISE
+    g.state.player1.stage.stage = [anju, c, -1];
+    g.state.recalculate_constants();
+    assert_eq!(
+        g.state.mods.get_heart_modifier(c, HeartColor::Heart05),
+        1,
+        "1 other A-RISE member must grant exactly 1 heart05"
+    );
 }
 
 #[test]
@@ -394,12 +410,16 @@ fn c9_arise_activate_and_recover() {
     let opp = g.id("PL!-sd1-001-SD");
     g.state.player2.stage.stage = [-1, opp, -1];
     g.state.mods.add_orientation_modifier(opp, "wait");
-    g.state.player1.waitroom.cards.push(f);
+    // A live card to recover from the waitroom when the activated member is
+    // the opponent's.
+    let live = g.id("PL!-sd1-020-SD");
+    g.state.player1.waitroom.cards.push(live);
     g.state.player1.hand.cards.push(f);
     deck(&mut g, f);
     g.give_energy(5);
     g.activate_ability(c);
-    while g.has_pending_choice() {
+    let mut guard = 0;
+    while g.has_pending_choice() && guard < 10 {
         match g.pending_choice_type().as_deref() {
             Some("SelectCard") => {
                 g.select_indices(&[0]);
@@ -407,9 +427,23 @@ fn c9_arise_activate_and_recover() {
             Some("SelectTarget") => {
                 g.select_option(0);
             }
-            _ => break,
+            _ => {
+                g.select_indices(&[]);
+            }
         }
+        guard += 1;
     }
+    // The waited opponent member was activated by the ability.
+    assert_eq!(
+        g.state.mods.get_orientation_modifier(opp).as_deref(),
+        Some("active"),
+        "waited opponent member must be active after activation"
+    );
+    // Activating an OPPONENT member recovers 1 live card from the waitroom.
+    assert!(
+        g.state.player1.hand.cards.contains(&live),
+        "live card must be recovered from waitroom to hand"
+    );
 }
 
 // ========== Card 10: PL!-bp6-007-R+ LIVE reveal top ==========
@@ -483,6 +517,22 @@ fn c11_peek_per_niji_selects_keep1() {
     deck(&mut g, f);
     g.give_energy(5);
     trigger(&mut g, l, "ライブ開始時");
+    while g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+    use rabuka_engine::card::HeartColor;
+    // Deck was all fillers (no live card): the reveal cannot grant score.
+    assert_eq!(
+        g.state.mods.get_score_modifier(l),
+        0,
+        "no live card revealed means no score bonus"
+    );
+    // 3 cards were looked at (one per Niji member); at most 1 stays on deck,
+    // so the waitroom must have received the rest of the peeked cards.
+    assert!(
+        g.state.player1.waitroom.cards.len() >= 2,
+        "peeked cards (3 minus at most 1 kept) must go to the waitroom"
+    );
 }
 
 // ========== Card 12: PL!HS-pb1-008-R restriction ==========

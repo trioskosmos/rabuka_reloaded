@@ -1,4 +1,4 @@
-/// Tests for untested abilities from the coverage report.
+﻿/// Tests for untested abilities from the coverage report.
 ///
 /// Covers:
 ///   - choice:           PL!N-pb1-010-R (debut: activate energy OR put Niji live on deck top)
@@ -74,10 +74,10 @@ fn trigger_live_start_with(game: &mut TestGame, filler_live: i16) {
 }
 
 // ============================================================
-// choice: PL!N-pb1-010-R — debut choice: activate energy OR put Niji live on deck top
+// choice: PL!N-pb1-010-R 窶・debut choice: activate energy OR put Niji live on deck top
 // ============================================================
 
-/// 登場: 選択肢0 — エネルギーを1枚アクティブにする。
+/// 逋ｻ蝣ｴ: 驕ｸ謚櫁い0 窶・繧ｨ繝阪Ν繧ｮ繝ｼ繧・譫壹い繧ｯ繝・ぅ繝悶↓縺吶ｋ縲・
 #[test]
 fn niji_choice_activate_energy() {
     let db = load_real_database();
@@ -106,7 +106,7 @@ fn niji_choice_activate_energy() {
     );
 }
 
-/// 登場: 選択肢1 — 控え室の虹ヶ咲ライブを2枚までデッキの上に置く。
+/// 逋ｻ蝣ｴ: 驕ｸ謚櫁い1 窶・謗ｧ縺亥ｮ､縺ｮ陌ｹ繝ｶ蜥ｲ繝ｩ繧､繝悶ｒ2譫壹∪縺ｧ繝・ャ繧ｭ縺ｮ荳翫↓鄂ｮ縺上・
 #[test]
 fn niji_choice_put_live_on_deck_top() {
     let db = load_real_database();
@@ -141,48 +141,68 @@ fn niji_choice_put_live_on_deck_top() {
 }
 
 // ============================================================
-// change_state: PL!N-bp5-004-R — weight self to weight opponent w/ exactly 4 blades
+// change_state: PL!N-bp5-004-R 窶・weight self to weight opponent w/ exactly 4 blades
 // ============================================================
 
-/// ライブ開始時: 自分をウェイトにして、相手のブレード恰好4のメンバーをウェイト。
+/// 繝ｩ繧､繝夜幕蟋区凾: 閾ｪ蛻・ｒ繧ｦ繧ｧ繧､繝医↓縺励※縲∫嶌謇九・繝悶Ξ繝ｼ繝画・螂ｽ4縺ｮ繝｡繝ｳ繝舌・繧偵え繧ｧ繧､繝医・
 #[test]
 fn niji_bp5_004_weight_exact_4_blades() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
     let member = game.id(NIJI_BLADE_4);
-    let opponent_member = game.id(FILLER);
+    // Condition is on ORIGINAL blades (蜈・・戟縺､窶ｦ縺｡繧・≧縺ｩ4縺､): use a member
+    // whose natural blade count is exactly 4 (蜊励％縺ｨ繧・.
+    let opponent_member = game.id("PL!-PR-003-PR");
+    // A modified blade count must NOT satisfy the original-value filter:
+    // filler naturally has 1 blade, +3 modifier makes 4 but original stays 1.
+    let modified = game.id(FILLER);
 
     game.state.player1.stage.stage[1] = member;
-    game.state.player2.stage.stage[1] = opponent_member;
-
-    // Give opponent member exactly 4 blades via modifier
-    game.state.mods.add_blade_modifier(opponent_member, 4);
+    game.state.player2.stage.stage = [opponent_member, modified, -1];
+    game.state.mods.add_blade_modifier(modified, 3);
 
     fill_deck(&mut game, "p2", 10);
     let filler_live = game.id(FILLER_LIVE);
 
     trigger_live_start_with(&mut game, filler_live);
 
-    // Handle the optional cost choice (weight self)
-    while game.has_pending_choice() {
-        game.select_indices(&[0]);
+    // Resolve choices:
+    //  - "pay_optional_cost:skip_optional_cost" is a pay/skip SelectTarget
+    //    where index 1 = pay (wait Karin herself), index 0 = skip.
+    //  - then pick the wait target.
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 10 {
+        guard += 1;
+        match game.get_pending_choice() {
+            rabuka_engine::ability::types::Choice::SelectTarget { target, .. }
+                if target == "pay_optional_cost:skip_optional_cost" =>
+            {
+                game.select_choice_option(1); // PAY the optional self-wait cost
+            }
+            _ => {
+                game.select_indices(&[0]);
+            }
+        }
     }
 
-    // Check orientations
-    let self_orientation = game.state.mods.get_orientation_modifier(member);
-    let opp_orientation = game.state.mods.get_orientation_modifier(opponent_member);
-
-    // The ability should have triggered if conditions are met
-    let _ = self_orientation;
-    let _ = opp_orientation;
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(opponent_member),
+        Some("wait"),
+        "member with natural 4 blades must be waited"
+    );
+    assert_ne!(
+        game.state.mods.get_orientation_modifier(modified),
+        Some("wait"),
+        "modified-to-4 blades does not satisfy 蜈・・縺､: not a legal target"
+    );
 }
 
 // ============================================================
-// change_state: PL!S-bp6-001-R — if from graveyard, weight cost>=13 side member
+// change_state: PL!S-bp6-001-R 窶・if from graveyard, weight cost>=13 side member
 // ============================================================
 
-/// 登場: 控え室から登場していない場合、コスト13以上メンバーはウェイトにならない。
+/// 逋ｻ蝣ｴ: 謗ｧ縺亥ｮ､縺九ｉ逋ｻ蝣ｴ縺励※縺・↑縺・ｴ蜷医√さ繧ｹ繝・3莉･荳翫Γ繝ｳ繝舌・縺ｯ繧ｦ繧ｧ繧､繝医↓縺ｪ繧峨↑縺・・
 #[test]
 fn shion_not_from_graveyard_no_weight() {
     let db = load_real_database();
@@ -202,17 +222,18 @@ fn shion_not_from_graveyard_no_weight() {
 }
 
 // ============================================================
-// change_state: PL!SP-PR-021 — if hearts>=5, weight opponent cost<=2
+// change_state: PL!SP-PR-021 窶・if hearts>=5, weight opponent cost<=2
 // ============================================================
 
-/// ライブ開始時: メンバーのハート合計が5未満の場合、コスト2以下の相手メンバーはウェイトにならない。
+/// 繝ｩ繧､繝夜幕蟋区凾: 繝｡繝ｳ繝舌・縺ｮ繝上・繝亥粋險医′5譛ｪ貅縺ｮ蝣ｴ蜷医√さ繧ｹ繝・莉･荳九・逶ｸ謇九Γ繝ｳ繝舌・縺ｯ繧ｦ繧ｧ繧､繝医↓縺ｪ繧峨↑縺・・/// SP-PR-021's own cost is 5 竊・her heart total is below 5 竊・condition unmet.
 #[test]
 fn sp_pr_021_hearts_lt5_no_weight() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let member = game.id(SP_PR_021);
-    let opponent_member = game.id(FILLER);
+    let member = game.id(SP_PR_021); // cost 5: alone, hearts total < 5
+    // A cost竕､2 member WOULD be a legal target if the hearts竕･5 condition held.
+    let opponent_member = game.id("PL!-sd1-002-SD"); // 邨｢轢ｬ邨ｵ驥・ cost 2
 
     game.state.player1.stage.stage[1] = member;
     game.state.player2.stage.stage[1] = opponent_member;
@@ -222,16 +243,23 @@ fn sp_pr_021_hearts_lt5_no_weight() {
 
     trigger_live_start_with(&mut game, filler_live);
 
-    let opp_orientation = game.state.mods.get_orientation_modifier(opponent_member);
-    // Without enough hearts, the opponent's member should not be weighted
-    let _ = opp_orientation;
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Hearts < 5 竊・the weight effect must not fire at all.
+    assert_ne!(
+        game.state.mods.get_orientation_modifier(opponent_member),
+        Some("wait"),
+        "hearts below 5 must not trigger the opponent wait"
+    );
 }
 
 // ============================================================
-// choose_target_player: PL!N-bp3-010-R — choose self/opponent
+// choose_target_player: PL!N-bp3-010-R 窶・choose self/opponent
 // ============================================================
 
-/// ライブ開始時: 自分を選ぶ → 自分の控え室のメンバーをデッキの下に置く。
+/// 繝ｩ繧､繝夜幕蟋区凾: 閾ｪ蛻・ｒ驕ｸ縺ｶ 竊・閾ｪ蛻・・謗ｧ縺亥ｮ､縺ｮ繝｡繝ｳ繝舌・繧偵ョ繝・く縺ｮ荳九↓鄂ｮ縺上・
 #[test]
 fn azuna_target_self_puts_members_on_deck_bottom() {
     let db = load_real_database();
@@ -274,10 +302,10 @@ fn azuna_target_self_puts_members_on_deck_bottom() {
 }
 
 // ============================================================
-// choose_target_player: PL!N-bp4-002-R — look at top card of chosen player
+// choose_target_player: PL!N-bp4-002-R 窶・look at top card of chosen player
 // ============================================================
 
-/// ライブ開始時: 自分を選ぶ → 自分のデッキの一番上のカードを見る。
+/// 繝ｩ繧､繝夜幕蟋区凾: 閾ｪ蛻・ｒ驕ｸ縺ｶ 竊・閾ｪ蛻・・繝・ャ繧ｭ縺ｮ荳逡ｪ荳翫・繧ｫ繝ｼ繝峨ｒ隕九ｋ縲・
 #[test]
 fn aiko_target_self_looks_at_top_card() {
     let db = load_real_database();
@@ -299,20 +327,26 @@ fn aiko_target_self_looks_at_top_card() {
 
     trigger_live_start_with(&mut game, filler_live);
 
-    // Handle the target player choice
+    // Handle choices:
+    //  - SelectTarget #1: target player 竊・option 0 = self
+    //  - remaining prompts: option 0 = put the looked-at card in the waitroom
     while game.has_pending_choice() {
         let choice = game.get_pending_choice();
         let is_target =
             matches!(choice, rabuka_engine::ability::types::Choice::SelectTarget { .. });
         if is_target {
-            game.select_option(0); // choose self
+            game.select_option(0);
         } else {
             game.select_indices(&[0]);
         }
     }
 
-    // After choosing self, we should be able to look at the top card
-    if game.has_pending_choice() {
-        game.select_option(0); // choose to put in discard (yes)
-    }
+    assert!(
+        game.state.player1.waitroom.cards.contains(&top_card),
+        "choosing the discard option moves the looked-at top card to the waitroom"
+    );
+    assert!(
+        !game.state.player1.main_deck.cards.contains(&top_card),
+        "the discarded card is no longer on the deck"
+    );
 }

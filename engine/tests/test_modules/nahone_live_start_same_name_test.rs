@@ -264,9 +264,10 @@ fn discard_same_name_as_activating_card() {
 
 // =========================================================================
 // 7. Multiple same-name → only 1 gets buffed
+//    Q30: two or more copies of the same card may be on stage at once.
 // =========================================================================
 #[test]
-fn multiple_same_name_only_one_buffed() {
+fn q30_multiple_same_name_only_one_buffed() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
