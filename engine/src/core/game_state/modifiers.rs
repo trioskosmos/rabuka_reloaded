@@ -210,6 +210,13 @@ impl GameState {
     /// Re-evaluate all constant (常時) abilities on all stage members.
     /// Handles gain_resource(blade, heart), modify_score, modify_cost.
     /// Clears old constant-derived values and re-applies those whose conditions pass.
+    ///
+    /// NOTE: deliberately NOT gated on `constants_dirty`. Constant ability
+    /// *conditions* read live state (energy counts, positions, success zone)
+    /// that mutates on paths which never mark the flag dirty (e.g. paying
+    /// energy costs); gating breaks 51 tests (wien dynamic energy, ruby front
+    /// blade, ayumu/ayumu-style zone-leave constants). The flag remains
+    /// write-only bookkeeping.
     #[inline(never)]
     pub fn recalculate_constants(&mut self) {
         tdbg!("RC:0 ENTERED");
@@ -276,16 +283,9 @@ impl GameState {
             // location_condition) know which card is "self" for this entry.
             let prev_activating = self.activating_card;
             self.activating_card = Some(card_id);
-            // Capture card info and owner for jyouji status tracking before the ctx borrow
-            let status_card_name = card_db
-                .get_card(card_id)
-                .map(|c| c.name.to_string())
-                .unwrap_or_default();
-            let status_owner = if self.player1.stage.stage.contains(&card_id) {
-                self.player1.id.clone()
-            } else {
-                self.player2.id.clone()
-            };
+            // Card info and owner for jyouji status tracking are captured
+            // lazily inside the `cond_met` branch below — computing them here
+            // allocated per entry even when the condition failed.
 
             {
                 let self_player = if self.player1.stage.stage.contains(&card_id) {
@@ -328,7 +328,17 @@ impl GameState {
                         .is_none_or(|c| ctx.evaluate_condition(c));
 
                     if cond_met {
-                        // Record jyouji status for this card
+                        // Record jyouji status for this card (lazily capture
+                        // name/owner only now that the condition passed)
+                        let status_card_name = card_db
+                            .get_card(card_id)
+                            .map(|c| c.name.to_string())
+                            .unwrap_or_default();
+                        let status_owner = if self.player1.stage.stage.contains(&card_id) {
+                            self.player1.id.clone()
+                        } else {
+                            self.player2.id.clone()
+                        };
                         jyouji_statuses.push(crate::types::ConstantAbilityStatus {
                             card_id: card_id,
                             card_name: status_card_name.clone(),

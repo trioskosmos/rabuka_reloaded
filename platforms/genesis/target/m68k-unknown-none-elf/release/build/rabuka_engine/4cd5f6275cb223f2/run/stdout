@@ -1,0 +1,5 @@
+cargo:rerun-if-changed=/mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/engine/../cards/cards.json
+cargo:rerun-if-changed=/mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/engine/../cards/abilities.json
+cargo:rerun-if-changed=/mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/engine/src/ability/abilities_gen.rs
+cargo:rerun-if-changed=/mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/engine/../cards/build/abilities.bin.z
+cargo:warning=bytecode size: 28503 bytes (compressed, from /mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/engine/../cards/build/abilities.bin.z)

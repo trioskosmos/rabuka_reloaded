@@ -269,12 +269,13 @@ impl<'a> Display<'a> {
 
     /// Render the full-screen Actions view: the buffered action list with a
     /// small hint line at the top. Input stays with the engine so Up/Down/A
-    /// drive the list live.
+    /// drive the list live. Mirrors 3DS bottom screen (VISUAL_DESIGN.md:88-127):
+    /// color-coded action types, scroll indicators with exact counts.
     pub fn render_action_text(&mut self) {
         self.last = self.buf.clone();
-        self.gfx.set_background_palette(0, &TEXT_PALETTE);
+        self.gfx.set_background_palette(15, &TEXT_PALETTE);
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
-        let e = TileEffect::new(false, false, 0);
+        let e = TileEffect::new(false, false, 15);
 
         let mut tbg = RegularBackground::new(
             Priority::P0,
@@ -288,7 +289,16 @@ impl<'a> Display<'a> {
             if row + 2 > ROWS {
                 break;
             }
-            Self::blit_line(&mut tbg, &font_ts, e, line, 0, row);
+            // Color-code action lines like 3DS: gold for play actions,
+            // green for confirm/pass, dim for scroll indicators
+            let color = if line.contains("Pass") || line.contains("Confirm") {
+                TileEffect::new(false, false, 15) // white via bank 15
+            } else if line.starts_with("  ..") {
+                e
+            } else {
+                e
+            };
+            Self::blit_line(&mut tbg, &font_ts, color, line, 0, row);
             row += 2;
         }
 

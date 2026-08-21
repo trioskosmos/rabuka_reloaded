@@ -1,0 +1,17 @@
+[build]
+# Local target dir - the repo root's C:/rust_targets is a Windows path that
+# breaks cargo when built from WSL (LD_LIBRARY_PATH join error).
+target-dir = "target"
+target = "m68k-unknown-none-elf"
+
+[target.m68k-unknown-none-elf]
+linker = "m68k-linux-gnu-gcc"
+rustflags = [
+    "-C", "link-arg=-Tlink.ld",
+    "-C", "link-arg=-nostdlib",
+    "-C", "panic=abort",
+]
+
+[unstable]
+build-std = ["core", "alloc"]
+build-std-features = ["compiler-builtins-mem"]

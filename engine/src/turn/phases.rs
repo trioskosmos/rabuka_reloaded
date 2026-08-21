@@ -108,10 +108,12 @@ impl super::TurnEngine {
                             }
                             // Skip members with a constant cannot_activate restriction
                             // (per-card, e.g. "このメンバーはアクティブフェイズにアクティブにしない")
+                            // Compare via parse (no alloc); player-level entries
+                            // ("p1"/"p2") fail the parse and never match a card id.
                             if game_state
                                 .constant_cannot_activate_members
                                 .iter()
-                                .any(|x| x == &cid.to_string())
+                                .any(|x| x.parse::<i16>().map_or(false, |v| v == cid))
                             {
                                 return None;
                             }
@@ -159,15 +161,16 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                     let _t = crate::timer::Timer::start("advance_phase::energy");
                     tdbg!("PHASE_ENERGY:0");
                     let _drawn_card = game_state.active_player_mut().draw_energy();
+                    // check_timing removed: redundant with the Draw-phase call that
+                    // immediately follows (only log_phase sits between them); the
+                    // full suite passes without it.
                     game_state.mark_constants_dirty();
-                    Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_draw");
                     game_state.current_phase = Phase::Draw;
                 }
                 Phase::Draw => {
                     #[cfg(not(feature = "no_std"))]
                     let _t = crate::timer::Timer::start("advance_phase::draw");
-                    Self::check_timing(game_state);
                     let _drawn = game_state.active_player_mut().draw_card();
                     // recalculate_constants skipped — check_timing below calls it
                     game_state.mark_constants_dirty();
@@ -177,7 +180,8 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                 }
                 Phase::Main => {
                     tdbg!("PHASE_MAIN:0");
-                    Self::check_timing(game_state);
+                    // check_timing removed: the Draw-phase call directly above already
+                    // ran with identical state (nothing mutates between); full suite passes.
                     if game_state.current_turn_phase
                         == crate::game_state::TurnPhase::FirstAttackerNormal
                     {
@@ -207,6 +211,11 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                     game_state.player1.live_card_set_limit_reduction = 0;
                     game_state.player2.live_card_set_limit_reduction = 0;
                     tdbg!("PHASE_LIVE:0");
+                    // Load-bearing: re-evaluates constant abilities (recalculate_constants)
+                    // before the performance phase begins. Removing this breaks the
+                    // Q127 heart-set+global tests and setsuna_pb1_heart_constant
+                    // (e.g. q127_wien_leaves_stage_modifier_removed): constants must be
+                    // freshly registered when LiveCardSet ends, or heart modifiers go stale.
                     Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_performance_first");
                     game_state.current_phase = Phase::FirstAttackerPerformance;

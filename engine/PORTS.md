@@ -560,6 +560,38 @@ Key findings:
    as **shelved** until someone wants to do that surgery; Jaguar (cart XIP,
    6MB) remains the easy m68k win.
 
+### Why `wasm2c` is ~400K lines / 21MB C and why it can't be smaller
+
+`wasm2c` doesn't create the bloat — `rustc` does. Verified on the real
+`rabuka_wasm.wasm` (`2,078,813 B`): `wasm-objdump -x` shows `44` types,
+`1924` functions, `Code 0x000f0ee1=987KB`, `Data 0x000ca6d9=829KB`,
+`Custom "name" 0x000407fb=263KB`. Each `SmallVec<[T;N]>`/`Vec<T>`/
+`HashMap<K,V,Hasher>`/`Option<T>` is monomorphized by Rust into a separate
+machine-code copy: `drop_glue<Option<Vec<String>>>`, `RawVec<HeartColor>`,
+`SmallVec<[i16;6]>` vs `[i16;8]`, `hashbrown::RawTable` variants, etc.
+(`engine/src/ability/choice.rs` uses `SmallVec` in ~12 files with `N=2,4,6,8`.)
+`platforms/wasm/Cargo.toml` already minimizes it (`opt-level="z"`,
+`lto=true`, `codegen-units=1`, `panic="abort"`, `features=["wasm"]`
+=`no_std+bytecode_abilities+compact_*`), but the wasm is still `~1K` funcs
+of generics.
+
+`wasm2c` is a faithful 1:1 transpiler — one wasm func → one C func
+(`4045` `w2c_*` symbols, `1926` `FUNC_PROLOGUE`, `486,423` lines, `21.3MB`);
+each wasm opcode expands to `3-7` C statements with `TRAP`/`MEM_ADDR`
+bounds checks and `funcref_table[216]`/`elem_segment` for `call_indirect`,
+so `987KB` wasm code becomes `~4×` C. `--no-debug-names` only strips the
+`263KB` name section (`2.0M→1.8M` wasm, `21.3M→17.9M` C) with no `text` change.
+It cannot dedup: wasm has lost generic info and every func is addressable.
+
+Other way = don't use `wasm2c`: keep the `2.0MB` wasm and interpret it
+(`wasm3`/`WAMR` `~30KB` interpreter + `9.3MB` linear memory `142` pages),
+or compile natively via `rustc_codegen_gcc` (`~600KB-1MB`
+`40KB+600KB+300KB`) which was abandoned for `SH-4`/`SH-2` due to `no_std`
+DCE `engine/PORTS.md` Dreamcast section. Source-level collapses
+(single `SmallVec` `N`, `Vec` instead of `SmallVec`, unified `Hasher`,
+`dyn Trait`/`-Zshare-generics`) only shrink the *wasm* — which `wasm2c`
+then copies.
+
 Pipeline gotchas discovered while measuring (apply to any new port):
 
 - `wasm-opt` (even plain `-Oz`) **strips the wasm name section**, which is
@@ -610,6 +642,24 @@ Saved to `research/wii/KEY_REFERENCE.md`:
 - **Path A (std mode)**: The Wii has 88MB RAM — no bytecode VM or no_std migration needed.
 - **PSP baked data**: Points to `psp/baked/` JSON decks (same as DC), embedded at compile time via `include_str!`.
 - **Dual input**: `Input::poll()` scans both `PAD_ScanPads` (GameCube) and `WPAD_ScanPads` (Wii Remote) — whichever you press, it works.
+
+---
+
+## Obscure 6th/7th Gen Handhelds — the stupid interesting ones (Aug 2026)
+
+Dreamcast worked because `wasm→C` dodges the `SH-4 No LLVM` gate. For `6th/7th`
+handhelds the gate is `LLVM? Yes` (`ARM` `engine/PORTS.md:40`) — they're
+boring `cargo --target armv4t` like `GBA`, not `wasm2c`. What's interesting is
+*how dead* their scenes are and whether you can still build/load.
+
+| device | gen | units | CPU / RAM | LLVM | homebrew scene | emulator / load path | verdict |
+|---|---|---|---|---|---|---|---|
+| **Tapwave Zodiac** `2003-2005` | 6th PDA+handheld | `50k` | `Motorola i.MX1 ARM9 @200MHz` `10MB` system + `32/128MB` storage + `8MB` `ATI Imageon W4200` | `armv4t` `Yes` | **Alive-ish**: Palm OS `5.2T` `prc-tools` `arm-palmos-gcc` free after register; `1200+` devs `2003`; `Tapwave Reborn` + `OpenHandhelds dl.openhandhelds.org/cgi-bin/zodiac.cgi` archives; leaked `Neverwinter Nights`, `Tomb Raider`, `ZDoomZ/ZHeretic/ZHexen`, `UAE`/`ScummVM`/`LJP` ports stock | `POSE` Palm OS Emulator + real HW via `SD` (2× `MMC/SD/SDIO` slots, `480×320` `16-bit`). `Palm OS` `5.2T` runs in `POSE`/`Garnet VM`; no cycle-accurate Zodiac emu but Palm tooling works | **Best boring-ARM stupid port** — `10MB` is `35× GBA` `engine/PORTS.md:195`, bytecode `~1MB` `engine/PORTS.md:69` fits easily; `480×320` `40×26` 12px grid like `Dreamcast` `platforms/dc/wasm/dc_main.c:1`; `Bluetooth`/`Wi-Fi SDIO` + analog nub like a proto-`Switch` |
+| **GP32** `2001-2005` Game Park Korea | 6th | `~32k` | `Samsung S3C2400 ARM920T @133MHz` `8MB` `SmartMedia` `320×240` | `armv4t` `Yes` | **The** homebrew handheld: `Free Launcher` (register device → encrypted per-ID) then alt firmware dumps crypto; `gp32x.de` File Archive; `RPG Maker` ports, `DivX` player, `Ericsson Chatboard` mod → Linux ports | `GeP32` Windows emu + real `HW` `SMC`/`USB 1.1`/`JTAG`; successors `GP2X/Wiz/Caanoo` `GamePark Holdings` keep toolchain alive | `8MB` `400×` `SNES` `engine/PORTS.md:211` fits; `SmartMedia` `2-128MB` is the CD-i disc here; community still around |
+| **Gizmondo** `2005-2006` Tiger Telematics | 7th | `<25k` worst seller `GamePro` | `Samsung S3C2440 ARM9 @400MHz` `GoForce 4500 1.2MB` `64MB` `WinCE` `GPS/GPRS` | `armv5te` `Yes` | **Dead**: `Windows CE 4.2` `eVC++ 4.0` `arm-wince-gcc` free; `30` cancelled titles (`Colors` GPS AR, `Chicane`), only `14` shipped (`Sticky Balls`); studios `Manchester/Sweden` liquidated `Feb 2006` `$400M` debt; `Wired` crack-up Ferrari `Enzo` `Stefan Eriksson` | No emu; `SD` + `ActiveSync` `USB` + `Regent Street` store; `Smart Adds` ad subs (`£129`) never launched — you get premium HW at discount | Amazing story (`Uppsala mafia`, `Le Mans`), `GPS` `AR` `Colors` was `Pokémon Go` `2005`, but `64MB` is `2× PSP` `engine/PORTS.md:112` — fits, scene just dead |
+| **Zeebo** `2009-2011` Tectoy/Qualcomm | 7th | `<30k` Brazil/Mexico `3G` only | `MSM7201A ARM11/QDSP5 @528MHz` `BREW` `160MB` `VGA 640×480` `Adreno Imageon` | `armv6k` `Yes` (`3DS` `engine/PORTS.md:42`) | **BREW gated**: `BREW 3.1.5` `arm-elf-gcc` SDK via `Zeebo Inc` site; `Qualcomm` `Tectoy` `12` partners; `40` games `5-50MB` `OTA 3G` `Z-Credits` `Claro/Telcel`; no `SD` sideload (1 `SD` slot but `OTA` only), no public emu | Device only (`HSUPA/EDGE/GPRS`) + `3× USB 2.0` host; `OTA` firmware updates like `ZeeboNet`; no `MAME` | Most obscure `7th` (never hit `US`), `160MB` is a rocket vs `Zodiac 10MB`, but `BREW` toolchain is `Qualcomm` gated and `OTA`-only distribution kills quick dev |
+
+**Takeaway for rabuka:** all four are `ARM` `Yes` — you never pay the `wasm2c 4.3MB→3.07MB -Os` `engine/PORTS.md:543` tax like `Dreamcast`/`Saturn` `engine/PORTS.md:48`. `compact_*` native `~150KB-1MB` already proven on `GBA 288KB` `platforms/gba/output/GBA_PORT_NOTES.md:1`. `Zodiac` is the sweet spot: obscure `50k` flop killed by `PSP/DS` pre-announce `May 2003`, `ARM9` `prc-tools` still downloadable, `POSE` emulates `Palm OS`, and `10MB` leaves `9MB` for `HEAP` after `~300KB` code. `GP32` runner-up if you want the `SmartMedia`/`Chatboard` meme and a still-seeded archive. `Gizmondo` for the crime story, `Zeebo` for `7th` `BREW` obscurity.
 
 ---
 

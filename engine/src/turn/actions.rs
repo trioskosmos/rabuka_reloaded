@@ -1261,13 +1261,11 @@ impl super::TurnEngine {
             Self::check_victory_condition(game_state);
         }
         tdbg!("CHECK_TIMING:4 victory OK");
-        let p1_id = game_state.player1.id.clone();
-        let p2_id = game_state.player2.id.clone();
         {
             #[cfg(not(feature = "no_std"))]
             let _t = crate::timer::Timer::start("check_timing::check_invalid_live_cards");
-            Self::check_invalid_live_cards(game_state, &p1_id);
-            Self::check_invalid_live_cards(game_state, &p2_id);
+            Self::check_invalid_live_cards(game_state, true);
+            Self::check_invalid_live_cards(game_state, false);
         }
         tdbg!("CHECK_TIMING:5 invalid live p1 OK");
         let _e1 =
@@ -1358,16 +1356,12 @@ impl super::TurnEngine {
     /// Also records movement events so turn-level tracking (turn_movements)
     /// captures which cards moved where, enabling "from live_card_zone to
     /// discard" conditions.
-    fn check_invalid_live_cards(game_state: &mut GameState, player_id: &str) {
-        let p1_id = game_state.player1.id.clone();
-        let p2_id = game_state.player2.id.clone();
-        if player_id != p1_id && player_id != p2_id {
-            return;
-        }
-        // Two-pass: collect invalid IDs via immutable borrow, then mutate.
-        // Avoids cloning the entire CardDatabase each call.
+    ///
+    /// `is_p1` selects the player; the id String is only cloned on the rare
+    /// path where a card actually moves (needed for the movement event).
+    fn check_invalid_live_cards(game_state: &mut GameState, is_p1: bool) {
         let invalids: Vec<(usize, i16, bool)> = {
-            let player = if player_id == p1_id {
+            let player = if is_p1 {
                 &game_state.player1
             } else {
                 &game_state.player2
@@ -1390,11 +1384,16 @@ impl super::TurnEngine {
         if invalids.is_empty() {
             return;
         }
+        let player_id = if is_p1 {
+            game_state.player1.id.clone()
+        } else {
+            game_state.player2.id.clone()
+        };
         // Live-zone membership changed → constant outputs may differ.
         game_state.mark_constants_dirty();
         let mut moved = Vec::new();
         for &(i, card_id, is_energy) in invalids.iter().rev() {
-            let player = if player_id == p1_id {
+            let player = if is_p1 {
                 &mut game_state.player1
             } else {
                 &mut game_state.player2
@@ -1416,7 +1415,7 @@ impl super::TurnEngine {
                 "live_card_zone",
                 dest_zone,
                 None,
-                player_id,
+                player_id.as_str(),
                 false,
             );
         }

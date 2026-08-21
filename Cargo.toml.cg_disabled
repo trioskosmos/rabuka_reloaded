@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = ["engine", "platforms/gba", "platforms/snes"]
+exclude = ["platforms/genesis", "platforms/psp", "platforms/wii"]
+
+[package]
+name = "cg_test"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "nul"
+crate-type = ["staticlib"]

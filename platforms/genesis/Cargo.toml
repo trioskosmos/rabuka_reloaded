@@ -1,0 +1,25 @@
+[package]
+name = "rabuka_genesis"
+version = "0.1.0"
+authors = ["Rabuka Reloaded"]
+edition = "2021"
+description = "Rabuka Reloaded for Sega Genesis / Mega Drive (m68k 68000, 64KB RAM) via m68k-unknown-none-elf"
+
+[workspace]
+
+[dependencies]
+rabuka_engine = { path = "../../engine", default-features = false, features = ["genesis"] }
+linked_list_allocator = { version = "0.10", features = ["use_spin"] }
+
+[profile.dev]
+opt-level = "z"
+lto = false
+debug = true
+panic = "abort"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

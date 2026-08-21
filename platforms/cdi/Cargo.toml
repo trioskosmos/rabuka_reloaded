@@ -1,0 +1,21 @@
+[package]
+name = "rabuka_cdi"
+version = "0.1.0"
+edition = "2021"
+description = "Philips CD-i native m68k port — SCC68070 @ 15.5MHz, 1MB RAM, CD-ROM. Native LLVM m68k (not wasm2c), compact bytecode engine."
+
+[workspace]
+
+[lib]
+crate-type = ["staticlib"]
+test = false
+doctest = false
+
+[dependencies]
+rabuka_engine = { path = "../../engine", default-features = false, features = ["cdi"] }
+
+[profile.release]
+opt-level = "z"
+panic = "abort"
+lto = true
+codegen-units = 1
