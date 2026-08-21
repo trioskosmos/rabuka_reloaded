@@ -98,3 +98,7 @@ platforms/3ds/romfs/locales/ability_en.json
 engine/data/
 engine/tests/data/cards.json
  /
+
+test_output/
+engine/profile_folded.txt
+engine/profile_stderr.txt
