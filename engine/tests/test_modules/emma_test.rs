@@ -50,11 +50,11 @@ fn emma_q163_self_excluded_no_other_niko_cost_fails() {
     // Cost should fail since exclude_self leaves no candidates.
     // The failed cost should not proceed to draw.
     let hand_count = game.state.player1.hand.cards.len();
-    eprintln!("[EMMA] hand after failed activation: {}", hand_count);
     // hand started with 1 filler, never drew because ability cost failed
     assert_eq!(
         hand_count, 1,
-        "No draw happened because cost couldn't be paid"
+        "No draw happened because cost couldn't be paid (got {})",
+        hand_count
     );
 }
 
@@ -83,21 +83,30 @@ fn emma_q163_nijigasaki_member_pays_cost() {
     // Activate Emma's ability
     game.activate_ability(emma);
 
-    // Cost: select 1 stage member to wait (valid: niji, excluded: emma, filler not 虹ヶ咲)
-    while game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-
-    let hand_count = game.state.player1.hand.cards.len();
-    eprintln!("[EMMA] hand after activation: {}", hand_count);
+    // Cost: wait a 虹ヶ咲 member other than self — niji is the ONLY candidate,
+    // so the engine auto-applies the wait (single legal target, no prompt needed).
+    // Strict: verify the wait was actually applied to niji (not emma, not filler).
     let niji_waited = game
         .state
         .mods
         .get_orientation_modifier(niji)
         .map_or(false, |o| o == "wait");
-    eprintln!("[EMMA] niji waited: {}", niji_waited);
-    assert!(hand_count > 0, "Should have drawn 1 card");
-    assert!(niji_waited, "虹ヶ咲 member should be waited");
+    assert!(niji_waited, "niji (only 虹ヶ咲 candidate) must be auto-waited as cost");
+    let emma_waited = game
+        .state
+        .mods
+        .get_orientation_modifier(emma)
+        .map_or(false, |o| o == "wait");
+    assert!(!emma_waited, "exclude_self: Emma herself must NOT be waited");
+    let filler_waited = game
+        .state
+        .mods
+        .get_orientation_modifier(filler)
+        .map_or(false, |o| o == "wait");
+    assert!(!filler_waited, "non-虹ヶ咲 filler must NOT be waited");
+
+    let hand_count = game.state.player1.hand.cards.len();
+    assert!(hand_count > 0, "Should have drawn 1 card after cost");
 }
 
 // =========================================================================

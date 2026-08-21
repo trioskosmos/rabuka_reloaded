@@ -41,9 +41,13 @@ fn triple_discard_gives_blade() {
 
     assert!(game.has_pending_choice(), "Optional cost should appear");
     game.select_indices(&[0]); // hand copy at index 0 — matches characters
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // any_number re-prompt: after first selection, engine offers to continue
+    // selecting (allow_skip). Skip it to finalize — this re-prompt MUST appear.
+    assert!(
+        game.has_pending_choice(),
+        "any_number cost must re-prompt after first discard (allow_skip continue)"
+    );
+    game.select_indices(&[]);
 
     let blade = game
         .state

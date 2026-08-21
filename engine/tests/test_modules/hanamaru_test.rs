@@ -90,9 +90,11 @@ fn hanamaru_q120_no_live_in_revealed_no_draw() {
     game.pass();
     game.pass();
 
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-    // No live in cheered cards → condition fails → no auto draw
-    eprintln!("[HANAMARU] no-live test completed");
+    // No live cards in revealed (deck is all filler) → condition (live in revealed) fails → no auto draw
+    let hand = game.state.player1.hand.cards.len();
+    assert_eq!(
+        hand, 6,
+        "no live in revealed → condition fails → no auto draw (hand should stay 6, got {})",
+        hand
+    );
 }

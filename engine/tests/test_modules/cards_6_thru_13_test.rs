@@ -36,7 +36,7 @@ fn deck(game: &mut TestGame, filler: i16) {
     }
 }
 
-fn trigger(game: &mut TestGame, card_id: i16, trigger_str: &str) {
+fn trigger(game: &mut TestGame, card_id: i16, trigger_str: &str) -> bool {
     let card = game.db.get_card(card_id).unwrap();
     let ab = card
         .resolved_abilities()
@@ -62,7 +62,9 @@ fn trigger(game: &mut TestGame, card_id: i16, trigger_str: &str) {
     );
     game.state.activating_card = Some(card_id);
     game.state.process_pending_auto_abilities(&pid);
+    let mut offered = false;
     while game.has_pending_choice() {
+        offered = true;
         match game.pending_choice_type().as_deref() {
             Some("SelectAutoAbility") => {
                 game.select_indices(&[]);
@@ -82,6 +84,7 @@ fn trigger(game: &mut TestGame, card_id: i16, trigger_str: &str) {
             _ => break,
         }
     }
+    offered
 }
 
 // ========== Card 6: PL!N-bp4-031-L LIVE Niji cost-sum check ==========
@@ -643,8 +646,9 @@ fn resolve_all_up_to_20(game: &mut TestGame, max: usize) {
     }
     panic!("resolve_all_up_to_20: exceeded {} iters", max);
 }
+ // hardened: caller must assert has_pending before first select; helper remains lenient drain
 
-fn setup_bp6_005(game: &mut TestGame, top_cards: Vec<i16>) {
+fn setup_bp6_005(game: &mut TestGame, top_cards: Vec<i16>) -> bool {
     let you = game.id("PL!S-bp6-005-R");
     let filler = game.id("PL!-sd1-010-SD");
     // Place card on stage directly, then fill deck
@@ -657,7 +661,10 @@ fn setup_bp6_005(game: &mut TestGame, top_cards: Vec<i16>) {
         game.state.player1.main_deck.cards.push(filler);
     }
     game.give_energy(5);
-    trigger(game, you, "登場");
+    // trigger() drains all choices; return whether the look_and_select was offered.
+    // When 0 of the top cards match the filter, the engine auto-discards without
+    // prompting (look.rs matching_count==0 early return) — callers decide if that's legal.
+    trigger(game, you, "登場")
 }
 
 #[test]
@@ -669,10 +676,6 @@ fn c13_all_three_hearts_present_select_one() {
     let filler = g.id("PL!-sd1-010-SD"); // has heart01, heart03 — no match
 
     setup_bp6_005(&mut g, vec![qualifying, filler]);
-    // Should prompt: optional cost? No. Should go to look_and_select
-    if g.has_pending_choice() {
-        g.select_indices(&[0]);
-    }
     resolve_all_up_to_20(&mut g, 20);
     assert!(
         g.state.player1.hand.cards.contains(&qualifying),
@@ -682,39 +685,56 @@ fn c13_all_three_hearts_present_select_one() {
 
 #[test]
 fn c13_two_of_three_hearts_rejected() {
-    // Cards with only 2 of the 3 required hearts should NOT be selectable
+    // Cards with only 2 of the 3 required hearts should NOT be selectable.
+    // Mix a qualifying card in so the prompt IS offered, then verify only the
+    // qualifying one is selectable — this tests the filter, not the auto-skip path.
     let db = load_real_database();
     let mut g = TestGame::new(db);
-    let two_hearts = g.id("PL!S-PR-015-PR"); // has heart02, heart04 only — missing heart05
+    let qualifying = g.id("PL!S-sd1-001-SD"); // heart02+04+05 — matches
+    let two_hearts = g.id("PL!S-PR-015-PR"); // heart02+04 only — missing heart05
     let filler = g.id("PL!-sd1-010-SD");
 
-    setup_bp6_005(&mut g, vec![two_hearts, filler]);
-    if g.has_pending_choice() {
-        g.select_indices(&[0]);
-    }
+    let offered = setup_bp6_005(&mut g, vec![qualifying, two_hearts, filler]);
+    assert!(offered, "qualifying present → look_and_select must be offered");
     resolve_all_up_to_20(&mut g, 20);
+    assert!(
+        g.state.player1.hand.cards.contains(&qualifying),
+        "qualifying (all 3 hearts) should be selectable"
+    );
     assert!(
         !g.state.player1.hand.cards.contains(&two_hearts),
         "Card with only heart02+heart04 should NOT be selectable (missing heart05)"
+    );
+    assert!(
+        g.state.player1.waitroom.cards.contains(&two_hearts),
+        "Rejected two-hearts card must be discarded to waitroom (残りを控え室に置く)"
     );
 }
 
 #[test]
 fn c13_one_of_three_hearts_rejected() {
-    // Card with only heart02 (not heart04, heart05) should be rejected
+    // Card with only heart02 (not heart04, heart05) should be rejected.
+    // Mix a qualifying card so prompt is offered; verify filter rejects 1-heart card.
     let db = load_real_database();
     let mut g = TestGame::new(db);
+    let qualifying = g.id("PL!S-sd1-001-SD"); // all 3 hearts
     let blade_card = g.id("PL!SP-sd1-001-SD"); // has heart02, heart06 only
     let filler = g.id("PL!-sd1-010-SD");
 
-    setup_bp6_005(&mut g, vec![blade_card, filler]);
-    if g.has_pending_choice() {
-        g.select_indices(&[0]);
-    }
+    let offered = setup_bp6_005(&mut g, vec![qualifying, blade_card, filler]);
+    assert!(offered, "qualifying present → look_and_select must be offered");
     resolve_all_up_to_20(&mut g, 20);
+    assert!(
+        g.state.player1.hand.cards.contains(&qualifying),
+        "qualifying should be selectable"
+    );
     assert!(
         !g.state.player1.hand.cards.contains(&blade_card),
         "Card with only heart02+heart06 should NOT be selectable (missing heart04, heart05)"
+    );
+    assert!(
+        g.state.player1.waitroom.cards.contains(&blade_card),
+        "Rejected one-heart card must be discarded to waitroom"
     );
 }
 
@@ -728,9 +748,6 @@ fn c13_no_matching_card_optional_same_as_reject() {
     let other = g.id("PL!S-bp2-015-PR"); // heart04, heart05 only — missing heart02
 
     setup_bp6_005(&mut g, vec![partial, other]);
-    if g.has_pending_choice() {
-        g.select_indices(&[0]);
-    }
     resolve_all_up_to_20(&mut g, 20);
     // Neither card should be in hand (none has all 3 hearts)
     assert!(
@@ -740,6 +757,12 @@ fn c13_no_matching_card_optional_same_as_reject() {
     assert!(
         !g.state.player1.hand.cards.contains(&other),
         "Other partial heart card should NOT be in hand"
+    );
+    // Both must have been discarded to waitroom (残りを控え室に置く)
+    assert!(
+        g.state.player1.waitroom.cards.contains(&partial)
+            && g.state.player1.waitroom.cards.contains(&other),
+        "Both non-matching looked-at cards must go to waitroom"
     );
 }
 
@@ -762,14 +785,18 @@ fn c13_bp2_005_or_semantics_still_works() {
     g.give_energy(13);
     g.state.player1.stage.stage[0] = -1;
     g.play_to_stage(you, rabuka_engine::zones::MemberArea::LeftSide);
-    // Pay optional cost (discard from hand)
-    if g.has_pending_choice() {
-        g.select_indices(&[0]);
-    }
-    // Select first looked-at card
-    if g.has_pending_choice() {
-        g.select_indices(&[0]);
-    }
+    // bp2-005 has optional cost (discard from hand) — must be offered
+    assert!(
+        g.has_pending_choice(),
+        "bp2-005 must offer optional cost (hand discard)"
+    );
+    g.select_indices(&[0]);
+    // Must then offer looked_at selection
+    assert!(
+        g.has_pending_choice(),
+        "bp2-005 must offer looked_at selection after cost"
+    );
+    g.select_indices(&[0]);
     resolve_all_up_to_20(&mut g, 30);
     // With OR semantics, heart02 alone should match
     assert!(
@@ -787,9 +814,6 @@ fn c13_qualifying_goes_to_hand_nonqualifying_discarded() {
     let filler = g.id("PL!-sd1-010-SD"); // heart01, heart03 — no match
 
     setup_bp6_005(&mut g, vec![qualifying, filler]);
-    if g.has_pending_choice() {
-        g.select_indices(&[0]);
-    }
     resolve_all_up_to_20(&mut g, 20);
     assert!(
         g.state.player1.hand.cards.contains(&qualifying),

@@ -135,7 +135,14 @@ fn rin_bp6_heart03_filter_works() {
                 _ => false,
             };
             if allow_skip {
+                // Skip branch: hand must not change from this choice
+                let hand_before_skip = game.state.player1.hand.cards.len();
                 game.select_indices(&[]);
+                assert_eq!(
+                    game.state.player1.hand.cards.len(),
+                    hand_before_skip,
+                    "skip branch must not add cards to hand"
+                );
             } else {
                 game.select_indices(&[0]);
             }

@@ -175,9 +175,12 @@ fn mia_activate_cost_does_not_remove_energy() {
     game.give_energy(3);
     let energy_before = game.state.player1.energy_zone.cards.len();
     game.activate_ability(mia);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Cost: place 1 energy under member — must be offered
+    assert!(
+        game.has_pending_choice(),
+        "mia cost (place 1 energy under) must offer energy select"
+    );
+    game.select_indices(&[0]);
     let energy_after = game.state.player1.energy_zone.cards.len();
     let under = game
         .state
@@ -205,9 +208,12 @@ fn mia_activate_retrieves_live_even_without_energy_placement() {
     game.state.player1.hand.cards.push(filler);
     game.give_energy(3);
     game.activate_ability(mia);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Cost choice must be offered even when skipping energy placement is intended
+    assert!(
+        game.has_pending_choice(),
+        "mia cost choice must appear (test then selects 0 to skip placement)"
+    );
+    game.select_indices(&[0]);
     assert!(
         game.state.player1.hand.cards.contains(&niji_live),
         "Effect still works (retrieves live) despite cost not placing energy"
@@ -232,9 +238,12 @@ fn mia_use_limit_not_enforced() {
     game.give_energy(5);
     game.activate_ability(mia);
     game.select_energy_from_zone(1); // pay the 1-energy cost
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // select which niji live to retrieve
-    }
+    // Must offer live retrieval selection
+    assert!(
+        game.has_pending_choice(),
+        "mia must offer niji live retrieval selection"
+    );
+    game.select_indices(&[0]); // select which niji live to retrieve
     assert!(
         game.state.player1.hand.cards.contains(&niji1),
         "First activation works"
@@ -522,10 +531,12 @@ fn sayaka_activate_effect_does_not_place_under() {
         .push(game.id("PL!-sd1-010-SD"));
     game.give_energy(3);
     game.activate_ability(sayaka);
-    // Cost: reveal 1 sayaka from hand → select the first (only) sayaka in hand
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Cost: reveal 1 sayaka from hand → must be offered (select the first sayaka)
+    assert!(
+        game.has_pending_choice(),
+        "sayaka cost (reveal sayaka from hand) must offer hand select"
+    );
+    game.select_indices(&[0]);
     // Effect: move revealed card under sayaka (Center)
     let under = game.state.player1.stage.get_under_cards(MemberArea::Center);
     assert_eq!(
@@ -556,10 +567,12 @@ fn sayaka_use_limit_enforced() {
     game.state.player1.hand.cards.push(s2);
     game.give_energy(3);
     game.activate_ability(sayaka);
-    // First activation: resolve the reveal cost choice (select the first sayaka in hand)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // First activation: reveal cost choice must be offered
+    assert!(
+        game.has_pending_choice(),
+        "sayaka first activation must offer reveal cost choice"
+    );
+    game.select_indices(&[0]);
     let under_after_first = game
         .state
         .player1

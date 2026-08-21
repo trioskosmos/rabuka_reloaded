@@ -14,9 +14,11 @@ fn blade_mod(game: &TestGame, card_id: i16) -> i32 {
 }
 
 fn accept_position_swap(game: &mut TestGame, dest: &str) {
-    if !game.has_pending_choice() {
-        return;
-    }
+    assert!(
+        game.has_pending_choice(),
+        "expected position|destination choice for kinako each_time swap to {}, got none",
+        dest
+    );
     match game.get_pending_choice().clone() {
         rabuka_engine::ability::types::Choice::SelectTarget { target, .. }
             if target == "position|destination" =>
@@ -27,14 +29,14 @@ fn accept_position_swap(game: &mut TestGame, dest: &str) {
                 .position(|a| {
                     a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some(dest)
                 })
-                .unwrap_or(0);
+                .unwrap_or_else(|| panic!("destination {} not offered, got {:?}", dest, acts.iter().filter_map(|a| a.parameters.as_ref().and_then(|p| p.stage_area.as_deref())).collect::<Vec<_>>()));
             game.select_generated(idx);
             game.drain_auto_ability_choices();
         }
-        _ => {
-            game.select_indices(&[]);
-            game.drain_auto_ability_choices();
-        }
+        other => panic!(
+            "expected SelectTarget position|destination for kinako swap to {}, got {:?}",
+            dest, other
+        ),
     }
 }
 

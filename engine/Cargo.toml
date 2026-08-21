@@ -62,6 +62,10 @@ dc = ["no_std", "debug_conditions", "bytecode_abilities", "compact_card_data"]
 wii = ["no_std", "bytecode_abilities", "compact_card_data"]
 # Atari Jaguar target: no_std + alloc, compact like PS1 (2MB main RAM)
 jaguar = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
+# WebAssembly target: no_std + alloc, compact like GBA/Jaguar. Compiled to
+# wasm32-unknown-unknown (or wasm32v1-none) and either interpreted (wasm3) or
+# transpiled to C (w2c2/wasm2c) for consoles without a Rust backend.
+wasm = ["no_std", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
 # Bytecode abilities: use pre-compiled bytecode instead of JSON serde
 # for ability loading. Dramatically reduces memory footprint (~7KB vs 1.4MB).
 bytecode_abilities = []

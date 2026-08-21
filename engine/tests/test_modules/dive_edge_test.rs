@@ -165,10 +165,12 @@ fn ab0_places_dive_ab1_grants_blade_verify_modifier() {
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     g.state.process_pending_auto_abilities(&pid);
 
-    // ab#0: place DIVE! if prompted
-    if g.has_pending_choice() {
-        g.select_indices(&[0]);
-    }
+    // ab#0: place DIVE! — must be prompted (DIVE! in hand, live zone has space)
+    assert!(
+        g.has_pending_choice(),
+        "ab#0 must prompt to place DIVE! in live zone"
+    );
+    g.select_indices(&[0]);
     // ab#1 may auto-select or create a choice — drain all
     while g.has_pending_choice() {
         g.select_indices(&[0]);

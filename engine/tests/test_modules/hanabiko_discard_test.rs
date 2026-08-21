@@ -367,10 +367,12 @@ fn hanabiko_baton_touch_replaced_triggers() {
     g.play_to_stage(baton_arriver, rabuka_engine::zones::MemberArea::Center);
 
     // Shioriko's debut: draw 2, then mandatory discard 1 from hand.
-    // Select a filler from hand.
-    if g.has_pending_choice() {
-        g.select_indices(&[0]);
-    }
+    // Must be offered — mandatory discard after draw.
+    assert!(
+        g.has_pending_choice(),
+        "Shioriko debut must offer mandatory discard 1 from hand"
+    );
+    g.select_indices(&[0]);
 
     // Now Hanabiko's auto-ability should fire.
     // Accept the optional discard, then retrieve live + member.

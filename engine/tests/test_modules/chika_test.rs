@@ -132,7 +132,9 @@ fn chika_q171_live_end_persistence() {
     game.set_live_card(filler_live);
     advance_to_live_start(&mut game);
 
-    if game.has_pending_choice() {
+    // LiveStart triggers may queue choices (e.g. other auto abilities) — drain
+    // but the score modifier must persist regardless.
+    while game.has_pending_choice() {
         game.select_indices(&[]);
     }
 

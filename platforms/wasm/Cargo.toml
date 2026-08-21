@@ -1,0 +1,23 @@
+[package]
+name = "rabuka_wasm"
+version = "0.1.0"
+authors = ["Rabuka Reloaded"]
+edition = "2021"
+description = "Rabuka Reloaded engine compiled to WebAssembly (smoke-test harness for the wasm3 / w2c2 console path)"
+
+# Standalone crate (like the other platform ports), not a workspace member.
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+test = false
+doctest = false
+
+[dependencies]
+rabuka_engine = { path = "../../engine", default-features = false, features = ["wasm"] }
+
+[profile.release]
+opt-level = "z"
+panic = "abort"
+lto = true
+codegen-units = 1

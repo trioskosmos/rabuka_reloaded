@@ -38,22 +38,26 @@ fn ayumu_pb1_q199_no_baton_touch_after_effect_placement() {
     // Play 上原歩夢 to stage center → triggers debut ability
     game.play_to_stage(ayumu, MemberArea::Center);
 
-    // Debut ability fires with optional pay_energy(2) cost
-    // The ability checks for a member named 上原歩夢 with cost ≤ 4 in hand
-    if game.has_pending_choice() {
-        // Pay the optional energy cost (select yes)
-        game.select_option(1);
-    }
+    // Debut ability fires with optional pay_energy(2) cost — must be offered
+    assert!(
+        game.has_pending_choice(),
+        "ayumu debut optional pay 2E cost must be offered (target in hand)"
+    );
+    game.select_option(1);
 
-    // Is there a choice to select the target card from hand?
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // select target_ayumu from hand
-    }
+    // Must offer hand selection for the cost≤4 上原歩夢
+    assert!(
+        game.has_pending_choice(),
+        "ayumu debut must offer hand select for cost<=4 target"
+    );
+    game.select_indices(&[0]); // select target_ayumu from hand
 
     // Position choice for placing on stage (multiple empty slots)
-    if game.has_pending_choice() {
-        game.select_option(1); // choose center
-    }
+    assert!(
+        game.has_pending_choice(),
+        "ayumu debut must offer position choice for placement"
+    );
+    game.select_option(1); // choose center
 
     // The target card should now be on stage
     let stage_has_target = game.state.player1.stage.stage.contains(&target_ayumu);
@@ -102,12 +106,16 @@ fn ayumu_pb1_q200_placed_card_retains_abilities() {
     game.give_energy(10);
     game.play_to_stage(ayumu, MemberArea::Center);
 
-    if game.has_pending_choice() {
-        game.select_option(1);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "q200: debut optional pay cost must be offered"
+    );
+    game.select_option(1);
+    assert!(
+        game.has_pending_choice(),
+        "q200: hand select must be offered"
+    );
+    game.select_indices(&[0]);
 
     // The placed card should still have abilities in the database
     let card = game

@@ -40,44 +40,84 @@ fn ginako_discard_self_gains_two_blades() {
     let mut game = TestGame::new(db);
     let ginako = game.id("PL!HS-bp6-004-R");
     let second_ginako = game.new_id("PL!HS-bp6-004-R");
-    let opp_member = game.new_id("PL!-sd1-005-SD");
+    let opp_member = game.new_id("PL!-sd1-005-SD"); // cost 2 (<= 9, legal ab#0 target)
 
     game.state.player1.stage.stage[1] = ginako;
     game.state.player2.stage.stage[1] = opp_member;
 
     setup_and_trigger_live_start(&mut game, vec![second_ginako]);
 
-    // Debug: inspect first pending choice
-    let c1 = game.get_pending_choice();
-    let c1_type = match c1 {
-        rabuka_engine::ability::types::Choice::SelectCard { zone, .. } => {
-            format!("SelectCard(zone={zone})")
-        }
-        rabuka_engine::ability::types::Choice::SelectTarget { target, .. } => {
-            format!("SelectTarget(target={target})")
-        }
-        _ => "other".to_string(),
-    };
-    game.dump_queue();
-
-    // Handle choices until none left, collecting all waitroom cards
-    let waitroom_before = game.state.player2.waitroom.cards.len();
     let discard_before = game.state.player1.waitroom.cards.len();
 
-    // Process ab#0 then ab#1
-    game.select_indices(&[0]); // should be ab#0 selection
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // should be ab#1 discard
+    // Ginako has two LiveStart abilities (ab#0 cost<=9 wait, ab#1 discard→blade).
+    // They trigger simultaneously → first pending must be SelectAutoAbility ordering.
+    assert!(
+        game.has_pending_choice(),
+        "ginako LiveStart must offer SelectAutoAbility for two abilities"
+    );
+    let first = game.get_pending_choice().clone();
+    assert!(
+        matches!(first, rabuka_engine::ability::types::Choice::SelectAutoAbility { .. }),
+        "first choice must be SelectAutoAbility, got {:?}",
+        first
+    );
+    game.select_option(0);
+
+    // ab#0 auto-applies when exactly 1 legal target (engine auto-picks, no prompt).
+    // Strict: verify the auto-picked target is the ONLY legal one (cost 2 <= 9)
+    // and the wait was actually applied — not silently skipped.
+    let opp_ori = game.state.mods.get_orientation_modifier(opp_member);
+    assert_eq!(
+        opp_ori,
+        Some("wait"),
+        "ab#0 must auto-apply wait to the single cost<=9 opponent (cost 2 <= 9)"
+    );
+
+    // ab#1 must offer hand discard (SelectCard hand, allow_skip)
+    assert!(
+        game.has_pending_choice(),
+        "ab#1 must offer hand SelectCard after ab#0"
+    );
+    let ch = game.get_pending_choice().clone();
+    match ch {
+        rabuka_engine::ability::types::Choice::SelectCard { zone, allow_skip, .. } => {
+            assert_eq!(zone, "hand", "ab#1 discard must be from hand, got {}", zone);
+            assert!(allow_skip, "ab#1 discard is optional (してもよい)");
+        }
+        other => panic!("ab#1 must be SelectCard(hand), got {:?}", other),
     }
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
+    game.select_indices(&[0]); // discard second_ginako (百生吟子)
+
+    // Drain remaining (conditional_on_result followup etc.)
+    let mut safety = 0;
+    while game.has_pending_choice() && safety < 10 {
+        safety += 1;
+        let ch = game.get_pending_choice().clone();
+        match ch {
+            rabuka_engine::ability::types::Choice::SelectAutoAbility { .. } => game.select_option(0),
+            _ => game.select_indices(&[0]),
+        }
     }
 
+    // Strict results:
     let blade = game.state.mods.get_blade_modifier(ginako);
-    let opponent_in_wait = game.state.player2.waitroom.cards.len() > waitroom_before;
-    let card_discarded = game.state.player1.waitroom.cards.len() > discard_before;
-    eprintln!(
-        "[DIAG] c1={c1_type} blade={blade} opp_waited={opponent_in_wait} discarded={card_discarded}"
+    assert_eq!(blade, 2, "discard 百生吟子 → 1 base blade + 1 conditional = 2, got {}", blade);
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(opp_member),
+        Some("wait"),
+        "opponent must remain waited"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.len() > discard_before,
+        "hand card must be discarded for ab#1 cost"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&second_ginako),
+        "the discarded card must be the second Ginako"
+    );
+    assert!(
+        !game.state.player2.waitroom.cards.contains(&opp_member),
+        "wait must NOT move the card to waitroom (orientation only)"
     );
 }
 

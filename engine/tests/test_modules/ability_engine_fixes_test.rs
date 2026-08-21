@@ -791,16 +791,19 @@ fn keke_look_select_sunny_passion_member() {
     game.state.player1.stage.stage = [-1, -1, -1];
     game.play_to_stage(keke, MemberArea::Center);
 
-    // Pay optional cost: discard 1 from hand (filler)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // discard index 0 (the filler)
-    }
+    // Pay optional cost: discard 1 from hand (filler) – must be offered
+    assert!(
+        game.has_pending_choice(),
+        "keke optional cost must be offered for SunnyPassion test"
+    );
+    game.select_indices(&[0]); // discard index 0 (the filler)
 
-    // The choice should now be to select 1 from the matching looked-at cards.
-    if game.has_pending_choice() {
-        // Select the first visible card (should be Sunny)
-        game.select_indices(&[0]);
-    }
+    // Must now offer look_and_select choice for SunnyPassion
+    assert!(
+        game.has_pending_choice(),
+        "keke look_and_select must be offered after cost"
+    );
+    game.select_indices(&[0]);
 
     // Sunny should now be in hand
     assert!(
@@ -877,15 +880,17 @@ fn keke_look_select_liella_with_blade_heart() {
     game.state.player1.stage.stage = [-1, -1, -1];
     game.play_to_stage(keke, MemberArea::Center);
 
-    // Pay optional cost
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "keke pay optional cost must be offered for Liella blade"
+    );
+    game.select_indices(&[0]);
 
-    // Liella member with blade heart should be selectable
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "keke Liella blade select must be offered"
+    );
+    game.select_indices(&[0]);
 
     assert!(
         game.state.player1.hand.cards.contains(&liella_bh),
@@ -1282,11 +1287,12 @@ fn kanon_unless_pay_pay_avoids_discard() {
     // Passing from LiveCardSetFirstAttacker draws 1 card per live card placed
     advance_to_live_start_kanon(&mut game);
 
-    // Kanon's ability fires: "unless pay 2, discard 2"
-    // Pay 2 energy to avoid discard
-    if game.has_pending_choice() {
-        game.select_option(1);
-    }
+    // Kanon's ability fires: "unless pay 2, discard 2" – must offer pay choice
+    assert!(
+        game.has_pending_choice(),
+        "kanon unless_pay must offer pay choice at LiveStart (pay branch)"
+    );
+    game.select_option(1);
 
     let hand_after = game.state.player1.hand.cards.len();
     // LiveCardSet pass draws 1 card; card selection prompt might exist but no discard
@@ -1345,15 +1351,18 @@ fn kanon_unless_pay_skip_triggers_discard() {
     // Passing from LiveCardSetFirstAttacker draws 1 card per live card placed
     advance_to_live_start_kanon(&mut game);
 
-    // Kanon's ability fires: "unless pay 2, discard 2"
-    // Skip paying → discard 2 should fire → then choose first 2 cards to discard
-    if game.has_pending_choice() {
-        game.select_option(0); // skip (don't pay)
-    }
-    // Card selection prompt for which 2 to discard
-    if game.has_pending_choice() {
-        game.try_select_indices(&[0, 1]).unwrap(); // discard first 2 cards
-    }
+    // Kanon's ability fires: "unless pay 2, discard 2" – must offer pay choice
+    assert!(
+        game.has_pending_choice(),
+        "kanon unless_pay must offer pay choice at LiveStart (skip branch)"
+    );
+    game.select_option(0); // skip (don't pay)
+    // Must now offer discard selection
+    assert!(
+        game.has_pending_choice(),
+        "kanon discard selection must appear after skipping pay"
+    );
+    game.try_select_indices(&[0, 1]).unwrap(); // discard first 2 cards
 
     let hand_after = game.state.player1.hand.cards.len();
     // LiveCardSet pass draws 1 card; discard removes 2 → hand = hand_before - 1

@@ -14,9 +14,11 @@ fn fill_deck_and_energy(game: &mut TestGame) {
 }
 
 fn accept_swap_to(game: &mut TestGame, dest: &str) {
-    if !game.has_pending_choice() {
-        return;
-    }
+    assert!(
+        game.has_pending_choice(),
+        "expected position|destination choice for Chisato swap to {}, got none (debut rotation/movement ability broken)",
+        dest
+    );
     match game.get_pending_choice().clone() {
         Choice::SelectTarget { target, .. } if target == "position|destination" => {
             let acts = game.generated_actions();
@@ -25,14 +27,14 @@ fn accept_swap_to(game: &mut TestGame, dest: &str) {
                 .position(|a| {
                     a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some(dest)
                 })
-                .unwrap_or(0);
+                .unwrap_or_else(|| panic!("destination {} not offered, got {:?}", dest, acts.iter().filter_map(|a| a.parameters.as_ref().and_then(|p| p.stage_area.as_deref())).collect::<Vec<_>>()));
             game.select_generated(idx);
             game.drain_auto_ability_choices();
         }
-        _ => {
-            game.select_indices(&[]);
-            game.drain_auto_ability_choices();
-        }
+        other => panic!(
+            "expected SelectTarget position|destination for Chisato swap to {}, got {:?}",
+            dest, other
+        ),
     }
 }
 
