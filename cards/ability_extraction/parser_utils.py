@@ -554,7 +554,8 @@ OPERATOR_PATTERNS: List[Tuple[str, str]] = [
 ]
 
 # ============== POSITION KEYWORDS ==============
-# SYNC: Keep in sync with parser.py POSITION_KEYWORDS
+# Single source of truth for position keyword -> canonical id. parser.py owns the
+# position-detection functions; this is the only copy of the map.
 POSITION_KEYWORDS: Dict[str, str] = {
     "センターエリア": "center",
     "左サイドエリア": "left_side",

@@ -1,7 +1,6 @@
 ﻿pub mod ability_engine_fixes_test;
 pub mod ability_from_source_test;
 pub mod abundant_test;
-pub mod strategy_bot_test;
 pub mod action_coverage_test;
 pub mod angelic_angel_test;
 pub mod aurora_flower_identity_test;

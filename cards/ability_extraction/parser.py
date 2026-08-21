@@ -103,6 +103,7 @@ from parser_utils import (
     extract_count,
     extract_dynamic_count,
     extract_group_name,
+    COUNT_PATTERN,
     normalize_fullwidth_digits,
     strip_suffix_period,
     extract_by_pattern,
@@ -127,6 +128,7 @@ from parser_utils import (
     CARD_TYPE_PATTERNS,
     OPERATOR_PATTERNS,
     POSITION_KEYWORDS,
+    _ALL_KW_RE,
     PriorityRegistry,
     ActionRule,
     EffectPattern,
@@ -164,36 +166,48 @@ SPLIT_LIMIT = 1
 # ============== POSITION KEYWORDS ==============
 
 
-def detect_positions(text: str) -> list:
-    """Return all position values found in text via POSITION_KEYWORDS.
+# ============== POSITION RESOLUTION (single owner) ==============
+# All position/area logic lives in this one section. The keyword map is the only
+# copy (kept in parser_utils.POSITION_KEYWORDS); the icon map and every detector
+# are defined exactly once here, so there is no second place for a position rule
+# to drift into. Previously this was duplicated as a hardcoded icon map inside
+# detect_icon_positions and reimplemented inline across several call sites.
+ICON_POSITION_TEMPLATES: Dict[str, str] = {
+    "{{center.png|センター}}": "center",
+    "{{leftside.png|左サイド}}": "left_side",
+    "{{rightside.png|右サイド}}": "right_side",
+}
 
-    Returns a list of position strings (e.g. ["left_side", "right_side"]).
-    Deduplicates by position value so e.g. "左サイドエリア" and "左サイド"
-    both contribute only one "left_side".
+
+def detect_position_matches(text: str) -> List[Tuple[str, str]]:
+    """Return ``(keyword, position)`` pairs in ``POSITION_KEYWORDS`` order.
+
+    Deduplicated by position value so ``センターエリア`` and ``センター`` both
+    contribute only one ``"center"``.
     """
-    positions = []
-    for _keyword, pos in POSITION_KEYWORDS.items():
-        if pos in positions:
+    seen: set = set()
+    matches: List[Tuple[str, str]] = []
+    for keyword, pos in POSITION_KEYWORDS.items():
+        if pos in seen:
             continue
-        if _keyword in text:
-            positions.append(pos)
-    return positions
+        if keyword in text:
+            seen.add(pos)
+            matches.append((keyword, pos))
+    return matches
 
 
-def detect_icon_positions(text: str) -> list:
-    """Return all positions from {{center.png|...}}, {{leftside.png|...}}, {{rightside.png|...}} icon templates."""
-    positions = []
-    if "{{center.png|センター}}" in text:
-        positions.append("center")
-    if "{{leftside.png|左サイド}}" in text:
-        positions.append("left_side")
-    if "{{rightside.png|右サイド}}" in text:
-        positions.append("right_side")
-    return positions
+def detect_positions(text: str) -> List[str]:
+    """All position values found via ``POSITION_KEYWORDS`` (keyword-based only)."""
+    return [pos for _, pos in detect_position_matches(text)]
 
 
-def format_positions(positions: list) -> str:
-    """Join position list into comma-separated string, or return empty string."""
+def detect_icon_positions(text: str) -> List[str]:
+    """All positions from {{center.png|...}}/{{leftside.png|...}}/{{rightside.png|...}} templates."""
+    return [pos for tmpl, pos in ICON_POSITION_TEMPLATES.items() if tmpl in text]
+
+
+def format_positions(positions: List[str]) -> str:
+    """Join position list into a comma-separated string, or return empty string."""
     return ",".join(positions)
 
 
@@ -207,7 +221,7 @@ def set_cross_position_fields(target, text):
     """
     if "position" in target:
         return False
-    matched = set(detect_positions(text))
+    matched = {pos for _, pos in detect_position_matches(text)}
     if "left_side" in matched and "right_side" in matched:
         target["position"] = "left_side"
         target["position_compare"] = "right_side"
@@ -298,6 +312,9 @@ def _strip_duration_prefix(text):
 
 
 # ============== COST MODIFICATION PATTERNS ==============
+# Single source for every cost-modification pattern. The two threshold entries
+# also populate cost_threshold/threshold_operator (see extract_cost_modification);
+# they are NOT re-coded as a second hardcoded regex there.
 COST_MODIFICATION_PATTERNS = [
     (r"元々持つコストより(\d+)低い値に等しくなる", "decrease_by"),
     (r"元々持つコストより(\d+)高い値に等しくなる", "increase_by"),
@@ -309,17 +326,15 @@ COST_MODIFICATION_PATTERNS = [
     (r"コストは(\d+)増やす", "increase_by"),
 ]
 
+# mod_type -> threshold operator produced when that pattern matches.
+COST_THRESHOLD_TYPES = {"cost_threshold": ">=", "cost_threshold_below": "<="}
+
 # ============== COMPLEX CONDITION PATTERNS ==============
 COMPLEX_CONDITION_MARKERS = ["これにより", "その結果"]
 
 # ============== REGEX PATTERNS ==============
-REGEX_COUNT_CARDS = r"(\d+)枚"
-REGEX_COUNT_PERSONS = r"(\d+)人"
-REGEX_COUNT_ITEMS = r"(\d+)つ"
-REGEX_COUNT_TIMES = r"(\d+)回"
-REGEX_QUOTED_TEXT = r"「([^」]+)」"
-REGEX_GROUP_NAME = r"『([^』]+)』"
-REGEX_DECK_POSITION = r"(\d+)枚目"
+# Count/name/deck-position regexes are owned by parser_utils (COUNT_PATTERN,
+# QUOTED_NAME_PATTERN, GROUP_PATTERN, ...); no second copy lives here.
 
 # ====================================================================
 # UTILITY FUNCTIONS
@@ -361,51 +376,53 @@ def extract_cost_range(text: str) -> Optional[Dict[str, int]]:
     return None
 
 
+# Single source for blade-count-limit matching. Each entry is (regex, operator_kind)
+# where operator_kind is "captured" (the operator word is group 2) or "==". Tried in
+# order; the regexes are not re-coded anywhere else.
+_BLADE_LIMIT_PATTERNS = [
+    (r"ブレード[の]数[がは](\d+)[つ個](以下|以上|未満|超)", "captured"),
+    (r"ブレード[の]数[がは](\d+)(以下|以上|未満|超)", "captured"),
+    (r"ブレード[の]数[がは]ちょうど(\d+)[つ個]", "=="),
+    (r"ブレード[の]数[がは](\d+)[つ個](?!になる)", "=="),
+    # "ブレードを4つ以上持つ" / "ブレードを4つ持つ" — the icon form of a member
+    # blade-count filter (e.g. Fire Bird "ブレードを4つ以上持つ『虹ヶ咲』のメンバー").
+    (r"ブレード[をが](\d+)[つ個](以上|以下|未満|超)持つ", "captured"),
+    (r"ブレード[をが]ちょうど(\d+)[つ個]持つ", "=="),
+    (r"ブレード[をが](\d+)[つ個]持つ", "=="),
+]
+
+_BLADE_LIMIT_OPERATORS = {"以下": "<=", "以上": ">=", "未満": "<", "超": ">"}
+
+
 def extract_blade_limit(text: str) -> Optional[Dict[str, Any]]:
     """Extract blade count limit from text like 'ブレードの数が3つ以下' (<=3 blades)."""
     normalized = re.sub(r"\{\{icon_blade\.png\|ブレード\}\}", "ブレード", text)
-    m = re.search(r"ブレード[の]数[がは](\d+)[つ個](以下|以上|未満|超)", normalized)
-    if not m:
-        m = re.search(r"ブレード[の]数[がは](\d+)(以下|以上|未満|超)", normalized)
-    if not m:
-        m = re.search(r"ブレード[の]数[がは]ちょうど(\d+)[つ個]", normalized)
-    if not m:
-        m = re.search(r"ブレード[の]数[がは](\d+)[つ個](?!になる)", normalized)
-    # "ブレードを4つ以上持つ" / "ブレードを4つ持つ" — the icon form of a member
-    # blade-count filter (e.g. Fire Bird "ブレードを4つ以上持つ『虹ヶ咲』のメンバー").
-    if not m:
-        m = re.search(r"ブレード[をが](\d+)[つ個](以上|以下|未満|超)持つ", normalized)
-    if not m:
-        m = re.search(r"ブレード[をが]ちょうど(\d+)[つ個]持つ", normalized)
-    if not m:
-        m = re.search(r"ブレード[をが](\d+)[つ個]持つ", normalized)
-    if m:
+    for pattern, op_kind in _BLADE_LIMIT_PATTERNS:
+        m = re.search(pattern, normalized)
+        if not m:
+            continue
         result: Dict[str, Any] = {"blade_limit": int(m.group(1))}
-        if len(m.groups()) >= 2 and m.group(2) and m.group(2) != "ちょうど":
-            op = m.group(2)
-            if op == "以下":
-                result["blade_limit_operator"] = "<="
-            elif op == "以上":
-                result["blade_limit_operator"] = ">="
-            elif op == "未満":
-                result["blade_limit_operator"] = "<"
-            elif op == "超":
-                result["blade_limit_operator"] = ">"
+        if op_kind == "captured":
+            result["blade_limit_operator"] = _BLADE_LIMIT_OPERATORS[m.group(2)]
         else:
             result["blade_limit_operator"] = "=="
         return result
     return None
 
 
+_DECK_POSITION_PATTERNS = [
+    r"一番上から(\d+)[枚番]目",
+    r"上から(\d+)[枚番]目",
+]
+
+
 def extract_deck_position(text: str) -> Optional[int]:
     """Extract deck position from text like '一番上から4枚目' / 'デッキの上から4番目'."""
-    # Match patterns like "一番上から4枚目", "上から4枚目", "上から4番目"
-    match = re.search(r"一番上から(\d+)[枚番]目", text)
-    if match:
-        return int(match.group(1))
-    match = re.search(r"上から(\d+)[枚番]目", text)
-    if match:
-        return int(match.group(1))
+    # Tried in order; single source for the deck-position regexes.
+    for pattern in _DECK_POSITION_PATTERNS:
+        match = re.search(pattern, text)
+        if match:
+            return int(match.group(1))
     return None
 
 
@@ -417,8 +434,8 @@ def extract_deck_position_for_action(text: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def extract_position(text: str) -> Optional[Dict[str, Any]]:
-    """Extract position requirement with target."""
+def extract_deck_position_constraint(text: str) -> Optional[Dict[str, Any]]:
+    """Extract deck-position requirement (e.g. Q226: 一番上から4枚目) with target."""
     result = {}
 
     # Extract target
@@ -453,17 +470,22 @@ def extract_heart_types(text: str) -> List[str]:
 
 
 
+# Single source for full-width （） and ASCII () parentheses.
+_PAREN_PATTERNS = [r"（([^）]+)）", r"\(([^)]+)\)"]
+
+
 def extract_parenthetical(text: str) -> List[str]:
     """Extract all text within （） or () parentheses."""
-    results = re.findall(r"（([^）]+)）", text)
-    results += re.findall(r"\(([^)]+)\)", text)
+    results: List[str] = []
+    for pattern in _PAREN_PATTERNS:
+        results += re.findall(pattern, text)
     return results
 
 
 def strip_parenthetical(text: str) -> str:
     """Remove parenthetical notes from text (both full-width （） and ASCII ())."""
-    text = re.sub(r"（([^）]+)）", "", text)
-    text = re.sub(r"\(([^)]+)\)", "", text)
+    for pattern in _PAREN_PATTERNS:
+        text = re.sub(pattern, "", text)
     return text.strip()
 
 
@@ -483,6 +505,17 @@ def categorize_quoted_text(quoted_text: List[str]) -> Dict[str, List[str]]:
     return result
 
 
+def _quoted_names(text: str) -> List[str]:
+    """All 「...」 names. Single owner for the quoted-name regex so the pattern is
+    not re-coded at a dozen call sites."""
+    return re.findall(r"「([^」]+)」", text)
+
+
+def _quoted_group_names(text: str) -> List[str]:
+    """All 『...』 group names. Single owner for the group-name regex."""
+    return re.findall(r"『([^』]+)』", text)
+
+
 def normalize(text: str) -> str:
     """Canonicalize variant patterns before parsing."""
     text = re.sub(r"'([^']{1,10})'", r"『\1』", text)
@@ -496,7 +529,7 @@ def extract_name_exclusions(text):
     """Extract name inclusion/exclusion from 「X」以外 patterns.
     Returns (include_names, exclude_names) as lists.
     """
-    includes = re.findall(r"「([^」]+)」", text)
+    includes = _quoted_names(text)
     excludes = re.findall(r"「([^」]+)」以外", text)
     # Remove excluded from included
     includes = [n for n in includes if n not in excludes]
@@ -509,7 +542,7 @@ def _split_include_exclude_chars(text):
     A name is treated as excluded when the three characters following its
     closing「are「以外」.
     """
-    names = re.findall(r"「([^」]+)」", text)
+    names = _quoted_names(text)
     include_chars = []
     exclude_chars = []
     for name in names:
@@ -540,25 +573,22 @@ def extract_cost_modification(text: str) -> Optional[Dict[str, Any]]:
     """Extract cost modification patterns from text."""
     result = {}
 
-    # Check for cost modification patterns
+    # Single pass over COST_MODIFICATION_PATTERNS (the only copy of these regexes).
+    # modification_type/value come from the FIRST match; the threshold entries also
+    # populate cost_threshold/threshold_operator regardless of which pattern matched
+    # first, so a text containing both e.g. "コストは2減る" and "コストが3以上になった場合"
+    # keeps both fields (as the previous independent inline check did).
     for pattern, mod_type in COST_MODIFICATION_PATTERNS:
         match = re.search(pattern, text)
-        if match:
+        if not match:
+            continue
+        if "modification_type" not in result:
             result["modification_type"] = mod_type
             if match.groups():
                 result["value"] = int(match.group(1))
-            break
-
-    # Check for cost threshold patterns
-    threshold_match = re.search(r"コストが(\d+)以上になった場合", text)
-    if threshold_match:
-        result["cost_threshold"] = int(threshold_match.group(1))
-        result["threshold_operator"] = ">="
-
-    threshold_match_below = re.search(r"コストが(\d+)以下になった場合", text)
-    if threshold_match_below:
-        result["cost_threshold"] = int(threshold_match_below.group(1))
-        result["threshold_operator"] = "<="
+        if mod_type in COST_THRESHOLD_TYPES:
+            result["cost_threshold"] = int(match.group(1))
+            result["threshold_operator"] = COST_THRESHOLD_TYPES[mod_type]
 
     return result if result else None
 
@@ -873,9 +903,52 @@ def parse_complex_condition(text: str) -> Optional[Dict[str, Any]]:
     return None  # type: ignore[return-value]
 
 
-def _extract_basic_cost_fields(cost, text):
-    """Extract common fields for cost dict (source, dest, count, card_type, etc.)."""
-    # Source
+# Independent cost-flag rules. Each entry is (test, field, value) where `test` is
+# either a substring to look for in the text or a callable returning truthy when
+# the flag applies. These do not depend on other cost fields, so they are applied
+# in one pass instead of being re-coded inline below.
+_COST_FLAG_RULES = [
+    ("同じグループ名", "group_reference", "same_group_name"),
+    (extract_optional, "optional", True),
+    (_has_shuffle, "shuffle", True),
+    (detect_exclude_self, "exclude_self", True),
+    ("同じユニット名", "same_unit_name", True),
+]
+
+# Baton-touch source/group extraction, single source instead of two hand-written
+# re.search calls.
+_COST_BATON_TOUCH_PATTERNS = [
+    (r"「([^」]+)」からバトンタッチ", "baton_touch_source"),
+    (r"『([^』]+)』からバトンタッチ", "baton_touch_group"),
+]
+
+
+def _mark_discard_all_hand(cost, text):
+    """Discard-all-hand costs (手札をすべて控え室に置く) must mark `all`.
+    Without this the engine defaults the count to 1 and only asks to discard a
+    single card instead of discarding the entire hand."""
+    if (
+        cost.get("source") == "hand"
+        and cost.get("destination") == "discard"
+        and re.search(r"手札を\s*(すべて|全て|全部)|手札の\s*(すべて|全て|全部)", text)
+    ):
+        cost["all"] = True
+        cost.pop("count", None)
+
+
+def _infer_destination_from_source(cost, text):
+    """Infer destination from source when not explicitly stated in the text."""
+    if "source" in cost and "destination" not in cost:
+        if cost["source"] == "hand" and (
+            "控え室に置く" in text or "控え室に置いて" in text
+        ):
+            cost["destination"] = "discard"
+        elif cost["source"] == "discard" and "手札に加える" in text:
+            cost["destination"] = "hand"
+
+
+def _fill_cost_source(cost, text):
+    """Set source/zone from explicit 'hand' keywords and extract_source()."""
     if "手札を" in text or "手札の" in text:
         cost["source"] = "hand"
         cost["zone"] = "hand"  # Add zone for choice creation
@@ -885,7 +958,10 @@ def _extract_basic_cost_fields(cost, text):
         # Set zone based on source if not already set
         if "zone" not in cost:
             cost["zone"] = src
-    # Destination
+
+
+def _fill_cost_destination(cost, text):
+    """Set destination from extract_destination() and the energy-deck keyword."""
     dst = extract_destination(text)
     if dst:
         cost["destination"] = dst
@@ -896,24 +972,26 @@ def _extract_basic_cost_fields(cost, text):
         # discard, which never holds energy, so the cost could never be paid.
         if "source" not in cost and "エネルギー" in text:
             cost["source"] = "energy_zone"
-    # Infer destination from source if missing
-    if "source" in cost and "destination" not in cost:
-        if cost["source"] == "hand" and (
-            "控え室に置く" in text or "控え室に置いて" in text
-        ):
-            cost["destination"] = "discard"
-        elif cost["source"] == "discard" and "手札に加える" in text:
-            cost["destination"] = "hand"
-    # Discard-all-hand costs (手札をすべて控え室に置く) must mark `all`.
-    # Without this the engine defaults the count to 1 and only asks to
-    # discard a single card instead of discarding the entire hand.
+
+
+def _mark_self_cost(cost, text):
+    """Mark self_cost when the cost refers to this member specifically
+    (このメンバー[をが]) and isn't excluding it or other members."""
     if (
-        cost.get("source") == "hand"
-        and cost.get("destination") == "discard"
-        and re.search(r"手札を\s*(すべて|全て|全部)|手札の\s*(すべて|全て|全部)", text)
+        "このメンバー" in text
+        and "このメンバー以外" not in text
+        and not bool(re.search(r"ほかの.*?メンバー", text))
     ):
-        cost["all"] = True
-        cost.pop("count", None)
+        if re.search(r"このメンバー[をが]", text):
+            cost["self_cost"] = True
+
+
+def _extract_basic_cost_fields(cost, text):
+    """Extract common fields for cost dict (source, dest, count, card_type, etc.)."""
+    _fill_cost_source(cost, text)
+    _fill_cost_destination(cost, text)
+    _infer_destination_from_source(cost, text)
+    _mark_discard_all_hand(cost, text)
     # State change
     sc = extract_state_change(text)
     if sc:
@@ -932,19 +1010,15 @@ def _extract_basic_cost_fields(cost, text):
     gns = extract_all_groups(text)
     if gns:
         cost["group_names"] = gns
-    if "同じグループ名" in text:
-        cost["group_reference"] = "same_group_name"
-    if extract_optional(text):
-        cost["optional"] = True
-    if _has_shuffle(text):
-        cost["shuffle"] = True
+    for test, field, value in _COST_FLAG_RULES:
+        cond = test(text) if callable(test) else (test in text)
+        if cond:
+            cost[field] = value
     if "バトンタッチ" in text:
-        qm = re.search(r"「([^」]+)」からバトンタッチ", text)
-        if qm:
-            cost["baton_touch_source"] = qm.group(1)
-        gm = re.search(r"『([^』]+)』からバトンタッチ", text)
-        if gm:
-            cost["baton_touch_group"] = gm.group(1)
+        for pat, field in _COST_BATON_TOUCH_PATTERNS:
+            m = re.search(pat, text)
+            if m:
+                cost[field] = m.group(1)
     # Cost limit
     cl = extract_cost_limit(text)
     if cl:
@@ -957,19 +1031,7 @@ def _extract_basic_cost_fields(cost, text):
     if cv:
         cost["cost_values"] = cv
         cost.pop("cost_limit", None)
-    # Exclude self / self cost
-    if detect_exclude_self(text):
-        cost["exclude_self"] = True
-    # Same unit name
-    if "同じユニット名" in text:
-        cost["same_unit_name"] = True
-    if (
-        "このメンバー" in text
-        and "このメンバー以外" not in text
-        and not bool(re.search(r"ほかの.*?メンバー", text))
-    ):
-        if re.search(r"このメンバー[をが]", text):
-            cost["self_cost"] = True
+    _mark_self_cost(cost, text)
     # Card names from 「」 — detect exclusion patterns (「name」以外)
     include_chars, exclude_chars = _split_include_exclude_chars(text)
     if include_chars:
@@ -1347,7 +1409,7 @@ def _cost_reveal(text, cost):
     cost["type"] = "reveal"
     if "手札" in text:
         cost["source"] = "hand"
-    cm = re.search(REGEX_COUNT_CARDS, text)
+    cm = re.search(COUNT_PATTERN, text)
     if cm:
         cost["count"] = int(cm.group(1))
     ct = extract_card_type(text)
@@ -1729,7 +1791,7 @@ def _enrich_condition_common(d: Dict[str, Any], text: str) -> None:
         "position_compare" not in d
         and d.get("comparison_type") == "equality"
     ):
-        matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in text}
+        matched = {pos for _, pos in detect_position_matches(text)}
         matched.discard(d.get("position"))
         if matched:
             d["position_compare"] = sorted(matched)[0]
@@ -2688,7 +2750,7 @@ _register_action(
         action="set_card_identity",
         setter=lambda t, a: a.update(
             {
-                "identities": re.findall(r"『([^』]+)』", t) or None,
+                "identities": _quoted_group_names(t) or None,
                 "all_regions": True,
             }
         ),
@@ -3118,8 +3180,8 @@ def parse_action(text: str) -> Dict[str, Any]:
     if tc_match:
         action["target_count"] = int(tc_match.group(1))
 
-    # Extract position
-    position = extract_position(text)
+    # Extract deck position
+    position = extract_deck_position_constraint(text)
     if position:
         if isinstance(position, dict):
             action.update(position)
@@ -3275,7 +3337,7 @@ def _try_character_each(text):
     )
     if not name_part:
         return None
-    names = re.findall(r"「([^」]+)」", name_part.group(1))
+    names = _quoted_names(name_part.group(1))
     if len(names) < 2:
         return None
     # Only for placement-to-zone conditions (手札から...控え室/下に置いた)
@@ -3469,7 +3531,7 @@ def _try_distinct(text):
     # Extract 「』-bracketed character names from のうち patterns
     cm = re.search(r"((?:「[^」]+」[とか、]? ?)+)(?:」?がいる|」?のうち)", text)
     if cm:
-        names = re.findall(r"「([^」]+)」", cm.group(1))
+        names = _quoted_names(cm.group(1))
         if names:
             result["characters"] = names
     return result
@@ -3562,7 +3624,7 @@ def _enrich_card_count_condition(result, text):
     if char_m:
         result["characters"] = [char_m.group(1)]
     elif "characters" not in result:
-        bracketed = re.findall(r"「([^」]+)」", text)
+        bracketed = _quoted_names(text)
         if bracketed:
             result["characters"] = bracketed
     # Same name constraint
@@ -4216,13 +4278,13 @@ def _try_movement(text):
     # "センターエリアにいるメンバーがエリアを移動" → position=center, area_direction=from
     # "メンバーがセンターエリアに移動"               → position=center, area_direction=to
     if "position" not in result:
-        for kw, pos in POSITION_KEYWORDS.items():
-            if kw in text:
-                result["position"] = pos
-                if f"{kw}にいる" in text or f"{kw}にいて" in text:
-                    result["area_direction"] = "from"
-                break
-        matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in text}
+        _m = detect_position_matches(text)
+        if _m:
+            kw, pos = _m[0]
+            result["position"] = pos
+            if f"{kw}にいる" in text or f"{kw}にいて" in text:
+                result["area_direction"] = "from"
+        matched = {pos for _, pos in _m}
         if len(matched) > 1:
             positions_list = sorted(matched)
             result["position_compare"] = (
@@ -4423,7 +4485,7 @@ def _try_appearance(text):
         subject = m.group(1)
     else:
         # Try to find the last quoted name before 登場 (the subject)
-        quoted = re.findall(r"「([^」]+)」", text[: text.find("登場")])
+        quoted = _quoted_names(text[: text.find("登場")])
         if quoted:
             subject = quoted[-1]
     # Detect cost comparison: 「A」よりコストの(大きい|高い)「B」
@@ -4446,7 +4508,7 @@ def _try_appearance(text):
                 {"position": POSITION_KEYWORDS[pos], "character": char}
                 for pos, char in pos_char_pairs
             ]
-        all_quoted = re.findall(r"「([^」]+)」", text)
+        all_quoted = _quoted_names(text)
         if all_quoted:
             result["characters"] = list(dict.fromkeys(all_quoted))
         else:
@@ -4687,9 +4749,8 @@ def _try_position(text):
         or DURATION_MARKER in text
     ):
         return None
-    for keyword in POSITION_KEYWORDS:
-        if keyword in text:
-            return {"type": "position_condition", "text": text}
+    if detect_positions(text):
+        return {"type": "position_condition", "text": text}
     return None
 
 
@@ -5418,7 +5479,7 @@ def _extract_generic_fields(condition, text):
     # 「A」、「B」、「C」のうち (any number of names with か/と/、 separators)
     cm = re.search(r"((?:「[^」]+」[とか、]? ?)+)(?:」?がいる|」?のうち)", text)
     if cm:
-        names = re.findall(r"「([^」]+)」", cm.group(1))
+        names = _quoted_names(cm.group(1))
         if names:
             condition["characters"] = names
     else:
@@ -5642,7 +5703,7 @@ def _extract_generic_fields(condition, text):
         condition["cost_limit"] = cl
 
     # Position
-    pos = extract_position(text)
+    pos = extract_deck_position_constraint(text)
     if pos:
         if isinstance(pos, dict):
             condition.update(pos)
@@ -6433,10 +6494,9 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         and "exclude_position" not in action
         and "source_position" not in action
     ):
-        for kw, pos in POSITION_KEYWORDS.items():
-            if kw in text:
-                action["position"] = pos
-                break
+        _m = detect_position_matches(text)
+        if _m:
+            action["position"] = _m[0][1]
     a = _fill_defaults_move_cards(action, text, action_text, _cached_source, _cached_dest)
     if (
         "cost_limit" not in action
@@ -7532,7 +7592,7 @@ def _build_reveal_add_discard(fp, sa_text, select_text):
     if gns:
         result["group_names"] = gns
     _apply_card_property_filter(result, select_text)
-    char_names = re.findall(r"「([^」]+)」", select_text)
+    char_names = _quoted_names(select_text)
     if char_names:
         result["characters"] = list(dict.fromkeys(char_names))
     cl = extract_cost_limit(select_text)
@@ -7606,7 +7666,7 @@ def _enrich_from_text(d, text):
     if gns:
         d["group_names"] = gns
     # Extract 「」-bracketed character names (e.g. 「朝香果林」のメンバーカード)
-    char_names = re.findall(r"「([^」]+)」", text)
+    char_names = _quoted_names(text)
     if char_names:
         d["characters"] = list(dict.fromkeys(char_names))
     cl = extract_cost_limit(text)
@@ -8319,11 +8379,11 @@ def _try_compound_select(text):
     if "のうちの" not in text or "これにより選んだメンバー以外" not in text:
         return None
     # Extract character names from the first group 「」
-    char_names = re.findall(r"「([^」]+)」", text)
+    char_names = _quoted_names(text)
     if len(char_names) < 2:
         return None
     # Extract second group from 『』
-    group_names = re.findall(r"『([^』]+)』", text)
+    group_names = _quoted_group_names(text)
     # Determine duration
     dur = "live_end" if "ライブ終了まで" in text else None
     # Build actions
@@ -8840,7 +8900,7 @@ def _try_conditional(text):
 
     # Special: yell count modification
     if "エールによって公開される自分のカードの枚数が" in at:
-        cm = re.search(REGEX_COUNT_CARDS, at)
+        cm = re.search(COUNT_PATTERN, at)
         cnt = int(cm.group(1)) if cm else None
         result = {
             "text": text,
@@ -10148,10 +10208,10 @@ def _walk_propagate_text_context_fields(d, d_ctx, ctx_text):
 
     # Propagate group_names from text context (including parent context) to any dict node
     if "group_names" not in d:
-        gms = re.findall(r"『([^』]+)』", d_ctx or "")
+        gms = _quoted_group_names(d_ctx or "")
         from_parent = not gms and ctx_text
         if from_parent:
-            gms = re.findall(r"『([^』]+)』", ctx_text or "")
+            gms = _quoted_group_names(ctx_text or "")
         if gms and (
             d.get("action") or d.get("type") or d.get("condition") or "text" in d
         ):
@@ -10225,6 +10285,21 @@ def _walk_propagate_text_context_fields(d, d_ctx, ctx_text):
         d["shuffle"] = True
 
 
+def _normalize_heart_ids(text: str) -> List[str]:
+    """Deduplicated, zero-padded heart color ids from bare 'heart_N' mentions."""
+    return list(dict.fromkeys(f"heart{m.zfill(2)}" for m in re.findall(r"heart_(\d+)", text)))
+
+
+def _count_heart_ids(text: str, allowed: Optional[List[str]] = None) -> Dict[str, int]:
+    """Per-color counts of bare 'heart_N' mentions, optionally filtered to `allowed`."""
+    counts: Dict[str, int] = {}
+    for m in re.finditer(r"heart_(\d+)", text):
+        h = f"heart{m.group(1).zfill(2)}"
+        if allowed is None or h in allowed:
+            counts[h] = counts.get(h, 0) + 1
+    return counts
+
+
 def _walk_extract_heart_colors(d, d_text, ctx_text):
     # Extract heart_colors from action text for gain_resource / modify_required_hearts
     if "heart_colors" not in d and d.get("action") in (
@@ -10248,11 +10323,7 @@ def _walk_extract_heart_colors(d, d_text, ctx_text):
                 if not d.get("heart_color"):
                     if _propagation_allowed("heart_colors", d, {"text": ctx_text}):
                         search_text = ctx_text
-        hc = list(
-            dict.fromkeys(
-                f"heart{m.zfill(2)}" for m in re.findall(r"heart_(\d+)", search_text)
-            )
-        )
+        hc = _normalize_heart_ids(search_text)
         if hc or "heart_00" in search_text:
             if not hc:
                 hc = ["heart00"]
@@ -10266,11 +10337,7 @@ def _walk_extract_heart_colors(d, d_text, ctx_text):
         if not re.search(r"heart_\d+", search_val) and ctx_text:
             search_val = ctx_text
         target_colors = d.get("heart_colors", [])
-        color_counts = {}
-        for m in re.finditer(r"heart_(\d+)", search_val):
-            h = f"heart{m.group(1).zfill(2)}"
-            if not target_colors or h in target_colors:
-                color_counts[h] = color_counts.get(h, 0) + 1
+        color_counts = _count_heart_ids(search_val, target_colors or None)
         if color_counts:
             counts = list(color_counts.values())
             if len(set(counts)) == 1:
@@ -10302,11 +10369,7 @@ def _walk_extract_heart_colors(d, d_text, ctx_text):
     # "30以上の場合、さらにこのカードの必要ハートを{{heart_00.png|heart0}}減らす").
     node_text = d.get("text") or ""
     if "heart_colors" not in d and d.get("action") == "select_cards" and node_text:
-        hc = list(
-            dict.fromkeys(
-                f"heart{m.zfill(2)}" for m in re.findall(r"heart_(\d+)", node_text)
-            )
-        )
+        hc = _normalize_heart_ids(node_text)
         if hc:
             d["heart_colors"] = hc
             if detect_require_all_hearts(node_text):
@@ -10318,7 +10381,7 @@ def _walk_propagate_all_and_targets(d, d_ctx):
     if (
         "all" not in d
         and d_ctx
-        and re.search(r"すべての|全ての|全部の|全て|全員|全体|カードをすべて", d_ctx)
+        and _ALL_KW_RE.search(d_ctx)
     ):
         d["all"] = True
 
@@ -10753,7 +10816,7 @@ def _enrich_characters(d):
                     r"((?:「[^」]+」[か、]? ?)+)の(?:メンバーカード|ライブカード)", text
                 )
                 if cm and not is_self_cost_set:
-                    names = re.findall(r"「([^」]+)」", cm.group(1))
+                    names = _quoted_names(cm.group(1))
                     if names:
                         d["characters"] = names
             if not d.get("card_names"):
