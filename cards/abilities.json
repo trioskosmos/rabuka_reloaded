@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-21T18:36:00.694354",
+  "generated_at": "2026-08-21T18:39:46.153072",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "1ad06e35",
+  "engine_commit": "b40d26dd",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -1635,21 +1635,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合、「{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを＋１する。ライブカードが3枚以上ある場合、代わりに合計スコアを＋２する。」を得る。",
-        "source": "revealed_cards",
-        "dynamic_count": {
-          "type": "revealed_cards",
-          "reference": "previous_reveal"
-        },
-        "count": 1,
-        "card_type": "live_card",
-        "target": "self",
-        "group_names": [
-          "Aqours"
-        ],
-        "action": "gain_ability",
-        "ability_gain_trigger": "ライブ成功時",
-        "ability_gain": "【ライブ成功時】エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを＋１する。ライブカードが3枚以上ある場合、代わりに合計スコアを＋２する。",
+        "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合、「{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを+1する。ライブカードが3枚以上ある場合、代わりに合計スコアを+2する。」を得る",
         "condition": {
           "type": "compound",
           "operator": "and",
@@ -1675,15 +1661,32 @@
               "target": "self",
               "distinct": "card_name",
               "text": "名前が異なる場合",
-              "location": "stage"
+              "location": "stage",
+              "group_names": [
+                "Aqours"
+              ]
             }
           ],
           "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合",
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
-          "distinct": "card_name"
+          "distinct": "card_name",
+          "group_names": [
+            "Aqours"
+          ]
         },
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
+        "count": 1,
+        "card_type": "live_card",
+        "target": "self",
+        "action": "gain_ability",
+        "ability_gain_trigger": "ライブ成功時",
+        "ability_gain": "【ライブ成功時】エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを+1する。ライブカードが3枚以上ある場合、代わりに合計スコアを+2する。",
         "gained_effect": {
           "text": "エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを+1する。ライブカードが3枚以上ある場合、代わりに合計スコアを+2する",
           "action": "conditional_alternative",
@@ -26322,7 +26325,9 @@
               "type": "comparison_condition"
             }
           ],
-          "text": "このターン、エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合か、または自分が余剰ハートを2つ以上持っている場合、このカードのスコアは4になる"
+          "text": "このターン、エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合か、または自分が余剰ハートを2つ以上持っている場合",
+          "card_property": "has_blade_heart",
+          "negation": true
         },
         "action": "modify_score",
         "operation": "set",

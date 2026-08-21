@@ -641,11 +641,13 @@ def split_cost_effect(text: str) -> Tuple[str, str]:
 
 def split_condition_action(text: str) -> Tuple[str, str]:
     """Split text into condition and action parts.
-    The condition keyword (場合/とき/なら) is kept with the condition text."""
+    The condition keyword (場合/とき/なら) is kept with the condition text.
+    Markers are located with nesting-aware depth-0 search so a 場合/とき
+    inside 「」 quotes or （） notes never acts as the split point."""
     for keyword in ["場合", "とき", "なら"]:
         pattern = keyword + "、"
-        if pattern in text:
-            keyword_idx = text.find(keyword)
+        keyword_idx = _find_depth0(text, pattern)
+        if keyword_idx >= 0:
             comma_idx = keyword_idx + len(keyword)
             condition = text[:comma_idx].strip()
             action = text[comma_idx + 1 :].strip()
