@@ -8260,16 +8260,14 @@ def _try_furthermore(text):
     """さらに — sequential conditional effects with "furthermore"."""
     if "さらに" not in text:
         return None
-    # Protect 「」 content from internal splitting (ability text with periods)
-    clean = re.sub(r"「[^」]*」", lambda m: m.group(0).replace("。", "\x00"), text)
-    parts = clean.split("。")
+    parts = _split_sentences_nesting(text)
     if len(parts) < 2:
         return None
     if not any("さらに" in p for p in parts[1:]):
         return None
     actions = []
     for p in parts:
-        pt = p.strip().replace("\x00", "。")
+        pt = p.strip()
         if not pt:
             continue
         if "さらに" in pt:
@@ -8720,7 +8718,7 @@ def _try_period_conditional(text):
     # "この能力は" (activation condition suffixes) — those have their own handlers.
     if "これにより" in text or "この能力は" in text:
         return None
-    parts = [p.strip() for p in text.split("。") if p.strip()]
+    parts = _split_sentences_nesting(text)
     if len(parts) < 2:
         return None
     # Find where conditional segments start (first part containing '場合')

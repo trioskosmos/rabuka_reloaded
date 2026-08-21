@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-21T18:32:26.742661",
+  "generated_at": "2026-08-21T18:36:00.694354",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "a5c2191e",
+  "engine_commit": "1ad06e35",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -2978,7 +2978,7 @@
             "duration": "live_end"
           },
           {
-            "text": "合計が25の場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する",
+            "text": "合計が25の場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
             "condition": {
               "text": "合計が25の場合",
               "aggregate": "total",
@@ -2987,10 +2987,16 @@
               "operator": "=",
               "count": 25
             },
-            "action": "modify_score",
-            "value": 1,
-            "operation": "add",
-            "duration": "live_end"
+            "action": "gain_ability",
+            "ability_gain_trigger": "常時",
+            "ability_gain": "【常時】ライブの合計スコアを+1する。",
+            "duration": "live_end",
+            "gained_effect": {
+              "text": "ライブの合計スコアを+1する",
+              "action": "modify_score",
+              "value": 1,
+              "operation": "add"
+            }
           }
         ]
       }
