@@ -186,6 +186,15 @@ impl AbilityResolver {
         filter: &util::CardFilter,
         filtered_indices: Option<Vec<usize>>,
     ) {
+        log::debug!(
+            "[PROMPT_SEL] zone={} count={} can_skip={} prop={:?} neg={:?} filtered={:?}",
+            zone,
+            count,
+            can_skip,
+            filter.card_property,
+            filter.negation,
+            filtered_indices
+        );
         let zone_display = crate::ability::describe::zone_label(Some(zone));
         let zone_display_ja = crate::ability::describe::zone_label_ja(Some(zone));
         let description = if effect.any_number_any().unwrap_or(false) {
@@ -1334,6 +1343,10 @@ impl AbilityResolver {
         }
         let cp_binding = effect.card_property_any();
         filter.card_property = cp_binding.as_deref();
+        // The property's polarity lives in `negation` (「ブレードハートを
+        // 持たない」→ negation=true). Forgetting it inverted emma bp7-008's
+        // eligibility: blade-heart holders were offered instead of excluded.
+        filter.negation = effect.negation_any().unwrap_or(false);
 
         // ── group_reference: "different_group_names" ──────────────────
         // Q89: Multi-name cards have the group name(s) from their series.
@@ -2363,6 +2376,14 @@ impl AbilityResolver {
             self.moved_cards
         );
 
+        // Zone membership changed — energy-count / stage / success-zone
+        // constants (「〜あるかぎり」) are live state and must re-evaluate now,
+        // not at the next phase boundary.
+        if !moved_cards.is_empty() {
+            gs.mark_constants_dirty();
+            gs.recalculate_constants();
+        }
+
         // Debut side effects for cards placed directly on stage (single free slot,
         // no position-choice dialog). Each card goes through the unified
         // fire_debut_side_effects which handles record_appearance, debut_count,
@@ -2623,6 +2644,17 @@ impl AbilityResolver {
             target
         );
 
+        // Card-property restriction (e.g. emma bp7-008 「ブレードハートを
+        // 持たないメンバーカード」→ card_property="has_blade_heart",
+        // negation=true). The Choice advertised to the player does not carry
+        // these fields, so read them from the activating effect.
+        let card_property = gs
+            .entry_effect()
+            .and_then(|e| e.card_property_any().map(|s| s.to_string()));
+        let property_negation = gs
+            .entry_effect()
+            .and_then(|e| e.negation_any())
+            .unwrap_or(false);
         let passes = |cid: i16| -> bool {
             util::card_matches_type(&card_db, cid, card_type_filter)
                 && util::card_matches_cost_limit_op(&card_db, cid, cost_limit, cost_limit_operator)
@@ -2632,6 +2664,18 @@ impl AbilityResolver {
                         util::card_matches_characters(&card_db, cid, Some(chars))
                     }
                     _ => true,
+                }
+                && match card_property.as_deref() {
+                    Some(prop) => {
+                        let has = match prop {
+                            "has_blade_heart" => card_db.get_card(cid).is_some_and(|c| c.has_blade_heart()),
+                            "has_score_icon" => card_db.get_card(cid).is_some_and(|c| c.has_score_icon()),
+                            "has_all_blade" => card_db.get_card(cid).is_some_and(|c| c.has_all_blade()),
+                            _ => false,
+                        };
+                        if property_negation { !has } else { has }
+                    }
+                    None => true,
                 }
         };
 
@@ -2691,8 +2735,13 @@ impl AbilityResolver {
                     }
                 }
 
-                let sum_limit = cost_total.or(cost_limit);
-                let sum_operator = cost_total_operator.or(cost_limit_operator);
+                // A SUM constraint applies only when the ability text states a
+                // total (「コストの合計」→ parsed cost_total). Falling back to
+                // the per-card cost_limit here was wrong: 「コスト2以下の
+                // メンバーを2枚まで」 limits EACH card, and eligibility is
+                // already enforced by the filtered_indices pass above.
+                let sum_limit = cost_total;
+                let sum_operator = cost_total_operator;
                 if zone_enum == Some(Zone::Discard) && sum_limit.is_some() {
                     let player = gs.resolve_target_player(&target);
                     let limit = sum_limit.unwrap();

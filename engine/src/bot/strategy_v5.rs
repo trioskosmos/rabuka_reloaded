@@ -202,14 +202,6 @@ pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase)
         .map(|c| c.score.unwrap_or(0) as i32)
         .sum();
 
-    // L3 concede (温存): a clearly losing contested comparison only donates a
-    // life to the opponent's ライブ成功時 triggers — hold ammo instead. Ties
-    // place for both below 2 successes (8.4.6.2), so only fold when we are
-    // ≥2 score bands under their ceiling and NEITHER side is at match point.
-    if !desired.is_empty() && my_succ < 2 && opp_succ < 2 && my_score + 2 <= estimate_opp_score(gs, me, db) {
-        desired.clear();
-    }
-
     // COMMITMENT RULE for everything below: whatever we decide to set joins
     // `desired`, so once selected it stays selected and emit() confirms.
     // SelectLiveCard is a TOGGLE in the engine — a stateless
@@ -228,16 +220,32 @@ pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase)
             }
         }
 
-        // Gamble fallback: when NOTHING clears its floor, bet one near-miss
-        // life anyway. A failed check costs one life card (recycled via
-        // refresh); passing unopposed places for free. Stalling wins nothing,
-        // and at opponent match point folding loses outright (S4).
-        let deficit_cap = if opp_succ >= 2 { 5 } else { 3 };
+        // Gamble fallback: when NOTHING clears its floor, bet the single
+        // most promising life anyway. A failed check costs one life card
+        // (recycled via refresh); passing unopposed places for free; folding
+        // guarantees nothing. Stalling is strictly worse than swinging.
         if let Some((deficit, hi)) = nearest_miss_life(gs, me, db) {
-            if deficit <= deficit_cap {
-                desired.push(hi);
-            }
+            let _ = deficit;
+            desired.push(hi);
         }
+        if std::env::var("V5_TRACE").is_ok() {
+            eprintln!(
+                "V5L t{} me{} EMPTY->{} (my_succ={} opp_succ={})",
+                gs.turn_number,
+                me,
+                if desired.is_empty() { "FOLD" } else { "GAMBLE" },
+                my_succ,
+                opp_succ
+            );
+        }
+    } else if std::env::var("V5_TRACE").is_ok() {
+        eprintln!(
+            "V5L t{} me{} SET n={} score={}",
+            gs.turn_number,
+            me,
+            desired.len(),
+            my_score
+        );
     }
 
     emit(gs, actions, &desired)

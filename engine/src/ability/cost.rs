@@ -838,6 +838,10 @@ let source = cost.source_str().unwrap_or("");
                 if energy > 0 {
                     player.energy_zone.pay_energy(energy)?
                 }
+                // Energy-count constants (「エネルギーがちょうどN枚あるかぎり」)
+                // are live state — re-evaluate right after the payment.
+                gs.mark_constants_dirty();
+                gs.recalculate_constants();
                 Ok(())
             }
             ActionType::EnergyCondition => {

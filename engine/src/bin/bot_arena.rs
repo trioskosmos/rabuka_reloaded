@@ -157,6 +157,12 @@ fn main() {
     let mut total_actions = 0u64;
     let mut total_turns = 0u64;
     let t0 = std::time::Instant::now();
+    // Optional hard game-count cap (ARENA_GAMES env): removes time-budget
+    // truncation bias when comparing logged vs unlogged runs.
+    let max_games: u32 = std::env::var("ARENA_GAMES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(u32::MAX);
     let mut trace_rows: Vec<String> = Vec::new();
     let mut game_start_idx = 0usize;
     if trace {
@@ -166,7 +172,7 @@ fn main() {
         );
     }
 
-    while t0.elapsed().as_secs() < budget {
+    while t0.elapsed().as_secs() < budget && games < max_games {
         games += 1;
         let mut gs = deal_from_templates(&db, &t1, &t2);
         // Archetype detection runs once per game over the full own decklist.

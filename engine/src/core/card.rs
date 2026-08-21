@@ -775,6 +775,10 @@ pub struct EffectFilter {
     pub per_unit: Option<bool>,
     pub per_unit_count: Option<u8>,
     pub per_unit_type: Option<ArcStr>,
+    /// What the per-unit count is measured against (e.g. "previous_moved_cards"
+    /// = cards moved by the preceding action step). Without this the generic
+    /// per-unit branch wrongly counts the default location instead.
+    pub per_unit_source: Option<ArcStr>,
     pub group_reference: Option<ArcStr>,
     pub state: Option<Box<EffectState>>,
     pub distinct: Option<Box<DistinctType>>,
@@ -1318,6 +1322,7 @@ impl AbilityEffect {
             per_unit: bool_field!("per_unit"),
             per_unit_count: u8_field!("per_unit_count"),
             per_unit_type: str_field!("per_unit_type"),
+            per_unit_source: str_field!("per_unit_source"),
             group_reference: str_field!("group_reference"),
             state: obj
                 .get("state")
@@ -1831,6 +1836,8 @@ impl AbilityEffect {
     filter_str_getter!(per_unit_location_any, per_unit_location);
 
     filter_str_getter!(per_unit_type_any, per_unit_type);
+
+    filter_str_getter!(per_unit_source_any, per_unit_source);
 
     filter_copy_getter!(placement_order_any, PlacementOrder, placement_order);
     filter_str_getter!(remainder_destination_any, remainder_destination);

@@ -37,32 +37,42 @@ impl AbilityResolver {
         let mut count: u8 = effect.count_or(0) as u8;
         let mut group_name = effect.group_name();
         if effect.per_unit_any().unwrap_or(false) {
-            let player = gs.resolve_target_player(&target);
-            let loc_binding = effect.location_any();
-            let location = loc_binding.unwrap_or(Zone::Stage.to_str());
-            let cards: Vec<i16> = util::zone_cards(player, location).to_vec();
-            let mut per_unit_filter = util::CardFilter::from_effect(effect);
-            per_unit_filter.card_type = None;
-            per_unit_filter.cost_limit = cost_limit;
-            let matching: Vec<i16> = cards
-                .iter()
-                .filter(|&&cid| per_unit_filter.matches(&gs.card_database, cid, false))
-                .copied()
-                .collect();
-            let matched_count = if matches!(
-                effect.distinct_any(),
-                Some(crate::card::DistinctType::CardName)
-            ) {
-                // Joint-aware distinct-name count (Q278/Q279): ordinary cards dedupe by
-                // name; a joint (multi-name) card adds one unit if it introduces a name
-                // not already present as a single-name card.
-                util::count_distinct_member_name_units(&matching, &gs.card_database) as u8
+            // "これによりデッキに置いたカード1枚につき" — count against the
+            // cards the PRECEDING sequential step moved, not a zone.
+            if effect
+                .per_unit_source_any()
+                .is_some_and(|s| s.contains("previous_moved"))
+            {
+                let per_unit_cnt = effect.per_unit_count_any().unwrap_or(1) as u8;
+                count = (self.moved_cards.len() as u8 / per_unit_cnt) * count.max(1);
             } else {
-                util::apply_distinct_filter(&matching, effect.distinct_any(), &gs.card_database)
-                    .len() as u8
-            };
-            let per_unit_cnt = effect.per_unit_count_any().unwrap_or(1) as u8;
-            count = (matched_count / per_unit_cnt) * count.max(1);
+                let player = gs.resolve_target_player(&target);
+                let loc_binding = effect.location_any();
+                let location = loc_binding.unwrap_or(Zone::Stage.to_str());
+                let cards: Vec<i16> = util::zone_cards(player, location).to_vec();
+                let mut per_unit_filter = util::CardFilter::from_effect(effect);
+                per_unit_filter.card_type = None;
+                per_unit_filter.cost_limit = cost_limit;
+                let matching: Vec<i16> = cards
+                    .iter()
+                    .filter(|&&cid| per_unit_filter.matches(&gs.card_database, cid, false))
+                    .copied()
+                    .collect();
+                let matched_count = if matches!(
+                    effect.distinct_any(),
+                    Some(crate::card::DistinctType::CardName)
+                ) {
+                    // Joint-aware distinct-name count (Q278/Q279): ordinary cards dedupe by
+                    // name; a joint (multi-name) card adds one unit if it introduces a name
+                    // not already present as a single-name card.
+                    util::count_distinct_member_name_units(&matching, &gs.card_database) as u8
+                } else {
+                    util::apply_distinct_filter(&matching, effect.distinct_any(), &gs.card_database)
+                        .len() as u8
+                };
+                let per_unit_cnt = effect.per_unit_count_any().unwrap_or(1) as u8;
+                count = (matched_count / per_unit_cnt) * count.max(1);
+            }
             group_name = None;
         }
         let max = effect.max.unwrap_or(false);

@@ -758,6 +758,10 @@ impl super::resolver::AbilityResolver {
                     entry.cost_paid = true;
                     entry.optional_cost_result = Some(true);
                 }
+                // Energy-count constants (「エネルギーがちょうどN枚あるかぎり」)
+                // are live state — re-evaluate right after the payment.
+                gs.mark_constants_dirty();
+                gs.recalculate_constants();
             }
             let energy_left = {
                 let player =

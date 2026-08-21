@@ -3588,6 +3588,10 @@ impl AbilityResolver {
         if count > 0 {
             let player = gs.resolve_target_player_mut(effect.target_name());
             player.energy_zone.pay_energy(count)?;
+            // Energy-count constants (「エネルギーがちょうどN枚あるかぎり」)
+            // are live state — re-evaluate right after the payment.
+            gs.mark_constants_dirty();
+            gs.recalculate_constants();
         }
         let pp = self.player_prefix(gs);
         let act_name = gs

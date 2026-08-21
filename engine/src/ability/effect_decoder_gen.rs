@@ -76,6 +76,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "per_unit" => { ek.per_unit = bc.read_bool_value(); return Some(true); }
             "per_unit_count" => { ek.per_unit_count = bc.read_u8_value(); return Some(true); }
             "per_unit_type" => { ek.per_unit_type = bc.read_arc_str_value(); return Some(true); }
+            "per_unit_source" => { ek.per_unit_source = bc.read_arc_str_value(); return Some(true); }
             "group_reference" => { ek.group_reference = bc.read_arc_str_value(); return Some(true); }
             "state" => { ek.state = bc.read_effect_state_value(); return Some(true); }
             "distinct" => { ek.distinct = bc.read_distinct_value(); return Some(true); }
@@ -317,6 +318,7 @@ pub(crate) struct EffectKindLocals {
     pub per_unit_count: Option<u8>,
     pub per_unit_heart_colors: Box<Vec<String>>,
     pub per_unit_location: Option<ArcStr>,
+    pub per_unit_source: Option<ArcStr>,
     pub per_unit_type: Option<ArcStr>,
     pub phase: Option<ArcStr>,
     pub picker: Option<ArcStr>,
@@ -394,6 +396,7 @@ fn build_filter(ek: &EffectKindLocals) -> Option<Box<EffectFilter>> {
         per_unit: ek.per_unit.clone(),
         per_unit_count: ek.per_unit_count.clone(),
         per_unit_type: ek.per_unit_type.clone(),
+        per_unit_source: ek.per_unit_source.clone(),
         group_reference: ek.group_reference.clone(),
         state: ek.state.clone(),
         distinct: ek.distinct.clone(),
