@@ -401,9 +401,14 @@ impl AbilityResolver {
             }
 
             if candidates.is_empty() {
-                let has_energy_in_text =
-                    effect.text.contains("エネルギー") || effect.text.contains("energy");
-                if has_energy_in_text {
+                // Energy fallback: only when the parser declares energy cards
+                // as an object of this state change (card_type or the mixed
+                // target_types list) — no effect-text sniffing.
+                let declares_energy = effect.card_type_any() == Some(&crate::card::CardType::Energy)
+                    || effect
+                        .target_types_any()
+                        .is_some_and(|t| t.iter().any(|s| s == "energy_card"));
+                if declares_energy {
                     if let Err(e) = self.execute_energy_state_change(
                         gs,
                         effect,
@@ -637,9 +642,12 @@ impl AbilityResolver {
             gs.trigger_auto_abilities_for_player(&p1);
             gs.trigger_auto_abilities_for_player(&p2);
 
-            let has_energy_in_text =
-                effect.text.contains("エネルギー") || effect.text.contains("energy");
-            if has_energy_in_text {
+            // Energy half of a mixed either/or state change: the parser
+            // declares it via target_types (e.g. [energy_card, member_card]).
+            let declares_energy_mixed = effect
+                .target_types_any()
+                .is_some_and(|t| t.iter().any(|s| s == "energy_card"));
+            if declares_energy_mixed {
                 if let Err(e) = self.execute_energy_state_change(
                     gs,
                     effect,

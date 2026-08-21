@@ -267,10 +267,12 @@ fn umi_opponent_score_exactly_six() {
 
     game.state.recalculate_constants();
 
-    let score_mod = game.state.mods.get_score_modifier(umi);
+    // 「ライブの合計スコアを＋１する」 is a live-TOTAL bonus: it lands in the
+    // per-player accumulator, not as a per-card modifier keyed under Umi's id.
+    let score_mod = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(
         score_mod, 1,
-        "Umi: opponent score >=6 → +1 score mod, got {}",
+        "Umi: opponent score >=6 → +1 live total score bonus, got {}",
         score_mod
     );
 }
@@ -308,16 +310,19 @@ fn umi_opponent_score_drops_below_threshold() {
     game.state.player2.success_live_card_zone.cards.push(live_6);
 
     game.state.recalculate_constants();
-    assert_eq!(game.state.mods.get_score_modifier(umi), 1);
+    assert_eq!(
+        game.state.mods.p1_constant_total_score_bonus, 1,
+        "opponent score >=6 → +1 live-total bonus"
+    );
 
     // Remove opponent's cards
     game.state.player2.success_live_card_zone.cards.clear();
     game.state.recalculate_constants();
 
-    let score_mod = game.state.mods.get_score_modifier(umi);
+    let score_mod = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(
         score_mod, 0,
-        "Umi: opponent cards removed → 0 score mod, got {}",
+        "Umi: opponent cards removed → 0 live-total bonus, got {}",
         score_mod
     );
 }

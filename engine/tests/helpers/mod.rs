@@ -1190,6 +1190,12 @@ impl TestGame {
         );
     }
 
+    /// Assert a card's total blade modifier.
+    pub fn assert_blade(&self, card_id: i16, expected: i32, msg: &str) {
+        let actual = self.state.mods.get_blade_modifier(card_id);
+        assert_eq!(actual, expected, "{}", msg);
+    }
+
     /// Assert the pending choice JSON has the expected card_id and card_name.
     /// This validates the identity metadata the frontend uses to render the header.
     /// Panics if there's no pending choice or the fields don't match.
@@ -1286,5 +1292,45 @@ impl TestGame {
                 msg, expected
             );
         }
+    }
+}
+
+// ── Free-function setup helpers ─────────────────────────────────────────────
+
+/// Fill BOTH players' main decks with `filler` (30 cards each), clearing any
+/// prior contents. Every test whose flow draws or mills MUST call this (or
+/// seed the decks itself) — an empty deck silently no-ops draws and triggers
+/// a deck-refresh mid-effect.
+pub fn fill_decks(game: &mut TestGame, filler: i16) {
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+}
+
+/// Put `card` on TOP of a player's main deck. Deck index 0 is the top:
+/// `draw()`, mills and look-at-top effects all consume from index 0, while
+/// `push()` adds to the BOTTOM of the deck.
+pub fn put_on_deck_top(game: &mut TestGame, player: u8, card: i16) {
+    let deck = match player {
+        0 => &mut game.state.player1.main_deck.cards,
+        _ => &mut game.state.player2.main_deck.cards,
+    };
+    deck.insert(0, card);
+}
+
+/// Seed a player's energy deck with `count` energy cards so effects that
+/// "place an energy card from the energy deck" have something to place.
+pub fn fill_energy_deck(game: &mut TestGame, player: u8, count: usize) {
+    let db = game.db.clone();
+    let deck = match player {
+        0 => &mut game.state.player1.energy_deck,
+        _ => &mut game.state.player2.energy_deck,
+    };
+    let energy = card_id(&db, "LL-E-001-SD");
+    for _ in 0..count {
+        deck.cards.push(energy);
     }
 }

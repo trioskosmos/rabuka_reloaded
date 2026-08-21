@@ -65,6 +65,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "group_names" => { ek.group_names = bc.read_opt_str_vec_value(); return Some(true); }
             "self_target" => { ek.self_target = bc.read_bool_value(); return Some(true); }
             "under_self" => { ek.under_self = bc.read_bool_value(); return Some(true); }
+            "target_types" => { ek.target_types = bc.read_opt_str_vec_value(); return Some(true); }
             "location" => { ek.location = bc.read_arc_str_value(); return Some(true); }
             "heart_colors" => { ek.heart_colors = bc.read_str_vec_value(); return Some(true); }
             "characters" => { ek.characters = bc.read_opt_str_vec_value(); return Some(true); }
@@ -356,6 +357,7 @@ pub(crate) struct EffectKindLocals {
     pub target_from_selection: Option<bool>,
     pub target_member: Option<ArcStr>,
     pub target_trigger: Option<ArcStr>,
+    pub target_types: Option<Box<Vec<String>>>,
     pub timing: Option<ArcStr>,
     pub timing_condition: Option<ArcStr>,
     pub treat_as: Option<ArcStr>,
@@ -380,6 +382,7 @@ fn build_filter(ek: &EffectKindLocals) -> Option<Box<EffectFilter>> {
         group_names: ek.group_names.clone(),
         self_target: ek.self_target.clone(),
         under_self: ek.under_self.clone(),
+        target_types: ek.target_types.clone(),
         location: ek.location.clone(),
         heart_colors: ek.heart_colors.clone(),
         source: ek.source.clone(),

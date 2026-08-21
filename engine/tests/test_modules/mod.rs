@@ -324,6 +324,7 @@ pub mod zero_tested_action_types_test;
 // Playthrough of coverage-gap test cards
 pub mod untested_abilities_playthrough_test;
 pub mod untested_abilities_batch2_test;
+pub mod untested_abilities_batch3_test;
 
 // Unique / edge-case ability tests
 pub mod unique_abilities_test;

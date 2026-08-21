@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-22T05:19:32.404727",
+  "generated_at": "2026-08-22T07:56:54.352832",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "7025fb86",
+  "engine_commit": "c5e7265d",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -1180,7 +1180,8 @@
           "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
-          "operation": "add"
+          "operation": "add",
+          "target": "live_total"
         }
       }
     },
@@ -1279,7 +1280,8 @@
           "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
-          "operation": "add"
+          "operation": "add",
+          "target": "live_total"
         }
       }
     },
@@ -1694,7 +1696,8 @@
             "text": "合計スコアを+2する",
             "action": "modify_score",
             "value": 2,
-            "operation": "add"
+            "operation": "add",
+            "target": "live_total"
           },
           "condition": {
             "type": "card_count_condition",
@@ -1718,7 +1721,8 @@
             "text": "ライブの合計スコアを+1する。",
             "action": "modify_score",
             "value": 1,
-            "operation": "add"
+            "operation": "add",
+            "target": "live_total"
           }
         }
       }
@@ -2539,7 +2543,8 @@
           "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
-          "operation": "add"
+          "operation": "add",
+          "target": "live_total"
         }
       }
     },
@@ -2832,7 +2837,8 @@
           "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
-          "operation": "add"
+          "operation": "add",
+          "target": "live_total"
         }
       }
     },
@@ -3001,7 +3007,8 @@
               "text": "ライブの合計スコアを+1する",
               "action": "modify_score",
               "value": 1,
-              "operation": "add"
+              "operation": "add",
+              "target": "live_total"
             }
           }
         ]
@@ -3089,7 +3096,8 @@
         "action": "modify_score",
         "value": 1,
         "operation": "add",
-        "activation_position": "center"
+        "activation_position": "center",
+        "target": "live_total"
       }
     },
     {
@@ -4328,7 +4336,8 @@
               "text": "ライブの合計スコアを+1する",
               "action": "modify_score",
               "value": 1,
-              "operation": "add"
+              "operation": "add",
+              "target": "live_total"
             }
           }
         ],
@@ -4888,7 +4897,11 @@
         ],
         "action": "change_state",
         "all": true,
-        "activation_position": "center"
+        "activation_position": "center",
+        "target_types": [
+          "energy_card",
+          "member_card"
+        ]
       }
     },
     {
@@ -5362,7 +5375,8 @@
         "conditional": true,
         "action": "modify_score",
         "value": 1,
-        "operation": "add"
+        "operation": "add",
+        "target": "live_total"
       }
     },
     {
@@ -5687,7 +5701,8 @@
             },
             "action": "modify_score",
             "value": 1,
-            "operation": "add"
+            "operation": "add",
+            "target": "live_total"
           }
         ]
       }
@@ -5950,7 +5965,8 @@
         "value": 1,
         "operation": "add",
         "activation_position": "center",
-        "position": "center"
+        "position": "center",
+        "target": "live_total"
       }
     },
     {
@@ -7038,7 +7054,8 @@
         "conditional": true,
         "action": "modify_score",
         "value": 1,
-        "operation": "add"
+        "operation": "add",
+        "target": "live_total"
       }
     },
     {
@@ -7287,7 +7304,8 @@
         "value": 1,
         "operation": "add",
         "activation_position": "center",
-        "position": "center"
+        "position": "center",
+        "target": "live_total"
       }
     },
     {
@@ -7871,7 +7889,8 @@
         "text": "ライブの合計スコアを+1する",
         "action": "modify_score",
         "value": 1,
-        "operation": "add"
+        "operation": "add",
+        "target": "live_total"
       }
     },
     {
@@ -9006,7 +9025,7 @@
         },
         "duration": "as_long_as",
         "conditional": true,
-        "target": "self",
+        "target": "live_total",
         "action": "modify_score",
         "value": 1,
         "operation": "add"
@@ -9126,7 +9145,8 @@
         "conditional": true,
         "action": "modify_score",
         "value": 1,
-        "operation": "add"
+        "operation": "add",
+        "target": "live_total"
       }
     },
     {
@@ -9403,7 +9423,8 @@
             },
             "action": "modify_score",
             "value": 1,
-            "operation": "add"
+            "operation": "add",
+            "target": "live_total"
           },
           {
             "text": "自分が余剰ハートを2つ以上持つ場合、ライブの合計スコアを-1する",
@@ -9416,7 +9437,8 @@
             },
             "action": "modify_score",
             "value": 1,
-            "operation": "remove"
+            "operation": "remove",
+            "target": "live_total"
           }
         ]
       }
@@ -10312,7 +10334,8 @@
           "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
-          "operation": "add"
+          "operation": "add",
+          "target": "live_total"
         }
       }
     },
@@ -11486,7 +11509,8 @@
         },
         "action": "modify_score",
         "value": 1,
-        "operation": "add"
+        "operation": "add",
+        "target": "live_total"
       }
     },
     {
@@ -13029,7 +13053,8 @@
                 "text": "ライブの合計スコアを+1する",
                 "action": "modify_score",
                 "value": 1,
-                "operation": "add"
+                "operation": "add",
+                "target": "live_total"
               }
             },
             "conditional_negation": true
@@ -14472,7 +14497,8 @@
             "text": "ライブの合計スコアを+2する",
             "action": "modify_score",
             "value": 2,
-            "operation": "add"
+            "operation": "add",
+            "target": "live_total"
           },
           "location": "success_live_card_zone"
         },
@@ -14513,7 +14539,8 @@
             "text": "ライブの合計スコアを+1する",
             "action": "modify_score",
             "value": 1,
-            "operation": "add"
+            "operation": "add",
+            "target": "live_total"
           },
           "location": "success_live_card_zone"
         },
@@ -14911,7 +14938,8 @@
             "text": "ライブの合計スコアを+1する",
             "action": "modify_score",
             "value": 1,
-            "operation": "add"
+            "operation": "add",
+            "target": "live_total"
           },
           "self_target": true
         }
@@ -15332,7 +15360,8 @@
           "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
-          "operation": "add"
+          "operation": "add",
+          "target": "live_total"
         }
       }
     },
@@ -15655,7 +15684,11 @@
         "group_names": [
           "虹ヶ咲"
         ],
-        "action": "change_state"
+        "action": "change_state",
+        "target_types": [
+          "energy_card",
+          "member_card"
+        ]
       }
     },
     {
@@ -15733,7 +15766,8 @@
         "conditional": true,
         "action": "modify_score",
         "value": 1,
-        "operation": "add"
+        "operation": "add",
+        "target": "live_total"
       }
     },
     {
@@ -16510,7 +16544,8 @@
         "operation": "add",
         "parenthetical": [
           "メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに戻す。"
-        ]
+        ],
+        "target": "live_total"
       }
     },
     {
@@ -19305,7 +19340,8 @@
         "action": "modify_score",
         "value": 1,
         "operation": "add",
-        "activation_position": "center"
+        "activation_position": "center",
+        "target": "live_total"
       }
     },
     {
@@ -19585,7 +19621,8 @@
           "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
-          "operation": "add"
+          "operation": "add",
+          "target": "live_total"
         }
       }
     },
@@ -20317,7 +20354,8 @@
         },
         "action": "modify_score",
         "value": 1,
-        "operation": "add"
+        "operation": "add",
+        "target": "live_total"
       }
     },
     {
@@ -20601,7 +20639,7 @@
         "group_names": [
           "Liella!"
         ],
-        "target": "self",
+        "target": "live_total",
         "card_property": "has_blade_heart",
         "negation": true
       }
@@ -22999,7 +23037,8 @@
           "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
-          "operation": "add"
+          "operation": "add",
+          "target": "live_total"
         }
       }
     },
@@ -24034,7 +24073,8 @@
           "text": "ライブの合計スコアを+3する",
           "action": "modify_score",
           "value": 3,
-          "operation": "add"
+          "operation": "add",
+          "target": "live_total"
         }
       }
     },
@@ -24575,7 +24615,8 @@
           "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
-          "operation": "add"
+          "operation": "add",
+          "target": "live_total"
         }
       }
     },

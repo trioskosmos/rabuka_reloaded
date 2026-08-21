@@ -761,6 +761,11 @@ pub struct EffectFilter {
     /// semantics). When set, the player does NOT choose which stage member
     /// receives the card — it auto-places under the activating member.
     pub under_self: Option<bool>,
+    /// Explicit multi-type target declaration parsed from either/or object
+    /// phrases in change_state steps (e.g. 「エネルギー1枚か『虹ヶ咲』の
+    /// メンバー1人をアクティブにする」→ ["energy_card", "member_card"]).
+    /// The engine branches on this instead of substring-matching effect text.
+    pub target_types: Option<Box<Vec<String>>>,
     pub location: Option<ArcStr>,
     pub heart_colors: Box<Vec<String>>,
     pub source: Option<Zone>,
@@ -1302,6 +1307,7 @@ impl AbilityEffect {
             same_name: bool_field!("same_name"),
             same_unit_name: bool_field!("same_unit_name"),
             group_names: opt_str_vec_field!("group_names"),
+            target_types: opt_str_vec_field!("target_types"),
             self_target: bool_field!("self_target"),
             under_self: bool_field!("under_self"),
             location: str_field!("location"),
@@ -1739,6 +1745,8 @@ impl AbilityEffect {
     }
 
     filter_opt_vec_ref_getter!(group_names_any, group_names);
+
+    filter_opt_vec_ref_getter!(target_types_any, target_types);
 
     filter_str_getter!(group_reference_any, group_reference);
 

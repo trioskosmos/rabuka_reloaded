@@ -1,28 +1,28 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-21T21:04:00.077306+00:00",
+  "generated_at": "2026-08-21T22:02:44.755800+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 410,
-  "n_tests": 2460,
+  "n_files": 411,
+  "n_tests": 2473,
   "total_cards": 771,
-  "covered_cards": 547,
-  "abilities_on_covered": 700,
+  "covered_cards": 555,
+  "abilities_on_covered": 709,
   "trigger_counts": {
     "起動": [
-      77,
+      78,
       96
     ],
     "登場": [
-      195,
+      200,
       269
     ],
     "ライブ開始時": [
-      192,
+      194,
       268
     ],
     "(none)": [
@@ -34,7 +34,7 @@
       122
     ],
     "常時": [
-      85,
+      86,
       117
     ],
     "自動": [
@@ -44,7 +44,7 @@
   },
   "action_counts": {
     "move_cards": [
-      112,
+      113,
       146
     ],
     "look_and_select": [
@@ -52,11 +52,11 @@
       72
     ],
     "gain_resource": [
-      115,
+      117,
       160
     ],
     "sequential": [
-      152,
+      156,
       217
     ],
     "unknown": [
@@ -64,11 +64,11 @@
       2
     ],
     "draw_card": [
-      30,
+      31,
       44
     ],
     "change_state": [
-      52,
+      53,
       63
     ],
     "play_baton_touch": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      404,
+      411,
       546
     ],
     "temporal_condition": [
@@ -190,11 +190,11 @@
       13
     ],
     "comparison_condition": [
-      34,
+      35,
       60
     ],
     "card_count_condition": [
-      69,
+      70,
       88
     ],
     "location_condition": [
@@ -260,15 +260,15 @@
       58
     ],
     "PR": [
-      38,
+      39,
       52
     ],
     "bp1": [
-      50,
+      52,
       56
     ],
     "bp3": [
-      56,
+      59,
       66
     ],
     "bp2": [
@@ -276,11 +276,11 @@
       68
     ],
     "bp4": [
-      63,
+      64,
       88
     ],
     "bp5": [
-      100,
+      102,
       134
     ],
     "bp6": [
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 528,
-    "none": 236,
+    "L2+choice": 537,
+    "none": 227,
     "L1+choice": 122,
     "L2": 35,
     "L1": 15
@@ -3649,14 +3649,30 @@
         "PL!-bp3-009-SEC"
       ],
       "base": "PL!-bp3-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch3_test.rs"
+      ],
+      "covering_tests": [
+        "kanata_bp3006_debut_enters_wait_state",
+        "niko_bp3009_activation_self_wait_and_heart_choice",
+        "niko_bp3009_cost13_condition_draw",
+        "niko_bp3009_no_cost13_no_draw",
+        "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
+        "ruby_bp5009_decline_optional_payment_fetches_nothing",
+        "suzuki_hsbp1008_mill_three_all_members_draws_one",
+        "suzuki_hsbp1008_mill_with_live_card_no_draw",
+        "wakashi_spbp1008_debut_draws_one_without_mei",
+        "wakashi_spbp1008_debut_draws_two_with_mei",
+        "yuna_sp222_exactly_eight_energy_scores_one",
+        "yuna_sp222_live_start_optional_energy_places_wait_energy"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -3676,14 +3692,30 @@
         "PL!-bp3-009-SEC"
       ],
       "base": "PL!-bp3-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch3_test.rs"
+      ],
+      "covering_tests": [
+        "kanata_bp3006_debut_enters_wait_state",
+        "niko_bp3009_activation_self_wait_and_heart_choice",
+        "niko_bp3009_cost13_condition_draw",
+        "niko_bp3009_no_cost13_no_draw",
+        "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
+        "ruby_bp5009_decline_optional_payment_fetches_nothing",
+        "suzuki_hsbp1008_mill_three_all_members_draws_one",
+        "suzuki_hsbp1008_mill_with_live_card_no_draw",
+        "wakashi_spbp1008_debut_draws_one_without_mei",
+        "wakashi_spbp1008_debut_draws_two_with_mei",
+        "yuna_sp222_exactly_eight_energy_scores_one",
+        "yuna_sp222_live_start_optional_energy_places_wait_energy"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -6657,7 +6689,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/ability_engine_fixes_test.rs",
-        "engine/tests/test_modules/sumire_bp2_center_cost_test.rs"
+        "engine/tests/test_modules/sumire_bp2_center_cost_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch3_test.rs"
       ],
       "covering_tests": [
         "all_equal_cost_no_heart",
@@ -6672,6 +6705,7 @@
         "chisato_003_rotation_full_stage",
         "chisato_003_rotation_partial_stage",
         "chisato_003_rotation_single_member",
+        "kanata_bp3006_debut_enters_wait_state",
         "kanon_unless_pay_pay_avoids_discard",
         "kanon_unless_pay_skip_triggers_discard",
         "karin_position_change_removes_not_moved_blade",
@@ -6682,16 +6716,15 @@
         "natsumi_009_no_draw_when_alone",
         "natsumi_009_no_draw_with_duplicate_in_hand",
         "natsumi_009_no_draw_with_non_5yncri5e",
-        "sumire_at_center_highest_gains_heart",
-        "three_distinct_costs_center_highest",
-        "wakana_008_choice_is_select_target_not_yes_no",
-        "wakana_008_debut_both_occupied_swap_either",
-        "wakana_008_debut_center_swap_with_left_occupant",
-        "wakana_008_debut_center_to_empty_left",
-        "wakana_008_debut_draw_last_card_then_move",
-        "wakana_008_debut_empty_deck_draw_noop_then_move"
+        "niko_bp3009_activation_self_wait_and_heart_choice",
+        "niko_bp3009_cost13_condition_draw",
+        "niko_bp3009_no_cost13_no_draw",
+        "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
+        "ruby_bp5009_decline_optional_payment_fetches_nothing",
+        "sumire_at_center_highest_gains_heart"
       ],
-      "covering_test_count": 47,
+      "covering_test_count": 60,
       "is_null": false
     },
     {
@@ -10755,14 +10788,30 @@
         "PL!S-bp5-009-AR"
       ],
       "base": "PL!S-bp5-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch3_test.rs"
+      ],
+      "covering_tests": [
+        "kanata_bp3006_debut_enters_wait_state",
+        "niko_bp3009_activation_self_wait_and_heart_choice",
+        "niko_bp3009_cost13_condition_draw",
+        "niko_bp3009_no_cost13_no_draw",
+        "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
+        "ruby_bp5009_decline_optional_payment_fetches_nothing",
+        "suzuki_hsbp1008_mill_three_all_members_draws_one",
+        "suzuki_hsbp1008_mill_with_live_card_no_draw",
+        "wakashi_spbp1008_debut_draws_one_without_mei",
+        "wakashi_spbp1008_debut_draws_two_with_mei",
+        "yuna_sp222_exactly_eight_energy_scores_one",
+        "yuna_sp222_live_start_optional_energy_places_wait_energy"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -11803,6 +11852,7 @@
         "engine/tests/test_modules/stellar_phoenix_test.rs",
         "engine/tests/test_modules/toubatsu_test.rs",
         "engine/tests/test_modules/untested_abilities_batch2_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch3_test.rs",
         "engine/tests/test_modules/untested_abilities_playthrough_test.rs",
         "engine/tests/test_modules/untested_choice_change_target_test.rs"
       ],
@@ -11838,7 +11888,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 671,
+      "covering_test_count": 684,
       "is_null": false
     },
     {
@@ -12033,14 +12083,30 @@
         "PL!SP-PR-025-PR"
       ],
       "base": "PL!-PR-021",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch3_test.rs"
+      ],
+      "covering_tests": [
+        "kanata_bp3006_debut_enters_wait_state",
+        "niko_bp3009_activation_self_wait_and_heart_choice",
+        "niko_bp3009_cost13_condition_draw",
+        "niko_bp3009_no_cost13_no_draw",
+        "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
+        "ruby_bp5009_decline_optional_payment_fetches_nothing",
+        "suzuki_hsbp1008_mill_three_all_members_draws_one",
+        "suzuki_hsbp1008_mill_with_live_card_no_draw",
+        "wakashi_spbp1008_debut_draws_one_without_mei",
+        "wakashi_spbp1008_debut_draws_two_with_mei",
+        "yuna_sp222_exactly_eight_energy_scores_one",
+        "yuna_sp222_live_start_optional_energy_places_wait_energy"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -12795,14 +12861,30 @@
         "PL!SP-bp1-008-P"
       ],
       "base": "PL!SP-bp1-008",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch3_test.rs"
+      ],
+      "covering_tests": [
+        "kanata_bp3006_debut_enters_wait_state",
+        "niko_bp3009_activation_self_wait_and_heart_choice",
+        "niko_bp3009_cost13_condition_draw",
+        "niko_bp3009_no_cost13_no_draw",
+        "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
+        "ruby_bp5009_decline_optional_payment_fetches_nothing",
+        "suzuki_hsbp1008_mill_three_all_members_draws_one",
+        "suzuki_hsbp1008_mill_with_live_card_no_draw",
+        "wakashi_spbp1008_debut_draws_one_without_mei",
+        "wakashi_spbp1008_debut_draws_two_with_mei",
+        "yuna_sp222_exactly_eight_energy_scores_one",
+        "yuna_sp222_live_start_optional_energy_places_wait_energy"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -12984,14 +13066,30 @@
         "PL!HS-bp1-008-P"
       ],
       "base": "PL!HS-bp1-008",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch3_test.rs"
+      ],
+      "covering_tests": [
+        "kanata_bp3006_debut_enters_wait_state",
+        "niko_bp3009_activation_self_wait_and_heart_choice",
+        "niko_bp3009_cost13_condition_draw",
+        "niko_bp3009_no_cost13_no_draw",
+        "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
+        "ruby_bp5009_decline_optional_payment_fetches_nothing",
+        "suzuki_hsbp1008_mill_three_all_members_draws_one",
+        "suzuki_hsbp1008_mill_with_live_card_no_draw",
+        "wakashi_spbp1008_debut_draws_one_without_mei",
+        "wakashi_spbp1008_debut_draws_two_with_mei",
+        "yuna_sp222_exactly_eight_energy_scores_one",
+        "yuna_sp222_live_start_optional_energy_places_wait_energy"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -13340,15 +13438,29 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/butterfly_wing_suppress_test.rs"
+        "engine/tests/test_modules/butterfly_wing_suppress_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch3_test.rs"
       ],
       "covering_tests": [
         "butterfly_wing_live_success_scores_with_live_start_members",
         "butterfly_wing_no_live_start_member_no_score",
         "butterfly_wing_q260_control_live_start_resolves",
-        "butterfly_wing_q260_suppressed_not_resolved"
+        "butterfly_wing_q260_suppressed_not_resolved",
+        "kanata_bp3006_debut_enters_wait_state",
+        "niko_bp3009_activation_self_wait_and_heart_choice",
+        "niko_bp3009_cost13_condition_draw",
+        "niko_bp3009_no_cost13_no_draw",
+        "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
+        "ruby_bp5009_decline_optional_payment_fetches_nothing",
+        "suzuki_hsbp1008_mill_three_all_members_draws_one",
+        "suzuki_hsbp1008_mill_with_live_card_no_draw",
+        "wakashi_spbp1008_debut_draws_one_without_mei",
+        "wakashi_spbp1008_debut_draws_two_with_mei",
+        "yuna_sp222_exactly_eight_energy_scores_one",
+        "yuna_sp222_live_start_optional_energy_places_wait_energy"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 17,
       "is_null": false
     },
     {
@@ -15726,14 +15838,30 @@
         "PL!N-bp3-006-P"
       ],
       "base": "PL!N-bp3-006",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch3_test.rs"
+      ],
+      "covering_tests": [
+        "kanata_bp3006_debut_enters_wait_state",
+        "niko_bp3009_activation_self_wait_and_heart_choice",
+        "niko_bp3009_cost13_condition_draw",
+        "niko_bp3009_no_cost13_no_draw",
+        "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
+        "ruby_bp5009_decline_optional_payment_fetches_nothing",
+        "suzuki_hsbp1008_mill_three_all_members_draws_one",
+        "suzuki_hsbp1008_mill_with_live_card_no_draw",
+        "wakashi_spbp1008_debut_draws_one_without_mei",
+        "wakashi_spbp1008_debut_draws_two_with_mei",
+        "yuna_sp222_exactly_eight_energy_scores_one",
+        "yuna_sp222_live_start_optional_energy_places_wait_energy"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -19524,14 +19652,30 @@
         "PL!SP-bp5-222-P＋"
       ],
       "base": "PL!SP-bp5-222",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch3_test.rs"
+      ],
+      "covering_tests": [
+        "kanata_bp3006_debut_enters_wait_state",
+        "niko_bp3009_activation_self_wait_and_heart_choice",
+        "niko_bp3009_cost13_condition_draw",
+        "niko_bp3009_no_cost13_no_draw",
+        "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
+        "ruby_bp5009_decline_optional_payment_fetches_nothing",
+        "suzuki_hsbp1008_mill_three_all_members_draws_one",
+        "suzuki_hsbp1008_mill_with_live_card_no_draw",
+        "wakashi_spbp1008_debut_draws_one_without_mei",
+        "wakashi_spbp1008_debut_draws_two_with_mei",
+        "yuna_sp222_exactly_eight_energy_scores_one",
+        "yuna_sp222_live_start_optional_energy_places_wait_energy"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -29751,14 +29895,30 @@
         "PL!SP-bp4-022-N"
       ],
       "base": "PL!SP-bp4-022",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch3_test.rs"
+      ],
+      "covering_tests": [
+        "kanata_bp3006_debut_enters_wait_state",
+        "niko_bp3009_activation_self_wait_and_heart_choice",
+        "niko_bp3009_cost13_condition_draw",
+        "niko_bp3009_no_cost13_no_draw",
+        "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
+        "ruby_bp5009_decline_optional_payment_fetches_nothing",
+        "suzuki_hsbp1008_mill_three_all_members_draws_one",
+        "suzuki_hsbp1008_mill_with_live_card_no_draw",
+        "wakashi_spbp1008_debut_draws_one_without_mei",
+        "wakashi_spbp1008_debut_draws_two_with_mei",
+        "yuna_sp222_exactly_eight_energy_scores_one",
+        "yuna_sp222_live_start_optional_energy_places_wait_energy"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {

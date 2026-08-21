@@ -499,13 +499,30 @@ impl GameState {
                             }
                             crate::ability::enums::ActionType::ModifyScore => {
                                 let sv = effect.value_any().unwrap_or(0) as i32;
-                                *exp_score.entry(card_id).or_insert(0) += sv as i16;
                                 if sv != 0 {
                                     self.mods.constant_score_sources.push((
                                         card_id,
                                         effect.text.to_string(),
                                         sv as i16,
                                     ));
+                                }
+                                // target="live_total" (parser-emitted for
+                                // 「ライブの合計スコアを＋１する」) modifies the
+                                // player's live TOTAL — route it into the same
+                                // per-player accumulator used by gained 常時
+                                // score abilities. Keying it under the member's
+                                // card_id could never match a live card and
+                                // silently no-op'd.
+                                if effect.target_any() == Some("live_total") {
+                                    let belongs_to_p1 =
+                                        self.player1.stage.stage.contains(&card_id);
+                                    if belongs_to_p1 {
+                                        p1_constant_score_bonus += sv;
+                                    } else {
+                                        p2_constant_score_bonus += sv;
+                                    }
+                                } else {
+                                    *exp_score.entry(card_id).or_insert(0) += sv as i16;
                                 }
                             }
                             crate::ability::enums::ActionType::Restriction => {

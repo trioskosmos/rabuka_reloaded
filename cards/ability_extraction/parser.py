@@ -10741,6 +10741,69 @@ def _fix_select_self_and_other(effect):
     walk(effect)
 
 
+def _mark_live_total_score(node):
+    """「ライブの合計スコアを＋１する」 modifies the player's live TOTAL, not
+    any specific card. Emit target="live_total" so the engine routes the bonus
+    into the per-player total-score accumulator instead of keying it under a
+    card id that can never match a live card (which silently no-op'd)."""
+    if isinstance(node, dict):
+        if node.get("action") == "modify_score":
+            txt = node.get("text") or ""
+            if ("合計スコア" in txt or "ライブのスコア" in txt) and node.get(
+                "target"
+            ) not in ("opponent", "相手"):
+                node["target"] = "live_total"
+        for v in node.values():
+            _mark_live_total_score(v)
+    elif isinstance(node, list):
+        for it in node:
+            _mark_live_total_score(it)
+
+
+def _state_energy_is_object(txt: str) -> bool:
+    """True when エネルギー is the OBJECT of a state change (activate/wait),
+    not merely mentioned (e.g. as an under-member count reference)."""
+    return bool(
+        re.search(
+            r"エネルギー(?:[0-9０-９一二三四五六]+枚)?を(?:すべて?)?(?:アクティブ|ウェイト)"
+            r"|すべてのエネルギーを"
+            r"|エネルギー[0-9０-９]*枚?か",
+            txt,
+        )
+    )
+
+
+def _state_member_is_object(txt: str) -> bool:
+    return bool(re.search(r"メンバー(?:[0-9０-９]+人)?を(?:アクティブ|ウェイト)", txt)) or bool(
+        re.search(r"メンバーと、", txt)
+    )
+
+
+def _mark_state_target_types(node):
+    """Declare the object types of change_state steps structurally.
+
+    Pure-energy steps already get card_type="energy_card"; this pass handles
+    MIXED either/or steps (「エネルギー1枚か『虹ヶ咲』のメンバー1人を
+    アクティブにする」) by emitting target_types=[energy_card, member_card]
+    so the engine can offer both candidate kinds without sniffing effect text.
+    """
+    if isinstance(node, dict):
+        if node.get("action") == "change_state":
+            txt = node.get("text") or ""
+            types = []
+            if _state_energy_is_object(txt):
+                types.append("energy_card")
+            if _state_member_is_object(txt):
+                types.append("member_card")
+            if len(types) >= 2:
+                node["target_types"] = types
+        for v in node.values():
+            _mark_state_target_types(v)
+    elif isinstance(node, list):
+        for it in node:
+            _mark_state_target_types(it)
+
+
 def _normalize_effect_tree(effect, original_text=None):
     if not effect or not isinstance(effect, dict):
         return effect
@@ -10761,6 +10824,8 @@ def _normalize_effect_tree(effect, original_text=None):
                 _strip_leaked_draw_g(it)
     _strip_leaked_draw_g(effect)
     _enrich_gain_abilities(effect)
+    _mark_live_total_score(effect)
+    _mark_state_target_types(effect)
     _enrich_characters(effect)
     _clean_gain_resource(effect)
     _fix_select_self_and_other(effect)
