@@ -734,6 +734,15 @@ def _find_depth0(text: str, marker: str) -> int:
     return -1
 
 
+def _split_marker_depth0(text: str, marker: str):
+    """Split on the first top-level `marker` occurrence. Returns
+    (before, after) or None when the marker only occurs inside brackets."""
+    idx = _find_depth0(text, marker)
+    if idx < 0:
+        return None
+    return text[:idx], text[idx + len(marker) :]
+
+
 def _segment_sentence(s: str) -> Dict[str, Any]:
     """Classify one sentence: optional link prefix + optional leading gate."""
     link = None
@@ -8436,7 +8445,9 @@ def _try_conditional_sequential(text):
     """そうした場合 — conditional sequential actions."""
     if CONDITIONAL_SEQUENTIAL_MARKER not in text:
         return None
-    parts = text.split(CONDITIONAL_SEQUENTIAL_MARKER, SPLIT_LIMIT)
+    parts = _split_marker_depth0(text, CONDITIONAL_SEQUENTIAL_MARKER)
+    if parts is None:
+        return None
     fp = parts[0].strip()
     sp = parts[1].strip()
 
@@ -8552,7 +8563,9 @@ def _try_sequential(text):
     (moved from position 17 to position 12 in _EFFECT_HANDLERS)."""
     if SEQUENTIAL_MARKER not in text:
         return None
-    parts = text.split(SEQUENTIAL_MARKER, 1)
+    parts = _split_marker_depth0(text, SEQUENTIAL_MARKER)
+    if parts is None:
+        return None
     fa = parse_effect(parts[0].strip())
     sp = parts[1].strip().lstrip("、")
     if sp.startswith("此后"):
@@ -9095,7 +9108,9 @@ def _try_sou_shinakatta(text):
     """そうしなかった場合 — conditional on optional action NOT taken."""
     if "そうしなかった場合" not in text:
         return None
-    parts = text.split("そうしなかった場合", SPLIT_LIMIT)
+    parts = _split_marker_depth0(text, "そうしなかった場合")
+    if parts is None:
+        return None
     opt_text = parts[0].strip()
     fa = parse_action(opt_text)
     # If optional action starts with "相手は" (opponent does X), set target to opponent
