@@ -102,3 +102,6 @@ engine/tests/data/cards.json
 test_output/
 engine/profile_folded.txt
 engine/profile_stderr.txt
+
+# Rust build artifacts
+platforms/*/target/
