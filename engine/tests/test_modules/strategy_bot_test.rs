@@ -4,7 +4,7 @@
 //!    opponent's *hidden* cards change (only public info may influence it).
 //! 2. The heuristic policy beats uniform-random play over a batch of games.
 
-use rabuka_engine::bot::strategy;
+use rabuka_engine::bot::{strategy, strategy_v2, strategy_v3};
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup;
@@ -379,6 +379,404 @@ fn csv_escape(s: &str) -> String {
     } else {
         s.to_string()
     }
+}
+
+/// V2 (yell-math live-set policy + mulligan policy) vs V1 (greedy live-set,
+/// no mulligan). Both sides use the same heuristic main-phase eval — the
+/// difference is purely the phase policies. Target: v2 dominates v1 at a
+/// rate comparable to v1's edge over random.
+#[test]
+fn strategy_v2_beats_v1() {
+    let mut db = fresh_database();
+    let nums = load_test_deck(&db);
+    let (t1, t2) = build_templates(&mut db, &nums);
+
+    const BUDGET_SECS: u64 = 10;
+    let mut rng = Lcg(0x2B0C_5EED_DEAD_0002);
+    let t0 = std::time::Instant::now();
+    let mut p1_wins = 0u32;
+    let mut p2_wins = 0u32;
+    let mut draws = 0u32;
+    let mut total_actions = 0u64;
+    let mut total_turns = 0u64;
+    let policy = rabuka_engine::bot::V2Policy::default();
+
+    let mut game_idx = 0usize;
+    while t0.elapsed().as_secs() < BUDGET_SECS {
+        game_idx += 1;
+        let mut gs = deal_from_templates(&db, &t1, &t2);
+        let mut last_turn = 0u8;
+        let mut stuck = 0u32;
+
+        for _ in 0..600 {
+            TurnEngine::check_victory_condition(&mut gs);
+            if gs.game_result != GameResult::Ongoing {
+                break;
+            }
+            if gs.turn_number == last_turn {
+                stuck += 1;
+                if stuck > 200 {
+                    break;
+                }
+            } else {
+                stuck = 0;
+                last_turn = gs.turn_number;
+            }
+
+            if game_setup::auto_advance_one(&mut gs) {
+                continue;
+            }
+
+            let actions = game_setup::generate_possible_actions(&gs);
+            if actions.is_empty() {
+                TurnEngine::advance_phase(&mut gs);
+                continue;
+            }
+
+            use rabuka_engine::game_setup::ActionType;
+            let active_is_p1 = gs.active_player().id == "p1";
+
+            // RPS: sandbox routes prompts to P1 then P2; both random.
+            if gs.current_phase == rabuka_engine::game_state::Phase::RockPaperScissors {
+                let a = &actions[rng.range(actions.len())];
+                let _ = game_setup::execute_action(&mut gs, a);
+                game_setup::settle_single_player_state(&mut gs);
+                continue;
+            }
+
+            // S6: winner of RPS prefers second attacker when it is P1's pick.
+            if gs.current_phase == rabuka_engine::game_state::Phase::ChooseFirstAttacker {
+                let a = if gs.rps_winner == Some(1) {
+                    actions
+                        .iter()
+                        .find(|a| a.action_type == ActionType::ChooseSecondAttacker)
+                        .unwrap_or(&actions[0])
+                } else {
+                    &actions[rng.range(actions.len())]
+                };
+                let _ = game_setup::execute_action(&mut gs, a);
+                game_setup::settle_single_player_state(&mut gs);
+                continue;
+            }
+
+            // Mulligan: P1 uses the v2 curve policy, P2 keeps its hand.
+            if matches!(
+                gs.current_phase,
+                rabuka_engine::game_state::Phase::MulliganFirstAttacker
+                    | rabuka_engine::game_state::Phase::MulliganSecondAttacker
+            ) {
+                let a = if active_is_p1 {
+                    strategy_v2::choose_mulligan_action_v2(&gs, &actions, &db)
+                } else if let Some(a) = actions.iter().find(|a| {
+                    matches!(a.action_type, ActionType::ConfirmMulligan | ActionType::SkipMulligan)
+                }) {
+                    a.clone()
+                } else {
+                    actions[rng.range(actions.len())].clone()
+                };
+                let _ = game_setup::execute_action(&mut gs, &a);
+                game_setup::settle_single_player_state(&mut gs);
+                continue;
+            }
+
+            // Live Card Set: P1 = v2 yell math, P2 = v1 greedy.
+            if matches!(
+                gs.current_phase,
+                rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker
+                    | rabuka_engine::game_state::Phase::LiveCardSetSecondAttacker
+            ) {
+                let a = if active_is_p1 {
+                    strategy_v2::choose_live_set_action_v2(
+                        &gs,
+                        &actions,
+                        &db,
+                        &policy,
+                    )
+                } else {
+                    strategy::choose_live_set_action(&gs, &actions, &db)
+                };
+                let _ = game_setup::execute_action(&mut gs, &a);
+                game_setup::settle_single_player_state(&mut gs);
+                continue;
+            }
+
+            // Main phase: P1 uses the v2 evaluation (pressure + blade value).
+            let action = if active_is_p1 {
+                strategy_v2::choose_action_heuristic_v2(&gs, &actions, 0)
+            } else {
+                strategy::choose_action_heuristic(&gs, &actions, 1)
+            };
+            let _ = game_setup::execute_action(&mut gs, &action);
+            game_setup::settle_single_player_state(&mut gs);
+            total_actions += 1;
+        }
+        total_turns += gs.turn_number as u64;
+        let p1z = gs.player1.success_live_card_zone.cards.len();
+        let p2z = gs.player2.success_live_card_zone.cards.len();
+        if p1z >= 3 && p2z <= 2 {
+            p1_wins += 1;
+        } else if p2z >= 3 && p1z <= 2 {
+            p2_wins += 1;
+        } else {
+            draws += 1;
+        }
+        drop(gs);
+    }
+
+    let dt = t0.elapsed().as_secs_f64();
+    eprintln!(
+        "v2 (P1) vs v1 (P2) over {} games in {:.1}s: {:.1} gps | P1 {} - P2 {} - draws {}",
+        game_idx,
+        dt,
+        game_idx as f64 / dt.max(0.001),
+        p1_wins, p2_wins, draws
+    );
+    eprintln!(
+        "  per game: {:.1} turns, {:.1} player actions",
+        total_turns as f64 / game_idx as f64,
+        total_actions as f64 / game_idx as f64
+    );
+    assert!(
+        p1_wins > p2_wins,
+        "v2 ({p1_wins} wins) did not beat v1 ({p2_wins} wins) over {game_idx} games"
+    );
+}
+
+/// V3 (planning: rush window, curve milestones, acquisition deltas) vs V2.
+/// Runs two mirror matchups: the fade deck (pure ramp — no cheap lives) and
+/// the hasunosora cup deck (cheap lives → rush plan activates). V3 must beat
+/// V2 in BOTH, proving the planning layer helps in both modes.
+#[test]
+fn strategy_v3_beats_v2() {
+    let mut results = Vec::new();
+    for deck_file in ["fade deck.txt", "hasunosora_cup.txt"] {
+        let (p1_wins, p2_wins, draws, games) = run_v3_vs_v2(deck_file);
+        eprintln!(
+            "v3 vs v2 [{deck_file}]: {} games | P1(v3) {} - P2(v2) {} - draws {}",
+            games, p1_wins, p2_wins, draws
+        );
+        results.push((deck_file.to_string(), p1_wins, p2_wins));
+    }
+    for (deck, p1w, p2w) in &results {
+        assert!(
+            p1w > p2w,
+            "v3 ({p1w}) did not beat v2 ({p2w}) on {deck}"
+        );
+    }
+}
+
+fn run_v3_vs_v2(deck_file: &str) -> (u32, u32, u32, usize) {
+    let mut db = fresh_database();
+    let deck_path = std::path::Path::new("../web_ui/decks")
+        .join(deck_file);
+    let deck = DeckParser::parse_deck_file(&deck_path)
+        .unwrap_or_else(|e| panic!("parse {deck_file}: {e}"));
+    let nums = DeckParser::deck_list_to_card_numbers(&deck);
+    let (t1, t2) = build_templates(&mut db, &nums);
+
+    const BUDGET_SECS: u64 = 8;
+    let mut rng = Lcg(0x3CEF_0001_BEEF_0003);
+    let t0 = std::time::Instant::now();
+    let mut p1_wins = 0u32;
+    let mut p2_wins = 0u32;
+    let mut draws = 0u32;
+    let mut stalls = 0u32;
+    let policy = rabuka_engine::bot::V2Policy::default();
+
+    let mut game_idx = 0usize;
+    while t0.elapsed().as_secs() < BUDGET_SECS {
+        game_idx += 1;
+        let mut gs = deal_from_templates(&db, &t1, &t2);
+        // Both sides get their own plan (detected from their own perspective).
+        let plan_p1 = rabuka_engine::bot::V3Plan::detect(&gs, 0, &db);
+        let plan_p2 = rabuka_engine::bot::V3Plan::detect(&gs, 1, &db);
+        let mut last_turn = 0u8;
+        let mut stuck = 0u32;
+        let mut stalled = false;
+        let mut last_actions: Vec<String> = Vec::new();
+
+        for _ in 0..600 {
+            TurnEngine::check_victory_condition(&mut gs);
+            if gs.game_result != GameResult::Ongoing {
+                break;
+            }
+            if gs.turn_number == last_turn {
+                stuck += 1;
+                if stuck > 200 {
+                    break;
+                }
+            } else {
+                stuck = 0;
+                last_turn = gs.turn_number;
+            }
+
+            if game_setup::auto_advance_one(&mut gs) {
+                continue;
+            }
+
+            let actions = game_setup::generate_possible_actions(&gs);
+            if actions.is_empty() {
+                TurnEngine::advance_phase(&mut gs);
+                continue;
+            }
+
+            use rabuka_engine::game_setup::ActionType;
+            let active_is_p1 = gs.active_player().id == "p1";
+            let (plan_me, my_index) = if active_is_p1 {
+                (&plan_p1, 0usize)
+            } else {
+                (&plan_p2, 1usize)
+            };
+
+            if gs.current_phase == rabuka_engine::game_state::Phase::RockPaperScissors {
+                let a = &actions[rng.range(actions.len())];
+                let _ = game_setup::execute_action(&mut gs, a);
+                game_setup::settle_single_player_state(&mut gs);
+                continue;
+            }
+
+            if gs.turn_number == last_turn {
+                stuck += 1;
+                if stuck > 200 {
+                    stalled = true;
+                    break;
+                }
+            } else {
+                stuck = 0;
+                last_turn = gs.turn_number;
+            }
+
+            if gs.current_phase == rabuka_engine::game_state::Phase::ChooseFirstAttacker {
+                let a = if gs.rps_winner == Some(1) && active_is_p1 {
+                    actions
+                        .iter()
+                        .find(|a| a.action_type == ActionType::ChooseSecondAttacker)
+                        .unwrap_or(&actions[0])
+                } else if gs.rps_winner == Some(2) && !active_is_p1 {
+                    actions
+                        .iter()
+                        .find(|a| a.action_type == ActionType::ChooseSecondAttacker)
+                        .unwrap_or(&actions[0])
+                } else {
+                    &actions[rng.range(actions.len())]
+                };
+                let _ = game_setup::execute_action(&mut gs, a);
+                game_setup::settle_single_player_state(&mut gs);
+                continue;
+            }
+
+            if matches!(
+                gs.current_phase,
+                rabuka_engine::game_state::Phase::MulliganFirstAttacker
+                    | rabuka_engine::game_state::Phase::MulliganSecondAttacker
+            ) {
+                // Both sides use the v2 mulligan (shared capability).
+                let a = strategy_v2::choose_mulligan_action_v2(&gs, &actions, &db);
+                let _ = game_setup::execute_action(&mut gs, &a);
+                game_setup::settle_single_player_state(&mut gs);
+                continue;
+            }
+
+            if matches!(
+                gs.current_phase,
+                rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker
+                    | rabuka_engine::game_state::Phase::LiveCardSetSecondAttacker
+            ) {
+                let a = if active_is_p1 {
+                    strategy_v3::choose_live_set_action_v3(&gs, &actions, &db, &policy, plan_me)
+                } else {
+                    strategy_v2::choose_live_set_action_v2(&gs, &actions, &db, &policy)
+                };
+                let _ = game_setup::execute_action(&mut gs, &a);
+                game_setup::settle_single_player_state(&mut gs);
+                continue;
+            }
+
+            let action = if active_is_p1 {
+                strategy_v3::choose_action_heuristic_v3(&gs, &actions, my_index as u8, plan_me)
+            } else {
+                strategy_v2::choose_action_heuristic_v2(&gs, &actions, my_index as u8)
+            };
+            last_actions.push(format!(
+                "t{} {:?} {}",
+                gs.turn_number,
+                gs.current_phase,
+                action.description
+            ));
+            if last_actions.len() > 6 {
+                last_actions.remove(0);
+            }
+            let exec_result = game_setup::execute_action(&mut gs, &action);
+            let exec_note = match &exec_result {
+                Ok(()) => "ok".to_string(),
+                Err(e) => format!("ERR: {e}"),
+            };
+            if gs.turn_number == last_turn && stuck > 180 {
+                eprintln!(
+                    "[loopdiag] t={} stuck={} hand={} wr_lives={} energy={}/{} act='{}' -> {}",
+                    gs.turn_number,
+                    stuck,
+                    gs.active_player().hand.cards.len(),
+                    gs.active_player()
+                        .waitroom
+                        .cards
+                        .iter()
+                        .filter(|&&cid| {
+                            gs.card_database
+                                .get_card(cid)
+                                .map_or(false, |c| matches!(c.card_type, rabuka_engine::card::CardType::Live))
+                        })
+                        .count(),
+                    gs.active_player().energy_zone.active_count(),
+                    gs.active_player().energy_zone.cards.len(),
+                    action.description.chars().take(40).collect::<String>(),
+                    exec_note
+                );
+            }
+            game_setup::settle_single_player_state(&mut gs);
+        }
+
+        let p1z = gs.player1.success_live_card_zone.cards.len();
+        let p2z = gs.player2.success_live_card_zone.cards.len();
+        if stalled {
+            stalls += 1;
+            if stalls <= 3 {
+                eprintln!(
+                    "[stall #{stalls}] turn={} phase={:?} p1z={p1z} p2z={p2z} pending={} p1(hand={},deck={},energy={}/{}) p2(hand={},deck={},energy={}/{}) recent: {:?}",
+                    gs.turn_number,
+                    gs.current_phase,
+                    gs.has_pending_choice(),
+                    gs.player1.hand.cards.len(),
+                    gs.player1.main_deck.cards.len(),
+                    gs.player1.energy_zone.active_count(),
+                    gs.player1.energy_zone.cards.len(),
+                    gs.player2.hand.cards.len(),
+                    gs.player2.main_deck.cards.len(),
+                    gs.player2.energy_zone.active_count(),
+                    gs.player2.energy_zone.cards.len(),
+                    last_actions
+                );
+            }
+        } else if p1z >= 3 && p2z <= 2 {
+            p1_wins += 1;
+        } else if p2z >= 3 && p1z <= 2 {
+            p2_wins += 1;
+        } else {
+            draws += 1;
+        }
+        drop(gs);
+    }
+
+    let dt = t0.elapsed().as_secs_f64();
+    eprintln!(
+        "  outcomes: v3 {} - v2 {} - rule-draws {} - STALLS {}",
+        p1_wins, p2_wins, draws, stalls
+    );
+    eprintln!(
+        "  ({game_idx} games in {dt:.1}s, {:.1} gps)",
+        game_idx as f64 / dt.max(0.001)
+    );
+    (p1_wins, p2_wins, draws, game_idx)
 }
 
 #[test]

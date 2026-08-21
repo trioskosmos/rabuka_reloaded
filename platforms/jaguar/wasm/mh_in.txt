@@ -1,0 +1,2 @@
+(invoke "rabuka_wasm_match" (i32.const 24249))
+(invoke "rabuka_wasm_heap_highwater")

@@ -91,6 +91,8 @@ static void blank_line(void) {
 static void row_append(int row, const unsigned char *bytes, int nbytes) {
     memcpy(lines[row] + row_len[row], bytes, nbytes);
     row_len[row] += nbytes;
+    lines[row][row_len[row]] = '\0'; /* re-terminate: shorter strings
+        overwrite longer ones, and paint() draws C strings */
 }
 
 /* Append a converted glyph run to the grid, wrapping on pixel width.

@@ -7,7 +7,7 @@
 //! `ui` namespace like the 3DS port, while the files stay where the toolchain
 //! expects.
 
-pub use crate::board::{Board, BoardFrame};
-pub use crate::card_art_gen::{CardArt, CARD_ART};
+pub use crate::board::{Board, BoardFrame, Slot, HAND_VISIBLE};
+pub use crate::card_art_gen::{CardArt, CardFront, BOARD_UI, CARD_ART, CARD_FRONTS};
 pub use crate::display::Display;
 pub use crate::font_tiles_gen::{FONT_GLYPHS, FONT_TILES};

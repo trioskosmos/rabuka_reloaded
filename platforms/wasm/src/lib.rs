@@ -93,6 +93,18 @@ impl PlatformUi for HostUi {
     fn wait_vblank(&mut self) {
         unsafe { host_wait_vblank() }
     }
+    // ---- layout (see engine PlatformUi docs) ----
+    // DC BIOS font: 12px thin (ASCII) / 24px wide (CJK) glyphs on a
+    // 640px line => 53 half-width columns. CJK = 2 columns matches the
+    // trait's convention exactly.
+    fn option_cols(&self) -> usize {
+        53
+    }
+    // 20 rows of 24px; menus get title + ".. N more" lines around the
+    // list, so offer 17 item rows.
+    fn option_rows(&self) -> usize {
+        17
+    }
 }
 
 fn load_deck_cards(idx1: usize, idx2: usize) -> Vec<Card> {
@@ -128,13 +140,15 @@ pub extern "C" fn rabuka_wasm_game_run(seed: u32) -> u32 {
 
 // ---- Bump allocator over a static heap in linear memory ----
 // Console targets run the engine in well under 1MB (GBA fits 288KB);
-// 4MB leaves headroom while keeping Dreamcast RAM comfortable (16MB total).
-const HEAP_SIZE: usize = 4 * 1024 * 1024;
+// 512KB keeps wasm linear memory at ~10 pages so the Jaguar port
+// (2MB DRAM, code XIP from cart) has room for shell + text screen too.
+const HEAP_SIZE: usize = 512 * 1024;
 
 struct BumpAlloc(u32);
 
 static mut HEAP: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
 static mut CURSOR: usize = 0;
+static mut HIGH_WATER: usize = 0;
 
 #[global_allocator]
 static GLOBAL_ALLOC: BumpAlloc = BumpAlloc(0);
@@ -148,9 +162,29 @@ unsafe impl GlobalAlloc for BumpAlloc {
             return core::ptr::null_mut();
         }
         CURSOR = end;
+        if end > HIGH_WATER {
+            HIGH_WATER = end;
+        }
         HEAP.as_mut_ptr().add(aligned)
     }
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {}
+}
+
+/// Peak bytes handed out by the bump allocator across all allocations so far
+/// (allocations are never freed, so this equals total bytes ever allocated).
+/// Used to size HEAP_SIZE for RAM-constrained consoles (Jaguar: 2MB DRAM).
+#[no_mangle]
+pub extern "C" fn rabuka_wasm_heap_highwater() -> u32 {
+    unsafe { HIGH_WATER as u32 }
+}
+
+/// Zero-arg diagnostic for `wasm-interp --run-all-exports` (which only invokes
+/// nullary exports): runs a full headless match at the standard seed, then
+/// returns `(heap_highwater << 8) | match_result`.
+#[no_mangle]
+pub extern "C" fn rabuka_wasm_match_probe() -> u32 {
+    let r = rabuka_wasm_match(0x5EED);
+    (unsafe { HIGH_WATER as u32 } << 8) | (r & 0xFF)
 }
 
 #[panic_handler]

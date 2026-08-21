@@ -21,7 +21,7 @@ import os
 import sys
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "cards"))
@@ -32,6 +32,15 @@ ART_W = 96  # 12 tiles
 ART_H = 128  # 16 tiles
 N_COLORS = 240  # leave indices 240-255 (bank 15) for the 4bpp text palette
 TILE = 8
+
+# On-board card fronts: small 4bpp sprites-in-the-background, one 16-colour
+# palette bank per card (banks 1-15; bank 0 is the shared text/board palette).
+# Portrait ratios so card art keeps its proportions.
+FRONT_W = 32  # hand cards, 4 tiles
+FRONT_H = 40  # 5 tiles
+STAGE_W = 40  # stage cards, 5 tiles
+STAGE_H = 48  # 6 tiles
+FRONT_COLORS = 16
 
 CACHE = REPO / "platforms" / "3ds" / ".card_png_cache"
 OUT = REPO / "platforms" / "gba" / "src" / "card_art_gen.rs"
@@ -69,9 +78,332 @@ def to_rgb15(r, g, b):
     return ((r >> 3) & 31) | (((g >> 3) & 31) << 5) | (((b >> 3) & 31) << 10)
 
 
+def pack_4bpp_tiles(px, w, h, tiles_w, tiles_h):
+    """Pack pixels (palette indices) into 4bpp tiles, ty-major then tx.
+
+    Tile (tx, ty) starts at byte ((ty * tiles_w) + tx) * 16; within a tile the
+    8x8 pixels are row-major with the LOW nibble holding the left pixel.
+    """
+    out = bytearray(tiles_w * tiles_h * 32)
+    for ty in range(tiles_h):
+        for tx in range(tiles_w):
+            base = (ty * tiles_w + tx) * 32
+            for rr in range(TILE):
+                for cc in range(TILE):
+                    v = px[tx * TILE + cc, ty * TILE + rr] & 0x0F
+                    out[base + rr * (TILE // 2) + cc // 2] |= v if cc % 2 == 0 else v << 4
+    return bytes(out)
+
+
+def pack_8bpp_tiles(px, w, h, tiles_w, tiles_h):
+    """Pack 8bpp palette indices into tiles, ty-major then tx. 64B per tile."""
+    out = bytearray(tiles_w * tiles_h * 64)
+    for ty in range(tiles_h):
+        for tx in range(tiles_w):
+            base = (ty * tiles_w + tx) * 64
+            for rr in range(TILE):
+                for cc in range(TILE):
+                    out[base + rr * TILE + cc] = px[tx * TILE + cc, ty * TILE + rr] & 0xFF
+    return bytes(out)
+
+
+def palette_bytes_16(pal, n=16):
+    """First n entries of a PIL palette as rgb15 little-endian bytes."""
+    out = bytearray()
+    for i in range(n):
+        r, g, b = pal[i * 3], pal[i * 3 + 1], pal[i * 3 + 2]
+        c = to_rgb15(r, g, b)
+        out += bytes([c & 0xFF, c >> 8])
+    return bytes(out)
+
+
+def bake_ui_tiles():
+    """Shared board UI tiles (bank-0 palette): empty stage slot (5x6), empty
+    hand slot (4x5), gold badge, focus marker.
+
+    Bank-0 palette indices (see display.rs TEXT_PALETTE):
+    0 transparent/backdrop, 1 white, 2 zone fill, 3 card back, 4 gold,
+    5 green, 6 dim.
+    """
+    tiles = []
+
+    def empty_slot(tiles_w, tiles_h):
+        out = []
+        for _ in range(tiles_w * tiles_h):
+            t = [2] * 64
+            for i in range(8):
+                t[i] = 6
+                t[56 + i] = 6
+                t[i * 8] = 6
+                t[i * 8 + 7] = 6
+            # inner shadow on the top row of tiles for a recessed look
+            for xx in range(8):
+                if t[xx] == 2:
+                    t[xx] = 3
+            out.extend(t)
+        return out
+
+    tiles.append(empty_slot(5, 6))  # stage: 30 tiles
+    tiles.append(empty_slot(4, 5))  # hand: 20 tiles
+
+    # Actionable badge: gold diamond on transparent.
+    badge = [[0] * 8 for _ in range(8)]
+    for y in range(8):
+        d = abs(y - 3.5)
+        for x in range(8):
+            if abs(x - 3.5) + d <= 3:
+                badge[y][x] = 4
+    tiles.append([badge[y][x] for y in range(8) for x in range(8)])
+
+    # Focus marker: white right-pointing triangle on transparent.
+    marker = [[0] * 8 for _ in range(8)]
+    for y in range(8):
+        for x in range(8):
+            if x <= 3 + abs(y - 3.5) * 1.4:
+                marker[y][x] = 1
+    tiles.append([marker[y][x] for y in range(8) for x in range(8)])
+
+    flat = bytearray()
+    for t in tiles:
+        for rr in range(TILE):
+            for cc in range(0, TILE, 2):
+                flat.append(t[rr * TILE + cc] | (t[rr * TILE + cc + 1] << 4))
+    return bytes(flat)  # 52 tiles x 32 bytes
+
+
+def preprocess(img):
+    """Boost saturation/contrast and sharpen so detail survives 16-colour
+    quantization at thumbnail scale."""
+    img = ImageEnhance.Color(img).enhance(1.35)
+    img = ImageEnhance.Contrast(img).enhance(1.18)
+    img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=90, threshold=2))
+    return img
+
+
+def darkest_index(pal):
+    """Palette index of the darkest colour (for the baked outline)."""
+    best, best_l = 0, 1e9
+    for i in range(FRONT_COLORS):
+        r, g, b = pal[i * 3], pal[i * 3 + 1], pal[i * 3 + 2]
+        l = 0.3 * r + 0.6 * g + 0.1 * b
+        if l < best_l:
+            best_l, best = l, i
+    return best
+
+
+def build_master_palette(thumbnails):
+    """Build a single 256-colour master palette from all thumbnails (as Tonc
+    recommends: one shared 8bpp palette for a tiled BG, vs per-tile 16-colour
+    banks). `thumbnails` is a list of RGB PIL Images already resized to
+    target sizes. Returns (master_palette_image P mode, rgb15 bytes)."""
+    if not thumbnails:
+        raise ValueError("no thumbnails for master palette")
+    # Stack vertically into one tall image for quantization
+    w = thumbnails[0].width
+    total_h = sum(im.height for im in thumbnails)
+    composite = Image.new("RGB", (w, total_h), (0, 0, 0))
+    y = 0
+    for im in thumbnails:
+        # centre narrower thumbs (stage vs hand widths) horizontally
+        x = (w - im.width) // 2
+        composite.paste(im, (x, y))
+        y += im.height
+    # Quantize composite to 256 colours — this is the shared palette
+    q = composite.quantize(colors=256, method=Image.Quantize.MEDIANCUT)
+    pal = q.getpalette()[: 256 * 3]
+    pal_bytes = bytearray()
+    for i in range(256):
+        r, g, b = pal[i * 3], pal[i * 3 + 1], pal[i * 3 + 2]
+        c = to_rgb15(r, g, b)
+        pal_bytes += bytes([c & 0xFF, c >> 8])
+    return q, bytes(pal_bytes)
+
+
+def bake_front_sized_with_master(img, w, h, master_q):
+    """Cover-crop + resize one card image to wxh and quantize to the shared
+    8bpp master palette (with dithering). Returns 8bpp tile bytes."""
+    target = w / h
+    iw, ih = img.size
+    if iw / ih > target:  # too wide -> crop width
+        nw = int(ih * target)
+        left = (iw - nw) // 2
+        img = img.crop((left, 0, left + nw, ih))
+    else:  # too tall -> crop height
+        nh = int(iw / target)
+        top = (ih - nh) // 2
+        img = img.crop((0, top, iw, top + nh))
+    img = preprocess(img).resize((w, h), Image.LANCZOS)
+    # Quantize to the shared master palette with dithering
+    q = img.quantize(
+        palette=master_q,
+        dither=Image.Dither.FLOYDSTEINBERG,
+    )
+    px = q.load()
+    tiles_w, tiles_h = w // TILE, h // TILE
+    return pack_8bpp_tiles(px, w, h, tiles_w, tiles_h)
+
+
+def bake_front_sized(img, w, h):
+    """Cover-crop + resize one card image to a wxh portrait 4bpp front."""
+    target = w / h
+    iw, ih = img.size
+    if iw / ih > target:  # too wide -> crop width
+        nw = int(ih * target)
+        left = (iw - nw) // 2
+        img = img.crop((left, 0, left + nw, ih))
+    else:  # too tall -> crop height
+        nh = int(iw / target)
+        top = (ih - nh) // 2
+        img = img.crop((0, top, iw, top + nh))
+    img = preprocess(img).resize((w, h), Image.LANCZOS)
+    q = img.quantize(
+        colors=FRONT_COLORS,
+        method=Image.Quantize.MEDIANCUT,
+        dither=Image.Dither.FLOYDSTEINBERG,
+    )
+    pal = q.getpalette()[: FRONT_COLORS * 3]
+    px = q.load()
+    # Baked 1px outline in the darkest palette colour so thumbs pop off the
+    # board instead of bleeding into it.
+    dark = darkest_index(pal)
+    for xx in range(w):
+        px[xx, 0] = dark
+        px[xx, h - 1] = dark
+    for yy in range(h):
+        px[0, yy] = dark
+        px[w - 1, yy] = dark
+    tiles_w, tiles_h = w // TILE, h // TILE
+    return palette_bytes_16(pal), pack_4bpp_tiles(px, w, h, tiles_w, tiles_h)
+
+
+def bake_front(img):
+    return bake_front_sized(img, FRONT_W, FRONT_H)
+
+
+def bake_stage_front(img):
+    return bake_front_sized(img, STAGE_W, STAGE_H)
+
+
+def bake_detail(img):
+    """Resize + quantize one card image to the 96x128 8bpp detail view."""
+    img = img.resize((ART_W, ART_H), Image.LANCZOS)
+    q = img.quantize(colors=N_COLORS, method=Image.Quantize.MEDIANCUT)  # P mode
+    # palette as rgb15 little-endian
+    pal = q.getpalette()[: N_COLORS * 3]
+    pal_bytes = bytearray()
+    for i in range(N_COLORS):
+        r, g, b = pal[i * 3], pal[i * 3 + 1], pal[i * 3 + 2]
+        c = to_rgb15(r, g, b)
+        pal_bytes += bytes([c & 0xFF, c >> 8])
+    # 8bpp tile indices (P-mode pixel values are palette indices)
+    px = q.load()
+    tiles = bytearray()
+    for ty in range(ART_H // TILE):
+        for tx in range(ART_W // TILE):
+            tile = bytearray(64)
+            for rr in range(TILE):
+                for cc in range(TILE):
+                    tile[rr * TILE + cc] = px[tx * TILE + cc, ty * TILE + rr] & 0xFF
+            tiles += tile
+    return bytes(pal_bytes), bytes(tiles)
+
+
+def fronts_from(entries):
+    """(card_no, front tiles) pairs from baked entries (8bpp shared palette)."""
+    return [(no, ftiles) for no, _pal, _tiles, ftiles, _stage in entries]
+
+
+def stage_fronts_from(entries):
+    """(card_no, stage-front tiles) pairs (8bpp shared palette)."""
+    return [(no, stiles) for no, _pal, _tiles, _ftiles, stiles in entries]
+
+
+def write_bytes_array(f, name, data, per_line):
+    f.write(f"        {name}: &[\n")
+    for i in range(0, len(data), per_line):
+        f.write("            " + ", ".join(str(b) for b in data[i:i + per_line]) + ",\n")
+    f.write("        ],\n")
+
+
+def write_gen(entries, fronts, stage_fronts, ui_tiles, master_pal_bytes):
+    with open(OUT, "w", encoding="utf-8") as f:
+        f.write("// Auto-generated by tools/bake_card_art.py -- do not edit.\n")
+        f.write("// CardArt: 8bpp detail art (96x128 = 12x16 tiles) + 240-colour\n")
+        f.write("// rgb15 palette (bank 15 reserved for text).\n")
+        f.write("// Card fronts: 8bpp shared 256-colour master palette\n")
+        f.write("// (tonc `mode 4` style, butano `bg_palette_items` sharing).\n")
+        f.write("// BOARD_UI: shared bank-0 board tiles (4bpp): 0-19 empty slot,\n")
+        f.write("// 20 gold actionable badge, 21 white focus marker.\n\n")
+        f.write("pub static MASTER_PAL: [u8; 512] = [\n")
+        for i in range(0, len(master_pal_bytes), 24):
+            f.write("    " + ", ".join(str(b) for b in master_pal_bytes[i:i + 24]) + ",\n")
+        f.write("];\n\n")
+        f.write("pub struct CardArt {\n")
+        f.write("    pub card_no: &'static str,\n")
+        f.write("    pub palette: &'static [u8; 480],\n")
+        f.write("    pub tiles: &'static [u8; 12288],\n")
+        f.write("}\n\n")
+        f.write("pub struct CardFront {\n")
+        f.write("    pub card_no: &'static str,\n")
+        f.write("    pub tiles: &'static [u8],\n")
+        f.write("}\n\n")
+        f.write("pub static CARD_ART: &[CardArt] = &[\n")
+        for card_no, pal, tiles, _fronts, _stage in entries:
+            f.write(f"    CardArt {{\n        card_no: {json.dumps(card_no, ensure_ascii=False)},\n")
+            write_bytes_array(f, "palette", pal, 24)
+            write_bytes_array(f, "tiles", tiles, 32)
+            f.write("    },\n")
+        f.write("];\n\n")
+        f.write("pub static CARD_FRONTS: &[CardFront] = &[\n")
+        for card_no, tiles in fronts:
+            f.write(f"    CardFront {{ card_no: {json.dumps(card_no, ensure_ascii=False)}, tiles: &[\n")
+            for i in range(0, len(tiles), 32):
+                f.write("        " + ", ".join(str(b) for b in tiles[i:i + 32]) + ",\n")
+            f.write("    ]},\n")
+        f.write("];\n\n")
+        f.write("pub static STAGE_FRONTS: &[CardFront] = &[\n")
+        for card_no, tiles in stage_fronts:
+            f.write(f"    CardFront {{ card_no: {json.dumps(card_no, ensure_ascii=False)}, tiles: &[\n")
+            for i in range(0, len(tiles), 32):
+                f.write("        " + ", ".join(str(b) for b in tiles[i:i + 32]) + ",\n")
+            f.write("    ]},\n")
+        f.write("];\n\n")
+        f.write(f"pub static BOARD_UI: &[u8; {len(ui_tiles)}] = &[\n")
+        for i in range(0, len(ui_tiles), 32):
+            f.write("    " + ", ".join(str(b) for b in ui_tiles[i:i + 32]) + ",\n")
+        f.write("];\n")
+
+
 def main():
     used = deck_card_nos()
     print(f"{len(used)} unique deck cards to bake")
+
+    # First pass: build a shared 256-colour master palette from all
+    # thumbnails (tonc/butano style: one 8bpp palette for a tiled BG).
+    # Use stage-sized thumbs for palette generation (more pixels, richer colours).
+    thumbs = []
+    png_cache = {}
+    for card_no in sorted(used):
+        png = CACHE / f"{card_no}.png"
+        if not png.exists():
+            continue
+        img = Image.open(png).convert("RGB")
+        png_cache[card_no] = img
+        # cover-crop + preprocess + resize to stage size, as bake will do
+        target = STAGE_W / STAGE_H
+        iw, ih = img.size
+        if iw / ih > target:
+            nw = int(ih * target)
+            left = (iw - nw) // 2
+            thumb = img.crop((left, 0, left + nw, ih))
+        else:
+            nh = int(iw / target)
+            top = (ih - nh) // 2
+            thumb = img.crop((0, top, iw, top + nh))
+        thumb = preprocess(thumb).resize((STAGE_W, STAGE_H), Image.LANCZOS)
+        thumbs.append(thumb)
+    master_q, master_pal_bytes = build_master_palette(thumbs)
+    print(f"master palette: 256 colours from {len(thumbs)} thumbs")
 
     entries = []
     missing = []
@@ -80,52 +412,22 @@ def main():
         if not png.exists():
             missing.append(card_no)
             continue
-        img = Image.open(png).convert("RGB")
-        img = img.resize((ART_W, ART_H), Image.LANCZOS)
-        q = img.quantize(colors=N_COLORS, method=Image.Quantize.MEDIANCUT)  # P mode
-        # palette as rgb15 little-endian
-        pal = q.getpalette()[: N_COLORS * 3]
-        pal_bytes = bytearray()
-        for i in range(N_COLORS):
-            r, g, b = pal[i * 3], pal[i * 3 + 1], pal[i * 3 + 2]
-            c = to_rgb15(r, g, b)
-            pal_bytes += bytes([c & 0xFF, c >> 8])
-        # 8bpp tile indices (P-mode pixel values are palette indices)
-        px = q.load()
-        tiles = bytearray()
-        for ty in range(ART_H // TILE):
-            for tx in range(ART_W // TILE):
-                tile = bytearray(64)
-                for rr in range(TILE):
-                    for cc in range(TILE):
-                        tile[rr * TILE + cc] = px[tx * TILE + cc, ty * TILE + rr] & 0xFF
-                tiles += tile
-        entries.append((card_no, bytes(pal_bytes), bytes(tiles)))
+        img = png_cache[card_no]
+        entries.append(
+            (card_no,)
+            + bake_detail(img)
+            + (
+                bake_front_sized_with_master(img, FRONT_W, FRONT_H, master_q),
+                bake_front_sized_with_master(img, STAGE_W, STAGE_H, master_q),
+            )
+        )
 
     print(f"baked {len(entries)} cards, missing {len(missing)}")
     if missing:
         print("missing:", missing[:20])
 
-    with open(OUT, "w", encoding="utf-8") as f:
-        f.write("// Auto-generated by tools/bake_card_art.py -- do not edit.\n")
-        f.write("// Card art as 8bpp tiles (96x128 = 12x16 tiles) + 240-colour\n")
-        f.write("// rgb15 palette (bank 15 reserved for text).\n\n")
-        f.write("pub struct CardArt {\n")
-        f.write("    pub card_no: &'static str,\n")
-        f.write("    pub palette: &'static [u8; 480],\n")
-        f.write("    pub tiles: &'static [u8; 12288],\n")
-        f.write("}\n\n")
-        f.write(f"pub static CARD_ART: &[CardArt] = &[\n")
-        for card_no, pal, tiles in entries:
-            f.write(f"    CardArt {{\n        card_no: {json.dumps(card_no, ensure_ascii=False)},\n")
-            f.write("        palette: &[\n")
-            for i in range(0, len(pal), 24):
-                f.write("            " + ", ".join(str(b) for b in pal[i:i + 24]) + ",\n")
-            f.write("        ],\n        tiles: &[\n")
-            for i in range(0, len(tiles), 32):
-                f.write("            " + ", ".join(str(b) for b in tiles[i:i + 32]) + ",\n")
-            f.write("        ],\n    },\n")
-        f.write("];\n")
+    ui_tiles = bake_ui_tiles()
+    write_gen(entries, fronts_from(entries), stage_fronts_from(entries), ui_tiles, master_pal_bytes)
     print(f"wrote {OUT} ({os.path.getsize(OUT)} bytes)")
 
 

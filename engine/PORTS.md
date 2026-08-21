@@ -485,6 +485,10 @@ Correcting the record from the Tier 5/6 notes above:
   file will need `-Os` / `-fno-tree-*` patience on m68k-gcc.
 
 Verdict: **feasible, blocked only on heap measurement.** Same generated C as DC.
+Measured SH-4 `text` is 4.28MB at `-O2` / 3.07MB at `-Os` (see CD-i section
+below) — both fit a 6MB cart executing in place, and m68k `-Os` density will be
+similar or better. The heap-diet measurement is still wanted for the 2MB DRAM
+budget, but nothing here threatens the port.
 
 ---
 
@@ -528,30 +532,47 @@ Small but genuinely alive:
 ### Feasibility for the wasm2c pipeline
 
 Same pipeline as DC/Jaguar: `cargo → wasm32 → wasm2c → m68k-elf-gcc → serial
-download`. Two walls, one fatal-looking:
+download`. **Measured on the real toolchain (Aug 2026, SH-4 via kos-cc; m68k
+will be in the same ballpark):**
 
-1. **Code size vs 1MB RAM — the hard one.** CD-i has no XIP cartridge: the
-   program is read from CD *into* RAM. The DC build carries ~4.3MB code+data;
-   even at m68k `-Os` density that's several MB against a 1MB budget shared
-   with linear memory, stack, and framebuffer. Options, in order of promise:
-   - Compile the generated C with `-Os` + `--gc-sections` and measure honestly
-     (the 4.3MB figure includes data that could stay in CD-read rodata pages);
-   - Split the wasm module (engine core vs. content) and page content from CD
-     via OS-9 file reads between turns — a card game has natural pause points;
-   - Last resort: trim the exported surface (one entry point instead of three).
-   Honest estimate: possible but tight; this is a real engineering task, not a
-   config change.
-2. **Linear memory diet.** Same measurement exercise as Jaguar, but stricter:
-   heap + wasm linear memory + stack + framebuffer must all fit in 1MB. Target
-   ≤512KB linear memory (16–24 pages).
+| stage | size |
+|---|---|
+| wasm artifact (cargo release) | 2,078,813 B |
+| after `wasm-opt -Oz` | 1,683,479 B (−19%) |
+| generated C | 21.3MB → 17.9MB (−16%) |
+| SH-4 `text` @ `-O2` (baseline) | **4,282,824 B** |
+| SH-4 `text` @ `-O2`, from `-Oz` wasm | **4,284,840 B (unchanged!)** |
+| SH-4 `text` @ `-Os` | **3,066,824 B (−28%)** |
 
-Plus the shared gotchas: big-endian byte-wise memory access (verify with
-`rabuka_wasm_card_count()` before anything else), software-emulated `i64` at
-15.5MHz (fine for turn-based), slow compiles of the 20MB C file.
+Key findings:
 
-Verdict: **the most charming target on the list and plausibly doable, gated on
-getting generated code size under ~700KB.** Do the heap/code-size measurements
-on the existing wasm artifact before committing — they decide everything.
+1. **`wasm-opt` is worthless for console code size.** It shrinks the wasm
+   artifact and the generated C, but GCC at `-O2` re-derives its own
+   optimization and lands on byte-identical machine code. The bloat is not in
+   the wasm — it's in what GCC does to the transcribed C (inlining/unrolling
+   ~4,700 generated functions). Don't add wasm-opt to the pipeline for size.
+2. **`-Os` on the target compiler is the only lever that works**, and it only
+   buys −28%. There is no configuration path from 3MB to 700KB.
+3. **Conclusion: CD-i is blocked on code size, not RAM diet.** Even with a
+   perfect heap measurement, ~3MB of code cannot fit 1MB RAM. The remaining
+   paths are structural, not config: split the wasm module and page content
+   from disc between turns, or cut the engine surface drastically. Treat CD-i
+   as **shelved** until someone wants to do that surgery; Jaguar (cart XIP,
+   6MB) remains the easy m68k win.
+
+Pipeline gotchas discovered while measuring (apply to any new port):
+
+- `wasm-opt` (even plain `-Oz`) **strips the wasm name section**, which is
+  where wasm2c derives module symbol names → link errors against the host
+  shell (`undefined reference to wasm2c_0x24rabuka...`). If you ever use it,
+  add `--debuginfo` to keep names (costs wasm-file bytes only, not machine
+  code). wasm2c also falls back to the *filename* for naming, so the file must
+  be named `rabuka_wasm.wasm` when transpiling.
+- `sjis_table.c` (dc_main dependency) must be on the link line; the
+  `build_dc_wasm.sh` in WSL's `/root/dcbuild` is the source of truth, not the
+  copy in this repo.
+- Repro scripts: `platforms/dc/wasm/build_opt_test.sh` (-O2) and
+  `build_os_test.sh` (-Os) run against `/root/dcbuild/optbuild`.
 
 ---
 

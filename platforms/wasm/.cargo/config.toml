@@ -1,0 +1,4 @@
+[target.wasm32-unknown-unknown]
+# 64KB wasm stack (wasm-ld default is 1MB, which bloats linear memory beyond
+# the Jaguar's 2MB DRAM budget; the engine needs far less).
+rustflags = ["-C", "link-args=-zstack-size=65536"]

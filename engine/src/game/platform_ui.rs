@@ -44,6 +44,17 @@ pub trait PlatformUi {
         false
     }
 
+    /// Cards referenced by the currently available actions (deduped), for
+    /// consoles whose board highlights actionable cards. Called from the
+    /// human-turn loop each frame before [`PlatformUi::render_board`].
+    fn set_actionable_cards(&mut self, _card_nos: &[String]) {}
+
+    /// The currently selected action in the human-turn list (first line of its
+    /// description plus its index and the total count), for consoles whose
+    /// board shows an action bar. Called each frame before
+    /// [`PlatformUi::render_board`].
+    fn set_selected_action(&mut self, _desc: &str, _index: usize, _total: usize) {}
+
     /// Shoulder buttons. Default off; consoles without them keep the menu
     /// behaviour unchanged. L/R open the full-text detail viewer on the
     /// currently highlighted option.
@@ -60,6 +71,14 @@ pub trait PlatformUi {
     /// (240px / 8px tiles).
     fn option_cols(&self) -> usize {
         30
+    }
+
+    /// Max menu items visible at once (the scroll window height).
+    /// Platforms with tall screens override this so menus use the full
+    /// display instead of scrolling after 7 items. The engine adds a
+    /// title line and possibly a ".. N more" line around the list.
+    fn option_rows(&self) -> usize {
+        7
     }
 }
 

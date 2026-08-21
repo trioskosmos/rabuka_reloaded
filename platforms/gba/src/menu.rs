@@ -14,7 +14,8 @@ use alloc::vec::Vec;
 use rabuka_engine::game_state::GameState;
 
 use crate::display::Display;
-use crate::input::{Button, Input};
+use crate::gba_ui::InputSource;
+use crate::input::Button;
 use crate::ui::CARD_ART;
 
 /// Show the focused card's art + stats until A/B/L/R is pressed.
@@ -22,7 +23,12 @@ use crate::ui::CARD_ART;
 /// `art` is looked up by `card_no`; the stat line reuses the engine's
 /// `card_stat_text` (mirroring the 3DS detail line) so the bin doesn't carry a
 /// duplicate formatter.
-pub fn show_card_detail(display: &mut Display, input: &mut Input, gs: &GameState, card_no: String) {
+pub fn show_card_detail<I: InputSource>(
+    display: &mut Display,
+    input: &mut I,
+    gs: &GameState,
+    card_no: String,
+) {
     let art = CARD_ART.iter().find(|a| a.card_no == card_no);
     let mut lines: Vec<String> = Vec::new();
     if let Some(card) = gs.card_database.get_card_by_no(&card_no) {

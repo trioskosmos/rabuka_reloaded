@@ -106,18 +106,18 @@ pub fn show_result(ui: &mut dyn PlatformUi, gs: &GameState) {
 pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
     let mut sel: usize = 0;
     let mut scroll: usize = 0;
-    const VIS: usize = 7;
+    let vis = ui.option_rows();
     let cols = ui.option_cols();
     loop {
         if sel < scroll {
             scroll = sel;
         }
-        if sel >= scroll + VIS {
-            scroll = sel + 1 - VIS;
+        if sel >= scroll + vis {
+            scroll = sel + 1 - vis;
         }
         ui.clear_screen();
         ui.println(title);
-        let end = (scroll + VIS).min(items.len());
+        let end = (scroll + vis).min(items.len());
         for n in scroll..end {
             let prefix = if n == sel { " >" } else { "  " };
             ui.println(&one_line(&format!("{prefix} {}", items[n]), cols));
@@ -156,18 +156,18 @@ pub fn menu_select(
     };
     let mut sel: usize = 0;
     let mut scroll: usize = 0;
-    const VIS: usize = 7;
+    let vis = ui.option_rows();
     let cols = ui.option_cols();
     loop {
         if sel < scroll {
             scroll = sel;
         }
-        if sel >= scroll + VIS {
-            scroll = sel + 1 - VIS;
+        if sel >= scroll + vis {
+            scroll = sel + 1 - vis;
         }
         ui.clear_screen();
         ui.println(title);
-        let end = (scroll + VIS).min(all_items.len());
+        let end = (scroll + vis).min(all_items.len());
         for n in scroll..end {
             let prefix = if n == sel { " >" } else { "  " };
             ui.println(&one_line(&format!("{prefix} {}", all_items[n]), cols));
@@ -202,7 +202,7 @@ pub fn human_turn(
 ) -> bool {
     let mut sel = 0;
     let mut scroll = 0;
-    const VIS: usize = 5;
+    let vis = ui.option_rows().min(9);
     let cols = ui.option_cols();
     loop {
         ui.clear_screen();
@@ -228,10 +228,10 @@ pub fn human_turn(
         if sel < scroll {
             scroll = sel;
         }
-        if sel >= scroll + VIS {
-            scroll = sel + 1 - VIS;
+        if sel >= scroll + vis {
+            scroll = sel + 1 - vis;
         }
-        let end = (scroll + VIS).min(acts.len());
+        let end = (scroll + vis).min(acts.len());
         for a in scroll..end {
             let prefix = if a == sel { " >" } else { "  " };
             let line = acts[a].description.lines().next().unwrap_or("");
@@ -249,6 +249,20 @@ pub fn human_turn(
         if acts.len() > end {
             ui.println(&format!("  .. {} more", acts.len() - end));
         }
+        let mut action_cards: Vec<String> = Vec::new();
+        for a in acts {
+            if let Some(n) = a.parameters.as_ref().and_then(|p| p.card_no.as_ref()) {
+                if !action_cards.contains(n) {
+                    action_cards.push(n.clone());
+                }
+            }
+        }
+        ui.set_actionable_cards(&action_cards);
+        ui.set_selected_action(
+            acts[sel].description.lines().next().unwrap_or(""),
+            sel,
+            acts.len(),
+        );
         let consumed = ui.render_board(gs);
         ui.poll_input();
         if !consumed {
@@ -361,6 +375,13 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                     }
                 }
             } else {
+                // Multi-select: A toggles the highlighted card in/out of the
+                // selection ([X] marker follows). The loop ends when exactly
+                // `count` distinct cards are chosen, or immediately via
+                // allow_skip (B). Previously, pressing A on an
+                // already-selected card pushed nothing and left the loop
+                // condition unchanged -> unavoidable infinite menu (the
+                // "stuck in mulligan" freeze).
                 let mut selected: Vec<usize> = Vec::new();
                 while selected.len() < count.min(items.len()) {
                     let display_items: Vec<String> = items
@@ -378,7 +399,9 @@ pub fn handle_choice(ui: &mut dyn PlatformUi, gs: &mut GameState) -> bool {
                     match sel {
                         None => break,
                         Some(idx) => {
-                            if !selected.contains(&idx) {
+                            if let Some(pos) = selected.iter().position(|&x| x == idx) {
+                                selected.remove(pos);
+                            } else {
                                 selected.push(idx);
                             }
                         }

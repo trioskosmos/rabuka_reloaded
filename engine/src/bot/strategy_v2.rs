@@ -24,23 +24,31 @@ use crate::player::Player;
 
 /// Decision thresholds for the live-set policy.
 pub struct V2Policy {
-    /// Required pass probability to set lives in a normal turn.
-    pub pass_threshold: f64,
-    /// Lower bar when the opponent is at 2 success cards (must contest).
-    pub urgent_threshold: f64,
-    /// Lower bar when WE are at 2 success cards (winning ends the game).
-    pub closing_threshold: f64,
     /// Monte Carlo trials per candidate subset.
     pub mc_trials: u32,
+    /// Minimum pass probability to set lives on a normal turn (below this,
+    /// hoard ammo — forfeiting is only marginally worse than a hopeless set).
+    pub gamble_floor: f64,
+    /// Lower bar when the opponent is at 2 success cards (must contest).
+    pub urgent_gamble_floor: f64,
 }
 
 impl Default for V2Policy {
     fn default() -> Self {
         Self {
-            pass_threshold: 0.60,
-            urgent_threshold: 0.30,
-            closing_threshold: 0.45,
-            mc_trials: 48,
+            mc_trials: 128,
+            gamble_floor: 0.12,
+            urgent_gamble_floor: 0.05,
+        }
+    }
+}
+
+impl Clone for V2Policy {
+    fn clone(&self) -> Self {
+        Self {
+            mc_trials: self.mc_trials,
+            gamble_floor: self.gamble_floor,
+            urgent_gamble_floor: self.urgent_gamble_floor,
         }
     }
 }
@@ -249,28 +257,6 @@ pub fn choose_live_set_action_v2(
 
     let my_hearts = stage_hearts(me, db);
     let my_flips = yell_flips(gs, me, db);
-    let opp_hearts_total = stage_hearts(opp, db).iter().take(7).sum::<i32>()
-        + opp
-            .stage
-            .total_blades(
-                db,
-                &gs.mods.blade_modifiers,
-                &gs.mods.orientation_modifiers,
-                false,
-            ) as i32;
-    // Opponent best case: every flip yields a heart (we don't know their deck).
-    let opp_max = max_score_from(opp_hearts_total);
-
-    // Target score and probability bar by game state.
-    let (target, threshold) = if opp_success >= 2 && my_success < 2 {
-        // 千秋楽: a tie denies them (8.4.7.1) — contest at all costs.
-        (opp_max, policy.urgent_threshold)
-    } else if my_success >= 2 && opp_success < 2 {
-        // We can end the game this turn — push.
-        (opp_max + 1, policy.closing_threshold)
-    } else {
-        (opp_max + 1, policy.pass_threshold)
-    };
 
     let candidates = hand_live_candidates(me, db);
     let selected: Vec<usize> = gs
@@ -279,18 +265,43 @@ pub fn choose_live_set_action_v2(
         .map(|&i| i as usize)
         .collect();
 
-    // Plan: minimal subset of lives with total score >= target that passes
-    // the yell Monte Carlo at the threshold.
+    // Plan: minimal subset of lives meeting a (target, threshold) rung of
+    // the ladder; first rung that yields a feasible plan wins.
     let mut desired: Vec<usize> = Vec::new();
-    if !candidates.is_empty() && target > 0 {
+    if !candidates.is_empty() {
         let mut rng = McRng(
             (gs.turn_number as u64)
                 .wrapping_mul(0x9E3779B97F4A7C15)
                 .wrapping_add(my_flips as u64)
                 | 1,
         );
-        let mut best: Option<(usize, i32, Vec<usize>)> = None; // (count, -score, indices)
         let n = candidates.len().min(8); // brute-force cap
+
+        // Pre-compute per-subset data once. Effective score includes the
+        // expected スコア+1 icons from yell flips (known deck composition).
+        let deck_len = me.main_deck.cards.len().max(1);
+        let score_icons_in_deck: i32 = me
+            .main_deck
+            .cards
+            .iter()
+            .filter_map(|&cid| db.get_card(cid))
+            .map(|c| {
+                c.blade_heart
+                    .as_ref()
+                    .map(|bh| bh.hearts.get(&HeartColor::Score).copied().unwrap_or(0) as i32)
+                    .unwrap_or(0)
+            })
+            .sum();
+        let expected_icons = my_flips as f64 * score_icons_in_deck as f64 / deck_len as f64;
+
+        struct Subset {
+            count: usize,
+            effective_score: i32,
+            need: Acc,
+            indices: Vec<usize>,
+            prob_milli: std::cell::Cell<u32>,
+        }
+        let mut subsets: Vec<Subset> = Vec::new();
         for mask in 1..(1u32 << n) {
             let count = mask.count_ones() as usize;
             if count > 3 {
@@ -309,52 +320,72 @@ pub fn choose_live_set_action_v2(
                     indices.push(c.hand_index);
                 }
             }
-            if score_sum < target {
-                continue;
-            }
+            subsets.push(Subset {
+                count,
+                effective_score: score_sum + expected_icons as i32,
+                need,
+                indices,
+                prob_milli: std::cell::Cell::new(u32::MAX), // not yet computed
+            });
+        }
+
+        // Compute pass probabilities once for all subsets.
+        for s in &subsets {
             let prob = pass_probability(
                 db,
                 &me.main_deck.cards,
                 my_flips,
                 &my_hearts,
-                &need,
+                &s.need,
                 policy.mc_trials,
                 &mut rng,
             );
-            if prob < threshold {
+            s.prob_milli.set((prob * 1000.0) as u32);
+        }
+
+        // Policy: succeed-at-all-costs ranking, modulated by STANCE — the
+        // qualitative endgame logic derived from the placement rules:
+        // - Ahead (my > opp): a tie places for both, so a tie WINS us the
+        //   game when we're at 2. Gamble freely.
+        // - Level: tie is neutral progress, EXCEPT at 2-2 where a tie draws
+        //   the game (rule 1.2.1.2) — be selective.
+        // - Behind: a tie feeds their placement (at 1-2 a tie LOSES us the
+        //   game); only an outright win helps, so if they're at match point
+        //   we gamble desperately — losing is losing either way.
+        let stance_floor: f64 = if my_success > opp_success {
+            0.05
+        } else if my_success == 2 && opp_success == 2 {
+            0.20
+        } else if my_success == opp_success {
+            0.12
+        } else if opp_success >= 2 {
+            0.03
+        } else {
+            0.10
+        };
+        let floor = stance_floor.min(if opp_success >= 2 && my_success < 2 {
+            policy.urgent_gamble_floor
+        } else {
+            policy.gamble_floor
+        });
+        let mut best: Option<(u32, usize, i32, Vec<usize>)> = None;
+        for s in &subsets {
+            let milli = s.prob_milli.get();
+            if milli == 0 || (milli as f64 / 1000.0) < floor {
                 continue;
             }
-            // Prefer fewer cards, then higher score.
-            let rank = (count, -score_sum);
-            if best.as_ref().map_or(true, |(bc, bs, _)| rank < (*bc, *bs)) {
-                best = Some((count, -score_sum, indices));
+            let rank = (std::cmp::Reverse(milli), s.count, std::cmp::Reverse(-s.effective_score));
+            if best
+                .as_ref()
+                .map_or(true, |(bp, bc, bs, _)| {
+                    rank < (std::cmp::Reverse(*bp), *bc, std::cmp::Reverse(-*bs))
+                })
+            {
+                best = Some((milli, s.count, -s.effective_score, s.indices.clone()));
             }
         }
-        if let Some((_, _, indices)) = best {
+        if let Some((_, _, _, indices)) = best {
             desired = indices;
-        } else if opp_success >= 2 && my_success < 2 {
-            // Must contest but nothing meets the bar: gamble on the single
-            // most likely life (tiebreak: higher score).
-            let mut rng = McRng(0xBADA55);
-            let mut best_gamble: Option<(u32, i16)> = None; // (prob_milli, hand_index)
-            for c in &candidates {
-                let p = pass_probability(
-                    db,
-                    &me.main_deck.cards,
-                    my_flips,
-                    &my_hearts,
-                    &c.need,
-                    policy.mc_trials,
-                    &mut rng,
-                );
-                let milli = (p * 1000.0) as u32;
-                if best_gamble.map_or(true, |(bp, _)| milli > bp) {
-                    best_gamble = Some((milli, c.hand_index));
-                }
-            }
-            if let Some((_, hi)) = best_gamble {
-                desired = vec![hi];
-            }
         }
     }
 
@@ -399,18 +430,22 @@ pub fn choose_live_set_action_v2(
         .expect("live set actions non-empty")
 }
 
-/// V2 mulligan policy (S7): keep the early curve (cost ≤4 member, cost-7,
-/// cost-13..15, lives); redraw dead high-cost members (cost > 15, max 2) and
-/// lives beyond the third.
+/// V2 mulligan policy (S7 — curve completion, per the play guides):
+/// - Keep the first 3 lives; redraw excess.
+/// - Redraw dead high-cost members (cost > 15), max 2.
+/// - No life in hand: fish for one by redrawing the most expensive members.
+/// - No cheap opener (cost ≤ 4 member): redraw the most expensive member.
 pub fn choose_mulligan_action_v2(
     gs: &GameState,
     actions: &[Action],
     db: &CardDatabase,
 ) -> Action {
     let me = gs.active_player();
-    let mut member_count = 0usize;
-    let mut live_count = 0usize;
     let mut discard: Vec<usize> = Vec::new();
+    let mut live_count = 0usize;
+    let mut members: Vec<(usize, u8)> = Vec::new(); // (hand_index, cost)
+    let mut has_life = false;
+    let mut has_cheap_opener = false;
     for (hand_index, &cid) in me.hand.cards.iter().enumerate() {
         let Some(card) = db.get_card(cid) else {
             continue;
@@ -418,18 +453,44 @@ pub fn choose_mulligan_action_v2(
         match card.card_type {
             CardType::Live => {
                 live_count += 1;
+                has_life = true;
                 if live_count > 3 {
                     discard.push(hand_index);
                 }
             }
             CardType::Member => {
                 let cost = card.cost.unwrap_or(0);
-                member_count += 1;
-                if cost > 15 && discard.len() < 2 {
-                    discard.push(hand_index);
+                members.push((hand_index, cost));
+                if cost <= 4 {
+                    has_cheap_opener = true;
                 }
             }
             CardType::Energy => {}
+        }
+    }
+
+    // Dead high-cost members.
+    for &(hi, c) in &members {
+        if c > 15 && discard.len() < 2 && !discard.contains(&hi) {
+            discard.push(hi);
+        }
+    }
+
+    // Fishing rules (only when the hand lacks a key piece).
+    if !has_life || !has_cheap_opener {
+        let mut sorted = members.clone();
+        sorted.sort_by_key(|&(_, c)| std::cmp::Reverse(c));
+        let want = if !has_life { 2 } else { 1 };
+        for &(hi, cost) in sorted.iter() {
+            if discard.len() >= 3 {
+                break;
+            }
+            if !discard.contains(&hi) && cost > 7 {
+                discard.push(hi);
+                if discard.len() >= want + 2 {
+                    break;
+                }
+            }
         }
     }
 
@@ -473,12 +534,93 @@ pub fn choose_mulligan_action_v2(
         .expect("mulligan actions non-empty")
 }
 
-/// V2 main-phase choice: currently the v1 heuristic eval (the v2 gains come
-/// from the live-set and mulligan policies).
+/// V2 main-phase evaluation: v1's heuristic with three adjustments.
+/// - Match-point pressure: when the opponent closes on 3 success cards,
+///   board-development terms are amplified (race harder or lose).
+/// - Blades valued higher (they feed both yell pass probability and
+///   スコア+1 icons).
+/// - Color coverage: bonus for stage hearts covering the color requirements
+///   of lives currently in hand (play members that enable your lives).
+pub fn evaluate_state_v2(gs: &GameState, me: u8, w: &crate::bot::strategy::StrategyWeights) -> f64 {
+    let base = crate::bot::strategy::evaluate_state(gs, me, w);
+
+    let db = &gs.card_database;
+    let (my, opp) = if me == 0 {
+        (&gs.player1, &gs.player2)
+    } else {
+        (&gs.player2, &gs.player1)
+    };
+    let my_success = my.success_live_card_zone.cards.len();
+    let opp_success = opp.success_live_card_zone.cards.len();
+
+    let mut adjusted = w.clone();
+    let pressure = match opp_success {
+        2 => 1.6,
+        1 => 1.2,
+        _ => 1.0,
+    };
+    // Only amplify development terms, never the terminal/success terms.
+    adjusted.stage_cost *= pressure;
+    adjusted.heart *= pressure;
+    adjusted.hand_size *= pressure;
+    adjusted.blade = w.blade * 1.6;
+
+    let mut val = crate::bot::strategy::evaluate_state(gs, me, &adjusted);
+
+    // Color coverage: for each specific color required by hand lives, reward
+    // having that color on stage (capped so hoarding one color doesn't stack).
+    let mut need_by_color = [0i32; 7]; // Heart00..Heart06
+    for &cid in my.hand.cards.iter() {
+        if let Some(card) = db.get_card(cid) {
+            if matches!(card.card_type, CardType::Live) {
+                if let Some(nh) = &card.need_heart {
+                    for (c, v) in nh.hearts.iter() {
+                        let idx = hc_index(*c);
+                        if idx < 7 {
+                            need_by_color[idx] += *v as i32;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if need_by_color.iter().sum::<i32>() > 0 {
+        let have = stage_hearts(my, db);
+        let covered = (0..7)
+            .map(|i| have[i].min(need_by_color[i]))
+            .sum::<i32>()
+            .max(0);
+        let total = need_by_color.iter().sum::<i32>().max(1);
+        val += (covered as f64 / total as f64) * w.heart * 2.0
+            * if my_success >= opp_success { 1.0 } else { pressure };
+    }
+
+    let _ = base;
+    val
+}
+
+/// V2 main-phase choice: v2 evaluation (see `evaluate_state_v2`).
 pub fn choose_action_heuristic_v2(
     gs: &GameState,
     actions: &[Action],
     me: u8,
 ) -> Action {
-    crate::bot::strategy::choose_action_heuristic(gs, actions, me)
+    if actions.len() == 1 {
+        return actions[0].clone();
+    }
+    let mut best_idx = 0usize;
+    let mut best_val = f64::NEG_INFINITY;
+    for (i, a) in actions.iter().enumerate() {
+        let mut sim = gs.clone();
+        if game_setup::execute_action(&mut sim, a).is_err() {
+            continue;
+        }
+        game_setup::settle_single_player_state(&mut sim);
+        let val = evaluate_state_v2(&sim, me, &crate::bot::strategy::StrategyWeights::fair());
+        if val > best_val {
+            best_val = val;
+            best_idx = i;
+        }
+    }
+    actions[best_idx].clone()
 }
