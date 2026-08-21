@@ -41,15 +41,13 @@ fn q209_ceras_discard_edelnote_live_recover_same() {
 
     // Debut fires: choose to pay optional cost (discard 2 from hand)?
     // First choice: SelectAutoAbility for the debut trigger
-    if game.has_pending_choice() {
-        game.select_option(0); // trigger the debut ability
-    }
+    assert!(game.has_pending_choice(), "Q209 debut SelectAutoAbility must be offered");
+    game.select_option(0);
 
     // Cost choice: select 2 cards from hand to discard
     // Hand has [edel_live, filler]. Select both (indices 0, 1)
-    if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
-    }
+    assert!(game.has_pending_choice(), "Q209 discard-2 cost must be offered");
+    game.select_indices(&[0, 1]);
 
     // Effect: select 1 EdelNote live from waitroom to retrieve
     if game.has_pending_choice() {
@@ -87,20 +85,19 @@ fn q209_ceras_discard_filler_retrieve_preexisting_edelnote() {
 
     game.play_to_stage(ceras, MemberArea::Center);
 
+    assert!(game.has_pending_choice(), "Q209 debut SelectAutoAbility must be offered");
+    game.select_option(0);
+
+    // Discard 2 fillers from hand — any_number re-prompt: select both, then skip
+    assert!(game.has_pending_choice(), "Q209 discard-2 cost must be offered");
+    game.select_indices(&[0, 1]);
+    // any_number finalize skip (count=0, allow_skip)
     if game.has_pending_choice() {
-        game.select_option(0); // trigger debut
+        game.select_indices(&[]);
     }
 
-    // Discard 2 fillers from hand
-    if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
-    }
-
-    // Retrieve the pre-existing EdelNote live from waitroom
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-
+    // Effect: move_cards with count=1 from a waitroom with exactly 1 EdelNote live
+    // → engine auto-resolves (single candidate), no prompt. Verify outcome strictly.
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
@@ -132,9 +129,8 @@ fn q209_ceras_no_edelnote_in_discard_skips() {
     }
 
     // Pay cost: discard 2 fillers
-    if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
-    }
+    assert!(game.has_pending_choice(), "Q209 discard-2 cost must be offered");
+    game.select_indices(&[0, 1]);
 
     // No EdelNote live in waitroom → no choice for retrieval
     // Hand: original hand was [ceras, filler, filler] = 3
@@ -169,15 +165,13 @@ fn q209_ceras_decline_cost_no_effect() {
 
     game.play_to_stage(ceras, MemberArea::Center);
 
-    if game.has_pending_choice() {
-        game.select_option(0); // trigger debut
-    }
+    assert!(game.has_pending_choice(), "Q209 debut SelectAutoAbility must be offered");
+    game.select_option(0);
 
     // Cost is optional — select Skip to decline
-    if game.has_pending_choice() {
-        // The skip action has card_id=-1
-        TurnEngine::resume_with_choice(&mut game.state, Some(-1), None).expect("skip");
-    }
+    assert!(game.has_pending_choice(), "Q209 optional skip must be offered");
+    // The skip action has card_id=-1
+    TurnEngine::resume_with_choice(&mut game.state, Some(-1), None).expect("skip");
 
     // No cost paid → no effect → hand unchanged (minus ceras which is on stage)
     while game.has_pending_choice() {
@@ -213,18 +207,15 @@ fn q209_ceras_multiple_edelnote_choose_one() {
 
     game.play_to_stage(ceras, MemberArea::Center);
 
-    if game.has_pending_choice() {
-        game.select_option(0);
-    }
+    assert!(game.has_pending_choice(), "Q209 debut SelectAutoAbility must be offered");
+    game.select_option(0);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0, 1]); // discard 2 fillers
-    }
+    assert!(game.has_pending_choice(), "Q209 discard-2 cost must be offered");
+    game.select_indices(&[0, 1]); // discard 2 fillers
 
     // Effect: choose which EdelNote live to retrieve
-    if game.has_pending_choice() {
-        game.select_indices(&[1]); // pick the second one
-    }
+    assert!(game.has_pending_choice(), "Q209 retrieval select must be offered");
+    game.select_indices(&[1]); // pick the second one
 
     while game.has_pending_choice() {
         game.select_indices(&[]);
@@ -277,19 +268,16 @@ fn q209_kasumi_discard_niji_live_recover_same() {
 
     // Cost 1: pay 2 energy. The choice is SelectEnergy or similar.
     // Use generated actions to pay the energy cost.
-    if game.has_pending_choice() {
-        game.select_generated(0);
-    }
+    assert!(game.has_pending_choice(), "Kasumi activation must offer energy payment");
+    game.select_generated(0);
 
     // Cost 2: discard 1 card from hand (the niji_live or filler)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // discard first card (niji_live)
-    }
+    assert!(game.has_pending_choice(), "Kasumi activation must offer hand discard");
+    game.select_indices(&[0]); // discard first card (niji_live)
 
     // Effect: retrieve 1 虹ヶ咲 live from waitroom
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // retrieve niji_live back
-    }
+    assert!(game.has_pending_choice(), "Kasumi retrieval select must be offered");
+    game.select_indices(&[0]); // retrieve niji_live back
 
     while game.has_pending_choice() {
         game.select_indices(&[]);

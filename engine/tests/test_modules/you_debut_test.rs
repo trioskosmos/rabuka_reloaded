@@ -34,9 +34,8 @@ fn you_q124_blade_heart_excluded_base_heart_included() {
     game.give_energy(13);
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(you, MemberArea::LeftSide);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(game.has_pending_choice(), "cost choice must be offered (filler in hand)");
+    game.select_indices(&[0]);
     resolve_all_up_to(&mut game, 30);
     assert!(!game.has_pending_choice(), "Ability should have ended");
     assert!(
@@ -63,9 +62,8 @@ fn you_ability_ends_and_discard_only_grows_at_end() {
     game.give_energy(13);
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(you, MemberArea::LeftSide);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(game.has_pending_choice(), "cost choice must be offered");
+    game.select_indices(&[0]);
     resolve_all_up_to(&mut game, 30);
     assert_eq!(
         game.state.player1.waitroom.cards.len() - initial_discard,
@@ -128,15 +126,16 @@ fn you_ability_select_multiple_cards() {
     game.give_energy(13);
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(you, MemberArea::LeftSide);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(game.has_pending_choice(), "cost choice must be offered");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "select q1 must be offered");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "select q2 must be offered");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "select q3 must be offered");
+    game.select_indices(&[0]);
+    // selecting up to max (3) auto-finalizes without a skip prompt when
+    // no matching cards remain — only assert skip when a choice is pending
     if game.has_pending_choice() {
         game.select_indices(&[0]);
     }
@@ -168,12 +167,10 @@ fn you_ability_user_scenario_select_one_card() {
     game.give_energy(13);
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(you, MemberArea::LeftSide);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(game.has_pending_choice(), "cost choice must be offered");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "look_and_select must be offered");
+    game.select_indices(&[0]);
     resolve_all_up_to(&mut game, 30);
     assert!(game.state.player1.hand.cards.contains(&q1), "Q1 in hand");
     assert!(
@@ -206,9 +203,8 @@ fn you_q124_two_plays_both_reject_blade_hearts() {
     game.give_energy(13);
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(you, MemberArea::LeftSide);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(game.has_pending_choice(), "cost choice must be offered");
+    game.select_indices(&[0]);
     resolve_all_up_to(&mut game, 30);
     assert!(
         !game.state.player1.hand.cards.contains(&blade_only),
@@ -237,12 +233,14 @@ fn you_select_2_then_ends() {
     game.give_energy(13);
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(you, MemberArea::LeftSide);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(game.has_pending_choice(), "cost choice must be offered");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "select q1 must be offered");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "select q2 must be offered");
+    game.select_indices(&[0]);
+    // selecting up to max (3) auto-finalizes without a skip prompt when
+    // no matching cards remain — only assert skip when a choice is pending
     if game.has_pending_choice() {
         game.select_indices(&[0]);
     }
@@ -273,15 +271,16 @@ fn you_select_3_then_ends() {
     game.give_energy(13);
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(you, MemberArea::LeftSide);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(game.has_pending_choice(), "cost choice must be offered");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "select q1 must be offered");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "select q2 must be offered");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "select q3 must be offered");
+    game.select_indices(&[0]);
+    // selecting up to max (3) auto-finalizes without a skip prompt when
+    // no matching cards remain — only assert skip when a choice is pending
     if game.has_pending_choice() {
         game.select_indices(&[0]);
     }
