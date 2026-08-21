@@ -58,8 +58,8 @@ LiveCardSetFirstAttacker → LiveCardSetSecondAttacker → FirstAttackerPerforma
 
 | Phase entered | Side effects |
 |-----------|--------------|
-| **LiveCardSetFirstAttacker** | Transitions to SecondAttacker (no draw) |
-| **LiveCardSetSecondAttacker** | **Fires LiveStart abilities** for both players, processes auto-abilities |
+| **LiveCardSetFirstAttacker** | `pass()`: **P1 draws 1 per card in P1's live card zone**, transitions to SecondAttacker |
+| **LiveCardSetSecondAttacker** | `pass()`: **P2 draws 1 per card in P2's live card zone**, then enters performance — **LiveStart abilities fire here** for both players, auto-abilities processed |
 | **FirstAttackerPerformance** | Resolves the live performance (cheer, scoring) |
 | **SecondAttackerPerformance** | Same for second attacker |
 | **LiveVictoryDetermination** | Compares scores, clears revealed cards, increments turn, resets to Active in `FirstAttackerNormal` |
@@ -75,11 +75,14 @@ LiveCardSetFirstAttacker → LiveCardSetSecondAttacker → FirstAttackerPerforma
 | 4 | Main | SecondAttackerNormal | **draw 1** |
 | 5 | LiveCardSetFirstAttacker | Live | — |
 | (set live card) | LiveCardSetFirstAttacker | Live | — |
-| 6 | LiveCardSetSecondAttacker | Live | — |
-| 7 | FirstAttackerPerformance | Live | — |
+| 6 | LiveCardSetSecondAttacker | Live | **P1 draws live-zone count** |
+| 7 | FirstAttackerPerformance | Live | **P2 draws live-zone count; LiveStart fires — drain choices here** |
 
 Total draws from deck during `advance_to_live_card_set_p1` (5 passes) → **1 draw**.
-`advance_to_live_start` (2 passes) → **0 draws** (just phase transitions within Live).
+After set_live_card: pass #6 refills by P1's live zone, pass #7 by P2's
+(usually empty) AND fires ライブ開始時. Measure hand deltas between the
+set and these passes; a third pass runs the performance phase and shuffles
+hand cards (cheer reveal), so stop asserting there.
 
 ### Helper implementations
 

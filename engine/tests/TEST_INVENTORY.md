@@ -36,7 +36,7 @@ Columns: **Depth** = inferred L0 (referenced) / L1 (asserts) / L2 (negative) / +
 | 25 | 常時 | sequential | compound | L2+choice | 25 | `PL!N-bp1-012-R＋` | engine/tests/test_modules/karin_bp4_004_live_start_test.rs<br>engine/tests/test_modules/kotori_bp5_003_test.rs<br>engine/tests/test_modules/q46_kanako_all_heart_timing_test.rs<br>+1 more |
 | 26 | 登場 | draw_card | appearance_condition | L2+choice | 6 | `PL!SP-bp1-002-R＋` | engine/tests/test_modules/position_ability_test.rs |
 | 27 | 起動 | gain_ability | comparison_condition | L1+choice | 5 | `PL!SP-bp1-003-R＋` | engine/tests/test_modules/chisato_test.rs |
-| 28 | 登場 | move_cards | card_count_condition | L2+choice | 15 | `PL!SP-bp1-007-R＋` | engine/tests/test_modules/untested_abilities_batch2_test.rs |
+| 28 | 登場 | move_cards | card_count_condition | L2+choice | 18 | `PL!SP-bp1-007-R＋` | engine/tests/test_modules/umi_q228_test.rs<br>engine/tests/test_modules/untested_abilities_batch2_test.rs |
 | 29 | 常時 | gain_ability | compound | L2+choice | 29 | `PL!HS-bp1-003-R＋` | engine/tests/test_modules/kinako_hs_test.rs<br>engine/tests/test_modules/pl_hs_bp1_003_test.rs<br>engine/tests/test_modules/victory_road_test.rs |
 | 30 | 起動 | move_cards | none | L2+choice | 29 | `PL!HS-bp1-003-R＋` | engine/tests/test_modules/kinako_hs_test.rs<br>engine/tests/test_modules/pl_hs_bp1_003_test.rs<br>engine/tests/test_modules/victory_road_test.rs |
 | 31 | 起動 | move_cards | none | L2+choice | 34 | `PL!HS-bp1-004-R＋` | engine/tests/test_modules/parser_issues_e2e_test.rs<br>engine/tests/test_modules/q38_live_card_zone_test.rs |

@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-21T20:24:36.515591+00:00",
+  "generated_at": "2026-08-21T21:04:00.077306+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -2115,6 +2115,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/umi_q228_test.rs",
         "engine/tests/test_modules/untested_abilities_batch2_test.rs"
       ],
       "covering_tests": [
@@ -2132,9 +2133,12 @@
         "sp_bp1_007_debut_no_retrieve_when_total_below_11_via_baton_touch",
         "sp_bp1_007_debut_noop_when_waitroom_has_no_live_card",
         "sp_bp2_013_debut_can_place_zero_cards",
-        "sp_bp2_013_debut_places_waitroom_card_on_deck_top"
+        "sp_bp2_013_debut_places_waitroom_card_on_deck_top",
+        "umi_q228_four_unique_groups_cost_zero",
+        "umi_q228_reduction_charges_effective_cost",
+        "umi_q228_two_groups_cost_3_not_offered_at_2_energy"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 18,
       "is_null": false
     },
     {
@@ -2429,7 +2433,7 @@
         "saikou_edge_score2_only",
         "saikou_edge_score5_only",
         "sayaka_activation_charges_energy_and_terminates",
-        "sayaka_unaffordable_press_terminates"
+        "sayaka_unaffordable_not_offered_and_press_rejected"
       ],
       "covering_test_count": 22,
       "is_null": false
@@ -5241,13 +5245,13 @@
         "dia_bp2_no_live_card_no_draw",
         "dia_bp2_yell_with_live_card_and_hand_under_7_draws_one",
         "sayaka_activation_charges_energy_and_terminates",
-        "sayaka_unaffordable_press_terminates",
+        "sayaka_unaffordable_not_offered_and_press_rejected",
         "umi_bp5_three_members_with_blade_heart_no_gain",
         "umi_bp5_three_members_without_blade_heart_gains_all_hearts",
         "umi_bp5_two_members_no_heart_gain",
         "umi_q228_four_unique_groups_cost_zero",
-        "umi_q228_insufficient_energy_fails",
-        "umi_q228_two_groups_cost_2"
+        "umi_q228_reduction_charges_effective_cost",
+        "umi_q228_two_groups_cost_3_not_offered_at_2_energy"
       ],
       "covering_test_count": 11,
       "is_null": false
@@ -5284,13 +5288,13 @@
         "dia_bp2_no_live_card_no_draw",
         "dia_bp2_yell_with_live_card_and_hand_under_7_draws_one",
         "sayaka_activation_charges_energy_and_terminates",
-        "sayaka_unaffordable_press_terminates",
+        "sayaka_unaffordable_not_offered_and_press_rejected",
         "umi_bp5_three_members_with_blade_heart_no_gain",
         "umi_bp5_three_members_without_blade_heart_gains_all_hearts",
         "umi_bp5_two_members_no_heart_gain",
         "umi_q228_four_unique_groups_cost_zero",
-        "umi_q228_insufficient_energy_fails",
-        "umi_q228_two_groups_cost_2"
+        "umi_q228_reduction_charges_effective_cost",
+        "umi_q228_two_groups_cost_3_not_offered_at_2_energy"
       ],
       "covering_test_count": 11,
       "is_null": false

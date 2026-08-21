@@ -714,8 +714,9 @@ fn wakana_bp2_008_choice_is_select_target() {
     }
 }
 
-/// With 0 active energy, the cost (E = 1 active energy) can't be paid,
-/// so the ability effect is skipped entirely — no area select appears.
+/// With 0 active energy, the mandatory cost (E = 1 active energy) can't be
+/// paid — per rules 9.6.2.3 the activation is rejected outright (rules-correct
+/// gating), no energy is consumed and no area select appears.
 #[test]
 fn wakana_bp2_008_no_energy_skips_effect() {
     let db = load_real_database();
@@ -723,14 +724,19 @@ fn wakana_bp2_008_no_energy_skips_effect() {
     let wakana = game.id("PL!SP-bp2-008-R");
     game.state.player1.stage.stage = [wakana, -1, -1];
     // No energy given
-    game.activate_ability(wakana);
+    let err = game.try_activate_ability(wakana).unwrap_err();
+    assert!(
+        err.contains("cost") || err.contains("energy"),
+        "expected affordability rejection, got: {}",
+        err
+    );
     // Energy stays 0 (nothing to consume)
     assert_eq!(
         game.state.player1.energy_zone.active_count(),
         0,
         "No energy consumed"
     );
-    // No area select appears — effect is skipped because cost can't be paid
+    // No area select appears — the ability never started
     assert!(
         !game.has_pending_choice(),
         "With 0 energy, cost can't be paid so effect is skipped entirely"

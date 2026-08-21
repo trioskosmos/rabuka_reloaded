@@ -2111,24 +2111,33 @@ impl GameState {
     /// Single source of truth for "グループ名1種類につき" cost reductions —
     /// used by the resolver's runtime cost adjustment AND by action
     /// generation's effective-cost display/gating.
+    ///
+    /// Membership is resolved through [`crate::ability::util::card_matches_group_str`]
+    /// so multi-name joint cards (Q228: LL-bp1-001-R＋ carries 虹ヶ咲 +
+    /// Liella! + 蓮ノ空 through its three names) contribute every group they
+    /// belong to, not just a single `card.group` field.
     pub fn distinct_stage_groups(&self, player_id: &str) -> u8 {
+        const CANONICAL_GROUPS: [&str; 5] = ["μ's", "Aqours", "虹ヶ咲", "Liella!", "蓮ノ空"];
         let player = if player_id == self.player2.id {
             &self.player2
         } else {
             &self.player1
         };
-        let mut groups = std::collections::HashSet::<String>::default();
-        for &cid in &player.stage.stage {
-            if cid == -1 {
-                continue;
-            }
-            if let Some(card) = self.card_database.get_card(cid) {
-                if !card.group.is_empty() {
-                    groups.insert(card.group.to_string());
-                }
+        let mut count = 0u8;
+        for group in CANONICAL_GROUPS {
+            let matched = player.stage.stage.iter().any(|&cid| {
+                cid != -1
+                    && crate::ability::util::card_matches_group_str(
+                        &self.card_database,
+                        cid,
+                        Some(group),
+                    )
+            });
+            if matched {
+                count += 1;
             }
         }
-        groups.len() as u8
+        count
     }
 
     /// Effective ACTIVE-energy cost of `cost` for `player_id` given the

@@ -105,12 +105,12 @@ fn TurnEngine_use(game: &mut TestGame, card_id: i16) -> Result<(), String> {
     )
 }
 
-/// Engine semantics: unpayable activations are still OFFERED (structurally
-/// identical to reducible costs like umi Q228 which MUST stay offered) and
-/// pressing fizzles quietly. The no-progress protection therefore lives in
-/// the BOT layer (no-op breaker in the choosers), not generation.
+/// Rules-correct semantics (9.6.2.3): an unpayable mandatory cost is not a
+/// legal activation — generation withholds it entirely and a direct press is
+/// rejected by the affordability pre-check. Nothing ever resolves, so no
+/// bot-side fizzle guard is needed anymore.
 #[test]
-fn sayaka_unaffordable_press_terminates() {
+fn sayaka_unaffordable_not_offered_and_press_rejected() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let sayaka = game.id("PL!HS-bp1-002-R");
@@ -120,27 +120,16 @@ fn sayaka_unaffordable_press_terminates() {
     let cid = game.id("PL!HS-bp1-005-R");
     game.add_to_discard(cid);
 
+    // Generation withholds the unpayable activation.
     let offers = count_sayaka_offers(&game, sayaka);
-    assert_eq!(offers, 1, "activation is offered regardless of energy");
+    assert_eq!(offers, 0, "cost 2 with 1 active energy must not be offered");
 
-    // Bot-flow termination: repeated presses must never loop forever.
-    let mut presses = 0usize;
-    for _ in 0..20 {
-        if count_sayaka_offers(&game, sayaka) == 0 {
-            break;
-        }
-        let before_en = game.state.player1.energy_zone.active_count();
-        let _ = TurnEngine_use(&mut game, sayaka);
-        let after_en = game.state.player1.energy_zone.active_count();
-        presses += 1;
-        if after_en == before_en {
-            // fizzle confirmed; nothing will ever change — stop pressing
-            break;
-        }
-    }
+    // A direct press is rejected cleanly — no partial resolution, no queue.
+    let err = game.try_activate_ability(sayaka).unwrap_err();
     assert!(
-        presses <= 2,
-        "unpayable activation pressed {} times — nothing can progress",
-        presses
+        err.contains("cost") || err.contains("energy"),
+        "expected affordability rejection, got: {}",
+        err
     );
+    assert!(!game.has_pending_choice(), "nothing may be left pending");
 }
