@@ -338,6 +338,11 @@ impl super::TurnEngine {
         let AbilityActivation { ability, loc, idx } = ability_to_activate
             .ok_or("No activatable ability found for this card at its current location")?;
 
+        // NOTE: no affordability pre-check here. Unpayable activations fizzle
+        // quietly at resolution (wakana bp2-008 "no_energy_skips_effect",
+        // umi Q228 insufficiency) — hard-erroring them broke both behaviors.
+        // Bots avoid dead presses via their no-op breakers instead.
+
         if loc == Zone::Hand {
             let player = game_state.active_player_mut();
             player.hand.cards.retain(|id| *id != card_id);

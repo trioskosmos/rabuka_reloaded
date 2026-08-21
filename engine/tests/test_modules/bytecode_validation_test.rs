@@ -246,9 +246,13 @@ mod bytecode_validation {
 
     #[test]
     fn empty_slice_returns_default_ability() {
-        // Ability index 0 with start==end in the offsets table should return Ok(default).
-        // This is the normal case for abilities with no cost/effect data.
-        // We just verify it doesn't panic.
-        let _ = get_ability(0);
+        // Index 0 decodes successfully whether its bytecode slice carries data
+        // or is empty (start==end → default ability). Either way: Ok, no panic.
+        let a = get_ability(0).expect("ability 0 must decode without error");
+        // Whatever the slice contained, decoding must yield a usable ability
+        // object with a known action.
+        let _action = &a.effect.as_ref().map(|e| e.action);
+        // And it must be distinct from the out-of-range error path.
+        assert!(get_ability(NUM_ABILITIES).is_err());
     }
 }

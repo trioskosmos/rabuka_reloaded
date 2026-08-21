@@ -3,10 +3,11 @@ pub mod encoding;
 pub mod evaluation;
 pub mod ismcts;
 pub mod neural;
-mod observation;
+pub mod observation;
 pub mod strategy;
 pub mod strategy_v2;
 pub mod strategy_v3;
+pub mod strategy_v4;
 pub mod weights;
 
 pub use ismcts::search;

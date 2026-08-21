@@ -1779,17 +1779,31 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     }
                 }
 
-                let ability_cost = ability
-                    .cost
-                    .as_ref()
-                    .and_then(|c| c.energy_count_any())
-                    .unwrap_or(0);
+                // NOTE: activations are ALWAYS offered. Unpayable ones
+                // fizzle quietly at resolution (umi Q228 / wakana bp2-008
+                // semantics), and bots avoid dead presses via their
+                // no-op breaker — generation cannot distinguish them
+                // because wakana and sayaka costs are structurally
+                // identical pay_energy blocks.
+
                 let trigger_info = ability
                     .triggers
                     .as_ref()
                     .map(|t| action_desc!(" ({})", t))
                     .unwrap_or_default();
 
+                // Display-only cost (activations are always offered).
+                let display_cost = ability
+                    .cost
+                    .as_ref()
+                    .map(|c| c.energy_cost_total() as u8)
+                    .unwrap_or(0);
+                // Display-only cost (activations are always offered).
+                let display_cost = ability
+                    .cost
+                    .as_ref()
+                    .map(|c| c.energy_cost_total() as u8)
+                    .unwrap_or(0);
                 actions.push(make_action_params(
                     ActionType::UseAbility,
                     action_desc!(
@@ -1798,7 +1812,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         area_name,
                         ability.full_text,
                         trigger_info,
-                        ability_cost
+                        display_cost
                     ),
                     ActionParameters {
                         card_id: Some(card_id),
@@ -1825,8 +1839,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         } else {
                             None
                         },
-                        base_cost: Some(ability_cost),
-                        final_cost: Some(ability_cost),
+                        base_cost: Some(display_cost),
+                        final_cost: Some(display_cost),
                         ..make_params()
                     },
                 ));
@@ -1876,9 +1890,18 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 let ability_cost = ability
                     .cost
                     .as_ref()
-                    .and_then(|c| c.energy_count_any())
+                    .map(|c| c.count.unwrap_or_else(|| c.energy_count_any().unwrap_or(0)))
                     .unwrap_or(0);
+                if ability_cost > active_player.energy_zone.active_count() {
+                    continue;
+                }
 
+                // Display-only cost (activations are always offered).
+                let display_cost = ability
+                    .cost
+                    .as_ref()
+                    .map(|c| c.energy_cost_total() as u8)
+                    .unwrap_or(0);
                 actions.push(make_action_params(
                     ActionType::UseAbility,
                     action_desc!(
@@ -1906,8 +1929,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         } else {
                             None
                         },
-                        base_cost: Some(ability_cost),
-                        final_cost: Some(ability_cost),
+                        base_cost: Some(display_cost),
+                        final_cost: Some(display_cost),
                         ..make_params()
                     },
                 ));

@@ -1323,6 +1323,7 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
         optional,
         max,
         effect_steps,
+        cost_reduction_per_group: None,
         compound: Box::new(crate::card::CompoundBranch {
             look_action,
             select_action,

@@ -327,9 +327,13 @@ fn aiko_target_self_looks_at_top_card() {
 
     trigger_live_start_with(&mut game, filler_live);
 
+    // Phase advancement drew cards; capture whoever is on top NOW — that is
+    // the card the ability will look at.
+    let looked = game.state.player1.main_deck.cards.first().copied().expect("deck has a top card");
+
     // Handle choices:
-    //  - SelectTarget #1: target player 竊・option 0 = self
-    //  - remaining prompts: option 0 = put the looked-at card in the waitroom
+    //  - SelectTarget "self_or_opponent": option 0 = self
+    //  - SelectCard zone=looked_at (destination=discard): index 0 = the looked card
     while game.has_pending_choice() {
         let choice = game.get_pending_choice();
         let is_target =
@@ -342,11 +346,11 @@ fn aiko_target_self_looks_at_top_card() {
     }
 
     assert!(
-        game.state.player1.waitroom.cards.contains(&top_card),
-        "choosing the discard option moves the looked-at top card to the waitroom"
+        !game.state.player1.main_deck.cards.contains(&looked),
+        "the discarded card is no longer on the deck"
     );
     assert!(
-        !game.state.player1.main_deck.cards.contains(&top_card),
-        "the discarded card is no longer on the deck"
+        game.state.player1.waitroom.cards.contains(&looked),
+        "choosing the discard option moves the looked-at top card to the waitroom"
     );
 }

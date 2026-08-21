@@ -16,6 +16,13 @@ doctest = false
 [dependencies]
 rabuka_engine = { path = "../../engine", default-features = false, features = ["wasm"] }
 
+[features]
+default = ["wasm"]
+# 8MB bump heap (Dreamcast-class); engine feature "wasm"
+wasm = ["rabuka_engine/wasm"]
+# 512KB bump heap (Jaguar 2MB DRAM); engine feature "jaguar"
+jaguar = ["rabuka_engine/jaguar"]
+
 [profile.release]
 opt-level = "z"
 panic = "abort"

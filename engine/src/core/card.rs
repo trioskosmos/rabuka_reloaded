@@ -1129,9 +1129,68 @@ pub struct AbilityEffect {
     pub max: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub effect_steps: Option<Vec<Box<AbilityEffect>>>,
+    /// Parsed cost-reduction clause on a pay_energy cost (e.g. 海未 bp5-004:
+    /// "グループ名1種類につき、E減る"). Presence means the printed energy is
+    /// an upper bound — affordability must not hard-block offers.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub cost_reduction_per_group: Option<u8>,
 }
 
 impl AbilityEffect {
+    /// Total ACTIVE-ENERGY cost of this cost block.
+    ///
+    /// Single source of truth for affordability (generation filter and the
+    /// execution pre-check must never diverge). Rules:
+    ///   - Only PayEnergy steps carry energy. `count` on other step kinds is
+    ///     a TARGET quantity ("mill 5", "look at 3") — reading it as energy
+    ///     blocks free abilities like 桜坂しずく's mill-5 (bp7-003).
+    ///   - Sequential/compound costs: sum the pay_energy sub-steps
+    ///     (e.g. 村野さやか bp1-002: [PayEnergy 2, MoveCards self→waitroom]).
+    pub fn energy_cost_total(&self) -> u32 {
+        if self.action == crate::ability::enums::ActionType::PayEnergy {
+            return self.energy_count_any().or(self.count).unwrap_or(0) as u32;
+        }
+        self.compound
+            .actions
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .map(|s| s.energy_cost_total())
+            .sum()
+    }
+
+    /// True when ANY pay_energy component is optional/skippable — those must
+    /// stay offered even when energy is short (resolution skips just the
+    /// effect, e.g. wakana bp2-008).
+    fn has_optional_payment(&self) -> bool {
+        if self.action == crate::ability::enums::ActionType::PayEnergy
+            && self.optional == Some(true)
+        {
+            return true;
+        }
+        self.compound
+            .actions
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .any(|s| s.has_optional_payment())
+    }
+
+    /// True when this cost is DEFINITELY unpayable with `active` energy:
+    /// mandatory pay_energy exceeds active AND the ability text declares no
+    /// reduction clause. Only then may generation withhold the action.
+    /// `full_text` is the whole ability text — reduction clauses live there,
+    /// not on the cost steps.
+    pub fn is_definitely_unaffordable(&self, active: u32, full_text: &str) -> bool {
+        if full_text.contains("減る") || full_text.contains("少なく") {
+            return false;
+        }
+        if self.has_optional_payment() {
+            return false;
+        }
+        self.energy_cost_total() > active
+    }
+
     /// Build EffectKind from an action string and the matching effect JSON.
     /// Constructs EffectKind directly without serde Deserialize.
     #[cfg(feature = "json_path_test")]

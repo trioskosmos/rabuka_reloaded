@@ -333,16 +333,17 @@ fn himeno_pb1_no_valid_destinations_skips() {
 
     drain_auto_abilities(&mut game);
 
-    // No valid destinations → position change auto-skips
-    if game.has_pending_choice() {
-        let choice = game.get_pending_choice().clone();
-        match &choice {
-            rabuka_engine::ability::types::Choice::SelectTarget { target, .. }
-                if target == "position|destination" =>
-            {
-                panic!("Should NOT have a position choice with no valid destinations");
-            }
-            _ => {}
-        }
-    }
+    // No mirakura member besides Himeno → no valid destination exists, so the
+    // optional position change must not offer a choice at all, and Himeno
+    // must stay put with no resources gained.
+    assert!(
+        !game.has_pending_choice(),
+        "no valid destinations: no choice may be offered"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[0], himeno,
+        "Himeno stays at Left"
+    );
+    let blade = game.state.mods.get_blade_modifier(himeno);
+    assert_eq!(blade, 0, "no position change → no blade");
 }

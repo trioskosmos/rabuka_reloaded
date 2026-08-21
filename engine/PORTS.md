@@ -395,33 +395,113 @@ sprite VRAM. See the GBA Port section below.
 
 ---
 
-## Dreamcast Port — **WORKING: boots & playable** (Aug 2026)
+## Dreamcast Port — WAMR interpreter pipeline (Aug 2026) — **WORKING, replaces wasm2c**
 
-Status: **The full engine runs on real SH-4 hardware code, booted in Flycast.**
-The rustc_codegen_gcc approach below was abandoned; the unlock was a completely
-different pipeline:
+Second working DC pipeline, and the new preferred one. The engine wasm is no
+longer transpiled at all: a ~420KB WAMR classic interpreter runs the 2MB
+`rabuka_wasm.wasm` in place on SH-4.
 
 ```
-engine (Rust no_std) --cargo--> rabuka_wasm.wasm (2MB)
-                      --wasm2c--> rabuka_wasm.c (~20MB C)
-                      --kos-cc/sh-elf-gcc--> rabuka_dc.elf (SH-4)
-                      --mkdcdisc--> rabuka.cdi -> Flycast
+engine (Rust no_std) --cargo--> rabuka_wasm.wasm (2MB, embedded as ROM data)
+WAMR classic interpreter (~420KB C incl. shell) --kos-cc/sh-elf-gcc--> rabuka_dc_wamr.elf
 ```
 
-Why it works when direct Rust didn't: wasm32 is a first-class Rust target
-(no backend problem), and wasm2c emits plain C that *any* console GCC can
-compile — the "no LLVM backend for SH-4" wall simply doesn't exist on this
-path. The same generated C compiles for Saturn (sh-elf), Jaguar (m68k-gcc,
-32-bit int default) or any other GCC target.
+Measured (same wasm artifact as the wasm2c build):
 
-- Playable flow: mode select -> deck select -> RPS -> mulligan -> match,
-  driven through four host imports (`host_clear_screen/host_println/
-  host_poll_buttons/host_wait_vblank`) implemented in ~200 lines of KOS C
-  (`platforms/dc/wasm/dc_main.c`: 40x28 BIOS-font text grid + maple pad).
-- One-button build: `platforms/dc/build_dc.bat` (replaces the dead
-  kos-cargo/rustc_codegen_gcc script). Setup: `platforms/dc/wasm/SETUP_WSL.md`.
-- RAM budget: ~4.3MB code+data + 6.1MB wasm linear memory = fits 16MB.
-- Flicker fix: text grid marks dirty; framebuffer redrawn once per vblank.
+| | wasm2c build | WAMR build |
+|---|---|---|
+| target-side code | 4.28MB (`-O2`) / 3.07MB (`-Os`) | **~420KB** (+ 2.08MB wasm blob data) |
+| stripped ELF | 4.3MB | 2.5MB (mostly the blob itself) |
+| linear memory | 93 pages malloc'd | same module, allocated via platform shim |
+| engine changes | none | none |
+
+Verified playable in Flycast: full flow boots fast, menus → mulligan → match,
+Japanese names via BIOS Shift-JIS font, build tag `rust -> wasm -> WAMR interp (sh-4)`.
+
+### Why this matters beyond Dreamcast
+
+The gate for Tier 6 consoles was never "no LLVM backend" but "no *small* way to
+get code there". An interpreter makes program size independent of engine size:
+the same ~420KB runtime + any-GCC-target CPU runs the identical wasm. Research
+pass (Aug 2026) that led here:
+
+- **wasm3**: wrong shape — its tail-call "meta machine" pre-expands the module
+  into RAM (~10-20MB for our build). Rejected.
+- **WAMR classic interpreter**: plain-C switch loop, ~56KB core on cortex-m4f,
+  no tail-call/TCO requirement, loads module from caller-owned buffer
+  (ROM-resident, not copied). Chosen.
+- **mrustc** (Rust→C): only x86_64/MSVC/macOS targets, bootstrap-oriented. Dead end.
+- **rustc_codegen_gcc**: no SH-4/m68k story; same per-function size problem anyway.
+- **cranelift**: no m68k/SH-4 backends. Dead end.
+- No maintained Rust→C transpiler exists at all; monomorphization means every
+  faithful translator reproduces the ~1,900 functions 1:1 (the wasm2c bloat).
+  Only interpretation collapses it — and since speed doesn't matter for a card
+  game, its cost is zero.
+
+Console implications:
+
+- **Jaguar** — easier than the wasm2c verdict: blob XIPs from cart, interp +
+  tuned linear memory in 2MB DRAM.
+- **CD-i** — reopened *conditionally*: interp+pages fit 1MB RAM; wall moves to
+  "the 2MB wasm must load into the same 1MB". Needs wasm shrunk <~600KB — and
+  under an interpreter every source-level de-genericization byte counts (unlike
+  wasm2c where GCC re-inflated it).
+- **Genesis / Neo Geo** — still dead, now mathematically: interpreter + one
+  64KB wasm page cannot fit 64KB DRAM even with code XIP. Native C or native
+  Rust (LLVM-m68k fix upstream) remain the only paths.
+- **Saturn / PS1 / N64** — inherit a proven SH-4-class runtime path.
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `platforms/dc/wamr/dc_main_wamr.c` | DC shell over WAMR embed API (same text grid/maple input as wasm2c shell) |
+| `platforms/dc/wamr_kos/platform_internal.h` | minimal WAMR platform shim for KOS (single-threaded, no-op sync) |
+| `platforms/dc/wamr_kos/kos_platform.c` | KOS impl of WAMR platform API (malloc-backed mmap, stubs) |
+| `platforms/dc/wamr_kos/wasm_blob.S` | `.incbin` embedding of rabuka_wasm.wasm |
+| `platforms/dc/build_dc_wamr.sh` | WSL-side build (interpreter + shell + link), run via bash |
+
+Build outputs: `platforms/dc/output/rabuka_dc_wamr{,_stripped}.elf`,
+packaged with mkdcdisc like the wasm2c build.
+
+### One-time WSL setup
+
+Same toolchain base as the wasm2c port (`/root/kos`, `/root/sh-elf`,
+`/root/mkdcdisc`), plus:
+
+```
+git clone --depth 1 https://github.com/bytecodealliance/wasm-micro-runtime.git /root/wamr
+```
+
+### Gotchas discovered while building (apply to future WAMR ports)
+
+1. **Register natives BEFORE `wasm_runtime_load`.** Import linking happens in
+   the loader; registering after load yields "failed to link import function"
+   warnings at instantiate even though registration returned true.
+2. **Compile the WAMR core against pure newlib (`-nostdinc`, sh-elf include
+   dirs only).** KOS's `arch/types.h` typedefs `int8/uint16/...` which clash
+   with WAMR's `platform_common.h` typedefs (char vs signed char). kos_platform.c
+   alone includes kos.h — it renames the KOS types with macros around the
+   include. The shell compiles normally with kos-cc.
+3. **GCC 15 defaults to C23** where `f()` means `(void)` — breaks
+   `invokeNative_general.c`. Build with `-std=gnu99`.
+4. **This toolchain prepends `_` to C symbols but not asm labels.** C-side
+   externs for the blob are declared without leading underscore
+   (`binary_rabuka_wasm_wasm_start`) matching asm labels written with one.
+5. **Don't embed the blob via objcopy binary objects** (`-O elf32-shl -B sh`)
+   — ld rejects them on endian merge against the `-ml` link. Use `.incbin`.
+6. `config.h` needs a BUILD_TARGET define (SH-4 isn't known): `-DBUILD_TARGET_ARM`
+   is inert for interp-only builds (all uses are JIT/AOT/GC-guarded).
+7. `wasm_trap_delete` referenced by `wasm_runtime_invoke_c_api_native` — one-line
+   no-op stub in the platform file.
+8. Use `WAMR_BUILD_INVOKE_NATIVE_GENERAL=1` semantics (compile
+   `invokeNative_general.c`, no arch asm exists for SH-4). Our four imports are
+   i32-only so the generic C path's ABI caveats don't apply.
+9. Platform API surface needed (THREAD_MGR=0, JIT/AOT=0, hw-trap off):
+   bh_platform_init/destroy, os_malloc/realloc/free, os_mmap/munmap/mprotect/
+   mremap(+_slow_fixup), os_getpagesize, os_time_get_boot_us,
+   os_time_thread_cputime_us, os_dcache_flush(void)/os_icache_flush(ptr,len),
+   mutex/thread stubs, os_thread_get_stack_boundary (returns uint8_t*).
 
 ### Historical: the abandoned rustc_codegen_gcc attempt (Jul 2026)
 
@@ -455,6 +535,12 @@ Two paths to finish:
 ---
 
 ## The wasm2c pipeline unlocks the rest of Tier 6 (Aug 2026)
+
+> **Superseded by the WAMR interpreter pipeline** (see "Dreamcast Port — WAMR
+> interpreter pipeline" above): same unlock, ~10× less target-side code, and
+> under an interpreter wasm-shrinking actually counts (with wasm2c, GCC
+> re-derived the bloat). Kept for history; the CD-i size analysis below is
+> wasm2c-specific and pessimistic for WAMR.
 
 The DC port proved the pattern: *any* CPU that GCC speaks can now run the engine,
 because wasm2c output is plain C. The old "Tier 6" table (rustc_codegen_gcc era)

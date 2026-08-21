@@ -608,6 +608,8 @@ pub fn choose_action_heuristic_v2(
     if actions.len() == 1 {
         return actions[0].clone();
     }
+    let db = &gs.card_database;
+    let my_now = if me == 0 { &gs.player1 } else { &gs.player2 };
     let mut best_idx = 0usize;
     let mut best_val = f64::NEG_INFINITY;
     for (i, a) in actions.iter().enumerate() {
@@ -616,7 +618,27 @@ pub fn choose_action_heuristic_v2(
             continue;
         }
         game_setup::settle_single_player_state(&mut sim);
-        let val = evaluate_state_v2(&sim, me, &crate::bot::strategy::StrategyWeights::fair());
+        let mut val = evaluate_state_v2(&sim, me, &crate::bot::strategy::StrategyWeights::fair());
+
+        // No-op breaker: an activation that leaves hand/energy/stage/deck/
+        // waitroom counts unchanged bought nothing (e.g. pressing an
+        // unpayable 起動 whose cost fizzles). Without this the eval's
+        // first-index tie-break re-picks it forever — observed as 30+
+        // identical use_ability picks and arena "turn-6 draws".
+        let my_sim = if me == 0 { &sim.player1 } else { &sim.player2 };
+        if my_sim.hand.cards.len() == my_now.hand.cards.len()
+            && my_sim.energy_zone.active_count() == my_now.energy_zone.active_count()
+            && my_sim.stage.stage == my_now.stage.stage
+            && my_sim.main_deck.cards.len() == my_now.main_deck.cards.len()
+            && my_sim.waitroom.cards.len() == my_now.waitroom.cards.len()
+        {
+            val -= 1000.0;
+        }
+        // Hand-reserve discipline: ≤1 card can't set lives or pay discards.
+        if my_sim.hand.cards.len() <= 1 {
+            val -= 40.0;
+        }
+        let _ = db;
         if val > best_val {
             best_val = val;
             best_idx = i;

@@ -8,44 +8,25 @@
 /// μ's member gains blade.
 use crate::helpers::*;
 
-/// Debug: check what abilities the card actually has
+/// The card must have a 常時 ability with an effect (the success-zone constant).
 #[test]
 fn love_wing_bell_debug_card_abilities() {
     let db = load_real_database();
-    let mut game = TestGame::new(db.clone());
 
-    let love_wing = game.id("PL!-bp4-020-L");
+    let love_wing = db.get_card_id("PL!-bp4-020-L").expect("card exists");
     let card = db.get_card(love_wing).unwrap();
-
-    eprintln!("[TEST_DEBUG] Card name: {}", card.name);
-    eprintln!("[TEST_DEBUG] Card type: {:?}", card.card_type);
-    eprintln!("[TEST_DEBUG] Card series: {}", card.series);
-    eprintln!("[TEST_DEBUG] Card group: {}", card.group);
-    eprintln!("[TEST_DEBUG] Number of abilities: {}", card.abilities.len());
-    for (i, ab) in card.resolved_abilities().enumerate() {
-        eprintln!("[TEST_DEBUG]   Ability {}: triggers={:?}", i, ab.triggers);
-        if let Some(ref eff) = ab.effect {
-            eprintln!(
-                "[TEST_DEBUG]     effect action={} resource={:?} count={:?}",
-                eff.action,
-                eff.resource_any(),
-                eff.count
-            );
-            eprintln!(
-                "[TEST_DEBUG]     effect condition={:?}",
-                eff.condition.as_ref().map(|c| c.as_ref())
-            );
-        }
-    }
-
-    let love_wing_ref = game.id_ref("PL!-bp4-020-L");
-    eprintln!(
-        "[TEST_DEBUG] love_wing id={}, ref={}",
-        love_wing, love_wing_ref
+    let constants: Vec<_> = card
+        .resolved_abilities()
+        .filter(|ab| ab.triggers.as_deref() == Some("常時"))
+        .collect();
+    assert!(
+        !constants.is_empty(),
+        "Love wing bell must have a 常時 ability"
     );
-
-    // Force evaluate
-    game.state.evaluate_success_zone_constant_abilities();
+    assert!(
+        constants.iter().any(|ab| ab.effect.is_some()),
+        "the 常時 ability must have a parsed effect"
+    );
 }
 
 /// Love wing bell in success zone + μ's member in center → gets blade +1
@@ -328,13 +309,16 @@ fn love_wing_bell_only_center_gets_blade_not_left_or_right() {
     );
 }
 
-/// Empty stage → no crash
+/// Empty stage → evaluation is a no-op: no panic, and no blade granted to
+/// anyone (there is no one to grant to). Adding a μ's member afterwards must
+/// still grant the blade, proving the empty pass didn't wedge the modifiers.
 #[test]
 fn love_wing_bell_empty_stage_no_crash() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
     let love_wing = game.id("PL!-bp4-020-L");
+    let muse = game.id("PL!-PR-001-PR");
 
     game.state
         .player1
@@ -345,5 +329,13 @@ fn love_wing_bell_empty_stage_no_crash() {
     game.state.player1.stage.stage = [-1, -1, -1];
 
     game.state.recalculate_constants();
-    // Should not panic
+
+    // Now put a μ's member at center and re-evaluate.
+    game.state.player1.stage.stage[1] = muse;
+    game.state.recalculate_constants();
+    assert_eq!(
+        game.state.mods.get_blade_modifier(muse),
+        1,
+        "blade still granted after an earlier empty-stage evaluation"
+    );
 }
