@@ -401,13 +401,10 @@ impl AbilityResolver {
             }
 
             if candidates.is_empty() {
-                // Energy fallback: only when the parser declares energy cards
-                // as an object of this state change (card_type or the mixed
-                // target_types list) — no effect-text sniffing.
-                let declares_energy = effect.card_type_any() == Some(&crate::card::CardType::Energy)
-                    || effect
-                        .target_types_any()
-                        .is_some_and(|t| t.iter().any(|s| s == "energy_card"));
+                // Energy state change (parser emits card_type="energy_card"
+                // when エネルギー is the object; mixed either/or steps are
+                // split into choice options upstream).
+                let declares_energy = effect.card_type_any() == Some(&crate::card::CardType::Energy);
                 if declares_energy {
                     if let Err(e) = self.execute_energy_state_change(
                         gs,
@@ -641,26 +638,6 @@ impl AbilityResolver {
             let p2 = gs.player2.id.clone();
             gs.trigger_auto_abilities_for_player(&p1);
             gs.trigger_auto_abilities_for_player(&p2);
-
-            // Energy half of a mixed either/or state change: the parser
-            // declares it via target_types (e.g. [energy_card, member_card]).
-            let declares_energy_mixed = effect
-                .target_types_any()
-                .is_some_and(|t| t.iter().any(|s| s == "energy_card"));
-            if declares_energy_mixed {
-                if let Err(e) = self.execute_energy_state_change(
-                    gs,
-                    effect,
-                    &state_change,
-                    &target,
-                    count,
-                    max,
-                    Some("energy_card"),
-                    None,
-                ) {
-                    log::debug!("Failed to change energy state: {}", e);
-                }
-            }
 
             let pp = self.player_prefix(gs);
             let act_name = gs

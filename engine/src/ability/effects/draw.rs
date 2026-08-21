@@ -146,18 +146,21 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
+        // Heart-color choices (「{{heart_01}}か{{heart_03}}か…のうち、1つを
+        // 選ぶ」) are recognized ONLY via the parsed `heart_colors` field.
+        // The previous effect-text substring check (`text.contains("heart_")`)
+        // was dead weight: every heart-choice step in abilities.json carries
+        // parsed heart_colors, while icon-bearing filter texts belong to other
+        // actions that must NOT be routed here.
         let has_heart_colors = !effect.heart_colors_any().is_empty();
-        let has_heart_icons = effect.text.contains("heart_");
         log::debug!(
-            "[SELECT_EFFECT] heart_colors={:?} has_icons={} source={:?} card_type={:?}",
+            "[SELECT_EFFECT] heart_colors={:?} source={:?} card_type={:?}",
             effect.heart_colors_any(),
-            has_heart_icons,
             effect.source_any(),
             effect.card_type_any()
         );
         if effect.source_any().is_none()
             && effect.heart_colors_any().is_empty()
-            && !has_heart_icons
             && effect.or_card_types_any().is_none()
             && effect.characters_any().is_none_or(|v| v.is_empty())
             && effect.group_names_any().is_none()
@@ -166,30 +169,24 @@ impl AbilityResolver {
         }
         if effect.source_any().is_none()
             && effect.card_type_any().is_none()
-            && (has_heart_colors || has_heart_icons)
+            && has_heart_colors
         {
-            let heart_colors = if !effect.heart_colors_any().is_empty() {
-                effect.heart_colors_any().to_vec()
-            } else {
-                crate::ability::util::extract_heart_colors_from_text(&effect.text)
-            };
-            if !heart_colors.is_empty() {
-                log::debug!(
-                    "[SELECT_EFFECT] calling execute_select_heart_color with colors={:?}",
-                    heart_colors
-                );
-                self.execute_select_heart_color(
-                    gs,
-                    effect.count_or(1),
-                    &heart_colors,
-                    effect.target_name(),
-                );
-                log::debug!(
-                    "[SELECT_EFFECT] pending_choice={:?}",
-                    self.pending_choice.is_some()
-                );
-                return Ok(());
-            }
+            let heart_colors = effect.heart_colors_any().to_vec();
+            log::debug!(
+                "[SELECT_EFFECT] calling execute_select_heart_color with colors={:?}",
+                heart_colors
+            );
+            self.execute_select_heart_color(
+                gs,
+                effect.count_or(1),
+                &heart_colors,
+                effect.target_name(),
+            );
+            log::debug!(
+                "[SELECT_EFFECT] pending_choice={:?}",
+                self.pending_choice.is_some()
+            );
+            return Ok(());
         }
         let source = if effect.card_type_any() == Some(&crate::card::CardType::Member)
             && effect.source_any().is_none()

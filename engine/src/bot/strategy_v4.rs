@@ -45,14 +45,10 @@ fn acc_add(acc: &mut Acc, hearts: &crate::card::HeartMap) {
     }
 }
 
-/// Stage base hearts + expected yell hits as wildcard capacity.
-/// `confidence` scales the flip contribution: 1.0 = full mean (main-phase
-/// coverage metric), <1.0 = conservative for all-or-nothing portfolio
-/// decisions, since a portfolio sized exactly to the mean fails ~half the
-/// time (binomial variance around the hit count).
-pub(crate) fn heart_pool_inner(gs: &GameState, me_player: u8, db: &CardDatabase, confidence: f64) -> Acc {
+/// Active blades and own-deck blade-heart density (fair info). Yell hits are
+/// a BINOMIAL draw, not a guarantee — portfolio sizing must budget variance.
+pub(crate) fn flip_stats(gs: &GameState, me_player: u8, db: &CardDatabase) -> (i32, f64) {
     let p = if me_player == 0 { &gs.player1 } else { &gs.player2 };
-    let mut acc = [0i32; 11];
     let mut blades = 0i32;
     for &cid in p.stage.stage.iter() {
         if cid < 0 {
@@ -60,15 +56,11 @@ pub(crate) fn heart_pool_inner(gs: &GameState, me_player: u8, db: &CardDatabase,
         }
         let waiting = gs.mods.get_orientation_modifier(cid) == Some("wait");
         if let Some(card) = db.get_card(cid) {
-            if let Some(bh) = &card.base_heart {
-                acc_add(&mut acc, &bh.hearts);
-            }
             if !waiting {
                 blades += card.blade as i32;
             }
         }
     }
-    // Expected yell hits act as any-color hearts (rule 8.3.15.1.1 analog).
     let deck_len = p.main_deck.cards.len().max(1);
     let density = p
         .main_deck
@@ -77,6 +69,29 @@ pub(crate) fn heart_pool_inner(gs: &GameState, me_player: u8, db: &CardDatabase,
         .filter(|&&cid| db.get_card(cid).map_or(false, |c| c.blade_heart.is_some()))
         .count() as f64
         / deck_len as f64;
+    (blades, density)
+}
+
+/// Stage base hearts + expected yell hits as wildcard capacity.
+/// `confidence` scales the flip contribution: 1.0 = full mean (main-phase
+/// coverage metric), <1.0 = conservative for all-or-nothing portfolio
+/// decisions, since a portfolio sized exactly to the mean fails ~half the
+/// time (binomial variance around the hit count).
+pub(crate) fn heart_pool_inner(gs: &GameState, me_player: u8, db: &CardDatabase, confidence: f64) -> Acc {
+    let p = if me_player == 0 { &gs.player1 } else { &gs.player2 };
+    let mut acc = [0i32; 11];
+    for &cid in p.stage.stage.iter() {
+        if cid < 0 {
+            continue;
+        }
+        if let Some(card) = db.get_card(cid) {
+            if let Some(bh) = &card.base_heart {
+                acc_add(&mut acc, &bh.hearts);
+            }
+        }
+    }
+    // Expected yell hits act as any-color hearts (rule 8.3.15.1.1 analog).
+    let (blades, density) = flip_stats(gs, me_player, db);
     acc[10] += ((blades as f64 * density) * confidence).floor() as i32;
     acc
 }

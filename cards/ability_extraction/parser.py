@@ -10766,6 +10766,7 @@ def _state_energy_is_object(txt: str) -> bool:
     return bool(
         re.search(
             r"エネルギー(?:[0-9０-９一二三四五六]+枚)?を(?:すべて?)?(?:アクティブ|ウェイト)"
+            r"|エネルギーを[0-9０-９]*枚*(?:アクティブ|ウェイト)"
             r"|すべてのエネルギーを"
             r"|エネルギー[0-9０-９]*枚?か",
             txt,
@@ -10773,35 +10774,148 @@ def _state_energy_is_object(txt: str) -> bool:
     )
 
 
-def _state_member_is_object(txt: str) -> bool:
-    return bool(re.search(r"メンバー(?:[0-9０-９]+人)?を(?:アクティブ|ウェイト)", txt)) or bool(
-        re.search(r"メンバーと、", txt)
-    )
+def _fw_int(txt: str, pattern: str) -> int:
+    """First integer capture of `pattern` in `txt`, full-width normalized."""
+    m = re.search(pattern, txt.translate(str.maketrans("０１２３４５６７８９", "0123456789")))
+    return int(m.group(1)) if m else 1
 
 
-def _mark_state_target_types(node):
-    """Declare the object types of change_state steps structurally.
+def _split_mixed_state_change(node):
+    """Split change_state steps whose OBJECT spans two card kinds.
 
-    Pure-energy steps already get card_type="energy_card"; this pass handles
-    MIXED either/or steps (「エネルギー1枚か『虹ヶ咲』のメンバー1人を
-    アクティブにする」) by emitting target_types=[energy_card, member_card]
-    so the engine can offer both candidate kinds without sniffing effect text.
+    - 「…メンバーと、…エネルギーをアクティブにする」 (AND) → sequential of a
+      member step and an energy step.
+    - 「エネルギー1枚か『虹ヶ咲』のメンバー1人をアクティブにする」 (OR) →
+      choice with one option per kind, so the PLAYER picks a side (rules:
+      either/or wording never resolves both).
+
+    The engine consumes plain change_state steps afterwards — no effect-text
+    sniffing. Steps where エネルギー appears only as a count reference
+    (「…の下にあるエネルギーカードの枚数…」) match no pattern and stay intact.
     """
+    if not isinstance(node, dict) or node.get("action") != "change_state":
+        return node
+    txt = node.get("text") or ""
+    sc = node.get("state_change") or "active"
+
+    # ── AND: 「メンバーと、エネルギー…」 ──
+    if "メンバーと、" in txt and _state_energy_is_object(txt):
+        grp = re.search(r"『([^』]+)』のメンバー", txt)
+        member_txt = txt.split("と、")[0]
+        member_step = {
+            "action": "change_state",
+            "state_change": sc,
+            "card_type": "member_card",
+            "count": 0,  # 0 = all matching (すべての)
+            "target": node.get("target") or "self",
+            "text": member_txt,
+        }
+        if grp:
+            member_step["group_names"] = [grp.group(1)]
+        energy_step = {
+            "action": "change_state",
+            "state_change": sc,
+            "card_type": "energy_card",
+            "count": 0,
+            "target": "self",
+            "text": "自分のすべてのエネルギーをアクティブにする"
+            if sc == "active"
+            else f"自分のすべてのエネルギーを{sc}にする",
+        }
+        seq = {
+            "action": "sequential",
+            "text": txt,
+            "actions": [member_step, energy_step],
+        }
+        if node.get("condition"):
+            seq["condition"] = node["condition"]
+        return seq
+
+    # ── OR: 「AかB」 ──
+    if not ("か" in txt and _state_energy_is_object(txt)):
+        return node
+
+    def member_option(member_txt: str) -> dict:
+        grp = re.search(r"『([^』]+)』", member_txt)
+        opt = {
+            "action": "change_state",
+            "state_change": sc,
+            "card_type": "member_card",
+            "count": _fw_int(member_txt, r"メンバー([0-9]+)人"),
+            "target": node.get("target") or "self",
+            "text": member_txt,
+        }
+        if grp:
+            opt["group_names"] = [grp.group(1)]
+        return opt
+
+    energy_n = _fw_int(txt, r"エネルギー([0-9]+)枚")
+    m = re.search(r"エネルギー[0-9]+枚か(.+)", txt)
+    if m:
+        # energy-first ordering
+        options = [
+            {
+                "action": "change_state",
+                "state_change": sc,
+                "card_type": "energy_card",
+                "count": energy_n,
+                "target": "self",
+                "text": f"エネルギー{energy_n}枚をアクティブにする"
+                if sc == "active"
+                else f"エネルギー{energy_n}枚を{sc}にする",
+            },
+            member_option(m.group(1)),
+        ]
+    else:
+        m2 = re.search(r"(.+?)か、エネルギー(?:([0-9]+)枚)?を(アクティブ|ウェイト)にする", txt)
+        m2b = None
+        if not m2:
+            m2b = re.search(
+                r"(.+?)か、エネルギーを([0-9]+)枚(アクティブ|ウェイト)", txt
+            )
+            if not m2b:
+                return node
+        if m2b:
+            energy_n = int(m2b.group(2))
+            options = [
+                member_option(m2b.group(1)),
+                {
+                    "action": "change_state",
+                    "state_change": sc,
+                    "card_type": "energy_card",
+                    "count": energy_n,
+                    "target": "self",
+                    "text": f"エネルギーを{energy_n}枚{m2b.group(3)}にする",
+                },
+            ]
+        else:
+            energy_n = int(m2.group(2)) if m2.group(2) else 1
+            options = [
+                member_option(m2.group(1)),
+                {
+                    "action": "change_state",
+                    "state_change": sc,
+                    "card_type": "energy_card",
+                    "count": energy_n,
+                    "target": "self",
+                    "text": f"エネルギー{energy_n}枚を{m2.group(3)}にする",
+                },
+            ]
+    choice = {"action": "choice", "text": txt, "count": 1, "options": options}
+    if node.get("condition"):
+        choice["condition"] = node["condition"]
+    return choice
+
+
+def _walk_split_mixed(node):
     if isinstance(node, dict):
-        if node.get("action") == "change_state":
-            txt = node.get("text") or ""
-            types = []
-            if _state_energy_is_object(txt):
-                types.append("energy_card")
-            if _state_member_is_object(txt):
-                types.append("member_card")
-            if len(types) >= 2:
-                node["target_types"] = types
-        for v in node.values():
-            _mark_state_target_types(v)
+        for key in ("actions", "options"):
+            if isinstance(node.get(key), list):
+                node[key] = [_walk_split_mixed(a) for a in node[key]]
+        return _split_mixed_state_change(node)
     elif isinstance(node, list):
-        for it in node:
-            _mark_state_target_types(it)
+        return [_walk_split_mixed(a) for a in node]
+    return node
 
 
 def _normalize_effect_tree(effect, original_text=None):
@@ -10825,7 +10939,7 @@ def _normalize_effect_tree(effect, original_text=None):
     _strip_leaked_draw_g(effect)
     _enrich_gain_abilities(effect)
     _mark_live_total_score(effect)
-    _mark_state_target_types(effect)
+    effect = _walk_split_mixed(effect)
     _enrich_characters(effect)
     _clean_gain_resource(effect)
     _fix_select_self_and_other(effect)

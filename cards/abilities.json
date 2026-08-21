@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-22T07:56:54.352832",
+  "generated_at": "2026-08-22T08:15:01.320591",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "c5e7265d",
+  "engine_commit": "870fb549",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -4886,21 +4886,28 @@
       "is_null": false,
       "cost": null,
       "effect": {
+        "action": "sequential",
         "text": "自分のステージにいるすべての『Liella!』のメンバーと、自分のすべてのエネルギーをアクティブにする",
-        "source": "stage",
-        "state_change": "active",
-        "card_type": "member_card",
-        "target": "self",
-        "position": "center",
-        "group_names": [
-          "Liella!"
-        ],
-        "action": "change_state",
-        "all": true,
-        "activation_position": "center",
-        "target_types": [
-          "energy_card",
-          "member_card"
+        "actions": [
+          {
+            "action": "change_state",
+            "state_change": "active",
+            "card_type": "member_card",
+            "count": 0,
+            "target": "self",
+            "text": "自分のステージにいるすべての『Liella!』のメンバー",
+            "group_names": [
+              "Liella!"
+            ]
+          },
+          {
+            "action": "change_state",
+            "state_change": "active",
+            "card_type": "energy_card",
+            "count": 0,
+            "target": "self",
+            "text": "自分のすべてのエネルギーをアクティブにする"
+          }
         ]
       }
     },
@@ -15677,17 +15684,29 @@
         "type": "move_cards"
       },
       "effect": {
+        "action": "choice",
         "text": "エネルギー1枚か『虹ヶ咲』のメンバー1人をアクティブにする",
-        "state_change": "active",
         "count": 1,
-        "card_type": "member_card",
-        "group_names": [
-          "虹ヶ咲"
-        ],
-        "action": "change_state",
-        "target_types": [
-          "energy_card",
-          "member_card"
+        "options": [
+          {
+            "action": "change_state",
+            "state_change": "active",
+            "card_type": "energy_card",
+            "count": 1,
+            "target": "self",
+            "text": "エネルギー1枚をアクティブにする"
+          },
+          {
+            "action": "change_state",
+            "state_change": "active",
+            "card_type": "member_card",
+            "count": 1,
+            "target": "self",
+            "text": "『虹ヶ咲』のメンバー1人をアクティブにする",
+            "group_names": [
+              "虹ヶ咲"
+            ]
+          }
         ]
       }
     },
@@ -16887,13 +16906,27 @@
       "is_null": false,
       "cost": null,
       "effect": {
+        "action": "choice",
         "text": "自分のステージにいるメンバー1人か、エネルギーを2枚アクティブにする",
-        "source": "stage",
-        "state_change": "active",
-        "count": 2,
-        "card_type": "member_card",
-        "target": "self",
-        "action": "change_state"
+        "count": 1,
+        "options": [
+          {
+            "action": "change_state",
+            "state_change": "active",
+            "card_type": "member_card",
+            "count": 1,
+            "target": "self",
+            "text": "自分のステージにいるメンバー1人"
+          },
+          {
+            "action": "change_state",
+            "state_change": "active",
+            "card_type": "energy_card",
+            "count": 2,
+            "target": "self",
+            "text": "エネルギーを2枚アクティブにする"
+          }
+        ]
       }
     },
     {

@@ -1,24 +1,24 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-21T22:02:44.755800+00:00",
+  "generated_at": "2026-08-21T22:22:41.384560+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 411,
-  "n_tests": 2473,
+  "n_files": 412,
+  "n_tests": 2477,
   "total_cards": 771,
-  "covered_cards": 555,
-  "abilities_on_covered": 709,
+  "covered_cards": 557,
+  "abilities_on_covered": 711,
   "trigger_counts": {
     "起動": [
-      78,
+      79,
       96
     ],
     "登場": [
-      200,
+      201,
       269
     ],
     "ライブ開始時": [
@@ -48,7 +48,7 @@
       146
     ],
     "look_and_select": [
-      41,
+      42,
       72
     ],
     "gain_resource": [
@@ -56,8 +56,8 @@
       160
     ],
     "sequential": [
-      156,
-      217
+      157,
+      218
     ],
     "unknown": [
       2,
@@ -68,8 +68,8 @@
       44
     ],
     "change_state": [
-      53,
-      63
+      51,
+      60
     ],
     "play_baton_touch": [
       1,
@@ -120,8 +120,8 @@
       6
     ],
     "choice": [
-      17,
-      22
+      19,
+      24
     ],
     "conditional_on_optional": [
       9,
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      411,
+      413,
       546
     ],
     "temporal_condition": [
@@ -272,11 +272,11 @@
       66
     ],
     "bp2": [
-      56,
+      57,
       68
     ],
     "bp4": [
-      64,
+      65,
       88
     ],
     "bp5": [
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 537,
-    "none": 227,
-    "L1+choice": 122,
-    "L2": 35,
+    "L2+choice": 539,
+    "none": 225,
+    "L1+choice": 124,
+    "L2": 33,
     "L1": 15
   },
   "qa_rulings": {
@@ -2951,14 +2951,21 @@
         "PL!SP-pb2-017-P＋"
       ],
       "base": "PL!SP-bp2-007",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/either_or_state_change_test.rs"
+      ],
+      "covering_tests": [
+        "chisato_bp5003_live_start_activates_all_members_and_energy",
+        "emma_bp4008_energy_side_leaves_member_waited",
+        "emma_bp4008_member_side_leaves_energy_alone",
+        "emma_pb1008_debut_choice_picks_member"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -6056,23 +6063,28 @@
       ],
       "base": "PL!SP-bp5-003",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/chisato_bp5_test.rs"
+        "engine/tests/test_modules/chisato_bp5_test.rs",
+        "engine/tests/test_modules/either_or_state_change_test.rs"
       ],
       "covering_tests": [
+        "chisato_bp5003_live_start_activates_all_members_and_energy",
         "chisato_bp5_q219_cost_10_fails_with_9",
         "chisato_bp5_q219_cost_10_needs_10_energy",
         "chisato_bp5_q219_cross_card_reduction_7_fails",
         "chisato_bp5_q219_cross_card_reduction_8_works",
         "chisato_bp5_self_cost_not_reduced",
         "chisato_promo_ab0_cross_card_reduction",
-        "chisato_promo_ab1_live_start"
+        "chisato_promo_ab1_live_start",
+        "emma_bp4008_energy_side_leaves_member_waited",
+        "emma_bp4008_member_side_leaves_energy_alone",
+        "emma_pb1008_debut_choice_picks_member"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 11,
       "is_null": false
     },
     {
@@ -6082,7 +6094,7 @@
       "trigger_list": [
         "ライブ開始時"
       ],
-      "action": "change_state",
+      "action": "sequential",
       "condition": "none",
       "set": "bp5",
       "cards": [
@@ -6093,23 +6105,28 @@
       ],
       "base": "PL!SP-bp5-003",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/chisato_bp5_test.rs"
+        "engine/tests/test_modules/chisato_bp5_test.rs",
+        "engine/tests/test_modules/either_or_state_change_test.rs"
       ],
       "covering_tests": [
+        "chisato_bp5003_live_start_activates_all_members_and_energy",
         "chisato_bp5_q219_cost_10_fails_with_9",
         "chisato_bp5_q219_cost_10_needs_10_energy",
         "chisato_bp5_q219_cross_card_reduction_7_fails",
         "chisato_bp5_q219_cross_card_reduction_8_works",
         "chisato_bp5_self_cost_not_reduced",
         "chisato_promo_ab0_cross_card_reduction",
-        "chisato_promo_ab1_live_start"
+        "chisato_promo_ab1_live_start",
+        "emma_bp4008_energy_side_leaves_member_waited",
+        "emma_bp4008_member_side_leaves_energy_alone",
+        "emma_pb1008_debut_choice_picks_member"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 11,
       "is_null": false
     },
     {
@@ -15844,9 +15861,14 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/either_or_state_change_test.rs",
         "engine/tests/test_modules/untested_abilities_batch3_test.rs"
       ],
       "covering_tests": [
+        "chisato_bp5003_live_start_activates_all_members_and_energy",
+        "emma_bp4008_energy_side_leaves_member_waited",
+        "emma_bp4008_member_side_leaves_energy_alone",
+        "emma_pb1008_debut_choice_picks_member",
         "kanata_bp3006_debut_enters_wait_state",
         "niko_bp3009_activation_self_wait_and_heart_choice",
         "niko_bp3009_cost13_condition_draw",
@@ -15861,7 +15883,7 @@
         "yuna_sp222_exactly_eight_energy_scores_one",
         "yuna_sp222_live_start_optional_energy_places_wait_energy"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 17,
       "is_null": false
     },
     {
@@ -17225,7 +17247,7 @@
       "trigger_list": [
         "起動"
       ],
-      "action": "change_state",
+      "action": "choice",
       "condition": "none",
       "set": "bp4",
       "cards": [
@@ -17233,14 +17255,21 @@
         "PL!N-bp4-008-P"
       ],
       "base": "PL!N-bp4-008",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/either_or_state_change_test.rs"
+      ],
+      "covering_tests": [
+        "chisato_bp5003_live_start_activates_all_members_and_energy",
+        "emma_bp4008_energy_side_leaves_member_waited",
+        "emma_bp4008_member_side_leaves_energy_alone",
+        "emma_pb1008_debut_choice_picks_member"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -18478,6 +18507,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/either_or_state_change_test.rs",
         "engine/tests/test_modules/gameplay_test.rs",
         "engine/tests/test_modules/surplus_heart_test.rs"
       ],
@@ -18493,6 +18523,7 @@
         "bella_q173_two_lives_succeed_both_trigger",
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "bella_q174_no_member_on_stage_ability_does_not_fire",
+        "chisato_bp5003_live_start_activates_all_members_and_energy",
         "choice_condition_shows_proper_labels_in_actions",
         "dia_sd1_optional_draw_pay_then_deck_top",
         "dia_sd1_optional_draw_skip_skips_movement",
@@ -18506,14 +18537,13 @@
         "distortion_same_name_catchu_all_active_score_plus_1",
         "distortion_same_name_catchu_condition_not_met",
         "distortion_two_same_one_diff_catchu_condition_met",
+        "emma_bp4008_energy_side_leaves_member_waited",
+        "emma_bp4008_member_side_leaves_energy_alone",
+        "emma_pb1008_debut_choice_picks_member",
         "energy_zone_capacity_handled",
-        "hanamaru_score_icon_filter",
-        "hareruya_q64_waitroom_only_five_distinct_liella_condition_met",
-        "hareruya_q74_multiname_distinct_counting",
-        "kanon_activation_choice_condition_discard_flow",
-        "kanon_activation_choice_condition_wait_option"
+        "hanamaru_score_icon_filter"
       ],
-      "covering_test_count": 61,
+      "covering_test_count": 65,
       "is_null": false
     },
     {
@@ -18523,7 +18553,7 @@
       "trigger_list": [
         "登場"
       ],
-      "action": "change_state",
+      "action": "choice",
       "condition": "none",
       "set": "pb1",
       "cards": [
@@ -18537,6 +18567,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/either_or_state_change_test.rs",
         "engine/tests/test_modules/gameplay_test.rs",
         "engine/tests/test_modules/surplus_heart_test.rs"
       ],
@@ -18552,6 +18583,7 @@
         "bella_q173_two_lives_succeed_both_trigger",
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "bella_q174_no_member_on_stage_ability_does_not_fire",
+        "chisato_bp5003_live_start_activates_all_members_and_energy",
         "choice_condition_shows_proper_labels_in_actions",
         "dia_sd1_optional_draw_pay_then_deck_top",
         "dia_sd1_optional_draw_skip_skips_movement",
@@ -18565,14 +18597,13 @@
         "distortion_same_name_catchu_all_active_score_plus_1",
         "distortion_same_name_catchu_condition_not_met",
         "distortion_two_same_one_diff_catchu_condition_met",
+        "emma_bp4008_energy_side_leaves_member_waited",
+        "emma_bp4008_member_side_leaves_energy_alone",
+        "emma_pb1008_debut_choice_picks_member",
         "energy_zone_capacity_handled",
-        "hanamaru_score_icon_filter",
-        "hareruya_q64_waitroom_only_five_distinct_liella_condition_met",
-        "hareruya_q74_multiname_distinct_counting",
-        "kanon_activation_choice_condition_discard_flow",
-        "kanon_activation_choice_condition_wait_option"
+        "hanamaru_score_icon_filter"
       ],
-      "covering_test_count": 61,
+      "covering_test_count": 65,
       "is_null": false
     },
     {
