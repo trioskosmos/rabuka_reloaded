@@ -6022,6 +6022,12 @@ def infer_count_from_icons(d, text):
 
 def _fill_defaults_count_and_refine(action, text, action_text, a):
     """under_member promotion, revealed_cards defaults, count extraction, custom refinement. Returns updated action type."""
+    # NOTE: unconditional promotion is LOAD-BEARING. The engine's
+    # execute_place_energy_under_member special-cases source=under_member
+    # with destination=energy_zone/empty_area/energy_deck (bp5-012 deck
+    # deploys counted from under-member, Burn!!-style returns, member
+    # deploys). Relabeling these as move_cards changes which engine path
+    # runs and breaks gameplay even when the label looks wrong.
     if action.get("source") == "under_member" and a != "place_energy_under_member":
         action["action"] = "place_energy_under_member"
         a = "place_energy_under_member"
@@ -10401,22 +10407,6 @@ def _walk_propagate_sequential_links(d):
                         cond[_key] = prev_pm_cond[_key]
 
 
-def _walk_collapse_sequential(d):
-    # Collapse single-action sequential wrappers (preserve condition + trigger_type + text)
-    if d.get("action") == "sequential" and d.get("actions") and len(d["actions"]) == 1:
-        inner = d["actions"][0]
-        if not d.get("condition") and not d.get("conditional"):
-            outer_fields = {}
-            for k in ("condition", "trigger_type", "text"):
-                if k in d:
-                    outer_fields[k] = d[k]
-            d.clear()
-            d.update(inner)
-            for k, v in outer_fields.items():
-                if k not in d:
-                    d[k] = v
-
-
 def _walk_set_defaults(d, d_text, ct):
     # Default target to "self" for location_conditions if missing
     if d.get("type") == "location_condition" and "target" not in d:
@@ -10541,7 +10531,6 @@ def _walk(d, full_text, original_text, ctx_text=None):
     _walk_extract_heart_colors(d, d_text, ctx_text)
     _walk_propagate_all_and_targets(d, d_ctx)
     _walk_propagate_sequential_links(d)
-    _walk_collapse_sequential(d)
     _walk_set_defaults(d, d_text, ct)
     _walk_propagate_position(d, d_ctx, d_text)
     _walk_propagate_flags(d, d_ctx)
@@ -11991,18 +11980,24 @@ def _strip_self_appearance_card_type(node):
 
 
 def _fix_ll_bp7_001_play_cost(data: Dict[str, Any]) -> None:
-    """Fix LL-bp7-001 ab#0: play-time discard cost mis-parsed as passive discard condition.
+    """LL-bp7-001 ab#0 play-cost template (LOAD-BEARING, not cosmetic).
 
-    Correct: optional hand→discard of one member_card per named character,
-    if done cost becomes 10. Emit as modify_cost(set) with 3 characters +
-    location hand, marked optional. Engine treats this pattern as play-time
-    (not passive) via modifiers.rs skip + phases.rs hook.
+    "このカードのプレイに際し、手札から「A」「B」「C」のメンバーカードを
+    それぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは
+    10になる。" is a PLAY-TIME cost modifier, not a triggered ability. The
+    generic parser reads it as conditional_on_optional and loses the contract
+    the engine expects: modify_cost(set) + location hand + characters +
+    optional, which modifiers.rs/phases.rs route as a play-time cost hook.
+    Replace with that exact structure. A general handler for the
+    「プレイに際し…コストはNになる」 template should eventually replace this.
     """
     for ability in data.get("unique_abilities", []):
         cards = ability.get("cards", [])
         if not any("LL-bp7-001" in c and "(ab#0)" in c for c in cards):
             continue
         tt = ability.get("triggerless_text", "")
+        if "プレイに際し" not in tt or "コストは10になる" not in tt:
+            continue
         ability["effect"] = {
             "text": tt,
             "action": "modify_cost",
