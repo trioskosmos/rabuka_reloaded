@@ -50,7 +50,7 @@ fn acc_add(acc: &mut Acc, hearts: &crate::card::HeartMap) {
 /// coverage metric), <1.0 = conservative for all-or-nothing portfolio
 /// decisions, since a portfolio sized exactly to the mean fails ~half the
 /// time (binomial variance around the hit count).
-fn heart_pool_inner(gs: &GameState, me_player: u8, db: &CardDatabase, confidence: f64) -> Acc {
+pub(crate) fn heart_pool_inner(gs: &GameState, me_player: u8, db: &CardDatabase, confidence: f64) -> Acc {
     let p = if me_player == 0 { &gs.player1 } else { &gs.player2 };
     let mut acc = [0i32; 11];
     let mut blades = 0i32;
@@ -81,19 +81,19 @@ fn heart_pool_inner(gs: &GameState, me_player: u8, db: &CardDatabase, confidence
     acc
 }
 
-fn heart_pool(gs: &GameState, me_player: u8, db: &CardDatabase) -> Acc {
+pub(crate) fn heart_pool(gs: &GameState, me_player: u8, db: &CardDatabase) -> Acc {
     heart_pool_inner(gs, me_player, db, 1.0)
 }
 
 /// Conservative pool for live-set portfolios (0.6× flip credit).
-fn heart_pool_gamble_safe(gs: &GameState, me_player: u8, db: &CardDatabase) -> Acc {
+pub(crate) fn heart_pool_gamble_safe(gs: &GameState, me_player: u8, db: &CardDatabase) -> Acc {
     heart_pool_inner(gs, me_player, db, 0.6)
 }
 
 /// Try allocating `need` from `pool`; returns None if impossible, else the
 /// remaining pool. Specific colors first, All/BAll cover deficits, grey
 /// bucket takes colorless + leftovers (rule 2.11.3).
-fn alloc(pool: &Acc, need: &Acc) -> Option<Acc> {
+pub(crate) fn alloc(pool: &Acc, need: &Acc) -> Option<Acc> {
     let mut p = *pool;
     let mut wildcard_used = 0i32;
     for c in 1..=6 {
@@ -140,7 +140,7 @@ fn alloc(pool: &Acc, need: &Acc) -> Option<Acc> {
     Some(p)
 }
 
-fn hand_lives<'a>(
+pub(crate) fn hand_lives<'a>(
     p: &'a crate::player::Player,
     db: &CardDatabase,
 ) -> Vec<(usize, i16, Acc)> {
@@ -161,7 +161,7 @@ fn hand_lives<'a>(
 }
 
 /// How many hand lives can currently pass their heart check.
-fn passable_count(gs: &GameState, me_player: u8, db: &CardDatabase) -> usize {
+pub(crate) fn passable_count(gs: &GameState, me_player: u8, db: &CardDatabase) -> usize {
     let p = if me_player == 0 { &gs.player1 } else { &gs.player2 };
     let pool = heart_pool(gs, me_player, db);
     hand_lives(p, db)
@@ -170,7 +170,7 @@ fn passable_count(gs: &GameState, me_player: u8, db: &CardDatabase) -> usize {
         .count()
 }
 
-fn lives_in_hand(p: &crate::player::Player, db: &CardDatabase) -> usize {
+pub(crate) fn lives_in_hand(p: &crate::player::Player, db: &CardDatabase) -> usize {
     p.hand
         .cards
         .iter()
@@ -189,6 +189,7 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
     let dbg = std::env::var("V4_DEBUG").is_ok();
     let db = &gs.card_database;
     let my_now = if me == 0 { &gs.player1 } else { &gs.player2 };
+    let base_hand_len = my_now.hand.cards.len() as i32;
 
     let base_passable = passable_count(gs, me, db);
     let base_ammo = lives_in_hand(my_now, db);
@@ -208,6 +209,27 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
             .sum()
     };
     let base_stage = stage_hearts_of(my_now);
+
+    // Life-acquisition odds: own decklist is fair information. When starving,
+    // actions that draw cards are lottery tickets toward the next life.
+    let deck_lives = my_now
+        .main_deck
+        .cards
+        .iter()
+        .filter(|&&c| {
+            db.get_card(c).map_or(false, |x| x.card_type == CardType::Live)
+        })
+        .count();
+    let deck_len = my_now.main_deck.cards.len().max(1);
+    let p_life_draw = deck_lives as f64 / deck_len as f64;
+    let waitroom_lives = my_now
+        .waitroom
+        .cards
+        .iter()
+        .filter(|&&c| {
+            db.get_card(c).map_or(false, |x| x.card_type == CardType::Live)
+        })
+        .count();
 
     let mut best_idx = 0usize;
     let mut best_val = f64::NEG_INFINITY;
@@ -254,7 +276,27 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
         // Hand reserve: ≤1 card can't set lives or pay costs.
         if my_sim.hand.cards.len() <= 1 {
             val -= 60.0;
-            dbg_parts.push("LOWHAND".into());
+        }
+
+        // Life acquisition: when ammo-starved, drawing cards digs toward the
+        // next life (P = remaining deck lives / deck size), and milling to
+        // waitroom banks lives for retrieval engines.
+        if base_ammo == 0 || base_ammo + base_passable == 0 {
+            let drawn = (my_sim.hand.cards.len() as i32 - base_hand_len).max(0);
+            val += 30.0 * p_life_draw * drawn as f64;
+            let wr_lives_now = my_sim
+                .waitroom
+                .cards
+                .iter()
+                .filter(|&&c| {
+                    db.get_card(c).map_or(false, |x| x.card_type == CardType::Live)
+                })
+                .count();
+            let wr_before = waitroom_lives;
+            if wr_lives_now > wr_before && p_life_draw > 0.0 {
+                val += 10.0; // banking lives where retrieval can reach them
+            }
+            let _ = waitroom_lives;
         }
 
         // No-op breaker: unchanged key counts bought nothing.

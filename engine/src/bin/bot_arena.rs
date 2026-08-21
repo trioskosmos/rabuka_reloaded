@@ -6,7 +6,7 @@
 //! Moved out of tests/test_modules/strategy_bot_test.rs — this is a
 //! benchmark/arena, not a unit test. Run it when you want numbers.
 
-use rabuka_engine::bot::{strategy, strategy_v2, strategy_v3, strategy_v4};
+use rabuka_engine::bot::{strategy, strategy_v2, strategy_v3, strategy_v4, strategy_v5};
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
 use rabuka_engine::deck_parser;
@@ -21,6 +21,7 @@ enum BotKind {
     V2,
     V3,
     V4,
+    V5,
     Random,
 }
 
@@ -30,6 +31,7 @@ fn parse_kind(s: &str) -> BotKind {
         "v2" => BotKind::V2,
         "v3" => BotKind::V3,
         "v4" => BotKind::V4,
+        "v5" => BotKind::V5,
         _ => BotKind::Random,
     }
 }
@@ -138,6 +140,7 @@ fn main() {
         BotKind::V2 => "v2",
         BotKind::V3 => "v3",
         BotKind::V4 => "v4",
+        BotKind::V5 => "v5",
         BotKind::Random => "random",
     };
 
@@ -292,6 +295,7 @@ fn main() {
                         strategy_v3::choose_mulligan_action_v3(&gs, &actions, &db)
                     }
                     BotKind::V4 => strategy_v4::choose_mulligan_v4(&gs, &actions, &db),
+                    BotKind::V5 => strategy_v4::choose_mulligan_v4(&gs, &actions, &db),
                     _ => actions
                         .iter()
                         .find(|a| {
@@ -326,6 +330,7 @@ fn main() {
                         )
                     }
                     BotKind::V4 => strategy_v4::choose_live_set_v4(&gs, &actions, &db),
+                    BotKind::V5 => strategy_v5::choose_live_set_v5(&gs, &actions, &db),
                     BotKind::Random => actions[rng.range(actions.len())].clone(),
                 };
                 if trace {
@@ -391,6 +396,7 @@ fn main() {
                     strategy_v3::choose_action_heuristic_v3(&gs, &actions, me, plan)
                 }
                 BotKind::V4 => strategy_v4::choose_action_v4(&gs, &actions, me),
+                BotKind::V5 => strategy_v5::choose_action_v5(&gs, &actions, me),
                 BotKind::Random => actions[rng.range(actions.len())].clone(),
             };
             if trace {
