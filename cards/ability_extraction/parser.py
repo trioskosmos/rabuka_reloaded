@@ -1133,28 +1133,19 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         if not isinstance(effect, dict):
             effect = {}
 
-        # Fill missing condition from text — unified single field
+        # Fill missing condition from text — unified single field.
+        # Gate markers are located with nesting-aware depth-0 search so a
+        # 場合/とき inside 「」 quotes or （） notes never creates a bogus gate
+        # (the old code approximated this by rejecting prefixes containing
+        # any paren, which also rejected legitimate gates).
         trigger_condition = None
         txt = remaining_text
         if SEQUENTIAL_MARKER in txt:
             txt = txt.split(SEQUENTIAL_MARKER)[-1].lstrip("、").strip()
         for sep in ["とき、", "場合、", "たび、", "なら、"]:
-            idx = txt.find(sep)
+            idx = _find_depth0(txt, sep)
             if idx >= 0:
-                cond_text = txt[
-                    : idx
-                    + len(
-                        "とき"
-                        if sep == "とき、"
-                        else "場合"
-                        if sep == "場合、"
-                        else "たび"
-                        if sep == "たび、"
-                        else "なら"
-                    )
-                ]
-                if ")" in cond_text or "）" in cond_text:
-                    continue
+                cond_text = txt[: idx + len(sep)]
                 tc = parse_condition(cond_text)
                 if tc and tc.get("type") not in (None, "custom"):
                     trigger_condition = tc
@@ -8363,19 +8354,13 @@ def _try_implicit_sequential(text):
         return None
     if CHOICE_MARKER in text:
         return None
-    # Prefer 。as separator when present (sentence boundaries)
+    # Prefer 。as separator when present (sentence boundaries).
+    # _split_sentences_nesting handles 「」/（）/{{}} natively — no \x00 tricks.
     if "。" in text:
-        # Filter out fully parenthetical segments before splitting
-        # to prevent notes like （対戦相手のカードの効果でも発動する） from becoming do_nothing
-        clean_for_split = re.sub(r"（[^）]*）", "", text)
-        clean_for_split = re.sub(r"\([^)]*\)", "", clean_for_split)
-        # Protect 「」 content from internal splitting (ability text with periods)
-        clean_for_split = re.sub(
-            r"「[^」]*」", lambda m: m.group(0).replace("。", "\x00"), clean_for_split
-        )
-        parts = [p.strip() for p in clean_for_split.split("。") if p.strip()]
-        # Restore protected periods
-        parts = [p.replace("\x00", "。") for p in parts]
+        parts = _split_sentences_nesting(text)
+        # Drop segments that are only parenthetical notes
+        # (e.g. （対戦相手のカードの効果でも発動する）) so they don't become do_nothing.
+        parts = [p for p in parts if strip_parenthetical(p)]
         # Also filter duration prefix fragments that are just "ライブ終了時まで、"
         # but remember the duration to apply to the next action.
         filt = []
