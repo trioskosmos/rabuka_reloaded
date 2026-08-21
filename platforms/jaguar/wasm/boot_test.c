@@ -29,7 +29,7 @@ static void disp_print(const unsigned char *s, unsigned n) {
 }
 void jag_main(void) {
     disp_clear();
-    static const unsigned char m[] = "BOOT OK - MINIMAL TEST";
+    static const unsigned char m[] = "BOOT OK - ROM EXTENSION TEST";
     disp_print(m, sizeof(m)-1);
     for (;;) { volatile unsigned n = 0; while (n < 200000u) n++; }
 }

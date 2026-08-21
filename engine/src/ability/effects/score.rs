@@ -587,17 +587,15 @@ impl AbilityResolver {
             "{} {}: [[log_yell_count:op={},n={}]]",
             pp, act_name, operation, count
         ));
+        // Every modifier is registered as data; the required count is derived
+        // from base + Σ deltas at read time (see effective_cheer_checks_required).
+        // Registration order and timing (before/after the base exists) do not
+        // matter — Q111 semantics fall out naturally.
+        let slot: u8 = if pp.contains('2') { 2 } else { 1 };
         match operation {
-            "add" => {
-                gs.cheer_checks_required += count;
-            }
-            "subtract" => {
-                gs.cheer_checks_required = gs.cheer_checks_required.saturating_sub(count);
-            }
-            "set" => {
-                gs.cheer_checks_required = count;
-            }
-            _ => log::debug!("Unknown operation: {}", operation),
+            "add" => gs.add_yell_count_modifier(slot, count as i32),
+            "subtract" => gs.add_yell_count_modifier(slot, -(count as i32)),
+            other => log::debug!("Unknown yell-count operation: {}", other),
         }
     }
 

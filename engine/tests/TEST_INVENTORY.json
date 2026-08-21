@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-21T08:04:50.484252+00:00",
+  "generated_at": "2026-08-21T15:31:53.137954+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 405,
-  "n_tests": 2426,
+  "n_files": 407,
+  "n_tests": 2438,
   "total_cards": 771,
   "covered_cards": 540,
   "abilities_on_covered": 692,
@@ -309,11 +309,19 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 518,
+    "L2+choice": 520,
     "none": 244,
     "L1+choice": 121,
-    "L2": 37,
+    "L2": 35,
     "L1": 16
+  },
+  "qa_rulings": {
+    "covered": 278,
+    "total": 280,
+    "uncovered_ids": [
+      "Q84",
+      "Q30"
+    ]
   },
   "abilities": [
     {
@@ -611,6 +619,7 @@
         "engine/tests/test_modules/himeno_test.rs",
         "engine/tests/test_modules/honoka_bp5_live_score_test.rs",
         "engine/tests/test_modules/maki_test.rs",
+        "engine/tests/test_modules/miyata_draw_until_test.rs",
         "engine/tests/test_modules/multi_color_heart_test.rs",
         "engine/tests/test_modules/nagi_live_card_draw_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test_part2.rs",
@@ -654,7 +663,7 @@
         "chika_adds_yo_gets_2_blades",
         "choice_condition_shows_proper_labels_in_actions"
       ],
-      "covering_test_count": 205,
+      "covering_test_count": 209,
       "is_null": false
     },
     {
@@ -3012,7 +3021,8 @@
       "covering_files": [
         "engine/tests/test_modules/gameplay_test.rs",
         "engine/tests/test_modules/modify_required_hearts_global_test.rs",
-        "engine/tests/test_modules/q127_heart_set_plus_global_test.rs"
+        "engine/tests/test_modules/q127_heart_set_plus_global_test.rs",
+        "engine/tests/test_modules/wien_yell_count_test.rs"
       ],
       "covering_tests": [
         "ai_screeam_answer_both_discard",
@@ -3046,7 +3056,7 @@
         "kanon_activation_choice_condition_wait_option",
         "kosuzu_choose_number_adds_to_hand"
       ],
-      "covering_test_count": 75,
+      "covering_test_count": 79,
       "is_null": false
     },
     {
@@ -3074,7 +3084,8 @@
       "covering_files": [
         "engine/tests/test_modules/gameplay_test.rs",
         "engine/tests/test_modules/modify_required_hearts_global_test.rs",
-        "engine/tests/test_modules/q127_heart_set_plus_global_test.rs"
+        "engine/tests/test_modules/q127_heart_set_plus_global_test.rs",
+        "engine/tests/test_modules/wien_yell_count_test.rs"
       ],
       "covering_tests": [
         "ai_screeam_answer_both_discard",
@@ -3108,7 +3119,7 @@
         "kanon_activation_choice_condition_wait_option",
         "kosuzu_choose_number_adds_to_hand"
       ],
-      "covering_test_count": 75,
+      "covering_test_count": 79,
       "is_null": false
     },
     {
@@ -3310,9 +3321,11 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/ginko_baton_touch_hasu_search_test.rs",
         "engine/tests/test_modules/nahone_live_start_same_name_test.rs"
       ],
       "covering_tests": [
+        "baton_touch_search_adds_hasu_live_to_hand",
         "discard_different_name_member_no_target",
         "discard_from_non_contiguous_hand",
         "discard_member_different_name_than_activating",
@@ -3322,19 +3335,26 @@
         "discarded_card_goes_to_waitroom",
         "effect_tracked_as_temporary_live_end",
         "empty_hand_skips",
+        "empty_waitroom_resolves_cleanly",
+        "equal_cost_replaced_no_trigger",
         "hand_mixed_cards_discard_member_only",
         "heart04_only_no_other_colors",
+        "member_in_waitroom_ignored",
+        "mixed_waitroom_only_hasu_selectable",
         "multiple_same_name_only_one_buffed",
         "nahone_at_left_position",
         "nahone_at_right_position",
+        "non_hasu_live_not_added",
         "only_live_card_in_hand_skips",
         "other_same_name_not_buffed",
         "p_plus_variant_works",
         "p_variant_works",
         "sec_variant_works",
-        "skip_cost_no_effect"
+        "skip_cost_no_effect",
+        "two_hasu_lives_exactly_one_taken",
+        "wrong_group_replaced_no_trigger"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 28,
       "is_null": false
     },
     {
@@ -3360,9 +3380,11 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/ginko_baton_touch_hasu_search_test.rs",
         "engine/tests/test_modules/nahone_live_start_same_name_test.rs"
       ],
       "covering_tests": [
+        "baton_touch_search_adds_hasu_live_to_hand",
         "discard_different_name_member_no_target",
         "discard_from_non_contiguous_hand",
         "discard_member_different_name_than_activating",
@@ -3372,19 +3394,26 @@
         "discarded_card_goes_to_waitroom",
         "effect_tracked_as_temporary_live_end",
         "empty_hand_skips",
+        "empty_waitroom_resolves_cleanly",
+        "equal_cost_replaced_no_trigger",
         "hand_mixed_cards_discard_member_only",
         "heart04_only_no_other_colors",
+        "member_in_waitroom_ignored",
+        "mixed_waitroom_only_hasu_selectable",
         "multiple_same_name_only_one_buffed",
         "nahone_at_left_position",
         "nahone_at_right_position",
+        "non_hasu_live_not_added",
         "only_live_card_in_hand_skips",
         "other_same_name_not_buffed",
         "p_plus_variant_works",
         "p_variant_works",
         "sec_variant_works",
-        "skip_cost_no_effect"
+        "skip_cost_no_effect",
+        "two_hasu_lives_exactly_one_taken",
+        "wrong_group_replaced_no_trigger"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 28,
       "is_null": false
     },
     {
@@ -3875,24 +3904,29 @@
       ],
       "base": "PL!N-bp3-005",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/miyashita_ai_bp3_test.rs",
-        "engine/tests/test_modules/miyashita_ai_test.rs"
+        "engine/tests/test_modules/miyashita_ai_test.rs",
+        "engine/tests/test_modules/miyata_draw_until_test.rs"
       ],
       "covering_tests": [
         "ai_bp3_draw_from_empty_hand",
         "ai_bp3_empty_deck_no_hang",
         "ai_bp3_only_two_deploys_no_draw",
         "ai_bp3_three_deploys_draws_to_five",
+        "hand_at_five_or_more_draws_nothing",
         "miyashita_ai_only_two_debuts_no_draw",
         "miyashita_ai_q160_displaced_debuts_still_count",
-        "miyashita_ai_q162_q161_three_debuts_triggers_draw"
+        "miyashita_ai_q162_q161_three_debuts_triggers_draw",
+        "small_deck_draws_out_and_resolves",
+        "third_appearance_draws_to_five",
+        "two_appearances_no_draw"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 11,
       "is_null": false
     },
     {
@@ -3913,24 +3947,29 @@
       ],
       "base": "PL!N-bp3-005",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/miyashita_ai_bp3_test.rs",
-        "engine/tests/test_modules/miyashita_ai_test.rs"
+        "engine/tests/test_modules/miyashita_ai_test.rs",
+        "engine/tests/test_modules/miyata_draw_until_test.rs"
       ],
       "covering_tests": [
         "ai_bp3_draw_from_empty_hand",
         "ai_bp3_empty_deck_no_hang",
         "ai_bp3_only_two_deploys_no_draw",
         "ai_bp3_three_deploys_draws_to_five",
+        "hand_at_five_or_more_draws_nothing",
         "miyashita_ai_only_two_debuts_no_draw",
         "miyashita_ai_q160_displaced_debuts_still_count",
-        "miyashita_ai_q162_q161_three_debuts_triggers_draw"
+        "miyashita_ai_q162_q161_three_debuts_triggers_draw",
+        "small_deck_draws_out_and_resolves",
+        "third_appearance_draws_to_five",
+        "two_appearances_no_draw"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 11,
       "is_null": false
     },
     {
@@ -9658,6 +9697,7 @@
         "engine/tests/test_modules/aurora_flower_identity_test.rs",
         "engine/tests/test_modules/blade_heart_colorless_test.rs",
         "engine/tests/test_modules/fixed_customs_test.rs",
+        "engine/tests/test_modules/ginko_baton_touch_hasu_search_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs",
         "engine/tests/test_modules/live_cards_disappear_test.rs",
         "engine/tests/test_modules/mari_bp2_test.rs",
@@ -9693,6 +9733,7 @@
         "aurora_flower_treated_as_three_groups_in_stage",
         "b_heart07_parses_to_colorless_heart00",
         "b_heart07_yell_contributes_two_colorless_hearts_each",
+        "baton_touch_search_adds_hasu_live_to_hand",
         "butterfly_to_butterfly_wing_matches",
         "butterfly_wing_to_butterfly_no_match",
         "colorless_hearts_cannot_fill_colored_requirement",
@@ -9702,10 +9743,9 @@
         "dream_believers_105_to_base_no_match",
         "dream_believers_to_105_matches",
         "duplicate_names_fails_condition",
-        "duplicate_names_fails_distinct_condition",
-        "empty_area_fails_all_areas_condition"
+        "duplicate_names_fails_distinct_condition"
       ],
-      "covering_test_count": 114,
+      "covering_test_count": 122,
       "is_null": true
     },
     {
@@ -12084,11 +12124,15 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/bp7_fire_bird_blade_gain_test.rs",
+        "engine/tests/test_modules/ginko_baton_touch_hasu_search_test.rs",
         "engine/tests/test_modules/miyashita_ai_pr_test.rs",
         "engine/tests/test_modules/target_selection_test.rs"
       ],
       "covering_tests": [
+        "baton_touch_search_adds_hasu_live_to_hand",
         "distinct_card_name_prevents_same_card_twice",
+        "empty_waitroom_resolves_cleanly",
+        "equal_cost_replaced_no_trigger",
         "fire_bird_below_4_blades_not_eligible",
         "fire_bird_current_blade_modifiers_count",
         "fire_bird_exactly_4_blades_eligible",
@@ -12097,6 +12141,9 @@
         "fire_bird_single_eligible_gains_2_heart02",
         "fire_bird_waited_member_still_eligible",
         "fire_bird_wrong_group_not_eligible",
+        "member_in_waitroom_ignored",
+        "mixed_waitroom_only_hasu_selectable",
+        "non_hasu_live_not_added",
         "pr_ai_empty_deck_no_draw_no_hang",
         "pr_ai_hand_4_pays_cost_draws_4",
         "pr_ai_hand_almost_full_skips_cost_no_effect",
@@ -12104,9 +12151,11 @@
         "pr_ai_pays_cost_discards_2_draws_4",
         "pr_ai_pays_cost_discards_2_draws_to_five",
         "target_count_1_gain_resource_chooses_one_of_many",
-        "target_count_on_draw_until_count"
+        "target_count_on_draw_until_count",
+        "two_hasu_lives_exactly_one_taken",
+        "wrong_group_replaced_no_trigger"
       ],
-      "covering_test_count": 17,
+      "covering_test_count": 25,
       "is_null": false
     },
     {
@@ -23836,12 +23885,16 @@
         "engine/tests/test_modules/batch5_test.rs",
         "engine/tests/test_modules/bp7_q266_natsumi_blade_wait_test.rs",
         "engine/tests/test_modules/bp7_tang_keke_cost_test.rs",
+        "engine/tests/test_modules/ginko_baton_touch_hasu_search_test.rs",
         "engine/tests/test_modules/qa_new_tests256.rs",
         "engine/tests/test_modules/qa_new_tests257.rs",
         "engine/tests/test_modules/sunny_test.rs"
       ],
       "covering_tests": [
         "baton_touch_cleared_between_actions",
+        "baton_touch_search_adds_hasu_live_to_hand",
+        "empty_waitroom_resolves_cleanly",
+        "equal_cost_replaced_no_trigger",
         "hanaho_baton_touch_low_cost_no_trigger",
         "hanaho_baton_touch_triggers_activates_energy",
         "hanaho_baton_touch_triggers_exactly_once",
@@ -23857,6 +23910,9 @@
         "live_phase_crossroads_replacement_with_dreamin",
         "maki_debut_crossroads_replacement_with_dreamin",
         "maki_sd1_q125_restriction_parsed",
+        "member_in_waitroom_ignored",
+        "mixed_waitroom_only_hasu_selectable",
+        "non_hasu_live_not_added",
         "q256_maki_reveal_crossroads_replacement",
         "q266_cost_b0_waits_nothing_incl_blade0",
         "q266_cost_b1_waits_nothing",
@@ -23864,15 +23920,9 @@
         "q266_cost_b4_waits_blade2_not_blade3",
         "q266_skip_cost_waits_nothing",
         "serasu_double_trigger_regression",
-        "serasu_edelnote_appears_fires_once",
-        "serasu_edelnote_appears_with_non_edelnote_on_stage",
-        "serasu_on_stage_non_edelnote_appears_no_trigger",
-        "serasu_played_to_stage_triggers_self",
-        "sunny_branch1_1_member_triggers_draw",
-        "sunny_branch1_no_members_does_nothing",
-        "sunny_branch2_one_member_skips_b2"
+        "serasu_edelnote_appears_fires_once"
       ],
-      "covering_test_count": 49,
+      "covering_test_count": 57,
       "is_null": false
     },
     {

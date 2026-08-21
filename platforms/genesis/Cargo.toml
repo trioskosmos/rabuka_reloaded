@@ -18,8 +18,10 @@ debug = true
 panic = "abort"
 
 [profile.release]
+# NOTE: lto=true (fat) SIGILLs the experimental LLVM m68k backend on this
+# input; thin/no LTO builds fine. Revisit when upstream m68k matures.
+lto = false
 opt-level = "z"
-lto = true
 codegen-units = 1
 panic = "abort"
-strip = true
+strip = "debuginfo"

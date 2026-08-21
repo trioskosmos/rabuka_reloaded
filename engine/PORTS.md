@@ -180,6 +180,8 @@ Consoles that remain borderline:
 - RAM: **64KB**
 - Target: `m68k-unknown-none-elf` (LLVM m68k is experimental)
 - Verdict: **Impossible** — 64KB is 1/60th of what's needed
+  (REVISED Aug 2026 — the RAM math was wrong and the CPU gate is real but
+  different than stated. See "Genesis native m68k attempt" below.)
 
 ### Neo Geo AES (1990)
 - CPU: 68000 + Z80
@@ -489,6 +491,114 @@ Measured SH-4 `text` is 4.28MB at `-O2` / 3.07MB at `-Os` (see CD-i section
 below) — both fit a 6MB cart executing in place, and m68k `-Os` density will be
 similar or better. The heap-diet measurement is still wanted for the 2MB DRAM
 budget, but nothing here threatens the port.
+
+---
+
+## Sega Genesis native m68k attempt — blocked on LLVM, not on RAM (Aug 2026)
+
+A native (non-wasm2c) Genesis port was attempted in `platforms/genesis/`.
+Result: **the pipeline works end-to-end and produced a linked ROM once; the
+full-engine build now dies inside LLVM's m68k assembler.** The blocker is the
+compiler backend, not RAM, not the engine code, and not the platform glue.
+
+### What was proven working
+
+- `m68k-unknown-none-elf` is a real rustc target (`rustc --print target-list`,
+  Tier 3). No prebuilt rustup artifacts — requires nightly + `-Zbuild-std=core,alloc`.
+- Engine lib cross-compiles for m68k with feature set identical to GBA
+  (`genesis = no_std + bytecode_abilities + compact_cards + compact_card_data +
+  compact_state`, added to `engine/Cargo.toml`).
+- Link path: Ubuntu WSL's `m68k-linux-gnu-gcc` as rustc linker with
+  `-nostdlib -lgcc -Tlink.ld`. (`rust-lld` fails with `unsupported e_machine
+  value: 4`; bfd ld via gcc flavor works. libgcc supplies
+  `__sync_val_compare_and_swap_1` — m68k has no 1-byte CAS.)
+- A complete ROM image was produced and inspected: vectors at $0 (SSP=$FF0000,
+  PC=$200), SEGA header at $100, `.text` at $200, work RAM at $FF0000,
+  48KB bump heap at $FF4000. `m68k-linux-gnu-size`: text 23,844 / bss 28.
+  Real joypad polling ($A10003/$A10009 TH-toggle) wired into the engine's
+  `PlatformUi`.
+
+### Corrected RAM math (the old "1/60th" verdict was wrong)
+
+The Tier 5 entry conflated code with RAM. With cart XIP (code executes from
+ROM, only data in DRAM — same argument as the Jaguar revision above):
+
+- Card data: NOT the 586KB `CARD_BLOB` — per-deck baked blobs are ~20KB total
+  (`platforms/gba/src/decks_baked.rs` pattern), decoded per-match into RAM.
+- Heap: 48KB of the 64KB (engine `compact_state` match state measured well
+  under this on GBA).
+- So RAM fits comfortably. The old "64KB is a microcontroller" line applies to
+  putting *code* in RAM, which nobody does on cartridge consoles.
+
+Also corrected while here: `CARD_BLOB` is ~586KB (not "27KB") and the ability
+bytecode blob is 28.5KB compressed (~692KB as source literals) — the "~40KB
+total data" figure earlier in this doc undercounts the string table.
+
+### The wall: LLVM m68k integrated assembler SIGILL
+
+Compiling the full engine lib for m68k kills rustc:
+
+```
+signal: 4, SIGILL
+llvm::MCAssembler::relaxOnce / MCAssembler::layout / MCObjectStreamer::finishImpl
+```
+
+Deterministic across every knob tried:
+
+| knob | result |
+|---|---|
+| opt-level z / 2 / 1 | SIGILL all |
+| codegen-units 1 / 16 | SIGILL all |
+| code-model large | SIGILL |
+| embed-bitcode=yes without LTO | SIGILL |
+| `-C llvm-args=-no-integrated-as` | flag accepted, still SIGILL |
+| nightly 1.99.0-nightly (LLVM 23.1, Aug 2026) | SIGILL |
+| nightly-2026-07-15 | SIGILL |
+| nightly-2025-08-14 | SIGSEGV in compiler_builtins instead |
+
+Controls that isolate it:
+
+- Minimal no_std crates (Vec/String/format/match) build fine → backend basically
+  works; this is size/pattern-triggered.
+- A stub-input build (input always "nothing pressed") compiled AND linked at
+  23KB — because LLVM proved the menu loop never exits and dead-code-eliminated
+  essentially the whole engine before assembly. Making input real (so the game
+  code becomes reachable) is what exposed the assembler crash.
+- Under fat/thin LTO the lib compiles clean — because cargo passes `-C lto`
+  down and rustc emits bitcode-only rlibs, skipping native object emission.
+  The crash then moves to the final LTO merge (one giant module → same MC
+  layout pass). Thin LTO also dies there.
+- Reverting the 5 recently-changed engine files to HEAD versions: still SIGILL
+  (the source diff was not the trigger).
+- `-C no-integrated-as` no longer exists as a rustc flag (removed upstream);
+  routing through llvm-args doesn't reach the MC layer.
+
+Reading: LLVM's m68k MC branch-relaxation cannot lay out our full-engine-sized
+modules (~hundreds of KB across CGUs; multi-MB merged under LTO). It handles
+small modules fine. This is exactly the "LLVM m68k is experimental" caveat
+being load-bearing.
+
+### Paths from here (none taken yet)
+
+1. **Upstream**: file rust-lang/rust + llvm/llvm-project issue with a reduced
+   reproducer (bisect engine modules to find the offending function/CGU size).
+   The relaxOnce code has known-unreachable paths for unrelaxable branches;
+   may be a genuine bug with a small fix.
+2. **Bisect + shrink**: find the specific function that kills layout and
+   restructure it (split giant matches in `vm.rs`/dispatch code). Unknown
+   effort; could be one function or a systemic size threshold.
+3. **wasm2c escape hatch** (proven on DC): same generated C compiles under
+   m68k-linux-gnu-gcc. Code XIPs from a 4MB cart (3-4MB text OK). The hard
+   part is wasm linear memory: default 6.1MB static array cannot live in 64KB
+   DRAM — needs the same heap-diet measurement as Jaguar (shrink the 4MB
+   `HEAP` bump allocator to measured usage, drop memory to ≤~48 pages) plus
+   big-endian byte-wise memory access verification. Feasible on paper, heavy
+   in practice.
+4. **Wait**: LLVM m68k is actively maturing; a future nightly may just work.
+   All scaffolding in `platforms/genesis/` is kept for that day.
+
+Verdict: **RAM-solvable, CPU-toolchain-blocked.** Not "impossible" as previously
+written — but not shippable today either.
 
 ---
 

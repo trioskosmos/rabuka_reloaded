@@ -1,4 +1,6 @@
 /* Sega Genesis / Mega Drive - 4MB cart ROM + 64KB work RAM */
+ENTRY(_start)
+
 MEMORY
 {
     rom (rx)  : ORIGIN = 0x00000000, LENGTH = 0x400000
@@ -7,13 +9,18 @@ MEMORY
 
 SECTIONS
 {
-    /* 68000 vector table: 256 x 4 bytes at 0x000000 - KEEP so linker doesn't GC */
+    /* 68000 vector table: 8 longwords at 0x000000 - KEEP so linker doesn't GC */
     .vectors 0x00000000 : {
         KEEP(*(.vectors))
         . = ALIGN(0x4);
     } > rom
 
-    .text :
+    /* Genesis ROM header at 0x000100 */
+    .header 0x000100 : {
+        KEEP(*(.header))
+    } > rom
+
+    .text 0x00000200 :
     {
         *(.text .text.*)
         *(.rodata .rodata.*)
@@ -38,11 +45,6 @@ SECTIONS
         . = ALIGN(4);
         _ebss = .;
     } > ram
-
-    /* Genesis ROM header at 0x000100 (after vectors) - TI/Genesis requirement */
-    .header 0x000100 : {
-        KEEP(*(.header))
-    } > rom
 
     /DISCARD/ : { *(.comment) *(.note*) *(.eh_frame*) }
 }

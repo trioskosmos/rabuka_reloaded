@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-21T22:45:15.260895",
+  "generated_at": "2026-08-22T00:31:29.696671",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "d8f4c363",
+  "engine_commit": "3935215d",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -2176,6 +2176,9 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
+        "group_names": [
+          "蓮ノ空"
+        ],
         "action": "move_cards",
         "baton_touch_trigger": true
       }

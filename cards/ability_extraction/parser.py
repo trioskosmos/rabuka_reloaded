@@ -1159,7 +1159,16 @@ def _attach_baton_touch_from_group_condition(effect, triggerless_text):
         if isinstance(node, dict):
             if "action" in node:
                 node.pop("baton_touch_trigger", None)
-                node.pop("group_names", None)
+                # Only the gate group itself is a condition leak; other 『Y』
+                # groups in an action's own clause are legitimate target
+                # filters (e.g. 控え室から『蓮ノ空』のライブカードを加える).
+                gn = node.get("group_names")
+                if isinstance(gn, list):
+                    remaining = [g for g in gn if g not in groups]
+                    if remaining:
+                        node["group_names"] = remaining
+                    else:
+                        node.pop("group_names", None)
             for v in node.values():
                 _strip(v)
         elif isinstance(node, list):
@@ -2021,12 +2030,13 @@ def _register_action(cond, act=None, setter=None, priority: Optional[int] = None
     if priority is None:
         priority = _ACTION_RULE_NEXT_PRIORITY
         _ACTION_RULE_NEXT_PRIORITY += 10
-    if isinstance(cond, ActionRule):
-        _ACTION_REGISTRY.register(priority, f"action_{priority}", cond)
-        _ACTION_RULES.append(cond)
-    else:
-        _ACTION_REGISTRY.register(priority, f"action_{priority}", (cond, act, setter))
-        _ACTION_RULES.append((cond, act, setter))
+    if not isinstance(cond, ActionRule):
+        if isinstance(cond, str):
+            cond = ActionRule(match=cond, action=act or "", setter=setter)
+        else:
+            cond = ActionRule(condition=cond, action=act or "", setter=setter)
+    _ACTION_REGISTRY.register(priority, f"action_{priority}", cond)
+    _ACTION_RULES.append(cond)
 
 
 _register_action(
@@ -3211,39 +3221,9 @@ def parse_action(text: str) -> Dict[str, Any]:
     # DISPATCH TABLE
     action["action"] = "custom"
     for entry in _ACTION_RULES:
-        if isinstance(entry, ActionRule):
-            if entry.matches(text, action):
-                entry.apply(text, action)
-                break
-        else:
-            cond, act, setter = entry
-            try:
-                if callable(cond):
-                    try:
-                        match = cond(text, action)
-                    except TypeError:
-                        match = cond(text)
-                else:
-                    match = cond in text
-            except Exception as e:
-                # Arity/type mismatches are expected (mixed 1-arg/2-arg rules);
-                # anything else is a bug — surface it in the debug log.
-                if not isinstance(e, TypeError):
-                    _DEBUG_LOG.append(
-                        f"parse_action({text!r}) rule condition raised: {e!r}"
-                    )
-                match = False
-            if match:
-                action["action"] = act
-                if setter:
-                    try:
-                        setter(text, action)
-                    except Exception as e:
-                        if not isinstance(e, TypeError):
-                            _DEBUG_LOG.append(
-                                f"parse_action({text!r}) rule {act} setter raised: {e!r}"
-                            )
-                break
+        if entry.matches(text, action):
+            entry.apply(text, action)
+            break
 
     _fill_defaults(action, text, _cached_source=source, _cached_dest=destination)
     return action
@@ -6349,7 +6329,15 @@ def _fill_defaults_move_cards(action, text, action_text, _cached_source, _cached
 
 
 def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
-    """Consolidated post-dispatch normalization. Fills defaults every action needs."""
+    """Consolidated post-dispatch normalization. Fills defaults every action needs.
+
+    Field ownership: parse_action owns initial extraction of source,
+    destination, count, card_type, target, state_change, cost_limit,
+    optional, max, position and group_names. This function only fills
+    fields those extractions left unset (guarded by `not in action`) plus
+    action-type-specific defaults, so it is also safe to call on fresh
+    sub-action dicts with the full sentence as `text`.
+    """
     action_text = action.get("text", text) or text
     a = action.get("action")
     # Normalize "revealed_card" (singular) to "revealed_cards" (plural) for consistency
@@ -6398,11 +6386,6 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         # Extract distinct_card_name from "名前の異なる" (different name constraint)
         if "名前の異なる" in text:
             action["distinct"] = "card_name"
-        # Extract same_name from "と同じ名前" / "同じ名前" (same name constraint)
-        if "same_name" not in action and (
-            "と同じ名前" in text or ("同じ名前" in text and "持つ" in text)
-        ):
-            action["same_name"] = True
     # same_name: applied to ALL action types, not just gain_resource
     if "same_name" not in action and (
         "と同じ名前" in text or ("同じ名前" in text and "持つ" in text)
@@ -12002,23 +11985,13 @@ def _process_post_fixes(data: Dict[str, Any], fix_stats: Dict[str, int]) -> None
     # ====================================================================
     # POST-HOC FIXES & MAIN
     # ====================================================================
-    # _fix_mari_gain_ability — targeted fix for a known parser gap
-    # _validate_semantic — validates parsed JSON against text patterns
-    # Main entry point for standalone parser.py execution
-    # ====================================================================
-
-    # FIX: 小原鞠莉 (PL!S-bp2-008) ab#1 — constant conditional_alternative is
-    # actually a gain_ability.  _try_sequential splices the text before
-    # parse_action's gain_ability fallback runs, so we fix it post-hoc.
-    _fix_mari_gain_ability(data, fix_stats)
+    # Card-specific post-hoc fixes (e.g. PL!S-bp2-008 gain_ability) live in
+    # card_overrides.py and are applied by process_abilities.
 
     # FIX 17: Clean up redundant fields on perform_yell actions with per_unit_source
     # When per_unit_source is "previous_moved_cards", the engine sums costs from
     # self.moved_cards directly — per_unit_type and count are not used for yell.
     _clean_per_unit_source(data["unique_abilities"])
-
-    # Validate parsed JSON against text patterns for missing mechanics
-    _validate_semantic(data["unique_abilities"])
 
 
 # Patterns whose appearance condition refers to the card's OWN debut. A
@@ -12042,73 +12015,6 @@ def _strip_self_appearance_card_type(node):
     elif isinstance(node, list):
         for item in node:
             _strip_self_appearance_card_type(item)
-
-
-def _fix_ll_bp7_001_play_cost(data: Dict[str, Any]) -> None:
-    """LL-bp7-001 ab#0 play-cost template (LOAD-BEARING, not cosmetic).
-
-    "このカードのプレイに際し、手札から「A」「B」「C」のメンバーカードを
-    それぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは
-    10になる。" is a PLAY-TIME cost modifier, not a triggered ability. The
-    generic parser reads it as conditional_on_optional and loses the contract
-    the engine expects: modify_cost(set) + location hand + characters +
-    optional, which modifiers.rs/phases.rs route as a play-time cost hook.
-    Replace with that exact structure. A general handler for the
-    「プレイに際し…コストはNになる」 template should eventually replace this.
-    """
-    for ability in data.get("unique_abilities", []):
-        cards = ability.get("cards", [])
-        if not any("LL-bp7-001" in c and "(ab#0)" in c for c in cards):
-            continue
-        tt = ability.get("triggerless_text", "")
-        if "プレイに際し" not in tt or "コストは10になる" not in tt:
-            continue
-        ability["effect"] = {
-            "text": tt,
-            "action": "modify_cost",
-            "operation": "set",
-            "value": 10,
-            "source": "hand",
-            "location": "hand",
-            "card_type": "member_card",
-            "characters": ["国木田花丸", "優木せつ菜", "嵐千砂都"],
-            "count": 3,
-            "optional": True,
-        }
-        ability["cost"] = {
-            "text": "手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置く",
-            "type": "move_cards",
-            "source": "hand",
-            "zone": "hand",
-            "destination": "discard",
-            "card_type": "member_card",
-            "characters": ["国木田花丸", "優木せつ菜", "嵐千砂都"],
-            "count": 1,
-            "per_character": True,
-            "optional": True,
-        }
-
-
-def _fix_burn_under_move(data: Dict[str, Any]) -> None:
-    """Fix PL!N-bp7-029-L Burn!!: parser mis-labels the under_member→energy_zone move
-    as place_energy_under_member (which is for placing *under*). Correct to move_cards.
-    """
-    for ability in data.get("unique_abilities", []):
-        if not any("N-bp7-029-L" in c for c in ability.get("cards", [])):
-            continue
-        eff = ability.get("effect")
-        if not isinstance(eff, dict) or eff.get("action") != "conditional_on_result":
-            continue
-        prim = eff.get("primary_effect")
-        if isinstance(prim, dict) and prim.get("source") == "under_member":
-            # This is the move from under_member to energy_zone, not a place-under
-            if prim.get("action") == "place_energy_under_member":
-                prim["action"] = "move_cards"
-            prim["source"] = "under_member"
-            prim["destination"] = "energy_zone"
-            # energy cards, all, wait state should remain
-            prim.setdefault("card_type", "energy_card")
-            prim.setdefault("all", True)
 
 
 def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -12137,8 +12043,10 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     for ability in data["unique_abilities"]:
         _process_pre_fix(ability, fix_stats)
     _process_post_fixes(data, fix_stats)
-    _fix_ll_bp7_001_play_cost(data)
-    _fix_burn_under_move(data)
+    # Card-specific patches live in card_overrides.py (single place).
+    from card_overrides import apply_card_overrides
+
+    apply_card_overrides(data, fix_stats)
     # Final invariant pass: strip card_type from self-appearance conditions
     # across every ability (single source of truth for this rule).
     for ability in data["unique_abilities"]:
@@ -12146,51 +12054,6 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(eff, dict):
             _strip_self_appearance_card_type(eff)
     return data
-
-
-def _fix_mari_gain_ability(data: Dict[str, Any], fix_stats: Dict[str, int]) -> None:
-    """Post-hoc fix: PL!S-bp2-008 ab#1 effect is sequential/conditional_alternative
-    but should be gain_ability.  Re-parses via parse_action + enriches gained_effect."""
-    for ability in data.get("unique_abilities", []):
-        cards = ability.get("cards", [])
-        if not any("S-bp2-008" in c and "(ab#1)" in c for c in cards):
-            continue
-        eff = ability.get("effect")
-        if not isinstance(eff, dict):
-            continue
-        if eff.get("action") not in ("sequential", "conditional_alternative"):
-            continue
-        tt = ability.get("triggerless_text", "")
-        if "得る" not in tt:
-            continue
-        q = extract_all_quoted_names(tt)
-        if not q:
-            continue
-        cat = categorize_quoted_text(q)
-        if not cat["abilities"]:
-            continue
-        fixed = parse_action(tt)
-        if fixed.get("action") != "gain_ability":
-            continue
-        # parse_action's gain_ability early return skips condition extraction.
-        # Re-extract condition from the triggerless text (scan for 場合、 etc.)
-        if not fixed.get("condition"):
-            for sep in ["とき、", "場合、", "たび、", "なら、"]:
-                idx = tt.find(sep)
-                if idx >= 0:
-                    ct = tt[: idx + 2]
-                    tc = parse_condition(ct)
-                    if tc and tc.get("type") not in (None, "custom"):
-                        fixed["condition"] = tc
-                        break
-        ability["effect"] = fixed
-        fix_stats["leak"] = fix_stats.get("leak", 0) + 1
-        # Re-run enrichment: gained_effect from ability_gain text
-        if "gained_effect" not in fixed and fixed.get("ability_gain"):
-            clean_gain = re.sub(r"【[^】]+】", "", fixed["ability_gain"]).strip()
-            gained = parse_effect(clean_gain)
-            if gained and gained.get("action") and gained.get("action") != "custom":
-                fixed["gained_effect"] = gained
 
 
 def _clean(obj):
@@ -12576,6 +12439,8 @@ def _validate_semantic(abilities):
 
     Each rule: (name, regex, check_fn(entry, effect) -> bool, description)
     check_fn returns True if the mechanic IS correctly handled.
+
+    Returns a list of issues: (rule_name, cards, trigger, snippet, desc).
     """
     issues = []
 
@@ -13261,6 +13126,7 @@ def _validate_semantic(abilities):
 
     issues = all_issues
     print(f"  Validation complete: {len(issues)} issues found")
+    return issues
 
 
 def _list_rules() -> None:
@@ -13271,17 +13137,10 @@ def _list_rules() -> None:
     print("ACTION RULES  (_ACTION_RULES — order = priority)")
     print(sep)
     for i, entry in enumerate(_ACTION_RULES):
-        if isinstance(entry, ActionRule):
-            desc = (
-                f"match={entry.match!r} match_any={entry.match_any}"
-                f" action={entry.action!r}"
-            )
-        else:
-            cond, act, setter = entry
-            if isinstance(cond, str):
-                desc = f"match={cond!r} action={act!r}"
-            else:
-                desc = f"<callable> action={act!r}"
+        desc = (
+            f"match={entry.match!r} match_any={entry.match_any}"
+            f" action={entry.action!r}"
+        )
         print(f"  {i:3}  {desc}")
     print(sep)
     print("COST HANDLERS  (_COST_HANDLERS — order = priority)")

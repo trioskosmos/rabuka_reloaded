@@ -12,6 +12,7 @@ import logging
 import re
 import sys
 import io
+import argparse
 from pathlib import Path
 from datetime import datetime
 
@@ -513,11 +514,36 @@ def test_parsing():
     print()
 
 
+def _count_issues(semantic_issues, group_filter_issues):
+    """Per-rule issue counts for baseline comparison."""
+    counts = {}
+    for rule_name, *_ in semantic_issues:
+        counts[rule_name] = counts.get(rule_name, 0) + 1
+    if group_filter_issues:
+        counts["group_filters"] = len(group_filter_issues)
+    return counts
+
+
 def main():
+    ap = argparse.ArgumentParser(description="Extract card abilities from cards.json")
+    ap.add_argument(
+        "--check",
+        action="store_true",
+        help="Fail (exit 1) if validation issues exceed the baseline in "
+        "validation_baseline.json",
+    )
+    ap.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="Rewrite validation_baseline.json with current issue counts",
+    )
+    args = ap.parse_args()
+
     test_parsing()
 
     cards_file = Path(__file__).parent.parent / "cards.json"
     output_file = Path(__file__).parent.parent / "abilities.json"
+    baseline_file = Path(__file__).parent / "validation_baseline.json"
 
     print(f"Extracting abilities from {cards_file}...")
     result = extract_all_abilities(cards_file)
@@ -538,8 +564,49 @@ def main():
     print(f"Output written to {output_file}")
 
     # Run basic validation: check for known gap patterns
-    _validate_semantic(result["unique_abilities"])
+    semantic_issues = _validate_semantic(result["unique_abilities"])
+    group_filter_issues = _validate_group_filters(result["unique_abilities"])
     print("Validation complete.")
+
+    current = _count_issues(semantic_issues, group_filter_issues)
+    if args.update_baseline:
+        with open(baseline_file, "w", encoding="utf-8") as f:
+            json.dump(current, f, indent=2, sort_keys=True)
+            f.write("\n")
+        print(f"Baseline written to {baseline_file}")
+    elif args.check:
+        if not baseline_file.exists():
+            print(f"ERROR: {baseline_file} missing. Run with --update-baseline first.")
+            sys.exit(1)
+        with open(baseline_file, encoding="utf-8") as f:
+            baseline = json.load(f)
+        regressions = {
+            rule: (base, current.get(rule, 0))
+            for rule, base in baseline.items()
+            if current.get(rule, 0) > base
+        }
+        improvements = {
+            rule: (base, current[rule])
+            for rule, base in baseline.items()
+            if current.get(rule, 0) < base
+        }
+        new_rules = sorted(set(current) - set(baseline))
+        for rule in new_rules:
+            regressions[rule] = (0, current[rule])
+        if regressions:
+            print("VALIDATION REGRESSIONS (current > baseline):")
+            for rule in sorted(regressions):
+                base, now = regressions[rule]
+                print(f"  {rule}: {base} -> {now}")
+            print("Fix the parser or refresh the baseline with --update-baseline.")
+            sys.exit(1)
+        if improvements:
+            print("Validation improved (counts lower than baseline):")
+            for rule in sorted(improvements):
+                base, now = improvements[rule]
+                print(f"  {rule}: {base} -> {now}")
+            print("Consider refreshing the baseline with --update-baseline.")
+        print("--check passed: no validation regressions.")
 
     # Auto-regenerate bytecode so abilities_gen.rs stays in sync
     import subprocess, sys
@@ -658,6 +725,7 @@ def _validate_group_filters(abilities):
             print(_encode_safe(issue))
     else:
         print("    All bracketed names have matching filter fields.")
+    return issues
 
 
 if __name__ == "__main__":

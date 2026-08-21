@@ -2470,6 +2470,17 @@ impl<'a> ConditionContext<'a> {
                     } else {
                         stage_cards
                     };
+                // Exclude the activating card itself (このメンバー以外).
+                // Without this, a lone Wien counts herself and
+                // "このメンバー以外のメンバーが1人以上いる" passes with 0 others.
+                let stage_cards: SmallVec<[i16; 6]> = if exclude_self {
+                    stage_cards
+                        .into_iter()
+                        .filter(|&cid| Some(cid) != activating_id)
+                        .collect()
+                } else {
+                    stage_cards
+                };
                 let is_distinct_cost = condition.get_distinct().is_some_and(
                     |d| matches!(d, crate::core::card::DistinctInfo::String(s) if s == "cost"),
                 );

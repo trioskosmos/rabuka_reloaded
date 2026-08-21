@@ -1,6 +1,5 @@
 #![no_std]
 #![no_main]
-#![feature(asm_experimental_arch)]
 
 extern crate alloc;
 
@@ -45,6 +44,7 @@ fn panic(_info: &PanicInfo) -> ! {
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
     unsafe {
+        // Heap: 48KB at $FF4000, leaving 16KB for stack + BSS
         ALLOCATOR.lock().init(0x00FF4000 as *mut u8, 0xC000);
     }
     main_genesis()
@@ -59,12 +59,6 @@ fn load_deck_cards(idx1: usize, idx2: usize) -> Vec<Card> {
 struct GenesisUi {
     display: rabuka_genesis::display::Display,
     input: rabuka_genesis::input::Input,
-    // track last press to implement just_pressed via poll delta
-    last_a: bool,
-    last_b: bool,
-    last_up: bool,
-    last_down: bool,
-    last_start: bool,
 }
 
 impl GenesisUi {
@@ -72,11 +66,6 @@ impl GenesisUi {
         Self {
             display: rabuka_genesis::display::Display::new(),
             input: rabuka_genesis::input::Input::new(),
-            last_a: false,
-            last_b: false,
-            last_up: false,
-            last_down: false,
-            last_start: false,
         }
     }
 }
@@ -85,12 +74,22 @@ impl PlatformUi for GenesisUi {
     fn clear_screen(&mut self) { self.display.clear(); }
     fn println(&mut self, text: &str) { self.display.println(text); }
     fn swap_buffers(&mut self) { self.display.swap_buffers(); }
-    fn poll_input(&mut self) { let _ = self.input.poll(); }
-    fn just_pressed_a(&self) -> bool { false }
-    fn just_pressed_b(&self) -> bool { false }
-    fn just_pressed_up(&self) -> bool { false }
-    fn just_pressed_down(&self) -> bool { false }
-    fn just_pressed_start(&self) -> bool { false }
+    fn poll_input(&mut self) { self.input.poll(); }
+    fn just_pressed_a(&self) -> bool {
+        self.input.just_pressed(|p| p.a || p.start)
+    }
+    fn just_pressed_b(&self) -> bool {
+        self.input.just_pressed(|p| p.b)
+    }
+    fn just_pressed_up(&self) -> bool {
+        self.input.just_pressed(|p| p.up)
+    }
+    fn just_pressed_down(&self) -> bool {
+        self.input.just_pressed(|p| p.down)
+    }
+    fn just_pressed_start(&self) -> bool {
+        self.input.just_pressed(|p| p.start)
+    }
     fn wait_vblank(&mut self) { self.display.wait_vblank(); }
 }
 
@@ -100,7 +99,7 @@ fn main_genesis() -> ! {
     let names: Vec<&str> = decks.iter().map(|d| d.name).collect();
 
     loop {
-        let mut ui = GenesisUi::new();
+        let ui = GenesisUi::new();
         rabuka_engine::game::platform_ui::run_embedded_game(
             ui,
             &names,

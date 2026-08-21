@@ -28,6 +28,8 @@ macro_rules! tdbg {
 impl super::TurnEngine {
     /// Log a phase transition to both rule_log and structured_log.
     /// Uses [[key]] translatable markers for bilingual frontend rendering.
+    /// No-op under the `headless` feature (bot playouts never render these).
+    #[cfg(not(feature = "headless"))]
     fn log_phase(game_state: &mut GameState, marker_key: &str) {
         let text = format!("[[{}]]", marker_key);
         game_state.push_rule_log(text.clone());
@@ -41,6 +43,9 @@ impl super::TurnEngine {
             metadata: None,
         });
     }
+
+    #[cfg(feature = "headless")]
+    fn log_phase(_game_state: &mut GameState, _marker_key: &str) {}
 
     /// Log the start of a new turn.
     /// Uses [[turn_start:turn=N]] translatable marker.

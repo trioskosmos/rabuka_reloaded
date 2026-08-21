@@ -203,6 +203,14 @@ pub struct GameState {
     pub player1_cheer_blade_heart_count: u8,
     pub player2_cheer_blade_heart_count: u8,
     pub cheer_checks_required: u8,
+    /// Blade count of the current live, set when the first cheer check runs.
+    /// `None` between lives. The required count is derived from this base
+    /// plus `yell_count_modifiers` — never mutated directly by effects.
+    pub cheer_check_base: Option<u8>,
+    /// All modify_yell_count effects as (player_slot 1|2, delta). LiveEnd-
+    /// scoped: cleared together with the base when a live-scoped effect
+    /// expires. Derived total = max(0, base + Σ deltas for the player).
+    pub yell_count_modifiers: SmallVec<[(u8, i32); 4]>,
     pub cheer_checks_done: u8,
     pub card_instance_counter: u8,
     pub baton_touch_count_p1: u8,
@@ -456,6 +464,8 @@ impl GameState {
             player1_cheer_blade_heart_count: 0,
             player2_cheer_blade_heart_count: 0,
             cheer_checks_required: 0,
+            cheer_check_base: None,
+            yell_count_modifiers: SmallVec::new(),
             cheer_checks_done: 0,
             card_instance_counter: 0,
             baton_touch_count_p1: 0,
@@ -1091,6 +1101,11 @@ impl GameState {
         chosen: Vec<String>,
         skipped: bool,
     ) {
+        // Headless bot playouts never render choice history — skip the
+        // label/format work entirely.
+        if cfg!(feature = "headless") {
+            return;
+        }
         let offered_count = self.choice_offered_labels(choice).len();
         let chosen_final = if skipped {
             vec!["skip".to_string()]

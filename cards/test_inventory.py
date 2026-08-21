@@ -34,6 +34,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CARDS_JSON = ROOT / "cards" / "abilities.json"
+QA_JSON = ROOT / "cards" / "qa_data.json"
 TESTS_DIR = ROOT / "engine" / "tests"
 OUT_COVERAGE = ROOT / "engine" / "tests" / "TEST_COVERAGE.md"
 OUT_MATRIX = ROOT / "docs" / "ABILITY_MATRIX.md"
@@ -165,6 +166,44 @@ def infer_ability_depth(covering_texts, covering_rels, covering_fns):
     return depth, {"has_assert": has_assert, "has_choice": has_choice, "has_negative": has_negative}
 
 
+def build_qa_coverage(all_src):
+    """Coverage of official QA rulings (cards/qa_data.json).
+
+    A ruling is covered when an engine test/src file references its Q-id
+    (e.g. "Q117") or one of its related card numbers (full-width ＋
+    normalized to +). Answers "is this ruling tested?" mechanically.
+    """
+    if not QA_JSON.exists():
+        return {"rows": [], "covered": 0, "total": 0}
+    with open(QA_JSON, encoding="utf-8") as f:
+        rulings = json.load(f)
+    # Q-ids also live in the in-crate QA suite (engine/src/qa_test_suite.rs)
+    corpus = [all_src]
+    for p in (ROOT / "engine" / "src").rglob("*.rs"):
+        try:
+            corpus.append(p.read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            continue
+    corpus = "\n".join(corpus)
+    rows = []
+    for r in rulings:
+        qid = r.get("id", "?")
+        cards = [
+            c.get("card_no", "").replace("＋", "+")
+            for c in r.get("related_cards", [])
+        ]
+        by_qid = qid in corpus
+        by_card = any(c and c in corpus for c in cards)
+        rows.append({
+            "id": qid,
+            "cards": cards,
+            "covered": by_qid or by_card,
+            "via": "qid" if by_qid else ("card" if by_card else "none"),
+        })
+    covered = sum(1 for r in rows if r["covered"])
+    return {"rows": rows, "covered": covered, "total": len(rows)}
+
+
 def build_inventory():
     abilities, stats = load_abilities()
     files = collect_test_files()
@@ -285,6 +324,8 @@ def build_inventory():
     covered_cards = sum(card_covered.values())
     abilities_on_covered = sum(1 for r in rows if r["covered"])
 
+    qa = build_qa_coverage(all_src)
+
     return {
         "abilities": rows,
         "stats": stats,
@@ -300,6 +341,7 @@ def build_inventory():
         "total_cards": total_cards,
         "covered_cards": covered_cards,
         "abilities_on_covered": abilities_on_covered,
+        "qa": qa,
         "all_src_len": len(all_src),
     }
 
@@ -396,6 +438,26 @@ def render_coverage(inv):
         for base, card, _tr, act, cond, text in sorted(grp, key=lambda r: r[0]):
             safe = text.replace("|", "/").replace("\n", " ")
             w(f"| `{card}` | {card_set(card)} | {act} | {cond} | {safe} |")
+        w("")
+
+    w("## Official QA rulings (cards/qa_data.json)")
+    w("")
+    qa = inv["qa"]
+    if qa["total"]:
+        w(f"- **Rulings covered by tests:** {qa['covered']} / {qa['total']} ({100 * qa['covered'] // max(qa['total'], 1)}%)")
+        uncovered = [r for r in qa["rows"] if not r["covered"]]
+        if uncovered:
+            w("")
+            w("Uncovered rulings (no test references the Q-id or any related card):")
+            w("")
+            w("| Ruling | Related card |")
+            w("|---|---|")
+            for r in uncovered:
+                card = r["cards"][0] if r["cards"] else "?"
+                w(f"| {r['id']} | `{card}` |")
+        w("")
+    else:
+        w("_qa_data.json not found._")
         w("")
 
     w("## Inventory")
@@ -586,6 +648,11 @@ def main():
         "cond_counts": inv["cond_counts"],
         "set_counts": inv["set_counts"],
         "depth_counts": inv["depth_counts"],
+        "qa_rulings": {
+            "covered": inv["qa"]["covered"],
+            "total": inv["qa"]["total"],
+            "uncovered_ids": [r["id"] for r in inv["qa"]["rows"] if not r["covered"]],
+        },
         "abilities": json_rows,
     }, ensure_ascii=False, indent=2) + "\n"
 

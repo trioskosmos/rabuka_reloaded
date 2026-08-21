@@ -15,6 +15,8 @@ impl super::TurnEngine {
         _cost_paid: u8,
         baton_touch_used: bool,
     ) {
+        #[cfg(not(feature = "no_std"))]
+        let _t = crate::timer::Timer::start("trig::debut");
         let player_id_clone = player_id.to_string();
         let card_no_clone = card_no.to_string();
         let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();

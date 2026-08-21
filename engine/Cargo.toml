@@ -40,6 +40,11 @@ server = ["actix-web", "actix-cors", "actix-files", "tokio", "tokio-stream", "lo
 3ds = ["bytecode_abilities"]
 # Profiling: enables Timer-based instrumentation for flamegraph generation
 profiling = []
+# Headless bot-testing mode: compiles out UI-only bookkeeping (rule/structured
+# logs, phase-transition log entries, choice_resolved capture, jyouji status
+# strings). Gameplay-relevant tracking (movement events, appearance records,
+# baton-touch history) is kept — ability conditions read those.
+headless = []
 # Alloc tracker: counts every malloc/free, reports via RABUKA_ALLOC_TRACK env var
 alloc_tracker = []
 # Generic no_std flag — used in cfg gates so ports don't touch engine source

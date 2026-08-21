@@ -440,3 +440,6 @@ pub mod pl_s_bp7_007_test;
 pub mod untested_choice_change_target_test;
 pub mod fixed_customs_test;
 pub mod energy_state_condition_test;
+pub mod ginko_baton_touch_hasu_search_test;
+pub mod miyata_draw_until_test;
+pub mod wien_yell_count_test;

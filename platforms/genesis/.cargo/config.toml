@@ -9,6 +9,8 @@ linker = "m68k-linux-gnu-gcc"
 rustflags = [
     "-C", "link-arg=-Tlink.ld",
     "-C", "link-arg=-nostdlib",
+    # libgcc provides __sync_val_compare_and_swap_1 etc. (m68k has no 1-byte CAS)
+    "-C", "link-arg=-lgcc",
     "-C", "panic=abort",
 ]
 

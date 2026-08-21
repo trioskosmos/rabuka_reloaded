@@ -2399,6 +2399,10 @@ impl GameState {
             });
             if any_live_scoped_expired {
                 self.mods.heart_color_multiplier.clear();
+                // LiveEnd-scoped cheer-check state: the base and all
+                // modify_yell_count modifiers belong to the finished live.
+                self.cheer_check_base = None;
+                self.yell_count_modifiers.clear();
             }
         }
 

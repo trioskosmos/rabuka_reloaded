@@ -64,10 +64,16 @@ impl super::TurnEngine {
             if game_state.has_pending_choice() {
                 return Err("Cannot activate ability while another choice is pending".to_string());
             }
-            return Self::handle_use_ability(game_state, card_id, ability_index);
+            return {
+                #[cfg(not(feature = "no_std"))]
+                let _t = crate::timer::Timer::start("exec::use_ability");
+                Self::handle_use_ability(game_state, card_id, ability_index)
+            };
         }
 
         if game_state.has_pending_choice() {
+            #[cfg(not(feature = "no_std"))]
+            let _t = crate::timer::Timer::start("exec::resume_with_choice");
             return Self::resume_with_choice(game_state, card_id, card_indices);
         }
 
@@ -155,13 +161,17 @@ impl super::TurnEngine {
                 Self::handle_mulligan_confirmation(game_state, card_indices.clone())
             }
             crate::game_setup::ActionType::SkipMulligan => Self::handle_mulligan_skip(game_state),
-            crate::game_setup::ActionType::PlayMemberToStage => Self::handle_play_member_to_stage(
-                game_state,
-                card_id,
-                card_indices.clone(),
-                stage_area,
-                use_baton_touch,
-            ),
+            crate::game_setup::ActionType::PlayMemberToStage => {
+                #[cfg(not(feature = "no_std"))]
+                let _t = crate::timer::Timer::start("exec::play_member_to_stage");
+                Self::handle_play_member_to_stage(
+                    game_state,
+                    card_id,
+                    card_indices.clone(),
+                    stage_area,
+                    use_baton_touch,
+                )
+            }
             crate::game_setup::ActionType::SetLiveCard => {
                 Self::handle_set_live_card(game_state, card_id)
             }
@@ -515,11 +525,17 @@ impl super::TurnEngine {
         let choice = pending.ok_or("No pending choice to resume")?;
 
         // Record a structured `choice_resolved` entry: what was offered vs chosen.
+        // Skipped under `headless` — the label computation itself allocates.
+        #[cfg(not(feature = "headless"))]
         game_state.push_choice_resolved(
             &choice,
             Self::profile_chosen_labels(game_state, &choice, card_id, card_indices.as_deref()),
             Self::profile_choice_is_skip(&choice, card_id, card_indices.as_deref()),
         );
+        #[cfg(feature = "headless")]
+        {
+            let _ = (&choice, &card_id, &card_indices);
+        }
 
         let ci = card_indices.clone();
         // Handle non-ability choices early (live success, etc.)

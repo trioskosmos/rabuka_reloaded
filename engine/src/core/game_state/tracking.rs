@@ -27,16 +27,46 @@ impl GameState {
         self.clear_area_placement_tracking();
     }
 
+    /// Register a modify_yell_count effect: (player_slot 1|2, delta).
+    /// Modifiers are data; the required count is derived on read.
+    pub fn add_yell_count_modifier(&mut self, player_slot: u8, delta: i32) {
+        self.yell_count_modifiers.push((player_slot, delta));
+    }
+
+    /// Derived cheer checks required for `player_id`:
+    /// max(0, base + Σ deltas registered for that player).
+    pub fn effective_cheer_checks_required(&self, player_id: &str, base: u8) -> u8 {
+        let slot = if player_id == self.player1.id || player_id == "p1" {
+            1u8
+        } else {
+            2u8
+        };
+        let base = self.cheer_check_base.unwrap_or(base);
+        let sum: i32 = self
+            .yell_count_modifiers
+            .iter()
+            .filter(|m| m.0 == slot)
+            .map(|m| m.1)
+            .sum();
+        (base as i32 + sum).max(0) as u8
+    }
+
     pub fn perform_cheer_check(&mut self, player_id: &str, blade_count: u8) -> Result<(), String> {
+        // The required count is always DERIVED: base (the live's blade count,
+        // fixed at the first check) plus every modify_yell_count modifier for
+        // this player, whenever it was applied. There is no initialization
+        // order dependency: a LiveStart modifier registered before the base
+        // exists is simply included in the sum.
+        if self.cheer_check_base.is_none() {
+            self.cheer_check_base = Some(blade_count);
+        }
+        self.cheer_checks_required = self.effective_cheer_checks_required(player_id, blade_count);
+
         let player = if player_id == self.player1.id {
             &mut self.player1
         } else {
             &mut self.player2
         };
-
-        if self.cheer_checks_required == 0 {
-            self.cheer_checks_required = blade_count;
-        }
 
         // Q104 / Rule 10.2.1: refresh from waitroom when deck runs out mid-draw.
         let from_bottom = player.yell_from_bottom;

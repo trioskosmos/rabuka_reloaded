@@ -329,28 +329,32 @@ impl GameState {
 
                     if cond_met {
                         // Record jyouji status for this card (lazily capture
-                        // name/owner only now that the condition passed)
-                        let status_card_name = card_db
-                            .get_card(card_id)
-                            .map(|c| c.name.to_string())
-                            .unwrap_or_default();
-                        let status_owner = if self.player1.stage.stage.contains(&card_id) {
-                            self.player1.id.clone()
-                        } else {
-                            self.player2.id.clone()
-                        };
-                        jyouji_statuses.push(crate::types::ConstantAbilityStatus {
-                            card_id: card_id,
-                            card_name: status_card_name.clone(),
-                            owner: status_owner.clone(),
-                            zone: "stage".to_string(),
-                            ability_text: effect.text.to_string(),
-                            all_conditions_met: pos_ok && cond_met,
-                            conditions: vec![crate::types::ConditionResult {
-                                text: "条件".to_string(),
-                                passed: cond_met,
-                            }],
-                        });
+                        // name/owner only now that the condition passed).
+                        // Skipped under `headless` — display-only summary data.
+                        #[cfg(not(feature = "headless"))]
+                        {
+                            let status_card_name = card_db
+                                .get_card(card_id)
+                                .map(|c| c.name.to_string())
+                                .unwrap_or_default();
+                            let status_owner = if self.player1.stage.stage.contains(&card_id) {
+                                self.player1.id.clone()
+                            } else {
+                                self.player2.id.clone()
+                            };
+                            jyouji_statuses.push(crate::types::ConstantAbilityStatus {
+                                card_id: card_id,
+                                card_name: status_card_name.clone(),
+                                owner: status_owner.clone(),
+                                zone: "stage".to_string(),
+                                ability_text: effect.text.to_string(),
+                                all_conditions_met: pos_ok && cond_met,
+                                conditions: vec![crate::types::ConditionResult {
+                                    text: "条件".to_string(),
+                                    passed: cond_met,
+                                }],
+                            });
+                        }
                         match effect.action {
                             crate::ability::enums::ActionType::GainResource => {
                                 match effect.resource_any().as_deref().unwrap_or("") {

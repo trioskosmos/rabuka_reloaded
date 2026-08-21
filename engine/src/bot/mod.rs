@@ -18,7 +18,8 @@ pub use strategy_v2::{
     choose_action_heuristic_v2, choose_live_set_action_v2, choose_mulligan_action_v2, V2Policy,
 };
 pub use strategy_v3::{
-    choose_action_heuristic_v3, choose_live_set_action_v3, evaluate_state_v3, V3Plan,
+    analyze_hand, choose_action_heuristic_v3, choose_live_set_action_v3,
+    choose_mulligan_action_v3, evaluate_state_v3, V3Plan,
 };
 
 use crate::card::CardDatabase;
