@@ -221,6 +221,57 @@ def test_deck_search_no_silent_move():
     )
 
 
+# ─── DESTINATION/SOURCE DEFAULT REGRESSION TESTS ──────────────────────────────
+# The 置く rule's setter used to inject destination=None, which blocked every
+# later default-fill guard (the key existed with value None). These pin the fix.
+
+def test_oku_rule_does_not_inject_null_destination():
+    """
+    "…置いてもよい" with no extractable destination: the 置く rule must leave
+    the key unset (so defaults/context can fill it) — never set it to None.
+    A None-valued key blocks every later `if "destination" not in action` guard.
+    """
+    result = parse_action('自分の控え室にあるライブカードを1枚置いてもよい')
+    assert result.get('action') == 'move_cards'
+    assert 'destination' not in result or result['destination'], (
+        f"destination explicitly None — null injection regression\nFULL: {result}"
+    )
+
+
+def test_energy_to_energy_deck_defaults_source():
+    """
+    "自分のエネルギー1枚をエネルギーデッキに置いてもよい" — the engine defaults
+    an empty source to discard (never holds energy), so the move would no-op.
+    The parser must default source=energy_zone.
+    """
+    result = parse_action('自分のエネルギー1枚をエネルギーデッキに置いてもよい')
+    assert result.get('action') == 'move_cards'
+    assert result.get('destination') == 'energy_deck', f"FULL: {result}"
+    assert result.get('source') == 'energy_zone', (
+        f"Expected source=energy_zone, got: {result.get('source')!r}\nFULL: {result}"
+    )
+
+
+def test_deck_position_insert_banme():
+    """
+    "それをデッキの上から4番目に置いてもよい" — 番目 (not just 枚目) must
+    produce a deck position and destination=deck_top so the engine inserts
+    at that position instead of dropping the card.
+    """
+    result = parse_action('それをデッキの上から4番目に置いてもよい')
+    assert result.get('action') == 'move_cards'
+    assert result.get('destination') == 'deck_top', f"FULL: {result}"
+    pos = result.get('position')
+    assert pos and str(pos.get('position')) == '4', f"FULL: {result}"
+
+
+def test_deck_position_insert_maime_still_works():
+    """Existing 枚目 pattern must keep working (Q226)."""
+    result = parse_action('一番上から4枚目のカードを手札に加える')
+    pos = result.get('position')
+    assert pos and str(pos.get('position')) == '4', f"FULL: {result}"
+
+
 if __name__ == '__main__':
     import traceback
     tests = [(k, v) for k, v in sorted(globals().items()) if k.startswith('test_')]

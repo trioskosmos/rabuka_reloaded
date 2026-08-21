@@ -1032,8 +1032,18 @@ class ActionRule:
         if self.setter:
             try:
                 self.setter(text, action)
-            except Exception:
-                pass
+            except TypeError:
+                pass  # arity mismatch on shared setters is expected
+            except Exception as e:
+                # Surface real setter bugs instead of silently dropping fields.
+                try:
+                    from parser import _DEBUG_LOG
+
+                    _DEBUG_LOG.append(
+                        f"ActionRule({self.action}) setter raised: {e!r} on {text!r}"
+                    )
+                except ImportError:
+                    pass
         if self.extract_optional and ("もよい" in text or "してもよい" in text):
             action["optional"] = True
 

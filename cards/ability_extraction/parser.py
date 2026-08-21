@@ -398,12 +398,12 @@ def extract_blade_limit(text: str) -> Optional[Dict[str, Any]]:
 
 
 def extract_deck_position(text: str) -> Optional[int]:
-    """Extract deck position from text like '一番上から4枚目' (4th from top)."""
-    # Match patterns like "一番上から4枚目" or "上から4枚目"
-    match = re.search(r"一番上から(\d+)枚目", text)
+    """Extract deck position from text like '一番上から4枚目' / 'デッキの上から4番目'."""
+    # Match patterns like "一番上から4枚目", "上から4枚目", "上から4番目"
+    match = re.search(r"一番上から(\d+)[枚番]目", text)
     if match:
         return int(match.group(1))
-    match = re.search(r"上から(\d+)枚目", text)
+    match = re.search(r"上から(\d+)[枚番]目", text)
     if match:
         return int(match.group(1))
     return None
@@ -653,6 +653,159 @@ def split_condition_action(text: str) -> Tuple[str, str]:
     return "", text
 
 
+# ======================================================================
+# CLAUSE SEGMENTATION (Stage A IR)
+# ======================================================================
+# A deterministic, purely structural pass: raw ability text → clause tree.
+# No semantics here — leaf clauses are still parsed by the existing
+# condition/action registries. Goal: sentence boundaries, cost/effect split,
+# leading condition gates, inter-clause links (その後/そうしたとき/さらに/
+# 代わりに) and choice bullets get recognized ONCE, here, instead of being
+# re-derived by every structural handler.
+#
+# Node shape:
+#   {"kind": "ability", "text", "cost_text"?, "children": [<sentence|choice>]}
+#   {"kind": "sentence", "text", "body", "link"?,
+#    "condition": {"text", "marker"}?}
+#   {"kind": "choice", "text", "intro", "options": [str]}
+# `link` is how this node attaches to the previous sibling:
+#   "then" (その後、) | "on_accept" (そうした場合/そうしたとき、) |
+#   "furthermore" (さらに) | "alternative" (代わりに)
+# ======================================================================
+
+_CONDITION_MARKERS_IR = ("場合、", "とき、", "なら、", "たび、", "かぎり、")
+
+_LINK_PREFIXES = (
+    ("そうした場合", "on_accept"),
+    ("そうしたとき", "on_accept"),
+    ("その後、", "then"),
+    ("さらに", "furthermore"),
+)
+
+
+def _ir_depth_scan(text: str):
+    """Yield (index, char, depth_after) for each position, tracking
+    bracket/template nesting. Depth 0 = top-level structure."""
+    depth = 0
+    i = 0
+    n = len(text)
+    while i < n:
+        if text.startswith("{{", i):
+            depth += 1
+            i += 2
+            continue
+        if text.startswith("}}", i):
+            depth = max(0, depth - 1)
+            i += 2
+            continue
+        ch = text[i]
+        if ch in "「『（(":
+            depth += 1
+        elif ch in "」』）)":
+            depth = max(0, depth - 1)
+        yield i, ch, depth
+        i += 1
+
+
+def _split_sentences_nesting(text: str) -> List[str]:
+    """Split on 。 at nesting depth 0. Drops the 。 and empty segments."""
+    sentences = []
+    start = 0
+    for i, ch, depth in _ir_depth_scan(text):
+        if ch == "。" and depth == 0:
+            seg = text[start:i].strip()
+            if seg:
+                sentences.append(seg)
+            start = i + 1
+    rest = text[start:].strip()
+    if rest:
+        sentences.append(rest)
+    return sentences
+
+
+def _find_depth0(text: str, marker: str) -> int:
+    """First index where `marker` occurs at nesting depth 0, or -1."""
+    n = len(text)
+    for i, ch, depth in _ir_depth_scan(text):
+        if depth == 0 and text.startswith(marker, i):
+            return i
+    return -1
+
+
+def _segment_sentence(s: str) -> Dict[str, Any]:
+    """Classify one sentence: optional link prefix + optional leading gate."""
+    link = None
+    for prefix, lk in _LINK_PREFIXES:
+        if s.startswith(prefix):
+            link = lk
+            s = s[len(prefix) :].lstrip("、，").strip()
+            break
+    best = None
+    for marker in _CONDITION_MARKERS_IR:
+        idx = _find_depth0(s, marker)
+        if idx >= 0 and (best is None or idx < best[0]):
+            best = (idx, marker)
+    node: Dict[str, Any] = {"kind": "sentence", "text": s, "body": s}
+    if link:
+        node["link"] = link
+    if best:
+        idx, marker = best
+        cond_text = s[: idx + len(marker)]
+        node["condition"] = {"text": cond_text, "marker": marker.rstrip("、")}
+        node["body"] = s[idx + len(marker) :].strip()
+    return node
+
+
+def segment_clauses(text: str) -> Dict[str, Any]:
+    """Segment a raw triggerless ability text into a structural clause tree.
+
+    Purely syntactic — see the CLAUSE SEGMENTATION header above for the node
+    shape. Never raises on unexpected input; worst case it returns the whole
+    text as a single unclassified sentence.
+    """
+    text = normalize(text.strip())
+    node: Dict[str, Any] = {"kind": "ability", "text": text, "children": []}
+    cost_text, effect_text = split_cost_effect(text)
+    if cost_text:
+        node["cost_text"] = cost_text
+
+    # Choice blocks: bullet options (・) may exist with or without the
+    # 以下から1つを選ぶ marker; everything from the first top-level ・ on is
+    # option material.
+    bullet_idx = _find_depth0(effect_text, "・")
+    if bullet_idx >= 0:
+        intro = effect_text[:bullet_idx].strip()
+        if intro.endswith("。"):
+            intro = intro[:-1].strip()
+        choice: Dict[str, Any] = {
+            "kind": "choice",
+            "text": effect_text[bullet_idx:].strip(),
+            "intro": intro,
+            "options": [],
+        }
+        for raw in effect_text[bullet_idx:].split("・")[1:]:
+            opt = raw.strip()
+            opt = _split_sentences_nesting(opt)
+            if opt:
+                choice["options"].append("。".join(opt))
+        node["children"].append(choice)
+        return node
+
+    prev_kind = None
+    for s in _split_sentences_nesting(effect_text):
+        sent = _segment_sentence(s)
+        # "そうした場合/とき" may also open with the marker mid-sentence when
+        # the previous sentence had no terminal 。; treat as on_accept link.
+        if prev_kind is not None and sent.get("link") is None:
+            for prefix, lk in (("そうした場合", "on_accept"), ("そうしたとき", "on_accept")):
+                if s.startswith(prefix):
+                    sent["link"] = lk
+                    break
+        node["children"].append(sent)
+        prev_kind = "sentence"
+    return node
+
+
 def parse_complex_condition(text: str) -> Optional[Dict[str, Any]]:
     """Parse complex conditions with cause-effect relationships (e.g., これにより)."""
     # "かつこれにより" is an AND compound, not a complex cause-effect
@@ -727,6 +880,11 @@ def _extract_basic_cost_fields(cost, text):
         cost["destination"] = dst
     if "エネルギーデッキに置く" in text:
         cost["destination"] = "energy_deck"
+        # "エネルギーN枚をエネルギーデッキに置く" — energy returns to the deck
+        # from the energy zone. Without a source the engine defaults to
+        # discard, which never holds energy, so the cost could never be paid.
+        if "source" not in cost and "エネルギー" in text:
+            cost["source"] = "energy_zone"
     # Infer destination from source if missing
     if "source" in cost and "destination" not in cost:
         if cost["source"] == "hand" and (
@@ -2117,8 +2275,11 @@ _register_action(
     and "選ぶ" not in t
     and "選び" not in t,
     "move_cards",
-    lambda t, a: a.update({"destination": extract_destination(t)})
+    # Only set destination when actually extracted — injecting None here would
+    # block every later default-fill guard (the key would exist with value None).
+    lambda t, a: a.update({"destination": dest})
     if "destination" not in a
+    and (dest := extract_destination(t)) is not None
     else None,
 )
 _register_action(
@@ -2843,6 +3004,10 @@ def parse_action(text: str) -> Dict[str, Any]:
     deck_position = extract_deck_position_for_action(text)
     if deck_position:
         action.update(deck_position)
+        # "デッキの上からN番目に置く" — inserting at position N of the deck top.
+        # The engine reads effect.position for the DeckTop insert index.
+        if "destination" not in action and re.search(r"(デッキ|山札)の上から\d+[枚番]目", text):
+            action["destination"] = "deck_top"
 
     # Extract cost limit specifically for move_cards actions
     cost_range = extract_cost_range(text)
@@ -2994,15 +3159,24 @@ def parse_action(text: str) -> Dict[str, Any]:
                         match = cond(text)
                 else:
                     match = cond in text
-            except Exception:
-                match = False  # Expected: lambda arity mismatch or type mismatch
+            except Exception as e:
+                # Arity/type mismatches are expected (mixed 1-arg/2-arg rules);
+                # anything else is a bug — surface it in the debug log.
+                if not isinstance(e, TypeError):
+                    _DEBUG_LOG.append(
+                        f"parse_action({text!r}) rule condition raised: {e!r}"
+                    )
+                match = False
             if match:
                 action["action"] = act
                 if setter:
                     try:
                         setter(text, action)
-                    except Exception:
-                        pass  # Expected: lambda arity mismatch or type mismatch
+                    except Exception as e:
+                        if not isinstance(e, TypeError):
+                            _DEBUG_LOG.append(
+                                f"parse_action({text!r}) rule {act} setter raised: {e!r}"
+                            )
                 break
 
     _fill_defaults(action, text, _cached_source=source, _cached_dest=destination)
@@ -5977,6 +6151,15 @@ def _fill_defaults_move_cards(action, text, action_text, _cached_source, _cached
             action["source"] = s
     if action.get("source") is None and "控え室から" in text:
         action["source"] = "discard"
+    # "自分のエネルギー1枚をエネルギーデッキに置く" — the engine defaults an
+    # empty source to discard, which never contains energy cards, so the move
+    # would silently no-op. Energy returns to the energy deck from the zone.
+    if (
+        action.get("source") is None
+        and action.get("destination") == "energy_deck"
+        and "エネルギー" in text
+    ):
+        action["source"] = "energy_zone"
     if "source" not in action:
         dest = action.get("destination", "")
         if "それらのカード" in text:
@@ -6881,6 +7064,12 @@ def _try_conditional_alternative(text):
                 "target_event": "placing_in_success_zone",
                 "text": ct,
             }
+            # The alternative replaces the original placement, so it lands in
+            # the SAME zone. Without an explicit destination the engine's move
+            # would have nowhere to put the card.
+            alt = result.get("alternative_effect")
+            if isinstance(alt, dict) and not alt.get("destination"):
+                alt["destination"] = "success_live_zone"
         else:
             cond = parse_condition(ct)
             if cond and cond.get("type") != "custom":
@@ -12051,13 +12240,16 @@ def _merge_parenthetical(target, parenthetical):
             break
 
 
-# Required field validators per action type
+# Required field validators per action type.
+# Only list fields the engine cannot default: count falls back to
+# count_or(1)/dynamic_count/all paths, and modify_required_hearts reads
+# value_or_count (value OR count), so requiring "count" there was a false
+# positive that drowned the real signals.
 _VALIDATORS = {
-    "gain_resource": {"required": ["resource", "count"]},
+    "gain_resource": {"required": ["resource"]},
     "move_cards": {"required": ["source", "destination"]},
-    "draw_card": {"required": ["count"]},
     "modify_score": {"required": ["operation", "value"]},
-    "modify_required_hearts": {"required": ["heart_colors", "count"]},
+    "modify_required_hearts": {"required": ["heart_colors"]},
     "change_state": {"required": ["state_change"]},
 }
 
@@ -12083,6 +12275,7 @@ _KNOWN_ACTIONS = {
     "modify_required_hearts_global",
     "modify_score",
     "modify_yell_count",
+    "modify_yell_source",
     "move_cards",
     "pay_energy",
     "perform_yell",
@@ -12651,6 +12844,91 @@ def _validate_semantic(abilities):
             lambda e, eff: _json_has_field(eff, "state_change")
             or _json_has_field(e.get("cost", {}), "state_change"),
             "State change described but no state_change field",
+        ),
+        # ─── Universal quantifier over preceding cards (それらがすべてX) ───
+        # The engine only implements "ALL moved cards match" as
+        # card_count_condition{source: preceding_moved, operator: "="}.
+        (
+            "all_preceding_match",
+            r"それらがすべて",
+            lambda e, eff: _json_has(
+                eff,
+                lambda d: isinstance(d, dict)
+                and d.get("type") == "card_count_condition"
+                and d.get("source") == "preceding_moved"
+                and d.get("operator") == "=",
+            ),
+            "'それらがすべて' (all moved cards match) but no "
+            "card_count_condition with source=preceding_moved + operator='='",
+        ),
+        # ─── Deck refresh this turn ───
+        # Engine evaluates temporal=this_turn + location=deck as
+        # deck_refreshed_this_turn — anything else loses the mechanic.
+        (
+            "refresh_condition",
+            r"リフレッシュし(?:ていた|た)場合",
+            lambda e, eff: _json_has(
+                eff.get("condition") or {},
+                lambda d: isinstance(d, dict)
+                and d.get("location") == "deck"
+                and d.get("temporal") == "this_turn",
+            ),
+            "Deck-refresh condition but condition is not "
+            "{location: deck, temporal: this_turn}",
+        ),
+        # ─── Exact count (ちょうどN人/枚) ───
+        (
+            "exact_count",
+            r"ちょうど\d+(人|枚|つ)",
+            lambda e, eff: _json_has(
+                eff,
+                lambda d: isinstance(d, dict)
+                and (
+                    (
+                        d.get("operator") in ("=", "==")
+                        and d.get("count") is not None
+                    )
+                    # blade-count filters encode ちょうど as blade_limit + "=="
+                    or d.get("blade_limit_operator") in ("=", "==")
+                ),
+            ),
+            "'ちょうどN' (exactly N) but no condition with operator '='",
+        ),
+        # ─── Replacement placement keeps the original destination ───
+        (
+            "replacement_destination",
+            r"成功ライブカード置き場に置く場合、代わりに",
+            lambda e, eff: _json_has(
+                eff,
+                lambda d: isinstance(d, dict)
+                and d.get("action") == "move_cards"
+                and d.get("destination") == "success_live_zone",
+            ),
+            "Replacement effect but alternative move has no "
+            "destination=success_live_zone",
+        ),
+        # ─── Energy returned to the energy deck must come from the zone ───
+        # Covers both effect moves and activation costs (エネルギーN枚を…デッキに
+        # 置く：). Engine defaults an empty source to discard, which never holds
+        # energy, so a missing source makes the move silently no-op.
+        (
+            "energy_to_deck_source",
+            r"エネルギー\d*枚をエネルギーデッキに置",
+            lambda e, eff: _json_has(
+                eff,
+                lambda d: isinstance(d, dict)
+                and d.get("action") == "move_cards"
+                and d.get("destination") == "energy_deck"
+                and bool(d.get("source")),
+            )
+            or _json_has(
+                e.get("cost") or {},
+                lambda d: isinstance(d, dict)
+                and d.get("destination") == "energy_deck"
+                and bool(d.get("source")),
+            ),
+            "Energy-to-energy-deck move but move/cost has no source "
+            "(engine defaults empty source to discard, which never holds energy)",
         ),
     ]
 

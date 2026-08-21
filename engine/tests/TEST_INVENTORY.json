@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-21T04:58:43.448661+00:00",
+  "generated_at": "2026-08-21T08:04:50.484252+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 404,
-  "n_tests": 2419,
+  "n_files": 405,
+  "n_tests": 2426,
   "total_cards": 771,
-  "covered_cards": 538,
-  "abilities_on_covered": 690,
+  "covered_cards": 540,
+  "abilities_on_covered": 692,
   "trigger_counts": {
     "起動": [
       76,
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      188,
+      190,
       268
     ],
     "(none)": [
@@ -52,11 +52,11 @@
       72
     ],
     "gain_resource": [
-      114,
+      115,
       160
     ],
     "sequential": [
-      150,
+      151,
       217
     ],
     "unknown": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      397,
+      399,
       546
     ],
     "temporal_condition": [
@@ -276,7 +276,7 @@
       68
     ],
     "bp4": [
-      62,
+      63,
       88
     ],
     "bp5": [
@@ -300,7 +300,7 @@
       31
     ],
     "pb2": [
-      27,
+      28,
       43
     ],
     "cl1": [
@@ -309,9 +309,9 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 515,
-    "none": 246,
-    "L1+choice": 122,
+    "L2+choice": 518,
+    "none": 244,
+    "L1+choice": 121,
     "L2": 37,
     "L1": 16
   },
@@ -9544,15 +9544,21 @@
       ],
       "base": "PL!SP-bp1-012",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/distortion_need_hearts_test.rs",
         "engine/tests/test_modules/fuyumari_test.rs",
         "engine/tests/test_modules/kinako_test.rs"
       ],
       "covering_tests": [
+        "distortion_duplicate_names_dedupe",
+        "distortion_no_catchu_no_change",
+        "distortion_one_catchu_no_score_gate_not_met",
+        "distortion_parse_increase_half_is_increase",
+        "distortion_three_distinct_catchu_reduces_and_scores",
         "fuyumari_edge_exclude_self_from_cost",
         "fuyumari_edge_no_valid_cost_target",
         "fuyumari_q63_effect_debut_no_cost_payment",
@@ -9563,7 +9569,7 @@
         "kinako_q108_sumire_discard_no_blade",
         "kinako_q240_non_center_debut_activates"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -29368,14 +29374,22 @@
         "PL!SP-bp4-012-N"
       ],
       "base": "PL!SP-bp4-012",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/distortion_need_hearts_test.rs"
+      ],
+      "covering_tests": [
+        "distortion_duplicate_names_dedupe",
+        "distortion_no_catchu_no_change",
+        "distortion_one_catchu_no_score_gate_not_met",
+        "distortion_parse_increase_half_is_increase",
+        "distortion_three_distinct_catchu_reduces_and_scores"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -36042,14 +36056,23 @@
         "PL!SP-pb2-048-L"
       ],
       "base": "PL!SP-pb2-048",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/distortion_need_hearts_test.rs",
+        "engine/tests/test_modules/mod.rs"
+      ],
+      "covering_tests": [
+        "distortion_duplicate_names_dedupe",
+        "distortion_no_catchu_no_change",
+        "distortion_one_catchu_no_score_gate_not_met",
+        "distortion_parse_increase_half_is_increase",
+        "distortion_three_distinct_catchu_reduces_and_scores"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {

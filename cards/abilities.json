@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-21T15:49:49.569785",
+  "generated_at": "2026-08-21T18:00:21.826639",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "428240c4",
+  "engine_commit": "16b00eff",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -17915,6 +17915,7 @@
       "cost": {
         "text": "エネルギー2枚をエネルギーデッキに置く",
         "destination": "energy_deck",
+        "source": "energy_zone",
         "count": 2,
         "type": "move_cards"
       },
@@ -20659,8 +20660,8 @@
           "count": 1,
           "target": "self",
           "action": "move_cards",
-          "card_type": "energy_card",
-          "source": "energy_zone"
+          "source": "energy_zone",
+          "card_type": "energy_card"
         },
         "conditional_negation": true
       }
@@ -33135,7 +33136,7 @@
           ],
           "optional": true,
           "action": "move_cards",
-          "destination": null,
+          "destination": "success_live_zone",
           "location": "success_live_card_zone"
         },
         "condition": {
@@ -36100,9 +36101,12 @@
             "text": "それをデッキの上から4番目に置いてもよい",
             "source": "looked_at",
             "count": 1,
+            "position": {
+              "position": "4"
+            },
+            "destination": "deck_top",
             "optional": true,
             "action": "move_cards",
-            "destination": null,
             "card_type": "card"
           }
         ]
@@ -36599,6 +36603,7 @@
           "optional": true,
           "action": "move_cards",
           "self_target": true,
+          "source": "energy_zone",
           "card_type": "energy_card",
           "location": "stage"
         }
