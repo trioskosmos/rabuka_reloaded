@@ -14,8 +14,11 @@ use alloc::vec::Vec;
 use rabuka_engine::core::constants::{EMPTY_SLOT, STAGE_SIZE};
 use rabuka_engine::game_state::GameState;
 
-/// Cards shown per hand window.
-pub const HAND_VISIBLE: usize = 6;
+/// Cards shown per hand window — derived from screen/pitch, not a guess.
+/// 240px wide = 30 tiles; hand pitch = card width (3) + gap (1) = 4 tiles.
+const SCREEN_COLS: i32 = 30;
+const HAND_PITCH_TILES: i32 = 4;
+pub const HAND_VISIBLE: usize = (SCREEN_COLS / HAND_PITCH_TILES) as usize; // 7
 
 /// One drawable card slot on the board.
 #[derive(Clone)]
@@ -49,6 +52,9 @@ pub struct BoardFrame {
     /// Stage slots, left to right.
     pub p2_stage: [Slot; 3],
     pub p1_stage: [Slot; 3],
+    /// Live/success zone (3 slots, small) — victory condition.
+    pub p2_live: [Slot; 3],
+    pub p1_live: [Slot; 3],
     /// Visible hand window.
     pub hand: Vec<Slot>,
     /// True when more hand cards exist to the right of the window.
@@ -142,6 +148,33 @@ impl Board {
             s.actionable = is_actionable(&s.card_no);
         }
 
+        // Live/success zone: 3 slots, empty padded
+        let live_slot = |cid: Option<i16>| -> Slot {
+            match cid {
+                Some(id) if id != EMPTY_SLOT => Slot {
+                    card_no: gs.card_database.get_card(id).map(|c| c.card_no.to_string()),
+                    actionable: false,
+                },
+                _ => Slot::empty(),
+            }
+        };
+        let p2_live_vec: Vec<Slot> = (0..3)
+            .map(|i| {
+                let cid = you.success_live_card_zone.cards.get(i).copied();
+                let mut s = live_slot(cid);
+                s.actionable = is_actionable(&s.card_no);
+                s
+            })
+            .collect();
+        let p1_live_vec: Vec<Slot> = (0..3)
+            .map(|i| {
+                let cid = me.success_live_card_zone.cards.get(i).copied();
+                let mut s = live_slot(cid);
+                s.actionable = is_actionable(&s.card_no);
+                s
+            })
+            .collect();
+
         let hand_cards: Vec<Option<String>> = me
             .hand
             .cards
@@ -210,6 +243,16 @@ impl Board {
             ],
             p2_stage: [p2_stage[0].clone(), p2_stage[1].clone(), p2_stage[2].clone()],
             p1_stage: [p1_stage[0].clone(), p1_stage[1].clone(), p1_stage[2].clone()],
+            p2_live: [
+                p2_live_vec[0].clone(),
+                p2_live_vec[1].clone(),
+                p2_live_vec[2].clone(),
+            ],
+            p1_live: [
+                p1_live_vec[0].clone(),
+                p1_live_vec[1].clone(),
+                p1_live_vec[2].clone(),
+            ],
             hand,
             hand_more: end < hand_cards.len(),
             hand_offset_col: start,

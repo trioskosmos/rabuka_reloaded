@@ -11,16 +11,42 @@ warning: function `decompressed_len` is never used
    Compiling rabuka_gba v0.1.0 (C:\Users\trios\OneDrive\Documents\rabuka_reloaded\platforms\gba)
 warning: `rabuka_engine` (lib) generated 1 warning
 warning: variable does not need to be mutable
-   --> platforms\gba\src\display.rs:362:9
+   --> platforms\gba\src\display.rs:423:9
     |
-362 |     let mut empty = |bg: &mut RegularBackground| {
+423 |     let mut empty = |bg: &mut RegularBackground| {
     |         ----^^^^^
     |         |
     |         help: remove this `mut`
     |
     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
 
-warning: `rabuka_gba` (lib) generated 1 warning (run `cargo fix --lib -p rabuka_gba` to apply 1 suggestion)
-    Finished `release` profile [optimized] target(s) in 1m 05s
+warning: constant `HAND_H` is never used
+  --> platforms\gba\src\display.rs:25:7
+   |
+25 | const HAND_H: i32 = HAND_CARD.1; // 4
+   |       ^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `HAND_START_X` is never used
+  --> platforms\gba\src\display.rs:33:7
+   |
+33 | const HAND_START_X: i32 = 0;
+   |       ^^^^^^^^^^^^
+
+warning: constant `HAND_FITS` is never used
+  --> platforms\gba\src\display.rs:41:11
+   |
+41 | pub const HAND_FITS: usize = (COLS / HAND_PITCH) as usize; // 7
+   |           ^^^^^^^^^
+
+warning: constant `UI_GOLD` is never used
+  --> platforms\gba\src\display.rs:48:7
+   |
+48 | const UI_GOLD: u16 = 3; // solid gold for cursor border
+   |       ^^^^^^^
+
+warning: `rabuka_gba` (lib) generated 5 warnings (run `cargo fix --lib -p rabuka_gba` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 1m 06s
 warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
 note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`

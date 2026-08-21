@@ -139,10 +139,14 @@ pub extern "C" fn rabuka_wasm_game_run(seed: u32) -> u32 {
 }
 
 // ---- Bump allocator over a static heap in linear memory ----
-// Console targets run the engine in well under 1MB (GBA fits 288KB);
-// 512KB keeps wasm linear memory at ~10 pages so the Jaguar port
-// (2MB DRAM, code XIP from cart) has room for shell + text screen too.
+// DC has 16 MB, GBA/Jaguar need 512 KB. Use the smallest that fits the
+// active target: DC needs ~4 MB for two 60-card decks + VM state; the
+// 512 KB build OOMs at handle_mulligan_confirmation's Vec spill and
+// freezes on the `loop {}` panic handler (mulligan → Main).
+#[cfg(feature = "jaguar")]
 const HEAP_SIZE: usize = 512 * 1024;
+#[cfg(not(feature = "jaguar"))]
+const HEAP_SIZE: usize = 8 * 1024 * 1024;
 
 struct BumpAlloc(u32);
 

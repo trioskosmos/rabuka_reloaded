@@ -129,6 +129,8 @@ from parser_utils import (
     OPERATOR_PATTERNS,
     POSITION_KEYWORDS,
     _ALL_KW_RE,
+    _OPTIONAL_RE,
+    _SHUFFLE_RE,
     PriorityRegistry,
     ActionRule,
     EffectPattern,
@@ -460,7 +462,7 @@ def extract_deck_position_constraint(text: str) -> Optional[Dict[str, Any]]:
 
 def extract_optional(text: str) -> bool:
     """Check if action is optional."""
-    return "もよい" in text or "てもよい" in text
+    return _OPTIONAL_RE.search(text) is not None
 
 
 def extract_heart_types(text: str) -> List[str]:
@@ -566,7 +568,7 @@ def _strip_icon_annotations(text):
 
 def _has_shuffle(text):
     """Detect a shuffle instruction in `text`."""
-    return "シャッフル" in text
+    return _SHUFFLE_RE.search(text) is not None
 
 
 def extract_cost_modification(text: str) -> Optional[Dict[str, Any]]:

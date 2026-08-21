@@ -20,9 +20,9 @@ wrote C:\Users\trios\OneDrive\Documents\rabuka_reloaded\platforms\jaguar\src\dec
 wrote C:\Users\trios\OneDrive\Documents\rabuka_reloaded\platforms\ps1\src\decks_baked.rs
 wrote C:\Users\trios\OneDrive\Documents\rabuka_reloaded\platforms\wasm\src\decks_baked.rs
 323 unique deck cards to bake
-master palette: 256 colours from 323 thumbs
+master palette: 240 colours from 323 thumbs
 baked 323 cards, missing 0
-wrote C:\Users\trios\OneDrive\Documents\rabuka_reloaded\platforms\gba\src\card_art_gen.rs (25198637 bytes)
+wrote C:\Users\trios\OneDrive\Documents\rabuka_reloaded\platforms\gba\src\card_art_gen.rs (25007737 bytes)
 [INFO] MSVC link.exe not found, using GNU toolchain for host build
 
 Built output\rabuka_gba.gba

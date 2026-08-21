@@ -24,16 +24,20 @@
 #define THIN_W 12
 #define WIDE_W 24
 #define ROWS (SCREEN_H / FONT_H)      /* 20 */
-#define MAX_ROW_BYTES 56              /* 53 thin glyphs max, + slack */
+#define MAX_ROW_BYTES 64              /* 53 thin (53B) or 26 wide (52B) + slack; +1 for NUL in storage */
 #define Y0 0
+#ifndef BUILD_TAG
+#define BUILD_TAG __DATE__ " " __TIME__
+#endif
 
 /* the single wasm instance, so imports can reach linear memory */
 struct w2c_host { int unused; };  /* opaque to the engine; contents are ours */
 w2c_0x24rabuka__wasm0x2Ewasm g_rabuka_inst;
 struct w2c_host g_host;
 
-/* each row is a Shift-JIS byte string (thin = 1 byte, wide = 2 bytes) */
-static unsigned char lines[ROWS][MAX_ROW_BYTES];
+/* each row is a Shift-JIS byte string (thin = 1 byte, wide = 2 bytes).
+ * +1 for the NUL terminator that row_append maintains. */
+static unsigned char lines[ROWS][MAX_ROW_BYTES + 1];
 static unsigned char row_len[ROWS];
 static int cur_line = 0;
 static int dirty = 0;
@@ -202,6 +206,18 @@ void w2c_host_host_println(struct w2c_host *h, u32 ptr, u32 len) {
         len = sizeof(buf) - 1;
     memcpy(buf, g_rabuka_inst.w2c_memory.data + ptr, len);
     buf[len] = '\0';
+    /* Tag the phase header so screenshots prove which build is running.
+     * Engine prints "Turn N | <Phase>" as the first line of each board
+     * redraw; appending the wall-clock build tag makes the mulligan→Main
+     * freeze diagnosable without guessing which CDI is mounted. */
+    if (strncmp(buf, "Turn ", 5) == 0) {
+        size_t n = strlen(buf);
+        if (n + 1 + strlen(BUILD_TAG) < sizeof(buf)) {
+            buf[n] = ' ';
+            strcpy(buf + n + 1, BUILD_TAG);
+            len = n + 1 + strlen(BUILD_TAG);
+        }
+    }
     /* split on embedded newlines; each piece is one logical line */
     char *start = buf;
     for (char *p = buf;; p++) {

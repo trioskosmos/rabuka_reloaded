@@ -6,33 +6,46 @@ use agb::display::tiled::{
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Priority, Rgb15, Rgb};
 
 use crate::board::BoardFrame;
-use crate::card_art_gen::{CardArt, BOARD_UI, CARD_FRONTS, MASTER_PAL, STAGE_FRONTS};
-use crate::font_tiles_gen::{FONT_GLYPHS, FONT_TILE_ROWS, FONT_TILES};
+use crate::card_art_gen::{CardArt, BOARD_UI, CARD_FRONTS, LIVE_FRONTS, MASTER_PAL, STAGE_FRONTS};
+use crate::font_tiles_gen::{FONT_GLYPHS, FONT_TILES};
 
-/// Screen is 240x160 = 30 cols x 20 rows of 8px tiles. Text glyphs are one
-/// tile row tall (8px font).
-const COLS: i32 = 30;
-const ROWS: i32 = 20;
+/// Screen is 240x160 = 30 cols x 20 rows of 8px tiles. Text glyphs are
+/// 16x16 (2x2 tiles, 12px font) — each text line is 2 tile-rows.
+pub const COLS: i32 = 30;
+pub const ROWS: i32 = 20;
+const FONT_ROWS: i32 = 2;
 
-/// Board layout (tile coords). Stage cards are 5x6 tiles (40x48 px), hand
-/// cards 4x5 tiles (32x40 px); slots sit on a pitch leaving gap columns for
-/// the actionable badge / focus marker.
-const STAGE_YS: [i32; 2] = [1, 7]; // opponent, player
-const STAGE_CARD: (i32, i32) = (5, 6); // cols, rows
-const STAGE_PITCH: i32 = 6;
-const HAND_Y: i32 = 13;
-const HAND_CARD: (i32, i32) = (4, 5); // cols, rows
-const HAND_PITCH: i32 = 5;
-const INFO_X: i32 = 19;
+/// Card tile sizes baked in `tools/bake_card_art.py` (multiples of 8px).
+const STAGE_CARD: (i32, i32) = (5, 6); // 40x48
+const HAND_CARD: (i32, i32) = (3, 4); // 24x32
 
-/// Action bar: two 8px text lines pinned to the bottom.
-const BAR_ROWS: [i32; 2] = [18, 19];
+/// Layout derived from card sizes + font metrics (no magic absolute Y).
+const HEADER_H: i32 = FONT_ROWS; // 2
+const STAGE_H: i32 = STAGE_CARD.1; // 6
+const HAND_H: i32 = HAND_CARD.1; // 4
+const BAR_H: i32 = FONT_ROWS; // single-line action bar
 
-/// Board UI tile indices inside [`BOARD_UI`] (4bpp text BG).
-const UI_EMPTY_STAGE: u16 = 0; // 30 tiles (5x6 empty slot)
-const UI_EMPTY_HAND: u16 = 30; // 20 tiles (4x5 empty slot)
-const UI_BADGE: u16 = 50; // gold actionable diamond
-const UI_MARKER: u16 = 51; // white focus triangle
+const STAGE_PITCH: i32 = STAGE_CARD.0 + 1; // 1 col gap for badge
+const HAND_PITCH: i32 = HAND_CARD.0 + 1; // 1 col gap
+const STAGE_START_X: i32 = 1;
+const LIVE_CARD: (i32, i32) = (2, 3); // 16x24 mini live
+const LIVE_PITCH: i32 = LIVE_CARD.0 + 1; // 3
+const HAND_START_X: i32 = 0;
+
+const STAGE_YS: [i32; 2] = [HEADER_H, HEADER_H + STAGE_H]; // [2, 8]
+const HAND_Y: i32 = STAGE_YS[1] + STAGE_H; // 14
+const BAR_Y: i32 = ROWS - BAR_H; // 18
+const INFO_X: i32 = STAGE_START_X + STAGE_PITCH * 2 + STAGE_CARD.0 + 1; // 19
+
+/// Hand capacity derived from screen width, not hardcoded (30 cols / 4 pitch = 7).
+pub const HAND_FITS: usize = (COLS / HAND_PITCH) as usize; // 7
+
+/// Board UI tile indices inside [`BOARD_UI`] (4bpp text BG, bank 15).
+/// Single solid gray tile repeated for all empty zones (VRAM-cheap).
+const UI_EMPTY: u16 = 0; // 1 tile, solid zone fill
+const UI_BADGE: u16 = 1; // gold actionable diamond
+const UI_MARKER: u16 = 2; // white focus triangle
+const UI_GOLD: u16 = 3; // solid gold for cursor border
 
 /// Full-screen text via a pre-baked, per-screen-shared glyph tile set, plus a
 /// tiled board (card fronts, zones, cursor) rendered from a [`BoardFrame`].
@@ -40,6 +53,7 @@ pub struct Display<'a> {
     gfx: Graphics<'a>,
     buf: String,
     last: String,
+    detail_active: bool,
 }
 
 /// 4bpp text/board palette (bank 0).
@@ -56,22 +70,32 @@ static TEXT_PALETTE: Palette16 = const {
 };
 
 /// Text palette for the card-detail view, on bank 15 (reserved from the art's
-/// 240-colour palette so the two never collide).
+/// 240-colour palette so the two never collide). Matches 3DS COL_CARD_OPAQUE
+/// dark panel + white text.
 static DETAIL_TEXT_PALETTE: Palette16 = const {
     let mut palette = [Rgb15::BLACK; 16];
     palette[0] = Rgb15::BLACK;
     palette[1] = Rgb15::WHITE;
+    palette[2] = Rgb::new(26, 35, 50).to_rgb15(); // zone fill behind text
     palette[6] = Rgb::new(160, 174, 192).to_rgb15(); // dim
     Palette16::new(palette)
 };
 
 impl<'a> Display<'a> {
-    pub fn new(gfx: Graphics<'a>) -> Self {
-        gfx.set_background_palette(0, &TEXT_PALETTE);
+    pub fn new(mut gfx: Graphics<'a>) -> Self {
+        // Master 240-colour palette for all card fronts (8bpp BG, indices 0-239)
+        // Loaded once here, not per-frame, to avoid mid-frame palette writes
+        // flashing the backdrop (black rectangle top left).
+        for i in 0..240 {
+            let v = MASTER_PAL[i * 2] as u16 | ((MASTER_PAL[i * 2 + 1] as u16) << 8);
+            gfx.set_background_palette_colour_256(i, Rgb15::new(v));
+        }
+        gfx.set_background_palette(15, &TEXT_PALETTE);
         Display {
             gfx,
             buf: String::new(),
             last: String::new(),
+            detail_active: false,
         }
     }
 
@@ -96,17 +120,17 @@ impl<'a> Display<'a> {
         }
     }
 
-    /// Place a glyph (one tile row tall) at (tx, ty); returns its width in tiles.
+    /// Place a 16px (2x2 tile) glyph at (tx, ty); returns its width in tiles.
     fn place_glyph(bg: &mut RegularBackground, ts: &TileSet, e: TileEffect, ch: char, tx: i32, ty: i32) -> i32 {
         let (idx, cols) = Self::glyph(ch);
         bg.set_tile((tx, ty), ts, TileSetting::new(idx as u16, e));
-        if cols == 2 {
-            bg.set_tile((tx + 1, ty), ts, TileSetting::new((idx + 1) as u16, e));
-        }
+        bg.set_tile((tx + 1, ty), ts, TileSetting::new((idx + 1) as u16, e));
+        bg.set_tile((tx, ty + 1), ts, TileSetting::new((idx + 2) as u16, e));
+        bg.set_tile((tx + 1, ty + 1), ts, TileSetting::new((idx + 3) as u16, e));
         cols as i32
     }
 
-    /// Render one line of 8px text at (tx0, ty), clipped to COLS.
+    /// Render one line of 16px text at (tx0, ty), clipped to COLS.
     fn blit_line(bg: &mut RegularBackground, ts: &TileSet, e: TileEffect, text: &str, tx0: i32, ty: i32) {
         let mut tx = tx0;
         for ch in text.chars() {
@@ -120,18 +144,23 @@ impl<'a> Display<'a> {
 
     /// Render the integrated board: 8bpp shared-palette card art on an
     /// 8bpp BG underneath a 4bpp text/UI BG, as Tonc/butano recommend for
-    /// many colourful tiles (one 256-colour master palette vs per-tile banks).
+    /// many colourful tiles (one 240-colour master palette + bank 15 for text).
     pub fn render_board_frame(&mut self, frame: &BoardFrame) {
         self.last = self.buf.clone();
-        // Master 256-colour palette for all card fronts (8bpp BG)
-        for i in 0..256 {
-            let v = MASTER_PAL[i * 2] as u16 | ((MASTER_PAL[i * 2 + 1] as u16) << 8);
-            self.gfx.set_background_palette_colour_256(i, Rgb15::new(v));
+        if self.detail_active {
+            // Detail view overwrote 0-239 with per-card palette — restore master
+            for i in 0..240 {
+                let v = MASTER_PAL[i * 2] as u16 | ((MASTER_PAL[i * 2 + 1] as u16) << 8);
+                self.gfx.set_background_palette_colour_256(i, Rgb15::new(v));
+            }
+            self.detail_active = false;
         }
-        self.gfx.set_background_palette(0, &TEXT_PALETTE);
+        // TEXT_PALETTE may have been overwritten by detail view's
+        // DETAIL_TEXT_PALETTE — restore it
+        self.gfx.set_background_palette(15, &TEXT_PALETTE);
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
-        let e0 = TileEffect::new(false, false, 0);
+        let e0 = TileEffect::new(false, false, 15);
 
         let mut art_bg = RegularBackground::new(
             Priority::P1,
@@ -144,14 +173,22 @@ impl<'a> Display<'a> {
             TileFormat::FourBpp,
         );
 
-        // Header + action counter (top-right) on text BG
+        // Solid board background on ui BG so gaps/margins are dark blue, not
+        // backdrop black. Card interiors will be cleared to transparent per-slot
+        // so the 8bpp art underneath shows through.
+        for ty in 0..ROWS {
+            for tx in 0..COLS {
+                ui_bg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e0));
+            }
+        }
         Self::blit_line(&mut ui_bg, &font_ts, e0, &frame.header, 0, 0);
         Self::blit_line(&mut ui_bg, &font_ts, e0, &frame.action_count, COLS - 6, 0);
 
-        // Stage rows: opponent then player, info lines in the right column.
+        // Stage rows: opponent then player, live zone + info in the right column.
         for (row, y) in STAGE_YS.iter().enumerate() {
             let y = *y;
             let stage = if row == 0 { &frame.p2_stage } else { &frame.p1_stage };
+            let live = if row == 0 { &frame.p2_live } else { &frame.p1_live };
             for (i, slot) in stage.iter().enumerate() {
                 let x = 1 + STAGE_PITCH * i as i32;
                 draw_slot(
@@ -164,13 +201,28 @@ impl<'a> Display<'a> {
                     x,
                     y,
                     STAGE_CARD,
-                    UI_EMPTY_STAGE,
                     STAGE_FRONTS,
                 );
             }
+            // Live/success zone: 3 mini cards (16x16) at the stage's right
+            for (i, slot) in live.iter().enumerate() {
+                let x = INFO_X + LIVE_PITCH * i as i32;
+                draw_slot(
+                    &mut art_bg,
+                    &mut ui_bg,
+                    &ui_ts,
+                    &font_ts,
+                    e0,
+                    slot,
+                    x,
+                    y,
+                    LIVE_CARD,
+                    LIVE_FRONTS,
+                );
+            }
             let info = if row == 0 { &frame.p2_info } else { &frame.p1_info };
-            Self::blit_line(&mut ui_bg, &font_ts, e0, &info[0], INFO_X, y);
-            Self::blit_line(&mut ui_bg, &font_ts, e0, &info[1], INFO_X, y + 2);
+            Self::blit_line(&mut ui_bg, &font_ts, e0, &info[0], INFO_X, y + 2);
+            Self::blit_line(&mut ui_bg, &font_ts, e0, &info[1], INFO_X, y + 4);
         }
 
         // Hand window; a gold badge marks more cards off-screen right.
@@ -186,7 +238,6 @@ impl<'a> Display<'a> {
                 x,
                 HAND_Y,
                 HAND_CARD,
-                UI_EMPTY_HAND,
                 CARD_FRONTS,
             );
         }
@@ -198,25 +249,17 @@ impl<'a> Display<'a> {
             );
         }
 
-        // Hand cursor: white marker in the gap column left of the cursored
-        // card (over its top-left tile for the first slot).
+        // Hand cursor: small white marker on the top-left corner of the
+        // cursored card (overlay on the card itself, not in the gap — so the
+        // first card doesn't get covered by a gap tile and more cards fit).
         if let Some(w) = frame.hand_cursor {
             let x = HAND_PITCH * w as i32;
-            let mx = if w == 0 { x } else { x - 1 };
-            ui_bg.set_tile((mx, HAND_Y), &ui_ts, TileSetting::new(UI_MARKER, e0));
+            ui_bg.set_tile((x, HAND_Y), &ui_ts, TileSetting::new(UI_MARKER, e0));
         }
 
-        // Action bar pinned to the bottom: selected action + control hints.
+        // Action bar pinned to the bottom (single 16px line; hint lives in header).
         let bar = alloc::format!("> {}", frame.action_line);
-        Self::blit_line(&mut ui_bg, &font_ts, e0, &bar, 0, BAR_ROWS[0]);
-        Self::blit_line(
-            &mut ui_bg,
-            &font_ts,
-            e0,
-            "Select:actions R:card L:text",
-            0,
-            BAR_ROWS[1],
-        );
+        Self::blit_line(&mut ui_bg, &font_ts, e0, &bar, 0, BAR_Y);
 
         let mut f = self.gfx.frame();
         art_bg.show(&mut f);
@@ -242,11 +285,11 @@ impl<'a> Display<'a> {
         Self::blit_line(&mut tbg, &font_ts, e, "ACTIONS  [Select: Board]", 0, 0);
         let mut row = 2i32;
         for line in self.buf.split('\n') {
-            if row >= ROWS {
+            if row + 2 > ROWS {
                 break;
             }
             Self::blit_line(&mut tbg, &font_ts, e, line, 0, row);
-            row += FONT_TILE_ROWS as i32;
+            row += 2;
         }
 
         let mut f = self.gfx.frame();
@@ -256,8 +299,11 @@ impl<'a> Display<'a> {
 
     /// Render a card-detail view: 8bpp art on a P0 background (indices 0-239)
     /// with 4bpp text on P1 using palette bank 15 (indices 240-255).
-    pub fn render_card_detail(&mut self, art: Option<&CardArt>, lines: &[String]) {
+    /// `scroll` is the first visible line index — paginated like 3DS detail
+    /// (render.rs:437 lpp 10) to avoid VRAM blow-up with long ability text.
+    pub fn render_card_detail(&mut self, art: Option<&CardArt>, lines: &[String], scroll: usize) {
         self.last = self.buf.clone();
+        self.detail_active = true;
         self.gfx.set_background_palette(15, &DETAIL_TEXT_PALETTE);
         if let Some(art) = art {
             for i in 0..240 {
@@ -290,8 +336,24 @@ impl<'a> Display<'a> {
             RegularBackgroundSize::Background32x32,
             TileFormat::FourBpp,
         );
-        for (idx, line) in lines.iter().enumerate() {
-            Self::blit_line(&mut tbg, &font_ts, e_text, line, 13, idx as i32);
+        // Dark panel behind ability text like 3DS COL_CARD_OPAQUE (render.rs:498)
+        let ui_ts = unsafe { TileSet::new(BOARD_UI, TileFormat::FourBpp) };
+        for ty in 0..ROWS {
+            for tx in 13..COLS {
+                tbg.set_tile((tx, ty), &ui_ts, TileSetting::new(UI_EMPTY, e_text));
+            }
+        }
+        const VISIBLE: usize = 8;
+        let end = (scroll + VISIBLE).min(lines.len());
+        for (i, line) in lines[scroll..end].iter().enumerate() {
+            Self::blit_line(&mut tbg, &font_ts, e_text, line, 13, i as i32 * 2);
+        }
+        // Scroll indicators like 3DS detail (render.rs:568)
+        if scroll > 0 {
+            Self::blit_line(&mut tbg, &font_ts, e_text, "^", 29, 0);
+        }
+        if end < lines.len() {
+            Self::blit_line(&mut tbg, &font_ts, e_text, "v", 29, 18);
         }
         tbg.show(&mut f);
         f.commit();
@@ -318,15 +380,15 @@ impl<'a> Display<'a> {
         for ch in self.buf.chars() {
             if ch == '\n' {
                 tx = 0;
-                ty += FONT_TILE_ROWS as i32;
+                ty += 2;
                 continue;
             }
             let (_, cols) = Self::glyph(ch);
             if tx + cols as i32 > COLS {
                 tx = 0;
-                ty += FONT_TILE_ROWS as i32;
+                ty += 2;
             }
-            if ty + FONT_TILE_ROWS as i32 > ROWS {
+            if ty + 2 > ROWS {
                 break;
             }
             tx += Self::place_glyph(&mut bg, &tileset, e, ch, tx, ty);
@@ -342,9 +404,9 @@ impl<'a> Display<'a> {
     }
 }
 
-/// Draw one card slot: 8bpp shared-palette front art on the art BG (or an
-/// empty slot on the text BG), plus the gold badge in the right gap column
-/// when the card has valid actions.
+/// Draw one card slot: 8bpp shared-palette front art on the art BG (or a
+/// solid gray slot on the text BG), plus the gold badge in the right gap
+/// column when the card has valid actions.
 fn draw_slot(
     art_bg: &mut RegularBackground,
     ui_bg: &mut RegularBackground,
@@ -355,18 +417,13 @@ fn draw_slot(
     x: i32,
     y: i32,
     card: (i32, i32),
-    empty_base: u16,
     fronts: &[crate::card_art_gen::CardFront],
     ) {
     let (cols, rows) = card;
     let mut empty = |bg: &mut RegularBackground| {
         for ty in 0..rows {
             for tx in 0..cols {
-                bg.set_tile(
-                    (x + tx, y + ty),
-                    ui_ts,
-                    TileSetting::new(empty_base + (ty * cols + tx) as u16, e0),
-                );
+                bg.set_tile((x + tx, y + ty), ui_ts, TileSetting::new(UI_EMPTY, e0));
             }
         }
     };
@@ -381,6 +438,8 @@ fn draw_slot(
                             &ts,
                             TileSetting::new((ty * cols + tx) as u16, TileEffect::new(false, false, 0)),
                         );
+                        // Clear ui_bg so card art shows through (ui is in front)
+                        ui_bg.set_tile((x + tx, y + ty), &ui_ts, TileSetting::BLANK);
                     }
                 }
             }
