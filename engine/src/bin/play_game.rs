@@ -9,13 +9,13 @@ use std::sync::Arc;
 fn main() {
     let cards_path = std::path::Path::new("../cards/cards.json");
     let cards = card_loader::CardLoader::load_cards_from_file(cards_path).unwrap();
-    let db = Arc::new(CardDatabase::load_or_create(cards));
+    let mut db = Arc::new(CardDatabase::load_or_create(cards));
 
     let deck_path = std::path::Path::new("../web_ui/decks/fade deck.txt");
     let deck = DeckParser::parse_deck_file(deck_path).unwrap();
     let card_numbers = DeckParser::deck_list_to_card_numbers(&deck);
 
-    let (t1, t2) = game_setup::build_two_decks(&db, &card_numbers, &card_numbers).unwrap();
+    let (t1, t2) = game_setup::build_two_decks(&mut db, &card_numbers, &card_numbers).unwrap();
 
     let mut gs = rabuka_engine::bin_common::deal_game(
         &db,

@@ -30,7 +30,7 @@ struct Step {
 fn main() {
     let cards_path = std::path::Path::new("../cards/cards.json");
     let cards = card_loader::CardLoader::load_cards_from_file(cards_path).unwrap();
-    let db = Arc::new(CardDatabase::load_or_create(cards));
+    let mut db = Arc::new(CardDatabase::load_or_create(cards));
 
     let deck_path = std::path::Path::new("../web_ui/decks/fade deck.txt");
     let deck = DeckParser::parse_deck_file(deck_path).unwrap();
@@ -54,7 +54,7 @@ fn main() {
     }
 
     let (mut t1, mut t2) =
-        game_setup::build_two_decks(&db, &card_numbers, &card_numbers).unwrap();
+        game_setup::build_two_decks(&mut db, &card_numbers, &card_numbers).unwrap();
 
     let mut out = File::create(&out_path).expect("create output");
     let state_dim = EncodedState::state_dim();

@@ -1161,7 +1161,7 @@ impl GameState {
         cause_player_id: &str,
         effect_only: bool,
     ) {
-        self.movement_event_counter += 1;
+        self.movement_event_counter = self.movement_event_counter.wrapping_add(1);
         let event = crate::types::MovementEvent {
             moved_card_id,
             source_zone: crate::types::ZoneId::from_str(source_zone),

@@ -14,7 +14,7 @@ use rabuka_engine::turn::TurnEngine;
 fn main() {
     let cards_path = std::path::Path::new("../cards/cards.json");
     let cards = card_loader::CardLoader::load_cards_from_file(cards_path).expect("cards.json");
-    let card_database = Arc::new(CardDatabase::load_or_create(cards));
+    let mut card_database = Arc::new(CardDatabase::load_or_create(cards));
 
     let deck_path = std::path::Path::new("../web_ui/decks/fade deck.txt");
     let deck = DeckParser::parse_deck_file(deck_path).expect("fade deck");
@@ -24,7 +24,7 @@ fn main() {
     let cn2 = card_numbers.clone();
 
     let (t1, t2) =
-        game_setup::build_two_decks(&card_database, &cn1, &cn2).expect("p1/p2 decks");
+        game_setup::build_two_decks(&mut card_database, &cn1, &cn2).expect("p1/p2 decks");
 
     let num_games: u32 = std::env::args()
         .nth(1)
@@ -37,7 +37,7 @@ fn main() {
     let mut out = File::create(&out_path).expect("create output file");
 
     let bot = weights_path.as_ref().map(|wp| {
-        let mut b = Bot::new(Arc::clone(&card_database), 0, &card_numbers, &card_numbers);
+        let mut b = Bot::new_fair(Arc::clone(&card_database), 0, &card_numbers);
         b.network.load_weights(wp).expect("load weights");
         eprintln!("Using bot with weights from {}", wp);
         b

@@ -12,7 +12,7 @@ use rabuka_engine::turn::TurnEngine;
 fn main() {
     let cards_path = std::path::Path::new("../cards/cards.json");
     let cards = card_loader::CardLoader::load_cards_from_file(cards_path).unwrap();
-    let db = Arc::new(CardDatabase::load_or_create(cards));
+    let mut db = Arc::new(CardDatabase::load_or_create(cards));
 
     let deck_path = std::path::Path::new("../web_ui/decks/fade deck.txt");
     let deck = DeckParser::parse_deck_file(deck_path).unwrap();
@@ -27,7 +27,7 @@ fn main() {
         .unwrap_or_else(|| "../train_data.bin".into());
 
     let (t1, t2) =
-        game_setup::build_two_decks(&db, &card_numbers, &card_numbers).unwrap();
+        game_setup::build_two_decks(&mut db, &card_numbers, &card_numbers).unwrap();
 
     let mut out = File::create(&out_path).unwrap();
     let mut total: u64 = 0;

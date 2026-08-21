@@ -187,7 +187,7 @@ pub struct GameState {
     /// (e.g. "member card went from live_card_zone to discard this turn").
     pub turn_movements: SmallVec<[MovementEvent; 8]>,
     /// Counter for assigning unique timestamps to MovementEvents within a turn.
-    pub movement_event_counter: u8,
+    pub movement_event_counter: u16,
     /// Snapshot of target cards' orientations taken before a change_state
     /// effect executes. Compared after the effect to detect actual transitions.
     /// None = no snapshot active.

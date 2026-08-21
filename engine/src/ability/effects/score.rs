@@ -1,7 +1,7 @@
 use super::super::enums::Zone;
 use super::super::resolver::AbilityResolver;
 use super::super::util;
-use crate::card::AbilityEffect;
+use crate::card::{AbilityEffect, CardDatabase};
 use crate::game_state::GameState;
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -137,6 +137,17 @@ impl AbilityResolver {
                         .copied()
                         .collect();
                     ids.extend(player.stage.stage.iter().filter(|&&id| id != -1).copied());
+                    // self_target on a live-card ability: the activating card is
+                    // the score recipient by definition, wherever it currently
+                    // lives (hand during LiveStart trigger setup, etc.). Include
+                    // it so the pool can never miss its own target.
+                    if self_target {
+                        if let Some(act) = gs.activating_card {
+                            if !ids.contains(&act) {
+                                ids.push(act);
+                            }
+                        }
+                    }
                     ids
                 }
             };
@@ -147,13 +158,13 @@ impl AbilityResolver {
                         return false;
                     }
                     if self_target {
-                        if let Some(activating_id) = self.activating_card_id {
-                            if card_id != activating_id {
-                                return false;
-                            }
+                        match self.activating_card_id {
+                            Some(activating_id) => card_id == activating_id,
+                            None => false,
                         }
+                    } else {
+                        true
                     }
-                    true
                 })
                 .map(|&card_id| {
                     let delta = match operation.as_str() {
@@ -278,6 +289,13 @@ impl AbilityResolver {
         let max = effect.max.unwrap_or(false);
         let repeat_limit = effect.repeat_limit_any().map(|v| v as u8);
         let per_unit_heart_colors = effect.per_unit_heart_colors_any();
+        let distinct = effect.distinct_any();
+        let is_distinct_names = matches!(
+            distinct,
+            Some(crate::card::DistinctType::CardName)
+                | Some(crate::card::DistinctType::True)
+                | Some(crate::card::DistinctType::Distinct)
+        );
         if per_unit {
             let card_db = &gs.card_database;
             let player = gs.resolve_target_player(target);
@@ -339,6 +357,7 @@ impl AbilityResolver {
                 };
                 let activating_id = gs.activating_card;
                 let mut count = 0u8;
+                let mut seen_names: crate::HashSet<String> = crate::HashSet::default();
                 for &card_id in &cards {
                     if exclude_self {
                         if activating_id == Some(card_id) {
@@ -348,6 +367,24 @@ impl AbilityResolver {
                     if let Some(g) = group_name {
                         if !util::card_matches_group_str(card_db, card_id, Some(g)) {
                             continue;
+                        }
+                    }
+                    // distinct="card_name": duplicate-named members count as ONE unit
+                    // (e.g. "名前の異なる『CatChu!』のメンバー1人につき")
+                    if is_distinct_names {
+                        match card_db.get_card(card_id) {
+                            Some(card) => {
+                                let names = card_db.get_card_names(card_id);
+                                let key = if names.is_empty() {
+                                    CardDatabase::normalize_name(&card.name)
+                                } else {
+                                    names.iter().cloned().collect::<Vec<_>>().join("|")
+                                };
+                                if !seen_names.insert(key) {
+                                    continue;
+                                }
+                            }
+                            None => continue,
                         }
                     }
                     if let Some(tc) = timing_condition {

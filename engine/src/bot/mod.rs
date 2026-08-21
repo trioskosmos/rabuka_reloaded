@@ -1,15 +1,21 @@
 mod determinization;
 pub mod encoding;
 pub mod evaluation;
-mod ismcts;
+pub mod ismcts;
 pub mod neural;
 mod observation;
+pub mod strategy;
+pub mod strategy_v2;
 pub mod weights;
 
 pub use ismcts::search;
 pub use ismcts::search_1ply;
 pub use neural::PolicyNet;
 pub use observation::PublicObservation;
+pub use strategy::{choose_action_heuristic, choose_live_set_action, evaluate_state, StrategyWeights};
+pub use strategy_v2::{
+    choose_action_heuristic_v2, choose_live_set_action_v2, choose_mulligan_action_v2, V2Policy,
+};
 
 use crate::card::CardDatabase;
 use crate::game_setup::{Action, ActionType};
@@ -17,12 +23,17 @@ use crate::game_state::GameState;
 use crate::Arc;
 
 use determinization::DeterminizationSampler;
+
 pub struct BotConfig {
     pub iterations: u32,
     pub exploration_constant: f64,
     pub progressive_widening_k: f64,
     pub rollout_depth: u32,
     pub use_heuristic_rollout: bool,
+    /// Tournament open-lists mode: sample the opponent's hidden cards from
+    /// their actual deck list. Default false — the bot must not use
+    /// information a fair player would not have.
+    pub open_decklists: bool,
 }
 
 impl Default for BotConfig {
@@ -33,6 +44,7 @@ impl Default for BotConfig {
             progressive_widening_k: 5.0,
             rollout_depth: 9999,
             use_heuristic_rollout: true,
+            open_decklists: false,
         }
     }
 }
@@ -46,13 +58,14 @@ pub struct Bot {
 }
 
 impl Bot {
-    pub fn new(
+    /// Fair bot: only our own deck list is used; the opponent's hidden cards
+    /// are sampled anonymously.
+    pub fn new_fair(
         card_database: Arc<CardDatabase>,
         perspective_player: u8,
         our_deck: &[String],
-        opp_deck: &[String],
     ) -> Self {
-        let sampler = DeterminizationSampler::new(Arc::clone(&card_database), our_deck, opp_deck);
+        let sampler = DeterminizationSampler::new_fair(Arc::clone(&card_database), our_deck);
         Self {
             config: BotConfig::default(),
             card_database,
@@ -60,6 +73,27 @@ impl Bot {
             sampler,
             network: PolicyNet::new(),
         }
+    }
+
+    /// Open-lists bot (research/tournament mode): also uses the opponent's
+    /// deck list for determinization.
+    pub fn new(
+        card_database: Arc<CardDatabase>,
+        perspective_player: u8,
+        our_deck: &[String],
+        opp_deck: &[String],
+    ) -> Self {
+        let sampler =
+            DeterminizationSampler::new(Arc::clone(&card_database), our_deck, opp_deck);
+        let mut bot = Self {
+            config: BotConfig::default(),
+            card_database,
+            perspective_player,
+            sampler,
+            network: PolicyNet::new(),
+        };
+        bot.config.open_decklists = true;
+        bot
     }
 
     pub fn choose_action(&self, state: &GameState) -> Action {

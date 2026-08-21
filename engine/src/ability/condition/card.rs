@@ -919,8 +919,8 @@ impl<'a> ConditionContext<'a> {
                                 group_name.is_none()
                                     || util::card_matches_group_str(card_db, cid, group_name)
                             })
-                            .filter_map(|&cid| card_db.get_card(cid))
-                            .map(|card| {
+                            .filter_map(|&cid| card_db.get_card(cid).map(|card| (cid, card)))
+                            .map(|(cid, card)| {
                                 card.need_heart
                                     .as_ref()
                                     .map(|nh| {
@@ -928,7 +928,17 @@ impl<'a> ConditionContext<'a> {
                                             .map(|color_str| {
                                                 let color =
                                                     crate::card::parse_heart_color(color_str);
-                                                nh.hearts.get(&color).copied().unwrap_or(0) as u8
+                                                // Base need_heart + live modifier (e.g.
+                                                // ディストーション reduces heart00 / adds
+                                                // heart02 per CatChu member before this gate)
+                                                let base =
+                                                    nh.hearts.get(&color).copied().unwrap_or(0)
+                                                        as i32;
+                                                let modifier = self
+                                                    .game_state
+                                                    .mods
+                                                    .get_need_heart_modifier(cid, color);
+                                                (base + modifier).max(0) as u8
                                             })
                                             .sum::<u8>()
                                     })
@@ -955,12 +965,19 @@ impl<'a> ConditionContext<'a> {
                                     group_name.is_none()
                                         || util::card_matches_group_str(card_db, cid, group_name)
                                 })
-                                .filter_map(|&cid| card_db.get_card(cid))
-                                .map(|card| {
-                                    card.need_heart
+                                .filter_map(|&cid| card_db.get_card(cid).map(|card| (cid, card)))
+                                .map(|(cid, card)| {
+                                    let base = card
+                                        .need_heart
                                         .as_ref()
-                                        .map(|nh| nh.hearts.get(&color).copied().unwrap_or(0) as u8)
-                                        .unwrap_or(0)
+                                        .and_then(|nh| nh.hearts.get(&color))
+                                        .copied()
+                                        .unwrap_or(0) as i32;
+                                    let modifier = self
+                                        .game_state
+                                        .mods
+                                        .get_need_heart_modifier(cid, color);
+                                    (base + modifier).max(0) as u8
                                 })
                                 .sum();
                             total >= threshold

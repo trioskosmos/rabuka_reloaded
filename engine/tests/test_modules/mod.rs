@@ -1,6 +1,7 @@
 ﻿pub mod ability_engine_fixes_test;
 pub mod ability_from_source_test;
 pub mod abundant_test;
+pub mod strategy_bot_test;
 pub mod action_coverage_test;
 pub mod angelic_angel_test;
 pub mod aurora_flower_identity_test;
@@ -399,6 +400,8 @@ pub mod keke_pb2_013_debut_test;
 // CatChu! per-unit energy activation (PL!SP-pb2-018-R)
 pub mod catchu_energy_activation_test;
 pub mod live_cards_disappear_test;
+// §5.5: ディストーション per-unit need-heart modification + score gate (PL!SP-pb2-048-L)
+pub mod distortion_need_hearts_test;
 
 // Q176: 蝨堤伐豬ｷ譛ｪ pb1-013 窶・opponent picks from your hand blind, reveal live 竊・+1 score
 pub mod umi_pb1_013_test;

@@ -10,7 +10,11 @@ use super::observation::{PlayerView, PublicObservation};
 pub struct DeterminizationSampler {
     card_database: Arc<CardDatabase>,
     our_pool: Vec<String>,
-    opp_pool: Vec<String>,
+    /// `Some(list)` = tournament open-lists mode (opponent's actual deck).
+    /// `None` = fair mode: opponent hidden cards are sampled from an
+    /// anonymous pool of all Member/Live cards in the database, minus what
+    /// their public zones reveal.
+    opp_pool: Option<Vec<String>>,
     energy_ids: Vec<i16>,
 }
 
@@ -20,8 +24,25 @@ impl DeterminizationSampler {
         our_card_numbers: &[String],
         opp_card_numbers: &[String],
     ) -> Self {
+        Self::with_policy(
+            card_database,
+            our_card_numbers,
+            Some(opp_card_numbers),
+        )
+    }
+
+    /// Fair sampler: does not use the opponent's deck list.
+    pub fn new_fair(card_database: Arc<CardDatabase>, our_card_numbers: &[String]) -> Self {
+        Self::with_policy(card_database, our_card_numbers, None)
+    }
+
+    pub fn with_policy(
+        card_database: Arc<CardDatabase>,
+        our_card_numbers: &[String],
+        opp_card_numbers: Option<&[String]>,
+    ) -> Self {
         let our_pool = our_card_numbers.to_vec();
-        let opp_pool = opp_card_numbers.to_vec();
+        let opp_pool = opp_card_numbers.map(|c| c.to_vec());
 
         let mut energy_ids: Vec<i16> = card_database
             .cards
@@ -40,8 +61,13 @@ impl DeterminizationSampler {
     }
 
     pub fn sample(&self, obs: &PublicObservation) -> GameState {
-        let my_player = self.build_player(&obs.me, &self.our_pool);
-        let opp_player = self.build_player(&obs.opp, &self.opp_pool);
+        let my_player = self.build_player(&obs.me, Some(&self.our_pool));
+        let opp_player = self
+            .opp_pool
+            .as_ref()
+            .map(|v| &v[..])
+            .map(|pool| self.build_player(&obs.opp, Some(pool)))
+            .unwrap_or_else(|| self.build_player(&obs.opp, None));
 
         let mut gs = GameState::new(my_player, opp_player, Arc::clone(&self.card_database));
         gs.current_phase = obs.current_phase.clone();
@@ -53,7 +79,7 @@ impl DeterminizationSampler {
         gs
     }
 
-    fn build_player(&self, view: &PlayerView, starting_pool: &[String]) -> Player {
+    fn build_player(&self, view: &PlayerView, starting_pool: Option<&[String]>) -> Player {
         let mut player = Player::new(String::new(), String::new(), view.is_first_attacker);
 
         for &cid in &view.hand {
@@ -118,10 +144,28 @@ impl DeterminizationSampler {
             count_seen(cid);
         }
 
-        // Compute remaining pool: starting_pool minus seen_counts
+        // Compute remaining pool: starting_pool minus seen_counts.
+        // In fair mode (no deck list) assume up to MAX_COPIES of every
+        // non-energy card in the database, minus what public zones reveal.
+        const MAX_COPIES: usize = 4;
         let mut starting_counts: HashMap<String, usize> = HashMap::default();
-        for cn in starting_pool {
-            *starting_counts.entry(cn.clone()).or_insert(0) += 1;
+        match starting_pool {
+            Some(list) => {
+                for cn in list {
+                    *starting_counts.entry(cn.clone()).or_insert(0) += 1;
+                }
+            }
+            None => {
+                for card in self.card_database.cards.values() {
+                    if matches!(card.card_type, crate::card::CardType::Energy) {
+                        continue;
+                    }
+                    let entry = starting_counts.entry(card.card_no.to_string()).or_insert(0);
+                    if *entry < MAX_COPIES {
+                        *entry += 1;
+                    }
+                }
+            }
         }
         let mut remaining: Vec<String> = Vec::new();
         for (cn, total) in starting_counts {
@@ -155,10 +199,18 @@ impl DeterminizationSampler {
         }
         // Pad if deck is still too small (extra copies of available cards)
         while player.main_deck.cards.len() < view.main_deck_size {
-            if let Some(first) = starting_pool.first() {
-                if let Some(&cid) = self.card_database.card_no_to_id.get(first) {
-                    player.main_deck.cards.push(cid);
+            let pad_cn = starting_pool
+                .and_then(|l| l.first().cloned())
+                .or_else(|| self.fallback_card_no());
+            match pad_cn {
+                Some(cn) => {
+                    if let Some(&cid) = self.card_database.card_no_to_id.get(&cn) {
+                        player.main_deck.cards.push(cid);
+                    } else {
+                        break;
+                    }
                 }
+                None => break,
             }
         }
 
@@ -173,5 +225,14 @@ impl DeterminizationSampler {
         }
 
         player
+    }
+
+    /// Any non-energy card_no, used to pad undersized decks in fair mode.
+    fn fallback_card_no(&self) -> Option<String> {
+        self.card_database
+            .cards
+            .values()
+            .find(|c| !matches!(c.card_type, crate::card::CardType::Energy))
+            .map(|c| c.card_no.to_string())
     }
 }

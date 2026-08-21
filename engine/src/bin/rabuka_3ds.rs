@@ -20,7 +20,7 @@ fn main() {
         }
     };
 
-    let card_database = Arc::new(rabuka_engine::card::CardDatabase::load_or_create(cards));
+    let mut card_database = Arc::new(rabuka_engine::card::CardDatabase::load_or_create(cards));
 
     let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
         Ok(d) => d,
@@ -44,7 +44,7 @@ fn main() {
 
     let player1_deck;
     let player2_deck;
-    match game_setup::build_two_decks(&card_database, &card_numbers1, &card_numbers2) {
+    match game_setup::build_two_decks(&mut card_database, &card_numbers1, &card_numbers2) {
         Ok((mut d1, mut d2)) => {
             d1.shuffle_main_deck();
             d1.shuffle_energy_deck();

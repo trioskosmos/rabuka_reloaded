@@ -12,16 +12,16 @@ use rabuka_engine::turn::TurnEngine;
 fn main() {
     let cards_path = std::path::Path::new("../cards/cards.json");
     let cards = card_loader::CardLoader::load_cards_from_file(cards_path).unwrap();
-    let card_database = Arc::new(CardDatabase::load_or_create(cards));
+    let mut card_database = Arc::new(CardDatabase::load_or_create(cards));
 
     let deck_path = std::path::Path::new("../web_ui/decks/fade deck.txt");
     let deck = DeckParser::parse_deck_file(deck_path).unwrap();
     let card_numbers = DeckParser::deck_list_to_card_numbers(&deck);
 
     let (t1, t2) =
-        game_setup::build_two_decks(&card_database, &card_numbers, &card_numbers).unwrap();
+        game_setup::build_two_decks(&mut card_database, &card_numbers, &card_numbers).unwrap();
 
-    let mut bot = Bot::new(Arc::clone(&card_database), 0, &card_numbers, &card_numbers);
+    let mut bot = Bot::new_fair(Arc::clone(&card_database), 0, &card_numbers);
     let weights_path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "../td_weights.bin".into());

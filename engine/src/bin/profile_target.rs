@@ -94,17 +94,17 @@ fn main() {
     let cards_path = std::path::Path::new("../cards/cards.json");
     let cards =
         card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
-    let card_database = Arc::new(CardDatabase::load_or_create(cards));
+    let mut card_database = Arc::new(CardDatabase::load_or_create(cards));
 
     let deck_lists = deck_parser::DeckParser::parse_all_decks().expect("Failed to load decks");
     let deck = &deck_lists[0];
     let card_numbers = deck_parser::DeckParser::deck_list_to_card_numbers(deck);
 
-    let (p1_template, p2_template) = game_setup::build_two_decks(&card_database, &card_numbers, &card_numbers)
+    let (p1_template, p2_template) = game_setup::build_two_decks(&mut card_database, &card_numbers, &card_numbers)
         .expect("Failed to build decks");
 
     let mut total_actions = 0u64;
-    let mut outcomes: std::collections::HashMap<String, u8> = std::collections::HashMap::default();
+    let mut outcomes: std::collections::HashMap<String, u32> = std::collections::HashMap::default();
     let mut p1_first_count = 0u32;
     let num_games = 5000;
     for _ in 0..num_games {

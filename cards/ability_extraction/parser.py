@@ -2286,7 +2286,16 @@ _register_action(
 )
 _register_action(
     ActionRule(
-        match_any=["必要ハート", "ハートを増やす", "ハートを減らす"],
+        match_any=[
+            "必要ハート",
+            "ハートを増やす",
+            "ハートを減らす",
+            # Continuative/fragment forms: "heart02増やす" after a 、-split
+            # (e.g. "必要ハートをheart00×2減らし、heart02増やす")
+            "増やす",
+            "減らす",
+            "減らし",
+        ],
         action="modify_required_hearts",
     )
 )
@@ -5625,6 +5634,14 @@ def _enrich_heart_content(cond, text):
     if hc_m:
         heart_color = f"heart{hc_m.group(1).zfill(2)}"
         heart_count = int(hc_m.group(2))
+        # 必要ハート lives on the live card — the engine's aggregate-total
+        # evaluator reads need_heart from live_card_zone (+success zone).
+        # Without location the condition can't be routed to that evaluator;
+        # without aggregate="total" it counts cards instead of summing hearts.
+        if "location" not in cond:
+            cond["location"] = "live_card_zone"
+        if "aggregate" not in cond:
+            cond["aggregate"] = "total"
         # Add heart_colors to the condition if not already present
         if "heart_colors" not in cond:
             cond["heart_colors"] = [heart_color]
@@ -6163,9 +6180,15 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
                 action.pop("heart_colors", None)
                 action.pop("require_all_heart_colors", None)
     if a == "modify_required_hearts" and "operation" not in action:
-        if "減らす" in text or "減る" in text:
+        # 減らし is the continuative (連用) form used mid-sentence: "A減らし、B増やす"
+        if (
+            "減らす" in text
+            or "減らし" in text
+            or "減る" in text
+            or "減って" in text
+        ):
             action["operation"] = "decrease"
-        elif "増やす" in text or "増える" in text:
+        elif "増やす" in text or "増える" in text or "増やし" in text:
             action["operation"] = "increase"
         elif "になる" in text or "にする" in text:
             action["operation"] = "set"
@@ -6610,8 +6633,11 @@ def _try_per_unit(text):
 
     action_text = text.split("につき", 1)[1].strip().lstrip("、")
 
-    # Sequential pattern in action (Aし、B) — comma-separated
-    if "、" in action_text and "し" in action_text:
+    # Sequential pattern in action (Aし、B) — comma-separated.
+    # Skip when その後 is present: the dedicated その後 handler below must win,
+    # otherwise its conditional tail ("…が9以上の場合、スコアを+1する") gets
+    # shredded into bogus per-comma actions.
+    if "、" in action_text and "し" in action_text and "その後" not in action_text:
         parts = [p.strip().rstrip("、") for p in action_text.split("、")]
         if len(parts) >= 2 and "し" in parts[0]:
             actions = []
@@ -6723,13 +6749,27 @@ def _try_per_unit(text):
                 if len(sub_actions) >= 2:
                     fa = {"action": "sequential", "actions": sub_actions}
                     _propagate(result, fa, skip_existing=True)
+                elif len(sub_actions) == 1 and sub_actions[0].get("action") == "sequential":
+                    # Single 。-sentence that itself parsed as a nested
+                    # sequential (e.g. "A減らし、B増やす" → two mrh actions).
+                    # Use it directly instead of re-parsing the whole fa_text,
+                    # which would collapse it into one wrong action.
+                    fa = sub_actions[0]
+                    _propagate(result, fa, skip_existing=True)
                 else:
                     fa = parse_action(fa_text)
                     _propagate(result, fa)
             else:
                 fa = parse_action(fa_text)
                 _propagate(result, fa)
-            sa = parse_action(parts[1].strip())
+            # その後 tail is a full sentence, often conditional
+            # ("…が9以上の場合、スコアを+1する"). parse_effect attaches the
+            # gate condition to the action; parse_action would mis-parse the
+            # condition fragment as a bogus separate action.
+            sa_text = parts[1].strip().lstrip("、")
+            sa = parse_effect(sa_text)
+            if sa.get("action") == "custom":
+                sa = parse_action(sa_text)
             return {"text": text, "action": "sequential", "actions": [fa, sa]}
 
     # Issue 15: Extract per_unit_source from "これにより控え室に置いた" patterns

@@ -1,0 +1,67 @@
+game,turn,phase,player,action_type,card_no,description,success_p1,success_p2
+14,1,Main,random,play_member_to_stage,PL!SP-bp4-001-P,澁谷かのん → Right (cost:4),0,0
+14,1,Main,random,pass,,Pass - End Main Phase,0,0
+14,1,Main,strategy,play_member_to_stage,PL!SP-bp4-001-P,澁谷かのん → Left (cost:4),0,0
+14,1,LiveCardSetFirstAttacker,strategy,pass,,Pass - End Main Phase,0,0
+14,2,Main,random,choose_option,LL-E-001-SD,ノンフィクション!!: 複数の自動能力が同時に発動しました。使用する順番を選択してください。,0,0
+14,2,Main,random,play_member_to_stage,PL!SP-bp4-002-R,唐 可可 → Center (cost:2),0,0
+14,2,Main,random,decision,IKZL-PR-001-PR,Skip optional cost,0,0
+14,2,Main,random,pass,,Pass - End Main Phase,0,0
+14,2,Main,strategy,play_member_to_stage,PL!SP-bp2-002-P,唐 可可 → Center (cost:2),0,0
+14,2,Main,strategy,select_card,PL!SP-bp4-006-P,桜小路きな子,0,0
+14,2,Main,strategy,play_member_to_stage,PL!SP-bp4-002-R,唐 可可 → Right (cost:2),0,0
+14,2,Main,strategy,decision,LL-E-001-SD,Pay optional cost,0,0
+14,2,Main,strategy,select_card,PL!SP-pb1-026-L,Jump Into the New World,0,0
+14,2,LiveCardSetFirstAttacker,strategy,pass,,Pass - End Main Phase,0,0
+14,3,Main,random,pass,,Pass - End Main Phase,0,0
+14,3,LiveCardSetFirstAttacker,strategy,pass,,Pass - End Main Phase,0,0
+14,4,Main,random,play_member_to_stage,PL!SP-pb1-014-N,嵐 千砂都 → Center (cost:0) bt from 唐 可可,0,0
+14,4,Main,random,play_member_to_stage,PL!SP-bp1-005-P,葉月 恋 → Left (cost:2),0,0
+14,4,Main,random,select_card,PL!SP-bp2-009-P,鬼塚夏美,0,0
+14,4,Main,random,select_card,PL!SP-bp2-024-L,ビタミンSUMMER！,0,0
+14,4,Main,random,play_member_to_stage,PL!SP-bp2-002-P,唐 可可 → Right (cost:0) bt from 澁谷かのん,0,0
+14,4,Main,random,pass,,Pass - End Main Phase,0,0
+14,4,Main,strategy,play_member_to_stage,PL!SP-pb1-001-R,澁谷かのん → Left (cost:7) bt from 澁谷かのん,0,0
+14,4,Main,strategy,play_member_to_stage,PL!SP-pb1-014-N,嵐 千砂都 → Center (cost:0) bt from 唐 可可,0,0
+14,4,LiveCardSetFirstAttacker,strategy,pass,,Pass - End Main Phase,0,0
+14,4,FirstAttackerPerformance,random,choose_option,IKZL-PR-001-PR,ノンフィクション!!: 複数の自動能力が同時に発動しました。使用する順番を選択してください。,0,0
+14,4,FirstAttackerPerformance,random,select_card,PL!-pb1-018-R,矢澤にこ,0,0
+14,5,Main,random,select_card,PL!SP-bp4-006-P,桜小路きな子,0,0
+14,5,Main,random,pass,,Pass - End Main Phase,0,0
+14,5,Main,strategy,play_member_to_stage,PL!N-sd1-008-SD,エマ・ヴェルデ → Right (cost:5) bt from 唐 可可,0,0
+14,5,LiveCardSetFirstAttacker,strategy,pass,,Pass - End Main Phase,0,0
+14,5,FirstAttackerPerformance,random,choose_option,IKZL-PR-001-PR,Skip,0,0
+14,5,FirstAttackerPerformance,random,select_card,PL!-pb1-018-R,矢澤にこ,0,0
+14,6,Main,random,select_card,PL!SP-bp4-004-P＋,平安名すみれ,0,0
+14,6,Main,random,play_member_to_stage,PL!SP-pb1-001-R,澁谷かのん → Left (cost:9) bt from 葉月 恋,0,0
+14,6,Main,random,play_member_to_stage,PL!SP-bp4-002-R,唐 可可 → Center (cost:0) bt from 嵐 千砂都,0,0
+14,6,Main,random,decision,IKZL-PR-001-PR,Skip optional cost,0,0
+14,6,Main,random,pass,,Pass - End Main Phase,0,0
+14,6,Main,strategy,play_member_to_stage,PL!SP-pb1-001-R,澁谷かのん → Center (cost:9) bt from 嵐 千砂都,0,0
+14,6,LiveCardSetFirstAttacker,strategy,pass,,Pass - End Main Phase,0,0
+14,6,FirstAttackerPerformance,random,choose_option,LL-E-001-SD,澁谷かのん: 複数の自動能力が同時に発動しました。使用する順番を選択してください。,0,0
+14,6,FirstAttackerPerformance,random,select_card,PL!N-sd1-008-SD,エマ・ヴェルデ,0,0
+14,6,FirstAttackerPerformance,random,select_card,PL!SP-pb1-018-N,米女メイ,0,0
+14,6,FirstAttackerPerformance,random,choose_option,LL-E-001-SD,澁谷かのん: 複数の自動能力が同時に発動しました。使用する順番を選択してください。,0,0
+14,6,FirstAttackerPerformance,random,select_card,PL!SP-bp4-019-N,若菜四季,0,0
+14,7,Main,random,select_card,PL!SP-bp1-026-L,未来予報ハレルヤ！,0,1
+14,7,Main,random,play_member_to_stage,PL!-pb1-018-R,矢澤にこ → Right (cost:5) bt from 唐 可可,0,1
+14,7,Main,random,play_member_to_stage,PL!-pb1-018-R,矢澤にこ → Center (cost:5) bt from 唐 可可,0,1
+14,7,Main,random,play_member_to_stage,PL!SP-pb1-014-N,嵐 千砂都 → Left (cost:0) bt from 澁谷かのん,0,1
+14,7,Main,random,pass,,Pass - End Main Phase,0,1
+14,7,Main,strategy,play_member_to_stage,PL!SP-bp4-006-P,桜小路きな子 → Right (cost:6) bt from エマ・ヴェルデ,0,1
+14,7,LiveCardSetFirstAttacker,strategy,pass,,Pass - End Main Phase,0,1
+14,7,FirstAttackerPerformance,random,choose_option,IKZL-PR-001-PR,澁谷かのん: 複数の自動能力が同時に発動しました。使用する順番を選択してください。,0,1
+14,7,FirstAttackerPerformance,random,choose_option,IKZL-PR-001-PR,Skip,0,1
+14,8,Main,random,choose_option,IKZL-PR-001-PR,Skip,0,2
+14,8,Main,random,play_member_to_stage,PL!SP-bp2-009-P,鬼塚夏美 → Center (cost:6) bt from 矢澤にこ,0,2
+14,8,Main,random,play_member_to_stage,PL!SP-pb1-018-N,米女メイ → Left (cost:0) bt from 嵐 千砂都,0,2
+14,8,Main,random,play_member_to_stage,PL!N-sd1-008-SD,エマ・ヴェルデ → Right (cost:0) bt from 矢澤にこ,0,2
+14,8,Main,random,pass,,Pass - End Main Phase,0,2
+14,8,LiveCardSetFirstAttacker,strategy,pass,,Pass - End Main Phase,0,2
+14,8,FirstAttackerPerformance,random,choose_option,IKZL-PR-001-PR,澁谷かのん: 複数の自動能力が同時に発動しました。使用する順番を選択してください。,0,2
+14,8,FirstAttackerPerformance,random,choose_option,IKZL-PR-001-PR,Skip,0,2
+14,8,LiveVictoryDetermination,random,choose_option,IKZL-PR-001-PR,Skip,0,2
+14,8,LiveVictoryDetermination,random,choose_option,LL-E-001-SD,ビタミンSUMMER！: 複数の自動能力が同時に発動しました。使用する順番を選択してください。,0,2
+14,9,Main,random,select_card,PL!SP-pb1-021-N,ウィーン・マルガレーテ,0,3
+,,,,,,RESULT p1=0 p2=3,0,3

@@ -393,7 +393,35 @@ sprite VRAM. See the GBA Port section below.
 
 ---
 
-## Dreamcast Port — **Toolchain done, entry point TBD** (Jul 2026)
+## Dreamcast Port — **WORKING: boots & playable** (Aug 2026)
+
+Status: **The full engine runs on real SH-4 hardware code, booted in Flycast.**
+The rustc_codegen_gcc approach below was abandoned; the unlock was a completely
+different pipeline:
+
+```
+engine (Rust no_std) --cargo--> rabuka_wasm.wasm (2MB)
+                      --wasm2c--> rabuka_wasm.c (~20MB C)
+                      --kos-cc/sh-elf-gcc--> rabuka_dc.elf (SH-4)
+                      --mkdcdisc--> rabuka.cdi -> Flycast
+```
+
+Why it works when direct Rust didn't: wasm32 is a first-class Rust target
+(no backend problem), and wasm2c emits plain C that *any* console GCC can
+compile — the "no LLVM backend for SH-4" wall simply doesn't exist on this
+path. The same generated C compiles for Saturn (sh-elf), Jaguar (m68k-gcc,
+32-bit int default) or any other GCC target.
+
+- Playable flow: mode select -> deck select -> RPS -> mulligan -> match,
+  driven through four host imports (`host_clear_screen/host_println/
+  host_poll_buttons/host_wait_vblank`) implemented in ~200 lines of KOS C
+  (`platforms/dc/wasm/dc_main.c`: 40x28 BIOS-font text grid + maple pad).
+- One-button build: `platforms/dc/build_dc.bat` (replaces the dead
+  kos-cargo/rustc_codegen_gcc script). Setup: `platforms/dc/wasm/SETUP_WSL.md`.
+- RAM budget: ~4.3MB code+data + 6.1MB wasm linear memory = fits 16MB.
+- Flicker fix: text grid marks dirty; framebuffer redrawn once per vblank.
+
+### Historical: the abandoned rustc_codegen_gcc attempt (Jul 2026)
 
 Toolchain: working. Produces SH-4 ELF binaries.
 Status: **Entry point not reaching Rust code** due to DCE in rustc_codegen_gcc.
@@ -421,6 +449,109 @@ match what cargo fetches (0.2.186). Fixing this requires:
 Two paths to finish:
 - **A**: Patch KOS libc to include missing types → std `fn main()` works
 - **B**: Fix rustc_codegen_gcc symbol emission for no_std (upstream fix)
+
+---
+
+## The wasm2c pipeline unlocks the rest of Tier 6 (Aug 2026)
+
+The DC port proved the pattern: *any* CPU that GCC speaks can now run the engine,
+because wasm2c output is plain C. The old "Tier 6" table (rustc_codegen_gcc era)
+is obsolete — the gate is no longer "does Rust target this CPU" but two boring
+questions: **(1) does m68k/sh/whatever-GCC compile 20MB of generated C, and
+(2) does the board's RAM hold the wasm linear memory?**
+
+### Atari Jaguar — revised verdict (was: dead, RAM too small)
+
+Correcting the record from the Tier 5/6 notes above:
+
+- **Cartridge size is a non-issue.** Official spec: ROM carts up to **6MB**
+  (per the Jaguar Software Reference Manual; several commercial carts shipped at
+  4MB, Skunkboard does 8MB flash). The recurring "2MB max cart" claim confuses
+  cart ROM with the console's 2MB DRAM.
+- **Cart ROM is memory-mapped and executable-in-place.** Unlike Dreamcast, where
+  everything must fit in RAM, the ~4.3MB of generated code + baked card data can
+  stay on the cart and execute from ROM. Only the wasm linear memory needs DRAM.
+- **The real wall: 2MB DRAM vs 6.1MB linear memory** (93 pages, mostly the 4MB
+  static `HEAP` bump allocator). `HEAP` is capacity, not usage — match state +
+  scratch for a card game should be far under 1MB.
+- **Plan:** instrument `BumpAlloc` with a high-water mark (headless
+  `rabuka_wasm_match` prints it), shrink the static heap to measured usage +
+  margin, drop linear memory to ~32–48 pages. Leaves room for C stack and a
+  small framebuffer in 2MB.
+- **Gotchas:** m68k has no native 64-bit ops → wasm2c's `i64` arithmetic is
+  software-emulated at 13MHz (fine for per-turn compute). Big-endian host →
+  wasm2c memory access must use the byte-wise path or every baked `u32` blob
+  reads byteswapped (verify first with `rabuka_wasm_card_count()`). The 20MB C
+  file will need `-Os` / `-fno-tree-*` patience on m68k-gcc.
+
+Verdict: **feasible, blocked only on heap measurement.** Same generated C as DC.
+
+---
+
+## Philips CD-i — research: the most interesting wasm2c target (Aug 2026)
+
+Why interesting: it's the platform everyone wrote off, with an active (if tiny)
+homebrew scene, a real hardware download path, and — uniquely — no cartridge at
+all: the game ships on a pressed CD-R alongside the actual consoles. A card game
+is exactly the kind of title the CD-i library was full of anyway.
+
+### Hardware (consumer players, e.g. CDI 205/210/220/450)
+
+- CPU: Philips SCC68070 @ 15.5MHz — a plain 68000-compatible core, so
+  `m68k-elf-gcc` targets it directly. No custom RISC needed (Tom/Jerry-style
+  coprocessor problems don't exist here).
+- RAM: **1MB total**. This is the whole ballgame — see below.
+- Video: SCC66470/MCD 212, up to 768×560, 16-bit color; text UI trivially fine.
+- OS: CD-RTOS (Microware OS-9 derivative) in the 512KB system ROM. Homebrew
+  typically bypasses authoring tools entirely: build a bare module, load it via
+  the serial stub, run.
+- Media: CD-i disc (Green Book, CD-ROM XA sectors). Up to ~744MB per disc —
+  size is irrelevant for us.
+
+### Homebrew scene (researched Aug 2026)
+
+Small but genuinely alive:
+
+- **Hardware load path exists**: CD-i Fan's CD-i Link/Stub (cdiemu.org) loads
+  binaries into player RAM over the built-in serial port; `Slamy/cdi-serial`
+  (Rust, MIT, actively maintained — commits within days of this writing)
+  reimplements the protocol: `download app.bin --address 8000 --end --reset`,
+  plus debug terminal, NVRAM file access, FUSE mounting of `/cd` and `/nvr`.
+- **Real homebrew titles ship**: Frog Feast (2005), Super Quartet (2018),
+  Nobelia (2022). Community hub: cdinteractive.co.uk forums.
+- **Emulators for dev loop**: CD-i Emulator (CD-i Fan) and MAME (MCD212-class
+  drivers) both boot homebrew; MAME is enough for a text-mode card game.
+- Toolchain: stock `m68k-elf-gcc` + custom linker script (app loaded at
+  $8000-ish by the stub). No SDK license issues — Green Book was freed by
+  Philips (1994 version public).
+
+### Feasibility for the wasm2c pipeline
+
+Same pipeline as DC/Jaguar: `cargo → wasm32 → wasm2c → m68k-elf-gcc → serial
+download`. Two walls, one fatal-looking:
+
+1. **Code size vs 1MB RAM — the hard one.** CD-i has no XIP cartridge: the
+   program is read from CD *into* RAM. The DC build carries ~4.3MB code+data;
+   even at m68k `-Os` density that's several MB against a 1MB budget shared
+   with linear memory, stack, and framebuffer. Options, in order of promise:
+   - Compile the generated C with `-Os` + `--gc-sections` and measure honestly
+     (the 4.3MB figure includes data that could stay in CD-read rodata pages);
+   - Split the wasm module (engine core vs. content) and page content from CD
+     via OS-9 file reads between turns — a card game has natural pause points;
+   - Last resort: trim the exported surface (one entry point instead of three).
+   Honest estimate: possible but tight; this is a real engineering task, not a
+   config change.
+2. **Linear memory diet.** Same measurement exercise as Jaguar, but stricter:
+   heap + wasm linear memory + stack + framebuffer must all fit in 1MB. Target
+   ≤512KB linear memory (16–24 pages).
+
+Plus the shared gotchas: big-endian byte-wise memory access (verify with
+`rabuka_wasm_card_count()` before anything else), software-emulated `i64` at
+15.5MHz (fine for turn-based), slow compiles of the 20MB C file.
+
+Verdict: **the most charming target on the list and plausibly doable, gated on
+getting generated code size under ~700KB.** Do the heap/code-size measurements
+on the existing wasm artifact before committing — they decide everything.
 
 ---
 

@@ -255,6 +255,12 @@ fn q209_kasumi_discard_niji_live_recover_same() {
     // Play Kasumi to stage
     game.play_to_stage(kasumi, MemberArea::Center);
 
+    // Baselines BEFORE activation: the fixed-count pay_energy step is
+    // auto-paid synchronously inside the activation call.
+    let energy_before = game.state.player1.energy_zone.active_count();
+    let hand_before = game.state.player1.hand.cards.len();
+    let waitroom_before = game.state.player1.waitroom.cards.len();
+
     // Activate ability
     TurnEngine::execute_main_phase_action(
         &mut game.state,
@@ -266,27 +272,33 @@ fn q209_kasumi_discard_niji_live_recover_same() {
     )
     .expect("activate");
 
-    // Cost 1: pay 2 energy. The choice is SelectEnergy or similar.
-    // Use generated actions to pay the energy cost.
-    assert!(game.has_pending_choice(), "Kasumi activation must offer energy payment");
-    game.select_generated(0);
+    // Cost 1+2 (pay 2E, discard 1) and the retrieval effect may interleave
+    // prompts in any order depending on how the engine chains sequential_cost.
+    // The fixed-count pay_energy step is AUTO-PAID during activation (no
+    // prompt); only choice-based steps (hand discard) prompt.
 
-    // Cost 2: discard 1 card from hand (the niji_live or filler)
-    assert!(game.has_pending_choice(), "Kasumi activation must offer hand discard");
+    assert!(game.has_pending_choice(), "hand discard prompt must be pending");
     game.select_indices(&[0]); // discard first card (niji_live)
 
-    // Effect: retrieve 1 虹ヶ咲 live from waitroom
-    assert!(game.has_pending_choice(), "Kasumi retrieval select must be offered");
-    game.select_indices(&[0]); // retrieve niji_live back
-
+    // Drain any residual prompts (defensive; retrieval auto-resolves).
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
 
-    // After activation: hand had [niji_live, filler] → discard niji_live → [filler] → retrieve niji_live → [filler, niji_live]
+    // Strict outcome:
     assert!(
         game.state.player1.hand.cards.contains(&niji_live),
         "Q209: 虹ヶ咲 live card discarded as cost should be retrievable"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "hand net unchanged: -1 discard +1 retrieve"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        waitroom_before,
+        "waitroom net unchanged: +1 discard -1 retrieve"
     );
 }
 

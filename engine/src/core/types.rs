@@ -796,7 +796,7 @@ pub struct MovementEvent {
     /// Whether the move was caused by a card effect (true) vs cost/rules (false).
     pub effect_only: bool,
     /// Monotonically increasing counter for ordering events.
-    pub timestamp: u8,
+    pub timestamp: u16,
 }
 
 /// A structured record of a stage-area-to-stage-area position change.

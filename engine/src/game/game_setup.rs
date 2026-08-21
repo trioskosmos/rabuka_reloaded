@@ -293,17 +293,22 @@ pub struct DoubleBatonPair {
 /// Every engine bin previously inlined this same 6-step block; callers clone + shuffle
 /// templates per game as needed.
 pub fn build_two_decks(
-    db: &crate::compat::Arc<crate::card::CardDatabase>,
+    db: &mut crate::compat::Arc<crate::card::CardDatabase>,
     n1: &[String],
     n2: &[String],
 ) -> Result<(crate::deck_builder::Deck, crate::deck_builder::Deck), String> {
+    // NOTE: `db` must be the caller's own uniquely-referenced Arc, passed as
+    // `&mut`. The deck builders register per-copy card IDs via
+    // `Arc::make_mut`, which silently deep-clones a shared Arc and throws the
+    // copies away — leaving decks full of dangling card IDs if a temporary
+    // clone is used here (that bug made every bin-built game unplayable).
     use crate::deck_builder::DeckBuilder;
-    let mut t1 = DeckBuilder::build_deck_from_database(&mut crate::compat::Arc::clone(db), n1.to_vec())
+    let mut t1 = DeckBuilder::build_deck_from_database(db, n1.to_vec())
         .map_err(|e| format!("P1 deck: {e}"))?;
-    let mut t2 = DeckBuilder::build_deck_from_database(&mut crate::compat::Arc::clone(db), n2.to_vec())
+    let mut t2 = DeckBuilder::build_deck_from_database(db, n2.to_vec())
         .map_err(|e| format!("P2 deck: {e}"))?;
-    DeckBuilder::add_default_energy_cards_from_database(&mut t1, &mut crate::compat::Arc::clone(db)).ok();
-    DeckBuilder::add_default_energy_cards_from_database(&mut t2, &mut crate::compat::Arc::clone(db)).ok();
+    DeckBuilder::add_default_energy_cards_from_database(&mut t1, db).ok();
+    DeckBuilder::add_default_energy_cards_from_database(&mut t2, db).ok();
     Ok((t1, t2))
 }
 

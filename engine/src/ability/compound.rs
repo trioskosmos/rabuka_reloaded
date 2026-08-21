@@ -292,6 +292,28 @@ impl AbilityResolver {
                             action_to_execute
                                 .set_per_unit_type(effect.per_unit_type_any().map(|s| s.into()));
                         }
+                        // distinct rides on the per-unit wrapper for
+                        // ModifyRequiredHearts (e.g. ディストーション:
+                        // "名前の異なる『CatChu!』のメンバー1人につき" applies to BOTH the
+                        // heart00-decrease and heart02-increase sub-actions). Without
+                        // inheriting it, duplicate-named members count twice.
+                        // Deliberately NOT inherited for gain_resource — there,
+                        // distinct filters TARGET SELECTION (self_and_other patterns
+                        // carry it explicitly per-action) and blind inheritance
+                        // breaks "メンバー1人" picking.
+                        if action.action == ActionType::ModifyRequiredHearts
+                            && action_to_execute.distinct_any().is_none()
+                        {
+                            if let Some(d) = effect.distinct_any() {
+                                if let Some(f) = action_to_execute
+                                    .kind
+                                    .as_deref_mut()
+                                    .and_then(|k| k.filter_mut())
+                                {
+                                    f.distinct = Some(Box::new(d));
+                                }
+                            }
+                        }
                     }
                     // Inherit self_target from the parent effect or the first
                     // sub-action when this action doesn't have it set.

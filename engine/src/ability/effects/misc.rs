@@ -71,19 +71,11 @@ impl AbilityResolver {
             effect.blind_any().unwrap_or(false),
         )?;
 
-        if effect.is_self_target() {
-            if let Some(ct) = effect.card_type_any() {
-                let card_db = &gs.card_database;
-                let has_matching = gs.revealed_cards.iter().any(|&cid| {
-                    crate::ability::util::card_matches_type(card_db, cid, Some(ct.as_card_str()))
-                });
-                if has_matching {
-                    if let Some(cid) = gs.activating_card {
-                        gs.mods.add_score_modifier(cid, 1);
-                    }
-                }
-            }
-        }
+        // NOTE: "これによりライブカードを公開した場合スコア+1" patterns are parsed
+        // as conditional_on_result (result_condition on revealed_cards +
+        // followup modify_score) and resolved by execute_conditional_on_result.
+        // The old hardcoded reveal→score heuristic here was removed: it fired
+        // even when the card text had no such follow-up.
 
         Ok(())
     }

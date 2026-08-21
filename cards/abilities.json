@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-21T00:58:03.315986",
+  "generated_at": "2026-08-21T15:49:49.569785",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "e33207f0",
+  "engine_commit": "428240c4",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -14210,12 +14210,30 @@
           },
           {
             "text": "自分のデッキの一番上のカードを1枚公開する。これによりライブカードを公開した場合、このカードのスコアを+1する",
-            "source": "deck_top",
-            "count": 1,
-            "card_type": "live_card",
-            "target": "self",
-            "action": "reveal",
-            "self_target": true
+            "action": "conditional_on_result",
+            "primary_effect": {
+              "text": "自分のデッキの一番上のカードを1枚公開する。",
+              "source": "deck_top",
+              "count": 1,
+              "target": "self",
+              "action": "reveal"
+            },
+            "result_condition": {
+              "text": "これによりライブカードを公開した場合",
+              "location": "revealed_cards",
+              "card_type": "live_card",
+              "type": "location_condition"
+            },
+            "followup_action": {
+              "text": "このカードのスコアを+1する",
+              "action": "modify_score",
+              "value": 1,
+              "operation": "add",
+              "self_target": true
+            },
+            "group_names": [
+              "虹ヶ咲"
+            ]
           }
         ],
         "group_names": [
@@ -28605,6 +28623,7 @@
             "success_live_card_zone",
             "live_card_zone"
           ],
+          "aggregate": "total",
           "heart_colors": [
             "heart01"
           ],
@@ -28645,6 +28664,7 @@
             "success_live_card_zone",
             "live_card_zone"
           ],
+          "aggregate": "total",
           "heart_colors": [
             "heart01"
           ],
@@ -35805,50 +35825,38 @@
         "action": "sequential",
         "actions": [
           {
-            "text": "このカードの必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らし",
-            "action": "modify_required_hearts",
-            "heart_colors": [
-              "heart00"
+            "text": "このカードの必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らし、{{heart_02.png|heart02}}増やす",
+            "action": "sequential",
+            "actions": [
+              {
+                "text": "このカードの必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らし",
+                "action": "modify_required_hearts",
+                "heart_colors": [
+                  "heart00"
+                ],
+                "operation": "decrease",
+                "self_target": true,
+                "target": "self",
+                "group_names": [
+                  "CatChu!"
+                ],
+                "value": 2
+              },
+              {
+                "text": "{{heart_02.png|heart02}}増やす",
+                "action": "modify_required_hearts",
+                "heart_colors": [
+                  "heart02"
+                ],
+                "operation": "increase",
+                "count": 1,
+                "target": "self",
+                "group_names": [
+                  "CatChu!"
+                ],
+                "value": 1
+              }
             ],
-            "operation": "decrease",
-            "self_target": true,
-            "per_unit": true,
-            "per_unit_count": 1,
-            "per_unit_type": "人",
-            "group_names": [
-              "CatChu!"
-            ],
-            "distinct": "card_name",
-            "location": "stage",
-            "target": "self",
-            "value": 2
-          },
-          {
-            "text": "このカードの必要ハートに含まれる{{heart_02.png|heart02}}が9以上の場合",
-            "count": 9,
-            "action": "modify_required_hearts",
-            "heart_colors": [
-              "heart02"
-            ],
-            "operation": "decrease",
-            "self_target": true,
-            "per_unit": true,
-            "per_unit_count": 1,
-            "per_unit_type": "人",
-            "group_names": [
-              "CatChu!"
-            ],
-            "distinct": "card_name",
-            "location": "stage",
-            "target": "self",
-            "value": 1
-          },
-          {
-            "text": "このカードのスコアを+1する",
-            "action": "modify_score",
-            "value": 1,
-            "operation": "add",
-            "self_target": true,
             "per_unit": true,
             "per_unit_count": 1,
             "per_unit_type": "人",
@@ -35858,6 +35866,27 @@
             "distinct": "card_name",
             "location": "stage",
             "target": "self"
+          },
+          {
+            "text": "このカードの必要ハートに含まれる{{heart_02.png|heart02}}が9以上の場合、このカードのスコアを+1する",
+            "condition": {
+              "text": "このカードの必要ハートに含まれる{{heart_02.png|heart02}}が9以上の場合",
+              "heart_colors": [
+                "heart02"
+              ],
+              "count": 9,
+              "operator": ">=",
+              "location": "live_card_zone",
+              "aggregate": "total",
+              "type": "score_threshold_condition"
+            },
+            "action": "modify_score",
+            "value": 1,
+            "operation": "add",
+            "self_target": true,
+            "group_names": [
+              "CatChu!"
+            ]
           }
         ],
         "distinct": "card_name",

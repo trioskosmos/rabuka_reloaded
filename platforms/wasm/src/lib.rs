@@ -27,8 +27,109 @@ use rabuka_engine::rng;
 mod decks_baked;
 use decks_baked::DECKS;
 
+// ---- Host imports: the console shell (KOS C code on Dreamcast, etc.)
+// implements these; the engine's PlatformUi calls forward to them. ----
+#[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "host")]
+extern "C" {
+    fn host_clear_screen();
+    fn host_println(ptr: *const u8, len: u32);
+    /// Returns a bitmask of currently-held buttons: A=1, B=2, Up=4, Down=8, Start=16.
+    fn host_poll_buttons() -> u32;
+    fn host_wait_vblank();
+}
+
+/// Button bits mirrored on both sides of the boundary.
+mod btns {
+    pub const A: u32 = 1;
+    pub const B: u32 = 2;
+    pub const UP: u32 = 4;
+    pub const DOWN: u32 = 8;
+    pub const START: u32 = 16;
+}
+
+/// Playable UI: text out to the host console, edge-detected buttons in.
+struct HostUi {
+    prev: u32,
+    cur: u32,
+}
+
+impl HostUi {
+    fn new() -> Self {
+        HostUi { prev: 0, cur: 0 }
+    }
+    fn edge(&self, bit: u32) -> bool {
+        self.cur & bit != 0 && self.prev & bit == 0
+    }
+}
+
+impl PlatformUi for HostUi {
+    fn clear_screen(&mut self) {
+        unsafe { host_clear_screen() }
+    }
+    fn println(&mut self, text: &str) {
+        unsafe { host_println(text.as_ptr(), text.len() as u32) }
+    }
+    fn swap_buffers(&mut self) {}
+    fn poll_input(&mut self) {
+        self.prev = self.cur;
+        self.cur = unsafe { host_poll_buttons() };
+    }
+    fn just_pressed_a(&self) -> bool {
+        self.edge(btns::A)
+    }
+    fn just_pressed_b(&self) -> bool {
+        self.edge(btns::B)
+    }
+    fn just_pressed_up(&self) -> bool {
+        self.edge(btns::UP)
+    }
+    fn just_pressed_down(&self) -> bool {
+        self.edge(btns::DOWN)
+    }
+    fn just_pressed_start(&self) -> bool {
+        self.edge(btns::START)
+    }
+    fn wait_vblank(&mut self) {
+        unsafe { host_wait_vblank() }
+    }
+}
+
+fn load_deck_cards(idx1: usize, idx2: usize) -> Vec<Card> {
+    let mut cards = rabuka_engine::game::deck_parser::load_two_decks(idx1, idx2);
+    CardLoader::attach_abilities(&mut cards);
+    cards
+}
+
+/// Playable game: mode select -> deck select -> full match, all rendered
+/// through the host's text console and driven by the host's controller.
+/// Returns the GameResult code (0 FirstAttacker, 1 SecondAttacker, 2 Draw).
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub extern "C" fn rabuka_wasm_game_run(seed: u32) -> u32 {
+    rng::seed(seed);
+
+    let deck_names: Vec<&str> = DECKS.iter().map(|d| d.name).collect();
+    let ui = HostUi::new();
+    let result = rabuka_engine::game::match_runner::run_embedded_game(
+        ui,
+        &deck_names,
+        |i| DECKS[i].cards,
+        |a, b| load_deck_cards(a, b),
+    );
+
+    match result {
+        rabuka_engine::core::types::GameResult::FirstAttackerWins => 0,
+        rabuka_engine::core::types::GameResult::SecondAttackerWins => 1,
+        rabuka_engine::core::types::GameResult::Draw => 2,
+        rabuka_engine::core::types::GameResult::Ongoing => 3,
+    }
+}
+
 // ---- Bump allocator over a static heap in linear memory ----
-const HEAP_SIZE: usize = 8 * 1024 * 1024;
+// Console targets run the engine in well under 1MB (GBA fits 288KB);
+// 4MB leaves headroom while keeping Dreamcast RAM comfortable (16MB total).
+const HEAP_SIZE: usize = 4 * 1024 * 1024;
 
 struct BumpAlloc(u32);
 
@@ -81,12 +182,6 @@ impl PlatformUi for HeadlessUi {
         false
     }
     fn wait_vblank(&mut self) {}
-}
-
-fn load_deck_cards(idx1: usize, idx2: usize) -> Vec<Card> {
-    let mut cards = rabuka_engine::game::deck_parser::load_two_decks(idx1, idx2);
-    CardLoader::attach_abilities(&mut cards);
-    cards
 }
 
 /// Decode two baked decks and attach bytecode abilities. Returns card count,

@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-20T15:33:10.390542+00:00",
+  "generated_at": "2026-08-21T04:58:43.448661+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 403,
-  "n_tests": 2417,
+  "n_files": 404,
+  "n_tests": 2419,
   "total_cards": 771,
   "covered_cards": 538,
   "abilities_on_covered": 690,

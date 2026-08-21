@@ -30,7 +30,7 @@ A certain school idol collectible card game engine, AI, and web UI — built in 
 | **Nintendo DS** (ARM9 @ 67MHz) | 4MB | 🟡 Boots, loads decks, plays — heap exhaustion on ability activation fixed; needs build test |
 | **PlayStation 1** (MIPS R3000A @ 33MHz) | 2MB | ✅ Works — full game flow, BIOS vblank event; card data streams from CD |
 | **Game Boy Advance** (ARM7TDMI @ 16MHz) | 288KB | 🟡 Boots & plays full flow via agb object-text rendering; sprite-VRAM crash fixed — needs longer play test |
-| **Sega Dreamcast** (SH-4 @ 200MHz) | 16MB | 🔴 Blocked — no LLVM backend for SH-4; rustc_codegen_gcc dead-code eliminates all user symbols on SH-4 no_std |
+| **Sega Dreamcast** (SH-4 @ 200MHz) | 16MB | ✅ **Works — playable** via new wasm→C pipeline (rust→wasm32→wasm2c→sh-elf-gcc); full engine, text UI in Flycast. See `platforms/dc/wasm/` |
 
 For a full portability analysis covering 15+ consoles (PS1, N64, GameCube, Vita, GBA, Saturn, and more), see [engine/PORTS.md](engine/PORTS.md).
 
@@ -145,7 +145,7 @@ cargo bench                         # Criterion benchmarks
 See [engine/ISSUES_FOUND.md](engine/ISSUES_FOUND.md) for the full list.
 
 - **DS ability activation** — Heap exhaustion on ability activation was fixed. Needs build test on actual DS hardware to confirm.
-- **Dreamcast toolchain** — No LLVM backend for SH-4. `rustc_codegen_gcc` dead-code eliminates all user symbols on SH-4 no_std targets. Port blocked until upstream Rust SH-4 support or GCC codegen matures.
+- **Dreamcast port** — SOLVED via the wasm→C pipeline (was: no LLVM backend for SH-4). `platforms/dc/build_dc.bat` builds engine→wasm→C→SH-4 ELF→bootable .cdi. Same pipeline unlocks Saturn/Jaguar later.
 - **Exit code 1** — commands return exit code 1 even on success (breaks CI)
 - **Wii GX FIFO** — `GX FIFO error 0x69` during system font rendering; currently falls back to printf console CLI
 - **Clippy warnings** — unused imports/variables in ~10 test files, missing `Default` impls for `CardDatabase` and `GameModifiers`
