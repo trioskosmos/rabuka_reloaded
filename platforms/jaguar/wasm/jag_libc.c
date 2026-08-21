@@ -79,3 +79,14 @@ void *realloc(void *old, size_t n) {
     }
     return p;
 }
+
+/* ---- stubs for wasm-rt shared-memory paths (unused: WASM_ENABLE_SHARED
+ * memory is off; the linker still pulls the symbols from mem-impl) ---- */
+int pthread_mutex_init(void *m, void *a) { (void)m; (void)a; return 0; }
+int pthread_mutex_lock(void *m) { (void)m; return 0; }
+int pthread_mutex_unlock(void *m) { (void)m; return 0; }
+int pthread_mutex_destroy(void *m) { (void)m; return 0; }
+/* FILE machinery does not exist; error paths only */
+int stderr_placeholder;
+void *stderr = &stderr_placeholder;
+int fprintf(void *f, const char *fmt, ...) { (void)f; (void)fmt; return 0; }

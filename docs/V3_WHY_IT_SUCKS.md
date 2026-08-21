@@ -1,5 +1,25 @@
 # Why v3 still sucks — post-mortem after the log-driven iteration
 
+> ## ⚠ CORRECTION (post-refresh-analysis)
+> An earlier version of this document claimed **"ammo exhaustion"** as a
+> structural cause (v4/v3 spending 12 deck-lives by turn 5). That diagnosis
+> was **wrong**: rule 10.2.2.1 REFRESH cycles the waitroom back into the
+> deck whenever the main deck empties, so lives are never permanently lost —
+> they circulate indefinitely (deck → hand → live zone → waitroom → deck).
+>
+> The real reason games ran to 12 turns for 3 placements:
+> **only ONE card places per WON check (8.4.7), and winning requires beating
+> the opponent's total score (8.4.6)** — passing your hearts is necessary
+> but not sufficient. Measured placement rate was ~0.33/turn, i.e. two
+> thirds of live phases produced nothing: lost comparisons, all-or-nothing
+> escalations at match point, or double-passes. The bottleneck is
+> **P(win the comparison)**, which is exactly the dimension the heuristic
+> stack cannot see (opponent's portfolio is unknown until set).
+>
+> This is why v4 — built to ignore scores entirely — dominates random
+> (~92%) yet sits at ~43–47% vs v2: execution wins uncontested games;
+> comparisons decide contested ones.
+
 State at time of writing: v3 ≈ v2 head-to-head (~47–51% over large samples),
 draws fixed (40% → <8%), no more infinite activation loops. All the
 session's patches are in. And it still doesn't play better than the version

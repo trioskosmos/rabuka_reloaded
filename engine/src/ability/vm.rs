@@ -1259,6 +1259,7 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
     let mut optional_action: Option<Box<AbilityEffect>> = None;
     let mut conditional_action: Option<Box<AbilityEffect>> = None;
     let mut conditional_negation: Option<bool> = None;
+    let mut cost_reduction_per_group: Option<u8> = None;
     let mut ek = EffectKindLocals::default();
 
     for _ in 0..count {
@@ -1279,6 +1280,7 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
             &mut optional,
             &mut max,
             &mut effect_steps,
+            &mut cost_reduction_per_group,
             &mut look_action,
             &mut select_action,
             &mut actions,
@@ -1323,7 +1325,7 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
         optional,
         max,
         effect_steps,
-        cost_reduction_per_group: None,
+        cost_reduction_per_group,
         compound: Box::new(crate::card::CompoundBranch {
             look_action,
             select_action,

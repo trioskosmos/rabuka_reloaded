@@ -1146,23 +1146,22 @@ impl AbilityEffect {
     ///     blocks free abilities like 桜坂しずく's mill-5 (bp7-003).
     ///   - Sequential/compound costs: sum the pay_energy sub-steps
     ///     (e.g. 村野さやか bp1-002: [PayEnergy 2, MoveCards self→waitroom]).
-    pub fn energy_cost_total(&self) -> u32 {
+    pub fn energy_cost_total(&self) -> u8 {
         if self.action == crate::ability::enums::ActionType::PayEnergy {
-            return self.energy_count_any().or(self.count).unwrap_or(0) as u32;
+            return self.energy_count_any().or(self.count).unwrap_or(0);
         }
         self.compound
             .actions
             .as_deref()
             .unwrap_or(&[])
             .iter()
-            .map(|s| s.energy_cost_total())
-            .sum()
+            .fold(0u8, |acc, s| acc.saturating_add(s.energy_cost_total()))
     }
 
     /// True when ANY pay_energy component is optional/skippable — those must
     /// stay offered even when energy is short (resolution skips just the
     /// effect, e.g. wakana bp2-008).
-    fn has_optional_payment(&self) -> bool {
+    pub fn has_optional_payment(&self) -> bool {
         if self.action == crate::ability::enums::ActionType::PayEnergy
             && self.optional == Some(true)
         {
@@ -1176,13 +1175,52 @@ impl AbilityEffect {
             .any(|s| s.has_optional_payment())
     }
 
+    /// True when ANY pay_energy component has a parsed reduction clause
+    /// (`cost_reduction_per_group`, extracted by the parser from e.g. 海未
+    /// bp5-004 "グループ名1種類につき、E減る"). Presence means the printed
+    /// energy is an upper bound — affordability must not hard-block offers.
+    fn has_cost_reduction(&self) -> bool {
+        if self.cost_reduction_per_group.is_some() {
+            return true;
+        }
+        self.compound
+            .actions
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .any(|s| s.has_cost_reduction())
+    }
+
+    /// Effective ACTIVE-energy cost of this cost block given
+    /// `groups_on_stage` distinct group names among the activator's stage
+    /// members. Single source of truth for affordability AND display:
+    /// each pay_energy step subtracts its own `cost_reduction_per_group`
+    /// × groups, clamped at zero per step (海未 bp5-004 Q228: 4E − groups×1,
+    /// can reach 0).
+    pub fn effective_energy_cost_total(&self, groups_on_stage: u8) -> u8 {
+        if self.action == crate::ability::enums::ActionType::PayEnergy {
+            let printed = self.energy_count_any().or(self.count).unwrap_or(0);
+            let reduction = self
+                .cost_reduction_per_group
+                .unwrap_or(0)
+                .saturating_mul(groups_on_stage);
+            return printed.saturating_sub(reduction);
+        }
+        self.compound
+            .actions
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .fold(0u8, |acc, s| {
+                acc.saturating_add(s.effective_energy_cost_total(groups_on_stage))
+            })
+    }
+
     /// True when this cost is DEFINITELY unpayable with `active` energy:
-    /// mandatory pay_energy exceeds active AND the ability text declares no
-    /// reduction clause. Only then may generation withhold the action.
-    /// `full_text` is the whole ability text — reduction clauses live there,
-    /// not on the cost steps.
-    pub fn is_definitely_unaffordable(&self, active: u32, full_text: &str) -> bool {
-        if full_text.contains("減る") || full_text.contains("少なく") {
+    /// mandatory pay_energy exceeds active AND the parser found no reduction
+    /// clause on the cost. Only then may generation withhold the action.
+    pub fn is_definitely_unaffordable(&self, active: u8) -> bool {
+        if self.has_cost_reduction() {
             return false;
         }
         if self.has_optional_payment() {

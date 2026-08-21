@@ -97,6 +97,12 @@ pub struct GameState {
     /// log overlay reads `rule_log`, not this.
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub structured_log: Vec<LogEntry>,
+    /// Always-on compact event trace for debugging (tests, support dumps).
+    /// Records phase transitions, trigger firings and ability-queue outcomes
+    /// as short strings. Capped ring: keeps the most recent
+    /// [`DEBUG_TRACE_CAP`] entries. Skipped on the wire.
+    #[cfg_attr(feature = "serde_support", serde(skip))]
+    pub debug_trace: Vec<String>,
     pub turn1_abilities_played: SmallVec<[String; 8]>,
     pub turn2_abilities_played: SmallVec<[(String, u8); 8]>,
     pub live_owned_hearts: SmallVec<[(String, Vec<(String, u8)>); 4]>,
@@ -403,6 +409,7 @@ impl GameState {
             game_state_history: Vec::new(),
             rule_log: Vec::new(),
             structured_log: Vec::new(),
+            debug_trace: Vec::new(),
             turn1_abilities_played: SmallVec::new(),
             turn2_abilities_played: SmallVec::new(),
             live_owned_hearts: SmallVec::new(),
@@ -1152,6 +1159,26 @@ impl GameState {
     /// `LOG_BOUND_STRUCTURED`); the newest entries are kept.
     pub fn push_structured_log(&mut self, entry: crate::types::LogEntry) {
         Self::push_structured_log_to(&mut self.structured_log, entry);
+    }
+
+    /// Append a compact event to the always-on [`Self::debug_trace`] ring.
+    /// Prefixes the turn number so dumps read chronologically across turns.
+    /// Use for facts a test/support dump needs: phase transitions, trigger
+    /// firings, queue outcomes — not per-card hot-loop noise.
+    pub fn push_debug_note(&mut self, text: String) {
+        const DEBUG_TRACE_CAP: usize = 600;
+        self.debug_trace.push(format!("[T{}]", self.turn_number));
+        let last = self.debug_trace.len() - 1;
+        self.debug_trace[last].push_str(&text);
+        if self.debug_trace.len() > DEBUG_TRACE_CAP {
+            self.debug_trace
+                .drain(0..self.debug_trace.len() - DEBUG_TRACE_CAP);
+        }
+    }
+
+    /// True when any debug-trace event contains `needle`.
+    pub fn debug_trace_contains(&self, needle: &str) -> bool {
+        self.debug_trace.iter().any(|e| e.contains(needle))
     }
 
     /// Field-level helper: push to a rule log Vec, keeping only the newest

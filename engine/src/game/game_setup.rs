@@ -1779,31 +1779,32 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     }
                 }
 
-                // NOTE: activations are ALWAYS offered. Unpayable ones
-                // fizzle quietly at resolution (umi Q228 / wakana bp2-008
-                // semantics), and bots avoid dead presses via their
-                // no-op breaker — generation cannot distinguish them
-                // because wakana and sayaka costs are structurally
-                // identical pay_energy blocks.
-
                 let trigger_info = ability
                     .triggers
                     .as_ref()
                     .map(|t| action_desc!(" ({})", t))
                     .unwrap_or_default();
 
-                // Display-only cost (activations are always offered).
-                let display_cost = ability
-                    .cost
-                    .as_ref()
-                    .map(|c| c.energy_cost_total() as u8)
-                    .unwrap_or(0);
-                // Display-only cost (activations are always offered).
-                let display_cost = ability
-                    .cost
-                    .as_ref()
-                    .map(|c| c.energy_cost_total() as u8)
-                    .unwrap_or(0);
+                // Effective cost: printed total minus per-group reductions
+                // (single source of truth shared with execution). Mandatory
+                // costs that cannot be paid are NOT offered (rules 9.6.2.3);
+                // optional-payment components keep the ability offered so the
+                // player can skip just that part (wakana bp2-008).
+                let groups = game_state.distinct_stage_groups(&active_player.id);
+                let (base_cost, effective_cost) = match ability.cost.as_ref() {
+                    Some(c) => (
+                        c.energy_cost_total() as u8,
+                        game_state.effective_activation_cost_for(c, groups) as u8,
+                    ),
+                    None => (0, 0),
+                };
+                if let Some(c) = ability.cost.as_ref() {
+                    if !c.has_optional_payment()
+                        && effective_cost > active_player.energy_zone.active_count()
+                    {
+                        continue;
+                    }
+                }
                 actions.push(make_action_params(
                     ActionType::UseAbility,
                     action_desc!(
@@ -1812,7 +1813,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         area_name,
                         ability.full_text,
                         trigger_info,
-                        display_cost
+                        effective_cost
                     ),
                     ActionParameters {
                         card_id: Some(card_id),
@@ -1839,8 +1840,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         } else {
                             None
                         },
-                        base_cost: Some(display_cost),
-                        final_cost: Some(display_cost),
+                        base_cost: Some(base_cost),
+                        final_cost: Some(effective_cost),
                         ..make_params()
                     },
                 ));
@@ -1887,28 +1888,29 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     }
                 }
 
-                let ability_cost = ability
-                    .cost
-                    .as_ref()
-                    .map(|c| c.count.unwrap_or_else(|| c.energy_count_any().unwrap_or(0)))
-                    .unwrap_or(0);
-                if ability_cost > active_player.energy_zone.active_count() {
-                    continue;
+                // Same effective-cost gate as stage activations: mandatory
+                // unpayable costs are withheld, optional ones stay offered.
+                let (base_cost, effective_cost) = match ability.cost.as_ref() {
+                    Some(c) => (
+                        c.energy_cost_total() as u8,
+                        game_state.effective_activation_cost(&active_player.id, c) as u8,
+                    ),
+                    None => (0, 0),
+                };
+                if let Some(c) = ability.cost.as_ref() {
+                    if !c.has_optional_payment()
+                        && effective_cost > active_player.energy_zone.active_count()
+                    {
+                        continue;
+                    }
                 }
-
-                // Display-only cost (activations are always offered).
-                let display_cost = ability
-                    .cost
-                    .as_ref()
-                    .map(|c| c.energy_cost_total() as u8)
-                    .unwrap_or(0);
                 actions.push(make_action_params(
                     ActionType::UseAbility,
                     action_desc!(
                         "Use ability on {} (discard): {} (起動) - Cost: {}",
                         card.name,
                         ability.full_text,
-                        ability_cost
+                        effective_cost
                     ),
                     ActionParameters {
                         card_id: Some(card_id),
@@ -1929,8 +1931,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         } else {
                             None
                         },
-                        base_cost: Some(display_cost),
-                        final_cost: Some(display_cost),
+                        base_cost: Some(base_cost),
+                        final_cost: Some(effective_cost),
                         ..make_params()
                     },
                 ));

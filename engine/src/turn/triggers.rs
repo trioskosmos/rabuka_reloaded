@@ -375,6 +375,11 @@ impl super::TurnEngine {
             abilities_to_trigger.len(),
             player_id
         );
+        game_state.push_debug_note(format!(
+            "live_start scan {}: {} ability(ies) fired",
+            player_id,
+            abilities_to_trigger.len()
+        ));
         for (ability_id, card_no, explicit_card_id) in abilities_to_trigger {
             log::debug!(
                 "[LIVE_START_TRIGGER]   ability={} card_no={}",

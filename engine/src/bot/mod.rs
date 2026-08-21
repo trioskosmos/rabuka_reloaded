@@ -22,6 +22,7 @@ pub use strategy_v3::{
     analyze_hand, choose_action_heuristic_v3, choose_live_set_action_v3,
     choose_mulligan_action_v3, evaluate_state_v3, V3Plan,
 };
+pub use strategy_v4::{choose_action_v4, choose_live_set_v4, choose_mulligan_v4};
 
 use crate::card::CardDatabase;
 use crate::game_setup::{Action, ActionType};

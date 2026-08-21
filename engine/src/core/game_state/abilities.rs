@@ -767,6 +767,12 @@ impl GameState {
                                     entry.card_no
                                 );
                             }
+                            self.push_debug_note(format!(
+                                "queue+ {} card={} trigger={:?}",
+                                ability_id,
+                                entry.card_no,
+                                entry.trigger_type
+                            ));
                             self.ability_queue.enqueue(entry);
                             return;
                         }
@@ -1417,12 +1423,22 @@ impl GameState {
         }
         match resolver.resolve_ability(self, &ability, card_id, ability_index) {
             Ok(()) => {
+                self.push_debug_note(format!(
+                    "resolve ok card={:?} idx={} pending_choice={}",
+                    card_id,
+                    ability_index,
+                    resolver.pending_choice.is_some()
+                ));
                 if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
                 {
                     log::debug!("[PCA] resolve_ability OK");
                 }
             }
             Err(e) => {
+                self.push_debug_note(format!(
+                    "resolve FAIL card={:?} idx={} err={}",
+                    card_id, ability_index, e
+                ));
                 if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
                 {
                     log::debug!("[PCA] resolve_ability FAILED: {}", e);
@@ -2089,6 +2105,48 @@ impl GameState {
         } else {
             self.player1.id.clone()
         }
+    }
+
+    /// Number of DISTINCT group names among `player_id`'s stage members.
+    /// Single source of truth for "グループ名1種類につき" cost reductions —
+    /// used by the resolver's runtime cost adjustment AND by action
+    /// generation's effective-cost display/gating.
+    pub fn distinct_stage_groups(&self, player_id: &str) -> u8 {
+        let player = if player_id == self.player2.id {
+            &self.player2
+        } else {
+            &self.player1
+        };
+        let mut groups = std::collections::HashSet::<String>::default();
+        for &cid in &player.stage.stage {
+            if cid == -1 {
+                continue;
+            }
+            if let Some(card) = self.card_database.get_card(cid) {
+                if !card.group.is_empty() {
+                    groups.insert(card.group.to_string());
+                }
+            }
+        }
+        groups.len() as u8
+    }
+
+    /// Effective ACTIVE-energy cost of `cost` for `player_id` given the
+    /// current board (printed total minus per-group reductions, clamped).
+    /// Generation gating, cost display and the execution pre-check must all
+    /// route through this so they can never diverge.
+    pub fn effective_activation_cost(&self, player_id: &str, cost: &crate::card::AbilityEffect) -> u8 {
+        self.effective_activation_cost_for(cost, self.distinct_stage_groups(player_id))
+    }
+
+    /// As [`Self::effective_activation_cost`] but with the group count
+    /// supplied by the caller.
+    pub fn effective_activation_cost_for(
+        &self,
+        cost: &crate::card::AbilityEffect,
+        groups_on_stage: u8,
+    ) -> u8 {
+        cost.effective_energy_cost_total(groups_on_stage)
     }
 
     /// Set just_completed_ability_key, process pending auto abilities, then clear it.

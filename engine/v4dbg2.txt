@@ -1,0 +1,3 @@
+﻿v4 vs v2 窶・27 games in 1.0s (26.8 gps)
+P1(v4) 11 - P2(v2) 16 - draws 0
+total actions 1873 | avg turns/game 7.2

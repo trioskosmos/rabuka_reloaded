@@ -6,7 +6,7 @@
 //! Moved out of tests/test_modules/strategy_bot_test.rs — this is a
 //! benchmark/arena, not a unit test. Run it when you want numbers.
 
-use rabuka_engine::bot::{strategy, strategy_v2, strategy_v3};
+use rabuka_engine::bot::{strategy, strategy_v2, strategy_v3, strategy_v4};
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
 use rabuka_engine::deck_parser;
@@ -20,6 +20,7 @@ enum BotKind {
     V1,
     V2,
     V3,
+    V4,
     Random,
 }
 
@@ -28,6 +29,7 @@ fn parse_kind(s: &str) -> BotKind {
         "v1" => BotKind::V1,
         "v2" => BotKind::V2,
         "v3" => BotKind::V3,
+        "v4" => BotKind::V4,
         _ => BotKind::Random,
     }
 }
@@ -135,6 +137,7 @@ fn main() {
         BotKind::V1 => "v1",
         BotKind::V2 => "v2",
         BotKind::V3 => "v3",
+        BotKind::V4 => "v4",
         BotKind::Random => "random",
     };
 
@@ -152,6 +155,7 @@ fn main() {
     let mut total_turns = 0u64;
     let t0 = std::time::Instant::now();
     let mut trace_rows: Vec<String> = Vec::new();
+    let mut game_start_idx = 0usize;
     if trace {
         trace_rows.push(
             "game,turn,phase,player,action_type,card_no,live_p1,live_p2,success_p1,success_p2"
@@ -287,6 +291,7 @@ fn main() {
                     BotKind::V3 => {
                         strategy_v3::choose_mulligan_action_v3(&gs, &actions, &db)
                     }
+                    BotKind::V4 => strategy_v4::choose_mulligan_v4(&gs, &actions, &db),
                     _ => actions
                         .iter()
                         .find(|a| {
@@ -320,6 +325,7 @@ fn main() {
                             &gs, &actions, &db, &v2_policy, plan,
                         )
                     }
+                    BotKind::V4 => strategy_v4::choose_live_set_v4(&gs, &actions, &db),
                     BotKind::Random => actions[rng.range(actions.len())].clone(),
                 };
                 if trace {
@@ -384,6 +390,7 @@ fn main() {
                     let plan = if active_is_p1 { &plan_p1 } else { &plan_p2 };
                     strategy_v3::choose_action_heuristic_v3(&gs, &actions, me, plan)
                 }
+                BotKind::V4 => strategy_v4::choose_action_v4(&gs, &actions, me),
                 BotKind::Random => actions[rng.range(actions.len())].clone(),
             };
             if trace {
@@ -426,7 +433,6 @@ fn main() {
 
         if logs {
             let dir = std::path::Path::new("../test_output/arena_logs");
-            let _ = std::fs::create_dir_all(dir);
             let result = if z1 >= 3 && z2 <= 2 {
                 "P1 WINS"
             } else if z2 >= 3 && z1 <= 2 {
@@ -455,7 +461,25 @@ fn main() {
                 ));
             }
             let _ = std::fs::write(dir.join(format!("game_{games:03}.txt")), out);
+
+            // Self-contained replay: snapshots + decisions in event order.
+            if trace {
+                let mut replay = format!(
+                    "REPLAY game {games} | {result} | final {z1}-{z2}\n\
+                     ENTER rows = board at phase entry (live/succ/hand/en/cost)\n\
+                     other rows = chosen action\n===\n"
+                );
+                for r in &trace_rows[game_start_idx.min(trace_rows.len())..] {
+                    replay.push_str(r);
+                    replay.push('\n');
+                }
+                let _ = std::fs::write(
+                    dir.join(format!("replay_game_{games:03}.txt")),
+                    replay,
+                );
+            }
         }
+        game_start_idx = trace_rows.len();
     }
 
     let secs = t0.elapsed().as_secs_f64();

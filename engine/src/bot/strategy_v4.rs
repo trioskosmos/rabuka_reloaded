@@ -46,7 +46,11 @@ fn acc_add(acc: &mut Acc, hearts: &crate::card::HeartMap) {
 }
 
 /// Stage base hearts + expected yell hits as wildcard capacity.
-fn heart_pool(gs: &GameState, me_player: u8, db: &CardDatabase) -> Acc {
+/// `confidence` scales the flip contribution: 1.0 = full mean (main-phase
+/// coverage metric), <1.0 = conservative for all-or-nothing portfolio
+/// decisions, since a portfolio sized exactly to the mean fails ~half the
+/// time (binomial variance around the hit count).
+fn heart_pool_inner(gs: &GameState, me_player: u8, db: &CardDatabase, confidence: f64) -> Acc {
     let p = if me_player == 0 { &gs.player1 } else { &gs.player2 };
     let mut acc = [0i32; 11];
     let mut blades = 0i32;
@@ -73,8 +77,17 @@ fn heart_pool(gs: &GameState, me_player: u8, db: &CardDatabase) -> Acc {
         .filter(|&&cid| db.get_card(cid).map_or(false, |c| c.blade_heart.is_some()))
         .count() as f64
         / deck_len as f64;
-    acc[10] += (blades as f64 * density).round() as i32;
+    acc[10] += ((blades as f64 * density) * confidence).floor() as i32;
     acc
+}
+
+fn heart_pool(gs: &GameState, me_player: u8, db: &CardDatabase) -> Acc {
+    heart_pool_inner(gs, me_player, db, 1.0)
+}
+
+/// Conservative pool for live-set portfolios (0.6× flip credit).
+fn heart_pool_gamble_safe(gs: &GameState, me_player: u8, db: &CardDatabase) -> Acc {
+    heart_pool_inner(gs, me_player, db, 0.6)
 }
 
 /// Try allocating `need` from `pool`; returns None if impossible, else the
@@ -173,21 +186,32 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
     if actions.len() == 1 {
         return actions[0].clone();
     }
+    let dbg = std::env::var("V4_DEBUG").is_ok();
     let db = &gs.card_database;
     let my_now = if me == 0 { &gs.player1 } else { &gs.player2 };
 
     let base_passable = passable_count(gs, me, db);
     let base_ammo = lives_in_hand(my_now, db);
-    let base_stage: i32 = my_now
-        .stage
-        .stage
-        .iter()
-        .filter(|&&c| c >= 0)
-        .map(|&c| db.get_card(c).and_then(|x| x.cost).unwrap_or(0) as i32)
-        .sum();
+    // Development measured in HEARTS (what actually passes checks),
+    // not cost.
+    let stage_hearts_of = |p: &crate::player::Player| -> i32 {
+        p.stage
+            .stage
+            .iter()
+            .filter(|&&c| c >= 0)
+            .map(|&c| {
+                db.get_card(c)
+                    .and_then(|x| x.base_heart.as_ref())
+                    .map(|bh| bh.hearts.values_sum() as i32)
+                    .unwrap_or(0)
+            })
+            .sum()
+    };
+    let base_stage = stage_hearts_of(my_now);
 
     let mut best_idx = 0usize;
     let mut best_val = f64::NEG_INFINITY;
+    let mut dbg_lines: Vec<String> = Vec::new();
 
     for (i, a) in actions.iter().enumerate() {
         let mut sim = gs.clone();
@@ -198,31 +222,39 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
         let my_sim = if me == 0 { &sim.player1 } else { &sim.player2 };
 
         let mut val = 0.0f64;
+        let mut dbg_parts: Vec<String> = Vec::new();
 
         // Doctrine 1: more passable lives = closer to a placement.
         let passable_after = passable_count(&sim, me, db);
-        val += 60.0 * (passable_after as f64 - base_passable as f64);
+        let d_pass = passable_after as f64 - base_passable as f64;
+        val += 60.0 * d_pass;
+        if d_pass != 0.0 {
+            dbg_parts.push(format!("pass{:+}", d_pass));
+        }
 
         // Doctrine 2: ammo — lives in hand are future placements.
         let ammo_after = lives_in_hand(my_sim, db);
-        val += 25.0 * (ammo_after as f64 - base_ammo as f64);
+        let d_ammo = ammo_after as f64 - base_ammo as f64;
+        val += 25.0 * d_ammo;
+        if d_ammo != 0.0 {
+            dbg_parts.push(format!("ammo{:+}", d_ammo));
+        }
         if ammo_after == 0 && base_ammo > 0 {
             val -= 120.0; // never burn the arsenal
+            dbg_parts.push("BURN".into());
         }
 
-        // Development tiebreak: stage growth enables future coverage.
-        let stage_after: i32 = my_sim
-            .stage
-            .stage
-            .iter()
-            .filter(|&&c| c >= 0)
-            .map(|&c| db.get_card(c).and_then(|x| x.cost).unwrap_or(0) as i32)
-            .sum();
-        val += 3.0 * (stage_after - base_stage) as f64;
+        // Development tiebreak: HEARTS gained (not cost) — hearts are what
+        // pass checks and place cards.
+        let stage_after = stage_hearts_of(my_sim);
+        let d_stage = stage_after - base_stage;
+        val += 3.0 * d_stage as f64;
+        dbg_parts.push(format!("hearts{d_stage:+}"));
 
         // Hand reserve: ≤1 card can't set lives or pay costs.
         if my_sim.hand.cards.len() <= 1 {
             val -= 60.0;
+            dbg_parts.push("LOWHAND".into());
         }
 
         // No-op breaker: unchanged key counts bought nothing.
@@ -233,12 +265,40 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
             && my_sim.waitroom.cards.len() == my_now.waitroom.cards.len()
         {
             val -= 1000.0;
+            dbg_parts.push("NOOP".into());
+        }
+        dbg_parts.push(format!("={val:.0}"));
+
+        if dbg {
+            dbg_lines.push(format!(
+                "    [{}] {:?} {} -> {}",
+                i,
+                a.action_type,
+                a.parameters
+                    .as_ref()
+                    .and_then(|p| p.card_id)
+                    .and_then(|cid| db.get_card(cid))
+                    .map(|c| c.card_no.clone())
+                    .unwrap_or_default(),
+                dbg_parts.join(" ")
+            ));
         }
 
         if val > best_val {
             best_val = val;
             best_idx = i;
         }
+    }
+    if dbg {
+        eprintln!(
+            "V4D t{} phase{:?} hand={} pass={} ammo={}\n{}",
+            gs.turn_number,
+            gs.current_phase,
+            my_now.hand.cards.len(),
+            base_passable,
+            base_ammo,
+            dbg_lines.join("\n")
+        );
     }
     actions[best_idx].clone()
 }
@@ -248,16 +308,26 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
 pub fn choose_live_set_v4(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     let me = if gs.active_player().id == gs.player1.id { 0u8 } else { 1u8 };
     let my = if me == 0 { &gs.player1 } else { &gs.player2 };
+    // Full-mean flip credit: calibration (calibrate.rs, 8130 decisions)
+    // showed 0.6× UNDERPERFORMS — its fail-bucket still placed 33% vs
+    // mean's 25%, i.e. it threw away winnable checks for no gain. Both
+    // predictors land at 79% on their pass-bucket anyway (placement also
+    // requires winning the comparison).
     let mut pool = heart_pool(gs, me, db);
 
-    // Cheapest-requirements-first greedy: maximizes the COUNT of passing
-    // lives (score is irrelevant under this doctrine).
+    // Score-descending greedy among PASSABLE lives only.
+    //
+    // A placement requires winning the COMPARISON (8.4.6), not merely
+    // passing — so among lives that all pass deterministically, prefer the
+    // highest scores. Count-maximization stays implicit (everything that
+    // fits gets set until slots run out).
     let mut candidates: Vec<(usize, i32, [i32; 11])> = Vec::new();
     for &(hi, _cid, ref need) in &hand_lives(my, db) {
-        let total_req: i32 = need.iter().sum();
-        candidates.push((hi, total_req, *need));
+        if let Some(card) = db.get_card(_cid) {
+            candidates.push((hi, card.score.unwrap_or(0) as i32, *need));
+        }
     }
-    candidates.sort_by(|a, b| a.1.cmp(&b.1));
+    candidates.sort_by(|a, b| b.1.cmp(&a.1));
 
     let max_slots =
         (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;

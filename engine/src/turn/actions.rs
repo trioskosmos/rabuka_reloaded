@@ -78,25 +78,33 @@ impl super::TurnEngine {
         }
 
         match action {
-            crate::game_setup::ActionType::Pass => match game_state.current_phase {
-                Phase::LiveCardSetFirstAttacker => {
-                    let player = game_state.active_player_mut();
-                    let cards_placed = player.live_card_zone.cards.len();
-                    for _ in 0..cards_placed {
-                        let _ = player.draw_card();
+                crate::game_setup::ActionType::Pass => match game_state.current_phase {
+                    Phase::LiveCardSetFirstAttacker => {
+                        let player = game_state.active_player_mut();
+                        let cards_placed = player.live_card_zone.cards.len();
+                        for _ in 0..cards_placed {
+                            let _ = player.draw_card();
+                        }
+                        game_state.push_debug_note(format!(
+                            "pass live_card_set(FA): refill +{} from live zone",
+                            cards_placed
+                        ));
+                        game_state.current_phase = Phase::LiveCardSetSecondAttacker;
+                        Ok(())
                     }
-                    game_state.current_phase = Phase::LiveCardSetSecondAttacker;
-                    Ok(())
-                }
-                Phase::LiveCardSetSecondAttacker => {
-                    let player = game_state.active_player_mut();
-                    let cards_placed = player.live_card_zone.cards.len();
-                    for _ in 0..cards_placed {
-                        let _ = player.draw_card();
+                    Phase::LiveCardSetSecondAttacker => {
+                        let player = game_state.active_player_mut();
+                        let cards_placed = player.live_card_zone.cards.len();
+                        for _ in 0..cards_placed {
+                            let _ = player.draw_card();
+                        }
+                        game_state.push_debug_note(format!(
+                            "pass live_card_set(SA): refill +{} from live zone",
+                            cards_placed
+                        ));
+                        Self::advance_phase(game_state);
+                        Ok(())
                     }
-                    Self::advance_phase(game_state);
-                    Ok(())
-                }
                 _ => {
                     Self::advance_phase(game_state);
                     Ok(())
@@ -302,6 +310,22 @@ impl super::TurnEngine {
                             .unwrap_or(0);
                         if u8::from(used) >= use_limit {
                             continue;
+                        }
+                    }
+                    // Mandatory-cost affordability pre-check: same evaluator
+                    // as generation (rules 9.6.2.3 — an unpayable cost is not
+                    // a legal activation). Optional payments may be skipped,
+                    // so they never block here.
+                    if let Some(ref cost) = ability.cost {
+                        let groups = game_state.distinct_stage_groups(&player_id);
+                        let effective =
+                            game_state.effective_activation_cost_for(cost, groups) as u32;
+                        let active = player.energy_zone.active_count();
+                        if !cost.has_optional_payment() && effective > u32::from(active) {
+                            return Err(format!(
+                                "Cannot activate: cost {} energy exceeds active {}",
+                                effective, active
+                            ));
                         }
                     }
                     ability_to_activate = Some(AbilityActivation { idx, ability, loc });

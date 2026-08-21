@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-22T02:49:50.607923",
+  "generated_at": "2026-08-22T05:19:32.404727",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "44d228c6",
+  "engine_commit": "7025fb86",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -4020,7 +4020,8 @@
         "type": "pay_energy",
         "energy": 4,
         "zone": "energy_zone",
-        "count": 4
+        "count": 4,
+        "cost_reduction_per_group": 1
       },
       "effect": {
         "text": "相手のステージにいるコスト10以下のメンバー1人をウェイトにする。この能力を起動するためのコストは自分のステージにいるメンバーの中のグループ名1種類につき、{{icon_energy.png|E}}減る",

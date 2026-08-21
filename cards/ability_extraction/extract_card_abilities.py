@@ -46,6 +46,7 @@ from parser import (
     _normalize_effect_tree,
     _enrich_effect_type,
     _validate_semantic,
+    _promote_self_cost_reduction,
 )
 
 TRIGGER_PATTERN = re.compile(r"\{\{([^|]+)\|([^}]+)\}\}")
@@ -429,6 +430,10 @@ def extract_all_abilities(cards_file: Path) -> dict:
         # lift it to the ability level (Q92: player chooses whether to pay)
         if isinstance(effect, dict) and "cost" in effect:
             cost = effect.pop("cost")
+
+        # Promote self-cost reduction clauses onto the pay_energy cost
+        # (e.g. 海未 bp5-004 "グループ名1種類につき、E減る").
+        _promote_self_cost_reduction({"cost": cost, "effect": effect})
 
         ability_entry = {
             "full_text": full_text,

@@ -926,6 +926,112 @@ impl TestGame {
         }
     }
 
+    /// Compact one-line description of the pending choice for assert messages.
+    /// Unlike `dbg_choice` this RETURNS a String so it can be embedded in
+    /// `assert!(..., "{}", game.pending_choice_summary())` failures.
+    pub fn pending_choice_summary(&self) -> String {
+        if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
+            return match choice {
+                Choice::SelectCard {
+                    zone,
+                    card_type,
+                    count,
+                    allow_skip,
+                    group,
+                    filtered_indices,
+                    ..
+                } => format!(
+                    "SelectCard zone={} count={} allow_skip={} card_type={:?} group={:?} options={:?}",
+                    zone,
+                    count,
+                    allow_skip,
+                    card_type,
+                    group,
+                    filtered_indices.as_ref().map(|v| v.len())
+                ),
+                Choice::SelectTarget { target, .. } => {
+                    format!("SelectTarget target={}", target)
+                }
+                Choice::SelectPosition { .. } => "SelectPosition".to_string(),
+                Choice::SelectHeartColor { .. } => "SelectHeartColor".to_string(),
+                Choice::SelectHeartType { .. } => "SelectHeartType".to_string(),
+                Choice::SelectAutoAbility { .. } => "SelectAutoAbility".to_string(),
+                Choice::SelectLiveSuccess { .. } => "SelectLiveSuccess".to_string(),
+            };
+        }
+        if let Some(ref pc) = self.state.get_pending_choice_json() {
+            return format!("(json) {}", pc);
+        }
+        "none".to_string()
+    }
+
+    /// True when the engine's always-on event trace contains `needle`.
+    /// The trace records phase transitions, trigger firings and ability
+    /// queue outcomes — see `GameState::push_debug_note`.
+    pub fn event_trace_contains(&self, needle: &str) -> bool {
+        self.state.debug_trace_contains(needle)
+    }
+
+    /// Print the last `n` debug-trace events. Always recorded by the engine,
+    /// no RUST_LOG needed.
+    pub fn dbg_events(&self, n: usize) {
+        if self.state.debug_trace.is_empty() {
+            eprintln!("[EVT] (trace empty)");
+            return;
+        }
+        let skip = self.state.debug_trace.len().saturating_sub(n);
+        for e in &self.state.debug_trace[skip..] {
+            eprintln!("[EVT] {}", e);
+        }
+    }
+
+    /// Dump recent events plus a full zone snapshot — the go-to first look
+    /// when a test fails unexpectedly.
+    pub fn dbg_state(&self) {
+        self.dbg_events(25);
+        self.dbg_all();
+    }
+
+    /// Print the full story of what happened, in the order a player would
+    /// have seen it. Built entirely from the engine's existing player-facing
+    /// logs — no RUST_LOG required:
+    ///
+    ///   1. PLAYER LOG  — `rule_log`, the lines shown in the game log overlay
+    ///   2. ABILITIES   — `structured_log` trigger evaluations and resolution
+    ///                    results (one line per ability)
+    ///   3. EVENTS      — compact always-on engine trace (phase changes,
+    ///                    queue enqueues, condition gates)
+    ///   4. BOARD       — zones, member states and any pending choice
+    pub fn dbg_story(&self) {
+        eprintln!("──── story ────");
+        eprintln!("── 1. player log (rule_log):");
+        for line in &self.state.rule_log {
+            eprintln!("  {}", line);
+        }
+        eprintln!("── 2. ability evaluations:");
+        for entry in &self.state.structured_log {
+            match entry.category.as_str() {
+                "trigger_evaluation" | "ability_resolution" => {
+                    eprintln!(
+                        "  [{}] {}",
+                        entry.category, entry.text
+                    );
+                }
+                _ => {}
+            }
+        }
+        eprintln!("── 3. events:");
+        for e in &self.state.debug_trace {
+            eprintln!("  {}", e);
+        }
+        eprintln!("── 4. board:");
+        self.dbg_all();
+        eprintln!(
+            "  choice: {}",
+            self.pending_choice_summary()
+        );
+    }
+
     /// Print all zones and pending state at once.
     pub fn dbg_all(&self) {
         self.dbg_hand();

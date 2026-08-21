@@ -37,7 +37,6 @@ use crate::game_state::{GameState, Phase};
 use crate::types::LogEntry;
 use crate::zones::MemberArea;
 use crate::Arc;
-use crate::HashSet;
 
 /// Collapse a set of offered option labels + skip flag into a single signature
 /// string, used to detect "the same offer re-presented" and dedup `choice_offered`
@@ -346,6 +345,13 @@ impl AbilityResolver {
                     }
                 }
                 if !passed {
+                    gs.push_debug_note(format!(
+                        "gate BLOCK card={:?} action={} cond_type={:?} location={:?}",
+                        gs.activating_card,
+                        effect.action.to_str(),
+                        condition.condition_type(),
+                        condition.get_location()
+                    ));
                     log::debug!("[CAN_ACTIVATE] condition FAILED for {}: type={:?} location={:?} group={:?} exclude={:?}",
                         effect.action, condition.condition_type(), condition.get_location(), condition.get_group_names(), condition.get_exclude_characters());
                     return false;
@@ -1103,22 +1109,10 @@ impl AbilityResolver {
                     && mod_cost.per_unit_type_any().as_deref() == Some("group_name")
                 {
                     // Count distinct group names on self's stage
-                    let player = gs.resolve_target_player("self");
-                    let card_db = &gs.card_database;
-                    let mut groups = HashSet::<String>::default();
-                    for &cid in &player.stage.stage {
-                        if cid == -1 {
-                            continue;
-                        }
-                        if let Some(card) = card_db.get_card(cid) {
-                            if !card.group.is_empty() {
-                                groups.insert(card.group.to_string());
-                            }
-                        }
-                    }
+                    // (shared with generation's effective-cost evaluator).
+                    let groups = gs.distinct_stage_groups("self");
                     let per_unit_count = mod_cost.per_unit_count_any().unwrap_or(1);
-                    let reduction =
-                        (groups.len() as u8 / per_unit_count) * mod_cost.count.unwrap_or(1);
+                    let reduction = (groups / per_unit_count) * mod_cost.count.unwrap_or(1);
                     if cost.action == crate::ability::enums::ActionType::PayEnergy {
                         let new_energy = cost
                             .energy_count_any()

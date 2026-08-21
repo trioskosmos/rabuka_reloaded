@@ -1,0 +1,14 @@
+﻿DIAG g1 me=1: hand=7 ["", "", "", "", "", "", ""]
+DIAG lives_in_hand=0
+DIAG g1 me=0: hand=7 ["", "", "", "", "", "", ""]
+DIAG lives_in_hand=0
+DIAG g1 me=1: hand=8 ["", "", "", "", "", "", "", ""]
+DIAG lives_in_hand=0
+live-set decisions: 47651 | lives tested: 0
+=== CALIBRATION RESULTS ===
+CONSERVATIVE (0.6x) predictor:
+  pred-pass: 0 total | placed 0 (0%)
+  pred-fail: 0 total | placed 0 (0% underconfident)
+FULL-MEAN (1.0x) predictor:
+  pred-pass: 0 total | placed 0 (0%)
+  pred-fail: 0 total | placed 0 (0% underconfident)

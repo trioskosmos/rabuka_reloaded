@@ -32,6 +32,7 @@ impl super::TurnEngine {
     #[cfg(not(feature = "headless"))]
     fn log_phase(game_state: &mut GameState, marker_key: &str) {
         let text = format!("[[{}]]", marker_key);
+        game_state.push_debug_note(format!("phase {}", marker_key));
         game_state.push_rule_log(text.clone());
         game_state.push_structured_log(LogEntry {
             text,

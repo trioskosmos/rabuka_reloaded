@@ -1178,6 +1178,62 @@ def _attach_baton_touch_from_group_condition(effect, triggerless_text):
     _strip(effect)
 
 
+def _find_modify_cost_nodes(obj):
+    """Collect modify_cost sub-action nodes (self-cost reduction clauses)."""
+    found = []
+    if isinstance(obj, dict):
+        if obj.get("action") == "modify_cost":
+            found.append(obj)
+        for v in obj.values():
+            found.extend(_find_modify_cost_nodes(v))
+    elif isinstance(obj, list):
+        for item in obj:
+            found.extend(_find_modify_cost_nodes(item))
+    return found
+
+
+def _find_pay_energy_steps(obj):
+    """Collect pay_energy cost steps from a cost tree."""
+    found = []
+    if isinstance(obj, dict):
+        if obj.get("type") == "pay_energy" or obj.get("action") == "pay_energy":
+            found.append(obj)
+        for key in ("costs", "options", "actions"):
+            sub = obj.get(key)
+            if isinstance(sub, list):
+                for item in sub:
+                    found.extend(_find_pay_energy_steps(item))
+    return found
+
+
+def _promote_self_cost_reduction(ability: Dict[str, Any]) -> None:
+    """Promote a self-cost energy reduction clause onto the ability's own
+    pay_energy cost as `cost_reduction_per_group`.
+
+    e.g. 海未 bp5-004: "この能力を起動するためのコストは自分のステージにいる
+    メンバーの中のグループ名1種類につき、{{E}}減る。" — the clause parses as
+    a modify_cost effect step with per_unit metadata; affordability decisions
+    need it attached to the cost itself so the printed energy is treated as an
+    upper bound. Only group-name-per-unit ENERGY reductions qualify; other
+    cards' continuous deploy-cost modifiers and non-energy reductions
+    (e.g. pb1-007's hand-count reduction) are untouched.
+    """
+    cost = ability.get("cost")
+    effect = ability.get("effect")
+    if not isinstance(cost, dict) or not isinstance(effect, dict):
+        return
+    for node in _find_modify_cost_nodes(effect):
+        if node.get("operation") != "subtract":
+            continue
+        if node.get("per_unit_type") != "group_name":
+            continue
+        amount = node.get("per_unit_count") or node.get("count")
+        if not isinstance(amount, int) or amount <= 0:
+            continue
+        for pay in _find_pay_energy_steps(cost):
+            pay.setdefault("cost_reduction_per_group", amount)
+
+
 def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     """Parse a complete ability text."""
     triggerless_text = normalize(triggerless_text.strip())
@@ -1301,6 +1357,9 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
             }
         else:
             ability["effect"]["condition"] = phase_gate
+
+    # Promote self-cost reduction clauses onto the cost (see helper docstring).
+    _promote_self_cost_reduction(ability)
 
     # Clean cost too
     if "cost" in ability:

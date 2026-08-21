@@ -18,6 +18,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
     optional: &mut Option<bool>,
     max: &mut Option<bool>,
     effect_steps: &mut Option<Vec<Box<AbilityEffect>>>,
+    cost_reduction_per_group: &mut Option<u8>,
     // CompoundBranch fields
     look_action: &mut Option<Box<AbilityEffect>>,
     select_action: &mut Option<Box<AbilityEffect>>,
@@ -46,6 +47,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "optional" => { *optional = bc.read_bool_value(); return Some(true); }
             "max" => { *max = bc.read_bool_value(); return Some(true); }
             "effect_steps" => { *effect_steps = bc.read_effect_vec_value(); return Some(true); }
+            "cost_reduction_per_group" => { *cost_reduction_per_group = bc.read_u8_value(); return Some(true); }
             "look_action" => { *look_action = bc.read_effect_value(); return Some(true); }
             "select_action" => { *select_action = bc.read_effect_value(); return Some(true); }
             "actions" => { *actions = bc.read_effect_vec_value(); return Some(true); }
