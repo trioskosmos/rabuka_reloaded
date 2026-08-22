@@ -220,7 +220,6 @@ pub fn choose_live_set_conductor(gs: &GameState, actions: &[Action], db: &CardDa
     // filtering starved placements — failed checks cost almost nothing
     // (lives recycle via refresh) while refusing to place loses the race.
     let cands: Vec<(i32, Vec<usize>)> = passing_portfolios(gs, me, db);
-    let mut desired: Vec<usize> = Vec::new();
 
     // Free win: sole passer places regardless of score (8.4.3.2).
     if gs.current_phase == crate::game_state::Phase::LiveCardSetSecondAttacker
@@ -238,7 +237,7 @@ pub fn choose_live_set_conductor(gs: &GameState, actions: &[Action], db: &CardDa
     // margins DO matter in bot play even though one card places regardless.
     // The plan layer lives in the MAIN phase (development targets); here we
     // simply want the portfolio most likely to place.
-    desired = super::strategy_v5::best_portfolio_scored(gs, me, db).0;
+    let mut desired: Vec<usize> = super::strategy_v5::best_portfolio_scored(gs, me, db).0;
 
     // Spare slots / planned dig: junk draws (8.2 + 8.3.4 hand filtering).
     fill_junk(gs, me, db, &mut desired, max_slots);

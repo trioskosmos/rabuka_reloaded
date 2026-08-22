@@ -64,10 +64,16 @@ ports/3ds/romfs/cards/*.png
 # Platform build outputs (3DS / Wii / Dreamcast builds are bulky)
 platforms/3ds/output/
 platforms/wii/output/
+platforms/jaguar/output/
+platforms/genesis/output/
 
 # Dreamcast toolchain build artifacts
 dc-toolchain/
 platforms/dc/output/
+
+# Rust build artifacts
+platforms/*/target/
+platforms/*/target_m68k/
 
 # Build intermediates
 a.out
@@ -104,6 +110,7 @@ cards/build/cards_gen.rs
 # Regenerated build artifacts (rebuilt by the 3DS/GBA toolchains)
 platforms/3ds/.card_png_cache/
 platforms/3ds/.font_tmp/
+platforms/3ds/romfs/cards.bin
 platforms/3ds/romfs/decks/
 platforms/3ds/romfs/cards/*.t3x
 platforms/3ds/romfs/cards_fmt.txt

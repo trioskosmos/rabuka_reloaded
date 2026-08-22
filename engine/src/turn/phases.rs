@@ -267,6 +267,12 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                     game_state.cannot_activate_members.clear();
                     game_state.cannot_live_players.clear();
                     game_state.wait_immune_members.clear();
+                    // Rule 9.6.2.1.2.1: only members deployed THIS turn are
+                    // baton-protected. The set must reset each turn or no
+                    // member is ever eligible for baton touch again (measured:
+                    // 0 baton offers across every traced game).
+                    game_state.player1.deployed_this_turn.clear();
+                    game_state.player2.deployed_this_turn.clear();
                     game_state.turn_number += 1;
                     Self::log_turn_start(game_state);
                     Self::log_phase(game_state, "phase_active_first");

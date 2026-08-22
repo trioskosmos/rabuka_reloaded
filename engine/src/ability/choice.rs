@@ -196,6 +196,11 @@ impl super::resolver::AbilityResolver {
             (false, true, false) => Continuation::DeferredOther,
             (false, false, _) => Continuation::Immediate,
         };
+        #[cfg(not(feature = "no_std"))]
+        eprintln!(
+            "[FIN_DBG] looked={:?} sub_choice={} has_pending={} was_select_card={} cont={:?}",
+            is_actual_looked_at_choice, sub_choice, has_pending, was_select_card, cont
+        );
         match cont {
             Continuation::DeferredSelectCard => {
                 self.pending_choice = None;

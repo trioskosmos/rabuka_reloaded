@@ -7,7 +7,6 @@
 ///   - PL!HS-pb1-014-R 常時: front opponent cost > own → heart01
 ///   - PL!S-bp2-022-L ライブ成功時: deck refreshed this turn → score +2
 use crate::helpers::*;
-use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
 
@@ -265,8 +264,8 @@ fn sumire_bpb4004_double_baton_removes_both_and_clamps_cost() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let sumire = game.id("PL!SP-bp4-004-R＋"); // cost 22 — double baton constant
-    let big_a = game.id("PL!S-bp5-009-R"); // cost 15
-    let big_b = game.id("PL!HS-bp6-006-R＋"); // cost 20
+    let big_a = game.id("PL!S-bp5-009-R"); // cost 15, unprotected
+    let big_b = game.id("PL!N-bp1-006-R＋"); // cost 13, unprotected
 
     // Two occupied areas with heavy members; third area empty.
     game.state.player1.stage.stage = [big_a, big_b, -1];
@@ -275,16 +274,16 @@ fn sumire_bpb4004_double_baton_removes_both_and_clamps_cost() {
     game.add_to_hand(sumire);
     game.give_energy(3);
 
-    // Combined occupant cost 35 ≥ her 22 → pair_cost clamps to 0.
     let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
     let double_plays: Vec<_> = actions
-        .iter()
+        .into_iter()
         .filter(|a| {
             a.action_type == rabuka_engine::game_setup::ActionType::PlayMemberToStage
+                && a.parameters.as_ref().and_then(|p| p.card_id) == Some(sumire)
                 && a.parameters
                     .as_ref()
-                    .and_then(|p| p.card_id)
-                    .is_some_and(|cid| cid == sumire)
+                    .and_then(|p| p.card_indices.as_ref())
+                    .is_some_and(|ix| ix.len() == 2)
         })
         .collect();
     assert!(
@@ -292,8 +291,23 @@ fn sumire_bpb4004_double_baton_removes_both_and_clamps_cost() {
         "double-baton play must be offered when two eligible occupants exist"
     );
 
-    let res = game.try_play_to_stage(sumire, MemberArea::Center);
-    assert!(res.is_ok(), "double baton resolves");
+    // Execute the pair whose placement is CENTER.
+    let chosen = double_plays
+        .iter()
+        .find(|a| {
+            a.parameters
+                .as_ref()
+                .and_then(|p| p.stage_area.as_deref())
+                == Some("center")
+        })
+        .expect("center-placement double baton offered");
+    let mut chosen = chosen.clone();
+    chosen
+        .parameters
+        .as_mut()
+        .map(|p| p.card_id = Some(sumire));
+    rabuka_engine::game_setup::execute_action(&mut game.state, chosen).expect("resolve");
+
     assert!(
         !game.state.player1.stage.stage.contains(&big_a)
             && !game.state.player1.stage.stage.contains(&big_b),
@@ -307,6 +321,6 @@ fn sumire_bpb4004_double_baton_removes_both_and_clamps_cost() {
     assert_eq!(
         game.state.player1.energy_zone.active_count(),
         3,
-        "combined cost 35 ≥ 22 → pair cost clamps to 0 (Q26: no refunds)"
+        "combined cost 28 ≥ 22 → pair cost clamps to 0 (Q26: no refunds)"
     );
 }
