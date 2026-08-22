@@ -1073,11 +1073,7 @@ impl<'a> ConditionContext<'a> {
             "cost" => {
                 let mut seen_costs: HashSet<u8> = HashSet::default();
                 for &cid in cards.iter() {
-                    if let Some(card) = card_db.get_card(cid) {
-                        let cost = card.cost.unwrap_or(0);
-                        let modified_cost = (cost as i32
-                            + self.game_state.mods.get_cost_modifier(cid))
-                        .max(0) as u8;
+                    if let Some(modified_cost) = self.modified_cost(cid) {
                         seen_costs.insert(modified_cost);
                     }
                 }
@@ -1734,28 +1730,25 @@ impl<'a> ConditionContext<'a> {
                 }
                 _ => "card_name",
             };
+            // Shared eligibility gate — identical across all three distinct-key
+            // modes; only the key extraction/aggregation below differs.
+            let eligible = |cid: i16| -> bool {
+                cid != -1
+                    && card_type_filter
+                        .is_none_or(|f| util::card_matches_type(card_db, cid, Some(f)))
+                    && group_names.is_none_or(|gn| {
+                        gn.iter()
+                            .any(|g| util::card_matches_group_str(card_db, cid, Some(g.as_str())))
+                    })
+            };
             match distinct_type {
                 "cost" => {
                     let mut distinct_costs: HashSet<u8> = HashSet::default();
                     for &cid in &combined {
-                        if cid == -1 {
+                        if !eligible(cid) {
                             continue;
                         }
-                        let passes_type = card_type_filter
-                            .is_none_or(|f| util::card_matches_type(card_db, cid, Some(f)));
-                        let passes_group = group_names.is_none_or(|gn| {
-                            gn.iter().any(|g| {
-                                util::card_matches_group_str(card_db, cid, Some(g.as_str()))
-                            })
-                        });
-                        if !passes_type || !passes_group {
-                            continue;
-                        }
-                        if let Some(card) = card_db.get_card(cid) {
-                            let cost = card.cost.unwrap_or(0);
-                            let modified_cost = (cost as i32
-                                + self.game_state.mods.get_cost_modifier(cid))
-                            .max(0) as u8;
+                        if let Some(modified_cost) = self.modified_cost(cid) {
                             distinct_costs.insert(modified_cost);
                         }
                     }
@@ -1765,17 +1758,7 @@ impl<'a> ConditionContext<'a> {
                 "group_name" => {
                     let mut distinct_groups: HashSet<String> = HashSet::default();
                     for &cid in &combined {
-                        if cid == -1 {
-                            continue;
-                        }
-                        let passes_type = card_type_filter
-                            .is_none_or(|f| util::card_matches_type(card_db, cid, Some(f)));
-                        let passes_group = group_names.is_none_or(|gn| {
-                            gn.iter().any(|g| {
-                                util::card_matches_group_str(card_db, cid, Some(g.as_str()))
-                            })
-                        });
-                        if !passes_type || !passes_group {
+                        if !eligible(cid) {
                             continue;
                         }
                         if let Some(card) = card_db.get_card(cid) {
@@ -1790,17 +1773,7 @@ impl<'a> ConditionContext<'a> {
                 _ => {
                     let mut name_sets: Vec<Vec<String>> = Vec::new();
                     for &cid in &combined {
-                        if cid == -1 {
-                            continue;
-                        }
-                        let passes_type = card_type_filter
-                            .is_none_or(|f| util::card_matches_type(card_db, cid, Some(f)));
-                        let passes_group = group_names.is_none_or(|gn| {
-                            gn.iter().any(|g| {
-                                util::card_matches_group_str(card_db, cid, Some(g.as_str()))
-                            })
-                        });
-                        if !passes_type || !passes_group {
+                        if !eligible(cid) {
                             continue;
                         }
                         name_sets.push(card_db.get_card_names(cid));
@@ -2302,6 +2275,14 @@ impl<'a> ConditionContext<'a> {
         result
     }
 
+    /// Card's effective cost after constant cost modifiers, clamped at 0.
+    /// `None` when the card id is unknown to the database.
+    fn modified_cost(&self, cid: i16) -> Option<u8> {
+        let card = self.game_state.card_database.get_card(cid)?;
+        let cost = card.cost.unwrap_or(0);
+        Some((cost as i32 + self.game_state.mods.get_cost_modifier(cid)).max(0) as u8)
+    }
+
     /// Count DISTINCT heart-color types present across `cards`, gated on
     /// `is_blade` (Q271: blade-hearts are NOT heart colors — a base-heart count
     /// ignores blade-hearts, and a blade-heart count ignores base hearts).
@@ -2319,10 +2300,7 @@ impl<'a> ConditionContext<'a> {
                     continue;
                 }
             }
-            if let Some(card) = card_db.get_card(cid) {
-                let cost = card.cost.unwrap_or(0);
-                let modified = (cost as i32 + self.game_state.mods.get_cost_modifier(cid))
-                    .max(0) as u8;
+            if let Some(modified) = self.modified_cost(cid) {
                 seen.insert(modified);
             }
         }
