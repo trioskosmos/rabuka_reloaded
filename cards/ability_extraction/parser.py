@@ -7228,6 +7228,8 @@ def _try_conditional_alternative(text):
                         "target",
                         "position",
                         "values",
+                        "distinct",
+                        "card_type",
                     ):
                         if key in result["condition"] and key not in alt_cond:
                             alt_cond[key] = result["condition"][key]
@@ -7241,7 +7243,14 @@ def _try_conditional_alternative(text):
                 # Inherit location/group/position context from the main condition
                 # since the secondary text ("2枚以上ある場合") omits the zone/group
                 if "condition" in result:
-                    for key in ("location", "group_names", "target", "position"):
+                    for key in (
+                        "location",
+                        "group_names",
+                        "target",
+                        "position",
+                        "distinct",
+                        "card_type",
+                    ):
                         if key in result["condition"] and key not in alt_cond:
                             alt_cond[key] = result["condition"][key]
                 result["alternative_condition"] = alt_cond

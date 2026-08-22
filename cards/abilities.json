@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-22T18:17:01.981577",
+  "generated_at": "2026-08-22T19:19:05.077041",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards\\cards.json",
-  "engine_commit": "a7bb5587",
+  "engine_commit": "4704a81a",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -26847,7 +26847,8 @@
           "values": [
             1,
             5
-          ]
+          ],
+          "card_type": "live_card"
         },
         "primary_effect": {
           "text": "このカードのスコアを+1する",
@@ -28099,7 +28100,9 @@
           "group_names": [
             "虹ヶ咲"
           ],
-          "target": "self"
+          "target": "self",
+          "distinct": "card_name",
+          "card_type": "live_card"
         },
         "primary_effect": {
           "text": "このカードのスコアを+1する",
