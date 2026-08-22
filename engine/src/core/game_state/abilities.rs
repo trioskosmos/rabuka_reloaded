@@ -2398,6 +2398,33 @@ impl GameState {
                     }
                 }
                 s if s.starts_with("gain_ability:") => {
+                    // Structured path: the registration stashed the owning
+                    // card + immediate-application info in effect_data, so
+                    // revert exactly what was applied. Only per-card score
+                    // gains get an immediate modifier reverted; live-total
+                    // gains were never applied per card (they live in the
+                    // p*_constant_total_score_bonus accumulator and expire
+                    // with the gained_card_abilities entry itself).
+                    if let Some(ref data) = effect.effect_data {
+                        if let crate::core::types::EffectData::GainAbility {
+                            card_id,
+                            amount,
+                            is_live_total,
+                        } = data
+                        {
+                            if !is_live_total && *amount != 0 {
+                                self.mods.remove_score_modifier(*card_id, *amount);
+                                log::debug!(
+                                    "Reverted gained ability score modifier +{} for card {}",
+                                    amount,
+                                    card_id
+                                );
+                            }
+                            self.clear_gained_abilities_for_card(*card_id);
+                        }
+                    } else {
+                    // Legacy fallback: no structured data — locate the owner by
+                    // matching the ability text against the gained maps.
                     let ability_text = s.trim_start_matches("gain_ability:");
                     let mut card_to_clear = None;
                     for (&cid, abilities) in &self.gained_abilities {
@@ -2432,6 +2459,7 @@ impl GameState {
                             );
                         }
                         self.clear_gained_abilities_for_card(card_id);
+                    }
                     }
                 }
                 "set_heart_type" => {

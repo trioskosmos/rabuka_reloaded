@@ -331,8 +331,9 @@ impl AbilityResolver {
                         Some(t.to_string())
                     }
                 });
+                let is_live_total = gained.target_any() == Some("live_total");
                 let immediate_val = if gained.action == crate::ability::enums::ActionType::ModifyScore
-                    && gained.target_any() != Some("live_total")
+                    && !is_live_total
                 {
                     // Structured value first; fall back to the "+N"/"＋N" text
                     // the old hack parsed (many cards carry no structured value).
@@ -367,11 +368,6 @@ impl AbilityResolver {
                     trigger,
                     card_id
                 );
-                log::debug!(
-                    "[GAINED_ABILITY] registered trigger={:?} on card {}",
-                    trigger,
-                    card_id
-                );
                 gs.gained_card_abilities
                     .entry(card_id)
                     .or_default()
@@ -392,6 +388,11 @@ impl AbilityResolver {
                 // A gained 常時 changes the constant landscape — make sure the
                 // next recalculation picks it up.
                 gs.mark_constants_dirty();
+                self.last_gain_effect_data = Some(crate::core::types::EffectData::GainAbility {
+                    card_id,
+                    amount: immediate_val as i16,
+                    is_live_total,
+                });
             }
             (None, Some(card_id)) => {
                 // Legacy fallback: no structured effect  Eparse "+N" from text.
@@ -417,6 +418,12 @@ impl AbilityResolver {
                         card_id
                     );
                 }
+                self.last_gain_effect_data =
+                    Some(crate::core::types::EffectData::SingleCard {
+                        card_id,
+                        amount: 0,
+                        color: None,
+                    });
             }
             _ => {}
         }
@@ -437,7 +444,7 @@ impl AbilityResolver {
             duration,
             target,
             &format!("Gained ability: {}", ability_text),
-            None,
+            self.last_gain_effect_data.take(),
         );
         Ok(())
     }

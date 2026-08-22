@@ -136,6 +136,10 @@ pub struct AbilityResolver {
     /// Declared intent of the pending Stage SelectCard choice, if its producer
     /// declared one. Consumed by handle_stage_selection.
     pub stage_select_intent: Option<crate::ability::types::StageSelectIntent>,
+    /// Structured EffectData produced by the most recent gain_ability
+    /// registration, forwarded to push_temporary_effect so expiry can revert
+    /// by card id instead of text-searching the gained maps.
+    pub last_gain_effect_data: Option<crate::core::types::EffectData>,
 }
 
 impl AbilityResolver {
@@ -177,6 +181,7 @@ impl AbilityResolver {
             looked_at_origin: None,
             looked_at_deck_position: None,
             stage_select_intent: None,
+            last_gain_effect_data: None,
         }
     }
 

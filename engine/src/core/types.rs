@@ -264,6 +264,14 @@ pub enum EffectData {
         is_p1: bool,
         old_value: u8,
     },
+    /// A granted 「常時：…」 style ability registered on `card_id`.
+    /// `amount`/`is_live_total` describe the immediate per-card score
+    /// application (None target ⇒ no immediate modifier to revert).
+    GainAbility {
+        card_id: i16,
+        amount: i16,
+        is_live_total: bool,
+    },
 }
 
 impl EffectData {
@@ -272,6 +280,7 @@ impl EffectData {
             EffectData::HeartOverride { card_id, .. } => Some(*card_id),
             EffectData::SingleCard { card_id, .. } => Some(*card_id),
             EffectData::SetBladeCount { card_id } => Some(*card_id),
+            EffectData::GainAbility { card_id, .. } => Some(*card_id),
             _ => None,
         }
     }
