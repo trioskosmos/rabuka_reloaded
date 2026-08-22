@@ -423,8 +423,9 @@ impl Player {
                 for (color, entry) in mods {
                     let delta = entry.total();
                     if delta != 0 {
-                        let new_val = (total_hearts.get(color).copied().unwrap_or(0) as i32 + delta)
-                            .max(0) as u8;
+                        let new_val = crate::constants::saturate_u8(
+                            total_hearts.get(color).copied().unwrap_or(0) as i32 + delta,
+                        );
                         if new_val > 0 {
                             total_hearts.insert(*color, new_val);
                         } else {

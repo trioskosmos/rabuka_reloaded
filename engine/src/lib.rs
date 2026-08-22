@@ -1,5 +1,11 @@
 #![recursion_limit = "512"]
 #![cfg_attr(feature = "no_std", no_std)]
+// Cast hygiene (audit QUEUE B): surface every remaining lossy cast so new
+// ones can't sneak in. Warn-only; the existing population is being worked
+// down via saturate_* helpers / CardId newtype — see docs/CODE_AUDIT_2026-08-23.md.
+#![warn(clippy::cast_possible_truncation)]
+#![warn(clippy::cast_sign_loss)]
+#![warn(clippy::cast_possible_wrap)]
 
 #[cfg(feature = "no_std")]
 #[macro_use]

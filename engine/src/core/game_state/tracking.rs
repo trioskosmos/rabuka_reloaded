@@ -50,7 +50,7 @@ impl GameState {
             .filter(|m| m.0 == slot)
             .map(|m| m.1)
             .sum();
-        (base as i32 + sum).max(0) as u8
+        crate::constants::saturate_u8(base as i32 + sum)
     }
 
     pub fn perform_cheer_check(&mut self, player_id: &str, blade_count: u8) -> Result<(), String> {

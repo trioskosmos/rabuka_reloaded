@@ -193,12 +193,11 @@ impl super::TurnEngine {
                     .iter()
                     .map(|(&k, e)| (k, e.total()))
                     .collect();
-                p1_extra = Self::score_delta_since(
+                p1_extra = crate::constants::saturate_u8(Self::score_delta_since(
                     &score_cur,
                     &pre_score_flat,
                     &game_state.player1.live_card_zone.cards,
-                )
-                .max(0) as u8;
+                ));
                 game_state.live_success_p1_extra = p1_extra;
                 game_state.live_success_p2_fired = true;
             } else {
@@ -224,12 +223,11 @@ impl super::TurnEngine {
                 .iter()
                 .map(|(&k, e)| (k, e.total()))
                 .collect();
-            p2_extra = Self::score_delta_since(
+            p2_extra = crate::constants::saturate_u8(Self::score_delta_since(
                 &score_cur2,
                 &pre_score_flat,
                 &game_state.player2.live_card_zone.cards,
-            )
-            .max(0) as u8;
+            ));
             game_state.live_success_p2_extra = p2_extra;
         }
 
@@ -319,7 +317,7 @@ impl super::TurnEngine {
                                 if me.additive != 0 {
                                     let idx = color.index();
                                     let current = required_arr[idx] as i32;
-                                    required_arr[idx] = (current + me.additive as i32).max(0) as u8;
+                                    required_arr[idx] = crate::constants::saturate_u8(current + me.additive as i32);
                                 }
                             }
                             if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] after_modifiers required={:?}",
@@ -446,7 +444,7 @@ impl super::TurnEngine {
                     } else {
                         base_score
                     };
-                    snap.lives[i].score = (effective_base + additive).max(0) as u8;
+                    snap.lives[i].score = crate::constants::saturate_u8(effective_base + additive);
                 }
             }
         }
@@ -1324,9 +1322,12 @@ impl super::TurnEngine {
             let entry = blade_modifiers.get(&cid).copied().unwrap_or_default();
             let (effective_base_blades, bonus_blades) = if entry.set != 0 {
                 // set replaces the base blade — additive stacks on top
-                (entry.total().max(0) as u8, 0u8)
+                (
+                    crate::constants::saturate_u8(entry.total()),
+                    0u8,
+                )
             } else {
-                (base_blades, entry.total().max(0) as u8)
+                (base_blades, crate::constants::saturate_u8(entry.total()))
             };
             base_blades = effective_base_blades;
 
@@ -1746,7 +1747,7 @@ impl super::TurnEngine {
                             if me.additive != 0 {
                                 let idx = color.index();
                                 let current = need[idx] as i32;
-                                need[idx] = (current + me.additive as i32).max(0) as u8;
+                                need[idx] = crate::constants::saturate_u8(current + me.additive as i32);
                             }
                         }
                     }
@@ -2440,7 +2441,7 @@ impl super::TurnEngine {
                         if me.additive != 0 {
                             let idx = color.index();
                             let current = required_arr[idx] as i32;
-                            required_arr[idx] = (current + me.additive as i32).max(0) as u8;
+                            required_arr[idx] = crate::constants::saturate_u8(current + me.additive as i32);
                         }
                     }
                 }

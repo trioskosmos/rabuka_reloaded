@@ -112,7 +112,7 @@ impl AbilityResolver {
                     .map(|idx| p.stage.under_cards[idx].len() as i32)
                     .unwrap_or(0)
             });
-            Some((under_count + base).max(0) as u8)
+            Some(crate::constants::saturate_u8(under_count + base))
         } else {
             effect.blade_limit_any().map(|v| v as u8)
         };

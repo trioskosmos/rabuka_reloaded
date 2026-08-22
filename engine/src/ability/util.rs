@@ -310,7 +310,7 @@ pub fn compute_play_cost(
     // Constant set-override ("コストはNになる", e.g. LL-bp7-001-R＋ ab#0)
     // replaces the base play cost entirely. 0 means no set modifier.
     if set_override != 0 && set_override != base_cost as i32 {
-        cost = set_override.max(0) as u8;
+        cost = crate::constants::saturate_u8(set_override);
     }
     cost
 }
@@ -1512,7 +1512,7 @@ pub fn filter_current_blade(
             let set = gs.mods.get_blade_set_modifier(cid);
             let effective = if set != 0 { set as i32 } else { base };
             let additive = gs.mods.get_blade_modifier(cid) - set as i32;
-            let total = (effective + additive).max(0) as u8;
+            let total = crate::constants::saturate_u8(effective + additive);
             compare_counts(Some(op), total, bl)
         })
         .collect()

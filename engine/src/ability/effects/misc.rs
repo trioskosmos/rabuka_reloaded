@@ -3917,7 +3917,7 @@ impl AbilityResolver {
                 let blade = base_blade + gs.mods.get_blade_modifier(cid);
                 if crate::ability::util::compare_counts(
                     blade_op,
-                    blade.max(0) as u8,
+                    crate::constants::saturate_u8(blade),
                     blade_limit,
                 ) {
                     to_protect.push(cid);

@@ -159,7 +159,8 @@ impl AbilityResolver {
                 )
             })?;
 
-        let resolved = (base_cost as i32).saturating_add(offset as i32).max(0) as u8;
+        let resolved =
+            crate::constants::saturate_u8((base_cost as i32).saturating_add(offset as i32));
         log::debug!(
             "[COST_REF] referenced='{}' name='{}' base_cost={} offset={} resolved={}",
             reference,

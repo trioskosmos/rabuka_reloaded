@@ -128,7 +128,7 @@ impl<'a> ConditionContext<'a> {
             return ids.iter().any(|&id| {
                 let original = card_db.get_card(id).and_then(|c| c.score).unwrap_or(0);
                 let current =
-                    (original as i32 + self.game_state.mods.get_score_modifier(id)).max(0) as u8;
+                    crate::constants::saturate_u8(original as i32 + self.game_state.mods.get_score_modifier(id));
                 util::compare_counts(op, current, original)
             });
         }
@@ -250,7 +250,7 @@ impl<'a> ConditionContext<'a> {
                                 // printed cost directly via cost_threshold_met().
                                 if ctype == "cost" {
                                     base.saturating_sub(
-                                        self.game_state.mods.get_cost_modifier(act_id).max(0) as u8,
+                                        crate::constants::saturate_u8(self.game_state.mods.get_cost_modifier(act_id)),
                                     )
                                 } else {
                                     base
@@ -374,7 +374,7 @@ impl<'a> ConditionContext<'a> {
                     })
                     .sum()
             };
-            return compare_counts(Some(operator), sum_cost.max(0) as u8, total);
+            return compare_counts(Some(operator), crate::constants::saturate_u8(sum_cost), total);
         }
 
         let result = compare_counts(condition.get_operator(), count, target_count);
@@ -470,7 +470,7 @@ impl<'a> ConditionContext<'a> {
                 .filter(|&&id| id != -1)
                 .map(|&id| {
                     let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
-                    (base + gs.mods.get_cost_modifier(id)).max(0) as u8
+                    crate::constants::saturate_u8(base + gs.mods.get_cost_modifier(id))
                 })
                 .collect()
         };
@@ -510,7 +510,7 @@ impl<'a> ConditionContext<'a> {
                 .get_card(card_at_pos)
                 .and_then(|c| c.cost)
                 .unwrap_or(0) as i32;
-            (base + self.game_state.mods.get_cost_modifier(card_at_pos)).max(0) as u8
+            crate::constants::saturate_u8(base + self.game_state.mods.get_cost_modifier(card_at_pos))
         };
 
         let operator = condition.get_operator().unwrap_or(">");
@@ -521,7 +521,7 @@ impl<'a> ConditionContext<'a> {
             }
             let other_cost = {
                 let base = card_db.get_card(other_id).and_then(|c| c.cost).unwrap_or(0) as i32;
-                (base + self.game_state.mods.get_cost_modifier(other_id)).max(0) as u8
+                crate::constants::saturate_u8(base + self.game_state.mods.get_cost_modifier(other_id))
             };
             if !compare_counts(Some(operator), pos_cost, other_cost) {
                 return false;
@@ -919,7 +919,7 @@ impl<'a> ConditionContext<'a> {
                                         .unwrap_or(0)
                                 })
                                 .sum();
-                            (base as i32 + modifier).max(0) as u8
+                            crate::constants::saturate_u8(base as i32 + modifier)
                         })
                         .sum();
                     Some(compare_counts(
@@ -962,7 +962,7 @@ impl<'a> ConditionContext<'a> {
                                                     .game_state
                                                     .mods
                                                     .get_need_heart_modifier(cid, color);
-                                                (base + modifier).max(0) as u8
+                                    crate::constants::saturate_u8(base + modifier)
                                             })
                                             .sum::<u8>()
                                     })
@@ -1001,7 +1001,7 @@ impl<'a> ConditionContext<'a> {
                                         .game_state
                                         .mods
                                         .get_need_heart_modifier(cid, color);
-                                    (base + modifier).max(0) as u8
+                                crate::constants::saturate_u8(base + modifier)
                                 })
                                 .sum();
                             total >= threshold
@@ -1465,7 +1465,9 @@ impl<'a> ConditionContext<'a> {
             })
             .unwrap_or(0);
 
-        HeartTotal::Value((base_sum as i32 + modifier_total).max(0) as u8)
+        HeartTotal::Value(crate::constants::saturate_u8(
+            base_sum as i32 + modifier_total,
+        ))
     }
 
     fn evaluate_heart_greater_than_all(&self, condition: &Condition, is_both: bool) -> bool {
@@ -2280,7 +2282,9 @@ impl<'a> ConditionContext<'a> {
     fn modified_cost(&self, cid: i16) -> Option<u8> {
         let card = self.game_state.card_database.get_card(cid)?;
         let cost = card.cost.unwrap_or(0);
-        Some((cost as i32 + self.game_state.mods.get_cost_modifier(cid)).max(0) as u8)
+        Some(crate::constants::saturate_u8(
+            cost as i32 + self.game_state.mods.get_cost_modifier(cid),
+        ))
     }
 
     /// Count DISTINCT heart-color types present across `cards`, gated on
@@ -2838,13 +2842,13 @@ impl<'a> ConditionContext<'a> {
             total_blades,
             op_display,
             count,
-            if util::compare_counts(operator, total_blades.max(0) as u8, count) {
+            if util::compare_counts(operator, crate::constants::saturate_u8(total_blades), count) {
                 "PASS"
             } else {
                 "FAIL"
             }
         );
-        util::compare_counts(operator, total_blades.max(0) as u8, count)
+        util::compare_counts(operator, crate::constants::saturate_u8(total_blades), count)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -3899,7 +3903,7 @@ impl<'a> ConditionContext<'a> {
                             if let Some(card) = self.game_state.card_database.get_card(card_id) {
                                 let base = card.get_score() as i32;
                                 let modifier = score_flat.get(&card_id).copied().unwrap_or(0);
-                                total += (base + modifier).max(0) as u8;
+                                total += crate::constants::saturate_u8(base + modifier);
                             }
                         }
                         total
@@ -3916,7 +3920,8 @@ impl<'a> ConditionContext<'a> {
                         ),
                         Some(Zone::SuccessLiveZone) => success_score,
                         None => {
-                            live_score + success_score + cheer_blade + constant_bonus.max(0) as u8
+                            live_score + success_score + cheer_blade
+                                + crate::constants::saturate_u8(constant_bonus as i32)
                         }
                         _ => 0,
                     };
@@ -3952,7 +3957,7 @@ impl<'a> ConditionContext<'a> {
                         }
                     }
                 }
-                total_cost.max(0) as u8
+                crate::constants::saturate_u8(total_cost)
             }
             Some("energy") => player.energy_zone.cards.len() as u8,
             _ => self.zone_len(player, location),
@@ -4029,7 +4034,7 @@ impl<'a> ConditionContext<'a> {
                     .filter(|&&id| ct.is_none() || util::card_matches_type(card_db, id, ct))
                     .map(|&id| {
                         let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
-                        (base + self.game_state.mods.get_cost_modifier(id)).max(0) as u8
+                        crate::constants::saturate_u8(base + self.game_state.mods.get_cost_modifier(id))
                     })
                     .sum();
             }
@@ -4108,7 +4113,7 @@ impl<'a> ConditionContext<'a> {
                         .map(|&id| {
                             let base =
                                 card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
-                            (base + self.game_state.mods.get_cost_modifier(id)).max(0) as u8
+                        crate::constants::saturate_u8(base + self.game_state.mods.get_cost_modifier(id))
                         })
                         .sum();
                     return total;
@@ -4226,7 +4231,9 @@ impl<'a> ConditionContext<'a> {
                 .iter()
                 .filter_map(|&id| {
                     let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
-                    Some((base + self.game_state.mods.get_cost_modifier(id)).max(0) as u8)
+                    Some(crate::constants::saturate_u8(
+                        base + self.game_state.mods.get_cost_modifier(id),
+                    ))
                 })
                 .sum();
             if total > 0 {
@@ -4244,7 +4251,9 @@ impl<'a> ConditionContext<'a> {
                 .iter()
                 .filter_map(|&id| {
                     let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
-                    Some((base + self.game_state.mods.get_cost_modifier(id)).max(0) as u8)
+                    Some(crate::constants::saturate_u8(
+                        base + self.game_state.mods.get_cost_modifier(id),
+                    ))
                 })
                 .sum();
             return total;
@@ -4551,7 +4560,7 @@ impl<'a> ConditionContext<'a> {
                     .map(|&cid| {
                         let base = card_db.get_card(cid).map(|c| c.blade as i32).unwrap_or(0);
                         let modifier = bm_flat.get(&cid).copied().unwrap_or(0);
-                        (base + modifier).max(0) as u8
+                        crate::constants::saturate_u8(base + modifier)
                     })
                     .sum()
             }

@@ -2230,9 +2230,10 @@ impl GameState {
                             for (color, me) in color_mods {
                                 if me.additive != 0 {
                                     *hearts.entry_or_default(*color) =
-                                        (hearts.get(color).copied().unwrap_or(0) as i32
-                                            + me.additive as i32)
-                                            .max(0) as u8;
+                                        crate::constants::saturate_u8(
+                                            hearts.get(color).copied().unwrap_or(0) as i32
+                                                + me.additive as i32,
+                                        );
                                 }
                             }
                         }

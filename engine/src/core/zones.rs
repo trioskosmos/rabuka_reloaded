@@ -385,9 +385,10 @@ impl Stage {
                 if let Some(card) = card_db.get_card(card_id) {
                     let entry = blade_entries.get(&card_id).copied().unwrap_or_default();
                     if entry.set != 0 {
-                        total += entry.total().max(0) as u8;
+                        total += crate::constants::saturate_u8(entry.total());
                     } else {
-                        total += (card.blade as i32 + entry.total()).max(0) as u8;
+                        total +=
+                            crate::constants::saturate_u8(card.blade as i32 + entry.total());
                     }
                 }
             }
@@ -455,8 +456,9 @@ impl Stage {
 
             if let Some(mods) = heart_modifiers.get(&card_id) {
                 for (color, delta) in mods {
-                    let new_val =
-                        (hearts.get(color).copied().unwrap_or(0) as i32 + *delta).max(0) as u8;
+                    let new_val = crate::constants::saturate_u8(
+                        hearts.get(color).copied().unwrap_or(0) as i32 + *delta,
+                    );
                     if new_val > 0 {
                         hearts.insert(*color, new_val);
                     } else {
@@ -542,7 +544,8 @@ impl LiveCardZone {
                     .and_then(|sm| sm.get(card_id))
                     .copied()
                     .unwrap_or(0);
-                let card_score = (base_score + modifier).max(0) as u8;
+                let card_score =
+                    crate::constants::saturate_u8(base_score + modifier);
 
                 let heart_needs_satisfied = if let Some(ref need_heart) = card.need_heart {
                     if !need_heart.hearts.is_empty() {
@@ -591,7 +594,8 @@ impl LiveCardZone {
             }
         }
 
-        total_score + cheer_blade_heart_count + constant_total_score_bonus.max(0) as u8
+        total_score + cheer_blade_heart_count
+            + crate::constants::saturate_u8(constant_total_score_bonus as i32)
     }
 
 }

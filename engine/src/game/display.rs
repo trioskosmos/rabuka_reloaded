@@ -583,7 +583,7 @@ pub fn card_to_display(
             total_blade: if orientation == Some(Orientation::Wait) {
                 0
             } else {
-                ((card.blade as i32) + blade_modifier).max(0) as u8
+                crate::constants::saturate_u8((card.blade as i32) + blade_modifier)
             },
             id: card_id,
             ability_text: Some(card.ability_text().to_string()),
@@ -676,9 +676,9 @@ pub fn card_to_display_full(
             }
         }
         let total_blade = if blade_set != 0 {
-            (blade_set + blade_additive).max(0) as u8
+            crate::constants::saturate_u8(blade_set + blade_additive)
         } else {
-            ((card.blade as i32) + blade_additive).max(0) as u8
+            crate::constants::saturate_u8((card.blade as i32) + blade_additive)
         };
         let transform_str = heart_transform.map(|hc| hc.as_str().to_string());
         CardDisplay {
@@ -974,7 +974,8 @@ pub fn player_to_display(
             if let Some(card_heart_modifiers) = heart_modifiers.get(&card_id) {
                 for (color, modifier) in card_heart_modifiers {
                     if let Some(index) = heart_color_index(color) {
-                        total_hearts[index] = (total_hearts[index] as i32 + modifier).max(0) as u8;
+                        total_hearts[index] =
+                            crate::constants::saturate_u8(total_hearts[index] as i32 + modifier);
                     }
                 }
             }
@@ -1000,7 +1001,8 @@ pub fn player_to_display(
         if player.live_card_zone.cards.contains(&cid) {
             for (color, &val) in colors {
                 if let Some(idx) = heart_color_index(color) {
-                    live_need_hearts[idx] = (live_need_hearts[idx] as i32 + val).max(0) as u8;
+                    live_need_hearts[idx] =
+                        crate::constants::saturate_u8(live_need_hearts[idx] as i32 + val);
                 }
             }
         }
@@ -1026,7 +1028,7 @@ pub fn player_to_display(
                     for (color, &val) in colors {
                         if let Some(ci) = heart_color_index(color) {
                             selected_need_hearts[ci] =
-                                (selected_need_hearts[ci] as i32 + val).max(0) as u8;
+                                crate::constants::saturate_u8(selected_need_hearts[ci] as i32 + val);
                         }
                     }
                 }
@@ -1040,14 +1042,14 @@ pub fn player_to_display(
         if let Some(card) = card_db.get_card(cid) {
             let base = card.score.unwrap_or(0);
             let bonus = score_modifiers.get(&cid).copied().unwrap_or(0);
-            live_card_scores.insert(card.card_no.to_string(), (base as i32 + bonus).max(0) as u8);
+            live_card_scores.insert(card.card_no.to_string(), crate::constants::saturate_u8(base as i32 + bonus));
         }
     }
     for &cid in &player.success_live_card_zone.cards {
         if let Some(card) = card_db.get_card(cid) {
             let base = card.score.unwrap_or(0);
             let bonus = score_modifiers.get(&cid).copied().unwrap_or(0);
-            live_card_scores.insert(card.card_no.to_string(), (base as i32 + bonus).max(0) as u8);
+            live_card_scores.insert(card.card_no.to_string(), crate::constants::saturate_u8(base as i32 + bonus));
         }
     }
 
@@ -1059,7 +1061,7 @@ pub fn player_to_display(
         }
     }
     for (_, &val) in score_modifiers {
-        current_score = (current_score as i32 + val).max(0) as u8;
+        current_score = crate::constants::saturate_u8(current_score as i32 + val);
     }
 
     // Collect gained abilities for this player's cards
