@@ -114,6 +114,7 @@ cards/build/cards_gen.rs
 platforms/3ds/.card_png_cache/
 platforms/3ds/.font_tmp/
 platforms/3ds/romfs/cards.bin
+platforms/3ds/romfs/font.bcfnt
 platforms/3ds/romfs/decks/
 platforms/3ds/romfs/cards/*.t3x
 platforms/3ds/romfs/cards_fmt.txt
