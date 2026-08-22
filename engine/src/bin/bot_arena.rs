@@ -146,6 +146,12 @@ fn main() {
 
     let mut db = fresh_database();
     let nums = load_test_deck(&db, &deck_name);
+    eprintln!(
+        "ARENA deck={} entries={} distinct={}",
+        deck_name,
+        nums.len(),
+        nums.iter().collect::<std::collections::HashSet<_>>().len()
+    );
     let (t1, t2) = build_templates(&mut db, &nums, &nums);
 
     let mut rng = Lcg(0x5EED_1234_ABCD_0001);
@@ -183,6 +189,7 @@ fn main() {
         // Live-phase telemetry: snapshot at every phase change so transcripts
         // show WHO set WHAT and whether checks passed.
         let mut prev_phase = gs.current_phase;
+        let mut timeline: Vec<String> = Vec::new();
         let mut snap_row = |tag: &str, gs: &GameState| -> String {
             let lives_in_hand = |p: &rabuka_engine::player::Player| {
                 p.hand
@@ -230,7 +237,7 @@ fn main() {
 
         for _ in 0..600 {
             if logs && gs.current_phase != prev_phase {
-                trace_rows.push(snap_row("ENTER", &gs));
+                trace_rows.push(snap_row(&format!("ENTER:{:?}", gs.current_phase), &gs));
                 prev_phase = gs.current_phase;
             }
             TurnEngine::check_victory_condition(&mut gs);
@@ -245,6 +252,36 @@ fn main() {
             } else {
                 stuck = 0;
                 last_turn = gs.turn_number;
+                if logs {
+                    timeline.push(format!(
+                        "TIMELINE t{} succ {}-{} hand {}({}L)/{}({}L) en {}/{}",
+                        gs.turn_number,
+                        gs.player1.success_live_card_zone.cards.len(),
+                        gs.player2.success_live_card_zone.cards.len(),
+                        gs.player1.hand.cards.len(),
+                        my_hand_lives(&gs, true, &db),
+                        gs.player2.hand.cards.len(),
+                        my_hand_lives(&gs, false, &db),
+                        gs.player1.energy_zone.active_count(),
+                        gs.player2.energy_zone.active_count(),
+                    ));
+                }
+                if games == 1 && std::env::var("DUMP_STATE").is_ok() {
+                    for (lbl, p) in [("P1", &gs.player1), ("P2", &gs.player2)] {
+                        eprintln!(
+                            "T{} {} hand={} deck={} wr={} livezone={} succ={} en={}",
+                            gs.turn_number,
+                            lbl,
+                            p.hand.cards.len(),
+                            p.main_deck.cards.len(),
+                            p.waitroom.cards.len(),
+                            p.live_card_zone.cards.len(),
+                            p.success_live_card_zone.cards.len(),
+                            p.energy_zone.active_count(),
+                        );
+                    }
+                    eprintln!("phase={:?}", gs.current_phase);
+                }
             }
 
             if game_setup::auto_advance_one(&mut gs) {
@@ -474,13 +511,29 @@ fn main() {
             }
             let _ = std::fs::write(dir.join(format!("game_{games:03}.txt")), out);
 
-            // Self-contained replay: snapshots + decisions in event order.
+            // Self-contained replay: header + turn timeline + decisions.
             if trace {
                 let mut replay = format!(
                     "REPLAY game {games} | {result} | final {z1}-{z2}\n\
-                     ENTER rows = board at phase entry (live/succ/hand/en/cost)\n\
-                     other rows = chosen action\n===\n"
+                     LIVE rows (structured log) = engine's own check verdicts\n\
+                     TIMELINE rows = per-turn board summary\n\
+                     ENTER rows = board at phase entry\n\
+                     other rows = chosen action\n=== TIMELINE ===\n"
                 );
+                for t in &timeline {
+                    replay.push_str(t);
+                    replay.push('\n');
+                }
+                replay.push_str("=== LIVE CHECKS (engine verdicts) ===\n");
+                for e in &gs.structured_log {
+                    if e.category == "live_result" {
+                        replay.push_str(&format!(
+                            "t{}|{}\n",
+                            e.turn, e.text
+                        ));
+                    }
+                }
+                replay.push_str("=== EVENTS ===\n");
                 for r in &trace_rows[game_start_idx.min(trace_rows.len())..] {
                     replay.push_str(r);
                     replay.push('\n');

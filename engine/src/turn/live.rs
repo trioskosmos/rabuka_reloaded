@@ -814,6 +814,77 @@ impl super::TurnEngine {
             game_state.player1.is_first_attacker = false;
             game_state.player2.is_first_attacker = true;
         }
+
+        // ── Structured live-check summary (one line: verdict + both sides).
+        // Only the engine knows pass/fail/scores — emit them here so replays
+        // and benchmark logs are readable WITHOUT per-action tracing.
+        {
+            let summarize = |gs: &crate::game_state::GameState, pid: &str| -> String {
+                let Some(snap) = gs
+                    .performance_snapshots
+                    .iter()
+                    .rev()
+                    .find(|s| s.player_id == pid)
+                else {
+                    return "no-performance".to_string();
+                };
+                let mut parts: Vec<String> = Vec::new();
+                for l in &snap.lives {
+                    let name = gs
+                        .card_database
+                        .get_card(l.card_id)
+                        .map(|c| c.name.to_string())
+                        .unwrap_or_else(|| l.card_no.to_string());
+                    if l.passed {
+                        parts.push(format!("{}:{}pt", name, l.score));
+                    } else {
+                        let deficit: Vec<String> = (0..8)
+                            .filter(|&i| l.filled[i] < l.required[i])
+                            .map(|i| format!("c{} {}/{}", i, l.filled[i], l.required[i]))
+                            .collect();
+                        parts.push(format!("{}:FAIL({})", name, deficit.join(",")));
+                    }
+                }
+                let hits: usize = snap
+                    .yell_cards
+                    .iter()
+                    .map(|y| y.blade_hearts.iter().sum::<u8>() as usize)
+                    .sum();
+                format!(
+                    "set[{}] yell {}/{}flips score={}",
+                    parts.join(" "),
+                    hits,
+                    snap.yell_count,
+                    snap.total_score
+                )
+            };
+            let p1_sum = summarize(game_state, &player1_id);
+            let p2_sum = summarize(game_state, &player2_id);
+            let verdict = match (player1_won, player2_won) {
+                (true, true) => "TIE-both-place",
+                (true, false) => "P1-WINS",
+                (false, true) => "P2-WINS",
+                _ => "NO-CONTEST",
+            };
+            game_state.push_structured_log(crate::types::LogEntry {
+                text: format!(
+                    "LIVE {} | P1 {} → succ={}(+{}) | P2 {} → succ={}(+{})",
+                    verdict,
+                    p1_sum,
+                    p1_now,
+                    p1_added as u8,
+                    p2_sum,
+                    p2_now,
+                    p2_added as u8
+                ),
+                turn: game_state.turn_number,
+                player_label: "SYSTEM".into(),
+                source_card_id: None,
+                source_card_name: None,
+                category: "live_result".into(),
+                metadata: None,
+            });
+        }
     }
 
     fn move_restricted_cards_to_discard(

@@ -220,13 +220,17 @@ pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase)
             }
         }
 
-        // Gamble fallback: when NOTHING clears its floor, bet the single
-        // most promising life anyway. A failed check costs one life card
-        // (recycled via refresh); passing unopposed places for free; folding
-        // guarantees nothing. Stalling is strictly worse than swinging.
+        // Gamble fallback: when NOTHING clears its floor, bet one near-miss
+        // life anyway — but ONLY a near-miss. Measured pathology: uncapped
+        // gambling throws lives at 10+ heart deficits that die for sure
+        // (all-or-nothing 8.3.16), draining ammo into waitroom and stalling
+        // the game at 0-0. Cap scales with urgency: at opponent match point
+        // folding loses outright (S4), so swing harder.
+        let deficit_cap = if opp_succ >= 2 { 8 } else { 4 };
         if let Some((deficit, hi)) = nearest_miss_life(gs, me, db) {
-            let _ = deficit;
-            desired.push(hi);
+            if deficit <= deficit_cap {
+                desired.push(hi);
+            }
         }
         if std::env::var("V5_TRACE").is_ok() {
             eprintln!(

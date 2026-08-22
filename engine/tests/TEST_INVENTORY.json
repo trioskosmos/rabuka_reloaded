@@ -1,28 +1,28 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-21T23:17:59.045339+00:00",
+  "generated_at": "2026-08-22T02:38:18.789994+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 413,
-  "n_tests": 2483,
+  "n_files": 414,
+  "n_tests": 2488,
   "total_cards": 771,
-  "covered_cards": 560,
-  "abilities_on_covered": 715,
+  "covered_cards": 565,
+  "abilities_on_covered": 720,
   "trigger_counts": {
     "起動": [
       79,
       96
     ],
     "登場": [
-      204,
+      205,
       269
     ],
     "ライブ開始時": [
-      194,
+      197,
       268
     ],
     "(none)": [
@@ -34,7 +34,7 @@
       122
     ],
     "常時": [
-      87,
+      88,
       117
     ],
     "自動": [
@@ -44,7 +44,7 @@
   },
   "action_counts": {
     "move_cards": [
-      114,
+      115,
       146
     ],
     "look_and_select": [
@@ -52,11 +52,11 @@
       72
     ],
     "gain_resource": [
-      118,
+      119,
       160
     ],
     "sequential": [
-      158,
+      159,
       218
     ],
     "unknown": [
@@ -64,11 +64,11 @@
       2
     ],
     "draw_card": [
-      31,
+      32,
       44
     ],
     "change_state": [
-      52,
+      53,
       60
     ],
     "play_baton_touch": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      416,
+      419,
       546
     ],
     "temporal_condition": [
@@ -190,7 +190,7 @@
       13
     ],
     "comparison_condition": [
-      36,
+      38,
       60
     ],
     "card_count_condition": [
@@ -268,15 +268,15 @@
       56
     ],
     "bp3": [
-      59,
+      60,
       66
     ],
     "bp2": [
-      59,
+      60,
       68
     ],
     "bp4": [
-      65,
+      67,
       88
     ],
     "bp5": [
@@ -296,7 +296,7 @@
       137
     ],
     "sd2": [
-      19,
+      20,
       31
     ],
     "pb2": [
@@ -310,8 +310,8 @@
   },
   "depth_counts": {
     "L2+choice": 543,
-    "none": 221,
-    "L1+choice": 124,
+    "none": 216,
+    "L1+choice": 129,
     "L2": 33,
     "L1": 15
   },
@@ -1089,26 +1089,32 @@
         "engine/tests/test_modules/kanata_bp1_test.rs",
         "engine/tests/test_modules/kanata_restrict_test.rs",
         "engine/tests/test_modules/konata_bp1_test.rs",
-        "engine/tests/test_modules/konata_test.rs"
+        "engine/tests/test_modules/konata_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch5_test.rs"
       ],
       "covering_tests": [
         "different_niji_member_on_turn2_activates",
+        "honoka_bp4001_draws_only_when_stage_total_is_cheaper",
         "kanata_can_be_activated_by_effect",
         "kanata_does_not_block_manual_ability_activation",
         "kanata_live_success_no_others_does_not_wait",
         "kanata_live_success_with_others_waits_self",
         "kanata_not_auto_activated_in_active_phase_but_others_are",
+        "kasumu_bp3002_grants_chosen_heart_to_other_nijigasaki_only",
         "konata_no_appearance_condition_fails",
         "konata_no_debut_condition_fails",
         "konata_q77_debuted_this_turn_activates_energy",
         "konata_q77_self_appearance_activates_energy",
         "konata_use_limit_blocks_second_activation",
+        "natsumi_bp4009_blade_constant_tracks_cost_total_race",
         "no_appearance_condition_fails",
         "non_niji_member_does_not_activate",
         "q77_self_appearance_activates_energy",
-        "use_limit_blocks_both_abilities"
+        "sayaka_hsbp2011_mills_top_five",
+        "use_limit_blocks_both_abilities",
+        "wondermates_activates_waited_nijigasaki_enabling_activation"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 20,
       "is_null": false
     },
     {
@@ -1944,26 +1950,32 @@
         "engine/tests/test_modules/kanata_bp1_test.rs",
         "engine/tests/test_modules/kanata_restrict_test.rs",
         "engine/tests/test_modules/konata_bp1_test.rs",
-        "engine/tests/test_modules/konata_test.rs"
+        "engine/tests/test_modules/konata_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch5_test.rs"
       ],
       "covering_tests": [
         "different_niji_member_on_turn2_activates",
+        "honoka_bp4001_draws_only_when_stage_total_is_cheaper",
         "kanata_can_be_activated_by_effect",
         "kanata_does_not_block_manual_ability_activation",
         "kanata_live_success_no_others_does_not_wait",
         "kanata_live_success_with_others_waits_self",
         "kanata_not_auto_activated_in_active_phase_but_others_are",
+        "kasumu_bp3002_grants_chosen_heart_to_other_nijigasaki_only",
         "konata_no_appearance_condition_fails",
         "konata_no_debut_condition_fails",
         "konata_q77_debuted_this_turn_activates_energy",
         "konata_q77_self_appearance_activates_energy",
         "konata_use_limit_blocks_second_activation",
+        "natsumi_bp4009_blade_constant_tracks_cost_total_race",
         "no_appearance_condition_fails",
         "non_niji_member_does_not_activate",
         "q77_self_appearance_activates_energy",
-        "use_limit_blocks_both_abilities"
+        "sayaka_hsbp2011_mills_top_five",
+        "use_limit_blocks_both_abilities",
+        "wondermates_activates_waited_nijigasaki_enabling_activation"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 20,
       "is_null": false
     },
     {
@@ -10834,13 +10846,17 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/untested_abilities_batch3_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch4_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch4_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch5_test.rs"
       ],
       "covering_tests": [
         "emma_bp7008_only_clean_members_place_and_pay_energy",
+        "honoka_bp4001_draws_only_when_stage_total_is_cheaper",
         "kanata_bp3006_debut_enters_wait_state",
+        "kasumu_bp3002_grants_chosen_heart_to_other_nijigasaki_only",
         "kotori_pb1003_accept_waits_self_and_activates_per_printemps",
         "kotori_pb1003_decline_self_wait_resolves_nothing",
+        "natsumi_bp4009_blade_constant_tracks_cost_total_race",
         "niko_bp3009_activation_self_wait_and_heart_choice",
         "niko_bp3009_cost13_condition_draw",
         "niko_bp3009_no_cost13_no_draw",
@@ -10850,14 +10866,16 @@
         "ruby_bp5009_decline_optional_payment_fetches_nothing",
         "sayaka_hsbp2002_blade_constant_tracks_higher_cost_member",
         "sayaka_hsbp2002_fetch_is_cost_and_count_filtered",
+        "sayaka_hsbp2011_mills_top_five",
         "suzuki_hsbp1008_mill_three_all_members_draws_one",
         "suzuki_hsbp1008_mill_with_live_card_no_draw",
         "wakashi_spbp1008_debut_draws_one_without_mei",
         "wakashi_spbp1008_debut_draws_two_with_mei",
+        "wondermates_activates_waited_nijigasaki_enabling_activation",
         "yuna_sp222_exactly_eight_energy_scores_one",
         "yuna_sp222_live_start_optional_energy_places_wait_energy"
       ],
-      "covering_test_count": 19,
+      "covering_test_count": 24,
       "is_null": false
     },
     {
@@ -12413,14 +12431,22 @@
         "PL!HS-bp2-011-N"
       ],
       "base": "PL!HS-bp2-011",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch5_test.rs"
+      ],
+      "covering_tests": [
+        "honoka_bp4001_draws_only_when_stage_total_is_cheaper",
+        "kasumu_bp3002_grants_chosen_heart_to_other_nijigasaki_only",
+        "natsumi_bp4009_blade_constant_tracks_cost_total_race",
+        "sayaka_hsbp2011_mills_top_five",
+        "wondermates_activates_waited_nijigasaki_enabling_activation"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -15813,14 +15839,22 @@
         "PL!N-bp3-002-P"
       ],
       "base": "PL!N-bp3-002",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch5_test.rs"
+      ],
+      "covering_tests": [
+        "honoka_bp4001_draws_only_when_stage_total_is_cheaper",
+        "kasumu_bp3002_grants_chosen_heart_to_other_nijigasaki_only",
+        "natsumi_bp4009_blade_constant_tracks_cost_total_race",
+        "sayaka_hsbp2011_mills_top_five",
+        "wondermates_activates_waited_nijigasaki_enabling_activation"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -16883,14 +16917,22 @@
         "PL!-bp4-001-P"
       ],
       "base": "PL!-bp4-001",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch5_test.rs"
+      ],
+      "covering_tests": [
+        "honoka_bp4001_draws_only_when_stage_total_is_cheaper",
+        "kasumu_bp3002_grants_chosen_heart_to_other_nijigasaki_only",
+        "natsumi_bp4009_blade_constant_tracks_cost_total_race",
+        "sayaka_hsbp2011_mills_top_five",
+        "wondermates_activates_waited_nijigasaki_enabling_activation"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -17605,14 +17647,22 @@
         "PL!SP-bp4-009-P"
       ],
       "base": "PL!SP-bp4-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch5_test.rs"
+      ],
+      "covering_tests": [
+        "honoka_bp4001_draws_only_when_stage_total_is_cheaper",
+        "kasumu_bp3002_grants_chosen_heart_to_other_nijigasaki_only",
+        "natsumi_bp4009_blade_constant_tracks_cost_total_race",
+        "sayaka_hsbp2011_mills_top_five",
+        "wondermates_activates_waited_nijigasaki_enabling_activation"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -23809,14 +23859,22 @@
         "PL!N-sd2-025-SD2"
       ],
       "base": "PL!N-sd2-025",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch5_test.rs"
+      ],
+      "covering_tests": [
+        "honoka_bp4001_draws_only_when_stage_total_is_cheaper",
+        "kasumu_bp3002_grants_chosen_heart_to_other_nijigasaki_only",
+        "natsumi_bp4009_blade_constant_tracks_cost_total_race",
+        "sayaka_hsbp2011_mills_top_five",
+        "wondermates_activates_waited_nijigasaki_enabling_activation"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {

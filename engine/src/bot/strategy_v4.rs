@@ -296,9 +296,12 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
         // Life acquisition: when ammo-starved, drawing cards digs toward the
         // next life (P = remaining deck lives / deck size), and milling to
         // waitroom banks lives for retrieval engines.
-        if base_ammo == 0 || base_ammo + base_passable == 0 {
+        // Measured pathology: a 14-turn fold stretch with 0 hand lives while
+        // the board sat at 19 blades — the old 30× lottery weight never
+        // outbid stage growth, so the bot starved instead of digging.
+        if base_ammo <= 1 {
             let drawn = (my_sim.hand.cards.len() as i32 - base_hand_len).max(0);
-            val += 30.0 * p_life_draw * drawn as f64;
+            val += 70.0 * p_life_draw * drawn as f64;
             let wr_lives_now = my_sim
                 .waitroom
                 .cards
@@ -309,9 +312,8 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
                 .count();
             let wr_before = waitroom_lives;
             if wr_lives_now > wr_before && p_life_draw > 0.0 {
-                val += 10.0; // banking lives where retrieval can reach them
+                val += 25.0; // banking lives where retrieval can reach them
             }
-            let _ = waitroom_lives;
         }
 
         // No-op breaker: unchanged key counts bought nothing.

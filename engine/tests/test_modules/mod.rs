@@ -326,6 +326,7 @@ pub mod untested_abilities_playthrough_test;
 pub mod untested_abilities_batch2_test;
 pub mod either_or_state_change_test;
 pub mod untested_abilities_batch4_test;
+pub mod untested_abilities_batch5_test;
 pub mod untested_abilities_batch3_test;
 
 // Unique / edge-case ability tests
