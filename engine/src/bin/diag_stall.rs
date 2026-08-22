@@ -15,23 +15,7 @@ fn fresh_database() -> Arc<CardDatabase> {
     Arc::new(CardDatabase::load_or_create(cards))
 }
 
-struct Lcg(u64);
-impl Lcg {
-    fn next(&mut self) -> u64 {
-        self.0 = self
-            .0
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
-        self.0 >> 33
-    }
-    fn range(&mut self, n: usize) -> usize {
-        if n == 0 {
-            0
-        } else {
-            (self.next() % n as u64) as usize
-        }
-    }
-}
+use rabuka_engine::rng::Lcg;
 
 fn main() {
     let mut db = fresh_database();

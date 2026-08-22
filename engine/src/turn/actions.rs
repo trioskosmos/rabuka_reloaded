@@ -1315,16 +1315,12 @@ impl super::TurnEngine {
             Self::check_invalid_live_cards(game_state, false);
         }
         tdbg!("CHECK_TIMING:5 invalid live p1 OK");
-        let e1 =
-            Self::check_invalid_energy_cards(&mut game_state.player1, &game_state.card_database);
-        let e2 =
-            Self::check_invalid_energy_cards(&mut game_state.player2, &game_state.card_database);
-        tdbg!("CHECK_TIMING:7 invalid energy OK ({} invalid)", e1 + e2);
-        let o1 =
-            Self::check_orphaned_under_cards(&mut game_state.player1, &game_state.card_database);
-        let o2 =
-            Self::check_orphaned_under_cards(&mut game_state.player2, &game_state.card_database);
-        tdbg!("CHECK_TIMING:8 orphaned under OK ({} orphaned)", o1 + o2);
+        Self::check_invalid_energy_cards(&mut game_state.player1, &game_state.card_database);
+        Self::check_invalid_energy_cards(&mut game_state.player2, &game_state.card_database);
+        tdbg!("CHECK_TIMING:7 invalid energy OK");
+        Self::check_orphaned_under_cards(&mut game_state.player1, &game_state.card_database);
+        Self::check_orphaned_under_cards(&mut game_state.player2, &game_state.card_database);
+        tdbg!("CHECK_TIMING:8 orphaned under OK");
         {
             #[cfg(not(feature = "no_std"))]
             let _t = crate::timer::Timer::start("check_timing::recalculate_constants");

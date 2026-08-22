@@ -42,23 +42,7 @@ fn parse_kind(s: &str) -> BotKind {
     }
 }
 
-struct Lcg(u64);
-impl Lcg {
-    fn next(&mut self) -> u64 {
-        self.0 = self
-            .0
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
-        self.0
-    }
-    fn range(&mut self, n: usize) -> usize {
-        if n == 0 {
-            0
-        } else {
-            (self.next() >> 33) as usize % n
-        }
-    }
-}
+use rabuka_engine::rng::Lcg;
 
 fn fresh_database() -> Arc<CardDatabase> {
     let cards_path = std::path::Path::new("../cards/cards.json");

@@ -1175,22 +1175,6 @@ impl AbilityEffect {
             .any(|s| s.has_optional_payment())
     }
 
-    /// True when ANY pay_energy component has a parsed reduction clause
-    /// (`cost_reduction_per_group`, extracted by the parser from e.g. 海未
-    /// bp5-004 "グループ名1種類につき、E減る"). Presence means the printed
-    /// energy is an upper bound — affordability must not hard-block offers.
-    fn has_cost_reduction(&self) -> bool {
-        if self.cost_reduction_per_group.is_some() {
-            return true;
-        }
-        self.compound
-            .actions
-            .as_deref()
-            .unwrap_or(&[])
-            .iter()
-            .any(|s| s.has_cost_reduction())
-    }
-
     /// Effective ACTIVE-energy cost of this cost block given
     /// `groups_on_stage` distinct group names among the activator's stage
     /// members. Single source of truth for affordability AND display:

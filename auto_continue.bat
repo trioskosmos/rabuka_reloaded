@@ -7,9 +7,9 @@ exit /b
 #>
 
 param(
-    [int]$IntervalMinutes = 12,
+    [int]$IntervalMinutes = 21,
     [string]$WindowTitle = "",
-    [string]$Message = "the aim is to find issues where the engine doesn't makes the card game works that does not match what is written in the rules.txt qa_data.json and ability texts and so on. not to just get tests passing for the sake of it. continue, look for bad tests to improve, new tests to make whether for untested abilities or combining multiple tests of abilities that interact with each other and so on, if you are struggling with tests failing go read yourself the ability and the tests and work out what is going wrong, also heavy refactors of bullshit you find as you work. again ENSURE it works as written, read the rules and so on of the game it should all be in rules.txt and qa_data.json. also any underscores replace them with what should actually be there don't be lazy"
+    [string]$Message = "continue if the md is done find new things if it's becoming kind of pointless get to test writing find tests and make them harder and more specific to the ability"
 )
 
 Add-Type -AssemblyName System.Windows.Forms

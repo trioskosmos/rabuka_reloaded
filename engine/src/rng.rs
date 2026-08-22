@@ -24,6 +24,39 @@ fn xorshift32(state: &mut u32) -> u32 {
     x
 }
 
+// ── instance-based RNG (shared by bot binaries / simulations) ────────────
+//
+/// PCG-style 64-bit LCG, no_std-safe (no std types, no global state).
+///
+/// Instance-based so parallel simulation workers keep independent streams.
+/// This is the single shared implementation — previously each binary in
+/// `src/bin/` carried its own identical copy.
+pub struct Lcg(pub u64);
+
+impl Lcg {
+    pub const fn new(seed: u64) -> Self {
+        Lcg(seed)
+    }
+
+    /// Advance and return the raw 64-bit state.
+    pub fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0
+    }
+
+    /// Uniform-ish value in `0..n` (high bits used; n == 0 yields 0).
+    pub fn range(&mut self, n: usize) -> usize {
+        if n == 0 {
+            0
+        } else {
+            (self.next() >> 33) as usize % n
+        }
+    }
+}
+
 // ── std path (desktop + 3DS) ─────────────────────────────────────────────
 #[cfg(not(feature = "no_std"))]
 mod inner {

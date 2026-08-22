@@ -2,7 +2,6 @@ use super::condition::ConditionContext;
 use super::enums::{ActionType, Zone};
 use super::types::{
     Choice, ChoiceBuilder, ChoiceResult, ChoiceRoute, ExecutionContext, LookAndSelectStep,
-    TriggerEvent,
 };
 use super::util;
 use crate::ability::debug::ABILITY_DEBUG;
