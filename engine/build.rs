@@ -12,6 +12,26 @@ fn main() {
     let build_bin_z = Path::new(&manifest_dir).join("../cards/build/abilities.bin.z");
     println!("cargo:rerun-if-changed={}", build_bin_z.display());
 
+    // Binary blobs embedded via include_bytes! in the *_gen.rs modules.
+    // include_bytes! itself does track these files for change detection, but
+    // declaring them here makes the data -> rebuild contract explicit and
+    // covers the case where a generator rewrites a gen file with identical
+    // bytes but different bin content ordering.
+    println!(
+        "cargo:rerun-if-changed={}",
+        Path::new(&manifest_dir).join("../cards/build/cards.bin").display()
+    );
+    println!(
+        "cargo:rerun-if-changed={}",
+        Path::new(&manifest_dir)
+            .join("../cards/build/abilities_strings.bin")
+            .display()
+    );
+    let decks_bin_dir = Path::new(&manifest_dir).join("baked/decks");
+    if decks_bin_dir.is_dir() {
+        println!("cargo:rerun-if-changed={}", decks_bin_dir.display());
+    }
+
     // Staleness check: abilities.json should be newer than cards.json
     if let (Ok(cards_meta), Ok(abilities_meta)) = (std::fs::metadata(&cards_json), std::fs::metadata(&abilities_json)) {
         if let (Ok(cards_time), Ok(abilities_time)) = (cards_meta.modified(), abilities_meta.modified()) {

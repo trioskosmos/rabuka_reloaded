@@ -822,26 +822,20 @@ def compact_bytecode(bytecode, offsets, strings, card_ability_pairs):
 
 # ── Rust code generation ──
 def generate_abilities_gen(bytecode, offsets, strings, card_ability_pairs, build_dir):
-    # Emit the concatenated binary-JSON as a byte array (24-byte rows).
-    hex_lines = []
-    for i in range(0, len(bytecode), 24):
-        chunk = bytecode[i : i + 24]
-        hex_lines.append("    " + ", ".join(f"0x{b:02x}" for b in chunk) + ",")
-
-    # Compressed bytecode for host (not snes) - saves ~60% via zlib
-    compressed = zlib.compress(bytes(bytecode), level=9)
-    comp_hex_lines = []
-    for i in range(0, len(compressed), 24):
-        chunk = compressed[i:i+24]
-        comp_hex_lines.append("    " + ", ".join(f"0x{b:02x}" for b in chunk) + ",")
+    # Byte data lives in .bin files next to this script's build dir; the generated
+    # Rust embeds them via include_bytes! so rustc never parses millions of hex
+    # tokens (a full rebuild of the engine stays fast).
+    #
+    # Compressed bytecode for host (not snes) - saves ~60% via zlib.
+    # Written by main() to build_dir/abilities.bin.z before this runs.
+    assert (build_dir / "abilities.bin.z").exists(), (
+        "run main() first: abilities.bin.z must exist before generating abilities_gen.rs"
+    )
 
     # Build string blob + offsets for compact storage (saves ~68KB vs &[&str] fat pointers)
     # Instead of &[&str] (16 bytes per entry + data), store as single &[u8] blob + u32 offsets
     blob_bytes = b"".join(s.encode('utf-8') for s in strings)
-    blob_hex_lines = []
-    for i in range(0, len(blob_bytes), 24):
-        chunk = blob_bytes[i:i+24]
-        blob_hex_lines.append("    " + ", ".join(f"0x{b:02x}" for b in chunk) + ",")
+    (build_dir / "abilities_strings.bin").write_bytes(blob_bytes)
     # Offsets: start of each string in blob, plus sentinel end
     str_offsets = []
     cur = 0
@@ -904,9 +898,7 @@ def generate_abilities_gen(bytecode, offsets, strings, card_ability_pairs, build
 pub const NUM_ABILITIES: usize = {len(offsets) - 1};
 
 #[cfg(not(feature = "snes"))]
-pub const COMPRESSED_BYTECODE: &[u8] = &[
-{chr(10).join(comp_hex_lines)}
-];
+pub const COMPRESSED_BYTECODE: &[u8] = include_bytes!("../../../cards/build/abilities.bin.z");
 #[cfg(not(feature = "snes"))]
 pub const DECOMPRESSED_LEN: usize = {len(bytecode)};
 
@@ -940,9 +932,7 @@ pub fn bytecode_slice(ci: u8, start: usize, len: usize) -> &'static [u8] {{
 /// with u32 offsets to save the 16-byte per-entry fat pointer overhead of
 /// `&[&str]` (saves ~68KB for 5695 strings). Indexed by the 2-byte `u16`
 /// references inside `BYTECODE` via `get_string(idx)`.
-pub const STRINGS_BLOB: &[u8] = &[
-{chr(10).join(blob_hex_lines)}
-];
+pub const STRINGS_BLOB: &[u8] = include_bytes!("../../../cards/build/abilities_strings.bin");
 pub const STRINGS_OFFSETS: &[u32] = &[{offsets_hex_str}];
 #[inline]
 pub fn get_string(idx: usize) -> Option<&'static str> {{

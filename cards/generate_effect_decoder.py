@@ -231,14 +231,32 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
     lines.append("    match key {")
 
     # --- AbilityEffect match arms ---
-    # text and action need special readers (non-Option types)
+    # text needs a special reader (non-Option type)
     ae_special = {
         "text": "*text = bc.read_string_value().map(ArcStr::from).unwrap_or_default();",
-        "action": "*action = ActionType::from_str(&bc.read_string_value().unwrap_or_default()).unwrap_or_default();",
     }
 
+    # action must fail loudly on unknown strings instead of silently
+    # decoding into ActionType::Custom (which executes as a no-op).
+    # The empty string is a legacy encoding meaning "no action" — real card
+    # data uses it for text-only effects — so it maps to Custom explicitly.
+    def _action_arm():
+        return [
+            '            "action" => {',
+            "                let s = bc.read_string_value().unwrap_or_default();",
+            '                if s.is_empty() { *action = ActionType::Custom; return Some(true); }',
+            "                match ActionType::from_str(&s) {",
+            "                    Some(a) => *action = a,",
+            '                    None => { log::error!("decode_effect_field: unknown action string {:?}", s); return None; }',
+            "                }",
+            "                return Some(true);",
+            "            }",
+        ]
+
     for fname, ftype, _ in ability_effect_fields:
-        if fname in ae_special:
+        if fname == "action":
+            lines.extend(_action_arm())
+        elif fname in ae_special:
             lines.append(
                 f'            "{fname}" => {{ {ae_special[fname]} return Some(true); }}'
             )

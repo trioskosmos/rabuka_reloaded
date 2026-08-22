@@ -316,7 +316,7 @@ impl<'a> BcReader<'a> {
         let tag = self.read_u8()?;
         match tag {
             TAG_NULL => None,
-            TAG_I64 => Some(self.read_int()? as u8),
+            TAG_I64 => u8::try_from(self.read_int()?).ok(),
             _ => None,
         }
     }
@@ -329,7 +329,7 @@ impl<'a> BcReader<'a> {
         let tag = self.read_u8()?;
         match tag {
             TAG_NULL => None,
-            TAG_I64 => Some(self.read_int()? as i8),
+            TAG_I64 => i8::try_from(self.read_int()?).ok(),
             _ => None,
         }
     }
@@ -1526,7 +1526,12 @@ fn decode_keywords(bc: &mut BcReader) -> Option<Option<Vec<crate::card::Keyword>
             let mut v = Vec::with_capacity(len);
             for _ in 0..len {
                 let s = bc.read_string_value()?;
-                v.push(keyword_from_str(&s));
+                match keyword_from_str(&s) {
+                    Some(k) => v.push(k),
+                    None => {
+                        log::error!("decode_keywords: unknown keyword string {:?}; skipping entry", s);
+                    }
+                }
             }
             Some(Some(v))
         }
@@ -1534,8 +1539,8 @@ fn decode_keywords(bc: &mut BcReader) -> Option<Option<Vec<crate::card::Keyword>
     }
 }
 
-fn keyword_from_str(s: &str) -> crate::card::Keyword {
-    match s {
+fn keyword_from_str(s: &str) -> Option<crate::card::Keyword> {
+    Some(match s {
         "Turn1" => crate::card::Keyword::Turn1,
         "Turn2" => crate::card::Keyword::Turn2,
         "Debut" => crate::card::Keyword::Debut,
@@ -1546,6 +1551,6 @@ fn keyword_from_str(s: &str) -> crate::card::Keyword {
         "RightSide" => crate::card::Keyword::RightSide,
         "PositionChange" => crate::card::Keyword::PositionChange,
         "FormationChange" => crate::card::Keyword::FormationChange,
-        _ => crate::card::Keyword::Turn1,
-    }
+        _ => return None,
+    })
 }

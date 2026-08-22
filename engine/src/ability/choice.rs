@@ -1668,7 +1668,11 @@ impl super::resolver::AbilityResolver {
         ctx: &SelectionContext,
         context: &ExecutionContext,
     ) -> Result<(), String> {
-        let cost = gs.entry_cost().cloned().unwrap();
+        let Some(cost) = gs.entry_cost().cloned() else {
+            log::error!("handle_entry_cost_reveal: no entry cost on queue entry; aborting reveal");
+            self.clear_choice_state(gs);
+            return Err("entry cost reveal without entry cost".to_string());
+        };
         let card_db = gs.card_database.clone();
         let player = gs.resolve_target_player("self");
         let card_ids: Vec<i16> = ctx
@@ -2404,7 +2408,10 @@ impl super::resolver::AbilityResolver {
         match choice_card_no.as_ref() {
             Some(ChoiceRoute::Choice) => {
                 if let Some(ConditionalChoice::Effects(all_options)) = conditional_choice {
-                    let idx: usize = selected.parse().unwrap_or(0);
+                    let Ok(idx) = selected.parse::<usize>() else {
+                        log::warn!("[HST] non-numeric option index {:?}; rejecting selection", selected);
+                        return Err(format!("invalid selection: {:?}", selected));
+                    };
                     if idx < all_options.len() {
                         let selected_effect = (*all_options[idx]).clone();
                         let mut remaining = all_options.clone();
@@ -2592,7 +2599,10 @@ impl super::resolver::AbilityResolver {
     }
 
     fn handle_draw_any_number(&mut self, gs: &mut GameState, selected: &str) -> Result<(), String> {
-        let count: usize = selected.parse().unwrap_or(0);
+        let Ok(count) = selected.parse::<usize>() else {
+            log::warn!("[DRAW_ANY] non-numeric count {:?}; rejecting selection", selected);
+            return Err(format!("invalid selection: {:?}", selected));
+        };
         if let Some(effect) = gs.entry_effect().cloned() {
             let source = effect.source_any().unwrap_or(Zone::Deck.to_str());
             let destination = effect
@@ -3374,7 +3384,10 @@ modified.destination = Some(Zone::from_source_str(dest));
         const HEART_VALS: [&str; 7] = [
             "heart00", "heart01", "heart02", "heart03", "heart04", "heart05", "heart06",
         ];
-        let idx: usize = selected.parse().unwrap_or(0);
+        let Ok(idx) = selected.parse::<usize>() else {
+            log::warn!("[HEART_COLOR_SEL] non-numeric index {:?}; rejecting selection", selected);
+            return Err(format!("invalid selection: {:?}", selected));
+        };
         if idx < HEART_VALS.len() {
             let color = HEART_VALS[idx];
             gs.prohibition_effects
@@ -3392,7 +3405,10 @@ modified.destination = Some(Zone::from_source_str(dest));
         gs: &mut GameState,
         selected: &str,
     ) -> Result<(), String> {
-        let idx: usize = selected.parse().unwrap_or(0);
+        let Ok(idx) = selected.parse::<usize>() else {
+            log::warn!("[CHOICE_COND] non-numeric index {:?}; rejecting selection", selected);
+            return Err(format!("invalid selection: {:?}", selected));
+        };
         if let Some(options) = gs.entry_cost().and_then(|c| c.compound.actions.clone()) {
             if idx < options.len() {
                 let label = options[idx]

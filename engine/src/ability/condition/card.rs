@@ -1705,7 +1705,10 @@ impl<'a> ConditionContext<'a> {
         let group_names = condition.get_group_names();
         let operator = condition.get_operator();
         let count_threshold = condition.get_count().unwrap_or(1);
-        let locs = condition.get_locations().unwrap();
+        let Some(locs) = condition.get_locations() else {
+            log::error!("evaluate_multi_location_condition: missing locations field; treating as unsatisfied");
+            return false;
+        };
 
         if condition.get_self_target().unwrap_or(false) && locs.len() == 2 {
             let dest_zone = &locs[1];

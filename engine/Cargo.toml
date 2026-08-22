@@ -98,6 +98,14 @@ compact_state = []
 # Umbrella: enable all console/embedded optimizations at once.
 console = ["compact_cards", "compact_state"]
 
+[profile.dev]
+# Trim DWARF to line tables only: cuts PDB size/link time dramatically.
+# Tests don't need variable-level debugging; build time is king.
+debug = "line-tables-only"
+
+[profile.test]
+debug = "line-tables-only"
+
 [dev-dependencies]
 criterion = "0.5"
 inferno = "0.12"

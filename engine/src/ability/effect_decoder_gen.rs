@@ -35,7 +35,15 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
 ) -> Option<bool> {
     match key {
             "text" => { *text = bc.read_string_value().map(ArcStr::from).unwrap_or_default(); return Some(true); }
-            "action" => { *action = ActionType::from_str(&bc.read_string_value().unwrap_or_default()).unwrap_or_default(); return Some(true); }
+            "action" => {
+                let s = bc.read_string_value().unwrap_or_default();
+                if s.is_empty() { *action = ActionType::Custom; return Some(true); }
+                match ActionType::from_str(&s) {
+                    Some(a) => *action = a,
+                    None => { log::error!("decode_effect_field: unknown action string {:?}", s); return None; }
+                }
+                return Some(true);
+            }
             "source" => { *source = bc.read_zone_value(); return Some(true); }
             "destination" => { *destination = bc.read_zone_value(); return Some(true); }
             "count" => { *count = bc.read_u8_value(); return Some(true); }

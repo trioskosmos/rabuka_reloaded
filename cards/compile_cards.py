@@ -205,11 +205,15 @@ def compile_all(cards_dict: dict) -> tuple[bytes, list[int], list[str]]:
 def generate_cards_gen(
     blob: bytes, offsets: list[int], strings: list[str], build_dir: Path
 ):
-    """Generate cards_gen.rs with embedded blob data."""
-    hex_lines = []
-    for i in range(0, len(blob), 24):
-        chunk = blob[i : i + 24]
-        hex_lines.append("    " + ", ".join(f"0x{b:02x}" for b in chunk) + ",")
+    """Generate cards_gen.rs embedding the blob via include_bytes!.
+
+    The blob itself is written to cards/build/cards.bin by main(); rustc then
+    never has to parse megabytes of hex tokens on every engine rebuild.
+    """
+    # Ensure the blob file exists where the include_bytes! paths expect it
+    # (repo-relative cards/build/, valid from both output locations).
+    build_dir.mkdir(parents=True, exist_ok=True)
+    (build_dir / "cards.bin").write_bytes(blob)
 
     str_lits = ", ".join(json.dumps(s, ensure_ascii=False) for s in strings)
 
@@ -223,9 +227,7 @@ def generate_cards_gen(
 /// represent a single >64KB object and uses per-deck blobs instead, so this is
 /// excluded there.
 #[cfg(not(feature = "snes"))]
-pub const CARD_BLOB: &[u8] = &[
-{chr(10).join(hex_lines)}
-];
+pub const CARD_BLOB: &[u8] = include_bytes!("../../../cards/build/cards.bin");
 
 /// String table for card data. Indexed by u16 references in the blob.
 pub const CARD_STRINGS: &[&str] = &[{str_lits}];

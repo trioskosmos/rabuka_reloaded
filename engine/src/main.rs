@@ -95,7 +95,7 @@ fn initialize_game() {
     let cards = match card_loader::CardLoader::load_cards_from_file(cards_path) {
         Ok(cards) => cards,
         Err(e) => {
-            log::debug!("Failed to load cards: {}", e);
+            eprintln!("Fatal: failed to load cards from {:?}: {}", cards_path, e);
             return;
         }
     };
@@ -107,7 +107,7 @@ fn initialize_game() {
     let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
         Ok(decks) => decks,
         Err(e) => {
-            log::debug!("Failed to load decks: {}", e);
+            eprintln!("Fatal: failed to parse decks: {}", e);
             return;
         }
     };
@@ -130,7 +130,7 @@ fn initialize_game() {
             deck
         }
         Err(e) => {
-            log::debug!("Failed to build deck for Player 1: {}", e);
+            eprintln!("Fatal: failed to build deck for Player 1: {}", e);
             return;
         }
     };
@@ -145,7 +145,7 @@ fn initialize_game() {
             deck
         }
         Err(e) => {
-            log::debug!("Failed to build deck for Player 2: {}", e);
+            eprintln!("Fatal: failed to build deck for Player 2: {}", e);
             return;
         }
     };
@@ -309,9 +309,9 @@ fn run_web_server(ngrok_authtoken: Option<String>) {
         Ok(runtime) => {
             match runtime.block_on(web_server::run_web_server_with_ngrok(ngrok_authtoken)) {
                 Ok(_) => println!("Server shutdown gracefully"),
-                Err(e) => log::debug!("Server error: {}", e),
+                Err(e) => eprintln!("Server error: {}", e),
             }
         }
-        Err(e) => log::debug!("Failed to create runtime: {}", e),
+        Err(e) => eprintln!("Fatal: failed to create tokio runtime: {}", e),
     }
 }

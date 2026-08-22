@@ -57,7 +57,7 @@ impl super::TurnEngine {
     ) -> Result<(), String> {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("execute_main_phase_action");
-        // UseAbility must check activation legality independently — never
+        // UseAbility must check activation legality independently  Enever
         // route through resume_with_choice, even when another ability's choice
         // is pending (e.g. a debut look-and-select from play_to_stage).
         if matches!(action, crate::game_setup::ActionType::UseAbility) {
@@ -313,7 +313,7 @@ impl super::TurnEngine {
                         }
                     }
                     // Mandatory-cost affordability pre-check: same evaluator
-                    // as generation (rules 9.6.2.3 — an unpayable cost is not
+                    // as generation (rules 9.6.2.3  Ean unpayable cost is not
                     // a legal activation). Optional payments may be skipped,
                     // so they never block here.
                     if let Some(ref cost) = ability.cost {
@@ -364,7 +364,7 @@ impl super::TurnEngine {
 
         // NOTE: no affordability pre-check here. Unpayable activations fizzle
         // quietly at resolution (wakana bp2-008 "no_energy_skips_effect",
-        // umi Q228 insufficiency) — hard-erroring them broke both behaviors.
+        // umi Q228 insufficiency)  Ehard-erroring them broke both behaviors.
         // Bots avoid dead presses via their no-op breakers instead.
 
         if loc == Zone::Hand {
@@ -554,7 +554,7 @@ impl super::TurnEngine {
         let choice = pending.ok_or("No pending choice to resume")?;
 
         // Record a structured `choice_resolved` entry: what was offered vs chosen.
-        // Skipped under `headless` — the label computation itself allocates.
+        // Skipped under `headless`  Ethe label computation itself allocates.
         #[cfg(not(feature = "headless"))]
         game_state.push_choice_resolved(
             &choice,
@@ -603,7 +603,7 @@ impl super::TurnEngine {
                 crate::ability::types::ChoiceResult::CardSelected { indices }
                     if !indices.is_empty() =>
                 {
-                    // Player chose a card from discard — move it to success zone,
+                    // Player chose a card from discard  Emove it to success zone,
                     // and put the original card in waitroom.
                     if let Some(&selected_idx) = indices.first() {
                         if selected_idx < player.waitroom.cards.len() {
@@ -626,8 +626,7 @@ impl super::TurnEngine {
                     }
                 }
                 _ => {
-                    // Player declined replacement (Skip or empty indices) —
-                    // place original card in success zone normally
+                    // Player declined replacement (Skip or empty indices)  E                    // place original card in success zone normally
                     player
                         .live_card_zone
                         .cards
@@ -644,7 +643,7 @@ impl super::TurnEngine {
             return Ok(());
         }
 
-        // Play-time cost reduction choice (常時「このカードをプレイする際…コストは減る」).
+        // Play-time cost reduction choice (常時「このカードをプレイする際…コスト�E減る、E.
         if let crate::ability::types::Choice::SelectTarget { target, .. } = &choice {
             if target == "play_time_cost_reduction" {
                 let accepted = card_id == Some(1); // option "Yes"
@@ -975,9 +974,9 @@ impl super::TurnEngine {
 
         // If inner processing (e.g. depth-first trigger scan) created a
         // pending choice on the game-state level (a different queue entry),
-        // don't touch it — return immediately.
+        // don't touch it  Ereturn immediately.
         if game_state.has_pending_choice() {
-            log::debug!("[RWC] inner processing created pending choice — returning early");
+            log::debug!("[RWC] inner processing created pending choice  Ereturning early");
             return Ok(());
         }
 
@@ -989,7 +988,7 @@ impl super::TurnEngine {
         );
 
         if resolver.pending_choice.is_some() {
-            // Sub-choice created — store resolver back on entry and pause queue
+            // Sub-choice created  Estore resolver back on entry and pause queue
             let sub_choice = resolver.pending_choice.clone().unwrap();
             // G1/G3: route pending choice to opponent if it targets opponent
             let targets_opponent = match &sub_choice {
@@ -1037,7 +1036,7 @@ impl super::TurnEngine {
             game_state.ability_queue.set_resolver(resolver);
             game_state.ability_queue.pause_for_choice(sub_choice);
         } else {
-            // No more choices — ability execution finished
+            // No more choices  Eability execution finished
             let cost_was_paid = game_state
                 .ability_queue
                 .current_entry()
@@ -1077,7 +1076,7 @@ impl super::TurnEngine {
                 effect_started,
                 had_pending_sequential
             );
-            // Save activating_card before clearing — it must be restored when
+            // Save activating_card before clearing  Eit must be restored when
             // the ability continues processing (needs_reprocess), otherwise
             // gain_resource etc. in nested sequentials lose their target.
             let saved_activating_card = game_state.activating_card;
@@ -1090,7 +1089,7 @@ impl super::TurnEngine {
                     && e.optional_cost_result == Some(false)
                     && e.choice_card_no == Some(ChoiceRoute::OptionalCost)
             });
-            // Re-check pending commands — they may have been cleared by the choice
+            // Re-check pending commands  Ethey may have been cleared by the choice
             // handler (e.g. optional draw skip), leaving the sequential stranded.
             // Only fire when effect hasn't started yet (the skip is between optional
             // draw choice and the draw action itself). Normal sequential mid-execution
@@ -1132,7 +1131,7 @@ impl super::TurnEngine {
                 game_state.just_completed_ability_key = None;
                 game_state.clear_movement_tracking();
             } else if needs_reprocess {
-                // Restore activating_card — the ability is still executing.
+                // Restore activating_card  Ethe ability is still executing.
                 game_state.activating_card = saved_activating_card;
                 game_state.activating_ability_index = saved_activating_ability_index;
                 log::debug!("[RWC] needs_reprocess=true: storing resolver and calling PCA");
@@ -1146,7 +1145,7 @@ impl super::TurnEngine {
                         .unwrap_or_else(|| "p1".to_string().into());
                     game_state.process_with_completed_key(just_completed_key.clone(), &player_id);
                 } else {
-                    // Effect completed without sub-choice — process any newly
+                    // Effect completed without sub-choice  Eprocess any newly
                     // enqueued watcher abilities (e.g. each_time triggers).
                     let player_id = entry_player_id
                         .clone()
@@ -1192,9 +1191,9 @@ impl super::TurnEngine {
                     }
                 }
                 // Don't complete if a pending choice (e.g. SelectPosition) was
-                // created by the current effect — it would be orphaned.
+                // created by the current effect  Eit would be orphaned.
                 if game_state.has_pending_choice() {
-                    log::debug!("[RWC] skipping complete_current — pending choice exists");
+                    log::debug!("[RWC] skipping complete_current  Epending choice exists");
                     return Ok(());
                 }
                 // Post-resolution TAS scan for movement-based triggers.
@@ -1402,7 +1401,7 @@ impl super::TurnEngine {
     // Q88: Players cannot voluntarily discard, retire members, move members,
     // or weigh active cards without an effect or cost.
 
-    /// Rule 10.5.1: Non-live cards in live card zone → moved to discard.
+    /// Rule 10.5.1: Non-live cards in live card zone ↁEmoved to discard.
     /// Also records movement events so turn-level tracking (turn_movements)
     /// captures which cards moved where, enabling "from live_card_zone to
     /// discard" conditions.
@@ -1439,7 +1438,7 @@ impl super::TurnEngine {
         } else {
             game_state.player2.id.clone()
         };
-        // Live-zone membership changed → constant outputs may differ.
+        // Live-zone membership changed ↁEconstant outputs may differ.
         game_state.mark_constants_dirty();
         let mut moved = Vec::new();
         for &(i, card_id, is_energy) in invalids.iter().rev() {
@@ -1471,7 +1470,7 @@ impl super::TurnEngine {
         }
     }
 
-    /// Rule 10.5.2: Non-energy cards in energy zone → moved to discard.
+    /// Rule 10.5.2: Non-energy cards in energy zone ↁEmoved to discard.
     fn check_invalid_energy_cards(
         player: &mut crate::player::Player,
         card_db: &CardDatabase,
@@ -1529,3 +1528,4 @@ impl super::TurnEngine {
         }
     }
 }
+

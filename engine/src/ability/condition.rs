@@ -530,7 +530,16 @@ impl<'a> ConditionContext<'a> {
             Condition::AllRevealedMatchHeartColor { .. } => {
                 self.evaluate_all_revealed_match_heart_color(condition)
             }
-            Condition::Compound { .. } => unreachable!(),
+            Condition::Compound { .. } => {
+                // The decoder CAN produce top-level Compound (variant 0 →
+                // build_compound). The pre-dispatch above normally handles it,
+                // but route defensively instead of panicking from card data.
+                if condition.get_operator() == Some("or") {
+                    self.evaluate_or_condition(condition)
+                } else {
+                    self.evaluate_compound_condition(condition)
+                }
+            }
         };
 
         let is_plain_location = matches!(condition, Condition::Location { .. })

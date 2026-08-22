@@ -546,7 +546,7 @@ Outputs:
 
 | File | Content |
 |------|---------|
-| `engine/tests/TEST_COVERAGE.md` | By trigger/action/condition/set + gap tables (wraps old `coverage_report.py`) |
+| `engine/tests/TEST_COVERAGE.md` | By trigger/action/condition/set + gap tables |
 | `docs/ABILITY_MATRIX.md` | Trigger×action matrix + prioritized gaps |
 | `engine/tests/TEST_INVENTORY.json` | Machine-readable per-ability rows (for tooling) |
 | `engine/tests/TEST_INVENTORY.md` | Human-readable per-ability index |
@@ -566,7 +566,7 @@ Optional override: add a comment above a test to pin depth:
 fn mia_cost_reduction_blocked_when_not_debut() { ... }
 ```
 
-The alias `python cards/coverage_report.py` still works (deprecated shim → `test_inventory.py`). Legacy scripts in `cards/ability_docs_scripts/` (`generate_report.py`, `cross_reference_tests.py`, etc.) are now deprecated shims to the same command — use the single `test_inventory.py` entry point.
+`python cards/test_inventory.py` is the single entry point for regenerating all coverage docs.
 
 ---
 
