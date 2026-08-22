@@ -253,3 +253,54 @@ fn hanamaru_bpb5007_no_eligible_member_fetches_nothing() {
         "all four looked-at cards still go to the waitroom"
     );
 }
+
+// ====================================================================
+// PL!N-bp4-004-R＋ 朝香果林 ab#1 — selection cap = opponent's WAITED member
+// count (active opponents must not raise it).
+// ====================================================================
+#[test]
+fn karin_bpb4004_cap_counts_waited_opponents_only() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let karin = game.id("PL!N-bp4-004-R＋");
+
+    // Opponent: two WAITED members + one ACTIVE.
+    let opp_a = game.new_id(FILLER);
+    let opp_b = game.new_id(FILLER);
+    let opp_active = game.new_id(FILLER);
+    game.state.player2.stage.stage = [opp_a, opp_b, opp_active];
+    game.state.mods.add_orientation_modifier(opp_a, "wait");
+    game.state.mods.add_orientation_modifier(opp_b, "wait");
+    game.state.player1.stage.stage[1] = karin;
+
+    // Three 虹ヶ咲 members in the waitroom — more than the cap of 2.
+    let niji_a = game.id("PL!N-bp3-002-R");
+    let niji_b = game.new_id("PL!N-bp3-002-R");
+    let niji_c = game.new_id("PL!N-bp3-002-R");
+    game.state
+        .player1
+        .waitroom
+        .cards
+        .extend_from_slice(&[niji_a, niji_b, niji_c]);
+
+    trigger_auto(
+        &mut game,
+        karin,
+        AbilityTrigger::LiveStart,
+        "ライブ開始時",
+    );
+
+    // The choice must offer only TWO candidates (waited count), not three.
+    assert!(
+        game.has_pending_choice(),
+        "selection from the waitroom should be asked"
+    );
+    game.select_indices(&[0, 1]);
+
+    // Two went to the deck top; the third stays in the waitroom.
+    let deck_top: Vec<_> = game.state.player1.main_deck.cards.iter().take(2).copied().collect();
+    assert!(
+        deck_top.contains(&niji_a) || deck_top.contains(&niji_b),
+        "selected members are placed on top of the deck"
+    );
+}

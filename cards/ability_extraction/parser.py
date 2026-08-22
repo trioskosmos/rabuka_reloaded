@@ -10942,6 +10942,52 @@ def _mark_success_pile_difference(node):
             _mark_success_pile_difference(it)
 
 
+def _canonicalize_dynamic_counts(node):
+    """Replace raw sentence fragments used as dynamic_count references with
+    canonical tokens the engine can dispatch on exactly:
+      - opponent waited-member count   (相手のステージにいるウェイト状態のメンバー)
+      - waitroom shortfall vs base     ((デッキの上からカードを)その差 with
+                                        控え室…N枚未満 gating)
+      - cards placed to waitroom by this effect (これにより控え室に置いた…)
+      - plain / opponent stage member counts (ステージ…メンバー)
+    """
+    if isinstance(node, dict):
+        dc = node.get("dynamic_count")
+        if isinstance(dc, dict):
+            ref = str(dc.get("reference") or "")
+            if "ウェイト状態" in ref and "ステージ" in ref and "メンバー" in ref:
+                dc["reference"] = "opponent_waited_member_count"
+            elif (
+                ("その差" in ref and "デッキ" in ref)
+                or ref == "その差"
+                or "その差に等しい枚数" in ref
+            ):
+                cond = node.get("condition") or {}
+                if "控え室" in str(cond.get("text", "")):
+                    dc["reference"] = "waitroom_count_below_base"
+                    dc["base_reference"] = re.search(
+                        r"(\d+)枚未満", str(cond.get("text", ""))
+                    )
+                    dc["base_reference"] = (
+                        dc["base_reference"].group(1)
+                        if dc["base_reference"]
+                        else "8"
+                    )
+            elif "これにより控え室に置いた" in ref:
+                dc["reference"] = "these_waitroom_placed_count"
+            elif "ステージ" in ref and "メンバー" in ref:
+                dc["reference"] = (
+                    "opponent_stage_member_count"
+                    if "相手" in ref
+                    else "stage_member_count"
+                )
+        for v in node.values():
+            _canonicalize_dynamic_counts(v)
+    elif isinstance(node, list):
+        for it in node:
+            _canonicalize_dynamic_counts(it)
+
+
 def _normalize_effect_tree(effect, original_text=None):
     if not effect or not isinstance(effect, dict):
         return effect
@@ -10964,6 +11010,7 @@ def _normalize_effect_tree(effect, original_text=None):
     _enrich_gain_abilities(effect)
     _mark_live_total_score(effect)
     _mark_success_pile_difference(effect)
+    _canonicalize_dynamic_counts(effect)
     effect = _walk_split_mixed(effect)
     _enrich_characters(effect)
     _clean_gain_resource(effect)

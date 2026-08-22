@@ -1,10 +1,10 @@
-//! Strategy bot v5 — v4's relentless placement execution + comparison awareness.
+//! Strategy bot v5  Ev4's relentless placement execution + comparison awareness.
 //!
 //! Doctrine: a placement requires WINNING the comparison (8.4.6), so among
 //! live portfolios that pass, v5 maximizes TOTAL SCORE subject to a
 //! stance-dependent binomial pass-probability floor (yell hits are
 //! Binomial(blades, density), not a mean). Concede clearly-lost contested
-//! checks (温存), steal free wins vs an empty opponent zone (8.4.3.2),
+//! checks (温孁E, steal free wins vs an empty opponent zone (8.4.3.2),
 //! contest at opponent match point (S4 / 8.4.7.1). Everything else is
 //! inherited from v4: hearts-based development, life-acquisition digging,
 //! no-op/hand-reserve breakers.
@@ -15,7 +15,7 @@ use crate::game_setup::{self, Action};
 use crate::game_state::{GameState, Phase};
 
 /// P(Bin(n, p) >= k), exact for small n (blade counts stay ≤ ~20).
-fn binom_ge(n: i32, k: i32, p: f64) -> f64 {
+pub(crate) fn binom_ge(n: i32, k: i32, p: f64) -> f64 {
     if k <= 0 {
         return 1.0;
     }
@@ -44,7 +44,7 @@ fn binom_ge(n: i32, k: i32, p: f64) -> f64 {
     prob.clamp(0.0, 1.0)
 }
 
-fn player_ref(gs: &GameState, me: u8) -> (&crate::player::Player, &crate::player::Player) {
+pub(crate) fn player_ref(gs: &GameState, me: u8) -> (&crate::player::Player, &crate::player::Player) {
     if me == 0 {
         (&gs.player1, &gs.player2)
     } else {
@@ -53,8 +53,8 @@ fn player_ref(gs: &GameState, me: u8) -> (&crate::player::Player, &crate::player
 }
 
 /// Opponent's achievable live score this turn, from their PUBLIC board
-/// (S2: median hearts ≈ 2·score + 1..2). Own deck density proxies their
-/// flips — fair information only.
+/// (S2: median hearts ≁E2·score + 1..2). Own deck density proxies their
+/// flips  Efair information only.
 pub fn estimate_opp_score(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
     let (_, opp) = player_ref(gs, me);
     let mut pool = 0i32;
@@ -93,8 +93,8 @@ pub fn estimate_opp_score(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
 ///
 /// Ranking doctrine (tree §1.3/§L4): every won check places exactly ONE card
 /// no matter the margin, so the ONLY thing that matters is P(win the
-/// comparison) — maximize TOTAL SCORE among portfolios whose all-or-nothing
-/// pass probability (8.3.15→8.3.16) clears the stance floor.
+/// comparison)  Emaximize TOTAL SCORE among portfolios whose all-or-nothing
+/// pass probability (8.3.15ↁE.3.16) clears the stance floor.
 ///
 /// Pass probability: yell hits are Binomial(blades, density), NOT the mean.
 /// Only reliance on EXPECTED-HIT wildcards is stochastic; board BAll
@@ -104,11 +104,11 @@ pub fn best_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
     best_portfolio_scored(gs, me, db).0
 }
 
-/// Honest opponent term — RULE FACTS only, no invented probabilities.
-/// E = their public-board ceiling (hearts+blades → score band). The single
+/// Honest opponent term  ERULE FACTS only, no invented probabilities.
+/// E = their public-board ceiling (hearts+blades ↁEscore band). The single
 /// behavioral use: if I sit at 2 successes, a tie places NOTHING for me
 /// (8.4.7.1), so a portfolio that cannot strictly beat their ceiling can
-/// only win when their check fails outright — discount it. Everything else
+/// only win when their check fails outright  Ediscount it. Everything else
 /// ranks by expected placed-score, chess-style: play my best, no despair.
 fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<usize>, i32, f64) {
     let (my, opp) = player_ref(gs, me);
@@ -124,12 +124,12 @@ fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<usiz
     let my_succ = my.success_live_card_zone.cards.len() as i32;
     let opp_succ = opp.success_live_card_zone.cards.len() as i32;
     // Stance floors (tree L2/L3). Calibrated against reality: a portfolio
-    // sized to the MEAN hit count sits at P(pass)≈0.5–0.7 by construction,
+    // sized to the MEAN hit count sits at P(pass)≁E.5 E.7 by construction,
     // so demanding 0.75+ folds nearly every contested turn (measured:
     // 76% empty confirms, games stretching past T15).
-    //  - opponent at 千秋楽 (2 successes): must CONTEST — folding loses
+    //  - opponent ahead (2 successes): must CONTEST — folding loses
     //    outright (8.4.7.1), so accept coin-flip-ish portfolios;
-    //  - I am at 2: one win ends the game — demand somewhat higher
+    //  - I am at 2: one win ends the game  Edemand somewhat higher
     //    reliability before spending the closeout attempt;
     //  - otherwise: moderate reliability, tempo beats hoarding.
     let floor = if opp_succ >= 2 {
@@ -145,8 +145,8 @@ fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<usiz
     let (blades, density) = flip_stats(gs, me, db);
     // Two-pool pass model (per-color flip reality):
     //   Pool F (mean flips, per printed color) must pass at all;
-    //   Pool B (board hearts only) passing ⇒ deterministic;
-    //   otherwise shortfall units must come from yell flips ⇒ binomial.
+    //   Pool B (board hearts only) passing ⇁Edeterministic;
+    //   otherwise shortfall units must come from yell flips ⇁Ebinomial.
     let pool_board = crate::bot::strategy_v4::heart_pool_inner(gs, me, db, 0.0);
     let board_supply: i32 = (0..=7).chain(std::iter::once(10)).map(|i| pool_board[i]).sum();
 
@@ -208,7 +208,7 @@ pub fn choose_action_v5(gs: &GameState, actions: &[Action], me: u8) -> Action {
     crate::bot::strategy_v4::choose_action_v4(gs, actions, me)
 }
 
-/// Main phase v6 — EXPERIMENT RESULT (2026-08-22): pricing actions by
+/// Main phase v6  EEXPERIMENT RESULT (2026-08-22): pricing actions by
 /// next-check equity delta LOST to plain v4 heuristics (~46% head-to-head,
 /// games stretching to ~10.4 turns). Root cause hypothesis: the projected
 /// portfolio score is dominated by hand-luck noise during Main phase (floors
@@ -234,12 +234,12 @@ pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase)
 
     // COMMITMENT RULE for everything below: whatever we decide to set joins
     // `desired`, so once selected it stays selected and emit() confirms.
-    // SelectLiveCard is a TOGGLE in the engine — a stateless
+    // SelectLiveCard is a TOGGLE in the engine  Ea stateless
     // select/deselect cycle here used to spin forever inside LiveCardSet
     // (the great 92%-draw stall).
     if desired.is_empty() {
         // Free win (8.4.3.2): as SECOND attacker with the opponent's zone
-        // still empty, ANY sole passer places regardless of score — set the
+        // still empty, ANY sole passer places regardless of score  Eset the
         // cheapest deterministic life even if it scores 0.
         if gs.current_phase == Phase::LiveCardSetSecondAttacker
             && opp.live_card_zone.cards.is_empty()
@@ -252,8 +252,7 @@ pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase)
 
         // Gamble fallback: bet ONE near-miss life, chosen by estimated pass
         // probability (per-color binomial over our own deck), not paper
-        // deficit. Measured: the old ≤4-deficit cap failed 97% of the time —
-        // expected flips aren't wildcards. At opponent match point folding
+        // deficit. Measured: the old ≤4-deficit cap failed 97% of the time  E        // expected flips aren't wildcards. At opponent match point folding
         // loses outright (S4), so accept longer odds there.
         let p_floor = if opp_succ >= 2 { 0.10 } else { 0.25 };
         if let Some((p, _deficit, hi)) = nearest_miss_life(gs, me, db) {
@@ -265,8 +264,7 @@ pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase)
         // Hand filtering (8.2 + 8.3.4): with no live worth setting, fill the
         // slots with dead NON-live cards instead of confirming an empty zone.
         // They are discarded at performance start BEFORE any check (so they
-        // can never fail it) and each placed card draws a replacement —
-        // trading up to 3 dead hand cards for 3 fresh deck draws per turn.
+        // can never fail it) and each placed card draws a replacement  E        // trading up to 3 dead hand cards for 3 fresh deck draws per turn.
         // This is the cure for the measured starvation stretch (14 turns at
         // zero hand lives while the board outgrew the game). Own decklist is
         // fair information: skip the churn once no lives remain to find.
@@ -358,11 +356,11 @@ fn cheapest_deterministic_life(gs: &GameState, me: u8, db: &CardDatabase) -> Opt
 /// Most-probable near-miss life: per-color deficits against BOARD-ONLY
 /// hearts, each covered by a per-color binomial over our own deck's
 /// blade-heart distribution. Measured pathology of the old paper-deficit
-/// gamble: 97% failure with ~11.7 unmet hearts — it counted expected flips
+/// gamble: 97% failure with ~11.7 unmet hearts  Eit counted expected flips
 /// as any-color wildcards, so "≤4 short on paper" was routinely 10+ short
 /// in the only colors that mattered.
 /// Returns (estimated pass probability, paper deficit, hand index).
-fn nearest_miss_life(gs: &GameState, me: u8, db: &CardDatabase) -> Option<(f64, i32, usize)> {
+pub(crate) fn nearest_miss_life(gs: &GameState, me: u8, db: &CardDatabase) -> Option<(f64, i32, usize)> {
     let (my, _) = player_ref(gs, me);
     let board = crate::bot::strategy_v4::heart_pool_inner(gs, me, db, 0.0);
     let dens = crate::bot::strategy_v4::blade_unit_densities(gs, me, db);
@@ -371,7 +369,7 @@ fn nearest_miss_life(gs: &GameState, me: u8, db: &CardDatabase) -> Option<(f64, 
     let mut best: Option<(f64, i32, usize)> = None;
     for &(hi, _cid, ref need) in &hand_lives(my, db) {
         if alloc(&board, need).is_some() {
-            continue; // deterministic — handled by the portfolio path
+            continue; // deterministic  Ehandled by the portfolio path
         }
         let mut p = 1.0f64;
         let mut deficit = 0i32;
@@ -406,7 +404,7 @@ fn nearest_miss_life(gs: &GameState, me: u8, db: &CardDatabase) -> Option<(f64, 
     best
 }
 
-fn emit(gs: &GameState, actions: &[Action], desired: &[usize]) -> Action {
+pub(crate) fn emit(gs: &GameState, actions: &[Action], desired: &[usize]) -> Action {
     let selected: Vec<usize> = gs
         .live_card_selected_indices
         .iter()
@@ -447,3 +445,5 @@ fn emit(gs: &GameState, actions: &[Action], desired: &[usize]) -> Action {
 pub fn choose_mulligan_v5(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
     crate::bot::strategy_v4::choose_mulligan_v4(gs, actions, db)
 }
+
+

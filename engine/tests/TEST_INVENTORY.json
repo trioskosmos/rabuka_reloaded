@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-22T04:08:48.881025+00:00",
+  "generated_at": "2026-08-22T04:32:02.384674+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 416,
-  "n_tests": 2501,
+  "n_tests": 2502,
   "total_cards": 771,
   "covered_cards": 573,
   "abilities_on_covered": 732,
@@ -309,9 +309,9 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 555,
+    "L2+choice": 556,
     "none": 204,
-    "L1+choice": 129,
+    "L1+choice": 128,
     "L2": 33,
     "L1": 15
   },
@@ -4382,9 +4382,14 @@
       "covering_files": [
         "engine/tests/test_modules/karin_bp4_004_live_start_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
-        "engine/tests/test_modules/parser_issues_e2e_test_part3.rs"
+        "engine/tests/test_modules/parser_issues_e2e_test_part3.rs",
+        "engine/tests/test_modules/untested_secondary_abilities_test.rs"
       ],
       "covering_tests": [
+        "eli_bp5011_chosen_heart_scales_with_success_pile",
+        "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
+        "hanamaru_bpb5007_fetches_double_heart04_member_only",
+        "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
         "issue10_dream_with_you_high_blade_plus_1_score",
         "issue10_dream_with_you_no_blade_no_score",
         "issue11_fanfare_15plus_cards_gives_blade",
@@ -4410,13 +4415,9 @@
         "issue4_izumi_self_gains_heart_with_other_member_on_stage",
         "issue4_you_exclude_aqours_live_start",
         "issue5_solitude_rain_heart_color_scoring",
-        "issue6_natsumi_blade_expires_after_live_victory_determination",
-        "issue6_natsumi_low_energy_no_blade",
-        "issue6_natsumi_self_and_other_blade",
-        "issue6_natsumi_self_only_blade",
-        "issue6_you_timed_heart_zero_for_setup_members"
+        "issue6_natsumi_blade_expires_after_live_victory_determination"
       ],
-      "covering_test_count": 57,
+      "covering_test_count": 63,
       "is_null": false
     },
     {
@@ -4444,9 +4445,14 @@
       "covering_files": [
         "engine/tests/test_modules/karin_bp4_004_live_start_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
-        "engine/tests/test_modules/parser_issues_e2e_test_part3.rs"
+        "engine/tests/test_modules/parser_issues_e2e_test_part3.rs",
+        "engine/tests/test_modules/untested_secondary_abilities_test.rs"
       ],
       "covering_tests": [
+        "eli_bp5011_chosen_heart_scales_with_success_pile",
+        "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
+        "hanamaru_bpb5007_fetches_double_heart04_member_only",
+        "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
         "issue10_dream_with_you_high_blade_plus_1_score",
         "issue10_dream_with_you_no_blade_no_score",
         "issue11_fanfare_15plus_cards_gives_blade",
@@ -4472,13 +4478,9 @@
         "issue4_izumi_self_gains_heart_with_other_member_on_stage",
         "issue4_you_exclude_aqours_live_start",
         "issue5_solitude_rain_heart_color_scoring",
-        "issue6_natsumi_blade_expires_after_live_victory_determination",
-        "issue6_natsumi_low_energy_no_blade",
-        "issue6_natsumi_self_and_other_blade",
-        "issue6_natsumi_self_only_blade",
-        "issue6_you_timed_heart_zero_for_setup_members"
+        "issue6_natsumi_blade_expires_after_live_victory_determination"
       ],
-      "covering_test_count": 57,
+      "covering_test_count": 63,
       "is_null": false
     },
     {
@@ -7268,9 +7270,10 @@
         "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "karin_bpb4004_cap_counts_waited_opponents_only",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -7303,9 +7306,10 @@
         "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "karin_bpb4004_cap_counts_waited_opponents_only",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -9102,12 +9106,13 @@
         "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "karin_bpb4004_cap_counts_waited_opponents_only",
         "multi_color_heart_condition_met_grants_both_colors",
         "multi_color_heart_condition_not_met_does_not_queue",
         "multi_color_heart_wrong_group_does_not_trigger",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 9,
       "is_null": false
     },
     {
@@ -10822,9 +10827,10 @@
         "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "karin_bpb4004_cap_counts_waited_opponents_only",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -11526,9 +11532,10 @@
         "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "karin_bpb4004_cap_counts_waited_opponents_only",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -11560,9 +11567,10 @@
         "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "karin_bpb4004_cap_counts_waited_opponents_only",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -11594,9 +11602,10 @@
         "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "karin_bpb4004_cap_counts_waited_opponents_only",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -12015,7 +12024,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 695,
+      "covering_test_count": 696,
       "is_null": false
     },
     {
@@ -15913,21 +15922,28 @@
       ],
       "base": "PL!N-bp3-002",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/untested_abilities_batch5_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch5_test.rs",
+        "engine/tests/test_modules/untested_secondary_abilities_test.rs"
       ],
       "covering_tests": [
+        "eli_bp5011_chosen_heart_scales_with_success_pile",
+        "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
+        "hanamaru_bpb5007_fetches_double_heart04_member_only",
+        "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
         "honoka_bp4001_draws_only_when_stage_total_is_cheaper",
+        "karin_bpb4004_cap_counts_waited_opponents_only",
         "kasumu_bp3002_grants_chosen_heart_to_other_nijigasaki_only",
         "natsumi_bp4009_blade_constant_tracks_cost_total_race",
+        "ruby_bp6009_blades_equal_success_pile_difference",
         "sayaka_hsbp2011_mills_top_five",
         "wondermates_activates_waited_nijigasaki_enabling_activation"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 11,
       "is_null": false
     },
     {
@@ -30483,9 +30499,10 @@
         "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "karin_bpb4004_cap_counts_waited_opponents_only",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 6,
       "is_null": false
     },
     {

@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-22T14:06:09.968779",
+  "generated_at": "2026-08-22T14:18:09.834825",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "4f25f571",
+  "engine_commit": "aa59c604",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -3204,7 +3204,7 @@
             "source": "discard",
             "dynamic_count": {
               "type": "dynamic_count",
-              "reference": "相手のステージにいるウェイト状態のメンバー",
+              "reference": "opponent_waited_member_count",
               "mode": "max"
             },
             "card_type": "member_card",
@@ -5999,7 +5999,7 @@
           "count": 1,
           "dynamic_count": {
             "type": "dynamic_count",
-            "reference": "自分のステージにいるメンバーの数",
+            "reference": "stage_member_count",
             "mode": "equals",
             "calculation": "add",
             "calculation_value": 2
@@ -10585,8 +10585,9 @@
             "destination": "discard",
             "dynamic_count": {
               "type": "dynamic_count",
-              "reference": "自分のデッキの上からカードをその差",
-              "mode": "equals"
+              "reference": "waitroom_count_below_base",
+              "mode": "equals",
+              "base_reference": "8"
             },
             "target": "self",
             "action": "move_cards",
@@ -22085,7 +22086,7 @@
             "source": "stage",
             "dynamic_count": {
               "type": "dynamic_count",
-              "reference": "自分のステージにいる『虹ヶ咲』のメンバーを、これにより控え室に置いたカードの枚数",
+              "reference": "these_waitroom_placed_count",
               "mode": "equals"
             },
             "card_type": "member_card",
@@ -23379,8 +23380,9 @@
             "destination": "discard",
             "dynamic_count": {
               "type": "dynamic_count",
-              "reference": "その差",
-              "mode": "equals"
+              "reference": "waitroom_count_below_base",
+              "mode": "equals",
+              "base_reference": "8"
             },
             "target": "self",
             "action": "move_cards",
@@ -34308,7 +34310,7 @@
             "text": "これにより控え室に置いた数に等しい枚数のエールを追加で行う",
             "dynamic_count": {
               "type": "dynamic_count",
-              "reference": "これにより控え室に置いた数",
+              "reference": "these_waitroom_placed_count",
               "mode": "equals"
             },
             "action": "modify_yell_count",

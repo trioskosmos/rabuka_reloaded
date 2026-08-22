@@ -4,6 +4,7 @@ pub mod evaluation;
 pub mod ismcts;
 pub mod neural;
 pub mod observation;
+pub mod rollout;
 pub mod strategy;
 pub mod strategy_v2;
 pub mod strategy_v3;
@@ -40,7 +41,7 @@ pub struct BotConfig {
     pub rollout_depth: u32,
     pub use_heuristic_rollout: bool,
     /// Tournament open-lists mode: sample the opponent's hidden cards from
-    /// their actual deck list. Default false — the bot must not use
+    /// their actual deck list. Default false  Ethe bot must not use
     /// information a fair player would not have.
     pub open_decklists: bool,
 }

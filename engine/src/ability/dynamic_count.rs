@@ -84,16 +84,14 @@ impl GameState {
                 (other.success_live_card_zone.cards.len() as u8)
                     .saturating_sub(own.success_live_card_zone.cards.len() as u8)
             }
-            Some(reference) if reference.contains("これにより控え室に置いた数") => {
+            Some("these_waitroom_placed_count") => {
                 if let Some(ref recently_moved) = self.recently_moved_cards {
                     recently_moved.len() as u8
                 } else {
                     moved_cards.len() as u8
                 }
             }
-            Some(reference)
-                if reference.contains("合計スコア") || reference == "total_live_score" =>
-            {
+            Some("total_live_score") => {
                 let player = self.resolve_target_player("self");
                 player
                     .live_card_zone
@@ -102,15 +100,37 @@ impl GameState {
                     .filter_map(|&id| self.card_database.get_card(id).and_then(|c| c.score))
                     .sum::<u8>()
             }
-            Some(reference) if reference.contains("ステージ") && reference.contains("メンバー") =>
-            {
-                let target = if reference.contains("相手") || reference.contains("opponent") {
-                    "opponent"
-                } else {
-                    "self"
-                };
-                let player = self.resolve_target_player(target);
+            Some("stage_member_count") => {
+                let player = self.resolve_target_player("self");
                 player.stage.stage.iter().filter(|&&c| c != -1).count() as u8
+            }
+            Some("opponent_stage_member_count") => {
+                let player = self.resolve_target_player("opponent");
+                player.stage.stage.iter().filter(|&&c| c != -1).count() as u8
+            }
+            // 「相手のステージにいるウェイト状態のメンバーの数まで」 — only
+            // WAITED opponents count; the old fuzzy arm counted everyone.
+            Some("opponent_waited_member_count") => {
+                let player = self.resolve_target_player("opponent");
+                player
+                    .stage
+                    .stage
+                    .iter()
+                    .filter(|&&c| {
+                        c != -1 && self.mods.get_orientation_modifier(c) == Some("wait")
+                    })
+                    .count() as u8
+            }
+            // 「控え室にあるカードの枚数がN枚未満の場合、その差に等しい枚数…」
+            // mills exactly the shortfall (base_reference holds N).
+            Some("waitroom_count_below_base") => {
+                let threshold = dc
+                    .base_reference
+                    .as_deref()
+                    .and_then(|s| s.parse::<u8>().ok())
+                    .unwrap_or(0);
+                let player = self.resolve_target_player("self");
+                threshold.saturating_sub(player.waitroom.cards.len() as u8)
             }
             Some("energy_cards_under_this_member") => {
                 let player = self.resolve_target_player("self");

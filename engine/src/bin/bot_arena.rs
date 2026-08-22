@@ -23,6 +23,7 @@ enum BotKind {
     V4,
     V5,
     V6,
+    V7,
     Random,
 }
 
@@ -34,6 +35,7 @@ fn parse_kind(s: &str) -> BotKind {
         "v4" => BotKind::V4,
         "v5" => BotKind::V5,
         "v6" => BotKind::V6,
+        "v7" => BotKind::V7,
         _ => BotKind::Random,
     }
 }
@@ -144,6 +146,7 @@ fn main() {
         BotKind::V4 => "v4",
         BotKind::V5 => "v5",
         BotKind::V6 => "v6",
+        BotKind::V7 => "v7",
         BotKind::Random => "random",
     };
 
@@ -376,6 +379,7 @@ fn main() {
                         )
                     }
                     BotKind::V4 => strategy_v4::choose_live_set_v4(&gs, &actions, &db),
+                    BotKind::V7 => rabuka_engine::bot::rollout::choose_live_set_v7(&gs, &actions, &db),
                     BotKind::V5 | BotKind::V6 => strategy_v5::choose_live_set_v5(&gs, &actions, &db),
                     BotKind::Random => actions[rng.range(actions.len())].clone(),
                 };
@@ -442,7 +446,7 @@ fn main() {
                     strategy_v3::choose_action_heuristic_v3(&gs, &actions, me, plan)
                 }
                 BotKind::V4 => strategy_v4::choose_action_v4(&gs, &actions, me),
-                BotKind::V6 => strategy_v5::choose_action_v6(&gs, &actions, me),
+                BotKind::V6 | BotKind::V7 => strategy_v5::choose_action_v6(&gs, &actions, me),
                 BotKind::V5 => strategy_v5::choose_action_v5(&gs, &actions, me),
                 BotKind::Random => actions[rng.range(actions.len())].clone(),
             };
@@ -574,3 +578,4 @@ fn main() {
         eprintln!("trace written to {}", path.display());
     }
 }
+
