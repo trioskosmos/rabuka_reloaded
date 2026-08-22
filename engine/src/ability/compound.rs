@@ -139,8 +139,8 @@ impl AbilityResolver {
             // Track if a preceding conditional step was satisfied, for
             // if-then-else (otherwise_condition) support.
             let mut condition_failed: Option<bool>;
-            for _repeat in 0..repeat_max {
-                let repeats_remaining = repeat_max.saturating_sub(_repeat + 1);
+            for repeat_idx in 0..repeat_max {
+                let repeats_remaining = repeat_max.saturating_sub(repeat_idx + 1);
                 // Reset the conditional-failed flag at the start of each repeat
                 // iteration so a failed result_condition in one iteration doesn't
                 // cause the next iteration's actions to be skipped.
@@ -153,8 +153,8 @@ impl AbilityResolver {
                     ); }
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
                         log::debug!(
-                            "[SEQ_TRACE] _repeat={} i={} action={}",
-                            _repeat,
+                            "[SEQ_TRACE] repeat_idx={} i={} action={}",
+                            repeat_idx,
                             i,
                             action.action
                         );

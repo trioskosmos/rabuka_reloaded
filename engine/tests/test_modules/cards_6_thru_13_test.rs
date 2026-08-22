@@ -520,7 +520,6 @@ fn c11_peek_per_niji_selects_keep1() {
     while g.has_pending_choice() {
         g.select_indices(&[0]);
     }
-    use rabuka_engine::card::HeartColor;
     // Deck was all fillers (no live card): the reveal cannot grant score.
     assert_eq!(
         g.state.mods.get_score_modifier(l),

@@ -55,8 +55,8 @@ impl PolicyNet {
             f32::from_le_bytes(bytes)
         };
 
-        // Version header
-        let _version = read_f32(&buf, &mut pos) as u8;
+        // Version header: skipped, but must be consumed to advance the cursor.
+        read_f32(&buf, &mut pos);
 
         // card_embed [2400, 128]
         for i in 0..CARD_EMBED_TABLE_SIZE * CARD_EMBED_DIM {

@@ -58,7 +58,7 @@ fn value_outcome(gs: &GameState, me: u8, start_succ: (i32, i32)) -> f64 {
 
 /// Apply a full portfolio (select toggles + confirm) in `sim` using the
 /// currently offered action list shape. Returns false if execution failed.
-fn apply_portfolio(sim: &mut GameState, me_player: u8, desired: &[usize]) -> bool {
+fn apply_portfolio(sim: &mut GameState, desired: &[usize]) -> bool {
     // Deselect everything first so indices map cleanly onto our list.
     loop {
         let acts = game_setup::generate_possible_actions(sim);
@@ -175,7 +175,7 @@ pub fn price_portfolios(
     for (ci, cand) in candidates.iter().enumerate() {
         for _ in 0..SIMS_PER_CANDIDATE {
             let mut sim = gs.clone();
-            if !apply_portfolio(&mut sim, me, cand) {
+            if !apply_portfolio(&mut sim, cand) {
                 totals[ci] -= 500.0 / SIMS_PER_CANDIDATE as f64;
                 continue;
             }
@@ -309,7 +309,6 @@ fn plan_key(gs: &GameState, me: u8) -> (u8, u8, u64) {
         cid.hash(&mut h);
     }
     my.success_live_card_zone.cards.len().hash(&mut h);
-    use std::hash::Hash as _;
     gs.turn_number.hash(&mut h);
     (side, gs.turn_number, h.finish())
 }

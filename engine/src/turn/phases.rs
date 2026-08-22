@@ -658,9 +658,9 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
     pub(crate) fn handle_mulligan_selection(
         game_state: &mut GameState,
         card_id: Option<i16>,
-        _card_indices: Option<Vec<usize>>,
+        card_indices: Option<Vec<usize>>,
     ) -> Result<(), String> {
-        let idx = if let Some(indices) = _card_indices {
+        let idx = if let Some(indices) = card_indices {
             indices.first().copied().unwrap_or(0)
         } else if let Some(cid) = card_id {
             game_state
@@ -790,9 +790,9 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
     pub(crate) fn handle_live_card_selection(
         game_state: &mut GameState,
         card_id: Option<i16>,
-        _card_indices: Option<Vec<usize>>,
+        card_indices: Option<Vec<usize>>,
     ) -> Result<(), String> {
-        let idx = if let Some(indices) = _card_indices {
+        let idx = if let Some(indices) = card_indices {
             indices.first().copied().unwrap_or(0)
         } else if let Some(cid) = card_id {
             game_state

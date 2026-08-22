@@ -25,7 +25,6 @@ impl AbilityResolver {
         }
 
         if let Some(ref select_action) = effect.compound.select_action {
-            let _placement_order = select_action.placement_order_any();
             let any_number = select_action.any_number_any().unwrap_or(false);
             let count = select_action.count.unwrap_or(1);
             let optional = select_action.optional.unwrap_or(false);
@@ -608,7 +607,6 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         self.current_effect = Some(effect.clone());
 
-        let _placement_order = effect.placement_order_any();
         let any_number = effect.any_number_any().unwrap_or(false);
         let count = effect.count.unwrap_or(1) as usize;
         let optional = effect.optional.unwrap_or(false);

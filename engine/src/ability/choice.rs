@@ -385,7 +385,7 @@ impl super::resolver::AbilityResolver {
             (
                 Some(Choice::SelectTarget { target, .. }),
                 ChoiceResult::TargetSelected { target: selected },
-            ) => self.handle_select_target(gs, target, &selected, context),
+            ) => self.handle_select_target(gs, target, &selected),
             (Some(Choice::SelectPosition { .. }), ChoiceResult::PositionSelected { position }) => {
                 self.handle_select_position(gs, &position, context)
             }
@@ -1092,7 +1092,7 @@ impl super::resolver::AbilityResolver {
         &mut self,
         gs: &mut GameState,
         ctx: &SelectionContext,
-        _context: &ExecutionContext,
+        context: &ExecutionContext,
         validate_card: &mut impl FnMut(i16) -> bool,
     ) -> Result<(), String> {
         let mapped_indices = ctx.mfi(&ctx.indices);
@@ -1211,7 +1211,7 @@ impl super::resolver::AbilityResolver {
                 // [select,draw] pending from restarting a second keep_shuffle.
                 gs.ability_queue.take_pending_actions();
             }
-            return self.handle_selection_epilogue(gs, _context);
+            return self.handle_selection_epilogue(gs, context);
         }
         if !hand_idx.is_empty() || ctx.allow_skip {
             if !hand_idx.is_empty() && ctx.count > 0 && hand_idx.len() < ctx.count {
@@ -1398,7 +1398,7 @@ impl super::resolver::AbilityResolver {
                 gs.ability_queue.take_pending_actions();
             }
         }
-        self.handle_selection_epilogue(gs, _context)
+        self.handle_selection_epilogue(gs, context)
     }
 
     fn handle_reveal_selection(
@@ -2388,7 +2388,6 @@ impl super::resolver::AbilityResolver {
         gs: &mut GameState,
         target: &str,
         selected: &str,
-        _context: ExecutionContext,
     ) -> Result<(), String> {
         let choice_card_no = gs.entry_choice_card_no();
         let conditional_choice = gs.entry_conditional_choice();

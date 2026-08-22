@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rabuka_engine::bot::{strategy, strategy_v2, strategy_v3, V2Policy, V3Plan};
+use rabuka_engine::bot::{strategy_v2, strategy_v3, V2Policy, V3Plan};
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::deck_parser::DeckParser;

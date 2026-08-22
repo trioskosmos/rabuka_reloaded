@@ -677,7 +677,7 @@ impl super::TurnEngine {
         choice: &crate::ability::types::Choice,
         card_id: Option<i16>,
         card_indices: Option<Vec<usize>>,
-        _choice_card_no: Option<&ChoiceRoute>,
+        choice_card_no: Option<&ChoiceRoute>,
     ) -> Result<crate::ability::types::ChoiceResult, String> {
         match choice {
             crate::ability::types::Choice::SelectCard { .. } => {
@@ -731,7 +731,7 @@ impl super::TurnEngine {
                     _ => {
                         // For position_change:opponent choices, use card_id as option index
                         // to look up the actual option string instead of the raw index.
-                        if _choice_card_no
+                        if choice_card_no
                             == Some(&ChoiceRoute::Raw(
                                 "position_change:opponent:front".to_string(),
                             ))
@@ -1313,19 +1313,19 @@ impl super::TurnEngine {
             Self::check_invalid_live_cards(game_state, false);
         }
         tdbg!("CHECK_TIMING:5 invalid live p1 OK");
-        let _e1 =
+        let e1 =
             Self::check_invalid_energy_cards(&mut game_state.player1, &game_state.card_database);
-        let _e2 =
+        let e2 =
             Self::check_invalid_energy_cards(&mut game_state.player2, &game_state.card_database);
-        if _e2 > 0 || _e1 > 0 {
+        if e2 > 0 || e1 > 0 {
             game_state.mark_constants_dirty();
         }
         tdbg!("CHECK_TIMING:7 invalid energy OK");
-        let _o1 =
+        let o1 =
             Self::check_orphaned_under_cards(&mut game_state.player1, &game_state.card_database);
-        let _o2 =
+        let o2 =
             Self::check_orphaned_under_cards(&mut game_state.player2, &game_state.card_database);
-        if _o1 > 0 || _o2 > 0 {
+        if o1 > 0 || o2 > 0 {
             game_state.mark_constants_dirty();
         }
         tdbg!("CHECK_TIMING:8 orphaned under OK");

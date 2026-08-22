@@ -164,7 +164,6 @@ fn hanamaru_bpb5007_fetches_double_heart04_member_only() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let hanamaru = game.id("PL!S-bp5-007-R");
-    let dia = game.id(DIA_H04X2); // heart04×2 — eligible
 
     game.state.player1.stage.stage[1] = hanamaru;
     let filler = game.id(FILLER);
@@ -302,5 +301,70 @@ fn karin_bpb4004_cap_counts_waited_opponents_only() {
     assert!(
         deck_top.contains(&niji_a) || deck_top.contains(&niji_b),
         "selected members are placed on top of the deck"
+    );
+}
+
+// ====================================================================
+// PL!-bp3-007-R 東條希 — PAY path: look top 3 → exactly one to hand,
+// one back on deck TOP, one to the waitroom.
+// ====================================================================
+#[test]
+fn nozomi_bp3007_paid_look_splits_three_ways() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let nozomi = game.id("PL!-bp3-007-R");
+    let filler = game.id(FILLER);
+
+    game.state.player1.stage.stage[1] = nozomi;
+    // Two cards for the optional cost.
+    let spare_a = game.id(FILLER);
+    let spare_b = game.id(FILLER);
+    game.add_to_hand(spare_a);
+    game.add_to_hand(spare_b);
+    let stock = game.new_id(FILLER);
+    fill_decks(&mut game, stock);
+    put_on_deck_top(&mut game, 0, filler);
+    let kotori_id2 = game.id(CLEAN_KOTORI);
+    put_on_deck_top(&mut game, 0, kotori_id2);
+
+    let deck_before = game.state.player1.main_deck.cards.len();
+    let waitroom_before = game.state.player1.waitroom.cards.len();
+
+    trigger_auto(
+        &mut game,
+        nozomi,
+        AbilityTrigger::LiveStart,
+        "ライブ開始時",
+    );
+
+    while game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectTarget") => game.select_option(1), // pay the optional cost
+            Some("SelectCard") => {
+                let n = game.pending_choice_count();
+                let take: Vec<usize> = (0..n.min(1)).collect();
+                game.select_indices(&take);
+            }
+            _ => break,
+        }
+        game.drain_auto_ability_choices();
+    }
+
+    // Per text: −2 hand (cost), +1 hand (one looked card) → net −1;
+    // deck −3 +1 back on top = −2; waitroom +1.
+    let hand_now = game.state.player1.hand.cards.len();
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 2,
+        "deck: three looked off, one placed back on top"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        waitroom_before + 3,
+        "two paid cards + one looked leftover land in the waitroom"
+    );
+    assert!(
+        hand_now <= 3,
+        "paid two, gained one — hand must not exceed start +1"
     );
 }

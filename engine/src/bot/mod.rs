@@ -1,4 +1,5 @@
 mod determinization;
+pub mod conductor;
 pub mod encoding;
 pub mod evaluation;
 pub mod ismcts;

@@ -9,7 +9,6 @@
 //!   3. What lands on stage after each activation?
 
 use crate::helpers::*;
-use rabuka_engine::card::CardType;
 use rabuka_engine::game_setup::{self, ActionType};
 
 fn count_sayaka_offers(game: &TestGame, sayaka: i16) -> usize {
@@ -62,7 +61,7 @@ fn sayaka_activation_charges_energy_and_terminates() {
         }
         activations += 1;
         let stage_before = game.state.player1.stage.stage;
-        let res = TurnEngine_use(&mut game, sayaka);
+        let res = turn_engine_use(&mut game, sayaka);
         let en_after = game.state.player1.energy_zone.active_count();
         log.push(format!(
             "step {step}: offers={offers} en {en_before}->{en_after} ok={} stage {:?}-> {:?}",
@@ -94,7 +93,7 @@ fn sayaka_activation_charges_energy_and_terminates() {
 }
 
 // Local wrapper so we don't depend on helper signature drift.
-fn TurnEngine_use(game: &mut TestGame, card_id: i16) -> Result<(), String> {
+fn turn_engine_use(game: &mut TestGame, card_id: i16) -> Result<(), String> {
     rabuka_engine::turn::TurnEngine::execute_main_phase_action(
         &mut game.state,
         &ActionType::UseAbility,

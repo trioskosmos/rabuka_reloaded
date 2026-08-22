@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-22T14:18:09.834825",
+  "generated_at": "2026-08-22T15:29:52.950319",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "aa59c604",
+  "engine_commit": "4c1d0f2b",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -13558,23 +13558,36 @@
         "type": "move_cards"
       },
       "effect": {
+        "action": "sequential",
         "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、1枚をデッキの上に置き、1枚を控え室に置く",
-        "action": "look_and_select",
-        "look_action": {
-          "text": "自分のデッキの上からカードを3枚見る。",
-          "source": "deck_top",
-          "count": 3,
-          "target": "self",
-          "action": "look_at"
-        },
-        "select_action": {
-          "action": "select_cards",
-          "discard_remaining": true,
-          "text": "1枚を手札に加え、1枚をデッキの上に置き、1枚を控え室に置く",
-          "reveal": false,
-          "destination": "deck_top",
-          "count": 1
-        }
+        "actions": [
+          {
+            "text": "自分のデッキの上からカードを3枚見る。",
+            "source": "deck_top",
+            "count": 3,
+            "target": "self",
+            "action": "look_at"
+          },
+          {
+            "action": "select_cards",
+            "source": "looked_at",
+            "destination": "hand",
+            "count": 1,
+            "discard_remaining": false,
+            "remainder_destination": "looked_at",
+            "target": "self",
+            "text": "1枚を手札に加え"
+          },
+          {
+            "action": "select_cards",
+            "source": "looked_at",
+            "destination": "deck_top",
+            "count": 1,
+            "discard_remaining": true,
+            "target": "self",
+            "text": "1枚をデッキの上に置き、1枚を控え室に置く"
+          }
+        ]
       }
     },
     {

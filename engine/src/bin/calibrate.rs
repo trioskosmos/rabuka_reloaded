@@ -37,7 +37,7 @@ fn fresh_database() -> Arc<CardDatabase> {
     Arc::new(CardDatabase::load_or_create(cards))
 }
 
-fn load_deck(db: &Arc<CardDatabase>, name: &str) -> Vec<String> {
+fn load_deck(name: &str) -> Vec<String> {
     let p = std::path::Path::new("../web_ui/decks").join(format!("{name}.txt"));
     let deck = deck_parser::DeckParser::parse_deck_file(&p).expect("parse deck");
     deck_parser::DeckParser::deck_list_to_card_numbers(&deck)
@@ -137,58 +137,6 @@ fn hand_lives(p: &Player, db: &CardDatabase) -> Vec<(usize, Acc)> {
     out
 }
 
-/// Conservative predictor (0.6×): can ALL selected lives be allocated?
-/// Non-life cards in the portfolio are ignored (discarded at 8.3.4 before
-/// checks — they never participate in heart requirements).
-fn predict_conservative(gs: &GameState, me: u8, db: &CardDatabase, selected: &[usize]) -> Option<bool> {
-    let my = if me == 0 { &gs.player1 } else { &gs.player2 };
-    let mut pool = heart_pool(gs, me, db, 0.6);
-    let mut lives: Vec<Acc> = Vec::new();
-    for &(hi, ref need) in &hand_lives(my, &db) {
-        if selected.contains(&hi) {
-            lives.push(*need);
-        }
-    }
-    if lives.is_empty() {
-        return None; // not a pass-prediction moment
-    }
-    let mut all_ok = true;
-    let mut p = pool;
-    for need in &lives {
-        if !alloc_probe(&mut p, need) {
-            all_ok = false;
-            break;
-        }
-    }
-    let _ = &mut pool;
-    Some(all_ok)
-}
-
-/// Full-mean predictor (1.0×).
-fn predict_full_mean(gs: &GameState, me: u8, db: &CardDatabase, selected: &[usize]) -> Option<bool> {
-    let my = if me == 0 { &gs.player1 } else { &gs.player2 };
-    let mut pool = heart_pool(gs, me, db, 1.0);
-    let mut lives: Vec<Acc> = Vec::new();
-    for &(hi, ref need) in &hand_lives(my, &db) {
-        if selected.contains(&hi) {
-            lives.push(*need);
-        }
-    }
-    if lives.is_empty() {
-        return None;
-    }
-    let mut all_ok = true;
-    let mut p = pool;
-    for need in &lives {
-        if !alloc_probe(&mut p, need) {
-            all_ok = false;
-            break;
-        }
-    }
-    let _ = &mut pool;
-    Some(all_ok)
-}
-
 fn alloc_probe(pool: &mut Acc, need: &Acc) -> bool {
     let mut p = *pool;
     let mut wildcard_used = 0i32;
@@ -242,10 +190,8 @@ fn alloc_probe(pool: &mut Acc, need: &Acc) -> bool {
 fn resolve_actual(
     sim: &mut GameState,
     me_is_p1: bool,
-    rng: &mut (dyn FnMut(usize) -> usize),
-    db: &Arc<CardDatabase>,
+    rng: &mut dyn FnMut(usize) -> usize,
 ) -> Option<bool> {
-    use rabuka_engine::card::CardType;
     let succ_before = if me_is_p1 {
         sim.player1.success_live_card_zone.cards.len()
     } else {
@@ -307,7 +253,6 @@ fn resolve_actual(
     } else {
         sim.player2.success_live_card_zone.cards.len()
     };
-    let _ = (db, CardType::Live);
     Some(succ_after > succ_before)
 }
 
@@ -320,7 +265,7 @@ fn main() {
     // makes make_mut clone the DB, registrations land on the throwaway copy,
     // and every drawn card becomes unresolvable (hands full of ghosts).
     let mut db = fresh_database();
-    let nums = load_deck(&db, "5CP3Z idou");
+    let nums = load_deck("5CP3Z idou");
     let (t1, t2) = game_setup::build_two_decks(&mut db, &nums, &nums).expect("decks");
 
     let mut rng_state = Lcg(0xC0FFEE);
@@ -332,7 +277,6 @@ fn main() {
     let mut full = [[0u32; 2]; 2];
     let mut samples: Vec<String> = Vec::new();
     let mut n_confirms: u32 = 0;
-    let mut n_selects: u32 = 0;
     let mut n_life_samples: u32 = 0;
 
     let start = std::time::Instant::now();
@@ -397,26 +341,6 @@ fn main() {
                             &gs, &actions, &db, &v2_policy,
                         )
                     };
-                    let confirming = matches!(
-                        a.action_type,
-                        game_setup::ActionType::ConfirmLiveCardSet
-                    );
-                    let mut selected: Vec<usize> = gs
-                        .live_card_selected_indices
-                        .iter()
-                        .map(|&i| i as usize)
-                        .collect();
-                    // Portfolio may arrive ON the confirm via card_indices.
-                    if let Some(ci) = a
-                        .parameters
-                        .as_ref()
-                        .and_then(|p| p.card_indices.clone())
-                    {
-                        if !ci.is_empty() {
-                            selected = ci;
-                        }
-                    }
-
                     // ── CALIBRATION POINT ──
                     // Per-life prediction audit: for each distinct hand life,
                     // ask both predictors whether it passes, then measure the
@@ -475,7 +399,7 @@ fn main() {
                                     .shuffle(&mut rand::thread_rng());
                                 let mut counter = |n: usize| rng_state.range(n);
                                 if let Some(placed) =
-                                    resolve_actual(&mut sim, active_is_p1, &mut counter, &db)
+                                    resolve_actual(&mut sim, active_is_p1, &mut counter)
                                 {
                                     any_resolved = true;
                                     if placed {

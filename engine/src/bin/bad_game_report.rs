@@ -4,7 +4,7 @@
 //!
 //! Usage: cargo run --release --bin bad_game_report -- [games] [worst_k]
 
-use rabuka_engine::bot::{strategy_v2, strategy_v3, strategy_v4, strategy_v5};
+use rabuka_engine::bot::{strategy_v2, strategy_v4, strategy_v5};
 use rabuka_engine::card::{CardDatabase, CardType};
 use rabuka_engine::card_loader;
 use rabuka_engine::deck_parser;
@@ -33,7 +33,7 @@ fn fresh_database() -> Arc<CardDatabase> {
     Arc::new(CardDatabase::load_or_create(cards))
 }
 
-fn load_deck(db: &Arc<CardDatabase>, name: &str) -> Vec<String> {
+fn load_deck(name: &str) -> Vec<String> {
     let deck_path = std::path::Path::new("../web_ui/decks").join(format!("{name}.txt"));
     if deck_path.exists() {
         let deck = deck_parser::DeckParser::parse_deck_file(&deck_path).expect("parse deck");
@@ -89,7 +89,7 @@ fn main() {
     let worst_k: usize = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(3);
 
     let db = fresh_database();
-    let nums = load_deck(&db, "5CP3Z idou");
+    let nums = load_deck("5CP3Z idou");
     eprintln!(
         "deck entries={} distinct={}",
         nums.len(),
@@ -101,13 +101,12 @@ fn main() {
     drop(db_mut);
 
     let mut rng = Lcg(0x5EED_1234_ABCD_0001);
-    let v2_policy = strategy_v2::V2Policy::default();
 
     let mut records: Vec<GameRecord> = Vec::with_capacity(n_games as usize);
 
-    for _game in 0..n_games {
+    for game in 0..n_games {
         let mut gs = deal(&db, &t1, &t2);
-        if _game == 0 {
+        if game == 0 {
             eprintln!(
                 "REPORT post-deal: en={} deck={} hand={}",
                 gs.player1.energy_zone.active_count(),
@@ -115,8 +114,6 @@ fn main() {
                 gs.player1.hand.cards.len()
             );
         }
-        let plan_p1 = strategy_v3::V3Plan::detect(&gs, 0, &db);
-        let plan_p2 = strategy_v3::V3Plan::detect(&gs, 1, &db);
         let mut rec = GameRecord::default();
         let mut last_turn = 0u8;
         let mut stuck = 0u32;

@@ -110,7 +110,7 @@ pub fn best_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
 /// (8.4.7.1), so a portfolio that cannot strictly beat their ceiling can
 /// only win when their check fails outright  Ediscount it. Everything else
 /// ranks by expected placed-score, chess-style: play my best, no despair.
-fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<usize>, i32, f64) {
+pub(crate) fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<usize>, i32, f64) {
     let (my, opp) = player_ref(gs, me);
     let pool = heart_pool(gs, me, db);
     let lives = hand_lives(my, db);

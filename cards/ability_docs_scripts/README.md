@@ -45,14 +45,16 @@ The inverted index (`INVERTED_ABILITIES_CONDENSED.md`, `INVERTED_ABILITIES_ABSTR
 
 ## Output Files
 
-| File | Description |
-|------|-------------|
-| `FULL_REPORT.md` | Comprehensive coverage report with tables and gaps |
-| `untested_card_ids.txt` | Plain list of untested card IDs for test writing |
-| `ABILITY_DOCUMENTATION.md` | Exhaustive schema reference |
-| `abilities_summary.md` | High-level stats (card counts, trigger breakdown) |
-| `INVERTED_ABILITIES_CONDENSED.md` | JSON → source text substrings with `(xN)` counts |
-| `INVERTED_ABILITIES_ABSTRACT.md` | Abstracted JSON (values → placeholders) with variable breakdown |
+_Generated outputs are **not checked in** — regenerate with the scripts above._
+
+| File | Produced by | Description |
+|------|-------------|-------------|
+| `../../engine/tests/TEST_COVERAGE.md` + `../../docs/ABILITY_MATRIX.md` + `TEST_INVENTORY.json/.md` | `../test_inventory.py` (checked in, CI-checked) | Canonical coverage inventory |
+| `FULL_REPORT.md` | `generate_report.py` (deprecated shim → test_inventory) | Legacy comprehensive report |
+| `untested_card_ids.txt` | old find_untested scripts | Plain list of untested card IDs |
+| `ABILITY_DOCUMENTATION.md` → canonical copy at `../ABILITY_DOCUMENTATION.md` | analyze_abilities.py era tools | Exhaustive schema reference |
+| `abilities_summary.md` | old summary script | High-level stats (card counts, trigger breakdown) |
+| `INVERTED_ABILITIES_CONDENSED.md` / `_ABSTRACT.md` / `.md` | `invert_abilities.py` | JSON → source text inversion for parser introspection |
 
 ## Test Coverage Method
 

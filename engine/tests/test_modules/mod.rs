@@ -329,6 +329,7 @@ pub mod untested_abilities_batch4_test;
 pub mod untested_abilities_batch5_test;
 pub mod untested_abilities_batch6_test;
 pub mod untested_secondary_abilities_test;
+pub mod restriction_mechanics_test;
 pub mod untested_abilities_batch3_test;
 
 // Unique / edge-case ability tests

@@ -70,7 +70,7 @@ fn setup_with_members(members: &[&str]) -> (TestGame, i16) {
 #[test]
 fn distortion_parse_increase_half_is_increase() {
     let db = load_real_database();
-    let mut g = TestGame::new(db);
+    let g = TestGame::new(db);
     let live = g.id("PL!SP-pb2-048-L");
     let card = g.db.get_card(live).unwrap();
     let ab = card

@@ -24,6 +24,7 @@ enum BotKind {
     V5,
     V6,
     V7,
+    Conductor,
     Random,
 }
 
@@ -36,6 +37,7 @@ fn parse_kind(s: &str) -> BotKind {
         "v5" => BotKind::V5,
         "v6" => BotKind::V6,
         "v7" => BotKind::V7,
+        "conductor" => BotKind::Conductor,
         _ => BotKind::Random,
     }
 }
@@ -147,6 +149,7 @@ fn main() {
         BotKind::V5 => "v5",
         BotKind::V6 => "v6",
         BotKind::V7 => "v7",
+        BotKind::Conductor => "conductor",
         BotKind::Random => "random",
     };
 
@@ -196,7 +199,7 @@ fn main() {
         // show WHO set WHAT and whether checks passed.
         let mut prev_phase = gs.current_phase;
         let mut timeline: Vec<String> = Vec::new();
-        let mut snap_row = |tag: &str, gs: &GameState| -> String {
+        let snap_row = |tag: &str, gs: &GameState| -> String {
             let lives_in_hand = |p: &rabuka_engine::player::Player| {
                 p.hand
                     .cards
@@ -344,7 +347,7 @@ fn main() {
                         strategy_v3::choose_mulligan_action_v3(&gs, &actions, &db)
                     }
                     BotKind::V4 => strategy_v4::choose_mulligan_v4(&gs, &actions, &db),
-                    BotKind::V5 | BotKind::V6 => strategy_v4::choose_mulligan_v4(&gs, &actions, &db),
+                    BotKind::V5 | BotKind::V6 | BotKind::V7 | BotKind::Conductor => strategy_v4::choose_mulligan_v4(&gs, &actions, &db),
                     _ => actions
                         .iter()
                         .find(|a| {
@@ -380,6 +383,7 @@ fn main() {
                     }
                     BotKind::V4 => strategy_v4::choose_live_set_v4(&gs, &actions, &db),
                     BotKind::V7 => rabuka_engine::bot::rollout::choose_live_set_v7(&gs, &actions, &db),
+                    BotKind::Conductor => rabuka_engine::bot::conductor::choose_live_set_conductor(&gs, &actions, &db),
                     BotKind::V5 | BotKind::V6 => strategy_v5::choose_live_set_v5(&gs, &actions, &db),
                     BotKind::Random => actions[rng.range(actions.len())].clone(),
                 };
@@ -447,6 +451,7 @@ fn main() {
                 }
                 BotKind::V4 => strategy_v4::choose_action_v4(&gs, &actions, me),
                 BotKind::V6 | BotKind::V7 => strategy_v5::choose_action_v6(&gs, &actions, me),
+                BotKind::Conductor => rabuka_engine::bot::conductor::choose_main_conductor(&gs, &actions, me),
                 BotKind::V5 => strategy_v5::choose_action_v5(&gs, &actions, me),
                 BotKind::Random => actions[rng.range(actions.len())].clone(),
             };

@@ -282,6 +282,7 @@ fn choose_deck(deck_lists: &[deck_parser::DeckList], player_name: &str) -> deck_
 /// Startup guard: verify every canonical English choice-prompt template has a
 /// Japanese translation. Loudly logs any gap at boot so missing i18n is caught
 /// before it ever reaches the UI.
+#[cfg(feature = "server")]
 fn i18n_self_check() {
     use crate::ability::describe::{translate_choice_prompt_en_to_ja, CHOICE_PROMPT_TEMPLATES_EN};
     let mut missing = 0;

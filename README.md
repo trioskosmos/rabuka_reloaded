@@ -1,8 +1,8 @@
 # Rabuka Reloaded
 
-A certain school idol collectible card game engine, AI, and web UI — built in Rust and ported to 8 platforms.
+A certain school idol collectible card game engine, AI, and web UI — built in Rust and ported to a dozen platforms.
 
-**2,280 cards · 800 unique abilities · ~1,800 tests · 90K lines of Rust**
+**2,526 cards · 936 unique abilities · ~2,500 tests · 129K lines of Rust**
 
 [Web UI](#web-ui) · [Console Ports](#target-platforms) · [AI Bot](#features) · [Quick Start](#quick-start) · [Docs](#documentation)
 
@@ -11,13 +11,13 @@ A certain school idol collectible card game engine, AI, and web UI — built in 
 ## Features
 
 - **Full game rules engine** — all phases (Active, Energy, Draw, Main, Live), all card types, full zone system (hand, stage, deck, waitroom, energy zone, etc.)
-- **2,280 real cards** with **800 unique abilities** compiled from Japanese card text via a Python extraction pipeline
+- **2,526 real cards** with **936 unique abilities** compiled from Japanese card text via a Python extraction pipeline
 - **Custom bytecode VM** — compiles abilities into binary opcodes, reducing on-disk size from 1.4MB to 136KB (90% reduction), enabling console targets with <1MB RAM
 - **ISMCTS AI bot** — Information Set Monte Carlo Tree Search handling imperfect information (hidden cards), with a neural network evaluation function
 - **PPO training pipeline** — Proximal Policy Optimization to train the neural evaluation function; collects trajectories via self-play
 - **Web UI** — full game board, card browser, deck converter, interactive tutorial, multiplayer via SSE + chat, QR code deck sharing, i18n
 - **Memory-optimized** — bytecode VM + struct compaction keeps runtime RAM small enough for retro consoles (as low as 2 MB). DS (4 MB) ability activation crash fixed.
-- **11 binary targets** — CLI harness, bot demo, training data generation, game tracing, profiling, REPL play, and platform-specific builds
+- **15 binary targets** — CLI harness, bot arena/demo, training data generation, game tracing, profiling, and platform-specific builds
 
 ## Target Platforms
 
@@ -31,6 +31,11 @@ A certain school idol collectible card game engine, AI, and web UI — built in 
 | **PlayStation 1** (MIPS R3000A @ 33MHz) | 2MB | ✅ Works — full game flow, BIOS vblank event; card data streams from CD |
 | **Game Boy Advance** (ARM7TDMI @ 16MHz) | 288KB | 🟡 Boots & plays full flow via agb object-text rendering; sprite-VRAM crash fixed — needs longer play test |
 | **Sega Dreamcast** (SH-4 @ 200MHz) | 16MB | ✅ **Works — playable** via new wasm→C pipeline (rust→wasm32→wasm2c→sh-elf-gcc); full engine, text UI in Flycast. See `platforms/dc/wasm/` |
+| **WebAssembly** (wasm32 headless) | unlimited | ✅ Works — full no_std engine + bytecode VM; headless AI-vs-AI match harness with C ABI (`platforms/wasm/`) |
+| **SNES** (5A22 @ ~21MHz) | 128KB | 🔧 In progress — crt0 + build scripts in place |
+| **Mega Drive / Genesis** (68000 @ ~7.6MHz) | 64KB | 🔧 In progress — WSL assemble pipeline in place |
+| **Atari Jaguar** (Tom & Jerry, m68k) | 2MB | 🟡 Display/input modules present; active development |
+| **Philips CD-i** (SCC68070 @ 15.5MHz) | 1MB | 🟡 Native m68k port; proves the engine fits 1MB with compact bytecode |
 
 For a full portability analysis covering 15+ consoles (PS1, N64, GameCube, Vita, GBA, Saturn, and more), see [engine/PORTS.md](engine/PORTS.md).
 
@@ -45,7 +50,7 @@ cargo run --release
 cargo run --release --features server -- web-server
 # → Open http://127.0.0.1:8080
 
-# Run all ~1,800 tests
+# Run all ~2,500 tests
 cargo test --test run_all
 
 # Run benchmarks
@@ -63,37 +68,42 @@ docker run -p 8080:8080 rabuka
 
 ```
 rabuka_reloaded/
-├── engine/            # Core Rust crate (90K LOC, 83 source files)
+├── engine/            # Core Rust crate (129K LOC, 100 source files)
 │   ├── src/core/      #   Card data, game state, player, zones, types
 │   ├── src/ability/   #   Ability system: effects, conditions, costs, VM
 │   ├── src/game/      #   Game setup, display, deck builder, web server
 │   ├── src/turn/      #   Turn phases, actions, live phase, triggers
 │   ├── src/bot/       #   ISMCTS AI, neural network, determinization
-│   ├── src/bin/       #   11 binary targets (harness, bot_demo, etc.)
-│   ├── tests/         #   318 test files, ~1,800 test functions
+│   ├── src/bin/       #   15 binary targets (harness, bot_arena, trace_game, etc.)
+│   ├── tests/         #   416 test files, ~2,500 test functions
 │   └── benches/       #   Criterion benchmarks
-├── web_ui/            # Vanilla JS web frontend (63 JS files, 12 CSS)
+├── web_ui/            # Vanilla JS web frontend (63 JS files, 11 CSS)
 │   ├── index.html     #   Game board
 │   ├── card_browser.html
 │   ├── deck_converter.html
 │   └── tutorial.html
 ├── cards/             # Card data & compilation pipeline
-│   ├── cards.json     #   Master database of 2,280 cards
-│   ├── abilities.json #   800 unique ability definitions
+│   ├── cards.json     #   Master database of 2,526 cards
+│   ├── abilities.json #   936 unique ability definitions
 │   ├── compile_cards.py / compile_abilities.py / gen_vm_decoder.py
-│   └── ability_extraction/  # 11K-line Python parser
+│   └── ability_extraction/  # 15K-line Python parser
 ├── platforms/         # Console platform glue
 │   ├── 3ds/           #   Nintendo 3DS (working)
 │   ├── wii/           #   Nintendo Wii (code complete)
 │   ├── psp/           #   PlayStation Portable
-│   ├── dc/            #   Sega Dreamcast
-│   ├── ds/            #   Nintendo DS (working)
-│   ├── ps1/           #   PlayStation 1 (working)
-│   └── gba/           #   Game Boy Advance (working, via agb)
+│   ├── dc/            #   Sega Dreamcast (playable, wasm→C pipeline)
+│   ├── ds/            #   Nintendo DS
+│   ├── ps1/           #   PlayStation 1
+│   ├── gba/           #   Game Boy Advance (via agb)
+│   ├── snes/          #   Super Nintendo (in progress)
+│   ├── genesis/       #   Mega Drive / Genesis (in progress)
+│   ├── jaguar/        #   Atari Jaguar (in progress)
+│   ├── cdi/           #   Philips CD-i (native m68k)
+│   └── wasm/          #   WebAssembly headless harness
 ├── training/          # PPO training artifacts & scripts
-├── docs/              # GitHub Pages site
-├── tools/             # Image baking, font generation, etc.
-└── research/          # Platform research materials
+├── docs/              # GitHub Pages site (frontend synced from web_ui at deploy time)
+├── tools/             # Image baking, font generation, deck analysis
+└── deployment_scripts/# Hugging Face deploy helpers
 ```
 
 ## Build Configuration
@@ -121,11 +131,11 @@ Console build scripts are provided (each lives in its platform folder): `platfor
 
 The engine targets retro consoles with as little as 288 KB (GBA) and 2 MB (PS1). A bytecode VM and struct compaction have reduced runtime RAM from ~3 MB to ~130-170 KB, enabling full game flow on both platforms.
 
-For the full optimization history, see [engine/MEMORY_REFACTOR.md](engine/MEMORY_REFACTOR.md).
+For the current memory/bytecode optimization state, see [docs/memory_optimization_combined.md](docs/memory_optimization_combined.md).
 
 ## Testing
 
-- **~1,800 test functions** across **318 test files** in `engine/tests/test_modules/`
+- **~2,500 test functions** across **416 test files** in `engine/tests/test_modules/`
 - Custom `TestGame` harness with helpers: `add_to_hand()`, `play_to_stage()`, `activate_ability()`, `fill_decks()`, etc.
 - Tests use real card data from `cards/cards.json` and `cards/abilities.json`
 - Card-specific tests per character (Chika, Yoshiko, Maki, etc.)
@@ -157,13 +167,15 @@ See [engine/ISSUES_FOUND.md](engine/ISSUES_FOUND.md) for the full list.
 | [engine/PORTS.md](engine/PORTS.md) | 450-line console port feasibility analysis for 15+ consoles |
 | [platforms/gba/output/GBA_PORT_NOTES.md](platforms/gba/output/GBA_PORT_NOTES.md) | GBA port build/toolchain + object-text rendering + VRAM crash fix |
 | [engine/PORT_TO_3DS.md](engine/PORT_TO_3DS.md) | 3DS porting plan and progress |
-| [engine/MEMORY_REFACTOR.md](engine/MEMORY_REFACTOR.md) | 1,000-line history of 40+ memory optimization tasks |
+| [docs/memory_optimization_combined.md](docs/memory_optimization_combined.md) | Unified memory & bytecode optimization guide (supersedes the older memory docs) |
 | [engine/ISSUES_FOUND.md](engine/ISSUES_FOUND.md) | Known build issues, warnings, and clippy lints |
 | [engine/tests/WRITING_TESTS.md](engine/tests/WRITING_TESTS.md) | 530-line guide for writing card tests |
 | [cards/ABILITY_DOCUMENTATION.md](cards/ABILITY_DOCUMENTATION.md) | Ability system reference |
 | [ai_design/nn_architecture.md](ai_design/nn_architecture.md) | Neural network design document |
 | [ai_design/rabuka_bot_design.md](ai_design/rabuka_bot_design.md) | Bot architecture overview |
-| [docs/QR_DECK_DECK_SHARING.md](docs/QR_DECK_DECK_SHARING.md) | QR code deck sharing guide |
+| [docs/QR_DECK_SHARING.md](docs/QR_DECK_SHARING.md) | QR code deck sharing guide |
+| [docs/ABILITY_PIPELINE.md](docs/ABILITY_PIPELINE.md) | Card-text → bytecode pipeline documentation |
+| [docs/REFACTOR_BACKLOG.md](docs/REFACTOR_BACKLOG.md) | Verified-remaining refactor items with necessity verdicts |
 
 ## License
 

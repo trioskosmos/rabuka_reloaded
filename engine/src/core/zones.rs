@@ -579,9 +579,9 @@ impl LiveCardZone {
         true
     }
 
-    pub fn add_card(&mut self, card_id: i16, _card_db: &CardDatabase) -> Result<(), String> {
-        if !self.can_place_card(_card_db, card_id) {
-            if let Some(card) = _card_db.get_card(card_id) {
+    pub fn add_card(&mut self, card_id: i16, card_db: &CardDatabase) -> Result<(), String> {
+        if !self.can_place_card(card_db, card_id) {
+            if let Some(card) = card_db.get_card(card_id) {
                 return Err(format!(
                     "Cannot place energy card '{}' in live card zone",
                     card.name

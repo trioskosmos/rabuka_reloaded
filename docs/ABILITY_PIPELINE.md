@@ -32,11 +32,11 @@ is to make the existing pipeline observable and mechanically validated first:
 | --- | --- | --- |
 | Authoring input | `cards/cards.json` contains card text and metadata | The Japanese card text is the upstream source for extracted abilities. |
 | Parsing | `cards/ability_extraction/extract_card_abilities.py` calls the large parser in `cards/ability_extraction/parser.py` | `abilities.json` is generated data, not the original source. |
-| Ability data | `cards/abilities.json` contains 800 grouped `unique_abilities` entries in this checkout | One entry can be referenced by many cards. |
+| Ability data | `cards/abilities.json` contains 936 grouped `unique_abilities` entries in this checkout | One entry can be referenced by many cards. |
 | Build format | `cards/compile_abilities.py` writes a compact tagged binary-JSON representation and generates `abilities_gen.rs` | This is serialization of the JSON tree, not a typed instruction VM. |
 | Embedded artifact | `engine/src/ability/abilities_gen.rs` contains the bytecode, offsets, interned strings, and card-to-ability pairs | The Rust binary does not parse `abilities.json` at runtime. |
 | Card loading | `engine/src/core/card_loader.rs` attaches `AbilityRef(u16)` values to cards | Cards keep lightweight indices rather than decoded `Ability` objects. |
-| Decode | `engine/src/ability/ability_store.rs` calls `vm::get_ability()` on demand | There is currently no decoded-ability cache; each `resolve()` decodes a fresh `Arc<Ability>`. |
+| Decode | `engine/src/ability/ability_store.rs` calls `vm::get_ability()` on demand | Results are cached per slot in `ability_store.rs` (`decoded_slots`, race-safe `set`) — a lost race re-decodes but never blocks. |
 | Typed model | `engine/src/core/card.rs` deserializes `AbilityEffect`, then `populate_from_json()` builds `EffectKind` recursively | The flat fields and typed `kind` must remain consistent. |
 | Triggering | `engine/src/core/game_state/abilities.rs` collects and enqueues triggered abilities | Trigger snapshots are stored on queue entries so later resolution can see the event that caused the trigger. |
 | Resolution | `AbilityResolver` owns cost/effect execution and choice state | The resolver is persisted in the queue entry across choice round-trips. |
@@ -389,10 +389,9 @@ typed decoder can be considered after Phase 1 and Phase 2, provided it has:
 - parity tests for every supported platform feature;
 - a clear answer for unknown fields and forward compatibility.
 
-`cards/gen_vm_decoder.py` currently describes a historical generated decoder
-and is marked deprecated; it is not the current runtime path. It should either
-be removed or rewritten as part of a real, tested code-generation design so it
-does not mislead future maintainers.
+_(2026-08-22: the paragraph below referred to `cards/gen_vm_decoder.py`, which has since been
+deleted — see "Dead code removed" above. The generated decoders now live at
+`engine/src/ability/effect_decoder_gen.rs` / `condition_decoder_gen.rs` and are the runtime path.)_
 
 ### Phase 4: make queue transitions explicit
 
@@ -487,9 +486,9 @@ made:
   every build?
 - Is the compatibility `serde_json` decoder retained for shipped builds, or
   only for tests and development?
-- Should decoded abilities be cached in a bounded pool, or decoded afresh as
-  they are now? A cache saves CPU but requires an eviction policy and platform
-  memory budget.
+- ~~Should decoded abilities be cached?~~ ANSWERED 2026-08-22: `ability_store.rs`
+  now caches decoded abilities per slot (race-safe). No eviction needed — slots
+  are bounded by the ability table size.
 - What is the supported behavior for unknown fields/actions: reject the build,
   preserve them as custom data, or log and skip them?
 - What is the stable identity of a queued execution instance when one ability

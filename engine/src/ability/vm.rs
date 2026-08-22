@@ -1,5 +1,5 @@
 #[cfg(not(feature = "snes"))]
-use super::abilities_gen::{COMPRESSED_BYTECODE, DECOMPRESSED_LEN, NUM_ABILITIES, OFFSET_DELTAS, STRINGS_OFFSETS, get_string};
+use super::abilities_gen::{COMPRESSED_BYTECODE, NUM_ABILITIES, OFFSET_DELTAS, STRINGS_OFFSETS, get_string};
 #[cfg(feature = "snes")]
 use super::abilities_gen::{ABILITY_LOCS, NUM_ABILITIES, STRINGS_OFFSETS, bytecode_slice, get_string};
 use super::enums::EffectState;
@@ -115,11 +115,6 @@ fn get_decompressed_bytecode() -> &'static [u8] {
         }
         (*CACHE.0.get()).as_ref().unwrap().as_slice()
     }
-}
-
-#[cfg(not(feature = "snes"))]
-fn decompressed_len() -> usize {
-    DECOMPRESSED_LEN
 }
 
 pub fn get_ability(idx: usize) -> Result<Ability, DecodeError> {

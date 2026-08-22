@@ -402,7 +402,6 @@ let source = cost.source_str().unwrap_or("");
             let mut filter = cost.filter_subset();
             filter.card_type = card_type_filter;
             filter.cost_limit = cost_limit;
-            let _zone_cards = util::zone_cards(player, source);
 
             if same_unit {
                 let is_optional = optional && !is_activation;

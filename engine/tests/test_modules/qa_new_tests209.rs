@@ -300,6 +300,11 @@ fn q209_kasumi_discard_niji_live_recover_same() {
         waitroom_before,
         "waitroom net unchanged: +1 discard -1 retrieve"
     );
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        energy_before - 2,
+        "Q209: fixed 2-energy cost step should be auto-paid during activation"
+    );
 }
 
 /// No 虹ヶ咲 live in waitroom → effect skips.

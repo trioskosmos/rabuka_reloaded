@@ -97,14 +97,6 @@ fn test_q23_member_card_to_stage_procedure() {
     let initial_hand_count = game_state.player1.hand.cards.len();
     let initial_energy_active = game_state.player1.energy_zone.active_count();
 
-    let _stage_member_id = game_state
-        .player1
-        .stage
-        .stage
-        .iter()
-        .find(|&&id| id != -1)
-        .unwrap();
-
     let actions = game_setup::generate_possible_actions(&game_state);
     println!(
         "Available actions: {:?}",
@@ -120,7 +112,7 @@ fn test_q23_member_card_to_stage_procedure() {
         .expect("Should have action to play member card");
 
     let action_params = play_action.parameters.as_ref().unwrap();
-    let _card_index = action_params.card_index.unwrap();
+    action_params.card_index.expect("play action must carry a card index");
     let available_areas = action_params.available_areas.as_ref().unwrap();
     let available_area = available_areas.iter().find(|a| a.available).unwrap();
 
@@ -194,7 +186,7 @@ fn test_q24_baton_touch_procedure() {
         .expect("Should have action to play member card");
 
     let action_params = play_action.parameters.as_ref().unwrap();
-    let _card_index = action_params.card_index.unwrap();
+    action_params.card_index.expect("play action must carry a card index");
     let available_areas = action_params.available_areas.as_ref().unwrap();
     let available_area = available_areas.iter().find(|a| a.available).unwrap();
 
@@ -216,14 +208,6 @@ fn test_q24_baton_touch_procedure() {
     let initial_waitroom_count = game_state.player1.waitroom.cards.len();
     let initial_hand_count = game_state.player1.hand.cards.len();
     let initial_energy_active = game_state.player1.energy_zone.active_count();
-    let _touched_member = game_state
-        .player1
-        .stage
-        .stage
-        .iter()
-        .find(|&&id| id != -1)
-        .copied();
-
     println!(
         "After turn 1 - hand: {:?}, energy: {}",
         game_state.player1.hand.cards,
@@ -252,7 +236,7 @@ fn test_q24_baton_touch_procedure() {
         .expect("Should have action to play member card");
 
     let action_params = play_action.parameters.as_ref().unwrap();
-    let _card_index = action_params.card_index.unwrap();
+    action_params.card_index.expect("play action must carry a card index");
     let available_areas = action_params.available_areas.as_ref().unwrap();
     let baton_area = available_areas
         .iter()
@@ -1562,8 +1546,6 @@ fn test_q39_cheer_checks_before_required_hearts() {
     // Q39: Cheer checks must be performed before checking required hearts
     // Even if it's known that required hearts will be met, cheer checks must still be performed
 
-    let _initial_cheer_checks_done = game_state.cheer_checks_done;
-
     // Perform cheer checks
     let player_id = game_state.player1.id.clone();
     let result = game_state.perform_cheer_check(&player_id, 1);
@@ -1590,7 +1572,7 @@ fn test_ability_optional_cost_user_choice() {
     let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Find a card with optional cost ability (桜坂しずく - PL!N-bp1-003-R＋)
-    let _sakura_id = card_database
+    card_database
         .get_card_id("PL!N-bp1-003-R+")
         .expect("Card not found (PL!N-bp1-003-R+)");
 
@@ -1615,7 +1597,7 @@ fn test_ability_optional_cost_user_choice() {
     let nijigasaki_id = get_card_id(nijigasaki_live, &card_database);
     player1.waitroom.cards.push(nijigasaki_id);
 
-    let _game_state = GameState::new(player1, player2, card_database.clone());
+    GameState::new(player1, player2, card_database.clone());
 
     println!("Ability optional cost test PASSED - optional cost behavior is respected");
 }
@@ -1626,7 +1608,6 @@ fn test_ability_cost_limit_filtering() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let _player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Setup opponent stage with members of various costs
@@ -1692,7 +1673,6 @@ fn test_ability_group_filtering() {
     let card_database = create_card_database(cards.clone());
 
     let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
-    let _player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Setup discard with live cards from different groups
     let nijigasaki_live = cards
@@ -1765,7 +1745,6 @@ fn test_ability_sequential_effects() {
     let card_database = create_card_database(cards.clone());
 
     let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
-    let _player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Setup deck with cards
     let deck_cards: Vec<i16> = cards

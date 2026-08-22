@@ -41,7 +41,7 @@ fn fresh_database() -> Arc<CardDatabase> {
     Arc::new(CardDatabase::load_or_create(cards))
 }
 
-fn load_deck(db: &Arc<CardDatabase>, name: &str) -> Vec<String> {
+fn load_deck(name: &str) -> Vec<String> {
     let deck_path = std::path::Path::new("../web_ui/decks").join(format!("{name}.txt"));
     if deck_path.exists() {
         let deck = deck_parser::DeckParser::parse_deck_file(&deck_path).expect("parse deck");
@@ -105,7 +105,7 @@ fn dump_state(out: &mut String, label: &str, gs: &GameState) {
 
 fn main() {
     let db = fresh_database();
-    let nums = load_deck(&db, "fade deck");
+    let nums = load_deck("fade deck");
     let mut db_mut = Arc::clone(&db);
     let (t1, t2) =
         game_setup::build_two_decks(&mut db_mut, &nums, &nums).expect("build decks");

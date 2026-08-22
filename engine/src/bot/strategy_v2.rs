@@ -107,16 +107,6 @@ fn yell_flips(gs: &GameState, p: &Player, db: &CardDatabase) -> usize {
         ) as usize
 }
 
-/// Max live score achievable from `h` total hearts (score bands need
-/// ~2N+1..2N+2 hearts per N points — source: ミヤ guide).
-fn max_score_from(h: i32) -> i32 {
-    if h < 3 {
-        0
-    } else {
-        (h - 1) / 2
-    }
-}
-
 /// Deterministic LCG for the Monte Carlo sampler.
 struct McRng(u64);
 
@@ -212,7 +202,6 @@ fn pass_probability(
 
 struct LiveCandidate {
     hand_index: usize,
-    card_id: i16,
     score: i32,
     need: Acc,
 }
@@ -230,7 +219,6 @@ fn hand_live_candidates(p: &Player, db: &CardDatabase) -> Vec<LiveCandidate> {
             }
             out.push(LiveCandidate {
                 hand_index,
-                card_id: cid,
                 score: card.score.unwrap_or(0) as i32,
                 need,
             });

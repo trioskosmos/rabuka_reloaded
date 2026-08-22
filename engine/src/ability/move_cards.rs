@@ -1000,10 +1000,6 @@ impl AbilityResolver {
                 .as_ref()
                 .and_then(|e| e.conditional_choice.as_ref())
                 .is_some();
-            let _opt_paid = entry
-                .as_ref()
-                .and_then(|e| e.optional_cost_result)
-                .is_some();
             if !decided {
                 if let Some(entry_mut) = gs.ability_queue.current_entry_mut() {
                     entry_mut.choice_card_no =
@@ -2625,7 +2621,14 @@ impl AbilityResolver {
         let destination = gs
             .entry_destination()
             .map(|s| s.to_string())
-            .or_else(|| self.spawn_context.destination.clone());
+            .or_else(|| self.spawn_context.destination.clone())
+            // Sub-action select_cards steps carry their own destination
+            // (e.g. 希 bp3-007 「1枚をデッキの上に置き」) — without this
+            // fallback they all defaulted to discard.
+            .or_else(|| {
+                gs.entry_effect()
+                    .and_then(|e| e.destination.map(|z| z.to_str().to_string()))
+            });
         let target = target_player_id
             .map(|s| s.to_string())
             .or_else(|| self.spawn_context.target.clone())
@@ -3048,6 +3051,11 @@ impl AbilityResolver {
             gs.looked_at_cards.len(),
             indices
         );
+        #[cfg(not(feature = "no_std"))]
+        eprintln!(
+            "[LA_DEST_DBG] resolved_dest={:?} discard_remaining={:?} placement_order={:?}",
+            destination, discard_remaining, placement_order
+        );
 
         // Extract per-group constraint from execution context
         let max_per_group = match &self.execution_context {
@@ -3244,10 +3252,13 @@ impl AbilityResolver {
             .and_then(|sa| sa.remainder_destination_any())
             .map(|s| s.to_string())
             .or_else(|| current.and_then(|c| c.remainder_destination_any()).map(|s| s.to_string()));
-        let _remainder_order = select_action
-            .as_ref()
-            .and_then(|sa| sa.remainder_placement_order_any())
-            .or_else(|| current.and_then(|c| c.remainder_placement_order_any()));
+        if remainder_dest.as_deref() == Some("looked_at") {
+            // Intermediate leg of a multi-destination look split (希 bp3-007):
+            // leftovers stay in the pool for the NEXT select step.
+            gs.looked_at_cards = remaining_cards;
+            self.pending_choice = None;
+            return Ok(());
+        }
         let dest_zone = if let Some(rd) = remainder_dest {
             rd
         } else if discard_remaining {

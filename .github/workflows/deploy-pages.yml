@@ -23,14 +23,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Copy card data and images into docs
+      - name: Copy card data and frontend into docs
         run: |
-          mkdir -p docs/cards docs/img docs/js/i18n
+          mkdir -p docs/cards docs/img
           cp cards/cards.json cards/abilities.json docs/cards/
           cp -r web_ui/img/cards_webp web_ui/img/texticon web_ui/img/tutorial docs/img/
-          # i18n is served from web_ui; keep docs in sync at deploy time so
-          # web_ui/js/i18n is the single source of truth (no manual copies).
-          cp -r web_ui/js/i18n/* docs/js/i18n/
+          # The whole frontend is served from web_ui; keep docs in sync at deploy
+          # time so web_ui is the single source of truth (no manual copies).
+          # docs/index.html is NOT overwritten: it is the Pages landing redirect.
+          cp -r web_ui/js docs/js
+          cp -r web_ui/css docs/css
+          cp web_ui/card_browser.html web_ui/deck_converter.html web_ui/tutorial.html docs/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

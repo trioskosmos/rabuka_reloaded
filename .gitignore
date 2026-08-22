@@ -8,6 +8,26 @@ node_modules/
 nul
 *.log
 
+# Scratch / debug output dumps
+*.bak
+tmp_*.txt
+tmp_*.py
+rustc-ice-*.txt
+flamegraph.svg
+profile_folded.txt
+profile_stderr.txt
+profile_output.txt
+profile_stdout.txt
+
+# Tool-generated debug dumps
+/deep_diffs.txt
+cards/abilities_debug.txt
+
+# Regenerable analysis outputs (invert_abilities.py etc.)
+cards/ability_docs_scripts/INVERTED_ABILITIES*.md
+cards/ability_docs_scripts/FULL_REPORT.md
+cards/ability_docs_scripts/abilities_summary.md
+
 .kilo/
 .opencode/
 .ruff_cache/
@@ -23,6 +43,15 @@ cloudflared.exe
 docs/img/cards_webp/
 docs/img/texticon/
 docs/img/tutorial/
+
+# Frontend in docs/ is copied from web_ui/ at deploy time by GitHub Actions
+# (web_ui is the single source of truth; docs/index.html is a tracked landing page)
+docs/js/
+docs/css/
+docs/cards/
+docs/card_browser.html
+docs/deck_converter.html
+docs/tutorial.html
 
 source_images/
 
@@ -75,14 +104,13 @@ cards/build/cards_gen.rs
 # Regenerated build artifacts (rebuilt by the 3DS/GBA toolchains)
 platforms/3ds/.card_png_cache/
 platforms/3ds/.font_tmp/
+platforms/3ds/romfs/decks/
 platforms/3ds/romfs/cards/*.t3x
 platforms/3ds/romfs/cards_fmt.txt
 platforms/3ds/romfs/cards_manifest.json
 platforms/3ds/romfs/abilities.json
 cards/build/bytecode_data.c
 cards/build/abilities.bin
-cards/build/cards.bin
-cards/build/generation_manifest.json
 engine/src/font_tiles_gen.rs
 platforms/gba/src/font_tiles_gen.rs
 platforms/gba/output/font_preview.png

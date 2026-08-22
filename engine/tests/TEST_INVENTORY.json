@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-22T04:32:02.384674+00:00",
+  "generated_at": "2026-08-22T06:01:59.788312+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 416,
-  "n_tests": 2502,
+  "n_files": 417,
+  "n_tests": 2508,
   "total_cards": 771,
   "covered_cards": 573,
   "abilities_on_covered": 732,
@@ -48,16 +48,16 @@
       146
     ],
     "look_and_select": [
-      44,
-      72
+      43,
+      71
     ],
     "gain_resource": [
       124,
       160
     ],
     "sequential": [
-      161,
-      218
+      162,
+      219
     ],
     "unknown": [
       2,
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 556,
+    "L2+choice": 560,
     "none": 204,
-    "L1+choice": 128,
-    "L2": 33,
+    "L1+choice": 125,
+    "L2": 32,
     "L1": 15
   },
   "qa_rulings": {
@@ -4417,7 +4417,7 @@
         "issue5_solitude_rain_heart_color_scoring",
         "issue6_natsumi_blade_expires_after_live_victory_determination"
       ],
-      "covering_test_count": 63,
+      "covering_test_count": 64,
       "is_null": false
     },
     {
@@ -4480,7 +4480,7 @@
         "issue5_solitude_rain_heart_color_scoring",
         "issue6_natsumi_blade_expires_after_live_victory_determination"
       ],
-      "covering_test_count": 63,
+      "covering_test_count": 64,
       "is_null": false
     },
     {
@@ -7271,9 +7271,10 @@
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
         "karin_bpb4004_cap_counts_waited_opponents_only",
+        "nozomi_bp3007_paid_look_splits_three_ways",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 7,
       "is_null": false
     },
     {
@@ -7307,9 +7308,10 @@
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
         "karin_bpb4004_cap_counts_waited_opponents_only",
+        "nozomi_bp3007_paid_look_splits_three_ways",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 7,
       "is_null": false
     },
     {
@@ -7541,9 +7543,11 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/himeno_test.rs"
+        "engine/tests/test_modules/himeno_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs"
       ],
       "covering_tests": [
+        "himena_bp6006_baton_only_with_murasakipark",
         "himeno_bp6_cost_no_reduction_without_mirakura",
         "himeno_bp6_cost_reduced_by_mirakura_on_stage",
         "himeno_bp6_cost_reduced_by_two_mirakura",
@@ -7552,9 +7556,13 @@
         "himeno_bp6_q249_cost_reduced_by_three_mirakura",
         "himeno_edge_no_mirakura_skips",
         "himeno_q82_dodo_live_card_selectable",
-        "himeno_q82_identity_live_card_selectable"
+        "himeno_q82_identity_live_card_selectable",
+        "ll_bp2001_cannot_be_baton_touched_out",
+        "mijuku_dreamer_refresh_condition_scores",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -7580,9 +7588,11 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/himeno_test.rs"
+        "engine/tests/test_modules/himeno_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs"
       ],
       "covering_tests": [
+        "himena_bp6006_baton_only_with_murasakipark",
         "himeno_bp6_cost_no_reduction_without_mirakura",
         "himeno_bp6_cost_reduced_by_mirakura_on_stage",
         "himeno_bp6_cost_reduced_by_two_mirakura",
@@ -7591,9 +7601,13 @@
         "himeno_bp6_q249_cost_reduced_by_three_mirakura",
         "himeno_edge_no_mirakura_skips",
         "himeno_q82_dodo_live_card_selectable",
-        "himeno_q82_identity_live_card_selectable"
+        "himeno_q82_identity_live_card_selectable",
+        "ll_bp2001_cannot_be_baton_touched_out",
+        "mijuku_dreamer_refresh_condition_scores",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -7619,9 +7633,11 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/himeno_test.rs"
+        "engine/tests/test_modules/himeno_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs"
       ],
       "covering_tests": [
+        "himena_bp6006_baton_only_with_murasakipark",
         "himeno_bp6_cost_no_reduction_without_mirakura",
         "himeno_bp6_cost_reduced_by_mirakura_on_stage",
         "himeno_bp6_cost_reduced_by_two_mirakura",
@@ -7630,9 +7646,13 @@
         "himeno_bp6_q249_cost_reduced_by_three_mirakura",
         "himeno_edge_no_mirakura_skips",
         "himeno_q82_dodo_live_card_selectable",
-        "himeno_q82_identity_live_card_selectable"
+        "himeno_q82_identity_live_card_selectable",
+        "ll_bp2001_cannot_be_baton_touched_out",
+        "mijuku_dreamer_refresh_condition_scores",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -9110,9 +9130,10 @@
         "multi_color_heart_condition_met_grants_both_colors",
         "multi_color_heart_condition_not_met_does_not_queue",
         "multi_color_heart_wrong_group_does_not_trigger",
+        "nozomi_bp3007_paid_look_splits_three_ways",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 10,
       "is_null": false
     },
     {
@@ -10828,9 +10849,10 @@
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
         "karin_bpb4004_cap_counts_waited_opponents_only",
+        "nozomi_bp3007_paid_look_splits_three_ways",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 7,
       "is_null": false
     },
     {
@@ -10881,6 +10903,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/restriction_mechanics_test.rs",
         "engine/tests/test_modules/untested_abilities_batch3_test.rs",
         "engine/tests/test_modules/untested_abilities_batch4_test.rs",
         "engine/tests/test_modules/untested_abilities_batch5_test.rs",
@@ -10890,35 +10913,35 @@
         "emma_bp7008_only_clean_members_place_and_pay_energy",
         "hanayo_pb1017_baton_touch_skips_the_discard",
         "hanayo_pb1017_discards_without_baton_touch",
+        "himena_bp6006_baton_only_with_murasakipark",
         "honoka_bp4001_draws_only_when_stage_total_is_cheaper",
         "kanata_bp3006_debut_enters_wait_state",
         "kasumu_bp3002_grants_chosen_heart_to_other_nijigasaki_only",
         "kotori_pb1003_accept_waits_self_and_activates_per_printemps",
         "kotori_pb1003_decline_self_wait_resolves_nothing",
+        "ll_bp2001_cannot_be_baton_touched_out",
+        "mijuku_dreamer_refresh_condition_scores",
         "natsumi_bp4009_blade_constant_tracks_cost_total_race",
         "natsumi_bpb7009_center_waits_low_blade_opponent_only",
         "natsumi_bpb7009_sides_grant_heart02_center_does_not",
         "niko_bp3009_activation_self_wait_and_heart_choice",
         "niko_bp3009_cost13_condition_draw",
         "niko_bp3009_no_cost13_no_draw",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "niko_pr021_exact_energy_constant_refreshes_on_gain",
         "niko_pr021_exactly_seven_energy_grants_two_blades",
         "nozomi_bp3007_skipped_cost_means_no_look",
         "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
         "ruby_bp5009_decline_optional_payment_fetches_nothing",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
         "sayaka_hsbp2002_blade_constant_tracks_higher_cost_member",
         "sayaka_hsbp2002_fetch_is_cost_and_count_filtered",
         "sayaka_hsbp2011_mills_top_five",
         "sayaka_hspb1010_expensive_opponent_not_eligible",
         "sayaka_hspb1010_no_big_member_no_effect",
-        "sayaka_hspb1010_waits_cheap_opponent_when_condition_met",
-        "suzuki_hsbp1008_mill_three_all_members_draws_one",
-        "suzuki_hsbp1008_mill_with_live_card_no_draw",
-        "wakashi_spbp1008_debut_draws_one_without_mei",
-        "wakashi_spbp1008_debut_draws_two_with_mei",
-        "wondermates_activates_waited_nijigasaki_enabling_activation"
+        "sayaka_hspb1010_waits_cheap_opponent_when_condition_met"
       ],
-      "covering_test_count": 32,
+      "covering_test_count": 37,
       "is_null": false
     },
     {
@@ -11533,9 +11556,10 @@
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
         "karin_bpb4004_cap_counts_waited_opponents_only",
+        "nozomi_bp3007_paid_look_splits_three_ways",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 7,
       "is_null": false
     },
     {
@@ -11568,9 +11592,10 @@
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
         "karin_bpb4004_cap_counts_waited_opponents_only",
+        "nozomi_bp3007_paid_look_splits_three_ways",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 7,
       "is_null": false
     },
     {
@@ -11603,9 +11628,10 @@
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
         "karin_bpb4004_cap_counts_waited_opponents_only",
+        "nozomi_bp3007_paid_look_splits_three_ways",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 7,
       "is_null": false
     },
     {
@@ -12024,7 +12050,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 696,
+      "covering_test_count": 697,
       "is_null": false
     },
     {
@@ -15584,6 +15610,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/restriction_mechanics_test.rs",
         "engine/tests/test_modules/untested_abilities_batch2_test.rs"
       ],
       "covering_tests": [
@@ -15595,15 +15622,20 @@
         "bp5_006_live_start_draws_when_live_zone_has_two_cards",
         "bp5_006_live_start_no_draw_when_zone_below_two",
         "combo_bp3_005_mass_activate_readies_self_waited_ability_member",
+        "himena_bp6006_baton_only_with_murasakipark",
+        "ll_bp2001_cannot_be_baton_touched_out",
+        "mijuku_dreamer_refresh_condition_scores",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "pb1_005_debut_draws_with_cards_in_success_zone",
         "pb1_005_debut_no_draw_without_success_zone_cards",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
         "sp_bp1_007_debut_counts_total_energy_not_active",
         "sp_bp1_007_debut_no_retrieve_when_total_below_11_via_baton_touch",
         "sp_bp1_007_debut_noop_when_waitroom_has_no_live_card",
         "sp_bp2_013_debut_can_place_zero_cards",
         "sp_bp2_013_debut_places_waitroom_card_on_deck_top"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 20,
       "is_null": false
     },
     {
@@ -15638,7 +15670,7 @@
       "trigger_list": [
         "ライブ開始時"
       ],
-      "action": "look_and_select",
+      "action": "sequential",
       "condition": "none",
       "set": "bp3",
       "cards": [
@@ -15652,19 +15684,27 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/untested_abilities_batch6_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch6_test.rs",
+        "engine/tests/test_modules/untested_secondary_abilities_test.rs"
       ],
       "covering_tests": [
+        "eli_bp5011_chosen_heart_scales_with_success_pile",
+        "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
+        "hanamaru_bpb5007_fetches_double_heart04_member_only",
+        "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
         "hanayo_pb1017_baton_touch_skips_the_discard",
         "hanayo_pb1017_discards_without_baton_touch",
+        "karin_bpb4004_cap_counts_waited_opponents_only",
         "natsumi_bpb7009_center_waits_low_blade_opponent_only",
         "natsumi_bpb7009_sides_grant_heart02_center_does_not",
+        "nozomi_bp3007_paid_look_splits_three_ways",
         "nozomi_bp3007_skipped_cost_means_no_look",
+        "ruby_bp6009_blades_equal_success_pile_difference",
         "sayaka_hspb1010_expensive_opponent_not_eligible",
         "sayaka_hspb1010_no_big_member_no_effect",
         "sayaka_hspb1010_waits_cheap_opponent_when_condition_met"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 15,
       "is_null": false
     },
     {
@@ -15939,11 +15979,12 @@
         "karin_bpb4004_cap_counts_waited_opponents_only",
         "kasumu_bp3002_grants_chosen_heart_to_other_nijigasaki_only",
         "natsumi_bp4009_blade_constant_tracks_cost_total_race",
+        "nozomi_bp3007_paid_look_splits_three_ways",
         "ruby_bp6009_blades_equal_success_pile_difference",
         "sayaka_hsbp2011_mills_top_five",
         "wondermates_activates_waited_nijigasaki_enabling_activation"
       ],
-      "covering_test_count": 11,
+      "covering_test_count": 12,
       "is_null": false
     },
     {
@@ -16543,20 +16584,26 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/maki_pb1_test.rs",
-        "engine/tests/test_modules/nico_cannot_activate_test.rs"
+        "engine/tests/test_modules/nico_cannot_activate_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs"
       ],
       "covering_tests": [
+        "himena_bp6006_baton_only_with_murasakipark",
         "kotori_activate_works_without_restriction",
+        "ll_bp2001_cannot_be_baton_touched_out",
         "maki_ab0_plus_ab1_end_to_end",
         "maki_ab1_draws_on_cost4_or_less_opponent_waited",
         "maki_ab1_no_draw_on_cost_over4_opponent_waited",
         "maki_ab1_use_limit_once_per_turn",
         "maki_debut_pay_cost_opponent_waits_one",
         "maki_debut_skip_cost_no_effect",
+        "mijuku_dreamer_refresh_condition_scores",
         "nico_blocks_kotori_activation",
-        "nico_q180_active_phase_still_activates"
+        "nico_q180_active_phase_still_activates",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -16581,20 +16628,26 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/maki_pb1_test.rs",
-        "engine/tests/test_modules/nico_cannot_activate_test.rs"
+        "engine/tests/test_modules/nico_cannot_activate_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs"
       ],
       "covering_tests": [
+        "himena_bp6006_baton_only_with_murasakipark",
         "kotori_activate_works_without_restriction",
+        "ll_bp2001_cannot_be_baton_touched_out",
         "maki_ab0_plus_ab1_end_to_end",
         "maki_ab1_draws_on_cost4_or_less_opponent_waited",
         "maki_ab1_no_draw_on_cost_over4_opponent_waited",
         "maki_ab1_use_limit_once_per_turn",
         "maki_debut_pay_cost_opponent_waits_one",
         "maki_debut_skip_cost_no_effect",
+        "mijuku_dreamer_refresh_condition_scores",
         "nico_blocks_kotori_activation",
-        "nico_q180_active_phase_still_activates"
+        "nico_q180_active_phase_still_activates",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -20831,14 +20884,16 @@
       ],
       "base": "PL!HS-pb1-014",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/himeno_front_test.rs"
+        "engine/tests/test_modules/himeno_front_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs"
       ],
       "covering_tests": [
+        "himena_bp6006_baton_only_with_murasakipark",
         "himeno_front_1_opponent_at_left_moves_to_center",
         "himeno_front_3_opponents_select_left_moves_to_center",
         "himeno_front_constant_evaluates",
@@ -20846,9 +20901,13 @@
         "himeno_front_constant_opponent_at_side",
         "himeno_front_no_opponent_skill_fails",
         "himeno_front_on_left_opponent_moves_to_right",
-        "himeno_front_on_right_opponent_moves_to_left"
+        "himeno_front_on_right_opponent_moves_to_left",
+        "ll_bp2001_cannot_be_baton_touched_out",
+        "mijuku_dreamer_refresh_condition_scores",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -20867,14 +20926,16 @@
       ],
       "base": "PL!HS-pb1-014",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/himeno_front_test.rs"
+        "engine/tests/test_modules/himeno_front_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs"
       ],
       "covering_tests": [
+        "himena_bp6006_baton_only_with_murasakipark",
         "himeno_front_1_opponent_at_left_moves_to_center",
         "himeno_front_3_opponents_select_left_moves_to_center",
         "himeno_front_constant_evaluates",
@@ -20882,9 +20943,13 @@
         "himeno_front_constant_opponent_at_side",
         "himeno_front_no_opponent_skill_fails",
         "himeno_front_on_left_opponent_moves_to_right",
-        "himeno_front_on_right_opponent_moves_to_left"
+        "himeno_front_on_right_opponent_moves_to_left",
+        "ll_bp2001_cannot_be_baton_touched_out",
+        "mijuku_dreamer_refresh_condition_scores",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -22864,16 +22929,22 @@
       ],
       "base": "PL!S-bp7-009",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/bp7_ruby_front_blade_test.rs"
+        "engine/tests/test_modules/bp7_ruby_front_blade_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs"
       ],
       "covering_tests": [
         "empty_front_slot_no_crash",
+        "himena_bp6006_baton_only_with_murasakipark",
+        "ll_bp2001_cannot_be_baton_touched_out",
+        "mijuku_dreamer_refresh_condition_scores",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "opponent_member_moves_out_of_front_recovers_blade",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
         "ruby_center_does_not_affect_side_slots",
         "ruby_facing_ruby_both_debuffed",
         "ruby_front_member_cost_4_loses_one_blade",
@@ -22883,7 +22954,7 @@
         "ruby_right_affects_p2_left_only",
         "ruby_zero_blade_member_stays_zero"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 15,
       "is_null": false
     },
     {
@@ -26806,20 +26877,26 @@
       ],
       "base": "PL!S-bp2-022",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/b9_more_test.rs"
+        "engine/tests/test_modules/b9_more_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs"
       ],
       "covering_tests": [
         "cutie_panther_live_start_reduce_hearts",
+        "himena_bp6006_baton_only_with_murasakipark",
         "kaguya_live_success_cheer_recover",
         "kaguya_live_success_recover",
         "kanan_live_success_timing",
+        "ll_bp2001_cannot_be_baton_touched_out",
         "mijuku_dreamer_no_refresh_no_bonus",
+        "mijuku_dreamer_refresh_condition_scores",
         "mijuku_dreamer_refresh_via_mill_gets_bonus",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
         "tiny_stars_basic",
         "tiny_stars_duplicate_kanon",
         "tiny_stars_duplicate_kanon_select_second",
@@ -26830,7 +26907,7 @@
         "tiny_stars_keke_only",
         "tiny_stars_none"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 20,
       "is_null": false
     },
     {
@@ -27433,6 +27510,7 @@
         "engine/tests/test_modules/ll_bp2_001_cost_reduction_test.rs",
         "engine/tests/test_modules/mirai_ticket_test.rs",
         "engine/tests/test_modules/multiname_card_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs",
         "engine/tests/test_modules/untested_abilities_test.rs"
       ],
       "covering_tests": [
@@ -27467,7 +27545,7 @@
         "chisato_q129_cost_reduction_affects_threshold",
         "chisato_q78_ability_lost_on_leave"
       ],
-      "covering_test_count": 143,
+      "covering_test_count": 148,
       "is_null": false
     },
     {
@@ -27501,6 +27579,7 @@
         "engine/tests/test_modules/ll_bp2_001_cost_reduction_test.rs",
         "engine/tests/test_modules/mirai_ticket_test.rs",
         "engine/tests/test_modules/multiname_card_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs",
         "engine/tests/test_modules/untested_abilities_test.rs"
       ],
       "covering_tests": [
@@ -27535,7 +27614,7 @@
         "chisato_q129_cost_reduction_affects_threshold",
         "chisato_q78_ability_lost_on_leave"
       ],
-      "covering_test_count": 143,
+      "covering_test_count": 148,
       "is_null": false
     },
     {
@@ -27569,6 +27648,7 @@
         "engine/tests/test_modules/ll_bp2_001_cost_reduction_test.rs",
         "engine/tests/test_modules/mirai_ticket_test.rs",
         "engine/tests/test_modules/multiname_card_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs",
         "engine/tests/test_modules/untested_abilities_test.rs"
       ],
       "covering_tests": [
@@ -27603,7 +27683,7 @@
         "chisato_q129_cost_reduction_affects_threshold",
         "chisato_q78_ability_lost_on_leave"
       ],
-      "covering_test_count": 143,
+      "covering_test_count": 148,
       "is_null": false
     },
     {
@@ -30500,9 +30580,10 @@
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
         "karin_bpb4004_cap_counts_waited_opponents_only",
+        "nozomi_bp3007_paid_look_splits_three_ways",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 7,
       "is_null": false
     },
     {

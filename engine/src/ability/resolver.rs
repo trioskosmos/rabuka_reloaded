@@ -260,8 +260,7 @@ impl AbilityResolver {
                 #[cfg(not(feature = "no_std"))]
                 {
                     if result {
-                        let _pre_check_verdicts =
-                            crate::ability::log::drain_verdicts_since(snapshot);
+                        crate::ability::log::drain_verdicts_since(snapshot);
                     }
                 }
                 return result;
@@ -332,8 +331,7 @@ impl AbilityResolver {
                 #[cfg(not(feature = "no_std"))]
                 {
                     if passed {
-                        let _pre_check_verdicts2 =
-                            crate::ability::log::drain_verdicts_since(cond_snapshot);
+                        crate::ability::log::drain_verdicts_since(cond_snapshot);
                     }
                 }
                 // Cache the result if the condition asks for it

@@ -149,11 +149,6 @@ pub(crate) fn heart_pool(gs: &GameState, me_player: u8, db: &CardDatabase) -> Ac
     heart_pool_inner(gs, me_player, db, 1.0)
 }
 
-/// Conservative pool for live-set portfolios (0.6× flip credit).
-pub(crate) fn heart_pool_gamble_safe(gs: &GameState, me_player: u8, db: &CardDatabase) -> Acc {
-    heart_pool_inner(gs, me_player, db, 0.6)
-}
-
 /// Try allocating `need` from `pool`; returns None if impossible, else the
 /// remaining pool. Specific colors first, All/BAll cover deficits, grey
 /// bucket takes colorless + leftovers (rule 2.11.3).
@@ -337,6 +332,16 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
         val += 3.0 * d_stage as f64;
         dbg_parts.push(format!("hearts{d_stage:+}"));
 
+        // GUIDE CURVE (S1): development is baton CHAINS -- 4->9->13 -- not
+        // spreading small members. A baton play upgrades the power piece at a
+        // discount; across thousands of traced games bots played 4468 member
+        // actions and ZERO baton touches, so no bot ever reached the
+        // big-member scores the guides take for granted.
+        if a.parameters.as_ref().and_then(|p| p.use_baton_touch) == Some(true) {
+            val += 45.0;
+            dbg_parts.push(format!("baton+45"));
+        }
+
         // Hand reserve: ≤1 card can't set lives or pay costs.
         if my_sim.hand.cards.len() <= 1 {
             val -= 60.0;
@@ -378,8 +383,15 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
         dbg_parts.push(format!("={val:.0}"));
 
         if dbg {
-            dbg_lines.push(format!(
-                "    [{}] {:?} {} -> {}",
+            let baton_mark = if a.parameters.as_ref().and_then(|p| p.use_baton_touch) == Some(true) { "[BATON]" } else { "" };
+        let cost_mark = a
+            .parameters
+            .as_ref()
+            .and_then(|p| p.final_cost)
+            .map(|c| format!("cost={}", c))
+            .unwrap_or_default();
+        dbg_lines.push(format!(
+                "    [{}] {:?} {} {} {} -> {}",
                 i,
                 a.action_type,
                 a.parameters
@@ -388,6 +400,8 @@ pub fn choose_action_v4(gs: &GameState, actions: &[Action], me: u8) -> Action {
                     .and_then(|cid| db.get_card(cid))
                     .map(|c| c.card_no.clone())
                     .unwrap_or_default(),
+                baton_mark,
+                cost_mark,
                 dbg_parts.join(" ")
             ));
         }
@@ -430,8 +444,8 @@ pub fn choose_live_set_v4(gs: &GameState, actions: &[Action], db: &CardDatabase)
     // highest scores. Count-maximization stays implicit (everything that
     // fits gets set until slots run out).
     let mut candidates: Vec<(usize, i32, [i32; 11])> = Vec::new();
-    for &(hi, _cid, ref need) in &hand_lives(my, db) {
-        if let Some(card) = db.get_card(_cid) {
+    for &(hi, cid, ref need) in &hand_lives(my, db) {
+        if let Some(card) = db.get_card(cid) {
             candidates.push((hi, card.score.unwrap_or(0) as i32, *need));
         }
     }

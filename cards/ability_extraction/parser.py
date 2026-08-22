@@ -10988,6 +10988,70 @@ def _canonicalize_dynamic_counts(node):
             _canonicalize_dynamic_counts(it)
 
 
+def _split_look_three_way(node):
+    """「その中から1枚を手札に加え、1枚をデッキの上に置き、1枚を控え室に置く」
+    needs THREE destinations from one look — look_and_select only carries one
+    select destination plus a remainder, so the hand leg was silently dropped.
+    Decompose into look_at + explicit selects/move over the looked-at pool."""
+    if not isinstance(node, dict) or node.get("action") != "look_and_select":
+        return node
+    sa = node.get("select_action") or {}
+    t = str(sa.get("text") or "")
+    if not ("手札に加え" in t and "デッキの上に置き" in t and "控え室に置く" in t):
+        return node
+    look = node.get("look_action") or {
+        "action": "look_at",
+        "source": "deck_top",
+        "count": 3,
+        "target": "self",
+    }
+
+    def sel(dest, txt):
+        return {
+            "action": "select_cards",
+            "source": "looked_at",
+            "destination": dest,
+            "count": 1,
+            # Each leg takes exactly one card; leftovers stay in the looked-at
+            # pool for the NEXT leg instead of being swept to one destination.
+            "discard_remaining": False,
+            "remainder_destination": "looked_at",
+            "target": node.get("target") or "self",
+            "text": txt,
+        }
+
+    return {
+        "action": "sequential",
+        "text": node.get("text"),
+        "actions": [
+            look,
+            sel("hand", "1枚を手札に加え"),
+            # Last leg: its native remainder sweep places the final card into
+            # the waitroom — no separate move step needed.
+            {
+                "action": "select_cards",
+                "source": "looked_at",
+                "destination": "deck_top",
+                "count": 1,
+                "discard_remaining": True,
+                "target": node.get("target") or "self",
+                "text": "1枚をデッキの上に置き、1枚を控え室に置く",
+            },
+        ],
+    }
+
+
+def _walk_split_look(node):
+    if isinstance(node, dict):
+        for key in ("actions", "options"):
+            if isinstance(node.get(key), list):
+                node[key] = [_walk_split_look(a) for a in node[key]]
+        return _split_look_three_way(node)
+    elif isinstance(node, list):
+        return [_walk_split_look(a) for a in node]
+    return node
+
+
 def _normalize_effect_tree(effect, original_text=None):
     if not effect or not isinstance(effect, dict):
         return effect
@@ -11012,6 +11076,7 @@ def _normalize_effect_tree(effect, original_text=None):
     _mark_success_pile_difference(effect)
     _canonicalize_dynamic_counts(effect)
     effect = _walk_split_mixed(effect)
+    effect = _walk_split_look(effect)
     _enrich_characters(effect)
     _clean_gain_resource(effect)
     _fix_select_self_and_other(effect)

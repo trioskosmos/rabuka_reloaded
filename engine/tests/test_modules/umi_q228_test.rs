@@ -94,7 +94,6 @@ fn umi_q228_reduction_charges_effective_cost() {
     let mut game = TestGame::new(db);
 
     let umi = game.id("PL!-bp5-004-R\u{ff0b}");
-    let filler = game.id("PL!-sd1-010-SD");
     let other_group = game.id("PL!SP-bp1-007-R\u{ff0b}"); // Liella!
 
     // umi (μ's) + one Liella! member → 2 groups → 4E − 2 = 2.

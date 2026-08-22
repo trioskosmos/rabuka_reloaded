@@ -2251,12 +2251,6 @@ pub async fn rooms_leave(
         .filter(|s| !s.is_empty())
         .map(|s| s.to_uppercase())
         .or_else(|| get_room_id_from_req(&http_req));
-    let _session_token: Option<String> = req
-        .get("session_id")
-        .and_then(|v| v.as_str())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
-        .or_else(|| get_session_token_from_req(&http_req));
 
     let room_id = match room_id {
         Some(id) if !id.is_empty() => id,

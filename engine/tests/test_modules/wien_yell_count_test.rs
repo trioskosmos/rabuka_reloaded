@@ -12,7 +12,6 @@
 ///   2. Wien alone 竊・no reduction (condition unmet)
 ///   3. Opponent's cheer checks unaffected
 use crate::helpers::*;
-use rabuka_engine::zones::MemberArea;
 
 const WIEN: &str = "PL!SP-bp2-010-R\u{ff0b}"; // full-width plus
 const FILLER: &str = "PL!-sd1-010-SD";

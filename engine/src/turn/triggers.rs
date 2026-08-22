@@ -21,31 +21,6 @@ impl super::TurnEngine {
         let card_no_clone = card_no.to_string();
         let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
 
-        let _played_card_cost = {
-            let player = if player_id_clone == game_state.player1.id {
-                &game_state.player1
-            } else {
-                &game_state.player2
-            };
-            let areas = [
-                crate::zones::MemberArea::LeftSide,
-                crate::zones::MemberArea::Center,
-                crate::zones::MemberArea::RightSide,
-            ];
-            let mut found_cost = None;
-            for area in areas {
-                if let Some(card_id) = player.stage.get_area(area) {
-                    if let Some(card) = game_state.card_database.get_card(card_id) {
-                        if card.card_no.as_ref() == card_no_clone {
-                            found_cost = Some(card.cost);
-                            break;
-                        }
-                    }
-                }
-            }
-            found_cost
-        };
-
         {
             let player = if player_id_clone == game_state.player1.id {
                 &game_state.player1

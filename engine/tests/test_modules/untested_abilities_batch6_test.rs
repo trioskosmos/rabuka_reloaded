@@ -114,13 +114,6 @@ fn sayaka_hspb1010_expensive_opponent_not_eligible() {
     );
 }
 
-fn is_active(game: &TestGame, cid: i16) -> bool {
-    rabuka_engine::ability::util::orientation_matches_state(
-        game.state.mods.get_orientation_modifier(cid),
-        "active",
-    )
-}
-
 fn is_waited(game: &TestGame, cid: i16) -> bool {
     game.state.mods.get_orientation_modifier(cid) == Some("wait")
 }

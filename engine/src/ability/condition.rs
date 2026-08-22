@@ -429,7 +429,7 @@ impl<'a> ConditionContext<'a> {
         let mut dbg = AbDebug::new();
         // Snapshot buffer before compound/or so children can be collected
         #[cfg(not(feature = "no_std"))]
-        let _before = crate::ability::log::buffer_len();
+        let before = crate::ability::log::buffer_len();
         // Handle compound/or first — they push their own verdicts with children
         if let Condition::Compound { .. } = condition {
             if condition.get_operator() == Some("or") {
@@ -555,7 +555,7 @@ impl<'a> ConditionContext<'a> {
         // (e.g. comparison_condition, card_count_condition).
         #[cfg(not(feature = "no_std"))]
         {
-            if crate::ability::log::buffer_len() <= _before {
+            if crate::ability::log::buffer_len() <= before {
                 let actual = self.describe_condition_actual(condition);
                 push_cond_verdict(condition, &actual, final_result, vec![]);
             }
