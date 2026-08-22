@@ -80,7 +80,9 @@ fn main() {
 }
 
 fn output_game_state() {
-    let game_state = GAME_STATE.lock().unwrap();
+    let game_state = GAME_STATE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     if let Some(ref state) = *game_state {
         let display = game_state_to_display(state);
         println!("{}", serde_json::to_string(&display).unwrap());
@@ -177,13 +179,15 @@ fn initialize_game() {
     game_setup::setup_game(&mut game_state);
 
     // Store in global state
-    *GAME_STATE.lock().unwrap() = Some(game_state);
+    *GAME_STATE.lock().unwrap_or_else(|e| e.into_inner()) = Some(game_state);
 
     println!("Game initialized successfully");
 }
 
 fn output_actions() {
-    let game_state = GAME_STATE.lock().unwrap();
+    let game_state = GAME_STATE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     if let Some(ref state) = *game_state {
         let actions = game_setup::generate_possible_actions(state)
             .into_iter()
@@ -237,7 +241,9 @@ fn output_actions() {
 }
 
 fn execute_action(index: usize) {
-    let mut game_state = GAME_STATE.lock().unwrap();
+    let mut game_state = GAME_STATE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     if let Some(ref mut state) = *game_state {
         let actions = game_setup::generate_possible_actions(state);
 

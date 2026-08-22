@@ -330,7 +330,7 @@ fn get_session_token_from_req(req: &actix_web::HttpRequest) -> Option<String> {
 
 fn resolve_game_state_arc(data: &AppState, req: &actix_web::HttpRequest) -> Arc<RwLock<GameState>> {
     if let Some(room_id) = get_room_id_from_req(req) {
-        let rooms = data.rooms.lock().unwrap();
+        let rooms = lock_recover(&data.rooms);
         if let Some(room) = rooms.get(&room_id) {
             if let Some(ref gs) = room.game_state {
                 return gs.clone();
@@ -352,6 +352,30 @@ macro_rules! lock_state {
             }
         }
     }};
+}
+
+/// Lock a `Mutex`, recovering from poisoning instead of panicking.
+/// A panic mid-critical-section poisons the lock but rarely leaves the data
+/// unusable; `.unwrap()` here turned one panic into a cascade across every
+/// later request handler.
+fn lock_recover<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock_recover()
+}
+
+trait LockRecoverExt<T> {
+    fn lock_recover(&self) -> std::sync::MutexGuard<'_, T>;
+}
+
+impl<T> LockRecoverExt<T> for std::sync::Mutex<T> {
+    fn lock_recover(&self) -> std::sync::MutexGuard<'_, T> {
+        match self.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                log::warn!("mutex poisoned; recovering inner guard");
+                poisoned.into_inner()
+            }
+        }
+    }
 }
 
 fn invalidate_actions(data: &AppState, room_id: Option<&str>) {
@@ -457,10 +481,10 @@ async fn get_game_state_version(
 ) -> impl Responder {
     let room_id = get_room_id_from_req(&req);
     let version = if let Some(ref rid) = room_id {
-        let rooms = data.rooms.lock().unwrap();
+        let rooms = lock_recover(&data.rooms);
         rooms.get(rid).map(|r| r.frame_counter).unwrap_or(0)
     } else {
-        *data.frame_counter.lock().unwrap()
+        *lock_recover(&data.frame_counter)
     };
     HttpResponse::Ok().json(serde_json::json!({ "version": version }))
 }
@@ -474,7 +498,7 @@ pub async fn get_game_state(
 
     // If room exists but game_state is not yet initialized, return a waiting response
     if let Some(ref rid) = room_id_str {
-        let rooms = data.rooms.lock().unwrap();
+        let rooms = lock_recover(&data.rooms);
         if let Some(room) = rooms.get(rid) {
             if room.game_state.is_none() {
                 let players_ready = room.custom_decks.as_ref().map(|d| d.len()).unwrap_or(0);
@@ -503,7 +527,7 @@ pub async fn get_game_state(
 
     let mut requester_player_id = None;
     if let Some(ref rid) = room_id_str {
-        let rooms = data.rooms.lock().unwrap();
+        let rooms = lock_recover(&data.rooms);
         if let Some(room) = rooms.get(rid) {
             display.mode = room.mode.clone();
             if room.mode == "pvp" || room.mode == "pve" {
@@ -531,7 +555,7 @@ pub async fn get_game_state(
         drop(gs);
     }
 
-    let ui_config = data.ui_config.lock().unwrap().clone();
+    let ui_config = lock_recover(&data.ui_config).clone();
     let final_actions = if display.waiting_for_opponent {
         display.pending_choice = None;
         None
@@ -689,7 +713,7 @@ pub async fn execute_action(
     // (std::sync::Mutex is not reentrant — same thread would deadlock)
     let exec_room_id_str = get_room_id_from_req(&http_req);
     let pvp_player_pid = exec_room_id_str.as_deref().and_then(|rid| {
-        let rooms = data.rooms.lock().unwrap();
+        let rooms = lock_recover(&data.rooms);
         rooms.get(rid).and_then(|room| {
             if room.mode != "pvp" && room.mode != "pve" {
                 return None;
@@ -830,17 +854,16 @@ pub async fn execute_action(
                     }
                 }
             } else {
-                let mut history = data.history.lock().unwrap();
+                let mut history = lock_recover(&data.history);
                 push_undo_snapshot(&mut history, &snapshot, &mut game_state, had_choice_before);
                 drop(history);
-                data.future.lock().unwrap().clear();
+                lock_recover(&data.future).clear();
                 invalidate_actions(&data, None);
-                let mut fc = data.frame_counter.lock().unwrap();
+                let mut fc = lock_recover(&data.frame_counter);
                 *fc += 1;
                 let label = frame_label(req.action_type.as_deref(), req.card_no.as_deref());
                 data.frame_history
-                    .lock()
-                    .unwrap()
+                    .lock_recover()
                     .push(FrameSnapshot::capture(&game_state, *fc, label));
             }
 
@@ -906,7 +929,7 @@ async fn set_ui_config(
     data: web::Data<AppState>,
     req: web::Json<SetUiConfigRequest>,
 ) -> impl Responder {
-    let mut ui_config = data.ui_config.lock().unwrap();
+    let mut ui_config = lock_recover(&data.ui_config);
 
     if let Some(lang) = &req.current_lang {
         ui_config.current_lang = lang.clone();
@@ -956,7 +979,7 @@ fn pvp_mode_for_room(data: &AppState, room_id: Option<&str>) -> bool {
 async fn undo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Responder {
     let undo_room_id = get_room_id_from_req(&req);
     let snapshot = if let Some(ref rid) = undo_room_id {
-        let mut rooms = data.rooms.lock().unwrap();
+        let mut rooms = lock_recover(&data.rooms);
         if let Some(room) = rooms.get_mut(rid) {
             room.history
                 .pop()
@@ -966,8 +989,7 @@ async fn undo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
         }
     } else {
         data.history
-            .lock()
-            .unwrap()
+            .lock_recover()
             .pop()
             .ok_or_else(|| HttpResponse::BadRequest().json("No history to undo"))
     };
@@ -985,7 +1007,7 @@ async fn undo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
             }
         }
     } else {
-        data.future.lock().unwrap().push(game_state.clone());
+        lock_recover(&data.future).push(game_state.clone());
     }
     *game_state = snapshot;
 
@@ -1014,7 +1036,7 @@ async fn undo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
     }
     let display = crate::display::game_state_to_display(&game_state);
     drop(game_state);
-    let ui_config = data.ui_config.lock().unwrap().clone();
+    let ui_config = lock_recover(&data.ui_config).clone();
     HttpResponse::Ok().json(GameStateResponse {
         game_state: display,
         legal_actions: None,
@@ -1025,7 +1047,7 @@ async fn undo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
 async fn redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Responder {
     let redo_room_id = get_room_id_from_req(&req);
     let snapshot = if let Some(ref rid) = redo_room_id {
-        let mut rooms = data.rooms.lock().unwrap();
+        let mut rooms = lock_recover(&data.rooms);
         if let Some(room) = rooms.get_mut(rid) {
             room.future
                 .pop()
@@ -1035,8 +1057,7 @@ async fn redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
         }
     } else {
         data.future
-            .lock()
-            .unwrap()
+            .lock_recover()
             .pop()
             .ok_or_else(|| HttpResponse::BadRequest().json("No future to redo"))
     };
@@ -1054,7 +1075,7 @@ async fn redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
             }
         }
     } else {
-        data.history.lock().unwrap().push(game_state.clone());
+        lock_recover(&data.history).push(game_state.clone());
     }
     *game_state = snapshot;
 
@@ -1083,7 +1104,7 @@ async fn redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
     }
     let display = crate::display::game_state_to_display(&game_state);
     drop(game_state);
-    let ui_config = data.ui_config.lock().unwrap().clone();
+    let ui_config = lock_recover(&data.ui_config).clone();
     HttpResponse::Ok().json(GameStateResponse {
         game_state: display,
         legal_actions: None,
@@ -1276,8 +1297,8 @@ async fn exec_code(
             }
         }
     } else {
-        data.history.lock().unwrap().push(game_state.clone());
-        data.future.lock().unwrap().clear();
+        lock_recover(&data.history).push(game_state.clone());
+        lock_recover(&data.future).clear();
         if let Ok(mut fc) = data.frame_counter.lock() {
             *fc += 1;
         }
@@ -1301,10 +1322,10 @@ async fn exec_code(
 async fn debug_rewind(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Responder {
     let rewind_room_id = get_room_id_from_req(&req);
     let snapshot = if let Some(ref rid) = rewind_room_id {
-        let mut rooms = data.rooms.lock().unwrap();
+        let mut rooms = lock_recover(&data.rooms);
         rooms.get_mut(rid).and_then(|r| r.history.pop())
     } else {
-        data.history.lock().unwrap().pop()
+        lock_recover(&data.history).pop()
     };
     let snapshot = match snapshot {
         Some(s) => s,
@@ -1322,7 +1343,7 @@ async fn debug_rewind(data: web::Data<AppState>, req: actix_web::HttpRequest) ->
             }
         }
     } else {
-        data.future.lock().unwrap().push(game_state.clone());
+        lock_recover(&data.future).push(game_state.clone());
     }
     *game_state = snapshot;
     invalidate_actions(&data, rewind_room_id.as_deref());
@@ -1332,10 +1353,10 @@ async fn debug_rewind(data: web::Data<AppState>, req: actix_web::HttpRequest) ->
 async fn debug_redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Responder {
     let redo_room_id = get_room_id_from_req(&req);
     let snapshot = if let Some(ref rid) = redo_room_id {
-        let mut rooms = data.rooms.lock().unwrap();
+        let mut rooms = lock_recover(&data.rooms);
         rooms.get_mut(rid).and_then(|r| r.future.pop())
     } else {
-        data.future.lock().unwrap().pop()
+        lock_recover(&data.future).pop()
     };
     let snapshot = match snapshot {
         Some(s) => s,
@@ -1353,7 +1374,7 @@ async fn debug_redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
             }
         }
     } else {
-        data.history.lock().unwrap().push(game_state.clone());
+        lock_recover(&data.history).push(game_state.clone());
     }
     *game_state = snapshot;
     HttpResponse::Ok().json(serde_json::json!({"success": true}))
@@ -1382,7 +1403,7 @@ async fn debug_dump_state(
 /// GET /api/debug/frames — lightweight frame index
 /// Returns frame metadata (no card IDs), suitable for UI counter display.
 async fn debug_frames(data: web::Data<AppState>) -> impl Responder {
-    let frames = data.frame_history.lock().unwrap();
+    let frames = lock_recover(&data.frame_history);
     let current = frames.len().saturating_sub(1);
     let index: Vec<serde_json::Value> = frames
         .iter()
@@ -1407,7 +1428,7 @@ async fn debug_frames(data: web::Data<AppState>) -> impl Responder {
 
 /// GET /api/debug/dump_frames — download all frame snapshots as JSON
 async fn debug_dump_frames(data: web::Data<AppState>) -> impl Responder {
-    let frames = data.frame_history.lock().unwrap();
+    let frames = lock_recover(&data.frame_history);
     HttpResponse::Ok().json(serde_json::json!({
         "success": true,
         "total_frames": frames.len(),
@@ -1652,7 +1673,7 @@ pub async fn set_deck(
     // If room_id is present, store deck in the room's custom_decks
     let mut init_game = false;
     if let Some(ref rid) = room_id {
-        let mut rooms = data.rooms.lock().unwrap();
+        let mut rooms = lock_recover(&data.rooms);
         if let Some(room) = rooms.get_mut(rid) {
             let decks = room.custom_decks.get_or_insert_with(HashMap::new);
             let deck_entry = decks.entry(player).or_insert_with(|| CustomDeck {
@@ -1682,8 +1703,7 @@ pub async fn set_deck(
         // Legacy sandbox mode: store in global custom_decks
         if !card_numbers.is_empty() {
             data.custom_decks
-                .lock()
-                .unwrap()
+                .lock_recover()
                 .insert(player, card_numbers);
         }
         if let Some(energy_arr) = req.get("energy_deck").and_then(|v| v.as_array()) {
@@ -1693,8 +1713,7 @@ pub async fn set_deck(
                 .collect();
             if !energy_cards.is_empty() {
                 data.custom_energy_decks
-                    .lock()
-                    .unwrap()
+                    .lock_recover()
                     .insert(player, energy_cards);
             }
         }
@@ -1709,7 +1728,7 @@ pub async fn set_deck(
 }
 
 async fn rooms_list(data: web::Data<AppState>) -> impl Responder {
-    let rooms = data.rooms.lock().unwrap();
+    let rooms = lock_recover(&data.rooms);
     let public_rooms: Vec<serde_json::Value> = rooms
         .values()
         .filter(|r| r.public)
@@ -1727,7 +1746,7 @@ async fn rooms_list(data: web::Data<AppState>) -> impl Responder {
 
 /// Notify all SSE clients in a room that state has changed.
 fn notify_room_clients(data: &AppState, room_id: &str) {
-    let broadcasts = data.room_broadcasts.lock().unwrap();
+    let broadcasts = lock_recover(&data.room_broadcasts);
     if let Some(sender) = broadcasts.get(room_id) {
         let count = sender.receiver_count();
         let _ = sender.send(());
@@ -1757,7 +1776,7 @@ async fn sse_events(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
 
     // Get or create broadcast sender for this room
     let sender = {
-        let mut broadcasts = data.room_broadcasts.lock().unwrap();
+        let mut broadcasts = lock_recover(&data.room_broadcasts);
         broadcasts
             .entry(room_id.clone())
             .or_insert_with(|| {
@@ -1798,14 +1817,14 @@ async fn sse_events(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
             }
         }
         // Client disconnected — clean up rooms with no remaining sessions
-        let mut rooms = cleanup_data.rooms.lock().unwrap();
+        let mut rooms = lock_recover(&cleanup_data.rooms);
         if let Some(room) = rooms.get(&cleanup_room_id) {
             if room.sessions.is_empty() {
                 rooms.remove(&cleanup_room_id);
                 log::debug!("[SSE] Room {} cleaned up (no sessions)", cleanup_room_id);
             }
         }
-        let mut broadcasts = cleanup_data.room_broadcasts.lock().unwrap();
+        let mut broadcasts = lock_recover(&cleanup_data.room_broadcasts);
         broadcasts.remove(&cleanup_room_id);
     });
 
@@ -2016,7 +2035,7 @@ pub async fn rooms_create(
     println!("DEBUG: Inserting room with ID: {}", room_id);
 
     {
-        let mut rooms = data.rooms.lock().unwrap();
+        let mut rooms = lock_recover(&data.rooms);
 
         rooms.insert(room_id.clone(), room);
 
@@ -2038,7 +2057,7 @@ pub async fn rooms_create(
     let ai_session_id;
 
     {
-        let mut rooms = data.rooms.lock().unwrap();
+        let mut rooms = lock_recover(&data.rooms);
 
         if let Some(room) = rooms.get_mut(&room_id) {
             room.sessions.insert(
@@ -2109,7 +2128,7 @@ pub async fn rooms_join(
     let mut player_id = -1;
 
     {
-        let mut rooms = data.rooms.lock().unwrap();
+        let mut rooms = lock_recover(&data.rooms);
 
         if let Some(room) = rooms.get_mut(&room_id) {
             // Check for recovery by username
@@ -2211,7 +2230,7 @@ pub async fn rooms_join(
     }
 
     let mode = {
-        let rooms = data.rooms.lock().unwrap();
+        let rooms = lock_recover(&data.rooms);
 
         rooms
             .get(&room_id)
@@ -2263,7 +2282,7 @@ pub async fn rooms_leave(
 
     // Notify other SSE clients that the room is closing, then destroy it
     {
-        let broadcasts = data.room_broadcasts.lock().unwrap();
+        let broadcasts = lock_recover(&data.room_broadcasts);
         if let Some(sender) = broadcasts.get(&room_id) {
             // Send a special "closed" event so other players know to redirect
             let _ = sender.send(());
@@ -2272,13 +2291,13 @@ pub async fn rooms_leave(
     }
     // Remove broadcast channel
     {
-        let mut broadcasts = data.room_broadcasts.lock().unwrap();
+        let mut broadcasts = lock_recover(&data.room_broadcasts);
         broadcasts.remove(&room_id);
     }
 
     // Destory the room entirely — a leave means the match is over
     {
-        let mut rooms = data.rooms.lock().unwrap();
+        let mut rooms = lock_recover(&data.rooms);
         rooms.remove(&room_id);
     }
 
@@ -2323,7 +2342,7 @@ async fn init_game(
     let (card_numbers1, card_numbers2, energy_nos1, energy_nos2) = {
         // Try room's custom decks first
         let room_decks = init_room_id_custom.as_ref().and_then(|rid| {
-            let rooms = data.rooms.lock().unwrap();
+            let rooms = lock_recover(&data.rooms);
             rooms.get(rid).and_then(|r| r.custom_decks.clone())
         });
         if let Some(decks) = room_decks {
@@ -2333,8 +2352,8 @@ async fn init_game(
             let e1 = decks.get(&1).map(|d| d.energy.clone()).unwrap_or_default();
             (p0, p1, e0, e1)
         } else {
-            let mut custom = data.custom_decks.lock().unwrap();
-            let mut custom_energy = data.custom_energy_decks.lock().unwrap();
+            let mut custom = lock_recover(&data.custom_decks);
+            let mut custom_energy = lock_recover(&data.custom_energy_decks);
             if custom.contains_key(&0) || custom.contains_key(&1) {
                 let p0 = custom.remove(&0).unwrap_or_default();
                 let p1 = custom.remove(&1).unwrap_or_else(|| p0.clone());
@@ -2455,7 +2474,7 @@ async fn init_game(
     let init_room_id = get_room_id_from_req(&http_req);
     if let Some(ref rid) = init_room_id {
         // Room context: write to room's state, history, frames
-        let mut rooms = data.rooms.lock().unwrap();
+        let mut rooms = lock_recover(&data.rooms);
         if let Some(room) = rooms.get_mut(rid) {
             room.actions_dirty = true;
             room.history.clear();
@@ -2473,7 +2492,7 @@ async fn init_game(
             room.game_state = Some(gs);
             drop(rooms);
             notify_room_clients(&data, rid);
-            let ui_config = data.ui_config.lock().unwrap().clone();
+            let ui_config = lock_recover(&data.ui_config).clone();
             return HttpResponse::Ok().json(GameStateResponse {
                 game_state: display,
                 legal_actions: Some(actions),
@@ -2486,18 +2505,18 @@ async fn init_game(
     let mut state_guard = lock_state!(data.game_state, write);
     *state_guard = game_state;
     invalidate_actions(&data, None);
-    data.history.lock().unwrap().clear();
-    data.future.lock().unwrap().clear();
-    *data.frame_counter.lock().unwrap() = 0;
-    data.frame_history.lock().unwrap().clear();
+    lock_recover(&data.history).clear();
+    lock_recover(&data.future).clear();
+    *lock_recover(&data.frame_counter) = 0;
+    lock_recover(&data.frame_history).clear();
     let frame0 = FrameSnapshot::capture(&state_guard, 0, "Game start".into());
-    data.frame_history.lock().unwrap().push(frame0);
+    lock_recover(&data.frame_history).push(frame0);
 
     let display = crate::display::game_state_to_display(&state_guard);
     let actions = actions_with_index(&state_guard);
     drop(state_guard);
 
-    let ui_config = data.ui_config.lock().unwrap().clone();
+    let ui_config = lock_recover(&data.ui_config).clone();
     HttpResponse::Ok().json(GameStateResponse {
         game_state: display,
         legal_actions: Some(actions),
@@ -2770,7 +2789,7 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
                     .as_secs();
-                let mut rooms_lock = rooms.lock().unwrap();
+                let mut rooms_lock = lock_recover(&rooms);
                 let before = rooms_lock.len();
                 rooms_lock.retain(|id, room| {
                     let empty = room.sessions.is_empty();
