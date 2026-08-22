@@ -1,146 +1,106 @@
-# Engine Code Audit — 2026-08-23
+# Master Refactor Plan — 2026-08-23 (rev 2)
 
-Deep-dive audit of `engine/src` (core/, ability/, root modules + bins). Every headline finding was verified firsthand against source. Priorities: **P0** = silently corrupts gameplay, fix now. **P1** = panic/robustness risk reachable from data or users. **P2** = architecture debt. **P3** = dedup/merge opportunities.
+Unified roadmap merging the original engine audit, `docs/CASTING_AUDIT.md` (~1,034 unchecked cast sites), and `cards/ability_extraction/PARSER_UNTANGLE_PLAN.md` (13.6K-line Python parser). Everything gets done eventually; order below is by risk-then-value. Every item gates on `cargo test --test run_all` (2541 baseline) and, for parser work, byte-identical `abilities.json`.
 
----
+## ✅ DONE (this session)
 
-## P0 — Silent fallbacks that corrupt gameplay
-
-These all share one failure mode: bad input decodes "successfully" into a *wrong* value instead of erroring, so regressions show up as wrong game outcomes, never as errors.
-
-### 1. Unknown keyword → `Keyword::Turn1`
-`ability/vm.rs:1549`
-```rust
-_ => crate::card::Keyword::Turn1,
-```
-Any new/misspelled keyword string in the card DB silently becomes `Turn1`, and `resolver.rs:378` then makes the card dead after turn 1 (`if gs.turn_number != 1 { return false }`). A typo in the extractor = a card quietly stops working, no warning anywhere.
-**Fix:** return `Option<Keyword>` and skip+log on unknown; or make the generator total over the enum so a new keyword fails the build.
-
-### 2. Unknown action string → `ActionType::Custom` → silent no-op
-`ability/effect_decoder_gen.rs:38`, `ability/enums.rs` (`Default for ActionType = Custom`), `ability/effects/mod.rs:128`
-```rust
-if effect.action == ActionType::Custom && effect.action_by().is_some() { return Ok(()); }
-```
-A card action type the engine doesn't know yet decodes fine and executes as either a no-op or falls into `execute_custom`. The whole decode path is honest `Option`-based failure everywhere *except* the single field that matters most.
-**Fix:** fail the decode (or log-error + skip the whole ability) on unknown action strings.
-
-### 3. User input parsed with `.unwrap_or(0)`
-`ability/choice.rs:2407, 2595, 3377, 3395`
-```rust
-let idx: usize = selected.parse().unwrap_or(0);
-```
-A garbled client reply silently selects index 0 (left stage slot) or count 0 instead of re-prompting. Can move the wrong card.
-**Fix:** propagate `Err("invalid selection")`; the choice handlers already return `Result`.
-
-### 4. Silent integer truncation in the bytecode reader
-`ability/vm.rs:315-322` — `read_u32_value()` returns `Option<u8>` via `as u8`; `read_i8_value` uses `as i8`. A value >255 in the JSON source wraps mod-256 with zero diagnostics — counts/costs wrap silently.
-**Fix:** `u8::try_from(v)` and return `None` (already propagates as decode failure).
-
-### 5. Data-driven panics: `.unwrap()` on decoded/card-data fields
-- `condition/card.rs:1708` — `condition.get_locations().unwrap()`
-- `choice.rs:1671` — `gs.entry_cost().cloned().unwrap()`
-- `move_cards.rs:2086` (`deck_pos.unwrap()`), `:2759` (`sum_limit.unwrap()`)
-- `effects/misc.rs:197` — `effect.cost_limit_any().unwrap()`
-
-All reachable from hand-authored card data / queue state, not programmer error.
-**Fix:** `unwrap_or_default` + `log::error!`, or return `Err(String)`.
-
-### 6. `unreachable!()` on a variant the decoder can produce
-`ability/condition.rs:533`: `Condition::Compound { .. } => unreachable!()`. Currently guarded by an early dispatch at `condition.rs:434-441`, but `condition_decoder_gen.rs:191,1357` can emit top-level `Compound`. Any refactor of that pre-dispatch turns this into a card-data panic.
-**Fix:** route to `evaluate_compound_condition` or log-error + defined result.
-
-### 7. `max_distinct_names`: exponential DFS + undercounting greedy fallback
-`ability/util.rs:778-834`. The ≤12-card branch clones a `HashSet<String>` per DFS node (branching factor = names per card, unbounded — comment says ≤3¹² but that's optimistic). The >12 branch is first-fit greedy which provably **undercounts**, i.e. can return wrong verdicts for large boards.
-**Fix:** memoized bitmask DP over name-set; keep greedy only as last resort with a debug warn.
+| # | Fix | Where |
+|---|-----|-------|
+| 1 | Unknown keyword no longer silently becomes `Turn1` — logs + skips | vm.rs |
+| 2 | Unknown action strings fail decode loudly (`""` legacy → Custom explicitly) — generator template + generated decoder in sync | effect_decoder_gen.rs + generate_effect_decoder.py |
+| 3 | `parse().unwrap_or(0)` ×4 → warn + Err | choice.rs |
+| 4 | `as u8`/`as i8` truncation in bytecode readers → try_from | vm.rs |
+| 5 | Data-driven unwraps removed (entry-cost reveal, multi-location) | choice.rs, condition/card.rs |
+| 6 | `unreachable!()` on decodable Compound → routed to compound evaluator | condition.rs |
+| 7 | Fatal setup errors were invisible `debug!` logs → stderr | main.rs |
+| 8 | Vestigial `constants_dirty` flag deleted (field + method + 30 call sites); recalculate_constants documented as unconditional | game_state/*, turn/*, ability/* |
+| 9 | game_state `include!()` splices → real child modules with own imports | core/game_state/{tracking,modifiers,abilities}.rs |
+| 10 | Post-movement TriggerEvent snapshot deduped into 2 helpers (11 copies, −110 lines) | abilities.rs, choice.rs, misc.rs |
+| 11 | Distinct-count eligibility gate unified; `modified_cost()` helper replaces 3 formula copies | condition/card.rs |
 
 ---
 
-## P1 — Robustness / panic paths
+## QUEUE A — Correctness / robustness leftovers
 
-### 8. Fatal setup errors logged at `debug!` level
-`main.rs:98, 110, 133, 148, 312, 315`:
-```rust
-log::debug!("Failed to load cards: {}", e);
-```
-With default logging the binary exits **silently** when cards/decks fail to load. Wrong level for user-facing failures.
-**Fix:** these are fatal → `error!` + non-zero exit.
+### A1. `max_distinct_names`: exponential DFS + undercounting greedy
+`ability/util.rs:778-834`. ≤12-card branch clones a HashSet per DFS node (branching = names per card, unbounded). >12 branch is first-fit greedy which **undercounts** → wrong condition verdicts on big boards.
+**Fix:** memoized bitmask DP over the name-set. Self-contained, pure function — easy to unit-test exhaustively against brute force.
 
-### 9. ~50× `lock().unwrap()` in web_server.rs
-Any panic in one request handler poisons the mutex and cascades panics through every later handler.
-**Fix:** handle `PoisonError` (recover the inner guard) at minimum; ideally narrow lock scope.
+### A2. web_server: ~50× `lock().unwrap()` poisoning cascade
+`game/web_server.rs`. One panicking handler poisons every later request.
+**Fix:** small helper that recovers from `PoisonError` (take inner guard), used everywhere.
 
-### 10. Unsynchronized unsafe static cache in `no_std` builds
-`ability/vm.rs:103-118`:
-```rust
-static CACHE: SyncUnsafeCell<Option<Vec<u8>>> = SyncUnsafeCell(UnsafeCell::new(None));
-static INIT: SyncUnsafeCell<bool> = SyncUnsafeCell(UnsafeCell::new(false));
-```
-No atomics/fences — a data race on any threaded `no_std` target. Documented single-threaded targets make this survivable today, but nothing enforces that.
-**Fix:** `critical-section` crate or `AtomicBool` + spin.
+### A3. RNG consolidation
+Four families coexist: `rng.rs` xorshift32 with **constant desktop seed**, LCG copies in 5 bins (+ strategy_v2 variant), optional `rand`. Determinism claims are undermined by the constant seed.
+**Fix:** one injectable engine RNG; bins take it via `bin_common`; delete copies.
 
-### 11. RNG fragmentation undermines determinism claims
-`rng.rs:13` documents desktop seeding as a **constant seed** ("deterministic between runs"), plus `xorshift32` here, `struct Lcg` copies in 5 bins (+1 variant in strategy_v2), and optional `rand`. Four RNG families coexisting; every determinism claim built on LCG seeds is undermined by the constant desktop seed.
-**Fix:** one engine RNG, injectable seed, delete the rest.
+### A4. Unsafe unsynchronized static cache in `no_std` vm path
+`vm.rs:103-118` — plain `SyncUnsafeCell` + bool, no atomics.
+**Fix:** atomic Bool + spin or critical-section crate.
+
+### A5. qa_test_suite relocation + crate test gating
+86KB regression corpus compiled into the lib while `[lib] test = false`; `run_qa_tests.rs` phantom bin; re-reads cards.json 28× via CWD-relative paths.
+**Fix:** move behind `#[cfg(test)]` in tests/, shared lazy DB fixture, restore `[lib] test = true`, delete phantom bin.
+
+## QUEUE B — Casting hygiene (from CASTING_AUDIT.md, ROI order)
+
+### B1. Lints first (prevents regrowth)
+`[lints]` / clippy warn: `cast_possible_truncation`, `cast_sign_loss`, `cast_precision_loss`. Expect a noisy first run — triage into fix/suppress.
+
+### B2. `CardId(i16)` newtype
+No ID type today; bare `i16` bounced to usize/u8 at every boundary (~250+ `as usize`). Precedent exists: `AbilityRef(u16)` in ability_store.rs.
+**Fix:** newtype + `From<CardId> for usize`; compiler funnels conversions into auditable spots. Big diff — do zone-boundary-first, mechanically.
+
+### B3. Widen modifier storage to i32
+`GameModifiers` HashMap<i16, i16> forces `as i16` tolls and double conversions. Check GBA/3DS serialization before widening; confine narrowing to platform layer if needed.
+
+### B4. Centralize the clamp idiom
+`(x).max(0) as u8` scattered across condition/card.rs, live.rs, move_cards.rs → one `saturate_u8(i32)` helper (or kill u8 count fields entirely per B3).
+
+### B5. Confine blob-decode casts
+card_binary.rs/vm.rs raw-byte casts are correct but smeared → keep them only inside decoder module + round-trip tests. Floats/RNG casts: leave alone.
+
+## QUEUE C — God-function surgery
+
+### C1. `execute_gain_resource` split (1,162 lines)
+`effects/misc.rs:740-1902`. Resource matched against JA/EN strings 17×. **Fix:** normalize once into `ResourceKind` enum at fn top; split into per-resource apply fns. Est. −500–700 lines, kills platform-dependent divergence bug class. Highest-value single refactor left in ability/.
+
+### C2. describe.rs EN/JA parity
+~400-line twin match towers (describe_effect_en/_ja). Either table-drive around shared fragments (−250–350) or add a compile-time/run-time parity test so they can't drift.
+
+### C3. heart/blade greater_than_all merge + rule-log prefix dedup
+Identical stage-scan scaffolding behind a stat-fn param; 3× rule-log prefix blocks in effects/mod.rs. Est. ~−90.
+
+## QUEUE D — Module boundaries & tooling
+
+### D1. vm decoder-gen modularization — RETRY, generator-first
+Attempted this session, reverted (122 compile errors): moving the gen files orphaned their scope because they freeload on vm.rs imports via include!. **Lesson:** the generators must emit the import headers themselves. Steps: (a) update generate_effect_decoder.py / generate_condition_decoder.py to emit `use` header block + pub(super) entry points; (b) regenerate into place; (c) then flip include!→mod in vm.rs; (d) regen must produce byte-stable output vs old pipeline apart from the header.
+
+### D2. bin_common migration completion
+15 bins, 7 use bin_common. `struct Lcg` ×5 (+1 variant), fresh_database() ×5, deal/shuffle/setup ×8 (bot_arena/diag_stall verbatim reimplementations of bin_common::deal_game). Est. −600–800 lines. Fold A3 into this.
+
+### D3. Bot strategy v2–v5 consolidation
+Four live generations sharing scaffolding incl. 5 copies of `.expect("live set actions non-empty")`. Decide supported generation(s); extract shared action-selection; replace expect with fallback policy.
+
+### D4. timer.rs / alloc_counter.rs hygiene
+timer: `cfg!()` runtime branches paid when profiling off; ignored lock failures; println/eprintln stream mismatch. alloc_counter: env vars read twice; counting allocator overhead even when env-disabled.
+
+## QUEUE E — Parser untangle (Python track; byte-gated per PARSER_UNTANGLE_PLAN.md)
+
+Verification loop already specified there (regen ref → change → fc.exe /b compare minus generated_at; engine suite + python tests + --check).
+
+- **E1. Phase 1 — dead weight**: duplicate 登場させ registration, unreachable parse_condition tail, unused locals; segment_clauses wire-or-delete; _try_phase_gate delegates to extract_phase_gate.
+- **E2. Phase 2 — dispatch surfaces**: tuple `_ACTION_RULES` → ActionRule; fold extra_checks lambdas + _fill_defaults refinement branches into rules where provably identical.
+- **E3. Phase 3 — single-pass field extraction**: adopt FieldExtractor in parse_action (built for this, never wired in); _fill_defaults* consumes cached values.
+- **E4. Phase 4 — merge tree walks**: _propagate_context into _walk schema, field-by-field sub-steps. Highest risk — golden-file harness mandatory.
+- **E5. Phase 5 — dissolve FIX blocks**: one compensating patch per step, moved into its producing handler, byte-gated; unlocalizable ones stay documented.
+
+Non-conforming steps get skipped and logged in the plan's "Deferred" section, not forced.
 
 ---
 
-## P2 — Architecture
+## Execution order
 
-### 12. `GameState` sub-modules are `include!()` splices, not modules
-`core/game_state/mod.rs:1242-1244`:
-```rust
-include!("tracking.rs");
-include!("modifiers.rs");
-include!("abilities.rs");
-```
-Same pattern in `ability/vm.rs:17-18` (decoder gen files included into vm's namespace). There are file boundaries but no encapsulation boundaries — everything is one giant scope, which is exactly how `abilities.rs` grew to 125KB and `modifiers.rs` to 79KB inside a god object.
-**Fix:** convert to real `mod` declarations; fix visibility while you're there. Low risk, high payoff.
+A1 → A2 → A3+A2(D2 partially) → A5 → B1 → B4 → B3 → B2 → C1 → C3 → C2 → D1 → D4 → E1..E5 → D3 last (bot consolidation benefits from stable API after B2's CardId).
 
-### 13. Vestigial `constants_dirty` flag
-`game_state/mod.rs:88, 406, 607` sets/marks it; `modifiers.rs:214` explicitly says invalidation is "deliberately NOT gated on `constants_dirty`". The flag is written, never honored — dead state that implies an invariant that doesn't exist.
-**Fix:** delete it or actually gate on it. Right now it lies to readers.
-
-### 14. `execute_gain_resource`: 1,162-line god function, stringly-typed dispatch
-`effects/misc.rs:740-1902`. Resource kind compared against raw JA/EN strings **17 times**: `resource == "blade" || resource == "ブレード" || resource == "heart" || ...` at lines 855, 930, 975, 1216, 1340, 1444, 1476, 1505, 1518, 1562, 1597, 1722, 1865... One missed JA/EN pair = platform-dependent behavior. It mixes heart-color resolution, selection filtering, blade targeting, post-filters, temp-effect bookkeeping and rule logging in one body.
-**Fix:** normalize resource once into a `ResourceKind` enum at function top, split into per-resource apply fns (~500-700 lines saved, kills the entire bug class).
-
-### 15. `qa_test_suite.rs`: 86KB regression corpus compiled into the library
-`lib.rs:68` ships it in every consumer; `Cargo.toml` simultaneously has `[lib] test = false` — unit tests disabled at crate level while a test corpus lives in src/. It panics-on-first-failure with no isolation and re-reads cards.json from disk 28 times via CWD-relative paths. `run_qa_tests.rs` is a phantom bin (4 lines, orphaned).
-**Fix:** move behind `#[cfg(test)]` in `tests/`, share a lazily-built DB fixture, delete `run_qa_tests.rs`, restore `[lib] test = true`.
-
-### 16. Bot strategies v2–v5 all coexist
-`bot/strategy_v2.rs` (21K), `v3` (31K), `v4` (21K), `v5` (17K) are four live generations sharing copy-paste scaffolding, including five copies of `.expect("live set actions non-empty")` — one empty-action edge case panics all of them.
-**Fix:** decide the supported generation(s); extract shared action-selection scaffolding; replace the expect with a fallback policy.
-
----
-
-## P3 — Dedup / merge candidates (est. savings)
-
-| # | What | Evidence | Savings |
-|---|------|----------|---------|
-| 1 | `ResourceKind` enum + split of `execute_gain_resource`; kills 17 duplicated JA/EN comparisons | misc.rs:740-1902 | ~500-700 lines |
-| 2 | `trigger_auto_abilities_snapshot(gs)` helper — identical pid + TriggerEvent block recurs 6× in choice.rs, 5× in misc.rs | choice.rs:2958-3048 et al. | ~110 lines |
-| 3 | Unify distinct-count logic: three ~25-line arms differ only by inserted key | condition/card.rs:1734-1808, 2307, 2329 | ~80-100 lines |
-| 4 | Merge `evaluate_heart_greater_than_all` / `evaluate_blade_greater_than_all` behind a stat fn param; merge 3× rule-log prefix blocks | card.rs:1475-1614; effects/mod.rs:283-337 | ~90 lines |
-| 5 | Table-drive `describe_effect_en`/`_ja` around shared format fragments (or add compile-time parity test) | describe.rs:506-1161 | ~250-350 lines |
-| 6 | Finish the abandoned `bin_common` migration: `struct Lcg` ×5 bins + strategy_v2 variant, `fresh_database()` ×5, deal/shuffle/setup block ×8 (`deal_from_templates` in bot_arena.rs:94-114 and diag_stall.rs:35-50 are verbatim reimplementations of `bin_common::deal_game`) | src/bin/* | ~600-800 lines |
-
-### Smaller hygiene items
-- Dead mirror code kept "for symmetry": `vm.rs:527,573` (~140 lines, `#[allow(dead_code)]`).
-- `timer.rs:28,46`: `cfg!(feature = "profiling")` is a runtime branch paid on every instrumented site even with profiling off — should be `#[cfg]` on the impl or a no-op macro. Lock failures silently ignored (`timer.rs:34,52,64,138`). `print_folded()` uses `println!` while the rest uses `eprintln!`.
-- `alloc_counter.rs:117-126,147`: env vars read twice (start + Drop); counting allocator adds atomics to every malloc/free whenever the feature is on, even if tracking is env-disabled.
-- `bin/test_hang.rs:31`: `.ok()` discards deck-legality Result — decks silently unenforced in harnesses.
-- cfg-gates live *inside* function bodies across the decoder files (47 attrs in condition_decoder_gen.rs alone). Whole-function gating would make the feature matrix testable.
-
----
-
-## Overall health
-
-The skeleton is sounder than expected: typed ActionType→handler dispatch is clean, generated decoders log unknown fields, `Result<(), String>` plumbing is pervasive, and the console/no_std porting shows real discipline. The rot is concentrated in two places:
-
-1. **Fallback posture is inverted.** Decode failures mostly propagate honestly — but the few silent defaults (`Keyword::Turn1`, `ActionType::Custom`, `parse().unwrap_or(0)`, `i64 as u8`) sit precisely on the highest-leverage fields. That's P0 items 1-4; fixing them is small diffs with outsized correctness payoff.
-2. **Files accreted instead of module boundaries holding.** Four ability files >140KB, god functions up to 1,162 lines, `include!()` pseudo-modules, and a half-finished bin_common migration. Dedup items #1/#2 above shrink misc.rs/choice.rs enough to make them reviewable again.
-
-Suggested order: P0 #1-#4 (correctness, small) → P2 #12+#15 (module hygiene) → P3 #1-#2 (biggest merges) → P1 #8-#11 → leave the no_std cfg matrix alone until CI actually builds psp/ds/gba combos.
-
-*Scope note: core/, ability/, root+bins were deep-dived. turn/ (230KB) and game/web_server internals beyond locking got spot-checks only.*
+Rationale: A-tier is small and correctness-flavored; B builds the type foundation that makes C/D diffs mechanical; E is independent of the engine and can interleave anytime a Rust item is blocked.
