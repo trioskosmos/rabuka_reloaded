@@ -3301,6 +3301,13 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(crate) fn evaluate_appearance_condition(&self, condition: &Condition) -> bool {
+        // NOTE: 「〜していないかぎり」 negation is applied generically at the end
+        // of ConditionContext::evaluate_condition (get_negation) — do NOT
+        // invert here or the two flips cancel out.
+        self.evaluate_appearance_condition_inner(condition)
+    }
+
+    fn evaluate_appearance_condition_inner(&self, condition: &Condition) -> bool {
         let appearance = condition.get_appearance().unwrap_or(false);
         let location = condition.get_location().unwrap_or("");
         let target = condition.get_target().unwrap_or("self");

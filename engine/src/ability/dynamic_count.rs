@@ -19,6 +19,7 @@ impl GameState {
         moved_cards: &[i16],
         selected_cards: &[i16],
         last_draw_count: u8,
+        owner_card: Option<i16>,
     ) -> u8 {
         let reference_text = dc.reference.as_deref().or(dc.base_reference.as_deref());
 
@@ -66,22 +67,22 @@ impl GameState {
                 let player = self.resolve_target_player("self");
                 (player.energy_zone.cards.len() as u8).saturating_sub(threshold)
             }
-            Some("its_difference") | Some("その差") => {
-                let self_score: u8 = self
-                    .player1
-                    .success_live_card_zone
-                    .cards
-                    .iter()
-                    .filter_map(|&id| self.card_database.get_card(id).and_then(|c| c.score))
-                    .sum();
-                let opp_score: u8 = self
-                    .player2
-                    .success_live_card_zone
-                    .cards
-                    .iter()
-                    .filter_map(|&id| self.card_database.get_card(id).and_then(|c| c.score))
-                    .sum();
-                self_score.abs_diff(opp_score)
+            Some("success_pile_count_difference") => {
+                // 「相手の成功ライブカード置き場にあるカードの枚数が自分より多い
+                // かぎり、その差に等しい数…」 — CARD COUNT difference between the
+                // opponent's and the owner's success piles (owner resolved from the
+                // activating card so the semantics hold for either player's copy).
+                let own_is_p1 = match owner_card {
+                    Some(cid) => self.player1.stage.stage.contains(&cid),
+                    None => true,
+                };
+                let (own, other) = if own_is_p1 {
+                    (&self.player1, &self.player2)
+                } else {
+                    (&self.player2, &self.player1)
+                };
+                (other.success_live_card_zone.cards.len() as u8)
+                    .saturating_sub(own.success_live_card_zone.cards.len() as u8)
             }
             Some(reference) if reference.contains("これにより控え室に置いた数") => {
                 if let Some(ref recently_moved) = self.recently_moved_cards {

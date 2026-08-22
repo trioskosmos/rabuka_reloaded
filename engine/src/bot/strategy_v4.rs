@@ -72,7 +72,54 @@ pub(crate) fn flip_stats(gs: &GameState, me_player: u8, db: &CardDatabase) -> (i
     (blades, density)
 }
 
-/// Stage base hearts + expected yell hits as wildcard capacity.
+/// Per-Acc-index chance that ONE random deck flip yields a unit of each
+/// kind (own decklist = fair information). Index layout matches Acc.
+pub(crate) fn blade_unit_densities(
+    gs: &GameState,
+    me_player: u8,
+    db: &CardDatabase,
+) -> [f64; 11] {
+    let p = if me_player == 0 { &gs.player1 } else { &gs.player2 };
+    let deck_len = p.main_deck.cards.len().max(1) as f64;
+    let mut units = [0f64; 11];
+    for &cid in p.main_deck.cards.iter() {
+        if let Some(card) = db.get_card(cid) {
+            if let Some(bh) = &card.blade_heart {
+                for (color, v) in bh.hearts.iter() {
+                    units[hc_index(*color)] += *v as f64;
+                }
+            }
+        }
+    }
+    for u in units.iter_mut() {
+        *u /= deck_len;
+    }
+    units
+}
+
+/// Stage base hearts + expected yell hits granted PER COLOR.
+///
+/// Measured miscalibration (2026-08-22 log attribution): treating expected
+/// flips as any-color wildcards predicted ~45% failure but observed 74–97%
+/// (avg unmet deficit ~9–12 hearts). Engine reality: a flipped blade-heart
+/// grants its PRINTED colors, not a wildcard (only icon_all/BAll are
+/// wildcards). Own decklist is fair information, so we distribute expected
+/// hits across colors exactly as our own deck would produce them:
+/// expected_units[color] = blades × units_of_that_color_in_deck / deck_len.
+pub(crate) fn expected_flip_units(
+    gs: &GameState,
+    me_player: u8,
+    db: &CardDatabase,
+) -> [f64; 11] {
+    let (blades, _density) = flip_stats(gs, me_player, db);
+    let mut out = blade_unit_densities(gs, me_player, db);
+    for u in out.iter_mut() {
+        *u *= blades as f64;
+    }
+    out
+}
+
+/// Stage base hearts + expected yell hits granted per printed color.
 /// `confidence` scales the flip contribution: 1.0 = full mean (main-phase
 /// coverage metric), <1.0 = conservative for all-or-nothing portfolio
 /// decisions, since a portfolio sized exactly to the mean fails ~half the
@@ -90,9 +137,11 @@ pub(crate) fn heart_pool_inner(gs: &GameState, me_player: u8, db: &CardDatabase,
             }
         }
     }
-    // Expected yell hits act as any-color hearts (rule 8.3.15.1.1 analog).
-    let (blades, density) = flip_stats(gs, me_player, db);
-    acc[10] += ((blades as f64 * density) * confidence).floor() as i32;
+    // Expected yell hits, per printed color (Draw/Score icons don't feed checks).
+    let expected = expected_flip_units(gs, me_player, db);
+    for idx in (0..=7).chain(std::iter::once(10)) {
+        acc[idx] += (expected[idx] * confidence).floor() as i32;
+    }
     acc
 }
 

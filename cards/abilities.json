@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-22T08:15:01.320591",
+  "generated_at": "2026-08-22T14:06:09.968779",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "870fb549",
+  "engine_commit": "4f25f571",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -5931,7 +5931,7 @@
         "conditional": true,
         "dynamic_count": {
           "type": "dynamic_count",
-          "reference": "その差",
+          "reference": "success_pile_count_difference",
           "mode": "equals"
         },
         "action": "gain_resource",
@@ -15165,6 +15165,7 @@
                 "Printemps"
               ],
               "baton_touch_trigger": true,
+              "negation": true,
               "card_type": "member_card"
             },
             "duration": "unless"

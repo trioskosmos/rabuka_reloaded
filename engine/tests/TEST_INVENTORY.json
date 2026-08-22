@@ -1,28 +1,28 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-22T02:38:18.789994+00:00",
+  "generated_at": "2026-08-22T04:08:48.881025+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 414,
-  "n_tests": 2488,
+  "n_files": 416,
+  "n_tests": 2501,
   "total_cards": 771,
-  "covered_cards": 565,
-  "abilities_on_covered": 720,
+  "covered_cards": 573,
+  "abilities_on_covered": 732,
   "trigger_counts": {
     "起動": [
       79,
       96
     ],
     "登場": [
-      205,
+      207,
       269
     ],
     "ライブ開始時": [
-      197,
+      201,
       268
     ],
     "(none)": [
@@ -30,11 +30,11 @@
       2
     ],
     "ライブ成功時": [
-      84,
+      86,
       122
     ],
     "常時": [
-      88,
+      93,
       117
     ],
     "自動": [
@@ -48,15 +48,15 @@
       146
     ],
     "look_and_select": [
-      42,
+      44,
       72
     ],
     "gain_resource": [
-      119,
+      124,
       160
     ],
     "sequential": [
-      159,
+      161,
       218
     ],
     "unknown": [
@@ -68,7 +68,7 @@
       44
     ],
     "change_state": [
-      53,
+      55,
       60
     ],
     "play_baton_touch": [
@@ -104,7 +104,7 @@
       2
     ],
     "modify_score": [
-      57,
+      58,
       73
     ],
     "conditional_alternative": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      419,
+      428,
       546
     ],
     "temporal_condition": [
@@ -190,7 +190,7 @@
       13
     ],
     "comparison_condition": [
-      38,
+      40,
       60
     ],
     "card_count_condition": [
@@ -198,7 +198,7 @@
       88
     ],
     "location_condition": [
-      57,
+      58,
       73
     ],
     "movement:baton_touch": [
@@ -268,7 +268,7 @@
       56
     ],
     "bp3": [
-      60,
+      61,
       66
     ],
     "bp2": [
@@ -280,19 +280,19 @@
       88
     ],
     "bp5": [
-      102,
+      107,
       134
     ],
     "bp6": [
-      58,
+      60,
       82
     ],
     "bp7": [
-      83,
+      85,
       111
     ],
     "pb1": [
-      98,
+      100,
       137
     ],
     "sd2": [
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 543,
-    "none": 216,
+    "L2+choice": 555,
+    "none": 204,
     "L1+choice": 129,
     "L2": 33,
     "L1": 15
@@ -7255,14 +7255,22 @@
         "PL!S-bp6-009-SEC"
       ],
       "base": "PL!S-bp6-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_secondary_abilities_test.rs"
+      ],
+      "covering_tests": [
+        "eli_bp5011_chosen_heart_scales_with_success_pile",
+        "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
+        "hanamaru_bpb5007_fetches_double_heart04_member_only",
+        "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "ruby_bp6009_blades_equal_success_pile_difference"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -7282,14 +7290,22 @@
         "PL!S-bp6-009-SEC"
       ],
       "base": "PL!S-bp6-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_secondary_abilities_test.rs"
+      ],
+      "covering_tests": [
+        "eli_bp5011_chosen_heart_scales_with_success_pile",
+        "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
+        "hanamaru_bpb5007_fetches_double_heart04_member_only",
+        "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "ruby_bp6009_blades_equal_success_pile_difference"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -9078,14 +9094,20 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/multi_color_heart_test.rs"
+        "engine/tests/test_modules/multi_color_heart_test.rs",
+        "engine/tests/test_modules/untested_secondary_abilities_test.rs"
       ],
       "covering_tests": [
+        "eli_bp5011_chosen_heart_scales_with_success_pile",
+        "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
+        "hanamaru_bpb5007_fetches_double_heart04_member_only",
+        "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
         "multi_color_heart_condition_met_grants_both_colors",
         "multi_color_heart_condition_not_met_does_not_queue",
-        "multi_color_heart_wrong_group_does_not_trigger"
+        "multi_color_heart_wrong_group_does_not_trigger",
+        "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -10787,14 +10809,22 @@
         "PL!S-bp5-007-AR"
       ],
       "base": "PL!S-bp5-007",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_secondary_abilities_test.rs"
+      ],
+      "covering_tests": [
+        "eli_bp5011_chosen_heart_scales_with_success_pile",
+        "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
+        "hanamaru_bpb5007_fetches_double_heart04_member_only",
+        "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "ruby_bp6009_blades_equal_success_pile_difference"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -10847,35 +10877,42 @@
       "covering_files": [
         "engine/tests/test_modules/untested_abilities_batch3_test.rs",
         "engine/tests/test_modules/untested_abilities_batch4_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch5_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch5_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch6_test.rs"
       ],
       "covering_tests": [
         "emma_bp7008_only_clean_members_place_and_pay_energy",
+        "hanayo_pb1017_baton_touch_skips_the_discard",
+        "hanayo_pb1017_discards_without_baton_touch",
         "honoka_bp4001_draws_only_when_stage_total_is_cheaper",
         "kanata_bp3006_debut_enters_wait_state",
         "kasumu_bp3002_grants_chosen_heart_to_other_nijigasaki_only",
         "kotori_pb1003_accept_waits_self_and_activates_per_printemps",
         "kotori_pb1003_decline_self_wait_resolves_nothing",
         "natsumi_bp4009_blade_constant_tracks_cost_total_race",
+        "natsumi_bpb7009_center_waits_low_blade_opponent_only",
+        "natsumi_bpb7009_sides_grant_heart02_center_does_not",
         "niko_bp3009_activation_self_wait_and_heart_choice",
         "niko_bp3009_cost13_condition_draw",
         "niko_bp3009_no_cost13_no_draw",
         "niko_pr021_exact_energy_constant_refreshes_on_gain",
         "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "nozomi_bp3007_skipped_cost_means_no_look",
         "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
         "ruby_bp5009_decline_optional_payment_fetches_nothing",
         "sayaka_hsbp2002_blade_constant_tracks_higher_cost_member",
         "sayaka_hsbp2002_fetch_is_cost_and_count_filtered",
         "sayaka_hsbp2011_mills_top_five",
+        "sayaka_hspb1010_expensive_opponent_not_eligible",
+        "sayaka_hspb1010_no_big_member_no_effect",
+        "sayaka_hspb1010_waits_cheap_opponent_when_condition_met",
         "suzuki_hsbp1008_mill_three_all_members_draws_one",
         "suzuki_hsbp1008_mill_with_live_card_no_draw",
         "wakashi_spbp1008_debut_draws_one_without_mei",
         "wakashi_spbp1008_debut_draws_two_with_mei",
-        "wondermates_activates_waited_nijigasaki_enabling_activation",
-        "yuna_sp222_exactly_eight_energy_scores_one",
-        "yuna_sp222_live_start_optional_energy_places_wait_energy"
+        "wondermates_activates_waited_nijigasaki_enabling_activation"
       ],
-      "covering_test_count": 24,
+      "covering_test_count": 32,
       "is_null": false
     },
     {
@@ -11476,14 +11513,22 @@
         "PL!SP-bp5-011-AR"
       ],
       "base": "PL!SP-bp5-011",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_secondary_abilities_test.rs"
+      ],
+      "covering_tests": [
+        "eli_bp5011_chosen_heart_scales_with_success_pile",
+        "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
+        "hanamaru_bpb5007_fetches_double_heart04_member_only",
+        "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "ruby_bp6009_blades_equal_success_pile_difference"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -11502,14 +11547,22 @@
         "PL!SP-bp5-011-AR"
       ],
       "base": "PL!SP-bp5-011",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_secondary_abilities_test.rs"
+      ],
+      "covering_tests": [
+        "eli_bp5011_chosen_heart_scales_with_success_pile",
+        "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
+        "hanamaru_bpb5007_fetches_double_heart04_member_only",
+        "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "ruby_bp6009_blades_equal_success_pile_difference"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -11528,14 +11581,22 @@
         "PL!SP-bp5-011-AR"
       ],
       "base": "PL!SP-bp5-011",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_secondary_abilities_test.rs"
+      ],
+      "covering_tests": [
+        "eli_bp5011_chosen_heart_scales_with_success_pile",
+        "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
+        "hanamaru_bpb5007_fetches_double_heart04_member_only",
+        "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "ruby_bp6009_blades_equal_success_pile_difference"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -11919,7 +11980,8 @@
         "engine/tests/test_modules/untested_abilities_batch3_test.rs",
         "engine/tests/test_modules/untested_abilities_batch4_test.rs",
         "engine/tests/test_modules/untested_abilities_playthrough_test.rs",
-        "engine/tests/test_modules/untested_choice_change_target_test.rs"
+        "engine/tests/test_modules/untested_choice_change_target_test.rs",
+        "engine/tests/test_modules/untested_secondary_abilities_test.rs"
       ],
       "covering_tests": [
         "ai_pay_activates_a_waited_member",
@@ -11953,7 +12015,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 690,
+      "covering_test_count": 695,
       "is_null": false
     },
     {
@@ -15575,14 +15637,25 @@
         "PL!-bp3-007-P"
       ],
       "base": "PL!-bp3-007",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch6_test.rs"
+      ],
+      "covering_tests": [
+        "hanayo_pb1017_baton_touch_skips_the_discard",
+        "hanayo_pb1017_discards_without_baton_touch",
+        "natsumi_bpb7009_center_waits_low_blade_opponent_only",
+        "natsumi_bpb7009_sides_grant_heart02_center_does_not",
+        "nozomi_bp3007_skipped_cost_means_no_look",
+        "sayaka_hspb1010_expensive_opponent_not_eligible",
+        "sayaka_hspb1010_no_big_member_no_effect",
+        "sayaka_hspb1010_waits_cheap_opponent_when_condition_met"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -16833,14 +16906,25 @@
         "PL!-pb1-017-P＋"
       ],
       "base": "PL!-pb1-017",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch6_test.rs"
+      ],
+      "covering_tests": [
+        "hanayo_pb1017_baton_touch_skips_the_discard",
+        "hanayo_pb1017_discards_without_baton_touch",
+        "natsumi_bpb7009_center_waits_low_blade_opponent_only",
+        "natsumi_bpb7009_sides_grant_heart02_center_does_not",
+        "nozomi_bp3007_skipped_cost_means_no_look",
+        "sayaka_hspb1010_expensive_opponent_not_eligible",
+        "sayaka_hspb1010_no_big_member_no_effect",
+        "sayaka_hspb1010_waits_cheap_opponent_when_condition_met"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -20593,14 +20677,25 @@
         "PL!HS-pb1-010-P＋"
       ],
       "base": "PL!HS-pb1-010",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch6_test.rs"
+      ],
+      "covering_tests": [
+        "hanayo_pb1017_baton_touch_skips_the_discard",
+        "hanayo_pb1017_discards_without_baton_touch",
+        "natsumi_bpb7009_center_waits_low_blade_opponent_only",
+        "natsumi_bpb7009_sides_grant_heart02_center_does_not",
+        "nozomi_bp3007_skipped_cost_means_no_look",
+        "sayaka_hspb1010_expensive_opponent_not_eligible",
+        "sayaka_hspb1010_no_big_member_no_effect",
+        "sayaka_hspb1010_waits_cheap_opponent_when_condition_met"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -23629,14 +23724,25 @@
         "PL!SP-bp7-009-P"
       ],
       "base": "PL!SP-bp7-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch6_test.rs"
+      ],
+      "covering_tests": [
+        "hanayo_pb1017_baton_touch_skips_the_discard",
+        "hanayo_pb1017_discards_without_baton_touch",
+        "natsumi_bpb7009_center_waits_low_blade_opponent_only",
+        "natsumi_bpb7009_sides_grant_heart02_center_does_not",
+        "nozomi_bp3007_skipped_cost_means_no_look",
+        "sayaka_hspb1010_expensive_opponent_not_eligible",
+        "sayaka_hspb1010_no_big_member_no_effect",
+        "sayaka_hspb1010_waits_cheap_opponent_when_condition_met"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -23654,14 +23760,25 @@
         "PL!SP-bp7-009-P"
       ],
       "base": "PL!SP-bp7-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch6_test.rs"
+      ],
+      "covering_tests": [
+        "hanayo_pb1017_baton_touch_skips_the_discard",
+        "hanayo_pb1017_discards_without_baton_touch",
+        "natsumi_bpb7009_center_waits_low_blade_opponent_only",
+        "natsumi_bpb7009_sides_grant_heart02_center_does_not",
+        "nozomi_bp3007_skipped_cost_means_no_look",
+        "sayaka_hspb1010_expensive_opponent_not_eligible",
+        "sayaka_hspb1010_no_big_member_no_effect",
+        "sayaka_hspb1010_waits_cheap_opponent_when_condition_met"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -30353,14 +30470,22 @@
         "PL!-bp5-011-N"
       ],
       "base": "PL!-bp5-011",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_secondary_abilities_test.rs"
+      ],
+      "covering_tests": [
+        "eli_bp5011_chosen_heart_scales_with_success_pile",
+        "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
+        "hanamaru_bpb5007_fetches_double_heart04_member_only",
+        "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "ruby_bp6009_blades_equal_success_pile_difference"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {

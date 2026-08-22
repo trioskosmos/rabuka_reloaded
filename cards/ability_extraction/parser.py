@@ -4590,6 +4590,10 @@ def _try_appearance(text):
         count_m = re.search(r"(\d+)人からバトンタッチ", text)
         if count_m:
             result["min_baton_touch_count"] = int(count_m.group(1))
+        # 「バトンタッチして登場していないかぎり、…する」 gates the action on
+        # the event NOT having happened — encode the polarity explicitly.
+        if re.search(r"バトンタッチ[^。]*?していない", text):
+            result["negation"] = True
     # Propagate target from text
     tgt = extract_target(text)
     if tgt:
@@ -10918,6 +10922,26 @@ def _walk_split_mixed(node):
     return node
 
 
+def _mark_success_pile_difference(node):
+    """「相手の成功ライブカード置き場にあるカードの枚数が自分より多いかぎり、
+    その差に等しい数の…を得る」 — the vague reference 「その差」 becomes an
+    explicit success-pile CARD-COUNT difference so the engine resolves the
+    printed semantics without guessing between counts and score sums."""
+    if isinstance(node, dict):
+        dc = node.get("dynamic_count")
+        if isinstance(dc, dict) and dc.get("reference") == "その差":
+            cond = node.get("condition") or {}
+            if cond.get("location") == "success_live_card_zone" or (
+                node.get("resource") == "blade"
+            ):
+                dc["reference"] = "success_pile_count_difference"
+        for v in node.values():
+            _mark_success_pile_difference(v)
+    elif isinstance(node, list):
+        for it in node:
+            _mark_success_pile_difference(it)
+
+
 def _normalize_effect_tree(effect, original_text=None):
     if not effect or not isinstance(effect, dict):
         return effect
@@ -10939,6 +10963,7 @@ def _normalize_effect_tree(effect, original_text=None):
     _strip_leaked_draw_g(effect)
     _enrich_gain_abilities(effect)
     _mark_live_total_score(effect)
+    _mark_success_pile_difference(effect)
     effect = _walk_split_mixed(effect)
     _enrich_characters(effect)
     _clean_gain_resource(effect)

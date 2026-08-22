@@ -3,7 +3,7 @@
 //! Usage: cargo run --release --bin bot_arena -- [p1] [p2] [budget_secs]
 //!   p1/p2: v1 | v2 | v3 | random   (default: v2 random 10)
 //!
-//! Moved out of tests/test_modules/strategy_bot_test.rs — this is a
+//! Moved out of tests/test_modules/strategy_bot_test.rs  Ethis is a
 //! benchmark/arena, not a unit test. Run it when you want numbers.
 
 use rabuka_engine::bot::{strategy, strategy_v2, strategy_v3, strategy_v4, strategy_v5};
@@ -22,6 +22,7 @@ enum BotKind {
     V3,
     V4,
     V5,
+    V6,
     Random,
 }
 
@@ -32,6 +33,7 @@ fn parse_kind(s: &str) -> BotKind {
         "v3" => BotKind::V3,
         "v4" => BotKind::V4,
         "v5" => BotKind::V5,
+        "v6" => BotKind::V6,
         _ => BotKind::Random,
     }
 }
@@ -141,6 +143,7 @@ fn main() {
         BotKind::V3 => "v3",
         BotKind::V4 => "v4",
         BotKind::V5 => "v5",
+        BotKind::V6 => "v6",
         BotKind::Random => "random",
     };
 
@@ -338,7 +341,7 @@ fn main() {
                         strategy_v3::choose_mulligan_action_v3(&gs, &actions, &db)
                     }
                     BotKind::V4 => strategy_v4::choose_mulligan_v4(&gs, &actions, &db),
-                    BotKind::V5 => strategy_v4::choose_mulligan_v4(&gs, &actions, &db),
+                    BotKind::V5 | BotKind::V6 => strategy_v4::choose_mulligan_v4(&gs, &actions, &db),
                     _ => actions
                         .iter()
                         .find(|a| {
@@ -373,7 +376,7 @@ fn main() {
                         )
                     }
                     BotKind::V4 => strategy_v4::choose_live_set_v4(&gs, &actions, &db),
-                    BotKind::V5 => strategy_v5::choose_live_set_v5(&gs, &actions, &db),
+                    BotKind::V5 | BotKind::V6 => strategy_v5::choose_live_set_v5(&gs, &actions, &db),
                     BotKind::Random => actions[rng.range(actions.len())].clone(),
                 };
                 if trace {
@@ -439,6 +442,7 @@ fn main() {
                     strategy_v3::choose_action_heuristic_v3(&gs, &actions, me, plan)
                 }
                 BotKind::V4 => strategy_v4::choose_action_v4(&gs, &actions, me),
+                BotKind::V6 => strategy_v5::choose_action_v6(&gs, &actions, me),
                 BotKind::V5 => strategy_v5::choose_action_v5(&gs, &actions, me),
                 BotKind::Random => actions[rng.range(actions.len())].clone(),
             };
@@ -549,7 +553,7 @@ fn main() {
 
     let secs = t0.elapsed().as_secs_f64();
     println!(
-        "{} vs {} — {} games in {:.1}s ({:.1} gps)\nP1({}) {} - P2({}) {} - draws {}\ntotal actions {} | avg turns/game {:.1}",
+        "{} vs {}  E{} games in {:.1}s ({:.1} gps)\nP1({}) {} - P2({}) {} - draws {}\ntotal actions {} | avg turns/game {:.1}",
         kind_name(p1_kind),
         kind_name(p2_kind),
         games,

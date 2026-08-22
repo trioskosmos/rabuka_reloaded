@@ -10,7 +10,7 @@
 //! no-op/hand-reserve breakers.
 
 use crate::bot::strategy_v4::{alloc, flip_stats, hand_lives, heart_pool};
-use crate::card::CardDatabase;
+use crate::card::{CardDatabase, CardType};
 use crate::game_setup::{self, Action};
 use crate::game_state::{GameState, Phase};
 
@@ -104,14 +104,20 @@ pub fn best_portfolio(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<usize> {
     best_portfolio_scored(gs, me, db).0
 }
 
-fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<usize>, i32) {
+/// Honest opponent term — RULE FACTS only, no invented probabilities.
+/// E = their public-board ceiling (hearts+blades → score band). The single
+/// behavioral use: if I sit at 2 successes, a tie places NOTHING for me
+/// (8.4.7.1), so a portfolio that cannot strictly beat their ceiling can
+/// only win when their check fails outright — discount it. Everything else
+/// ranks by expected placed-score, chess-style: play my best, no despair.
+fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<usize>, i32, f64) {
     let (my, opp) = player_ref(gs, me);
     let pool = heart_pool(gs, me, db);
     let lives = hand_lives(my, db);
     let max_slots =
         (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
     if lives.is_empty() || max_slots == 0 {
-        return (Vec::new(), 0);
+        return (Vec::new(), 0, 0.0);
     }
     let n = lives.len().min(8);
 
@@ -127,20 +133,24 @@ fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<usiz
     //    reliability before spending the closeout attempt;
     //  - otherwise: moderate reliability, tempo beats hoarding.
     let floor = if opp_succ >= 2 {
-        0.40
+        0.35
     } else if my_succ >= 2 {
-        0.65
+        0.60
     } else {
-        0.55
+        0.45
     };
+
+    let e_opp = estimate_opp_score(gs, me, db);
 
     let (blades, density) = flip_stats(gs, me, db);
-    let expected_hits_start = pool[10];
+    // Two-pool pass model (per-color flip reality):
+    //   Pool F (mean flips, per printed color) must pass at all;
+    //   Pool B (board hearts only) passing ⇒ deterministic;
+    //   otherwise shortfall units must come from yell flips ⇒ binomial.
+    let pool_board = crate::bot::strategy_v4::heart_pool_inner(gs, me, db, 0.0);
+    let board_supply: i32 = (0..=7).chain(std::iter::once(10)).map(|i| pool_board[i]).sum();
 
-    let rank = |score: i32, cnt: usize| -> (i32, std::cmp::Reverse<usize>) {
-        (score, std::cmp::Reverse(cnt))
-    };
-    let mut best: Option<((i32, std::cmp::Reverse<usize>), Vec<usize>)> = None;
+    let mut best: Option<(f64, usize, i32, Vec<usize>)> = None;
     for mask in 1..(1u32 << n) {
         let cnt = mask.count_ones() as usize;
         if cnt > max_slots {
@@ -148,6 +158,7 @@ fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<usiz
         }
         let mut p = pool;
         let mut score = 0i32;
+        let mut total_req = 0i32;
         let mut idxs = Vec::with_capacity(cnt);
         let mut ok = true;
         for bit in 0..n {
@@ -157,6 +168,7 @@ fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<usiz
                     Some(next) => {
                         p = next;
                         score += db.get_card(cid).and_then(|c| c.score).unwrap_or(0) as i32;
+                        total_req += (0..=7).chain(std::iter::once(10)).map(|i| need[i]).sum::<i32>();
                         idxs.push(hi);
                     }
                     None => {
@@ -169,23 +181,41 @@ fn best_portfolio_scored(gs: &GameState, me: u8, db: &CardDatabase) -> (Vec<usiz
         if !ok {
             continue;
         }
-        // Stochastic reliance = expected-hit wildcards consumed by this
-        // portfolio (BAll consumption is deterministic board material).
-        let relied = expected_hits_start - p[10];
-        let p_pass = binom_ge(blades, relied.max(0), density);
+        let shortfall = (total_req - board_supply.min(total_req)).max(0);
+        let p_pass = if shortfall == 0 {
+            1.0
+        } else {
+            binom_ge(blades, shortfall, density)
+        };
         if p_pass < floor {
             continue;
         }
-        let r = rank(score, cnt);
-        if best.as_ref().map_or(true, |(br, _)| r > *br) {
-            best = Some((r, idxs));
+        let tie_worthless = score <= e_opp && my_succ >= 2;
+        let ev =
+            p_pass * (score as f64) * if tie_worthless { 0.5 } else { 1.0 };
+        let better = best.as_ref().map_or(true, |(be, bc, _, _)| {
+            ev > *be + f64::EPSILON || ((ev - *be).abs() <= f64::EPSILON && cnt < *bc)
+        });
+        if better {
+            best = Some((ev, cnt, score, idxs));
         }
     }
-    let (idxs, score) = best.map(|(r, idxs)| (idxs, r.0)).unwrap_or_default();
-    (idxs, score)
+    best.map(|(ev, _cnt, score, idxs)| (idxs, score, ev))
+        .unwrap_or_default()
 }
 
 pub fn choose_action_v5(gs: &GameState, actions: &[Action], me: u8) -> Action {
+    crate::bot::strategy_v4::choose_action_v4(gs, actions, me)
+}
+
+/// Main phase v6 — EXPERIMENT RESULT (2026-08-22): pricing actions by
+/// next-check equity delta LOST to plain v4 heuristics (~46% head-to-head,
+/// games stretching to ~10.4 turns). Root cause hypothesis: the projected
+/// portfolio score is dominated by hand-luck noise during Main phase (floors
+/// filter most candidates early game), so its delta drowns the reliable
+/// passable/ammo signals and delays board growth when `behind` inflates its
+/// weight. Kept as documentation; delegates to the proven v4 policy.
+pub fn choose_action_v6(gs: &GameState, actions: &[Action], me: u8) -> Action {
     crate::bot::strategy_v4::choose_action_v4(gs, actions, me)
 }
 
@@ -220,24 +250,79 @@ pub fn choose_live_set_v5(gs: &GameState, actions: &[Action], db: &CardDatabase)
             }
         }
 
-        // Gamble fallback: when NOTHING clears its floor, bet one near-miss
-        // life anyway — but ONLY a near-miss. Measured pathology: uncapped
-        // gambling throws lives at 10+ heart deficits that die for sure
-        // (all-or-nothing 8.3.16), draining ammo into waitroom and stalling
-        // the game at 0-0. Cap scales with urgency: at opponent match point
-        // folding loses outright (S4), so swing harder.
-        let deficit_cap = if opp_succ >= 2 { 8 } else { 4 };
-        if let Some((deficit, hi)) = nearest_miss_life(gs, me, db) {
-            if deficit <= deficit_cap {
+        // Gamble fallback: bet ONE near-miss life, chosen by estimated pass
+        // probability (per-color binomial over our own deck), not paper
+        // deficit. Measured: the old ≤4-deficit cap failed 97% of the time —
+        // expected flips aren't wildcards. At opponent match point folding
+        // loses outright (S4), so accept longer odds there.
+        let p_floor = if opp_succ >= 2 { 0.10 } else { 0.25 };
+        if let Some((p, _deficit, hi)) = nearest_miss_life(gs, me, db) {
+            if p >= p_floor {
+                desired.push(hi);
+            }
+        }
+
+        // Hand filtering (8.2 + 8.3.4): with no live worth setting, fill the
+        // slots with dead NON-live cards instead of confirming an empty zone.
+        // They are discarded at performance start BEFORE any check (so they
+        // can never fail it) and each placed card draws a replacement —
+        // trading up to 3 dead hand cards for 3 fresh deck draws per turn.
+        // This is the cure for the measured starvation stretch (14 turns at
+        // zero hand lives while the board outgrew the game). Own decklist is
+        // fair information: skip the churn once no lives remain to find.
+        let deck_lives = my
+            .main_deck
+            .cards
+            .iter()
+            .filter(|&&cid| {
+                db.get_card(cid).map_or(false, |c| c.card_type == CardType::Live)
+            })
+            .count();
+        let max_slots =
+            (3i32 - i32::from(my.live_card_set_limit_reduction)).max(0) as usize;
+        if desired.len() < max_slots && deck_lives > 0 {
+            let mut junk: Vec<(usize, u8)> = my
+                .hand
+                .cards
+                .iter()
+                .enumerate()
+                .filter(|&(i, &cid)| {
+                    !desired.contains(&i)
+                        && db
+                            .get_card(cid)
+                            .map_or(false, |c| c.card_type != CardType::Live)
+                })
+                .map(|(i, &cid)| {
+                    (
+                        i,
+                        db.get_card(cid).and_then(|c| c.cost).unwrap_or(0),
+                    )
+                })
+                .collect();
+            junk.sort_by_key(|&(_, cost)| std::cmp::Reverse(cost));
+            for &(hi, _) in &junk {
+                if desired.len() >= max_slots {
+                    break;
+                }
                 desired.push(hi);
             }
         }
         if std::env::var("V5_TRACE").is_ok() {
+            let n_lives = desired
+                .iter()
+                .filter(|&&hi| {
+                    my.hand.cards.get(hi).copied().map_or(false, |cid| {
+                        db.get_card(cid).map_or(false, |c| c.card_type == CardType::Live)
+                    })
+                })
+                .count();
             eprintln!(
-                "V5L t{} me{} EMPTY->{} (my_succ={} opp_succ={})",
+                "V5L t{} me{} EMPTY->{} lives={} junk={} (my_succ={} opp_succ={})",
                 gs.turn_number,
                 me,
                 if desired.is_empty() { "FOLD" } else { "GAMBLE" },
+                n_lives,
+                desired.len() - n_lives,
                 my_succ,
                 opp_succ
             );
@@ -270,29 +355,52 @@ fn cheapest_deterministic_life(gs: &GameState, me: u8, db: &CardDatabase) -> Opt
         .map(|(hi, _, _)| hi)
 }
 
-fn nearest_miss_life(gs: &GameState, me: u8, db: &CardDatabase) -> Option<(i32, usize)> {
+/// Most-probable near-miss life: per-color deficits against BOARD-ONLY
+/// hearts, each covered by a per-color binomial over our own deck's
+/// blade-heart distribution. Measured pathology of the old paper-deficit
+/// gamble: 97% failure with ~11.7 unmet hearts — it counted expected flips
+/// as any-color wildcards, so "≤4 short on paper" was routinely 10+ short
+/// in the only colors that mattered.
+/// Returns (estimated pass probability, paper deficit, hand index).
+fn nearest_miss_life(gs: &GameState, me: u8, db: &CardDatabase) -> Option<(f64, i32, usize)> {
     let (my, _) = player_ref(gs, me);
-    let pool = heart_pool(gs, me, db);
-    let mut best: Option<(i32, usize)> = None;
+    let board = crate::bot::strategy_v4::heart_pool_inner(gs, me, db, 0.0);
+    let dens = crate::bot::strategy_v4::blade_unit_densities(gs, me, db);
+    let (blades, _) = flip_stats(gs, me, db);
+    let dens_any: f64 = (0..=7).map(|i| dens[i]).sum();
+    let mut best: Option<(f64, i32, usize)> = None;
     for &(hi, _cid, ref need) in &hand_lives(my, db) {
-        if alloc(&pool, need).is_some() {
-            continue; // deterministic ones were already handled above
+        if alloc(&board, need).is_some() {
+            continue; // deterministic — handled by the portfolio path
         }
-        // deficit vs optimistic pool
-        let mut p = pool;
+        let mut p = 1.0f64;
         let mut deficit = 0i32;
         for c in 1..=6 {
-            let d = need[c] - p[c];
+            let d = need[c] - board[c];
             if d > 0 {
-                deficit += d - (p[10] + p[7]).min(d);
+                deficit += d;
+                p *= binom_ge(blades, d, dens[c]);
             }
         }
-        let grey_short = need[0]
-            - ([p[0], p[1], p[2], p[3], p[4], p[5], p[6]].iter().sum::<i32>() + p[7] + p[10])
-                .min(need[0]);
-        deficit += grey_short.max(0);
-        if best.map_or(true, |(bd, _)| deficit < bd) {
-            best = Some((deficit, hi));
+        // Grey bucket: colorless + leftover specifics + wildcards.
+        let grey_have = board[0]
+            + (1..=6)
+                .map(|c| board[c].max(0))
+                .sum::<i32>()
+            + board[7]
+            + board[10];
+        let specific_used: i32 = (1..=6).map(|c| need[c].min(board[c])).sum::<i32>();
+        let grey_short =
+            need[0] - (grey_have - specific_used).min(need[0]);
+        if grey_short > 0 {
+            deficit += grey_short;
+            p *= binom_ge(blades, grey_short, dens_any);
+        }
+        if deficit == 0 {
+            continue;
+        }
+        if best.as_ref().map_or(true, |(bp, bd, _)| p > *bp + f64::EPSILON || ((p - *bp).abs() <= f64::EPSILON && deficit < *bd)) {
+            best = Some((p, deficit, hi));
         }
     }
     best

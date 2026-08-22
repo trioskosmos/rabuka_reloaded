@@ -286,7 +286,20 @@ Version history:
 - **v4** `strategy_v4.rs` — "success-zone fundamentalism": hearts-based
   development, deterministic-pass portfolios, junk filtering.
 - **v5** `strategy_v5.rs` — v4 execution + comparison awareness: binomial
-  stance floors, score-max portfolios, free-win rule, committed gamble.
+  stance floors, score-max portfolios, free-win rule, committed gamble,
+  starvation hand-filtering.
+- **v6** `strategy_v5.rs::choose_action_v6` — experiment log (2026-08-22):
+  (a) adversarial live-set EV with invented comparison probabilities →
+  measured WORSE (66–71 / 76–84 vs v5), scrapped; (b) next-check-equity main
+  phase (projected portfolio delta, race-scaled weight) → measured WORSE
+  (~46% vs v5, games stretching to T10+), reverted; (c) surviving changes:
+  rule-fact-only opponent terms (tie-worthless discount at my match point,
+  P(pass)-weighted portfolio ranking). Result: statistically indistinguishable
+  from v5 head-to-head (73–73 / 80–82), still beats v2 ~59% and random ~97%.
+  **Conclusion: v5 sits on a heuristic plateau — marginal term surgery does
+  not move it.** Next structural step per `V3_WHY_IT_SUCKS.md`: fix the
+  measurement bug (§8.4), then simulation-priced decisions (determinized
+  self-play rollouts over live-set/main candidates).
 
 ## 8. POST-MORTEM 2026-08-22 — why it looked terrible and what was fixed
 

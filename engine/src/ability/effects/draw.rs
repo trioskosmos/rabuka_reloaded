@@ -83,6 +83,7 @@ impl AbilityResolver {
             &self.moved_cards,
             &self.selected_cards,
             self.step_state.last_draw_count,
+            self.activating_card_id,
         )
     }
     pub(crate) fn execute_draw_wrapper(

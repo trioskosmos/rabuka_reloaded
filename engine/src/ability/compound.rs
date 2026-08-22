@@ -239,6 +239,7 @@ impl AbilityResolver {
                                 let ctx = ConditionContext::with_moved_cards(gs, &self.moved_cards);
                                 let p = ctx.evaluate_condition(cond);
                                 // Cache the result if condition asks for it
+                                // Cache the result if condition asks for it
                                 if cond.get_cache().unwrap_or(false) {
                                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
                                         let key = format!("{:?}", cond);

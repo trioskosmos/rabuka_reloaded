@@ -303,12 +303,34 @@ impl GameState {
                 // Check effect-level position requirement.
                 // "front" is a targeting rule (正面のエリア) not an activation gate,
                 // so it does not restrict where the activating card must sit.
-                let pos_ok = if let Some(ref pos) = effect.position_any() {
+                //
+                // activation_position ("左サイド,右サイド" etc.) is the AUTHORITATIVE
+                // gate when present — cards like 鬼塚夏美 SP-bp7-009 print
+                // 「（この能力は左サイド/右サイドエリアにいる場合のみ発動する）」 and the
+                // parser encodes both slots there. Checking only `position` (which
+                // may name a single slot) broke the second listed side: moving her
+                // right never re-granted heart02.
+                let card_pos = entry_positions.get(&card_id).copied().flatten();
+                let pos_matches = |ps: &str, cp: Option<u8>| {
+                    matches!(
+                        (ps, cp),
+                        ("center", Some(1))
+                            | ("left" | "left_side", Some(0))
+                            | ("right" | "right_side", Some(2))
+                    )
+                };
+                let pos_ok = if let Some(act) = effect
+                    .activation_position_any()
+                    .map(|s| s.to_string())
+                {
+                    act.split(',')
+                        .map(|p| p.trim())
+                        .any(|p| pos_matches(p, card_pos))
+                } else if let Some(ref pos) = effect.position_any() {
                     let pos_str = pos.get_position();
                     if pos_str == Some("front") {
                         true
                     } else {
-                        let card_pos = entry_positions.get(&card_id).copied().flatten();
                         matches!(
                             (pos_str, card_pos),
                             (Some("center"), Some(1))
@@ -359,7 +381,15 @@ impl GameState {
                             crate::ability::enums::ActionType::GainResource => {
                                 match effect.resource_any().as_deref().unwrap_or("") {
                                     "blade" | "ブレード" => {
-                                        let n = if effect.per_unit_any().unwrap_or(false) {
+                                        let n = if let Some(ref dc) = effect.dynamic_count_any() {
+                                            self.resolve_dynamic_count(
+                                                dc,
+                                                &[],
+                                                &[],
+                                                0,
+                                                Some(card_id),
+                                            ) as i32
+                                        } else if effect.per_unit_any().unwrap_or(false) {
                                             let player =
                                                 if self.player1.stage.stage.contains(&card_id) {
                                                     &self.player1
@@ -455,7 +485,13 @@ impl GameState {
                                             // Unified dynamic_count resolution (dynamic_count.rs).
                                             // The constant path has no resolver step context, so
                                             // pass empty moved/selected and 0 draw count.
-                                            self.resolve_dynamic_count(dc, &[], &[], 0) as i32
+                                                self.resolve_dynamic_count(
+                                                    dc,
+                                                    &[],
+                                                    &[],
+                                                    0,
+                                                    Some(card_id),
+                                                ) as i32
                                         } else if effect.per_unit_any().unwrap_or(false) {
                                             let player =
                                                 if self.player1.stage.stage.contains(&card_id) {
