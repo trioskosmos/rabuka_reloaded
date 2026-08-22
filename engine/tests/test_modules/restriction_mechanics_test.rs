@@ -102,12 +102,32 @@ fn niko_pb1009_suppresses_effect_activations_for_the_turn() {
     game.state.player1.stage.stage[1] = nico;
     game.state.player1.stage.stage[2] = mass_activator;
 
-    trigger_auto(
-        &mut game,
-        nico,
-        AbilityTrigger::Debut,
-        "登場",
-    );
+    // Fire BOTH of nico's 登場 abilities: ab#0 waits a low-blade opponent,
+    // ab#1 registers the turn-wide 「効果によってはアクティブにならない」 aura.
+    let card = game.db.get_card(nico).unwrap();
+    let debuts: Vec<_> = card
+        .resolved_abilities()
+        .filter(|ar| ar.triggers.as_deref() == Some("登場"))
+        .collect();
+    drop(card);
+    for ar in debuts {
+        let ability = ar;
+        let pid = game.state.player1.id.clone();
+        game.state.trigger_auto_ability(
+            format!("{}_{}", "PL!-pb1-009-R", ability.full_text),
+            AbilityTrigger::Debut,
+            pid.clone(),
+            Some("PL!-pb1-009-R".to_string()),
+            Some(nico),
+            None,
+            None,
+        );
+        game.state.activating_card = Some(nico);
+        game.state.process_pending_auto_abilities(&pid);
+        while game.has_pending_choice() {
+            game.select_indices(&[]);
+        }
+    }
 
     trigger_auto(
         &mut game,
@@ -306,7 +326,15 @@ fn sumire_bpb4004_double_baton_removes_both_and_clamps_cost() {
         .parameters
         .as_mut()
         .map(|p| p.card_id = Some(sumire));
-    rabuka_engine::game_setup::execute_action(&mut game.state, chosen).expect("resolve");
+    rabuka_engine::game_setup::execute_action(&mut game.state, &chosen).expect("resolve");
+
+    eprintln!(
+        "[SUMIRE_DBG] stage={:?} waitroom={:?} hand={:?} energy={}",
+        game.state.player1.stage.stage,
+        game.state.player1.waitroom.cards,
+        game.state.player1.hand.cards,
+        game.state.player1.energy_zone.active_count()
+    );
 
     assert!(
         !game.state.player1.stage.stage.contains(&big_a)
