@@ -20,6 +20,7 @@ Unified roadmap merging the original engine audit, `docs/CASTING_AUDIT.md` (~1,0
 | 12 | **A1** `max_distinct_names`: exact bitmask DP w/ domination pruning replaces exponential DFS + undercounting greedy; greedy only as >128-name safety net; brute-force cross-validation test (2000 cases) | util.rs + tests/test_modules/max_distinct_names_test.rs |
 | 13 | **A2** web_server mutex poisoning recovered (LockRecoverExt) instead of unwrap-cascade; 52 sites converted | game/web_server.rs, main.rs |
 | 14 | **A3** single shared no_std-safe `Lcg` in rng.rs — six identical binary-local copies deleted | rng.rs, src/bin/* |
+| 15 | **C1** `execute_gain_resource` split: `ResourceKind` enum replaces 13 ad-hoc EN/JA string comparisons; four focused units extracted (`try_create_target_selection_choice`, `resolve_gain_resource_targets`, `apply_blade_resource`, `apply_heart_resource`) | effects/misc.rs |
 
 ---
 
@@ -54,19 +55,19 @@ Four families coexist: `rng.rs` xorshift32 with **constant desktop seed**, LCG c
 No ID type today; bare `i16` bounced to usize/u8 at every boundary (~250+ `as usize`). Precedent exists: `AbilityRef(u16)` in ability_store.rs.
 **Fix:** newtype + `From<CardId> for usize`; compiler funnels conversions into auditable spots. Big diff — do zone-boundary-first, mechanically.
 
-### B3. Widen modifier storage to i32
-`GameModifiers` HashMap<i16, i16> forces `as i16` tolls and double conversions. Check GBA/3DS serialization before widening; confine narrowing to platform layer if needed.
+### B3. Modifier conversions: keep u8/i8, kill the pointless casts
+`GameModifiers` HashMap<i16, i16> forces `as i16` tolls and double conversions on write paths.
+**Policy (owner preference):** stay on **u8/i8 as much as possible** — this codebase targets 64KB-RAM consoles and the narrow types are deliberate. Widen only where genuinely required (real overflow potential), never as a blanket move. The fix is therefore *conversion hygiene*, not widening: one auditable helper per boundary (see B4) so the `as i16`/`as u8` noise disappears without growing memory. Any widening must be justified per-field in review.
 
 ### B4. Centralize the clamp idiom
-`(x).max(0) as u8` scattered across condition/card.rs, live.rs, move_cards.rs → one `saturate_u8(i32)` helper (or kill u8 count fields entirely per B3).
+`(x).max(0) as u8` scattered across condition/card.rs (21×), live.rs, move_cards.rs, zones.rs, display.rs (~63 sites total) → one `saturate_u8(i32)` / `saturate_i16(i32)` helper pair. Keeps the narrow storage types (see B3 policy); every remaining narrowing lives in one tested place instead of being smeared across the codebase.
 
 ### B5. Confine blob-decode casts
 card_binary.rs/vm.rs raw-byte casts are correct but smeared → keep them only inside decoder module + round-trip tests. Floats/RNG casts: leave alone.
 
 ## QUEUE C — God-function surgery
 
-### C1. `execute_gain_resource` split (1,162 lines)
-`effects/misc.rs:740-1902`. Resource matched against JA/EN strings 17×. **Fix:** normalize once into `ResourceKind` enum at fn top; split into per-resource apply fns. Est. −500–700 lines, kills platform-dependent divergence bug class. Highest-value single refactor left in ability/.
+### ~~C1. `execute_gain_resource` split~~ ✅ DONE (see DONE table #15)
 
 ### C2. describe.rs EN/JA parity
 ~400-line twin match towers (describe_effect_en/_ja). Either table-drive around shared fragments (−250–350) or add a compile-time/run-time parity test so they can't drift.
@@ -102,16 +103,8 @@ Non-conforming steps get skipped and logged in the plan's "Deferred" section, no
 
 ---
 
-## Execution order (rev 3 — impact-first)
+## Execution order (rev 4)
 
-**C1 → C3 → C2 → B1 → B4 → B3 → B2 → A4 → A5 → D1 → D4 → E1..E5 → D2 → D3**
+**[test-writing track: hard, ability-specific tests against the biggest coverage-gap cells] → C3 → C2 → B1 → B4 → B3 → B2 → A4 → A5 → D1 → D4 → E1..E5 → D2 → D3**
 
-Rationale: C1 (`execute_gain_resource`) is the highest-value item left — a 1,162-line god function with 17 duplicated JA/EN string comparisons; splitting it eliminates an entire divergence bug class. C-tier god-function surgery comes before B's type-system work because the split is easier while the function is still in one piece to read. A5/D2/D3 are bookkeeping and go last. The Python track (E) is independent and can interleave anytime.
-
-### C1 progress notes
-Full body read (misc.rs:740-1902). Split plan, each step test-gated:
-1. `ResourceKind` enum derived once from the resource string; replaces 17 ad-hoc `"blade"|"ブレード"|"heart"|"ハート"` comparisons.
-2. Extract target-resolution block (~330 lines: blade_targets/heart_targets/heart_color/final_count) into `resolve_gain_resource_targets()` returning a `GainTargets` struct; shared params bundled into a context struct.
-3. Extract target_count pre-choice pass (~140 lines) into `try_create_target_selection_choice()`.
-4. Extract blade application (~120 lines) → `apply_blade_resource()`.
-5. Extract heart application (~140 lines) → `apply_heart_resource()`.
+C1 done. Current focus: the ABILITY_MATRIX gap cells (LiveStart×gain_resource 43/60, LiveSuccess×move_zones 30/40, Constant×gain_resource 55/67, group_condition 29/43) get new adversarial tests before further refactors — the refactored gain_resource paths especially need the coverage. The Python track (E) remains independent and can interleave.
