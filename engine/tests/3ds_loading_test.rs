@@ -1,5 +1,8 @@
-//! Desktop test that exactly mirrors the 3DS loading + first action.
-//! Run: cargo test --test 3ds_loading_test -- --nocapture
+//! Manual 3DS-parity smoke test — NOT part of the default suite.
+//! Run: cargo test --test 3ds_loading_test -- --ignored --nocapture
+//!
+//! #[ignore]d because it depends on `../web_ui/decks/` existing on disk and
+//! re-parses the full cards.json + deck lists (slow, environment-sensitive).
 
 use std::path::Path;
 use std::sync::Arc;
@@ -37,6 +40,7 @@ fn build_game(json_str: &str) -> Result<GameState, String> {
 }
 
 #[test]
+#[ignore = "manual smoke test: needs ../web_ui/decks/ and a full cards.json parse"]
 fn load_and_play() {
     let json_str = std::fs::read_to_string("../cards/cards.json").expect("cards.json not found");
     eprintln!("cards: {} KB", json_str.len() / 1024,);

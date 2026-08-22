@@ -9,10 +9,6 @@ Tools for analyzing `cards/abilities.json` and tracking test coverage for card a
 python ../test_inventory.py
 # (or from repo root: python cards/test_inventory.py)
 
-# Legacy aliases (deprecated shims → test_inventory.py):
-python ../coverage_report.py
-python ability_docs_scripts/generate_report.py  # now -> test_inventory
-
 # Invert abilities.json — map JSON back to source texts (parser introspection):
 python ability_docs_scripts/invert_abilities.py
 ```
@@ -34,12 +30,6 @@ The inverted index (`INVERTED_ABILITIES_CONDENSED.md`, `INVERTED_ABILITIES_ABSTR
 | Script | Description | Status |
 |--------|-------------|--------|
 | `../test_inventory.py` | **Canonical** coverage inventory — generates `TEST_COVERAGE.md`, `ABILITY_MATRIX.md`, `TEST_INVENTORY.json/.md` | **Use this** |
-| `../coverage_report.py` | Alias for `test_inventory.py` | Deprecated shim |
-| `generate_report.py` | Old `FULL_REPORT.md` generator | Deprecated shim → `test_inventory.py` |
-| `cross_reference_tests.py` | Old action→test mapping | Deprecated shim |
-| `find_untested_abilities.py` | Old untested report | Deprecated shim |
-| `find_unique_untested.py` | Old unique-pattern finder | Deprecated shim |
-| `key_combo_analysis.py` | Old key-combo analysis | Deprecated shim |
 | `analyze_abilities.py` | Field usage stats (cost/effect keys) | Kept (parser introspection, not coverage) |
 | `invert_abilities.py` | JSON-to-text inversion (`INVERTED_ABILITIES*.md`, `--card/--diff/--query`) | Kept (parser introspection) |
 
@@ -50,10 +40,7 @@ _Generated outputs are **not checked in** — regenerate with the scripts above.
 | File | Produced by | Description |
 |------|-------------|-------------|
 | `../../engine/tests/TEST_COVERAGE.md` + `../../docs/ABILITY_MATRIX.md` + `TEST_INVENTORY.json/.md` | `../test_inventory.py` (checked in, CI-checked) | Canonical coverage inventory |
-| `FULL_REPORT.md` | `generate_report.py` (deprecated shim → test_inventory) | Legacy comprehensive report |
-| `untested_card_ids.txt` | old find_untested scripts | Plain list of untested card IDs |
 | `ABILITY_DOCUMENTATION.md` → canonical copy at `../ABILITY_DOCUMENTATION.md` | analyze_abilities.py era tools | Exhaustive schema reference |
-| `abilities_summary.md` | old summary script | High-level stats (card counts, trigger breakdown) |
 | `INVERTED_ABILITIES_CONDENSED.md` / `_ABSTRACT.md` / `.md` | `invert_abilities.py` | JSON → source text inversion for parser introspection |
 
 ## Test Coverage Method

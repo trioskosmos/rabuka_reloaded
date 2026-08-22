@@ -163,3 +163,30 @@ test = false
 name = "trace_game"
 path = "src/bin/trace_game.rs"
 test = false
+
+# Dev/debug tools — declared explicitly with test = false so bare `cargo test`
+# doesn't build and run each one as an empty test harness.
+[[bin]]
+name = "bad_game_report"
+path = "src/bin/bad_game_report.rs"
+test = false
+
+[[bin]]
+name = "bot_arena"
+path = "src/bin/bot_arena.rs"
+test = false
+
+[[bin]]
+name = "calibrate"
+path = "src/bin/calibrate.rs"
+test = false
+
+[[bin]]
+name = "diag_stall"
+path = "src/bin/diag_stall.rs"
+test = false
+
+[[bin]]
+name = "hunt_loop"
+path = "src/bin/hunt_loop.rs"
+test = false
