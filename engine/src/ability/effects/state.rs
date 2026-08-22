@@ -768,13 +768,22 @@ impl AbilityResolver {
                 count
             };
 
-            if valid_indices.len() < effective_count as usize {
-                return Err(format!(
-                    "Not enough energy cards to deactivate: need {}, have {}",
+            // Partial resolution (Q167: 「実行可能な限り解決する」): when the
+            // zone holds fewer matching candidates than requested, resolve as
+            // many as possible instead of aborting the whole effect. Legacy
+            // behavior (candidates ≥ requested) is untouched.
+            let effective_count = if valid_indices.len() < effective_count as usize {
+                let capped = valid_indices.len() as u8;
+                log::debug!(
+                    "[ENERGY] partial: requested={} candidates={} effective={}",
                     effective_count,
-                    valid_indices.len()
-                ));
-            }
+                    valid_indices.len(),
+                    capped
+                );
+                capped
+            } else {
+                effective_count
+            };
 
             if !max
                 && valid_indices.len() > effective_count as usize
@@ -820,30 +829,10 @@ impl AbilityResolver {
 
         let active_cards: Vec<i16> = if state_change == "active" || state_change == "アクティブ"
         {
-            let player = gs.resolve_target_player(target);
-            let mut result = Vec::new();
-            let mut active_count = 0u8;
-            let group_filter_for_active = if card_type_filter == Some("energy_card") {
-                None
-            } else {
-                group_filter
-            };
-            for i in 0..player.energy_zone.cards.len() {
-                if active_count >= deactivate_count {
-                    break;
-                }
-                if let Some(&card_id) = player.energy_zone.cards.get(i) {
-                    let matches_type = card_type_filter
-                        .is_none_or(|ct| util::card_matches_type(&card_db, card_id, Some(ct)));
-                    let matches_grp = group_filter_for_active
-                        .is_none_or(|gf| util::card_matches_group_str(&card_db, card_id, Some(gf)));
-                    if matches_type && matches_grp {
-                        result.push(card_id);
-                        active_count += 1;
-                    }
-                }
-            }
-            result
+            // The eligible WAITING energies selected above — identical set to
+            // wait_cards. Re-scanning from zone index 0 would re-include
+            // already-active cards and double-count them.
+            wait_cards.clone()
         } else {
             vec![]
         };

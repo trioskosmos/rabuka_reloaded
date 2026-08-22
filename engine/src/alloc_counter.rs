@@ -181,23 +181,3 @@ impl Drop for AllocGuard {
         }
     }
 }
-
-/// Print lifetime stats (call at program exit).
-pub fn print_lifetime() {
-    let now = snapshot();
-    eprintln!();
-    eprintln!("=== Allocator lifetime totals ===");
-    eprintln!("  alloc calls:       {}", now.alloc_calls);
-    eprintln!("  dealloc calls:     {}", now.dealloc_calls);
-    eprintln!("  live bytes:        {} B", now.live_bytes.max(0));
-    eprintln!(
-        "  peak bytes (lifetime):  {} B  ({} KB)",
-        now.peak_bytes,
-        now.peak_bytes / 1024
-    );
-    eprintln!(
-        "  total allocated:   {} B  ({} KB)",
-        now.total_allocated,
-        now.total_allocated / 1024
-    );
-}

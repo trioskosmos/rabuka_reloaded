@@ -1,4 +1,4 @@
-use crate::card::{BaseHeart, CardDatabase, HeartColor, HeartIcon, HeartMap, Keyword};
+use crate::card::{BaseHeart, CardDatabase, HeartColor, HeartMap};
 use crate::core::game_modifiers::ModifierEntry;
 use crate::{HashMap, HashSet};
 #[cfg(feature = "serde_support")]
@@ -221,25 +221,6 @@ impl Stage {
         debug_assert!(self.invariant(), "Stage invariant violated after set");
     }
 
-    // Q138: Energy under a member cannot be used to pay costs
-    // (under-cards have no active/wait state).
-    // Q139: Energy under a member moves with them when changing areas on stage.
-    // Q140: When member with energy underneath moves to waitroom/hand,
-    // the energy goes to the energy deck.
-    // Q141: When baton-touching with a member that has energy underneath,
-    // the energy goes to the energy deck.
-    /// Place a card (energy or member) under the member at the given area.
-    /// Rule 4.5.5: Cards can be stacked beneath member cards.
-    /// Swap the contents (member card + under-cards) of two stage slots by index.
-    /// Rule 4.5.5.3: Under-cards move with the member when changing areas.
-    pub fn swap_stage_slots(&mut self, from_idx: usize, to_idx: usize) {
-        if from_idx >= STAGE_SIZE || to_idx >= STAGE_SIZE || from_idx == to_idx {
-            return;
-        }
-        self.stage.swap(from_idx, to_idx);
-        self.under_cards.swap(from_idx, to_idx);
-    }
-
     pub fn place_under_card(&mut self, area: MemberArea, card_id: i16) {
         let index = match area {
             MemberArea::LeftSide => 0,
@@ -257,23 +238,6 @@ impl Stage {
             MemberArea::RightSide => 2,
         };
         &self.under_cards[index]
-    }
-
-    /// If `under_card` is physically stacked beneath a member, return that
-    /// host member's id (the top card of the slot holding `under_card`).
-    /// `None` if the card isn't under any member on this stage.
-    pub fn host_of_under_card(&self, under_card: i16) -> Option<i16> {
-        for idx in 0..STAGE_SIZE {
-            if self.under_cards[idx].contains(&under_card) {
-                let host = self.stage[idx];
-                return if host == EMPTY_SLOT {
-                    None
-                } else {
-                    Some(host)
-                };
-            }
-        }
-        None
     }
 
     /// Iterate (under_card, host_member) pairs for every card stacked beneath a
@@ -321,30 +285,6 @@ impl Stage {
             }
         }
         (waitroom, energy_deck)
-    }
-
-    // Q137: A member already weighed cannot be "weighed" again as a cost
-    // (weigh means changing from active to weighed state).
-    pub fn clear_area(&mut self, area: MemberArea) {
-        debug_assert!(self.invariant(), "Stage invariant violated before clear");
-        let index = match area {
-            MemberArea::LeftSide => 0,
-            MemberArea::Center => 1,
-            MemberArea::RightSide => 2,
-        };
-        self.stage[index] = EMPTY_SLOT;
-        debug_assert!(self.invariant(), "Stage invariant violated after clear");
-    }
-
-    pub fn member_in_position(&self, position: Keyword) -> bool {
-        // Check if a member is in the specified position (Center, LeftSide, RightSide)
-        let index = match position {
-            Keyword::Center => 1,
-            Keyword::LeftSide => 0,
-            Keyword::RightSide => 2,
-            _ => return false,
-        };
-        self.stage[index] != -1
     }
 
     pub fn position_change(
@@ -465,25 +405,6 @@ impl Stage {
         }
     }
 
-    pub fn all_heart_icons(&self, card_db: &CardDatabase) -> Vec<HeartIcon> {
-        let mut hearts = Vec::new();
-        for &card_id in &self.stage {
-            if card_id != -1 {
-                if let Some(card) = card_db.get_card(card_id) {
-                    if let Some(ref base_heart) = card.base_heart {
-                        for (color, count) in &base_heart.hearts {
-                            hearts.push(HeartIcon {
-                                color: *color,
-                                count: *count,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-        hearts
-    }
-
     pub fn get_available_hearts(
         &self,
         card_db: &CardDatabase,
@@ -593,19 +514,6 @@ impl LiveCardZone {
         Ok(())
     }
 
-    pub fn get_live_cards(&self, card_db: &CardDatabase) -> Vec<i16> {
-        self.cards
-            .iter()
-            .filter(|&&card_id| {
-                card_db
-                    .get_card(card_id)
-                    .map(|c| c.is_live())
-                    .unwrap_or(false)
-            })
-            .copied()
-            .collect()
-    }
-
     pub fn clear(&mut self) -> SmallVec<[i16; 3]> {
         core::mem::take(&mut self.cards)
     }
@@ -686,19 +594,6 @@ impl LiveCardZone {
         total_score + cheer_blade_heart_count + constant_total_score_bonus.max(0) as u8
     }
 
-    pub fn get_top_card(&self) -> Option<i16> {
-        // Rule 9.3.1: Get top card from Live Card Zone for victory determination
-        self.cards.first().copied()
-    }
-
-    pub fn remove_top_card(&mut self) -> Option<i16> {
-        // Rule 9.3.1: Remove top card from Live Card Zone
-        if self.cards.is_empty() {
-            None
-        } else {
-            self.cards.drain(..1).next()
-        }
-    }
 }
 
 use crate::constants::{MAX_ENERGY_CARDS, MAX_LIVE_CARDS};
@@ -772,22 +667,6 @@ impl EnergyZone {
 
     pub fn sub_active(&mut self, delta: u8) {
         self.active_energy_count = self.active_energy_count.saturating_sub(delta);
-    }
-
-    // Q56/Q138: Cost payment — full amount required; under-member energy cannot pay costs.
-    pub fn can_pay_energy(&self, amount: u8) -> bool {
-        // Rule 5.9: Check if player has enough active energy cards
-        self.active_energy_count >= amount
-    }
-
-    pub fn pay_energy_count(&mut self, amount: u8) -> bool {
-        // Rule 5.9: Pay energy by decrementing active count
-        if self.active_energy_count >= amount {
-            self.active_energy_count -= amount;
-            true
-        } else {
-            false
-        }
     }
 
     pub fn pay_energy(&mut self, amount: u8) -> Result<(), String> {
@@ -867,11 +746,6 @@ impl MainDeck {
 
     pub fn draw_multiple(&mut self, count: usize) -> Vec<i16> {
         (0..count).filter_map(|_| self.draw()).collect()
-    }
-
-    /// Peek at the top `count` cards (indices 0..count). Does not remove them.
-    pub fn peek_top(&self, count: usize) -> Vec<i16> {
-        self.cards.iter().take(count).copied().collect()
     }
 
     pub fn is_empty(&self) -> bool {

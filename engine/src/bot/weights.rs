@@ -19,10 +19,6 @@ impl CardWeights {
         }
     }
 
-    pub fn set_weight(&mut self, card_id: i16, w: f64) {
-        self.weights.insert(card_id, w);
-    }
-
     pub fn get_weight(&self, card_id: i16) -> f64 {
         self.weights.get(&card_id).copied().unwrap_or(0.0)
     }

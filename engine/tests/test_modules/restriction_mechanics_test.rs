@@ -109,7 +109,6 @@ fn niko_pb1009_suppresses_effect_activations_for_the_turn() {
         .resolved_abilities()
         .filter(|ar| ar.triggers.as_deref() == Some("登場"))
         .collect();
-    drop(card);
     for ar in debuts {
         let ability = ar;
         let pid = game.state.player1.id.clone();
@@ -200,18 +199,12 @@ fn mijuku_dreamer_refresh_condition_scores() {
     game.state.player1.live_card_zone.cards.push(live);
 
     // No refresh this turn → no bonus.
-    game.state.trigger_auto_ability(
-        format!("{}_refresh", live),
+    trigger_auto(
+        &mut game,
+        live,
         AbilityTrigger::LiveSuccess,
-        game.state.player1.id.clone(),
-        Some("PL!S-bp2-022-L".to_string()),
-        Some(live),
-        None,
-        None,
+        "ライブ成功時",
     );
-    game.state.activating_card = Some(live);
-    let pid = game.state.player1.id.clone();
-    game.state.process_pending_auto_abilities(&pid);
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
@@ -223,17 +216,12 @@ fn mijuku_dreamer_refresh_condition_scores() {
 
     // Refresh happened this turn → +2.
     game.state.player1.deck_refreshed_this_turn = true;
-    game.state.trigger_auto_ability(
-        format!("{}_refresh2", live),
+    trigger_auto(
+        &mut game,
+        live,
         AbilityTrigger::LiveSuccess,
-        game.state.player1.id.clone(),
-        Some("PL!S-bp2-022-L".to_string()),
-        Some(live),
-        None,
-        None,
+        "ライブ成功時",
     );
-    game.state.activating_card = Some(live);
-    game.state.process_pending_auto_abilities(&pid);
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
@@ -293,6 +281,13 @@ fn sumire_bpb4004_double_baton_removes_both_and_clamps_cost() {
     game.state.mods.add_orientation_modifier(big_b, "wait");
     game.add_to_hand(sumire);
     game.give_energy(3);
+    // Fill the deck: the 登場 ability draws 2, and an empty deck would
+    // legitimately refresh (10.2.2.1), pulling the just-batoned members
+    // out of the waitroom and into hand.
+    let filler = game.id(FILLER);
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
 
     let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
     let double_plays: Vec<_> = actions

@@ -126,7 +126,4 @@ impl Bot {
         search(&obs, &actions, &self.config, &self.sampler)
     }
 
-    pub fn set_iterations(&mut self, n: u32) {
-        self.config.iterations = n;
-    }
 }

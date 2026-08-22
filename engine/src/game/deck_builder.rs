@@ -81,7 +81,12 @@ impl DeckBuilder {
             }
         }
 
-        // Validate deck composition with priority on 12 live + 48 member
+        // Validate deck composition with priority on 12 live + 48 member.
+        // NOTE (audit 2026-08): this is warn-only (Rule 6.1.1). Exact counts are
+        // not enforced and the max-4-copies-per-card-number limit has no check
+        // anywhere. Deck-construction replacement abilities (Rule 6.1.2) are
+        // also unimplemented (no デッキ構築 text in card data yet).
+
         let total_main = member_count + live_count;
         if total_main < 60 {
             log::debug!(

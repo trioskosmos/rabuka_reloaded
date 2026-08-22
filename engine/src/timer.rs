@@ -79,17 +79,6 @@ impl Drop for Timer {
     }
 }
 
-pub fn get_data() -> Vec<(Vec<&'static str>, u64, u128)> {
-    let guard = get_timers();
-    if let Some(ref map) = *guard {
-        let mut results: Vec<_> = map.iter().map(|(k, &v)| (k.clone(), v.0, v.1)).collect();
-        results.sort_by(|a, b| b.2.cmp(&a.2));
-        results
-    } else {
-        Vec::new()
-    }
-}
-
 pub fn print_results() {
     let guard = get_timers();
     if let Some(ref map) = *guard {

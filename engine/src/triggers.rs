@@ -66,6 +66,14 @@ pub fn canonical_trigger(raw: &str) -> String {
 // 15. on_placed_in_live_zone   — "表向きでライブカード置き場に置かれた"
 // 16. on_energy_placed_each    — "エネルギー置き場に...置かれるたび"
 // 17. on_baton_touch_to_discard— "バトンタッチして控え室に置かれた"
+//
+// Trigger categories from the rulebook that are NOT implemented (audit 2026-08):
+//   - Rule 7.4.2  ‘ターンの始めに’ / ‘アクティブフェイズの始めに’ / ‘ゲームの始めに’
+//   - Rule 7.5.1/7.6.1/7.7.1  phase-begin triggers (エネルギー/ドロー/メイン)
+//   - Rule 8.2.1/8.4.1  ライブカードセット/ライブ判定 フェイズの始めに
+//   - Rule 8.4.10-12  ‘ターンの終わりに’ end-of-turn triggers + stability loop
+// None of these appear in cards/abilities.json yet, so no card currently
+// requires them; add trigger types here when such cards are introduced.
 
 /// Map a trigger string to its texticon filename for card badge display.
 /// Used by gain_ability to show the gained ability's trigger type as a texticon on the card.

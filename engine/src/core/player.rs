@@ -134,14 +134,6 @@ impl Player {
 
     // Helper method to remove a card from hand by index
 
-    pub fn remove_card_from_hand(&mut self, index: usize) -> Option<i16> {
-        if index >= self.hand.cards.len() {
-            return None;
-        }
-
-        Some(self.hand.cards.remove(index))
-    }
-
     /// Rule 9.6.2.1.2.1: Check if the area currently contains a member deployed this turn.
     /// The restriction follows the member (R4), not the area — if the member position-changes,
     /// the destination area becomes locked, not the vacated one.
@@ -382,62 +374,6 @@ impl Player {
 
             Err("Card not found in database".to_string())
         }
-    }
-
-    pub fn move_card_from_hand_to_energy_zone(
-        &mut self,
-        hand_index: usize,
-        card_db: &CardDatabase,
-    ) -> Result<(), String> {
-        // Rule 7.2: Energy Phase - Play energy card from hand to energy zone
-
-        if hand_index >= self.hand.cards.len() {
-            return Err("Invalid hand index".to_string());
-        }
-
-        let card_id = self.hand.cards.remove(hand_index);
-
-        if let Some(card) = card_db.get_card(card_id) {
-            if !card.is_energy() {
-                // Card is not an energy card, put it back
-
-                self.hand.cards.insert(hand_index, card_id);
-
-                return Err("Card is not an energy card".to_string());
-            }
-
-            self.energy_zone.cards.push(card_id);
-
-            Ok(())
-        } else {
-            self.hand.cards.insert(hand_index, card_id);
-
-            Err("Card not found in database".to_string())
-        }
-    }
-
-    pub fn move_card_from_hand_to_live_zone(
-        &mut self,
-        hand_index: usize,
-        card_db: &CardDatabase,
-    ) -> Result<(), String> {
-        // Rule 9.1: Live Card Set Phase - Place card from hand to live card zone
-
-        if hand_index >= self.hand.cards.len() {
-            return Err("Invalid hand index".to_string());
-        }
-
-        let card_id = self.hand.cards.remove(hand_index);
-
-        if !self.live_card_zone.can_place_card(card_db, card_id) {
-            self.hand.cards.insert(hand_index, card_id);
-
-            return Err("Card cannot be placed in live card zone".to_string());
-        }
-
-        self.live_card_zone.add_card(card_id, card_db)?;
-
-        Ok(())
     }
 
     /// Calculate the total hearts provided by all members on stage

@@ -640,22 +640,6 @@ impl GameState {
         }
     }
 
-    pub fn non_active_player(&self) -> &Player {
-        if core::ptr::eq(self.active_player(), &self.player1) {
-            &self.player2
-        } else {
-            &self.player1
-        }
-    }
-
-    pub fn non_active_player_mut(&mut self) -> &mut Player {
-        if core::ptr::eq(self.active_player(), &self.player1) {
-            &mut self.player2
-        } else {
-            &mut self.player1
-        }
-    }
-
     /// Clear tracking fields that transiently live across effect resolution.
     /// Must be called whenever an ability completes (success or failure) and
     /// when post-choice state machine exits.
@@ -719,36 +703,10 @@ impl GameState {
             .map(|m| m.cause_player_id.as_str())
     }
 
-    /// Resolve which player's cheer_revealed_cards to use based on ability master.
-    pub fn cheer_revealed_cards_mut(&mut self) -> &mut SmallVec<[i16; 8]> {
-        match self.ability_master_id().as_deref() {
-            Some("player2") | Some("p2") => &mut self.player2_cheer_revealed_cards,
-            _ => &mut self.player1_cheer_revealed_cards,
-        }
-    }
-
     pub fn cheer_revealed_cards(&self) -> &SmallVec<[i16; 8]> {
         match self.ability_master_id().as_deref() {
             Some("player2") | Some("p2") => &self.player2_cheer_revealed_cards,
             _ => &self.player1_cheer_revealed_cards,
-        }
-    }
-
-    /// Cheer blade heart count, keyed by first/second attacker.
-    pub fn cheer_blade_heart_count_mut(&mut self, is_first: bool) -> &mut u8 {
-        if is_first {
-            &mut self.player1_cheer_blade_heart_count
-        } else {
-            &mut self.player2_cheer_blade_heart_count
-        }
-    }
-
-    /// Cheer revealed cards, keyed by first/second attacker.
-    pub fn cheer_revealed_cards_first(&mut self, is_first: bool) -> &mut SmallVec<[i16; 8]> {
-        if is_first {
-            &mut self.player1_cheer_revealed_cards
-        } else {
-            &mut self.player2_cheer_revealed_cards
         }
     }
 
@@ -878,32 +836,6 @@ impl GameState {
             );
         }
         m
-    }
-
-    /// Log zone deltas from before/after snapshots.
-    pub fn log_zone_delta(&mut self, before: &HashMap<String, usize>, category: &str) {
-        let after = self.zone_snapshot();
-        let mut parts: Vec<String> = Vec::new();
-        let all_keys: HashSet<String> = before.keys().chain(after.keys()).cloned().collect();
-        let mut sorted: Vec<&String> = all_keys.iter().collect();
-        sorted.sort();
-        for key in sorted {
-            let b = before.get(key).copied().unwrap_or(0);
-            let a = after.get(key).copied().unwrap_or(0);
-            if a != b {
-                let delta = a as i64 - b as i64;
-                let zone_short = key.split('.').nth(1).unwrap_or(key);
-                parts.push(format!(
-                    "{} {}{}",
-                    zone_short,
-                    if delta >= 0 { "+" } else { "" },
-                    delta
-                ));
-            }
-        }
-        if !parts.is_empty() {
-            self.log_ability(parts.join(", "), category);
-        }
     }
 
     /// Commit an ability resolution to the structured log deterministically.

@@ -158,68 +158,6 @@ impl AbilityResolver {
         }
     }
 
-    /// Set `pending_choice` and return `Ok(())` in one call.
-    /// Replaces the repeated 2-liner:
-    ///   `self.pending_choice = Some(c); return Ok(());`
-    /// that appears in ~25 handler sites across effects/*.rs.
-    #[inline]
-    pub fn emit_choice(&mut self, c: Choice) -> Result<(), String> {
-        self.pending_choice = Some(c);
-        Ok(())
-    }
-
-    /// Name of the activating card, or `"<unknown>"` when unavailable.
-    /// Used by log and debug helpers to avoid repeated DB look-ups.
-    pub fn activating_card_name(&self) -> &str {
-        self.activating_card_id
-            .and_then(|cid| self.card_database.get_card(cid))
-            .map(|c| c.name.as_ref())
-            .unwrap_or("<unknown>")
-    }
-
-    /// Find matching card indices in a zone, prompt if too many.
-    /// Takes &[i16] (read-only — works with Vec, SmallVec, any container).
-    /// Returns Ok(Some(indices)) if exact match or fewer.
-    /// Returns Ok(None) if too many — sets pending_choice, caller should `return Ok(())`.
-    pub fn match_cards_in_zone(
-        &mut self,
-        cards: &[i16],
-        count: usize,
-        card_db: &crate::card::CardDatabase,
-        card_type: Option<&str>,
-        group_name: Option<&str>,
-        cost_limit: Option<u8>,
-        zone_name: &str,
-        _prompt_desc: &str,
-    ) -> Result<Option<Vec<usize>>, String> {
-        let filter =
-            util::filter_from_parts(card_type, group_name, cost_limit, None, None, None, None);
-        let idxs = util::matching_indices(cards, card_db, &filter, false);
-        if idxs.is_empty() || idxs.len() < count {
-            return Err(format!("Not enough cards in {}: need {}", zone_name, count));
-        }
-        if idxs.len() > count {
-            let desc_en = format!(
-                "Select {} card(s) to {} for cost",
-                count,
-                crate::ability::describe::zone_label(Some(zone_name))
-            );
-            let desc_ja = format!(
-                "コストとして{}に置くカードを{}枚選択",
-                crate::ability::describe::zone_label_ja(Some(zone_name)),
-                count
-            );
-            self.pending_choice = Some(
-                Choice::select_cards(zone_name.to_string(), 0, desc_en, true)
-                    .description_ja(Some(desc_ja))
-                    .build(),
-            );
-            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
-            return Ok(None);
-        }
-        Ok(Some(idxs.into_iter().rev().take(count).collect()))
-    }
-
     pub fn get_pending_choice(&self) -> Option<&Choice> {
         self.pending_choice.as_ref()
     }

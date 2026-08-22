@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-22T16:27:09.903527",
+  "generated_at": "2026-08-22T18:17:01.981577",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
-  "source_file": "cards/cards.json",
-  "engine_commit": "041abcb2",
+  "source_file": "cards\\cards.json",
+  "engine_commit": "a7bb5587",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -10691,10 +10691,10 @@
                 "heart04"
               ],
               "card_type": "member_card",
+              "source": "preceding_moved",
               "count": 3,
               "operator": "=",
-              "type": "card_count_condition",
-              "source": "preceding_moved"
+              "type": "card_count_condition"
             },
             "action": "gain_resource",
             "resource": "heart",
@@ -10774,10 +10774,10 @@
                 "heart01"
               ],
               "card_type": "member_card",
+              "source": "preceding_moved",
               "count": 3,
               "operator": "=",
-              "type": "card_count_condition",
-              "source": "preceding_moved"
+              "type": "card_count_condition"
             },
             "action": "gain_resource",
             "resource": "heart",
@@ -11387,10 +11387,10 @@
             "condition": {
               "text": "それらがすべてメンバーカードの場合",
               "card_type": "member_card",
+              "source": "preceding_moved",
               "count": 3,
               "operator": "=",
-              "type": "card_count_condition",
-              "source": "preceding_moved"
+              "type": "card_count_condition"
             },
             "action": "draw_card",
             "count": 1,
@@ -13798,6 +13798,7 @@
               "count": 6,
               "operator": ">=",
               "comparison_type": "score",
+              "source": "preceding_moved",
               "type": "comparison_condition"
             },
             "state_change": "active",
@@ -21406,10 +21407,10 @@
                 "Aqours"
               ],
               "card_type": "member_card",
+              "source": "preceding_moved",
               "type": "card_count_condition",
               "count": 3,
-              "operator": "=",
-              "source": "preceding_moved"
+              "operator": "="
             },
             "action": "gain_resource",
             "resource": "heart",
@@ -21602,6 +21603,7 @@
                 "Aqours"
               ],
               "card_type": "member_card",
+              "source": "preceding_moved",
               "type": "group_condition"
             },
             "action": "modify_required_hearts",
@@ -30481,10 +30483,10 @@
             "condition": {
               "text": "それらがすべてメンバーカードの場合",
               "card_type": "member_card",
+              "source": "preceding_moved",
               "count": 3,
               "operator": "=",
-              "type": "card_count_condition",
-              "source": "preceding_moved"
+              "type": "card_count_condition"
             },
             "action": "gain_resource",
             "resource": "blade",
@@ -31662,10 +31664,10 @@
                 "heart05"
               ],
               "card_type": "member_card",
+              "source": "preceding_moved",
               "count": 3,
               "operator": "=",
-              "type": "card_count_condition",
-              "source": "preceding_moved"
+              "type": "card_count_condition"
             },
             "action": "gain_resource",
             "resource": "heart",
@@ -33716,10 +33718,10 @@
               "group_names": [
                 "蓮ノ空"
               ],
+              "source": "preceding_moved",
               "type": "card_count_condition",
               "count": 4,
-              "operator": "=",
-              "source": "preceding_moved"
+              "operator": "="
             },
             "action": "gain_resource",
             "resource": "blade",
@@ -36260,10 +36262,10 @@
                 "Aqours"
               ],
               "card_type": "member_card",
+              "source": "preceding_moved",
               "type": "card_count_condition",
               "count": 2,
-              "operator": "=",
-              "source": "preceding_moved"
+              "operator": "="
             },
             "group_names": [
               "Aqours"
@@ -36281,10 +36283,10 @@
                 "Aqours"
               ],
               "card_type": "member_card",
+              "source": "preceding_moved",
               "type": "card_count_condition",
               "count": 2,
-              "operator": "=",
-              "source": "preceding_moved"
+              "operator": "="
             }
           }
         ],
@@ -36444,6 +36446,7 @@
             "condition": {
               "text": "それがライブカードの場合",
               "card_type": "live_card",
+              "source": "preceding_moved",
               "count": 1,
               "operator": ">=",
               "type": "card_count_condition"
@@ -36532,6 +36535,7 @@
               "comparison_type": "cost",
               "cost_limit": 10,
               "cost_limit_operator": ">=",
+              "source": "preceding_moved",
               "type": "comparison_condition"
             },
             "action": "gain_resource",
@@ -36653,10 +36657,10 @@
             "condition": {
               "text": "それらがすべてメンバーカードの場合",
               "card_type": "member_card",
+              "source": "preceding_moved",
               "count": 5,
               "operator": "=",
               "type": "card_count_condition",
-              "source": "preceding_moved",
               "location": "stage"
             },
             "action": "modify_score",

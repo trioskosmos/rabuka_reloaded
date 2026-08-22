@@ -1,28 +1,28 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-22T06:01:59.788312+00:00",
+  "generated_at": "2026-08-22T08:48:28.644450+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 417,
-  "n_tests": 2508,
+  "n_files": 418,
+  "n_tests": 2543,
   "total_cards": 771,
-  "covered_cards": 573,
-  "abilities_on_covered": 732,
+  "covered_cards": 580,
+  "abilities_on_covered": 739,
   "trigger_counts": {
     "起動": [
-      79,
+      80,
       96
     ],
     "登場": [
-      207,
+      208,
       269
     ],
     "ライブ開始時": [
-      201,
+      202,
       268
     ],
     "(none)": [
@@ -30,11 +30,11 @@
       2
     ],
     "ライブ成功時": [
-      86,
+      87,
       122
     ],
     "常時": [
-      93,
+      96,
       117
     ],
     "自動": [
@@ -44,7 +44,7 @@
   },
   "action_counts": {
     "move_cards": [
-      115,
+      117,
       146
     ],
     "look_and_select": [
@@ -52,11 +52,11 @@
       71
     ],
     "gain_resource": [
-      124,
+      126,
       160
     ],
     "sequential": [
-      162,
+      164,
       219
     ],
     "unknown": [
@@ -104,7 +104,7 @@
       2
     ],
     "modify_score": [
-      58,
+      59,
       73
     ],
     "conditional_alternative": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      428,
+      429,
       546
     ],
     "temporal_condition": [
@@ -182,7 +182,7 @@
       20
     ],
     "compound": [
-      30,
+      31,
       34
     ],
     "appearance_condition": [
@@ -190,11 +190,11 @@
       13
     ],
     "comparison_condition": [
-      40,
+      43,
       60
     ],
     "card_count_condition": [
-      70,
+      72,
       88
     ],
     "location_condition": [
@@ -268,7 +268,7 @@
       56
     ],
     "bp3": [
-      61,
+      62,
       66
     ],
     "bp2": [
@@ -276,11 +276,11 @@
       68
     ],
     "bp4": [
-      67,
+      69,
       88
     ],
     "bp5": [
-      107,
+      109,
       134
     ],
     "bp6": [
@@ -292,7 +292,7 @@
       111
     ],
     "pb1": [
-      100,
+      102,
       137
     ],
     "sd2": [
@@ -309,16 +309,19 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 560,
-    "none": 204,
+    "L2+choice": 569,
+    "none": 197,
     "L1+choice": 125,
-    "L2": 32,
+    "L2": 30,
     "L1": 15
   },
   "qa_rulings": {
-    "covered": 280,
+    "covered": 278,
     "total": 280,
-    "uncovered_ids": []
+    "uncovered_ids": [
+      "Q139",
+      "Q138"
+    ]
   },
   "abilities": [
     {
@@ -404,6 +407,7 @@
         "engine/tests/test_modules/setsuna_test.rs",
         "engine/tests/test_modules/sunny_test.rs",
         "engine/tests/test_modules/untested_abilities_batch4_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/wonder_zone_max_repeats_test.rs",
         "engine/tests/test_modules/yoshiko_debut_test.rs"
       ],
@@ -439,7 +443,7 @@
         "dia_position_change_no_saintsnow_skips_gracefully",
         "dia_position_change_saintsnow_source_any_destination"
       ],
-      "covering_test_count": 341,
+      "covering_test_count": 374,
       "is_null": false
     },
     {
@@ -715,7 +719,8 @@
         "engine/tests/test_modules/logging_test.rs",
         "engine/tests/test_modules/opponent_choice_tests.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
-        "engine/tests/test_modules/position_change_multi_test.rs"
+        "engine/tests/test_modules/position_change_multi_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs"
       ],
       "covering_tests": [
         "baton_touch_arriving_card_ids_tracked",
@@ -749,7 +754,7 @@
         "c9_arise_activate_and_recover",
         "c9_arise_constant_heart_with_other_arise"
       ],
-      "covering_test_count": 143,
+      "covering_test_count": 150,
       "is_null": false
     },
     {
@@ -1090,10 +1095,13 @@
         "engine/tests/test_modules/kanata_restrict_test.rs",
         "engine/tests/test_modules/konata_bp1_test.rs",
         "engine/tests/test_modules/konata_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs",
         "engine/tests/test_modules/untested_abilities_batch5_test.rs"
       ],
       "covering_tests": [
         "different_niji_member_on_turn2_activates",
+        "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
         "honoka_bp4001_draws_only_when_stage_total_is_cheaper",
         "kanata_can_be_activated_by_effect",
         "kanata_does_not_block_manual_ability_activation",
@@ -1106,15 +1114,20 @@
         "konata_q77_debuted_this_turn_activates_energy",
         "konata_q77_self_appearance_activates_energy",
         "konata_use_limit_blocks_second_activation",
+        "ll_bp2001_cannot_be_baton_touched_out",
+        "mijuku_dreamer_refresh_condition_scores",
         "natsumi_bp4009_blade_constant_tracks_cost_total_race",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "no_appearance_condition_fails",
         "non_niji_member_does_not_activate",
         "q77_self_appearance_activates_energy",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
         "sayaka_hsbp2011_mills_top_five",
+        "sumire_bpb4004_double_baton_removes_both_and_clamps_cost",
         "use_limit_blocks_both_abilities",
         "wondermates_activates_waited_nijigasaki_enabling_activation"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 27,
       "is_null": false
     },
     {
@@ -1448,6 +1461,7 @@
         "engine/tests/test_modules/baton_touch_restriction_combination_test.rs",
         "engine/tests/test_modules/chisato_natsumi_test.rs",
         "engine/tests/test_modules/nonfiction_cost_comparison_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs",
         "engine/tests/test_modules/sumire_bp4_test.rs"
       ],
       "covering_tests": [
@@ -1460,6 +1474,11 @@
         "chisato_natsumi_q265_double_baton_both_no_blade_heart",
         "double_baton_to_non_protected_zones_succeeds",
         "double_baton_to_protected_zone_rejected",
+        "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
+        "ll_bp2001_cannot_be_baton_touched_out",
+        "mijuku_dreamer_refresh_condition_scores",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "nonfiction_cost_equal_costs_no_score",
         "nonfiction_cost_p1_high_vs_p2_empty_scores",
         "nonfiction_cost_p1_high_vs_p2_low_scores",
@@ -1471,18 +1490,13 @@
         "nonfiction_cost_p2_high_vs_p1_low_scores",
         "nonfiction_cost_p2_low_vs_p1_high_no_score",
         "opponent_baton_touch_unaffected_by_protected_card",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
         "single_baton_to_non_protected_zone_succeeds",
         "sumire_action_type_string_parsing_play_member_to_stage",
-        "sumire_double_baton_integration_via_string_path",
-        "sumire_double_baton_to_left_does_not_activate_debut",
-        "sumire_explicit_double_baton_to_left_no_debut",
-        "sumire_explicit_double_baton_via_card_indices",
-        "sumire_no_baton_touch_no_draw",
-        "sumire_no_liella_on_stage_plays_normally",
-        "sumire_only_one_occupied_area_triggers_single_baton_touch",
-        "sumire_q193_q194_baton_touch_draw_and_deploy"
+        "sumire_bpb4004_double_baton_removes_both_and_clamps_cost",
+        "sumire_double_baton_integration_via_string_path"
       ],
-      "covering_test_count": 32,
+      "covering_test_count": 39,
       "is_null": false
     },
     {
@@ -1951,10 +1965,13 @@
         "engine/tests/test_modules/kanata_restrict_test.rs",
         "engine/tests/test_modules/konata_bp1_test.rs",
         "engine/tests/test_modules/konata_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs",
         "engine/tests/test_modules/untested_abilities_batch5_test.rs"
       ],
       "covering_tests": [
         "different_niji_member_on_turn2_activates",
+        "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
         "honoka_bp4001_draws_only_when_stage_total_is_cheaper",
         "kanata_can_be_activated_by_effect",
         "kanata_does_not_block_manual_ability_activation",
@@ -1967,15 +1984,20 @@
         "konata_q77_debuted_this_turn_activates_energy",
         "konata_q77_self_appearance_activates_energy",
         "konata_use_limit_blocks_second_activation",
+        "ll_bp2001_cannot_be_baton_touched_out",
+        "mijuku_dreamer_refresh_condition_scores",
         "natsumi_bp4009_blade_constant_tracks_cost_total_race",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "no_appearance_condition_fails",
         "non_niji_member_does_not_activate",
         "q77_self_appearance_activates_energy",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
         "sayaka_hsbp2011_mills_top_five",
+        "sumire_bpb4004_double_baton_removes_both_and_clamps_cost",
         "use_limit_blocks_both_abilities",
         "wondermates_activates_waited_nijigasaki_enabling_activation"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 27,
       "is_null": false
     },
     {
@@ -4856,11 +4878,17 @@
       "covering_files": [
         "engine/tests/test_modules/baton_touch_restriction_combination_test.rs",
         "engine/tests/test_modules/nonfiction_cost_comparison_test.rs",
+        "engine/tests/test_modules/restriction_mechanics_test.rs",
         "engine/tests/test_modules/sumire_bp4_test.rs"
       ],
       "covering_tests": [
         "double_baton_to_non_protected_zones_succeeds",
         "double_baton_to_protected_zone_rejected",
+        "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
+        "ll_bp2001_cannot_be_baton_touched_out",
+        "mijuku_dreamer_refresh_condition_scores",
+        "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "nonfiction_cost_equal_costs_no_score",
         "nonfiction_cost_p1_high_vs_p2_empty_scores",
         "nonfiction_cost_p1_high_vs_p2_low_scores",
@@ -4872,8 +4900,10 @@
         "nonfiction_cost_p2_high_vs_p1_low_scores",
         "nonfiction_cost_p2_low_vs_p1_high_no_score",
         "opponent_baton_touch_unaffected_by_protected_card",
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
         "single_baton_to_non_protected_zone_succeeds",
         "sumire_action_type_string_parsing_play_member_to_stage",
+        "sumire_bpb4004_double_baton_removes_both_and_clamps_cost",
         "sumire_double_baton_integration_via_string_path",
         "sumire_double_baton_to_left_does_not_activate_debut",
         "sumire_explicit_double_baton_to_left_no_debut",
@@ -4881,11 +4911,9 @@
         "sumire_no_baton_touch_no_draw",
         "sumire_no_liella_on_stage_plays_normally",
         "sumire_only_one_occupied_area_triggers_single_baton_touch",
-        "sumire_q193_q194_baton_touch_draw_and_deploy",
-        "sumire_q194_locked_member_excluded_from_double_baton",
-        "sumire_single_baton_stays_single_no_auto_promote"
+        "sumire_q193_q194_baton_touch_draw_and_deploy"
       ],
-      "covering_test_count": 25,
+      "covering_test_count": 32,
       "is_null": false
     },
     {
@@ -7548,6 +7576,7 @@
       ],
       "covering_tests": [
         "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
         "himeno_bp6_cost_no_reduction_without_mirakura",
         "himeno_bp6_cost_reduced_by_mirakura_on_stage",
         "himeno_bp6_cost_reduced_by_two_mirakura",
@@ -7560,9 +7589,10 @@
         "ll_bp2001_cannot_be_baton_touched_out",
         "mijuku_dreamer_refresh_condition_scores",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
-        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
+        "sumire_bpb4004_double_baton_removes_both_and_clamps_cost"
       ],
-      "covering_test_count": 14,
+      "covering_test_count": 16,
       "is_null": false
     },
     {
@@ -7593,6 +7623,7 @@
       ],
       "covering_tests": [
         "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
         "himeno_bp6_cost_no_reduction_without_mirakura",
         "himeno_bp6_cost_reduced_by_mirakura_on_stage",
         "himeno_bp6_cost_reduced_by_two_mirakura",
@@ -7605,9 +7636,10 @@
         "ll_bp2001_cannot_be_baton_touched_out",
         "mijuku_dreamer_refresh_condition_scores",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
-        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
+        "sumire_bpb4004_double_baton_removes_both_and_clamps_cost"
       ],
-      "covering_test_count": 14,
+      "covering_test_count": 16,
       "is_null": false
     },
     {
@@ -7638,6 +7670,7 @@
       ],
       "covering_tests": [
         "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
         "himeno_bp6_cost_no_reduction_without_mirakura",
         "himeno_bp6_cost_reduced_by_mirakura_on_stage",
         "himeno_bp6_cost_reduced_by_two_mirakura",
@@ -7650,9 +7683,10 @@
         "ll_bp2001_cannot_be_baton_touched_out",
         "mijuku_dreamer_refresh_condition_scores",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
-        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
+        "sumire_bpb4004_double_baton_removes_both_and_clamps_cost"
       ],
-      "covering_test_count": 14,
+      "covering_test_count": 16,
       "is_null": false
     },
     {
@@ -10661,14 +10695,47 @@
         "PL!-bp5-008-AR"
       ],
       "base": "PL!-bp5-008",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs"
+      ],
+      "covering_tests": [
+        "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
+        "hanamaru_pb1_007_member_only_or_empty_reveal_places_nothing",
+        "hanamaru_pb1_007_multiple_lives_still_only_one_energy",
+        "hanamaru_pb1_007_revealed_live_places_wait_energy",
+        "hanayo_bp5_008_counts_score_not_card_count",
+        "hanayo_bp5_008_ignores_opponent_success_zone",
+        "hanayo_bp5_008_requires_presence_on_stage",
+        "hanayo_bp5_008_score_sum_threshold_and_boundary",
+        "hanayo_bp5_008_two_copies_each_get_bonus",
+        "hanayo_bp5_008_value_fixed_and_color_exact",
+        "kanon_spbp4_001_empty_energy_deck_degrades_gracefully",
+        "kanon_spbp4_001_energy_count_includes_wait_state",
+        "kanon_spbp4_001_non_liella_blocks_placement",
+        "kanon_spbp4_001_places_wait_energy_when_liella_only",
+        "mari_bp3_008_activates_only_available_waiting_energies",
+        "mari_bp3_008_aqours_below_six_skips_activation",
+        "mari_bp3_008_aqours_high_fetch_activates_four",
+        "mari_bp3_008_selection_mandatory_and_live_only",
+        "mari_bp3_008_usable_with_no_live_in_waitroom",
+        "mari_bp3_008_wrong_group_fetch_skips_activation",
+        "mari_bp5_008_bonus_is_live_total_not_per_card",
+        "mari_bp5_008_exactly_two_surplus_qualifies",
+        "mari_bp5_008_no_surplus_when_need_covers_hearts",
+        "mari_bp5_008_opponent_surplus_gates_live_total_bonus",
+        "rin_bp4_009_both_stages_empty_does_not_fire",
+        "rin_bp4_009_equal_totals_do_not_fire",
+        "rin_bp4_009_higher_own_total_does_not_fire",
+        "rin_bp4_009_lower_total_draws_two_puts_one_on_top",
+        "rin_bp4_009_own_empty_stage_counts_as_zero_and_fires",
+        "ruby_pb1_009_combined_count_threshold"
+      ],
+      "covering_test_count": 33,
       "is_null": false
     },
     {
@@ -10871,14 +10938,47 @@
         "PL!S-bp5-008-AR"
       ],
       "base": "PL!S-bp5-008",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs"
+      ],
+      "covering_tests": [
+        "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
+        "hanamaru_pb1_007_member_only_or_empty_reveal_places_nothing",
+        "hanamaru_pb1_007_multiple_lives_still_only_one_energy",
+        "hanamaru_pb1_007_revealed_live_places_wait_energy",
+        "hanayo_bp5_008_counts_score_not_card_count",
+        "hanayo_bp5_008_ignores_opponent_success_zone",
+        "hanayo_bp5_008_requires_presence_on_stage",
+        "hanayo_bp5_008_score_sum_threshold_and_boundary",
+        "hanayo_bp5_008_two_copies_each_get_bonus",
+        "hanayo_bp5_008_value_fixed_and_color_exact",
+        "kanon_spbp4_001_empty_energy_deck_degrades_gracefully",
+        "kanon_spbp4_001_energy_count_includes_wait_state",
+        "kanon_spbp4_001_non_liella_blocks_placement",
+        "kanon_spbp4_001_places_wait_energy_when_liella_only",
+        "mari_bp3_008_activates_only_available_waiting_energies",
+        "mari_bp3_008_aqours_below_six_skips_activation",
+        "mari_bp3_008_aqours_high_fetch_activates_four",
+        "mari_bp3_008_selection_mandatory_and_live_only",
+        "mari_bp3_008_usable_with_no_live_in_waitroom",
+        "mari_bp3_008_wrong_group_fetch_skips_activation",
+        "mari_bp5_008_bonus_is_live_total_not_per_card",
+        "mari_bp5_008_exactly_two_surplus_qualifies",
+        "mari_bp5_008_no_surplus_when_need_covers_hearts",
+        "mari_bp5_008_opponent_surplus_gates_live_total_bonus",
+        "rin_bp4_009_both_stages_empty_does_not_fire",
+        "rin_bp4_009_equal_totals_do_not_fire",
+        "rin_bp4_009_higher_own_total_does_not_fire",
+        "rin_bp4_009_lower_total_draws_two_puts_one_on_top",
+        "rin_bp4_009_own_empty_stage_counts_as_zero_and_fires",
+        "ruby_pb1_009_combined_count_threshold"
+      ],
+      "covering_test_count": 33,
       "is_null": false
     },
     {
@@ -10914,6 +11014,7 @@
         "hanayo_pb1017_baton_touch_skips_the_discard",
         "hanayo_pb1017_discards_without_baton_touch",
         "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
         "honoka_bp4001_draws_only_when_stage_total_is_cheaper",
         "kanata_bp3006_debut_enters_wait_state",
         "kasumu_bp3002_grants_chosen_heart_to_other_nijigasaki_only",
@@ -10938,10 +11039,9 @@
         "sayaka_hsbp2002_fetch_is_cost_and_count_filtered",
         "sayaka_hsbp2011_mills_top_five",
         "sayaka_hspb1010_expensive_opponent_not_eligible",
-        "sayaka_hspb1010_no_big_member_no_effect",
-        "sayaka_hspb1010_waits_cheap_opponent_when_condition_met"
+        "sayaka_hspb1010_no_big_member_no_effect"
       ],
-      "covering_test_count": 37,
+      "covering_test_count": 39,
       "is_null": false
     },
     {
@@ -12014,6 +12114,7 @@
         "engine/tests/test_modules/untested_abilities_batch2_test.rs",
         "engine/tests/test_modules/untested_abilities_batch3_test.rs",
         "engine/tests/test_modules/untested_abilities_batch4_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_playthrough_test.rs",
         "engine/tests/test_modules/untested_choice_change_target_test.rs",
         "engine/tests/test_modules/untested_secondary_abilities_test.rs"
@@ -12050,7 +12151,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 697,
+      "covering_test_count": 730,
       "is_null": false
     },
     {
@@ -15261,14 +15362,47 @@
         "PL!S-pb1-007-P＋"
       ],
       "base": "PL!S-pb1-007",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs"
+      ],
+      "covering_tests": [
+        "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
+        "hanamaru_pb1_007_member_only_or_empty_reveal_places_nothing",
+        "hanamaru_pb1_007_multiple_lives_still_only_one_energy",
+        "hanamaru_pb1_007_revealed_live_places_wait_energy",
+        "hanayo_bp5_008_counts_score_not_card_count",
+        "hanayo_bp5_008_ignores_opponent_success_zone",
+        "hanayo_bp5_008_requires_presence_on_stage",
+        "hanayo_bp5_008_score_sum_threshold_and_boundary",
+        "hanayo_bp5_008_two_copies_each_get_bonus",
+        "hanayo_bp5_008_value_fixed_and_color_exact",
+        "kanon_spbp4_001_empty_energy_deck_degrades_gracefully",
+        "kanon_spbp4_001_energy_count_includes_wait_state",
+        "kanon_spbp4_001_non_liella_blocks_placement",
+        "kanon_spbp4_001_places_wait_energy_when_liella_only",
+        "mari_bp3_008_activates_only_available_waiting_energies",
+        "mari_bp3_008_aqours_below_six_skips_activation",
+        "mari_bp3_008_aqours_high_fetch_activates_four",
+        "mari_bp3_008_selection_mandatory_and_live_only",
+        "mari_bp3_008_usable_with_no_live_in_waitroom",
+        "mari_bp3_008_wrong_group_fetch_skips_activation",
+        "mari_bp5_008_bonus_is_live_total_not_per_card",
+        "mari_bp5_008_exactly_two_surplus_qualifies",
+        "mari_bp5_008_no_surplus_when_need_covers_hearts",
+        "mari_bp5_008_opponent_surplus_gates_live_total_bonus",
+        "rin_bp4_009_both_stages_empty_does_not_fire",
+        "rin_bp4_009_equal_totals_do_not_fire",
+        "rin_bp4_009_higher_own_total_does_not_fire",
+        "rin_bp4_009_lower_total_draws_two_puts_one_on_top",
+        "rin_bp4_009_own_empty_stage_counts_as_zero_and_fires",
+        "ruby_pb1_009_combined_count_threshold"
+      ],
+      "covering_test_count": 33,
       "is_null": false
     },
     {
@@ -15319,14 +15453,47 @@
         "PL!S-pb1-009-P＋"
       ],
       "base": "PL!S-pb1-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs"
+      ],
+      "covering_tests": [
+        "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
+        "hanamaru_pb1_007_member_only_or_empty_reveal_places_nothing",
+        "hanamaru_pb1_007_multiple_lives_still_only_one_energy",
+        "hanamaru_pb1_007_revealed_live_places_wait_energy",
+        "hanayo_bp5_008_counts_score_not_card_count",
+        "hanayo_bp5_008_ignores_opponent_success_zone",
+        "hanayo_bp5_008_requires_presence_on_stage",
+        "hanayo_bp5_008_score_sum_threshold_and_boundary",
+        "hanayo_bp5_008_two_copies_each_get_bonus",
+        "hanayo_bp5_008_value_fixed_and_color_exact",
+        "kanon_spbp4_001_empty_energy_deck_degrades_gracefully",
+        "kanon_spbp4_001_energy_count_includes_wait_state",
+        "kanon_spbp4_001_non_liella_blocks_placement",
+        "kanon_spbp4_001_places_wait_energy_when_liella_only",
+        "mari_bp3_008_activates_only_available_waiting_energies",
+        "mari_bp3_008_aqours_below_six_skips_activation",
+        "mari_bp3_008_aqours_high_fetch_activates_four",
+        "mari_bp3_008_selection_mandatory_and_live_only",
+        "mari_bp3_008_usable_with_no_live_in_waitroom",
+        "mari_bp3_008_wrong_group_fetch_skips_activation",
+        "mari_bp5_008_bonus_is_live_total_not_per_card",
+        "mari_bp5_008_exactly_two_surplus_qualifies",
+        "mari_bp5_008_no_surplus_when_need_covers_hearts",
+        "mari_bp5_008_opponent_surplus_gates_live_total_bonus",
+        "rin_bp4_009_both_stages_empty_does_not_fire",
+        "rin_bp4_009_equal_totals_do_not_fire",
+        "rin_bp4_009_higher_own_total_does_not_fire",
+        "rin_bp4_009_lower_total_draws_two_puts_one_on_top",
+        "rin_bp4_009_own_empty_stage_counts_as_zero_and_fires",
+        "ruby_pb1_009_combined_count_threshold"
+      ],
+      "covering_test_count": 33,
       "is_null": false
     },
     {
@@ -15623,6 +15790,7 @@
         "bp5_006_live_start_no_draw_when_zone_below_two",
         "combo_bp3_005_mass_activate_readies_self_waited_ability_member",
         "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
         "ll_bp2001_cannot_be_baton_touched_out",
         "mijuku_dreamer_refresh_condition_scores",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
@@ -15633,9 +15801,10 @@
         "sp_bp1_007_debut_no_retrieve_when_total_below_11_via_baton_touch",
         "sp_bp1_007_debut_noop_when_waitroom_has_no_live_card",
         "sp_bp2_013_debut_can_place_zero_cards",
-        "sp_bp2_013_debut_places_waitroom_card_on_deck_top"
+        "sp_bp2_013_debut_places_waitroom_card_on_deck_top",
+        "sumire_bpb4004_double_baton_removes_both_and_clamps_cost"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 22,
       "is_null": false
     },
     {
@@ -15850,14 +16019,47 @@
         "PL!S-bp3-008-P"
       ],
       "base": "PL!S-bp3-008",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs"
+      ],
+      "covering_tests": [
+        "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
+        "hanamaru_pb1_007_member_only_or_empty_reveal_places_nothing",
+        "hanamaru_pb1_007_multiple_lives_still_only_one_energy",
+        "hanamaru_pb1_007_revealed_live_places_wait_energy",
+        "hanayo_bp5_008_counts_score_not_card_count",
+        "hanayo_bp5_008_ignores_opponent_success_zone",
+        "hanayo_bp5_008_requires_presence_on_stage",
+        "hanayo_bp5_008_score_sum_threshold_and_boundary",
+        "hanayo_bp5_008_two_copies_each_get_bonus",
+        "hanayo_bp5_008_value_fixed_and_color_exact",
+        "kanon_spbp4_001_empty_energy_deck_degrades_gracefully",
+        "kanon_spbp4_001_energy_count_includes_wait_state",
+        "kanon_spbp4_001_non_liella_blocks_placement",
+        "kanon_spbp4_001_places_wait_energy_when_liella_only",
+        "mari_bp3_008_activates_only_available_waiting_energies",
+        "mari_bp3_008_aqours_below_six_skips_activation",
+        "mari_bp3_008_aqours_high_fetch_activates_four",
+        "mari_bp3_008_selection_mandatory_and_live_only",
+        "mari_bp3_008_usable_with_no_live_in_waitroom",
+        "mari_bp3_008_wrong_group_fetch_skips_activation",
+        "mari_bp5_008_bonus_is_live_total_not_per_card",
+        "mari_bp5_008_exactly_two_surplus_qualifies",
+        "mari_bp5_008_no_surplus_when_need_covers_hearts",
+        "mari_bp5_008_opponent_surplus_gates_live_total_bonus",
+        "rin_bp4_009_both_stages_empty_does_not_fire",
+        "rin_bp4_009_equal_totals_do_not_fire",
+        "rin_bp4_009_higher_own_total_does_not_fire",
+        "rin_bp4_009_lower_total_draws_two_puts_one_on_top",
+        "rin_bp4_009_own_empty_stage_counts_as_zero_and_fires",
+        "ruby_pb1_009_combined_count_threshold"
+      ],
+      "covering_test_count": 33,
       "is_null": false
     },
     {
@@ -16589,6 +16791,7 @@
       ],
       "covering_tests": [
         "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
         "kotori_activate_works_without_restriction",
         "ll_bp2001_cannot_be_baton_touched_out",
         "maki_ab0_plus_ab1_end_to_end",
@@ -16601,9 +16804,10 @@
         "nico_blocks_kotori_activation",
         "nico_q180_active_phase_still_activates",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
-        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
+        "sumire_bpb4004_double_baton_removes_both_and_clamps_cost"
       ],
-      "covering_test_count": 14,
+      "covering_test_count": 16,
       "is_null": false
     },
     {
@@ -16633,6 +16837,7 @@
       ],
       "covering_tests": [
         "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
         "kotori_activate_works_without_restriction",
         "ll_bp2001_cannot_be_baton_touched_out",
         "maki_ab0_plus_ab1_end_to_end",
@@ -16645,9 +16850,10 @@
         "nico_blocks_kotori_activation",
         "nico_q180_active_phase_still_activates",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
-        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
+        "sumire_bpb4004_double_baton_removes_both_and_clamps_cost"
       ],
-      "covering_test_count": 14,
+      "covering_test_count": 16,
       "is_null": false
     },
     {
@@ -17528,14 +17734,47 @@
         "PL!N-bp4-009-P"
       ],
       "base": "PL!N-bp4-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs"
+      ],
+      "covering_tests": [
+        "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
+        "hanamaru_pb1_007_member_only_or_empty_reveal_places_nothing",
+        "hanamaru_pb1_007_multiple_lives_still_only_one_energy",
+        "hanamaru_pb1_007_revealed_live_places_wait_energy",
+        "hanayo_bp5_008_counts_score_not_card_count",
+        "hanayo_bp5_008_ignores_opponent_success_zone",
+        "hanayo_bp5_008_requires_presence_on_stage",
+        "hanayo_bp5_008_score_sum_threshold_and_boundary",
+        "hanayo_bp5_008_two_copies_each_get_bonus",
+        "hanayo_bp5_008_value_fixed_and_color_exact",
+        "kanon_spbp4_001_empty_energy_deck_degrades_gracefully",
+        "kanon_spbp4_001_energy_count_includes_wait_state",
+        "kanon_spbp4_001_non_liella_blocks_placement",
+        "kanon_spbp4_001_places_wait_energy_when_liella_only",
+        "mari_bp3_008_activates_only_available_waiting_energies",
+        "mari_bp3_008_aqours_below_six_skips_activation",
+        "mari_bp3_008_aqours_high_fetch_activates_four",
+        "mari_bp3_008_selection_mandatory_and_live_only",
+        "mari_bp3_008_usable_with_no_live_in_waitroom",
+        "mari_bp3_008_wrong_group_fetch_skips_activation",
+        "mari_bp5_008_bonus_is_live_total_not_per_card",
+        "mari_bp5_008_exactly_two_surplus_qualifies",
+        "mari_bp5_008_no_surplus_when_need_covers_hearts",
+        "mari_bp5_008_opponent_surplus_gates_live_total_bonus",
+        "rin_bp4_009_both_stages_empty_does_not_fire",
+        "rin_bp4_009_equal_totals_do_not_fire",
+        "rin_bp4_009_higher_own_total_does_not_fire",
+        "rin_bp4_009_lower_total_draws_two_puts_one_on_top",
+        "rin_bp4_009_own_empty_stage_counts_as_zero_and_fires",
+        "ruby_pb1_009_combined_count_threshold"
+      ],
+      "covering_test_count": 33,
       "is_null": false
     },
     {
@@ -17604,14 +17843,47 @@
         "PL!SP-bp4-001-P"
       ],
       "base": "PL!SP-bp4-001",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs"
+      ],
+      "covering_tests": [
+        "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
+        "hanamaru_pb1_007_member_only_or_empty_reveal_places_nothing",
+        "hanamaru_pb1_007_multiple_lives_still_only_one_energy",
+        "hanamaru_pb1_007_revealed_live_places_wait_energy",
+        "hanayo_bp5_008_counts_score_not_card_count",
+        "hanayo_bp5_008_ignores_opponent_success_zone",
+        "hanayo_bp5_008_requires_presence_on_stage",
+        "hanayo_bp5_008_score_sum_threshold_and_boundary",
+        "hanayo_bp5_008_two_copies_each_get_bonus",
+        "hanayo_bp5_008_value_fixed_and_color_exact",
+        "kanon_spbp4_001_empty_energy_deck_degrades_gracefully",
+        "kanon_spbp4_001_energy_count_includes_wait_state",
+        "kanon_spbp4_001_non_liella_blocks_placement",
+        "kanon_spbp4_001_places_wait_energy_when_liella_only",
+        "mari_bp3_008_activates_only_available_waiting_energies",
+        "mari_bp3_008_aqours_below_six_skips_activation",
+        "mari_bp3_008_aqours_high_fetch_activates_four",
+        "mari_bp3_008_selection_mandatory_and_live_only",
+        "mari_bp3_008_usable_with_no_live_in_waitroom",
+        "mari_bp3_008_wrong_group_fetch_skips_activation",
+        "mari_bp5_008_bonus_is_live_total_not_per_card",
+        "mari_bp5_008_exactly_two_surplus_qualifies",
+        "mari_bp5_008_no_surplus_when_need_covers_hearts",
+        "mari_bp5_008_opponent_surplus_gates_live_total_bonus",
+        "rin_bp4_009_both_stages_empty_does_not_fire",
+        "rin_bp4_009_equal_totals_do_not_fire",
+        "rin_bp4_009_higher_own_total_does_not_fire",
+        "rin_bp4_009_lower_total_draws_two_puts_one_on_top",
+        "rin_bp4_009_own_empty_stage_counts_as_zero_and_fires",
+        "ruby_pb1_009_combined_count_threshold"
+      ],
+      "covering_test_count": 33,
       "is_null": false
     },
     {
@@ -20894,6 +21166,7 @@
       ],
       "covering_tests": [
         "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
         "himeno_front_1_opponent_at_left_moves_to_center",
         "himeno_front_3_opponents_select_left_moves_to_center",
         "himeno_front_constant_evaluates",
@@ -20905,9 +21178,10 @@
         "ll_bp2001_cannot_be_baton_touched_out",
         "mijuku_dreamer_refresh_condition_scores",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
-        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
+        "sumire_bpb4004_double_baton_removes_both_and_clamps_cost"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 15,
       "is_null": false
     },
     {
@@ -20936,6 +21210,7 @@
       ],
       "covering_tests": [
         "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
         "himeno_front_1_opponent_at_left_moves_to_center",
         "himeno_front_3_opponents_select_left_moves_to_center",
         "himeno_front_constant_evaluates",
@@ -20947,9 +21222,10 @@
         "ll_bp2001_cannot_be_baton_touched_out",
         "mijuku_dreamer_refresh_condition_scores",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
-        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
+        "sumire_bpb4004_double_baton_removes_both_and_clamps_cost"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 15,
       "is_null": false
     },
     {
@@ -22940,6 +23216,7 @@
       "covering_tests": [
         "empty_front_slot_no_crash",
         "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
         "ll_bp2001_cannot_be_baton_touched_out",
         "mijuku_dreamer_refresh_condition_scores",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
@@ -22952,9 +23229,10 @@
         "ruby_leaves_stage_modifier_removed",
         "ruby_left_affects_p2_right_only",
         "ruby_right_affects_p2_left_only",
-        "ruby_zero_blade_member_stays_zero"
+        "ruby_zero_blade_member_stays_zero",
+        "sumire_bpb4004_double_baton_removes_both_and_clamps_cost"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 17,
       "is_null": false
     },
     {
@@ -25922,7 +26200,8 @@
       "covering_files": [
         "engine/tests/test_modules/awaken_the_power_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs",
-        "engine/tests/test_modules/nico_recover_test.rs"
+        "engine/tests/test_modules/nico_recover_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs"
       ],
       "covering_tests": [
         "butterfly_to_butterfly_wing_matches",
@@ -25935,6 +26214,16 @@
         "dream_believers_105_to_base_no_match",
         "dream_believers_to_105_matches",
         "fewer_than_4_available",
+        "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
+        "hanamaru_pb1_007_member_only_or_empty_reveal_places_nothing",
+        "hanamaru_pb1_007_multiple_lives_still_only_one_energy",
+        "hanamaru_pb1_007_revealed_live_places_wait_energy",
+        "hanayo_bp5_008_counts_score_not_card_count",
+        "hanayo_bp5_008_ignores_opponent_success_zone",
+        "hanayo_bp5_008_requires_presence_on_stage",
+        "hanayo_bp5_008_score_sum_threshold_and_boundary",
+        "hanayo_bp5_008_two_copies_each_get_bonus",
+        "hanayo_bp5_008_value_fixed_and_color_exact",
         "happy_path_moves_up_to_4_cards",
         "hinoshita_multiple_waitroom_matches_prompts_choice",
         "hinoshita_no_live_card_in_hand_fails",
@@ -25943,19 +26232,10 @@
         "hinoshita_q237_name_contains_all_no_match",
         "hinoshita_reveal_choice_keeps_card_in_hand",
         "hinoshita_use_limit_once_per_turn",
-        "link_to_the_future_104_to_base_no_match",
-        "link_to_the_future_to_104_matches",
-        "nico_heart06_too_low_not_recovered",
-        "nico_no_eligible_card_skips",
-        "nico_one_card_recovered_even_if_multiple_eligible",
-        "nico_recover_with_heart06_ge3",
-        "no_aqours_does_not_fire",
-        "no_matching_live_in_discard_skips",
-        "no_saint_snow_does_not_fire",
-        "only_selects_matching_live_cards",
-        "optional_can_skip"
+        "kanon_spbp4_001_empty_energy_deck_degrades_gracefully",
+        "kanon_spbp4_001_energy_count_includes_wait_state"
       ],
-      "covering_test_count": 29,
+      "covering_test_count": 62,
       "is_null": false
     },
     {
@@ -26106,14 +26386,25 @@
       ],
       "base": "PL!SP-bp1-027",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/constant_edge_case_test.rs"
+        "engine/tests/test_modules/constant_edge_case_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs"
       ],
       "covering_tests": [
+        "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
+        "hanamaru_pb1_007_member_only_or_empty_reveal_places_nothing",
+        "hanamaru_pb1_007_multiple_lives_still_only_one_energy",
+        "hanamaru_pb1_007_revealed_live_places_wait_energy",
+        "hanayo_bp5_008_counts_score_not_card_count",
+        "hanayo_bp5_008_ignores_opponent_success_zone",
+        "hanayo_bp5_008_requires_presence_on_stage",
+        "hanayo_bp5_008_score_sum_threshold_and_boundary",
+        "hanayo_bp5_008_two_copies_each_get_bonus",
+        "hanayo_bp5_008_value_fixed_and_color_exact",
         "hanayo_combined_energy_below_fifteen",
         "hanayo_combined_energy_exactly_fifteen",
         "honoka_distinct_names_duplicate_name",
@@ -26121,20 +26412,21 @@
         "honoka_distinct_names_three_members",
         "honoka_distinct_names_two_members",
         "kanon_alone_cannot_live",
+        "kanon_spbp4_001_empty_energy_deck_degrades_gracefully",
+        "kanon_spbp4_001_energy_count_includes_wait_state",
+        "kanon_spbp4_001_non_liella_blocks_placement",
+        "kanon_spbp4_001_places_wait_energy_when_liella_only",
         "kanon_with_other_member_no_restriction",
-        "riko_compound_and_condition_both_met",
-        "riko_compound_and_condition_removal",
-        "riko_compound_and_opponent_empty",
-        "riko_compound_and_own_has_cards",
-        "umi_opponent_score_below_six",
-        "umi_opponent_score_drops_below_threshold",
-        "umi_opponent_score_exactly_six",
-        "you_pb1_energy_changes_dynamically",
-        "you_pb1_opponent_equal_energy_no_blade",
-        "you_pb1_opponent_less_energy_no_blade",
-        "you_pb1_opponent_more_energy_gains_blade"
+        "mari_bp3_008_activates_only_available_waiting_energies",
+        "mari_bp3_008_aqours_below_six_skips_activation",
+        "mari_bp3_008_aqours_high_fetch_activates_four",
+        "mari_bp3_008_selection_mandatory_and_live_only",
+        "mari_bp3_008_usable_with_no_live_in_waitroom",
+        "mari_bp3_008_wrong_group_fetch_skips_activation",
+        "mari_bp5_008_bonus_is_live_total_not_per_card",
+        "mari_bp5_008_exactly_two_surplus_qualifies"
       ],
-      "covering_test_count": 19,
+      "covering_test_count": 52,
       "is_null": false
     },
     {
@@ -26888,6 +27180,7 @@
       "covering_tests": [
         "cutie_panther_live_start_reduce_hearts",
         "himena_bp6006_baton_only_with_murasakipark",
+        "himena_bp6006_murasakipark_partner_baton_succeeds",
         "kaguya_live_success_cheer_recover",
         "kaguya_live_success_recover",
         "kanan_live_success_timing",
@@ -26897,6 +27190,7 @@
         "mijuku_dreamer_refresh_via_mill_gets_bonus",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
+        "sumire_bpb4004_double_baton_removes_both_and_clamps_cost",
         "tiny_stars_basic",
         "tiny_stars_duplicate_kanon",
         "tiny_stars_duplicate_kanon_select_second",
@@ -26907,7 +27201,7 @@
         "tiny_stars_keke_only",
         "tiny_stars_none"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 22,
       "is_null": false
     },
     {
@@ -27545,7 +27839,7 @@
         "chisato_q129_cost_reduction_affects_threshold",
         "chisato_q78_ability_lost_on_leave"
       ],
-      "covering_test_count": 148,
+      "covering_test_count": 150,
       "is_null": false
     },
     {
@@ -27614,7 +27908,7 @@
         "chisato_q129_cost_reduction_affects_threshold",
         "chisato_q78_ability_lost_on_leave"
       ],
-      "covering_test_count": 148,
+      "covering_test_count": 150,
       "is_null": false
     },
     {
@@ -27683,7 +27977,7 @@
         "chisato_q129_cost_reduction_affects_threshold",
         "chisato_q78_ability_lost_on_leave"
       ],
-      "covering_test_count": 148,
+      "covering_test_count": 150,
       "is_null": false
     },
     {
@@ -27915,12 +28209,27 @@
         "engine/tests/test_modules/pl_hs_bp1_003_test.rs",
         "engine/tests/test_modules/qa_new_tests256.rs",
         "engine/tests/test_modules/qa_new_tests257.rs",
-        "engine/tests/test_modules/tsunagaru_connect_test.rs"
+        "engine/tests/test_modules/tsunagaru_connect_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs"
       ],
       "covering_tests": [
         "all_areas_hasunosora_with_multiname_gains_score",
         "duplicate_names_fails_distinct_condition",
         "empty_area_fails_all_areas_condition",
+        "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
+        "hanamaru_pb1_007_member_only_or_empty_reveal_places_nothing",
+        "hanamaru_pb1_007_multiple_lives_still_only_one_energy",
+        "hanamaru_pb1_007_revealed_live_places_wait_energy",
+        "hanayo_bp5_008_counts_score_not_card_count",
+        "hanayo_bp5_008_ignores_opponent_success_zone",
+        "hanayo_bp5_008_requires_presence_on_stage",
+        "hanayo_bp5_008_score_sum_threshold_and_boundary",
+        "hanayo_bp5_008_two_copies_each_get_bonus",
+        "hanayo_bp5_008_value_fixed_and_color_exact",
+        "kanon_spbp4_001_empty_energy_deck_degrades_gracefully",
+        "kanon_spbp4_001_energy_count_includes_wait_state",
+        "kanon_spbp4_001_non_liella_blocks_placement",
+        "kanon_spbp4_001_places_wait_energy_when_liella_only",
         "live_phase_crossroads_replacement_multiple_targets",
         "live_phase_crossroads_replacement_no_targets",
         "live_phase_crossroads_replacement_p1",
@@ -27933,23 +28242,9 @@
         "maki_debut_crossroads_replacement_with_dreamin",
         "maki_pb1_active_opponent_no_draw",
         "maki_pb1_empty_deck_still_works",
-        "maki_pb1_multiple_waits_still_draw_one",
-        "maki_pb1_no_mus_but_wait_still_draws",
-        "maki_pb1_no_mus_live_in_discard",
-        "maki_pb1_no_opponent_wait_no_draw",
-        "maki_pb1_opponent_wait_draws",
-        "maki_pb1_place_mus_live_on_deck_top",
-        "maki_pb1_self_wait_not_enough",
-        "maki_pb1_wait_in_all_positions_triggers",
-        "missing_hasunosora_member_fails_condition",
-        "multiname_card_matches_hasunosora_group",
-        "no_niji_members_no_peek",
-        "one_member_discard_card",
-        "one_member_keep_card",
-        "q256_maki_reveal_crossroads_replacement",
-        "reveal_live_card_gets_score_boost"
+        "maki_pb1_multiple_waits_still_draw_one"
       ],
-      "covering_test_count": 34,
+      "covering_test_count": 67,
       "is_null": false
     },
     {
@@ -33309,6 +33604,7 @@
         "engine/tests/test_modules/stage_to_discard_ability_test.rs",
         "engine/tests/test_modules/strawberry_test.rs",
         "engine/tests/test_modules/tokimeki_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/yoshiko_test.rs",
         "engine/tests/test_modules/you_debut_test.rs"
       ],
@@ -33344,7 +33640,7 @@
         "c9_arise_activate_and_recover",
         "c9_arise_constant_heart_with_other_arise"
       ],
-      "covering_test_count": 182,
+      "covering_test_count": 215,
       "is_null": false
     },
     {
@@ -36425,14 +36721,25 @@
       ],
       "base": "PL!SP-bp1-027",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/constant_edge_case_test.rs"
+        "engine/tests/test_modules/constant_edge_case_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs"
       ],
       "covering_tests": [
+        "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
+        "hanamaru_pb1_007_member_only_or_empty_reveal_places_nothing",
+        "hanamaru_pb1_007_multiple_lives_still_only_one_energy",
+        "hanamaru_pb1_007_revealed_live_places_wait_energy",
+        "hanayo_bp5_008_counts_score_not_card_count",
+        "hanayo_bp5_008_ignores_opponent_success_zone",
+        "hanayo_bp5_008_requires_presence_on_stage",
+        "hanayo_bp5_008_score_sum_threshold_and_boundary",
+        "hanayo_bp5_008_two_copies_each_get_bonus",
+        "hanayo_bp5_008_value_fixed_and_color_exact",
         "hanayo_combined_energy_below_fifteen",
         "hanayo_combined_energy_exactly_fifteen",
         "honoka_distinct_names_duplicate_name",
@@ -36440,20 +36747,21 @@
         "honoka_distinct_names_three_members",
         "honoka_distinct_names_two_members",
         "kanon_alone_cannot_live",
+        "kanon_spbp4_001_empty_energy_deck_degrades_gracefully",
+        "kanon_spbp4_001_energy_count_includes_wait_state",
+        "kanon_spbp4_001_non_liella_blocks_placement",
+        "kanon_spbp4_001_places_wait_energy_when_liella_only",
         "kanon_with_other_member_no_restriction",
-        "riko_compound_and_condition_both_met",
-        "riko_compound_and_condition_removal",
-        "riko_compound_and_opponent_empty",
-        "riko_compound_and_own_has_cards",
-        "umi_opponent_score_below_six",
-        "umi_opponent_score_drops_below_threshold",
-        "umi_opponent_score_exactly_six",
-        "you_pb1_energy_changes_dynamically",
-        "you_pb1_opponent_equal_energy_no_blade",
-        "you_pb1_opponent_less_energy_no_blade",
-        "you_pb1_opponent_more_energy_gains_blade"
+        "mari_bp3_008_activates_only_available_waiting_energies",
+        "mari_bp3_008_aqours_below_six_skips_activation",
+        "mari_bp3_008_aqours_high_fetch_activates_four",
+        "mari_bp3_008_selection_mandatory_and_live_only",
+        "mari_bp3_008_usable_with_no_live_in_waitroom",
+        "mari_bp3_008_wrong_group_fetch_skips_activation",
+        "mari_bp5_008_bonus_is_live_total_not_per_card",
+        "mari_bp5_008_exactly_two_surplus_qualifies"
       ],
-      "covering_test_count": 19,
+      "covering_test_count": 52,
       "is_null": false
     },
     {

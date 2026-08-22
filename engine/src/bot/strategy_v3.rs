@@ -666,9 +666,6 @@ pub struct HandUsefulness {
 }
 
 impl HandUsefulness {
-    pub fn is_dead(&self, hand_index: usize) -> bool {
-        self.uncovered_lives.contains(&hand_index) || self.dead_members.contains(&hand_index)
-    }
 }
 
 /// Classify the active player's hand. Mid-game signal: stage hearts for

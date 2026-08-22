@@ -449,37 +449,6 @@ impl ChoiceBuilder {
 }
 
 impl Choice {
-    pub fn select_target(
-        target: impl Into<String>,
-        description: impl Into<String>,
-        allow_skip: bool,
-    ) -> Self {
-        Choice::SelectTarget {
-            target: target.into(),
-            description: description.into(),
-            description_en: None,
-            description_ja: None,
-            allow_skip,
-            options: None,
-        }
-    }
-
-    pub fn select_target_with_options(
-        target: impl Into<String>,
-        description: impl Into<String>,
-        allow_skip: bool,
-        options: Vec<String>,
-    ) -> Self {
-        Choice::SelectTarget {
-            target: target.into(),
-            description: description.into(),
-            description_en: None,
-            description_ja: None,
-            allow_skip,
-            options: Some(options),
-        }
-    }
-
     pub fn select_cards(
         zone: impl Into<String>,
         count: usize,
@@ -845,25 +814,11 @@ pub struct StepOutput {
 }
 
 impl StepOutput {
-    pub fn from_cards(cards: Vec<i16>) -> Self {
-        StepOutput {
-            cards,
-            value: None,
-            accepted: None,
-        }
-    }
     pub fn from_value(value: i32) -> Self {
         StepOutput {
             cards: Vec::new(),
             value: Some(value),
             accepted: None,
-        }
-    }
-    pub fn from_accepted(accepted: bool) -> Self {
-        StepOutput {
-            cards: Vec::new(),
-            value: None,
-            accepted: Some(accepted),
         }
     }
     pub fn merge(&mut self, other: &StepOutput) {
@@ -994,9 +949,6 @@ impl AbilityTraceNode {
         self
     }
 
-    pub fn add_child(&mut self, node: AbilityTraceNode) {
-        self.children.push(node);
-    }
 }
 
 // ====================================================================

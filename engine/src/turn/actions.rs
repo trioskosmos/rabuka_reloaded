@@ -1265,6 +1265,11 @@ impl super::TurnEngine {
         Ok(())
     }
 
+    // Rule 9.5.1/10.1 cascade. NOTE (audit 2026-08): the duplicate-member rule
+    // process (Rule 10.4: multiple members in one area -> newest stays, others
+    // to owner's waitroom) is NOT implemented here. It is unreachable by
+    // construction today (baton-touch enforcement, swap-on-position-change,
+    // formation change forbidding stacking), so no defensive scan exists.
     pub fn check_timing(game_state: &mut GameState) {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("check_timing");

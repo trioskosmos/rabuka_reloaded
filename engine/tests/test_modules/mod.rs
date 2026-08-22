@@ -328,6 +328,7 @@ pub mod either_or_state_change_test;
 pub mod untested_abilities_batch4_test;
 pub mod untested_abilities_batch5_test;
 pub mod untested_abilities_batch6_test;
+pub mod untested_abilities_batch7_test;
 pub mod untested_secondary_abilities_test;
 pub mod restriction_mechanics_test;
 pub mod untested_abilities_batch3_test;
@@ -454,6 +455,3 @@ pub mod wien_yell_count_test;
 pub mod kasumi_turn_limit_test;
 pub mod sayaka_loop_test;
 
-
-
-pub mod probe_tmp_test;

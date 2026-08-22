@@ -3960,6 +3960,55 @@ impl<'a> ConditionContext<'a> {
         let comparison_type = condition.get_comparison_type();
         let resource_type = condition.get_resource_type();
         if comparison_type == Some("score") {
+            // "それがスコア6以上の『Aqours』のライブカードの場合" — 「それ」
+            // refers to the card(s) moved/selected by the PRECEDING sequential
+            // step, not to any zone. Every referenced card matching the group/
+            // type filters must satisfy the score threshold (min over the set;
+            // no match at all → fail).
+            if condition.get_location().is_none()
+                && (condition.get_source() == Some("preceding_moved")
+                    || condition.get_source() == Some("previous_moved_cards"))
+            {
+                let card_db = &self.game_state.card_database;
+                let pool: SmallVec<[i16; 8]> = if self.moved_cards.is_empty() {
+                    let enqueued = self.game_state.entry_trigger_moved_cards();
+                    let global = self.game_state.recently_moved_cards.clone();
+                    match (&enqueued, &global) {
+                        (Some(ev), None) if !ev.is_empty() => ev.iter().copied().collect(),
+                        _ => global.map_or_else(SmallVec::new, |g| g.iter().copied().collect()),
+                    }
+                } else {
+                    self.moved_cards.iter().copied().collect()
+                };
+                let mut matched_min: Option<u8> = None;
+                for &id in &pool {
+                    if id == -1 {
+                        continue;
+                    }
+                    if let Some(ref groups) = condition.get_group_names() {
+                        if !groups.is_empty()
+                            && !groups
+                                .iter()
+                                .any(|g| util::card_matches_group_str(card_db, id, Some(g)))
+                        {
+                            continue;
+                        }
+                    }
+                    if let Some(ref ct) = condition.get_card_type() {
+                        if !util::card_matches_type(card_db, id, Some(ct)) {
+                            continue;
+                        }
+                    }
+                    let s = card_db.get_card(id).and_then(|c| c.score).unwrap_or(0);
+                    matched_min = Some(matched_min.map_or(s, |m: u8| m.min(s)));
+                }
+                log::debug!(
+                    "[SCORE_PRECEDING_MOVED] pool={:?} min={:?}",
+                    pool,
+                    matched_min
+                );
+                return matched_min.unwrap_or(0);
+            }
             return self.get_count_for_target(condition, target);
         }
         if comparison_type == Some("cost") {

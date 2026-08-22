@@ -1065,18 +1065,6 @@ impl GameState {
         });
     }
 
-    pub fn record_area_placement(&mut self, player_id: &str, area: &str) {
-        let key = format!("{}:{}", player_id, area);
-        if !self.areas_placed_this_turn.contains(&key) {
-            self.areas_placed_this_turn.push(key);
-        }
-    }
-
-    pub fn has_area_been_placed_this_turn(&self, player_id: &str, area: &str) -> bool {
-        let key = format!("{}:{}", player_id, area);
-        self.areas_placed_this_turn.contains(&key)
-    }
-
     pub fn clear_area_placement_tracking(&mut self) {
         self.areas_placed_this_turn.clear();
     }
@@ -1110,78 +1098,8 @@ impl GameState {
         self.card_appearance_source.clear();
     }
 
-    pub fn set_turn_order_changed(&mut self, changed: bool) {
-        self.turn_order_changed = changed;
-    }
-
-    pub fn has_turn_order_changed(&self) -> bool {
-        self.turn_order_changed
-    }
-
-    pub fn record_auto_ability_trigger(&mut self, card_id: &str) {
-        let key = card_id.to_string();
-        match self
-            .auto_ability_trigger_counts
-            .iter_mut()
-            .find(|(k, _)| *k == key)
-        {
-            Some((_, count)) => *count += 1,
-            None => self.auto_ability_trigger_counts.push((key, 1)),
-        }
-    }
-
-    pub fn get_auto_ability_trigger_count(&self, card_id: &str) -> u8 {
-        self.auto_ability_trigger_counts
-            .iter()
-            .find(|(k, _)| *k == card_id)
-            .map(|(_, c)| *c)
-            .unwrap_or(0)
-    }
-
     pub fn clear_auto_ability_trigger_tracking(&mut self) {
         self.auto_ability_trigger_counts.clear();
-    }
-
-    pub fn record_turn_limit_usage(&mut self, player_id: &str, card_instance_id: u8) {
-        let key = format!("{}:{}", player_id, card_instance_id);
-        if let Some((_, count)) = self.turn_limit_usage.iter_mut().find(|(k, _)| *k == key) {
-            *count += 1;
-        } else {
-            self.turn_limit_usage.push((key, 1));
-        }
-    }
-
-    pub fn get_turn_limit_usage(&self, player_id: &str, card_instance_id: u8) -> u8 {
-        let key = format!("{}:{}", player_id, card_instance_id);
-        self.turn_limit_usage
-            .iter()
-            .find(|(k, _)| *k == key)
-            .map(|(_, v)| *v)
-            .unwrap_or(0)
-    }
-
-    pub fn clear_turn_limit_tracking(&mut self) {
-        self.turn_limit_usage.clear();
-    }
-
-    pub fn assign_card_instance_id(&mut self, card_id: i16) -> u8 {
-        self.card_instance_counter += 1;
-        let instance_id = self.card_instance_counter;
-        self.card_instance_mapping.insert(card_id, instance_id);
-        instance_id
-    }
-
-    pub fn get_card_instance_id(&self, card_id: i16) -> Option<u8> {
-        self.card_instance_mapping.get(&card_id).copied()
-    }
-
-    pub fn remove_card_instance(&mut self, card_id: i16) {
-        self.card_instance_mapping.remove(&card_id);
-    }
-
-    pub fn clear_card_instance_tracking(&mut self) {
-        self.card_instance_mapping.clear();
-        self.card_instance_counter = 0;
     }
 
     pub fn record_baton_touch(&mut self, player_id: &str, arriving_card_id: Option<i16>) {
@@ -1272,133 +1190,8 @@ impl GameState {
         self.turn_area_movements.clear();
     }
 
-    pub fn set_heart_color_decision_phase(&mut self, phase: &str) {
-        self.heart_color_decision_phase = phase.to_string();
-    }
-
-    pub fn get_heart_color_decision_phase(&self) -> &str {
-        &self.heart_color_decision_phase
-    }
-
-    pub fn is_in_required_hearts_check_phase(&self) -> bool {
-        self.heart_color_decision_phase == "required_hearts_check"
-    }
-
-    pub fn is_in_live_start_phase(&self) -> bool {
-        self.heart_color_decision_phase == "live_start"
-    }
-
-    // Rule 10.2 / Q85 / Q86 / Q104: Deck refresh pending flag
-    //
-    // `deck_refresh_pending` is set when a mid-effect refresh condition is
-    // detected (Rule 10.2.2.1 or 10.2.2.2) but the actual refresh couldn't
-    // be performed inline. The flag is checked at the next safe opportunity
-    // (usually in process_player_abilities or check_timing).
-    pub fn set_deck_refresh_pending(&mut self, pending: bool) {
-        self.deck_refresh_pending = pending;
-    }
-
-    pub fn is_deck_refresh_pending(&self) -> bool {
-        self.deck_refresh_pending
-    }
-
-    // Rule 10.2.3 / Q85 / Q86 / Q104: Perform deck refresh
-    //
-    // Takes ALL cards from the player's waitroom, shuffles them,
-    // and places them as the new main deck.
-    //
-    // Rule 10.2.3 specifies that refreshed cards go UNDER any existing
-    // deck cards. This implementation assumes the deck is empty when
-    // refresh is called (which is the common case: refresh is triggered
-    // when deck = 0). If there ARE existing deck cards, they would be
-    // on top and the refreshed cards below.
-    //
-    // Q85: During look-at-N with insufficient deck:
-    //   The already-looked-at cards stay above the refreshed cards.
-    //   This is correct because looked_at cards were REMOVED from deck
-    //   (via draw), so the deck is empty when refresh fires.
-    //
-    // Q86: When deck has exactly N cards during look-at-N:
-    //   No refresh during look. If the effect discards looked cards,
-    //   deck might become 0, triggering refresh AFTER the effect.
-    //
-    // Q104: During mill-N with insufficient deck:
-    //   The just-milled cards go to waitroom, then refresh moves them
-    //   back to deck. The remaining N - milled cards are then milled
-    //   from the refreshed deck. This is correct because the milled
-    //   cards reached the waitroom before refresh was checked.
-    pub fn perform_deck_refresh(&mut self, player_id: &str) {
-        let player = if player_id == "player1" {
-            &mut self.player1
-        } else {
-            &mut self.player2
-        };
-
-        // Rule 10.2.3: Take all waitroom cards
-        let waitroom_cards: Vec<i16> = player.waitroom.cards.iter().copied().collect();
-        player.waitroom.cards.clear();
-        // Place as new deck (if deck had existing cards, these go under)
-        // But per Q85/Q104, deck should be empty at this point.
-        for card_id in waitroom_cards {
-            player.main_deck.cards.push(card_id);
-        }
-
-        player.main_deck.shuffle();
-        self.deck_refresh_pending = false;
-    }
-
-    pub fn set_live_being_performed(&mut self, performed: bool) {
-        self.live_being_performed = performed;
-    }
-
-    pub fn is_live_being_performed(&self) -> bool {
-        self.live_being_performed
-    }
-
-    pub fn set_game_ended(&mut self, ended: bool) {
-        self.game_ended = ended;
-    }
-
-    pub fn is_game_ended(&self) -> bool {
-        self.game_ended
-    }
-
-    pub fn set_draw_state(&mut self, draw: bool) {
-        self.draw_state = draw;
-    }
-
-    pub fn is_draw_state(&self) -> bool {
-        self.draw_state
-    }
-
-    pub fn check_success_zone_draw_condition(&self, player_id: &str) -> bool {
-        let player = if player_id == self.player1.id {
-            &self.player1
-        } else if player_id == self.player2.id {
-            &self.player2
-        } else {
-            return false;
-        };
-
-        let success_count = player.success_live_card_zone.cards.len();
-        success_count >= 3
-    }
-
-    pub fn add_revealed_card(&mut self, card_id: i16) {
-        let src = self.current_ability_source_card_id();
-        let owner = self
-            .ability_master_id()
-            .as_deref()
-            .and_then(|m| crate::ability::util::target_player_index("self", Some(m)));
-        self.push_revealed_card(card_id, src, false, owner, "ability");
-    }
-
     pub fn remove_revealed_card(&mut self, card_id: i16) {
         self.revealed_cards.retain(|id| *id != card_id);
-    }
-
-    pub fn is_card_revealed(&self, card_id: i16) -> bool {
-        self.revealed_cards.contains(&card_id)
     }
 
     pub fn clear_revealed_cards(&mut self) {
@@ -1434,17 +1227,6 @@ impl GameState {
         if !list.contains(&ability_type) {
             list.push(ability_type);
         }
-    }
-
-    pub fn remove_gained_abilities(&mut self, card_id: i16) {
-        self.gained_abilities.remove(&card_id);
-        self.gained_card_abilities.remove(&card_id);
-    }
-
-    pub fn has_gained_ability(&self, card_id: i16, ability_type: &str) -> bool {
-        self.gained_abilities
-            .get(&card_id)
-            .is_some_and(|a| a.iter().any(|x| x == ability_type))
     }
 
     pub fn clear_gained_abilities_for_card(&mut self, card_id: i16) {

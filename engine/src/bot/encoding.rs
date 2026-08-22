@@ -66,21 +66,6 @@ impl ZoneId {
         )
     }
 
-    pub fn is_positional_zone(self) -> bool {
-        matches!(
-            self,
-            Self::MyStagePos0
-                | Self::MyStagePos1
-                | Self::MyStagePos2
-                | Self::OppStagePos0
-                | Self::OppStagePos1
-                | Self::OppStagePos2
-        )
-    }
-
-    pub fn as_usize(self) -> usize {
-        self as usize
-    }
 }
 
 pub struct EncodedState {
@@ -125,21 +110,6 @@ impl EncodedState {
         8 * CARD_EMBED_DIM + 6 * (CARD_EMBED_DIM + POSITION_FEATURES) + GLOBAL_FEATURES
     }
 
-    /// Returns (start, end) ranges for each zone in the flat encoding.
-    pub fn zone_ranges() -> [(ZoneId, (usize, usize)); NUM_ZONES] {
-        let mut offset = 0;
-        let mut ranges = [(ZoneId::MyHand, (0, 0)); NUM_ZONES];
-        for (i, z) in ZoneId::all().iter().enumerate() {
-            let dim = if z.is_sum_zone() {
-                CARD_EMBED_DIM
-            } else {
-                CARD_EMBED_DIM + POSITION_FEATURES
-            };
-            ranges[i] = (*z, (offset, offset + dim));
-            offset += dim;
-        }
-        ranges
-    }
 }
 
 pub struct ActionEncoding {

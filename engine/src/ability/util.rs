@@ -909,24 +909,12 @@ impl<'a> CardFilter<'a> {
         self.group = Some(g);
         self
     }
-    pub fn group_opt(mut self, g: Option<&'a str>) -> Self {
-        self.group = g;
-        self
-    }
     pub fn heart_colors(mut self, hc: &'a [String]) -> Self {
         self.heart_colors = hc;
         self
     }
     pub fn distinct(mut self, d: DistinctType) -> Self {
         self.distinct = Some(d);
-        self
-    }
-    pub fn exclude_cards_opt(mut self, ids: Option<&'a [i16]>) -> Self {
-        self.exclude_cards = ids;
-        self
-    }
-    pub fn exclude_names_opt(mut self, names: Option<&'a Vec<String>>) -> Self {
-        self.exclude_names = names;
         self
     }
     pub fn original_blade_limit(mut self, obl: Option<u8>, obo: Option<&'a str>) -> Self {
@@ -941,40 +929,6 @@ impl<'a> CardFilter<'a> {
     pub fn exclude_self_opt(mut self, id: Option<i16>) -> Self {
         self.exclude_self = id;
         self
-    }
-
-    /// Set `group` from the first element of a group-names slice.
-    /// For multi-group OR matching, use `CardFilter::from_effect` instead
-    /// (which also sets the `groups` field for the full slice).
-    pub fn with_groups(mut self, groups: &'a [String]) -> Self {
-        if let Some(first) = groups.first() {
-            self.group = Some(first.as_str());
-        }
-        self
-    }
-
-    /// Set `cost_limit` (upper bound) and `cost_limit_min` (lower bound) together.
-    /// Eliminates the dual-field assignment in range-filter handlers.
-    pub fn with_cost_range(
-        mut self,
-        min: Option<u8>,
-        max: Option<u8>,
-        op: Option<&'a str>,
-    ) -> Self {
-        self.cost_limit = max;
-        self.cost_operator = op;
-        self.cost_limit_min = min;
-        self
-    }
-
-    /// Like `matches()` but additionally excludes every card in `excluded`.
-    /// Replaces the pattern where handlers filter `selected_cards` out of a
-    /// candidate list before passing to CardFilter (~8 sites).
-    pub fn matches_with_excluded(&self, db: &CardDatabase, id: i16, excluded: &[i16]) -> bool {
-        if excluded.contains(&id) {
-            return false;
-        }
-        self.matches(db, id, false)
     }
 
     /// Returns true if any filter field is set that could cause cards to be rejected.
@@ -1367,14 +1321,6 @@ impl<'a> CardFilter<'a> {
         self.matches(db, id, false)
     }
 
-    pub fn find_ids(&self, cards: &[i16], db: &CardDatabase) -> Vec<i16> {
-        cards
-            .iter()
-            .filter(|&&id| self.matches(db, id, false))
-            .copied()
-            .collect()
-    }
-
     pub fn count(&self, cards: &[i16], db: &CardDatabase) -> u8 {
         cards
             .iter()
@@ -1462,56 +1408,6 @@ impl<'a> CardFilter<'a> {
             or_ability_filters: effect.or_ability_filters_any().map(|v| &**v),
             card_property,
             negation: effect.negation_any().unwrap_or(false),
-        }
-    }
-
-    /// Build from a Choice::SelectCard — reads filter fields the choice advertised.
-    pub fn from_choice(choice: &'a crate::ability::types::Choice) -> Self {
-        match choice {
-            crate::ability::types::Choice::SelectCard {
-                card_type,
-                cost_limit,
-                cost_limit_operator,
-                cost_total: _,
-                cost_total_operator: _,
-                group,
-                characters,
-                ..
-            } => CardFilter {
-                card_type: card_type.as_deref(),
-                group: group.as_deref(),
-                groups: None,
-            cost_limit: cost_limit.map(|c| c as u8),
-            cost_operator: cost_limit_operator.as_deref(),
-            cost_values: None,
-                cost_limit_min: None,
-                cost_total: None,
-                cost_total_operator: None,
-                need_heart_total: None,
-                need_heart_operator: None,
-                need_heart_color: None,
-                characters: characters.as_ref(),
-                exclude_characters: None,
-                exclude_group_names: None,
-                exclude_names: None,
-                heart_colors: &[],
-                require_all_heart_colors: false,
-                heart_color_count: None,
-                name_fragments: None,
-                distinct: None,
-                exclude_self: None,
-                original_blade_limit: None,
-                original_blade_operator: None,
-                current_blade_limit: None,
-                current_blade_operator: None,
-                exclude_cards: None,
-                ability_filter: None,
-                ability_filter_triggers: None,
-                or_ability_filters: None,
-                card_property: None,
-                negation: false,
-            },
-            _ => CardFilter::default(),
         }
     }
 
@@ -1838,20 +1734,6 @@ pub fn compare_counts(operator: Option<&str>, actual: u8, expected: u8) -> bool 
     }
 }
 
-pub fn sum_score_in_zone(
-    cards: &[i16],
-    card_db: &CardDatabase,
-    get_modifier: impl Fn(i16) -> i32,
-) -> u8 {
-    cards
-        .iter()
-        .map(|&id| {
-            let base = card_db.get_card(id).map(|c| c.get_score()).unwrap_or(0);
-            (base as i32 + get_modifier(id)) as u8
-        })
-        .sum()
-}
-
 pub fn remove_card_from_zone(
     player: &mut crate::player::Player,
     card_id: i16,
@@ -2107,14 +1989,6 @@ pub fn pos_to_area(pos: usize) -> crate::zones::MemberArea {
         0 => crate::zones::MemberArea::LeftSide,
         1 => crate::zones::MemberArea::Center,
         _ => crate::zones::MemberArea::RightSide,
-    }
-}
-
-pub fn area_to_index(area: &crate::zones::MemberArea) -> Option<usize> {
-    match area {
-        crate::zones::MemberArea::LeftSide => Some(0),
-        crate::zones::MemberArea::Center => Some(1),
-        crate::zones::MemberArea::RightSide => Some(2),
     }
 }
 
@@ -2420,29 +2294,6 @@ pub fn push_temporary_effect(
                 });
         }
     }
-}
-
-pub fn extract_heart_colors_from_text(text: &str) -> Vec<String> {
-    let mut colors: Vec<String> = Vec::new();
-    let mut pos = 0;
-    while let Some(start) = text[pos..].find("heart_") {
-        let nums_start = pos + start + 6;
-        let end = nums_start
-            + text[nums_start..]
-                .chars()
-                .take_while(|c| c.is_ascii_digit())
-                .count();
-        if end > nums_start {
-            if let Ok(n) = text[nums_start..end].parse::<u8>() {
-                let color = format!("heart{:02}", n);
-                if !colors.contains(&color) {
-                    colors.push(color);
-                }
-            }
-        }
-        pos = end.max(nums_start);
-    }
-    colors
 }
 
 // ============== SELECTION PRIMITIVES ==============

@@ -256,28 +256,6 @@ impl PolicyNet {
         (logits, value)
     }
 
-    /// Score a single action (for 1-ply search).
-    pub fn score_action(&self, state: &EncodedState, action: &ActionEncoding) -> (f32, f32) {
-        let state_flat = state.flatten();
-        let h_state = self.forward_state(&state_flat);
-        let value = self.state_value(&h_state);
-        let act_enc = action.encode(&self.card_embed, &self.zone_embed, &self.action_type_embed);
-        let logit = self.action_logit(&h_state, &act_enc);
-        (logit, value)
-    }
-
-    pub fn num_params(&self) -> usize {
-        CARD_EMBED_TABLE_SIZE * CARD_EMBED_DIM
-            + NUM_ZONES * ZONE_EMBED_DIM
-            + 16 * ACTION_TYPE_EMBED_DIM
-            + HIDDEN * EncodedState::state_dim()
-            + HIDDEN
-            + HIDDEN * ACTION_ENC_DIM
-            + HIDDEN
-            + 1
-            + HIDDEN
-            + 1
-    }
 }
 
 fn relu(x: f32) -> f32 {

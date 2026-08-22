@@ -101,7 +101,6 @@ fn advance_to_live_start(game: &mut TestGame) {
 
 `check_timing()` is called during every phase transition (inside `advance_phase`) and during `execute_effect`. It:
 - Refreshes both players' decks from waitroom if empty
-- Checks duplicate member rule (no-op safety check)
 - Checks victory condition
 - Checks invalid live/energy cards
 - Checks orphaned under-member cards

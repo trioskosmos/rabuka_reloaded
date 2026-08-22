@@ -2025,46 +2025,6 @@ impl GameState {
         }
     }
 
-    pub fn resolve_target_single<'a>(
-        &'a self,
-        target: &str,
-        perspective_player: &'a Player,
-    ) -> Option<&'a Player> {
-        match target {
-            "self" | "自分" => Some(perspective_player),
-            "opponent" | "相手" => Some(if core::ptr::eq(perspective_player, &self.player1) {
-                &self.player2
-            } else {
-                &self.player1
-            }),
-            _ => None,
-        }
-    }
-
-    pub fn resolve_target_single_mut<'a>(
-        &'a mut self,
-        target: &str,
-        perspective_player: &'a Player,
-    ) -> Option<&'a mut Player> {
-        match target {
-            "self" | "自分" => {
-                if core::ptr::eq(perspective_player, &self.player1) {
-                    Some(&mut self.player1)
-                } else {
-                    Some(&mut self.player2)
-                }
-            }
-            "opponent" | "相手" => {
-                if core::ptr::eq(perspective_player, &self.player1) {
-                    Some(&mut self.player2)
-                } else {
-                    Some(&mut self.player1)
-                }
-            }
-            _ => None,
-        }
-    }
-
     pub fn resolve_target_player(&self, target: &str) -> &Player {
         let master = self.ability_master_id().or_else(|| {
             self.activating_card.and_then(|cid| {
@@ -2170,91 +2130,6 @@ impl GameState {
         self.recently_moved_cards = None;
         self.recently_appeared_cards.clear();
         self.recently_state_changed.clear();
-    }
-
-    pub fn resolve_target<'a>(
-        &'a self,
-        target: &str,
-        perspective_player: &'a Player,
-    ) -> Vec<&'a Player> {
-        match target {
-            "self" | "自分" => {
-                vec![perspective_player]
-            }
-            "opponent" | "相手" => {
-                if core::ptr::eq(perspective_player, &self.player1) {
-                    vec![&self.player2]
-                } else {
-                    vec![&self.player1]
-                }
-            }
-            "both" | "両方" => {
-                vec![&self.player1, &self.player2]
-            }
-            "either" | "どちらか" => {
-                vec![&self.player1, &self.player2]
-            }
-            _ => vec![],
-        }
-    }
-
-    pub fn resolve_target_mut(
-        &mut self,
-        target: &str,
-        perspective_player_id: &str,
-    ) -> Vec<&mut Player> {
-        match target {
-            "self" | "自分" => {
-                if perspective_player_id == self.player1.id {
-                    vec![&mut self.player1]
-                } else {
-                    vec![&mut self.player2]
-                }
-            }
-            "opponent" | "相手" => {
-                if perspective_player_id == self.player1.id {
-                    vec![&mut self.player2]
-                } else {
-                    vec![&mut self.player1]
-                }
-            }
-            "both" | "両方" => {
-                vec![&mut self.player1, &mut self.player2]
-            }
-            "either" | "どちらか" => {
-                vec![&mut self.player1, &mut self.player2]
-            }
-            _ => vec![],
-        }
-    }
-
-    pub fn get_player(&self, player_id: &str) -> Option<&Player> {
-        if self.player1.id == player_id {
-            Some(&self.player1)
-        } else if self.player2.id == player_id {
-            Some(&self.player2)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_player_mut(&mut self, player_id: &str) -> Option<&mut Player> {
-        if self.player1.id == player_id {
-            Some(&mut self.player1)
-        } else if self.player2.id == player_id {
-            Some(&mut self.player2)
-        } else {
-            None
-        }
-    }
-
-    pub fn should_trigger_debut(&self, _player: &Player, card: &crate::card::Card) -> bool {
-        card.is_member()
-    }
-
-    pub fn should_trigger_live_start(&self, _player: &Player) -> bool {
-        self.current_phase == Phase::FirstAttackerPerformance
-            || self.current_phase == Phase::SecondAttackerPerformance
     }
 
     pub fn should_trigger_live_success(&self, player: &Player) -> bool {
@@ -2364,63 +2239,6 @@ impl GameState {
             return false;
         }
         true
-    }
-
-    pub fn enforce_constant_ability_restrictions(&mut self) {
-        let p1_id = self.player1.id.clone();
-        let p2_id = self.player2.id.clone();
-        let p1_cards: Vec<(usize, i16)> = self
-            .player1
-            .live_card_zone
-            .cards
-            .iter()
-            .enumerate()
-            .map(|(i, &id)| (i, id))
-            .collect();
-        let p2_cards: Vec<(usize, i16)> = self
-            .player2
-            .live_card_zone
-            .cards
-            .iter()
-            .enumerate()
-            .map(|(i, &id)| (i, id))
-            .collect();
-
-        let mut cards_to_remove: Vec<(&str, usize)> = Vec::new();
-        for (index, card_id) in p1_cards {
-            if !self.can_place_card_in_zone(
-                card_id,
-                crate::ability::enums::Zone::LiveCardZone.to_str(),
-                &p1_id,
-            ) {
-                cards_to_remove.push((&p1_id, index));
-            }
-        }
-        for (index, card_id) in p2_cards {
-            if !self.can_place_card_in_zone(
-                card_id,
-                crate::ability::enums::Zone::LiveCardZone.to_str(),
-                &p2_id,
-            ) {
-                cards_to_remove.push((&p2_id, index));
-            }
-        }
-
-        for (player_id, index) in cards_to_remove {
-            let player = if *player_id == self.player1.id {
-                &mut self.player1
-            } else {
-                &mut self.player2
-            };
-            let card = player.live_card_zone.cards.remove(index);
-            player.waitroom.cards.push(card);
-            if let Some(card_data) = self.card_database.get_card(card) {
-                log::debug!(
-                    "Removed card {} from live_card_zone due to constant ability restriction",
-                    card_data.card_no
-                );
-            }
-        }
     }
 
     pub fn check_expired_effects(&mut self) {

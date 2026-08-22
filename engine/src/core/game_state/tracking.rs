@@ -102,23 +102,8 @@ impl GameState {
         Ok(true)
     }
 
-    pub fn add_prohibition_effect(&mut self, effect: String) {
-        self.prohibition_effects.push(effect);
-    }
-
     pub fn is_action_prohibited(&self, action: &str) -> bool {
         self.prohibition_effects.iter().any(|e| e.contains(action))
     }
 
-    pub fn move_resolution_zone_to_waitroom(&mut self, player_id: &str) {
-        let player = if player_id == self.player1.id {
-            &mut self.player1
-        } else {
-            &mut self.player2
-        };
-
-        for card_id in self.resolution_zone.cards.drain(..) {
-            player.waitroom.cards.push(card_id);
-        }
-    }
 }

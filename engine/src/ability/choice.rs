@@ -1265,6 +1265,9 @@ impl super::resolver::AbilityResolver {
                     "Select {} more card(s) from hand{}",
                     remaining,
                     if ctx.blind { " (blind)" } else { "" }
+                    // Rule 4.1.2.3 audit: `blind` is prompt text only — the
+                    // player is never allowed to treat a matching hidden card
+                    // as absent, as the rulebook permits.
                 );
                 let desc_ja = format!(
                     "手札からさらに{}枚選択{}",
@@ -2188,6 +2191,37 @@ impl super::resolver::AbilityResolver {
             }
             return self.finalize_choice(gs, &context);
         } else {
+            // An empty pick (index outside filtered_indices, or nothing mapped)
+            // must never satisfy a MANDATORY (allow_skip=false) selection:
+            // silently completing would skip the required move entirely
+            // (Q123: 必ず手札に加える必要がある). Re-offer the SAME choice so
+            // the player can pick legal targets.
+            if mapped_indices.is_empty() && !ctx.allow_skip {
+                let target = ctx
+                    .target_player_id
+                    .clone()
+                    .unwrap_or_else(|| "self".to_string());
+                self.pending_choice = Some(
+                    self.build_reprompt(
+                        ctx,
+                        Zone::Discard.to_str(),
+                        ctx.count,
+                        format!(
+                            "Select {} card(s) from the waiting room",
+                            ctx.count
+                        ),
+                        format!("控え室から{}枚選択", ctx.count),
+                        false,
+                        None,
+                        Some(target),
+                        ctx.cost_total,
+                        ctx.cost_total_operator.clone(),
+                    )
+                    .build(),
+                );
+                self.store_pending_choice(gs);
+                return Ok(());
+            }
             if !mapped_indices.is_empty() && ctx.count > 0 && mapped_indices.len() < ctx.count {
                 let target = ctx
                     .target_player_id

@@ -5781,6 +5781,18 @@ def _extract_generic_fields(condition, text):
 
 def _infer_condition_type(condition, text):
     """Determine condition type from extracted fields (mutates condition in place)."""
+    # "それが…の場合" / "それらが…の場合" refer to the card(s) moved or
+    # selected by the PRECEDING sequential step ("それ" = that card), NOT to a
+    # zone state. Tag them so the engine evaluates them against moved_cards
+    # (the character-name variant further down already does this in its own
+    # branch; this covers the group/score/cost/card-type variants).
+    stripped = text.strip()
+    if (
+        stripped.startswith(("それが", "それらが"))
+        and not condition.get("location")
+        and not condition.get("locations")
+    ):
+        condition.setdefault("source", "preceding_moved")
     group_names = condition.get("group_names")
     location = condition.get("location")
     card_type = condition.get("card_type")

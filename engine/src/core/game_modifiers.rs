@@ -223,10 +223,6 @@ impl GameModifiers {
         self.blade_type_modifiers.insert(card_id, blade_color);
     }
 
-    pub fn get_blade_type_modifier(&self, card_id: i16) -> Option<BladeColor> {
-        self.blade_type_modifiers.get(&card_id).copied()
-    }
-
     pub fn clear_blade_type_modifier(&mut self, card_id: i16) {
         self.blade_type_modifiers.remove(&card_id);
     }
@@ -279,15 +275,6 @@ impl GameModifiers {
         color_val() + wildcard_val()
     }
 
-    pub fn set_heart_modifier(&mut self, card_id: i16, color: HeartColor, value: i16) {
-        self.heart_modifiers
-            .entry(card_id)
-            .or_default()
-            .entry(color)
-            .or_default()
-            .set = value;
-    }
-
     pub fn remove_heart_modifier(&mut self, card_id: i16, color: HeartColor, delta: i16) {
         if let Some(colors) = self.heart_modifiers.get_mut(&card_id) {
             if let Some(entry) = colors.get_mut(&color) {
@@ -302,23 +289,8 @@ impl GameModifiers {
         }
     }
 
-    pub fn get_heart_modifier_wildcard(&self, card_id: i16, color: HeartColor) -> i32 {
-        let by_color = self.heart_modifiers.get(&card_id);
-        let specific = by_color
-            .and_then(|colors| colors.get(&color))
-            .map_or(0, |e| e.total());
-        let wildcard = by_color
-            .and_then(|colors| colors.get(&HeartColor::Heart00))
-            .map_or(0, |e| e.total());
-        specific + wildcard
-    }
-
     pub fn set_heart_override(&mut self, card_id: i16, color: HeartColor, count: u8) {
         self.heart_override.insert(card_id, (color, count));
-    }
-
-    pub fn get_heart_override(&self, card_id: i16) -> Option<&(HeartColor, u8)> {
-        self.heart_override.get(&card_id)
     }
 
     pub fn remove_heart_override(&mut self, card_id: i16) {
@@ -331,10 +303,6 @@ impl GameModifiers {
 
     pub fn get_heart_copy(&self, target_card_id: i16) -> Option<i16> {
         self.heart_copy.get(&target_card_id).copied()
-    }
-
-    pub fn remove_heart_copy(&mut self, target_card_id: i16) {
-        self.heart_copy.remove(&target_card_id);
     }
 
     // ============== SCORE ==============

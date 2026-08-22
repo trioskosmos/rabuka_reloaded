@@ -656,10 +656,6 @@ impl Ability {
 pub struct AbilityCost(pub AbilityEffect);
 
 impl AbilityCost {
-    /// Consume the cost and return the inner effect.
-    pub fn into_effect(self) -> AbilityEffect {
-        self.0
-    }
 }
 
 impl From<AbilityCost> for AbilityEffect {
@@ -1218,19 +1214,6 @@ impl AbilityEffect {
             .fold(0u8, |acc, s| {
                 acc.saturating_add(s.effective_energy_cost_total(groups_on_stage))
             })
-    }
-
-    /// True when this cost is DEFINITELY unpayable with `active` energy:
-    /// mandatory pay_energy exceeds active AND the parser found no reduction
-    /// clause on the cost. Only then may generation withhold the action.
-    pub fn is_definitely_unaffordable(&self, active: u8) -> bool {
-        if self.has_cost_reduction() {
-            return false;
-        }
-        if self.has_optional_payment() {
-            return false;
-        }
-        self.energy_cost_total() > active
     }
 
     /// Build EffectKind from an action string and the matching effect JSON.
@@ -1944,20 +1927,6 @@ impl AbilityEffect {
         }
     }
 
-    /// Set the placement target consistently on both underlying booleans so the
-    /// two never conflict. `None` clears both.
-    pub fn set_placement_target(&mut self, target: Option<PlacementTarget>) {
-        let (st, us) = match target {
-            Some(PlacementTarget::UnderThisMember) => (None, Some(true)),
-            Some(PlacementTarget::FilterSelfAsSource) => (Some(true), None),
-            Some(PlacementTarget::UnderChosenMember) | None => (None, None),
-        };
-        if let Some(f) = self.kind.as_deref_mut().and_then(|k| k.filter_mut()) {
-            f.self_target = st;
-            f.under_self = us;
-        }
-    }
-
     /// Boolean convenience: whether the effect targets the activating card as a
     /// source-filter (the legacy `self_target` boolean). Derived from
     /// `placement_target()`; equivalent to `self_target_any().unwrap_or(false)`.
@@ -2017,15 +1986,6 @@ impl AbilityEffect {
 
     filter_u8_getter!(value_any, value);
 
-    pub fn effect_type_any(&self) -> Option<&str> {
-        self.kind
-            .as_deref()?
-            .filter()?
-            .effect_type
-            .as_ref()
-            .map(|s| -> &str { s })
-    }
-
     pub fn action_by_any(&self) -> Option<&str> {
         self.kind
             .as_deref()?
@@ -2080,19 +2040,9 @@ impl AbilityEffect {
         self.source
     }
 
-    /// Typed destination zone. `self.destination` is `Option<Zone>`.
-    pub fn destination_zone(&self) -> Option<Zone> {
-        self.destination
-    }
-
     /// String form of the source zone (mirrors the pre-refactor `Option<ArcStr>.as_deref()`).
     pub fn source_str(&self) -> Option<&str> {
         self.source.map(|z| z.as_str())
-    }
-
-    /// String form of the destination zone.
-    pub fn destination_str(&self) -> Option<&str> {
-        self.destination.map(|z| z.as_str())
     }
 
     /// Build a `CardFilter` containing the 7 base filter fields (card_type,
@@ -3313,10 +3263,6 @@ impl Condition {
 
     pub fn get_heart_source(&self) -> Option<&str> {
         self.common().and_then(|c| c.heart_source.as_deref())
-    }
-
-    pub fn get_exclude_group_names(&self) -> Option<&[String]> {
-        self.common().and_then(|c| c.exclude_group_names.as_deref()).map(|v| v.as_slice())
     }
 
     pub fn get_distinct(&self) -> Option<&DistinctInfo> {
