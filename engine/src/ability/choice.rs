@@ -2710,23 +2710,7 @@ impl super::resolver::AbilityResolver {
                             log::debug!("Failed to execute position change: {}", e);
                         }
                         if pc_ok.is_ok() {
-                            let pid = gs
-                                .ability_queue
-                                .current_entry()
-                                .map(|e| e.player_id.clone())
-                                .unwrap_or_default();
-                            gs.trigger_auto_abilities_for_player_with_event(
-                                &pid,
-                                &TriggerEvent {
-                                    moved_cards: gs
-                                        .recently_moved_cards
-                                        .clone()
-                                        .unwrap_or_default()
-                                        .into(),
-                                    position_change_occurred: gs.position_change_occurred_this_turn,
-                                    ..Default::default()
-                                },
-                            );
+                            gs.trigger_auto_abilities_for_movement_current();
                         }
                         self.clear_choice_state_and_resume(gs)?;
                         return Ok(());
@@ -2819,19 +2803,7 @@ modified.destination = Some(Zone::from_source_str(dest));
                                 }
                             }
                         }
-                        let pid = gs
-                            .ability_queue
-                            .current_entry()
-                            .map(|e| e.player_id.clone())
-                            .unwrap_or_default();
-                        gs.trigger_auto_abilities_for_player_with_event(
-                            &pid,
-                            &TriggerEvent {
-                                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
-                                position_change_occurred: gs.position_change_occurred_this_turn,
-                                ..Default::default()
-                            },
-                        );
+                        gs.trigger_auto_abilities_for_movement_current();
                     }
                     self.clear_choice_state_and_resume(gs)?;
                     return Ok(());
@@ -2915,23 +2887,7 @@ modified.destination = Some(Zone::from_source_str(dest));
                             self.compute_valid_position_destinations(gs, &effect, "self");
                         if valid_destinations.is_empty() {
                             self.finalize_formation_change(gs)?;
-                            let pid = gs
-                                .ability_queue
-                                .current_entry()
-                                .map(|e| e.player_id.clone())
-                                .unwrap_or_default();
-                            gs.trigger_auto_abilities_for_player_with_event(
-                                &pid,
-                                &TriggerEvent {
-                                    moved_cards: gs
-                                        .recently_moved_cards
-                                        .clone()
-                                        .unwrap_or_default()
-                                        .into(),
-                                    position_change_occurred: gs.position_change_occurred_this_turn,
-                                    ..Default::default()
-                                },
-                            );
+                            gs.trigger_auto_abilities_for_movement_current();
                             self.clear_choice_state_and_resume(gs)?;
                             return Ok(());
                         }
@@ -2963,23 +2919,7 @@ modified.destination = Some(Zone::from_source_str(dest));
                     } else {
                         // All members assigned — execute batch swap.
                         self.finalize_formation_change(gs)?;
-                        let pid = gs
-                            .ability_queue
-                            .current_entry()
-                            .map(|e| e.player_id.clone())
-                            .unwrap_or_default();
-                        gs.trigger_auto_abilities_for_player_with_event(
-                            &pid,
-                            &TriggerEvent {
-                                moved_cards: gs
-                                    .recently_moved_cards
-                                    .clone()
-                                    .unwrap_or_default()
-                                    .into(),
-                                position_change_occurred: gs.position_change_occurred_this_turn,
-                                ..Default::default()
-                            },
-                        );
+                        gs.trigger_auto_abilities_for_movement_current();
                         self.clear_choice_state_and_resume(gs)?;
                         return Ok(());
                     }
@@ -3024,36 +2964,12 @@ modified.destination = Some(Zone::from_source_str(dest));
                         }
                     }
                 }
-                let pid = gs
-                    .ability_queue
-                    .current_entry()
-                    .map(|e| e.player_id.clone())
-                    .unwrap_or_default();
-                gs.trigger_auto_abilities_for_player_with_event(
-                    &pid,
-                    &TriggerEvent {
-                        moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
-                        position_change_occurred: gs.position_change_occurred_this_turn,
-                        ..Default::default()
-                    },
-                );
+                gs.trigger_auto_abilities_for_movement_current();
             } else {
                 if let Err(e) = self.execute_position_change_with_destination(gs, &modified, dest) {
                     log::debug!("Failed to execute position change: {}", e);
                 } else {
-                    let pid = gs
-                        .ability_queue
-                        .current_entry()
-                        .map(|e| e.player_id.clone())
-                        .unwrap_or_default();
-                    gs.trigger_auto_abilities_for_player_with_event(
-                        &pid,
-                        &TriggerEvent {
-                            moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
-                            position_change_occurred: gs.position_change_occurred_this_turn,
-                            ..Default::default()
-                        },
-                    );
+                    gs.trigger_auto_abilities_for_movement_current();
                 }
             }
             self.selected_area = None;

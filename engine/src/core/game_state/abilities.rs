@@ -318,6 +318,29 @@ impl GameState {
         self.trigger_auto_abilities_for_player_with_event(player_id, &event);
     }
 
+    /// Post-movement scan wrapper: fires the TAS with the standard
+    /// post-movement snapshot (recently moved cards + position-change flag).
+    pub fn trigger_auto_abilities_for_movement(&mut self, player_id: &str) {
+        let event = crate::ability::types::TriggerEvent {
+            moved_cards: self.recently_moved_cards.clone().unwrap_or_default().into(),
+            position_change_occurred: self.position_change_occurred_this_turn,
+            ..Default::default()
+        };
+        self.trigger_auto_abilities_for_player_with_event(player_id, &event);
+    }
+
+    /// Same as [`Self::trigger_auto_abilities_for_movement`] but targets the
+    /// player of the current ability-queue entry (the common case inside
+    /// choice/effect handlers).
+    pub fn trigger_auto_abilities_for_movement_current(&mut self) {
+        let pid = self
+            .ability_queue
+            .current_entry()
+            .map(|e| e.player_id.clone())
+            .unwrap_or_default();
+        self.trigger_auto_abilities_for_movement(&pid);
+    }
+
     // Q58: Two copies of the same member with "once per turn" can each use the ability once per turn.
     // Q59: A card that changes zones (except stage-to-stage) is treated as new; its once-per-turn resets.
     // Q60: A non-once-per-turn auto ability that triggers must be used (cannot opt out).

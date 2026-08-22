@@ -2714,19 +2714,7 @@ impl AbilityResolver {
             return Err(format!("Member not found: {}", target_member));
         }
         gs.position_change_occurred_this_turn = true;
-        let pid = gs
-            .ability_queue
-            .current_entry()
-            .map(|e| e.player_id.clone())
-            .unwrap_or_default();
-        gs.trigger_auto_abilities_for_player_with_event(
-            &pid,
-            &crate::ability::types::TriggerEvent {
-                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
-                position_change_occurred: gs.position_change_occurred_this_turn,
-                ..Default::default()
-            },
-        );
+        gs.trigger_auto_abilities_for_movement_current();
         gs.recalculate_constants();
         Ok(())
     }
@@ -3106,17 +3094,11 @@ impl AbilityResolver {
                     true,
                 );
             }
-            gs.trigger_auto_abilities_for_player_with_event(
-                &mover_pid,
-                &crate::ability::types::TriggerEvent {
-                    moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
-                    position_change_occurred: gs.position_change_occurred_this_turn,
-                    ..Default::default()
-                },
-            );
+            gs.trigger_auto_abilities_for_movement(&mover_pid);
             gs.recalculate_constants();
             return Ok(());
         }
+
         // Handle specific card_no (for "multiple_targets" each-member pattern)
         if let Some(ref card_no) = effect.target_member_any() {
             if *card_no != "this_member" {
@@ -3203,14 +3185,7 @@ impl AbilityResolver {
                             true,
                         );
                     }
-                    gs.trigger_auto_abilities_for_player_with_event(
-                        &mover_pid,
-                        &crate::ability::types::TriggerEvent {
-                            moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
-                            position_change_occurred: gs.position_change_occurred_this_turn,
-                            ..Default::default()
-                        },
-                    );
+                    gs.trigger_auto_abilities_for_movement(&mover_pid);
                     gs.recalculate_constants();
                     return Ok(());
                 }
@@ -3312,19 +3287,7 @@ impl AbilityResolver {
             }
         }
         gs.position_change_occurred_this_turn = true;
-        let pid = gs
-            .ability_queue
-            .current_entry()
-            .map(|e| e.player_id.clone())
-            .unwrap_or_default();
-        gs.trigger_auto_abilities_for_player_with_event(
-            &pid,
-            &crate::ability::types::TriggerEvent {
-                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
-                position_change_occurred: gs.position_change_occurred_this_turn,
-                ..Default::default()
-            },
-        );
+        gs.trigger_auto_abilities_for_movement_current();
         gs.recalculate_constants();
         Ok(())
     }
@@ -3388,19 +3351,7 @@ impl AbilityResolver {
 
         gs.position_change_occurred_this_turn = true;
         gs.recalculate_constants();
-        let pid = gs
-            .ability_queue
-            .current_entry()
-            .map(|e| e.player_id.clone())
-            .unwrap_or_default();
-        gs.trigger_auto_abilities_for_player_with_event(
-            &pid,
-            &crate::ability::types::TriggerEvent {
-                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
-                position_change_occurred: gs.position_change_occurred_this_turn,
-                ..Default::default()
-            },
-        );
+        gs.trigger_auto_abilities_for_movement_current();
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
