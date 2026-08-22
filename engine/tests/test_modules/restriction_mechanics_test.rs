@@ -327,12 +327,54 @@ fn sumire_bpb4004_double_baton_removes_both_and_clamps_cost() {
         .as_mut()
         .map(|p| p.card_id = Some(sumire));
     rabuka_engine::game_setup::execute_action(&mut game.state, &chosen).expect("resolve");
+    while game.has_pending_choice() {
+        let c = game.pending_choice_summary();
+        eprintln!("[SUMIRE_CHOICE] {}", c);
+        match game.pending_choice_type().as_deref() {
+            Some("SelectTarget") => game.select_option(1),
+            Some("SelectCard") => game.select_indices(&[0]),
+            _ => break,
+        }
+    }
 
+    let name_of = |id: i16| -> String {
+        game.db
+            .get_card(id)
+            .map(|c| c.name.to_string())
+            .unwrap_or_default()
+    };
+    eprintln!("[SUMIRE_TRACE] last 25 debug_trace entries:");
+    for entry in game.state.debug_trace.iter().rev().take(25).rev() {
+        eprintln!("  [TRACE] {}", entry);
+    }
+    eprintln!("[SUMIRE_TRACE] last 20 rule_log entries:");
+    for entry in game.state.rule_log.iter().rev().take(20).rev() {
+        eprintln!("  [RULE] {}", entry);
+    }
     eprintln!(
-        "[SUMIRE_DBG] stage={:?} waitroom={:?} hand={:?} energy={}",
-        game.state.player1.stage.stage,
-        game.state.player1.waitroom.cards,
-        game.state.player1.hand.cards,
+        "[SUMIRE_DBG] stage_names={:?} waitroom_names={:?} hand_names={:?} energy={}",
+        game.state
+            .player1
+            .stage
+            .stage
+            .iter()
+            .filter(|&&c| c != -1)
+            .map(|&c| name_of(c))
+            .collect::<Vec<_>>(),
+        game.state
+            .player1
+            .waitroom
+            .cards
+            .iter()
+            .map(|&c| name_of(c))
+            .collect::<Vec<_>>(),
+        game.state
+            .player1
+            .hand
+            .cards
+            .iter()
+            .map(|&c| name_of(c))
+            .collect::<Vec<_>>(),
         game.state.player1.energy_zone.active_count()
     );
 

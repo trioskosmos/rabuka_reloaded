@@ -1065,6 +1065,13 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                         replaced.push(existing_card_id);
                     }
                 }
+                #[cfg(not(feature = "no_std"))]
+                eprintln!(
+                    "[DBATON_DBG] replaced={:?} waitroom_after={:?} active={}",
+                    replaced,
+                    game_state.active_player().waitroom.cards,
+                    game_state.active_player().id
+                );
                 replaced
             };
             for &replaced_id in &double_replaced_ids {
@@ -1105,11 +1112,40 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             game_state.record_card_appearance(card_id, "hand");
             game_state.baton_touch_arriving_card_id = Some(card_id);
 
+            #[cfg(not(feature = "no_std"))]
+            eprintln!(
+                "[DBATON_DBG] pre_triggers waitroom={:?}",
+                game_state.active_player().waitroom.cards
+            );
             Self::trigger_debut_abilities(game_state, &player_id, &card_no, final_cost, true);
+            #[cfg(not(feature = "no_std"))]
+            eprintln!(
+                "[DBATON_DBG] after_debut waitroom={:?} hand={:?}",
+                game_state.active_player().waitroom.cards,
+                game_state.active_player().hand.cards
+            );
             Self::trigger_auto_abilities_for_player(game_state, &player_id);
+            #[cfg(not(feature = "no_std"))]
+            eprintln!(
+                "[DBATON_DBG] after_auto_p1 waitroom={:?} hand={:?}",
+                game_state.active_player().waitroom.cards,
+                game_state.active_player().hand.cards
+            );
             let db_opponent_id = game_state.opponent_id(&player_id);
             Self::trigger_auto_abilities_for_player(game_state, &db_opponent_id);
+            #[cfg(not(feature = "no_std"))]
+            eprintln!(
+                "[DBATON_DBG] after_auto_p2 waitroom={:?} hand={:?}",
+                game_state.active_player().waitroom.cards,
+                game_state.active_player().hand.cards
+            );
             game_state.process_pending_auto_abilities(&player_id);
+            #[cfg(not(feature = "no_std"))]
+            eprintln!(
+                "[DBATON_DBG] post_triggers waitroom={:?} hand={:?}",
+                game_state.active_player().waitroom.cards,
+                game_state.active_player().hand.cards
+            );
             tdbg!("PHASE_AUTO:0 recalc");
             game_state.mark_constants_dirty();
             game_state.recalculate_constants();
