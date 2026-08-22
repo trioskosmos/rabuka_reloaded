@@ -303,9 +303,10 @@ pub enum ExecutionContext {
 /// under-member energy moves and stage exits).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StageSelectIntent {
-    /// change_state wait-COST: apply "wait" to the chosen members right now
-    /// (the cost handler will not re-enter for deferred choices).
-    WaitCost,
+    /// change_state wait-COST/WAIT-TARGET: apply "wait" to the chosen members
+    /// when the choice resolves during cost phase; in effect phase the stored
+    /// ChangeState pending-action re-applies with immunity filtering.
+    ChangeStateWait,
     /// Move the chosen members' under-cards into the energy zone (Burn!!).
     UnderMemberMove,
     /// Only collect the chosen members into selected_cards; a stored pending

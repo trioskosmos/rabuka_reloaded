@@ -614,6 +614,8 @@ let source = cost.source_str().unwrap_or("");
                     .target_player_id(Some(cost.target.as_deref().unwrap_or("self").to_string()))
                     .build(),
                 );
+                self.stage_select_intent =
+                    Some(crate::ability::types::StageSelectIntent::ChangeStateWait);
                 return Ok(());
             }
         }
@@ -1144,6 +1146,8 @@ let source = cost.source_str().unwrap_or("");
                             .is_select_action(true)
                             .build(),
                         );
+                        self.stage_select_intent =
+                            Some(crate::ability::types::StageSelectIntent::ChangeStateWait);
                         return Ok(());
                     }
                 }

@@ -2422,44 +2422,6 @@ impl GameState {
                             }
                             self.clear_gained_abilities_for_card(*card_id);
                         }
-                    } else {
-                    // Legacy fallback: no structured data — locate the owner by
-                    // matching the ability text against the gained maps.
-                    let ability_text = s.trim_start_matches("gain_ability:");
-                    let mut card_to_clear = None;
-                    for (&cid, abilities) in &self.gained_abilities {
-                        if abilities.contains(&ability_text.to_string()) {
-                            card_to_clear = Some(cid);
-                            break;
-                        }
-                    }
-                    if card_to_clear.is_none() {
-                        for (&cid, abils) in &self.gained_card_abilities {
-                            if abils.iter().any(|a| {
-                                a.triggerless_text() == ability_text || a.full_text == ability_text
-                            }) {
-                                card_to_clear = Some(cid);
-                                break;
-                            }
-                        }
-                    }
-                    if let Some(card_id) = card_to_clear {
-                        if let Some(val) = ability_text.split('+').nth(1).and_then(|s| {
-                            s.chars()
-                                .take_while(|c| c.is_ascii_digit())
-                                .collect::<String>()
-                                .parse::<i32>()
-                                .ok()
-                        }) {
-                            self.mods.remove_score_modifier(card_id, val as i16);
-                            log::debug!(
-                                "Reverted gained ability score modifier +{} for card {}",
-                                val,
-                                card_id
-                            );
-                        }
-                        self.clear_gained_abilities_for_card(card_id);
-                    }
                     }
                 }
                 "set_heart_type" => {

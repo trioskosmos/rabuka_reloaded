@@ -1933,19 +1933,32 @@ impl super::resolver::AbilityResolver {
                     self.selected_cards.push(cid);
                 }
             }
-            // Dispatch on the DECLARED intent of this prompt. Producers set
-            // stage_select_intent when spawning the choice; the sniffing chain
-            // below remains only as a fallback for legacy producers that never
-            // declare one.
+            // Dispatch on the DECLARED intent of this prompt. Every producer
+            // of an is_select_action Stage choice declares one; there is no
+            // guess-based fallback.
+            log::debug!(
+                "[STAGE_SELECT] intent={:?} cards={:?} effect_started={}",
+                self.stage_select_intent,
+                cards,
+                gs.ability_queue
+                    .current_entry()
+                    .is_some_and(|e| e.effect_started)
+            );
             match self.stage_select_intent.take() {
-                Some(crate::ability::types::StageSelectIntent::WaitCost) => {
-                    if !cards.is_empty() {
+                Some(crate::ability::types::StageSelectIntent::ChangeStateWait) => {
+                    if !cards.is_empty()
+                        && gs
+                            .ability_queue
+                            .current_entry()
+                            .is_some_and(|e| !e.effect_started)
+                    {
                         for &cid in &cards {
                             gs.mods.add_orientation_modifier(cid, "wait");
                             gs.last_cost_wait_member = Some(cid);
                         }
                     }
-                    return Ok(());
+                    // Effect phase: the stored ChangeState pending-action
+                    // re-applies with wait-immunity filtering.
                 }
                 Some(crate::ability::types::StageSelectIntent::UnderMemberMove) => {
                     if !cards.is_empty() {
@@ -1991,117 +2004,6 @@ impl super::resolver::AbilityResolver {
                     return Ok(());
                 }
                 None => {}
-            }
-            // Legacy fallbacks (producers that do not declare an intent).
-            // During cost phase (effect_started=false) the only is_select_action
-            // stage selections come from change_state: "wait" costs. Apply the
-            // wait directly so the cost is truly paid — the cost handler won't
-            // re-enter because abilities.rs skips setting cost_paid for deferred
-            // choices.
-            if !cards.is_empty()
-                && gs
-                    .ability_queue
-                    .current_entry()
-                    .is_some_and(|e| !e.effect_started)
-            {
-                for &cid in &cards {
-                    gs.mods.add_orientation_modifier(cid, "wait");
-                    gs.last_cost_wait_member = Some(cid);
-                }
-            }
-            // Burn!! under_member move: Stage selection with is_select_action true
-            // is used to choose which member's under energies to move. The actual
-            // energy movement must happen here, not in a second resolve call which
-            // is never re-entered for conditional_on_result.
-            if !cards.is_empty()
-                && (gs.ability_queue.current_entry().is_some_and(|e| {
-                    e.ability
-                        .effect
-                        .as_ref()
-                        .is_some_and(|eff| {
-                            eff.source
-                                .as_ref()
-                                .is_some_and(|z| z.to_str() == "under_member")
-                                || eff
-                                    .compound
-                                    .primary_effect
-                                    .as_ref()
-                                    .is_some_and(|pe| {
-                                        pe.source
-                                            .as_ref()
-                                            .is_some_and(|z| z.to_str() == "under_member")
-                                    })
-                        })
-                }) || self
-                    .current_effect
-                    .as_ref()
-                    .is_some_and(|eff| {
-                        eff.source
-                            .as_ref()
-                            .is_some_and(|z| z.to_str() == "under_member")
-                            || eff
-                                .compound
-                                .primary_effect
-                                .as_ref()
-                                .is_some_and(|pe| {
-                                    pe.source
-                                        .as_ref()
-                                        .is_some_and(|z| z.to_str() == "under_member")
-                                })
-                    }) || {
-                        // Fallback: any Stage is_select_action where selected member has under cards → treat as under_member move
-                        cards.iter().any(|&mid| {
-                            gs.resolve_target_player("self")
-                                .stage
-                                .stage
-                                .iter()
-                                .position(|&id| id == mid)
-                                .map(|idx| {
-                                    !gs.player1.stage.under_cards[idx].is_empty()
-                                        || !gs.player2.stage.under_cards[idx].is_empty()
-                                })
-                                .unwrap_or(false)
-                        })
-                    })
-            {
-                if let Some(entry) = gs.ability_queue.current_entry().cloned() {
-                    let target = entry
-                        .ability
-                        .effect
-                        .as_ref()
-                        .and_then(|eff| eff.target.as_deref())
-                        .unwrap_or("self");
-                    let mut moved: Vec<i16> = Vec::new();
-                    for &mid in &cards {
-                        if let Some(idx) = gs
-                            .resolve_target_player(target)
-                            .stage
-                            .stage
-                            .iter()
-                            .position(|&id| id == mid)
-                        {
-                            let mut m =
-                                crate::ability::move_cards::drain_under_cards_to_energy_zone(
-                                    gs, target, idx,
-                                );
-                            moved.append(&mut m);
-                        }
-                    }
-                    if !moved.is_empty() {
-                        self.moved_cards.extend(moved.iter().copied());
-                        gs.recently_moved_cards = Some(moved.clone().into());
-                        gs.recently_moved_from_zone = Some("under_member".to_string());
-                        self.last_move_moved_any = Some(true);
-                    } else {
-                        self.last_move_moved_any = Some(false);
-                    }
-                    log::debug!(
-                        "[UNDER_MEMBER_VIA_STAGE] moved {} energies for members {:?} -> moved_cards={:?}",
-                        moved.len(),
-                        cards,
-                        self.moved_cards
-                    );
-                }
             }
         } else {
             let edst = gs.entry_destination().map(|s| s.to_string());

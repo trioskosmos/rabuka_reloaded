@@ -394,37 +394,6 @@ impl AbilityResolver {
                     is_live_total,
                 });
             }
-            (None, Some(card_id)) => {
-                // Legacy fallback: no structured effect  Eparse "+N" from text.
-                if let Some(val) = ability_text.split('+').nth(1).and_then(|s| {
-                    s.chars()
-                        .take_while(|c| c.is_ascii_digit())
-                        .collect::<String>()
-                        .parse::<i32>()
-                        .ok()
-                }) {
-                    gs.mods.add_score_modifier(card_id, val as i16);
-                    gs.record_ability_application(
-                        card_id,
-                        ability_text.to_string(),
-                        "score_bonus",
-                        card_id,
-                        None,
-                        val as i16,
-                    );
-                    log::debug!(
-                        "[GAINED_ABILITY] Applied +{} score modifier to card {}",
-                        val,
-                        card_id
-                    );
-                }
-                self.last_gain_effect_data =
-                    Some(crate::core::types::EffectData::SingleCard {
-                        card_id,
-                        amount: 0,
-                        color: None,
-                    });
-            }
             _ => {}
         }
 

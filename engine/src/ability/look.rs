@@ -591,6 +591,8 @@ impl AbilityResolver {
                 .is_select_action(true)
                 .build(),
         );
+        self.stage_select_intent =
+            Some(crate::ability::types::StageSelectIntent::CollectTargets);
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())
     }

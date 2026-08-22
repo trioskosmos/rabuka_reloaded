@@ -481,11 +481,8 @@ impl AbilityResolver {
                     .target_player_id(Some(target.clone()))
                     .build(),
                 );
-                // NOTE: deliberately NO stage_select_intent here. The
-                // cost-phase vs stored-pending-action split for change_state
-                // waits is answered at CHOICE-ANSWER time (effect_started),
-                // and wait-immunity lives in the re-apply path — the legacy
-                // fallback chain in handle_stage_selection handles both.
+                self.stage_select_intent =
+                    Some(crate::ability::types::StageSelectIntent::ChangeStateWait);
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 // Store a re-apply effect so finalize_choice applies the state
                 // change to the selected target after the choice is resolved.
