@@ -504,7 +504,7 @@ impl super::TurnEngine {
                                     .as_ref()
                                     .is_some_and(|t| &**t == crate::triggers::LIVE_SUCCESS)
                                 {
-                                    if !seen.insert((card_id, 10000 + gidx)) {
+                                    if !seen.insert((card_id, crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx)) {
                                         continue;
                                     }
                                     if crate::ability::debug::ABILITY_DEBUG
@@ -524,7 +524,7 @@ impl super::TurnEngine {
                                             trigger: "live_success".to_string(),
                                             zone: "stage_gained".to_string(),
                                             result: "pending".to_string(),
-                                            ability_index: 10000 + gidx,
+                                            ability_index: crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx,
                                             ability_text: gained_ability.full_text.clone(),
                                         }),
                                     });
@@ -595,7 +595,7 @@ impl super::TurnEngine {
                                 .as_ref()
                                 .is_some_and(|t| &**t == crate::triggers::LIVE_SUCCESS)
                             {
-                                if !seen.insert((*card_id, 10000 + gidx)) {
+                                if !seen.insert((*card_id, crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx)) {
                                     continue;
                                 }
                                 if crate::ability::debug::ABILITY_DEBUG
@@ -615,7 +615,7 @@ impl super::TurnEngine {
                                         trigger: "live_success".to_string(),
                                         zone: "live_card_zone_gained".to_string(),
                                         result: "pending".to_string(),
-                                        ability_index: 10000 + gidx,
+                                        ability_index: crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx,
                                         ability_text: gained_ability.full_text.clone(),
                                     }),
                                 });

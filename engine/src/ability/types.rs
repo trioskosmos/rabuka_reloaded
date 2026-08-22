@@ -313,6 +313,21 @@ pub enum StageSelectIntent {
     CollectTargets,
 }
 
+/// Ability-index offset addressing RUNTIME-GAINED abilities (「…を得る」 grants)
+/// instead of printed card abilities. Encoded as `GAINED_ABILITY_INDEX_BASE +
+/// gained_idx` in every (card_id, ability_index) pair that outlives the
+/// resolution that produced it — constant scans, trigger scans, and queue
+/// entries all share this single encoding.
+pub const GAINED_ABILITY_INDEX_BASE: usize = 10_000;
+
+/// Extract the gained index from an encoded ability index, if it addresses a
+/// gained ability.
+pub fn gained_ability_index(ability_idx: usize) -> Option<usize> {
+    ability_idx
+        .checked_sub(GAINED_ABILITY_INDEX_BASE)
+        .filter(|&g| g < GAINED_ABILITY_INDEX_BASE)
+}
+
 #[derive(Debug, Clone, PartialEq)]
 
 pub enum LookAndSelectStep {

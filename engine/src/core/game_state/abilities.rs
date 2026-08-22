@@ -156,7 +156,6 @@ impl GameState {
         &self,
         cids: impl IntoIterator<Item = i16>,
     ) -> Vec<(i16, usize)> {
-        const GAINED_ABILITY_INDEX_BASE: usize = 10_000;
         let mut ids = Vec::new();
         for cid in cids {
             if let Some(card) = self.card_database.get_card(cid) {
@@ -188,7 +187,7 @@ impl GameState {
                     &crate::game_state::AbilityTrigger::Constant,
                 ) && ability.effect.is_some()
                 {
-                    ids.push((cid, GAINED_ABILITY_INDEX_BASE + gidx));
+                    ids.push((cid, crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx));
                 }
             }
         }
@@ -223,9 +222,7 @@ impl GameState {
         card_id: i16,
         ability_idx: usize,
     ) -> Option<crate::Arc<crate::card::Ability>> {
-        const GAINED_ABILITY_INDEX_BASE: usize = 10_000;
-        if ability_idx >= GAINED_ABILITY_INDEX_BASE {
-            let gidx = ability_idx - GAINED_ABILITY_INDEX_BASE;
+        if let Some(gidx) = crate::ability::types::gained_ability_index(ability_idx) {
             return self
                 .gained_card_abilities
                 .get(&card_id)?
@@ -822,7 +819,7 @@ impl GameState {
                                             ) {
                                                 let entry = self.build_ability_queue_entry(
                                                     card_no.clone(),
-                                                    10000 + gidx,
+                                                    crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx,
                                                     crate::Arc::new(gained_ability.clone()),
                                                     Some(card_id_val),
                                                     player_id.clone(),

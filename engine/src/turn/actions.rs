@@ -351,7 +351,7 @@ impl super::TurnEngine {
             {
                 if player.stage.stage.iter().any(|&id| id == card_id) {
                     ability_to_activate = Some(AbilityActivation {
-                        idx: 10000 + gained.0,
+                        idx: crate::ability::types::GAINED_ABILITY_INDEX_BASE + gained.0,
                         ability: crate::Arc::new(gained.1),
                         loc: Zone::Stage,
                     });
@@ -376,12 +376,12 @@ impl super::TurnEngine {
         // Gained abilities use the "card_no_gained_{idx}" format so
         // trigger_auto_ability's gained-ability code path (line ~683)
         // can find and enqueue them.
-        let ability_id = if idx >= 10000 {
+        let ability_id = if let Some(gidx) = crate::ability::types::gained_ability_index(idx) {
             debug_assert!(
                 game_state.gained_card_abilities.contains_key(&card_id),
-                "gained ability idx >= 10000 but no gained_card_abilities entry"
+                "gained ability index but no gained_card_abilities entry"
             );
-            format!("{}_gained_{}", card.card_no, idx - 10000)
+            format!("{}_gained_{}", card.card_no, gidx)
         } else {
             format!("{}_{}", card.card_no, ability.full_text)
         };
