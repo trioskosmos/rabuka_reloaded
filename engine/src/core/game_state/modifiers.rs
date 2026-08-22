@@ -1229,6 +1229,20 @@ impl GameState {
         self.gained_card_abilities.remove(&card_id);
     }
 
+    /// Single choke point for zone-exit cleanup (rule 4.1.4: a card that
+    /// changes zones is a NEW card — all runtime state resets). Clears both
+    /// the modifier tables and any runtime-gained abilities. Zone-exit paths
+    /// MUST route through this instead of picking individual clears.
+    pub fn on_cards_left_zones(&mut self, cards: &[i16]) {
+        for &card_id in cards {
+            if card_id == -1 {
+                continue;
+            }
+            self.mods.clear_all_for_card(card_id);
+            self.clear_gained_abilities_for_card(card_id);
+        }
+    }
+
     /// Evaluate all constant (常時) abilities on cards in the success_live_card_zone.
     /// Handles the following action types:
     ///   - modify_required_hearts: heart requirement reductions (existing behavior)

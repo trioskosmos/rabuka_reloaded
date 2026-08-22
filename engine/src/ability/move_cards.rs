@@ -667,10 +667,8 @@ impl AbilityResolver {
         for &card_id in &cards {
             remove_card_from_any_zone(player, &mut gs.last_vacated_stage_area, card_id);
         }
-        // Card left any zone → clean up its gained abilities
-        for &card_id in &cards {
-            gs.clear_gained_abilities_for_card(card_id);
-        }
+        // Card left any zone → full zone-exit cleanup (rule 4.1.4)
+        gs.on_cards_left_zones(&cards);
         Ok(cards)
     }
 
@@ -1547,10 +1545,8 @@ impl AbilityResolver {
                         card_id,
                     );
                 }
-                // Card left any zone → clean up its gained abilities
-                for &card_id in &taken {
-                    gs.clear_gained_abilities_for_card(card_id);
-                }
+                // Card left any zone → full zone-exit cleanup (rule 4.1.4)
+                gs.on_cards_left_zones(&taken);
                 Ok(taken)
             }
             util::SelectionOutcome::Prompt => {
@@ -2318,7 +2314,8 @@ impl AbilityResolver {
         Ok(())
     }
 
-    /// Apply post-move side effects: clear_all_for_card, state_change, record_card_movement, tracking.
+    /// Apply post-move side effects: zone-exit cleanup (rule 4.1.4),
+    /// state_change, record_card_movement, tracking.
     fn finalize_card_movement(
         &mut self,
         gs: &mut GameState,
@@ -2328,9 +2325,7 @@ impl AbilityResolver {
         state_change: &Option<String>,
         target: Option<&str>,
     ) {
-        for card_id in moved_cards {
-            gs.mods.clear_all_for_card(*card_id);
-        }
+        gs.on_cards_left_zones(moved_cards);
 
         if let Some(ref sc) = state_change {
             if sc == "wait" {
