@@ -456,4 +456,5 @@ pub mod miyata_draw_until_test;
 pub mod wien_yell_count_test;
 pub mod kasumi_turn_limit_test;
 pub mod sayaka_loop_test;
+pub mod max_distinct_names_test;
 

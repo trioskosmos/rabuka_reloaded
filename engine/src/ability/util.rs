@@ -758,8 +758,7 @@ pub fn card_matches_name_constraint(
 
 /// Result of computing the maximum distinct name count across a set of cards,
 /// where each multi-name card contributes exactly ONE of its constituent names
-/// (the player chooses optimally).  With at most 3 names per card this is
-/// computed by exhaustive search.
+/// (the player chooses optimally).  Computed exactly via bitmask DP.
 #[derive(Debug, Copy, Clone)]
 pub struct DistinctNamesResult {
     /// Maximum number of distinct names achievable by choosing one name per card.
@@ -768,13 +767,19 @@ pub struct DistinctNamesResult {
     pub collision: bool,
 }
 
-/// Brute-force search for the optimal name assignment across cards.
+/// Optimal search for the best name assignment across cards.
 ///
 /// Each entry in `name_sets` is the list of constituent names for one card
 /// (multi-name cards produce multiple entries via get_card_names, single-name
-/// cards produce one entry).  Picks exactly one name per card, tries every
-/// combination when ≤ 12 cards (≤ 3¹² = 531k — fast in practice), and falls
-/// back to a greedy first-unused heuristic for larger collections.
+/// cards produce one entry). Picks exactly one name per card.
+///
+/// Exact algorithm: layered bitmask DP over the deduplicated name universe
+/// with domination pruning (a mask that is a superset of another always
+/// yields an equal-or-better final count, so non-maximal masks are dropped).
+/// This replaces the previous exhaustive DFS (exponential in cards, cloning a
+/// HashSet per node) and the >12-card greedy fallback that provably
+/// undercounted. Greedy survives only as a safety net for pathological
+/// universes (> 128 unique names, where the bitmask no longer fits).
 pub fn max_distinct_names(name_sets: &[Vec<String>]) -> DistinctNamesResult {
     if name_sets.is_empty() {
         return DistinctNamesResult {
@@ -782,54 +787,119 @@ pub fn max_distinct_names(name_sets: &[Vec<String>]) -> DistinctNamesResult {
             collision: false,
         };
     }
-    if name_sets.len() <= 12 {
-        // Exhaustive search — tries all combinations of picking one name per card.
-        let mut best_distinct = 0usize;
-        let mut found_no_collision = false;
-        let mut stack: Vec<(usize, HashSet<String>, bool)> = vec![(0, HashSet::default(), false)];
-        while let Some((idx, seen, collided)) = stack.pop() {
-            if idx == name_sets.len() {
-                best_distinct = best_distinct.max(seen.len());
-                if !collided {
-                    found_no_collision = true;
-                }
-                continue;
-            }
-            for name in &name_sets[idx] {
-                let new_collided = collided || seen.contains(name.as_str());
-                let mut next = seen.clone();
-                next.insert(name.clone());
-                stack.push((idx + 1, next, new_collided));
+    // A card with no names means no complete assignment exists — mirrors the
+    // degenerate behavior of the old DFS (zero leaves reached).
+    if name_sets.iter().any(|ns| ns.is_empty()) {
+        return DistinctNamesResult {
+            distinct: 0,
+            collision: true,
+        };
+    }
+
+    // Map the name universe to bit positions; build each card's option mask.
+    let mut ids: HashMap<&str, u32> = HashMap::default();
+    let mut option_masks: Vec<u128> = Vec::with_capacity(name_sets.len());
+    let mut universe_len = 0u32;
+    for names in name_sets {
+        let mut mask = 0u128;
+        for name in names {
+            let next = universe_len;
+            let id = *ids.entry(name.as_str()).or_insert_with(|| {
+                universe_len += 1;
+                next
+            });
+            mask |= 1u128 << id;
+        }
+        option_masks.push(mask);
+    }
+
+    if universe_len > 128 {
+        // Pathological universe — bitmask DP impossible. First-fit greedy
+        // keeps the engine running but MAY UNDERCOUNT; say so loudly.
+        log::warn!(
+            "max_distinct_names: {} unique names exceeds 128-bit mask; \
+             falling back to greedy (result may undercount)",
+            universe_len
+        );
+        return max_distinct_names_greedy(name_sets);
+    }
+
+    let n_cards = option_masks.len();
+    // Frontier = antichain of maximal reachable picked-masks.
+    let mut frontier: Vec<u128> = vec![0u128];
+    for mask in &option_masks {
+        let mut next: Vec<u128> = Vec::with_capacity(frontier.len());
+        for &f in &frontier {
+            // Each candidate extends the frontier mask by one of the card's names.
+            let mut rest = *mask;
+            while rest != 0 {
+                let bit = rest & (!rest + 1); // lowest set bit
+                rest &= !bit;
+                next.push(f | bit);
             }
         }
-        DistinctNamesResult {
-            distinct: best_distinct,
-            collision: !found_no_collision,
-        }
-    } else {
-        // Greedy fallback: for each card pick the first name not yet used.
-        let mut seen: HashSet<String> = HashSet::default();
-        let mut had_collision = false;
-        for names in name_sets {
-            let mut picked = false;
-            for name in names {
-                if seen.insert(name.clone()) {
-                    picked = true;
-                    break;
-                }
+        prune_dominated(&mut next);
+        frontier = next;
+    }
+
+    let best = frontier
+        .iter()
+        .map(|m| m.count_ones() as usize)
+        .max()
+        .unwrap_or(0);
+    let collision_free_exists = frontier
+        .iter()
+        .any(|m| m.count_ones() as usize == n_cards);
+    DistinctNamesResult {
+        distinct: best,
+        collision: !collision_free_exists,
+    }
+}
+
+/// Removes any mask that is a strict subset of another mask in the list.
+/// Dominated masks can never lead to a better outcome (picking a superset now
+/// dominates every future continuation), so they are safe to drop.
+fn prune_dominated(masks: &mut Vec<u128>) {
+    masks.sort_unstable();
+    masks.dedup();
+    let mut kept: Vec<u128> = Vec::with_capacity(masks.len());
+    'outer: for &m in masks.iter() {
+        for &k in kept.iter() {
+            if k & m == m {
+                continue 'outer; // m ⊆ k → dominated
             }
-            if !picked {
-                // All names already in set — take the first (already seen).
-                if let Some(first) = names.first() {
-                    seen.insert(first.clone());
-                }
-                had_collision = true;
+        }
+        // m may dominate entries already kept.
+        kept.retain(|&k| m & k != k);
+        kept.push(m);
+    }
+    *masks = kept;
+}
+
+/// First-fit greedy fallback. Correct only when a collision-free assignment
+/// exists trivially; otherwise the distinct count can be an undercount.
+fn max_distinct_names_greedy(name_sets: &[Vec<String>]) -> DistinctNamesResult {
+    let mut seen: HashSet<String> = HashSet::default();
+    let mut had_collision = false;
+    for names in name_sets {
+        let mut picked = false;
+        for name in names {
+            if seen.insert(name.clone()) {
+                picked = true;
+                break;
             }
         }
-        DistinctNamesResult {
-            distinct: seen.len(),
-            collision: had_collision,
+        if !picked {
+            // All names already in set — take the first (already seen).
+            if let Some(first) = names.first() {
+                seen.insert(first.clone());
+            }
+            had_collision = true;
         }
+    }
+    DistinctNamesResult {
+        distinct: seen.len(),
+        collision: had_collision,
     }
 }
 
