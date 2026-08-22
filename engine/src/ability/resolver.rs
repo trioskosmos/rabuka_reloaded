@@ -69,6 +69,12 @@ pub struct AbilityResolver {
     pub current_effect: Option<AbilityEffect>,
     pub is_reveal_cost: bool,
     pub selected_cards: SmallVec<[i16; 4]>,
+    /// Member card IDs actually changed state by the most recent change_state
+    /// member-op step of THIS ability (e.g. members waited). Used by a
+    /// following delayed restriction step ("そのメンバーは次のターンの…アクティブ
+    /// しない") to key the flag on the waited victims instead of falling back
+    /// to recently_moved_cards/activating_card.
+    pub changed_state_members: SmallVec<[i16; 4]>,
     pub selected_area: Option<String>,
     pub moved_cards: SmallVec<[i16; 4]>,
     /// C6 keep-N-shuffle-rest: phase 0=idle, 1=awaiting self's hand selection,
@@ -118,6 +124,15 @@ pub struct AbilityResolver {
     /// same pending choice re-stored (re-prompt, auto-ability interleave) is not
     /// re-logged as a fresh offer. `None` = never offered yet.
     pub last_offered_sig: Option<String>,
+    /// Zone the current `looked_at` pool was taken from (rule 5.7: looking at
+    /// cards only informs — a DECLINED optional move must return them there,
+    /// not to the default remainder destination).
+    pub looked_at_origin: Option<String>,
+    /// Numeric deck position (「デッキの上からN番目」) captured from the
+    /// optional `looked_at`-source move_cards step when its SelectCard choice
+    /// is spawned. The answer-time handler has no effect context, so the
+    /// position rides here (consumed on first looked_at selection).
+    pub looked_at_deck_position: Option<usize>,
 }
 
 impl AbilityResolver {
@@ -133,6 +148,7 @@ impl AbilityResolver {
             current_effect: None,
             is_reveal_cost: false,
             selected_cards: SmallVec::new(),
+            changed_state_members: SmallVec::new(),
             selected_area: None,
             moved_cards: SmallVec::new(),
             keep_shuffle_under_phase: 0,
@@ -155,6 +171,8 @@ impl AbilityResolver {
             formation_plan: SmallVec::new(),
             last_move_moved_any: None,
             last_offered_sig: None,
+            looked_at_origin: None,
+            looked_at_deck_position: None,
         }
     }
 

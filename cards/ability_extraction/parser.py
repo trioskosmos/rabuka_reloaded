@@ -4205,7 +4205,8 @@ def _try_or(text):
         # Aggregate each leg's trigger_event so the engine can prefilter by
         # real event types instead of relying on an always-true leg.
         leg_events = [p.get("trigger_event") for p in parsed if p.get("trigger_event")]
-        result = {"type": "or_condition", "conditions": parsed, "text": text}
+        result = {"type": "or_condition",
+        "operator": "or", "conditions": parsed, "text": text}
         if leg_events:
             result["trigger_event"] = {
                 "type": "or",
@@ -4453,6 +4454,7 @@ def _try_live_success_or_move(text):
     tense = "past" if "移動した" in text else "nonpast"
     return {
         "type": "or_condition",
+        "operator": "or",
         "conditions": [
             {
                 "type": "movement_condition",
@@ -4486,6 +4488,7 @@ def _try_appear_or_move(text):
     tense = "past" if "移動した" in text else "nonpast"
     return {
         "type": "or_condition",
+        "operator": "or",
         "conditions": [
             {
                 "type": "appearance_condition",
@@ -5155,6 +5158,7 @@ def _try_placed_discard_live_or_member(text):
     }
     return {
         "type": "or_condition",
+        "operator": "or",
         "source": "preceding_moved",
         "conditions": [leg_live, leg_member],
         "text": text,
@@ -9025,6 +9029,7 @@ def _try_conditional(text):
     if action.get("condition") and at.lstrip().startswith("または"):
         cond = {
             "type": "or_condition",
+        "operator": "or",
             "conditions": [cond, action.pop("condition")],
             "text": text,
         }

@@ -116,6 +116,7 @@ impl AbilityResolver {
                 effect.duration_any().as_deref(),
                 effect.gained_effect_any().cloned(),
                 effect.ability_gain_trigger_any().as_deref(),
+                gs.activating_card,
             );
         }
 
@@ -3683,9 +3684,25 @@ impl AbilityResolver {
                 // this ability just moved (e.g. energy placed in wait), NOT the card
                 // that owns the ability. Key the flag on the recently-moved cards so
                 // it survives being later activated/waited by other effects.
+                // A preceding change_state member-op step (e.g. "メンバーを2人まで
+                // ウェイトにする。そのメンバーは次のターンの…アクティブしない") records
+                // its victims in changed_state_members — those take precedence since
+                // they were populated most recently by THIS ability's steps and no
+                // move-based flow touches that field.
                 // Fall back to the activating card for member "次のターンにアクティブしない"
                 // restrictions where the target is the ability's own member.
-                if let Some(moved) = gs.recently_moved_cards.as_ref() {
+                if !self.changed_state_members.is_empty() {
+                    for &cid in self.changed_state_members.iter() {
+                        if cid != -1 {
+                            gs.mods.add_delayed_cannot_active(cid, 1);
+                            log::debug!(
+                                "[RESTRICT_DELAYED] keyed on changed_state_members: cid={}",
+                                cid
+                            );
+                        }
+                    }
+                    self.changed_state_members.clear();
+                } else if let Some(moved) = gs.recently_moved_cards.as_ref() {
                     for &cid in moved.iter() {
                         if cid != -1 {
                             gs.mods.add_delayed_cannot_active(cid, 1);

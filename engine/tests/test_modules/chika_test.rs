@@ -67,11 +67,12 @@ fn chika_q151_ability_lost_on_leave() {
 
     game.activate_ability(chika);
 
-    // Chika should have +1 score modifier after activation
-    let score_before = game.state.mods.get_score_modifier(chika);
+    // Chika gains 「常時：ライブの合計スコア＋１する」 — live-total accumulator.
+    game.state.recalculate_constants();
+    let bonus_before = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(
-        score_before, 1,
-        "Q151: Chika should have +1 score after activation"
+        bonus_before, 1,
+        "Q151: live-total bonus should be +1 after activation"
     );
 
     // Remove Chika from stage (simulating leaving via effect)
@@ -81,11 +82,13 @@ fn chika_q151_ability_lost_on_leave() {
 
     // Manually clear (since we bypassed move_cards)
     game.state.mods.clear_all_for_card(chika);
+    game.state.clear_gained_abilities_for_card(chika);
 
-    let score_after = game.state.mods.get_score_modifier(chika);
+    game.state.recalculate_constants();
+    let bonus_after = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(
-        score_after, 0,
-        "Q151: Score boost should be lost when member leaves stage"
+        bonus_after, 0,
+        "Q151: live-total bonus should be lost when member leaves stage"
     );
 }
 
@@ -118,12 +121,13 @@ fn chika_q171_live_end_persistence() {
 
     game.give_energy(5);
 
-    // Activate → Chika gains +1 score
+    // Activate → Chika gains 「常時：ライブの合計スコア＋１する」
     game.activate_ability(chika);
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(chika),
+        game.state.mods.p1_constant_total_score_bonus,
         1,
-        "Score should be +1 after activation"
+        "Live-total bonus should be +1 after activation"
     );
 
     // Advance through phases to live
@@ -142,11 +146,12 @@ fn chika_q171_live_end_persistence() {
     game.pass(); // → SecondAttackerPerformance
     game.pass(); // → LiveVictoryDetermination
 
-    // Q171: Score modifier should still exist during LiveVictoryDetermination
+    // Q171: Live-total bonus should still exist during LiveVictoryDetermination
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(chika),
+        game.state.mods.p1_constant_total_score_bonus,
         1,
-        "Q171: Score +1 should persist to LiveVictoryDetermination"
+        "Q171: live-total +1 should persist to LiveVictoryDetermination"
     );
 }
 
@@ -173,11 +178,12 @@ fn chika_center_required() {
     );
 
     // Position mismatch skips the ability, but doesn't error
-    // The score modifier should NOT be applied
+    // The live-total bonus should NOT be applied
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(chika),
+        game.state.mods.p1_constant_total_score_bonus,
         0,
-        "Score should NOT be applied when activated from wrong position"
+        "Bonus should NOT be applied when activated from wrong position"
     );
 }
 
@@ -192,12 +198,13 @@ fn chika_turn1_use_limit() {
     game.state.player1.stage.stage = [-1, chika, -1];
     game.give_energy(10);
 
-    // First activation succeeds (gain_ability grants constant +1 score)
+    // First activation succeeds (gain_ability grants constant live-total +1)
     game.activate_ability(chika);
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(chika),
+        game.state.mods.p1_constant_total_score_bonus,
         1,
-        "First activation should apply +1 score via granted constant ability"
+        "First activation should apply +1 via granted constant ability"
     );
 
     // Second activation in same turn should skip (use_limit=1)
@@ -211,11 +218,12 @@ fn chika_turn1_use_limit() {
     );
 
     // The function may return Ok (skipping silently) or Err
-    // Either way, score should still be 1 (not 2)
+    // Either way, the live-total bonus should still be 1 (not 2)
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(chika),
+        game.state.mods.p1_constant_total_score_bonus,
         1,
-        "Second activation should not apply any additional score modifiers"
+        "Second activation should not apply any additional bonuses"
     );
 }
 
@@ -280,18 +288,14 @@ fn chika_waited_member_gets_score_boost() {
         game.select_indices(&[0]); // wait other
     }
 
-    // Chika (activating card) gets +1 score via gain_ability
+    // Chika gains 「常時：ライブの合計スコア＋１する」 — live-total accumulator.
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(chika),
+        game.state.mods.p1_constant_total_score_bonus,
         1,
-        "Chika should have +1 score (gain_ability targets activating_card)"
+        "Live-total bonus +1 after activation"
     );
-    // The waited member does NOT get the score modifier directly
-    assert_eq!(
-        game.state.mods.get_score_modifier(other),
-        0,
-        "Waited member should NOT get score (gain_ability gives to activating card)"
-    );
+    // The waited member does NOT add another bonus (gain targets Chika only)
 }
 
 /// Two non-Chika members → can select either, the selected one gets waited
@@ -323,16 +327,12 @@ fn chika_wait_can_select_any_member() {
         None,
         "Non-selected member (a) should NOT be in wait state"
     );
-    // Chika (activating card) gets +1 score via gain_ability
+    // Chika gains 「常時：ライブの合計スコア＋１する」 — live-total accumulator.
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(chika),
+        game.state.mods.p1_constant_total_score_bonus,
         1,
-        "Chika should have +1 score (gain_ability targets activating_card)"
-    );
-    assert_eq!(
-        game.state.mods.get_score_modifier(a),
-        0,
-        "Non-selected member should NOT have score boost"
+        "Live-total bonus +1 after activation"
     );
 }
 

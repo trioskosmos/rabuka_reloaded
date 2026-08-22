@@ -47,8 +47,9 @@ fn nagisa_one_card_gets_plus_one() {
     game.play_to_stage(nagisa, MemberArea::Center);
     game.drain_auto_ability_choices();
 
-    let score_mod = game.state.mods.get_score_modifier(nagisa);
-    assert_eq!(score_mod, 1, "1 card → gain +1");
+    game.state.recalculate_constants();
+    let score_mod = game.state.mods.p1_constant_total_score_bonus;
+    assert_eq!(score_mod, 1, "1 card → gain +1 (live total)");
 }
 
 /// 0 μ's cards in success zone → gate fails → nothing → score_mod = 0
@@ -67,7 +68,8 @@ fn nagisa_zero_cards_nothing_happens() {
     game.play_to_stage(nagisa, MemberArea::Center);
     game.drain_auto_ability_choices();
 
-    let score_mod = game.state.mods.get_score_modifier(nagisa);
+    game.state.recalculate_constants();
+    let score_mod = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(score_mod, 0, "0 cards → nothing");
 }
 
@@ -91,8 +93,9 @@ fn nagisa_two_cards_gets_plus_two() {
     game.play_to_stage(nagisa, MemberArea::Center);
     game.drain_auto_ability_choices();
 
-    let score_mod = game.state.mods.get_score_modifier(nagisa);
-    assert_eq!(score_mod, 2, "2 cards → gain +2 instead of +1");
+    game.state.recalculate_constants();
+    let score_mod = game.state.mods.p1_constant_total_score_bonus;
+    assert_eq!(score_mod, 2, "2 cards → gain +2 instead of +1 (live total)");
 }
 
 /// Not at center → activation_condition_parsed blocks the ability
@@ -113,7 +116,8 @@ fn nagisa_not_at_center_does_not_fire() {
     game.play_to_stage(nagisa, MemberArea::LeftSide);
     game.drain_auto_ability_choices();
 
-    let score_mod = game.state.mods.get_score_modifier(nagisa);
+    game.state.recalculate_constants();
+    let score_mod = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(score_mod, 0, "Left side → activation_condition blocks");
 }
 
@@ -136,11 +140,13 @@ fn nagisa_effect_expires_on_clear() {
     game.play_to_stage(nagisa, MemberArea::Center);
     game.drain_auto_ability_choices();
 
-    let before = game.state.mods.get_score_modifier(nagisa);
+    game.state.recalculate_constants();
+    let before = game.state.mods.p1_constant_total_score_bonus;
     assert_eq!(before, 2, "Should have +2 before clear");
 
-    game.state.mods.clear_all_for_card(nagisa);
+    game.state.clear_gained_abilities_for_card(nagisa);
 
-    let after = game.state.mods.get_score_modifier(nagisa);
-    assert_eq!(after, 0, "Modifier cleared");
+    game.state.recalculate_constants();
+    let after = game.state.mods.p1_constant_total_score_bonus;
+    assert_eq!(after, 0, "Gained live-total bonus cleared");
 }

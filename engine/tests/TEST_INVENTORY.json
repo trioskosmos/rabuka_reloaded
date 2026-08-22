@@ -1,28 +1,28 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-22T09:20:51.932140+00:00",
+  "generated_at": "2026-08-22T12:54:22.884020+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 419,
-  "n_tests": 2562,
+  "n_files": 420,
+  "n_tests": 2575,
   "total_cards": 771,
-  "covered_cards": 592,
-  "abilities_on_covered": 752,
+  "covered_cards": 600,
+  "abilities_on_covered": 760,
   "trigger_counts": {
     "起動": [
       80,
       96
     ],
     "登場": [
-      212,
+      215,
       269
     ],
     "ライブ開始時": [
-      207,
+      210,
       268
     ],
     "(none)": [
@@ -30,7 +30,7 @@
       2
     ],
     "ライブ成功時": [
-      87,
+      89,
       122
     ],
     "常時": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      168,
+      171,
       219
     ],
     "unknown": [
@@ -64,7 +64,7 @@
       2
     ],
     "draw_card": [
-      34,
+      35,
       44
     ],
     "change_state": [
@@ -80,7 +80,7 @@
       19
     ],
     "gain_ability": [
-      9,
+      11,
       11
     ],
     "conditional_on_result": [
@@ -120,7 +120,7 @@
       6
     ],
     "choice": [
-      19,
+      20,
       24
     ],
     "conditional_on_optional": [
@@ -144,7 +144,7 @@
       3
     ],
     "choose_target_player": [
-      5,
+      6,
       6
     ],
     "set_blade_type": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      435,
+      440,
       546
     ],
     "temporal_condition": [
@@ -182,7 +182,7 @@
       20
     ],
     "compound": [
-      31,
+      32,
       34
     ],
     "appearance_condition": [
@@ -190,7 +190,7 @@
       13
     ],
     "comparison_condition": [
-      45,
+      46,
       60
     ],
     "card_count_condition": [
@@ -214,7 +214,7 @@
       43
     ],
     "or_condition": [
-      8,
+      9,
       9
     ],
     "movement:energy_placed": [
@@ -260,7 +260,7 @@
       58
     ],
     "PR": [
-      39,
+      40,
       52
     ],
     "bp1": [
@@ -284,11 +284,11 @@
       134
     ],
     "bp6": [
-      61,
+      62,
       82
     ],
     "bp7": [
-      88,
+      93,
       111
     ],
     "pb1": [
@@ -300,7 +300,7 @@
       31
     ],
     "pb2": [
-      29,
+      30,
       43
     ],
     "cl1": [
@@ -310,8 +310,8 @@
   },
   "depth_counts": {
     "L2+choice": 583,
-    "none": 184,
-    "L1+choice": 124,
+    "none": 176,
+    "L1+choice": 132,
     "L2": 30,
     "L1": 15
   },
@@ -12120,6 +12120,7 @@
         "engine/tests/test_modules/untested_abilities_batch4_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch9_test.rs",
         "engine/tests/test_modules/untested_abilities_playthrough_test.rs",
         "engine/tests/test_modules/untested_choice_change_target_test.rs",
         "engine/tests/test_modules/untested_secondary_abilities_test.rs"
@@ -12156,7 +12157,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 749,
+      "covering_test_count": 762,
       "is_null": false
     },
     {
@@ -12326,14 +12327,30 @@
         "PL!SP-PR-026-PR"
       ],
       "base": "PL!-PR-020",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch9_test.rs"
+      ],
+      "covering_tests": [
+        "chika_bp7010_bottom_card_to_fourth_from_top",
+        "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_own_waitroom_members_to_deck_bottom",
+        "guilty_night_option_a_waits_and_suppresses",
+        "guilty_night_option_b_draws_instead",
+        "hanamaru_bp6007_alt_cost_gain_constant_to_aqours",
+        "honoka_pr0020_gains_constant_live_total_at_eight",
+        "kinako_spbp7017_placed_energy_wont_activate_next_turn",
+        "sumire_pbp2004_original_score_beaten_or_revealed_live_draws",
+        "tabi_bp7021_all_five_members_draw_and_score",
+        "tabi_bp7021_fewer_than_three_members_on_stage_noop",
+        "tabi_bp7021_mill_tiers_three_members_draw_only",
+        "tabi_bp7021_mill_tiers_two_members_no_bonus"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -15396,9 +15413,16 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch8_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch8_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch9_test.rs"
       ],
       "covering_tests": [
+        "chika_bp7010_bottom_card_to_fourth_from_top",
+        "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_own_waitroom_members_to_deck_bottom",
+        "guilty_night_option_a_waits_and_suppresses",
+        "guilty_night_option_b_draws_instead",
+        "hanamaru_bp6007_alt_cost_gain_constant_to_aqours",
         "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
         "hanamaru_pb1_007_member_only_or_empty_reveal_places_nothing",
         "hanamaru_pb1_007_multiple_lives_still_only_one_energy",
@@ -15414,6 +15438,7 @@
         "happy_party_train_mill_non_aqours_no_reduction",
         "happy_party_train_waited_or_empty_stage_no_reduction",
         "heartbeat_bp4021_escalating_thresholds",
+        "honoka_pr0020_gains_constant_live_total_at_eight",
         "kanon_spbp2023_stacked_energy_threshold_hearts",
         "kanon_spbp4_001_empty_energy_deck_degrades_gracefully",
         "kanon_spbp4_001_energy_count_includes_wait_state",
@@ -15421,16 +15446,9 @@
         "kanon_spbp4_001_places_wait_energy_when_liella_only",
         "keke_spbp1002_twelve_energy_live_total_bonus",
         "ketsumi_no_hikari_per_waited_member_score",
-        "mari_bp3_008_activates_only_available_waiting_energies",
-        "mari_bp3_008_aqours_below_six_skips_activation",
-        "mari_bp3_008_aqours_high_fetch_activates_four",
-        "mari_bp3_008_selection_mandatory_and_live_only",
-        "mari_bp3_008_usable_with_no_live_in_waitroom",
-        "mari_bp3_008_wrong_group_fetch_skips_activation",
-        "mari_bp5_008_bonus_is_live_total_not_per_card",
-        "mari_bp5_008_exactly_two_surplus_qualifies"
+        "kinako_spbp7017_placed_energy_wont_activate_next_turn"
       ],
-      "covering_test_count": 52,
+      "covering_test_count": 65,
       "is_null": false
     },
     {
@@ -21728,14 +21746,30 @@
         "PL!S-bp6-007-P"
       ],
       "base": "PL!S-bp6-007",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch9_test.rs"
+      ],
+      "covering_tests": [
+        "chika_bp7010_bottom_card_to_fourth_from_top",
+        "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_own_waitroom_members_to_deck_bottom",
+        "guilty_night_option_a_waits_and_suppresses",
+        "guilty_night_option_b_draws_instead",
+        "hanamaru_bp6007_alt_cost_gain_constant_to_aqours",
+        "honoka_pr0020_gains_constant_live_total_at_eight",
+        "kinako_spbp7017_placed_energy_wont_activate_next_turn",
+        "sumire_pbp2004_original_score_beaten_or_revealed_live_draws",
+        "tabi_bp7021_all_five_members_draw_and_score",
+        "tabi_bp7021_fewer_than_three_members_on_stage_noop",
+        "tabi_bp7021_mill_tiers_three_members_draw_only",
+        "tabi_bp7021_mill_tiers_two_members_no_bonus"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -22391,14 +22425,30 @@
         "PL!SP-pb2-004-PP"
       ],
       "base": "PL!SP-pb2-004",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch9_test.rs"
+      ],
+      "covering_tests": [
+        "chika_bp7010_bottom_card_to_fourth_from_top",
+        "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_own_waitroom_members_to_deck_bottom",
+        "guilty_night_option_a_waits_and_suppresses",
+        "guilty_night_option_b_draws_instead",
+        "hanamaru_bp6007_alt_cost_gain_constant_to_aqours",
+        "honoka_pr0020_gains_constant_live_total_at_eight",
+        "kinako_spbp7017_placed_energy_wont_activate_next_turn",
+        "sumire_pbp2004_original_score_beaten_or_revealed_live_draws",
+        "tabi_bp7021_all_five_members_draw_and_score",
+        "tabi_bp7021_fewer_than_three_members_on_stage_noop",
+        "tabi_bp7021_mill_tiers_three_members_draw_only",
+        "tabi_bp7021_mill_tiers_two_members_no_bonus"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -26620,9 +26670,16 @@
       "covering_files": [
         "engine/tests/test_modules/constant_edge_case_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch8_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch8_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch9_test.rs"
       ],
       "covering_tests": [
+        "chika_bp7010_bottom_card_to_fourth_from_top",
+        "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_own_waitroom_members_to_deck_bottom",
+        "guilty_night_option_a_waits_and_suppresses",
+        "guilty_night_option_b_draws_instead",
+        "hanamaru_bp6007_alt_cost_gain_constant_to_aqours",
         "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
         "hanamaru_pb1_007_member_only_or_empty_reveal_places_nothing",
         "hanamaru_pb1_007_multiple_lives_still_only_one_energy",
@@ -26644,17 +26701,11 @@
         "honoka_distinct_names_member_removed",
         "honoka_distinct_names_three_members",
         "honoka_distinct_names_two_members",
+        "honoka_pr0020_gains_constant_live_total_at_eight",
         "kanon_alone_cannot_live",
-        "kanon_spbp2023_stacked_energy_threshold_hearts",
-        "kanon_spbp4_001_empty_energy_deck_degrades_gracefully",
-        "kanon_spbp4_001_energy_count_includes_wait_state",
-        "kanon_spbp4_001_non_liella_blocks_placement",
-        "kanon_spbp4_001_places_wait_energy_when_liella_only",
-        "kanon_with_other_member_no_restriction",
-        "keke_spbp1002_twelve_energy_live_total_bonus",
-        "ketsumi_no_hikari_per_waited_member_score"
+        "kanon_spbp2023_stacked_energy_threshold_hearts"
       ],
-      "covering_test_count": 71,
+      "covering_test_count": 84,
       "is_null": false
     },
     {
@@ -33900,6 +33951,7 @@
         "engine/tests/test_modules/tokimeki_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch9_test.rs",
         "engine/tests/test_modules/yoshiko_test.rs",
         "engine/tests/test_modules/you_debut_test.rs"
       ],
@@ -33935,7 +33987,7 @@
         "c9_arise_activate_and_recover",
         "c9_arise_constant_heart_with_other_arise"
       ],
-      "covering_test_count": 234,
+      "covering_test_count": 247,
       "is_null": false
     },
     {
@@ -37023,9 +37075,16 @@
       "covering_files": [
         "engine/tests/test_modules/constant_edge_case_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch8_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch8_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch9_test.rs"
       ],
       "covering_tests": [
+        "chika_bp7010_bottom_card_to_fourth_from_top",
+        "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_own_waitroom_members_to_deck_bottom",
+        "guilty_night_option_a_waits_and_suppresses",
+        "guilty_night_option_b_draws_instead",
+        "hanamaru_bp6007_alt_cost_gain_constant_to_aqours",
         "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
         "hanamaru_pb1_007_member_only_or_empty_reveal_places_nothing",
         "hanamaru_pb1_007_multiple_lives_still_only_one_energy",
@@ -37047,17 +37106,11 @@
         "honoka_distinct_names_member_removed",
         "honoka_distinct_names_three_members",
         "honoka_distinct_names_two_members",
+        "honoka_pr0020_gains_constant_live_total_at_eight",
         "kanon_alone_cannot_live",
-        "kanon_spbp2023_stacked_energy_threshold_hearts",
-        "kanon_spbp4_001_empty_energy_deck_degrades_gracefully",
-        "kanon_spbp4_001_energy_count_includes_wait_state",
-        "kanon_spbp4_001_non_liella_blocks_placement",
-        "kanon_spbp4_001_places_wait_energy_when_liella_only",
-        "kanon_with_other_member_no_restriction",
-        "keke_spbp1002_twelve_energy_live_total_bonus",
-        "ketsumi_no_hikari_per_waited_member_score"
+        "kanon_spbp2023_stacked_energy_threshold_hearts"
       ],
-      "covering_test_count": 71,
+      "covering_test_count": 84,
       "is_null": false
     },
     {
@@ -37697,14 +37750,30 @@
         "PL!S-bp7-010-N"
       ],
       "base": "PL!S-bp7-010",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch9_test.rs"
+      ],
+      "covering_tests": [
+        "chika_bp7010_bottom_card_to_fourth_from_top",
+        "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_own_waitroom_members_to_deck_bottom",
+        "guilty_night_option_a_waits_and_suppresses",
+        "guilty_night_option_b_draws_instead",
+        "hanamaru_bp6007_alt_cost_gain_constant_to_aqours",
+        "honoka_pr0020_gains_constant_live_total_at_eight",
+        "kinako_spbp7017_placed_energy_wont_activate_next_turn",
+        "sumire_pbp2004_original_score_beaten_or_revealed_live_draws",
+        "tabi_bp7021_all_five_members_draw_and_score",
+        "tabi_bp7021_fewer_than_three_members_on_stage_noop",
+        "tabi_bp7021_mill_tiers_three_members_draw_only",
+        "tabi_bp7021_mill_tiers_two_members_no_bonus"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -37782,14 +37851,30 @@
         "PL!S-bp7-013-N"
       ],
       "base": "PL!S-bp7-013",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch9_test.rs"
+      ],
+      "covering_tests": [
+        "chika_bp7010_bottom_card_to_fourth_from_top",
+        "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_own_waitroom_members_to_deck_bottom",
+        "guilty_night_option_a_waits_and_suppresses",
+        "guilty_night_option_b_draws_instead",
+        "hanamaru_bp6007_alt_cost_gain_constant_to_aqours",
+        "honoka_pr0020_gains_constant_live_total_at_eight",
+        "kinako_spbp7017_placed_energy_wont_activate_next_turn",
+        "sumire_pbp2004_original_score_beaten_or_revealed_live_draws",
+        "tabi_bp7021_all_five_members_draw_and_score",
+        "tabi_bp7021_fewer_than_three_members_on_stage_noop",
+        "tabi_bp7021_mill_tiers_three_members_draw_only",
+        "tabi_bp7021_mill_tiers_two_members_no_bonus"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -38002,14 +38087,30 @@
         "PL!S-bp7-021-L"
       ],
       "base": "PL!S-bp7-021",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch9_test.rs"
+      ],
+      "covering_tests": [
+        "chika_bp7010_bottom_card_to_fourth_from_top",
+        "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_own_waitroom_members_to_deck_bottom",
+        "guilty_night_option_a_waits_and_suppresses",
+        "guilty_night_option_b_draws_instead",
+        "hanamaru_bp6007_alt_cost_gain_constant_to_aqours",
+        "honoka_pr0020_gains_constant_live_total_at_eight",
+        "kinako_spbp7017_placed_energy_wont_activate_next_turn",
+        "sumire_pbp2004_original_score_beaten_or_revealed_live_draws",
+        "tabi_bp7021_all_five_members_draw_and_score",
+        "tabi_bp7021_fewer_than_three_members_on_stage_noop",
+        "tabi_bp7021_mill_tiers_three_members_draw_only",
+        "tabi_bp7021_mill_tiers_two_members_no_bonus"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -38074,14 +38175,30 @@
         "PL!S-bp7-025-L"
       ],
       "base": "PL!S-bp7-025",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch9_test.rs"
+      ],
+      "covering_tests": [
+        "chika_bp7010_bottom_card_to_fourth_from_top",
+        "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_own_waitroom_members_to_deck_bottom",
+        "guilty_night_option_a_waits_and_suppresses",
+        "guilty_night_option_b_draws_instead",
+        "hanamaru_bp6007_alt_cost_gain_constant_to_aqours",
+        "honoka_pr0020_gains_constant_live_total_at_eight",
+        "kinako_spbp7017_placed_energy_wont_activate_next_turn",
+        "sumire_pbp2004_original_score_beaten_or_revealed_live_draws",
+        "tabi_bp7021_all_five_members_draw_and_score",
+        "tabi_bp7021_fewer_than_three_members_on_stage_noop",
+        "tabi_bp7021_mill_tiers_three_members_draw_only",
+        "tabi_bp7021_mill_tiers_two_members_no_bonus"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -38880,14 +38997,30 @@
         "PL!SP-bp7-017-N"
       ],
       "base": "PL!SP-bp7-017",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch9_test.rs"
+      ],
+      "covering_tests": [
+        "chika_bp7010_bottom_card_to_fourth_from_top",
+        "chika_bp7010_decline_leaves_bottom_card_alone",
+        "dia_bp7013_own_waitroom_members_to_deck_bottom",
+        "guilty_night_option_a_waits_and_suppresses",
+        "guilty_night_option_b_draws_instead",
+        "hanamaru_bp6007_alt_cost_gain_constant_to_aqours",
+        "honoka_pr0020_gains_constant_live_total_at_eight",
+        "kinako_spbp7017_placed_energy_wont_activate_next_turn",
+        "sumire_pbp2004_original_score_beaten_or_revealed_live_draws",
+        "tabi_bp7021_all_five_members_draw_and_score",
+        "tabi_bp7021_fewer_than_three_members_on_stage_noop",
+        "tabi_bp7021_mill_tiers_three_members_draw_only",
+        "tabi_bp7021_mill_tiers_two_members_no_bonus"
+      ],
+      "covering_test_count": 13,
       "is_null": false
     },
     {

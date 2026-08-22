@@ -271,8 +271,7 @@ impl GameState {
             // Re-lookup effect through the local Arc clone — avoids 152B clone.
             // The reference borrows card_db (not self), so there's no borrow
             // conflict with &mut self operations later in this iteration.
-            let ability = match GameState::resolve_constant_ability(&card_db, card_id, ability_idx)
-            {
+            let ability = match self.resolve_constant_ability(card_id, ability_idx) {
                 Some(a) => a,
                 None => continue,
             };
@@ -812,7 +811,7 @@ impl GameState {
         // Pass pre-collected stage effects to avoid re-scanning the stage
         tdbg!("RC:13 COST_MODIFIERS_WITH_ENTRIES");
         let hand_ids = self.collect_constant_hand_effect_ids();
-        self.recalculate_constant_cost_modifiers_with_ids(&card_db, &entries, &hand_ids);
+        self.recalculate_constant_cost_modifiers_with_ids(&entries, &hand_ids);
         tdbg!("RC:13b COST_MODIFIERS_DONE");
 
         // Evaluate constant abilities from success live card zone (e.g. Love wing bell)
@@ -857,15 +856,13 @@ impl GameState {
     }
 
     pub fn recalculate_constant_cost_modifiers(&mut self) {
-        let card_db = self.card_database.clone();
         let stage_ids = self.collect_constant_stage_effect_ids();
         let hand_ids = self.collect_constant_hand_effect_ids();
-        self.recalculate_constant_cost_modifiers_with_ids(&card_db, &stage_ids, &hand_ids);
+        self.recalculate_constant_cost_modifiers_with_ids(&stage_ids, &hand_ids);
     }
 
     fn recalculate_constant_cost_modifiers_with_ids(
         &mut self,
-        card_db: &crate::card::CardDatabase,
         stage_ids: &[(i16, usize)],
         hand_ids: &[(i16, usize)],
     ) {
@@ -877,9 +874,7 @@ impl GameState {
             // Chain stage and hand ability IDs, look up each effect, filter to ModifyCost
             let all_ids = stage_ids.iter().chain(hand_ids.iter());
             for &(cid, ability_idx) in all_ids {
-                let Some(cost_ability) =
-                    GameState::resolve_constant_ability(card_db, cid, ability_idx)
-                else {
+                let Some(cost_ability) = self.resolve_constant_ability(cid, ability_idx) else {
                     continue;
                 };
                 let Some(ref effect) = cost_ability.effect else {

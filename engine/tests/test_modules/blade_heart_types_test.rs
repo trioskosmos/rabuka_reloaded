@@ -166,11 +166,12 @@ fn six_blade_heart_types_grants_both() {
         1,
         "Should have heart01 ×1 with 6 blade heart types"
     );
-    // The gain_ability action grants modify_score to the member card
+    // The gain_ability grants 「常時：ライブの合計スコア＋１する」 — live-total.
+    game.state.recalculate_constants();
     assert_eq!(
-        get_score_modifier(&game, ability_card),
+        game.state.mods.p1_constant_total_score_bonus,
         1,
-        "Score should be +1 with 6 blade heart types (applied to member card)"
+        "6 blade heart types → gained constant gives live total +1"
     );
 }
 
@@ -197,10 +198,12 @@ fn all_blade_heart_types_with_b_all_grants_both() {
         1,
         "Should have heart01 ×1 with all blade heart types + b_all"
     );
+    // The gain_ability grants 「常時：ライブの合計スコア＋１する」 — live-total.
+    game.state.recalculate_constants();
     assert_eq!(
-        get_score_modifier(&game, ability_card),
+        game.state.mods.p1_constant_total_score_bonus,
         1,
-        "Score should be +1 with b_all contributing all 6+ types"
+        "b_all contributing all 6+ types → live total +1"
     );
 }
 

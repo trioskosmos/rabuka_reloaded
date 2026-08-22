@@ -108,6 +108,30 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(crate) fn evaluate_comparison_condition(&self, condition: &Condition) -> bool {
+        // "元々のスコアより高いスコアのライブカードがある" — existence of a
+        // live card in the zone whose CURRENT (modifier-adjusted) score is
+        // higher than its ORIGINAL printed score. Not a count-vs-threshold
+        // comparison; the operator relates current to original per card.
+        if condition.get_original_value() == Some(true)
+            && condition.get_comparison_type() == Some("score")
+        {
+            let player =
+                self.resolve_condition_player(condition.get_target().unwrap_or("self"));
+            let location = condition.get_location().unwrap_or("");
+            let ids: Vec<i16> = match Zone::from_str(location) {
+                Some(Zone::LiveCardZone) => player.live_card_zone.cards.to_vec(),
+                Some(Zone::SuccessLiveZone) => player.success_live_card_zone.cards.to_vec(),
+                _ => Vec::new(),
+            };
+            let card_db = &self.game_state.card_database;
+            let op = condition.get_operator();
+            return ids.iter().any(|&id| {
+                let original = card_db.get_card(id).and_then(|c| c.score).unwrap_or(0);
+                let current =
+                    (original as i32 + self.game_state.mods.get_score_modifier(id)).max(0) as u8;
+                util::compare_counts(op, current, original)
+            });
+        }
         if let Some(ref pos) = condition.get_position() {
             if pos.get_position() == Some("front") {
                 return self.evaluate_front_comparison(condition);

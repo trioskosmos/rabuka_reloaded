@@ -597,6 +597,10 @@ impl AbilityResolver {
                     self.selected_cards.push(*card_id);
                 }
             }
+            // Record the members this step changed so a following delayed
+            // restriction step ("そのメンバーは次のターンのアクティブフェイズに
+            // アクティブしない") can key its flags on exactly these victims.
+            self.changed_state_members = actual_targets.iter().map(|(_, cid)| *cid).collect();
 
             // Track how many members were actually changed from wait→active
             // (activations blocked by cannot_activate_by_effect don't count)

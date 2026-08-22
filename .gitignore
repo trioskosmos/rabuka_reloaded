@@ -144,3 +144,6 @@ engine/profile_stderr.txt
 
 # Rust build artifacts
 platforms/*/target/
+
+# Tweet mood analysis (personal data, regenerable)
+/tweet_mood/

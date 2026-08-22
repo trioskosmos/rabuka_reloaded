@@ -962,6 +962,9 @@ impl AbilityResolver {
         };
 
         gs.looked_at_cards = cards.into();
+        // Remember where the pool came from: a DECLINED optional move must
+        // return the cards here (rule 5.7 — 見る only informs).
+        self.looked_at_origin = Some(source.to_string());
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -979,7 +982,7 @@ impl AbilityResolver {
         _effect: &AbilityEffect,
         count: u8,
         target: &str,
-        _source: &str,
+        source: &str,
     ) -> Result<(), String> {
         let count = count as usize;
         let first = {
@@ -1007,6 +1010,7 @@ impl AbilityResolver {
             }
         }
         gs.looked_at_cards = looked.into();
+        self.looked_at_origin = Some(source.to_string());
         Ok(())
     }
 

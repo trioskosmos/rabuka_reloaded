@@ -1068,7 +1068,7 @@ fn mari_bp3_008_usable_with_no_live_in_waitroom() {
 fn mari_bp3_008_selection_mandatory_and_live_only() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let (mari, aqours_high, niji_low) = mari_bp3_008_board(&mut game, 2);
+    let (mari, aqours_high, _niji_low) = mari_bp3_008_board(&mut game, 2);
     let member_in_waitroom = game.new_id(FILLER);
     game.add_to_discard(member_in_waitroom);
 
@@ -1082,14 +1082,6 @@ fn mari_bp3_008_selection_mandatory_and_live_only() {
         .iter()
         .position(|&c| c == member_in_waitroom)
         .expect("member present in waitroom");
-    let high_idx = game
-        .state
-        .player1
-        .waitroom
-        .cards
-        .iter()
-        .position(|&c| c == aqours_high)
-        .expect("Aqours live present");
 
     // Edge 6: offering the MEMBER must never move it — only lives are legal
     // targets (ライブカードを1枚手札に加える).

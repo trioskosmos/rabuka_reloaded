@@ -74,11 +74,12 @@ fn chisato_cost_hits_threshold_condition_passes() {
         5,
         "Revealed cost cards should be tracked for condition evaluation"
     );
-    // Score modifier should be +1 (condition passed: 20 ∈ {10,20,30,40,50})
+    // Gained 「常時：ライブの合計スコア＋１する」 — live-total accumulator.
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(chisato),
+        game.state.mods.p1_constant_total_score_bonus,
         1,
-        "Score should be +1 when threshold is met"
+        "Live-total bonus should be +1 when threshold is met"
     );
     // use_limit should be consumed (key: chisato_id_0_turn_number)
     let key = (chisato, 0, game.state.turn_number);
@@ -189,11 +190,12 @@ fn chisato_q78_ability_lost_on_leave() {
     // Sequential selection matching frontend single-select behaviour.
     game.select_indices_sequential(&[0, 0, 0, 0, 0]);
 
-    // Verify the +1 score was applied (threshold 20 was met)
+    // Verify the gained live-total bonus was applied (threshold 20 was met)
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(chisato),
+        game.state.mods.p1_constant_total_score_bonus,
         1,
-        "Q78: Score should be +1 before leaving stage"
+        "Q78: live-total bonus should be +1 before leaving stage"
     );
 
     // Now move Chisato to waitroom (simulating leaving stage)
@@ -202,10 +204,11 @@ fn chisato_q78_ability_lost_on_leave() {
     game.state.mods.clear_all_for_card(chisato);
 
     // After leaving stage, the gained ability should be gone
-    // (The score modifier should also be cleared)
-    let score_mod = game.state.mods.get_score_modifier(chisato);
+    game.state.clear_gained_abilities_for_card(chisato);
+    game.state.recalculate_constants();
     assert_eq!(
-        score_mod, 0,
-        "Q78: Score boost should be lost when member leaves stage"
+        game.state.mods.p1_constant_total_score_bonus,
+        0,
+        "Q78: live-total bonus should be lost when member leaves stage"
     );
 }

@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-22T19:19:05.077041",
+  "generated_at": "2026-08-22T19:42:46.335607",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards\\cards.json",
-  "engine_commit": "4704a81a",
+  "engine_commit": "8db79b6e",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -3802,6 +3802,7 @@
         "text": "このメンバーが登場か、エリアを移動したとき、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする",
         "condition": {
           "type": "or_condition",
+          "operator": "or",
           "conditions": [
             {
               "type": "appearance_condition",
@@ -6724,6 +6725,7 @@
         "text": "これにより控え室に置いたカードの中に『虹ヶ咲』のライブカードかブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合、以下から1つを選ぶ。\n・エネルギーを2枚アクティブにする。\n・ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "condition": {
           "type": "or_condition",
+          "operator": "or",
           "source": "preceding_moved",
           "conditions": [
             {
@@ -7135,6 +7137,7 @@
         "text": "このメンバーが登場するか、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれたとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。そのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない",
         "condition": {
           "type": "or_condition",
+          "operator": "or",
           "conditions": [
             {
               "type": "appearance_condition",
@@ -11655,6 +11658,7 @@
         "trigger_type": "each_time",
         "condition": {
           "type": "or_condition",
+          "operator": "or",
           "conditions": [
             {
               "type": "appearance_condition",
@@ -20423,6 +20427,7 @@
         "text": "自分のライブカード置き場の中に元々のスコアより高いスコアのライブカードがあるか、エールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードがある場合、カードを1枚引く",
         "condition": {
           "type": "or_condition",
+          "operator": "or",
           "conditions": [
             {
               "text": "自分のライブカード置き場の中に元々のスコアより高いスコアのライブカードがある",
@@ -20582,6 +20587,7 @@
         "text": "自分のライブが成功するか、このメンバーがエリアを移動したとき、自分の控え室にある『Liella!』のメンバーカードを1枚、このメンバーの下に置く",
         "condition": {
           "type": "or_condition",
+          "operator": "or",
           "conditions": [
             {
               "type": "movement_condition",
@@ -23519,6 +23525,7 @@
         "text": "自分のステージに、このメンバーか、ほかのメンバーがバトンタッチして登場したとき、カードを1枚引く",
         "condition": {
           "type": "or_condition",
+          "operator": "or",
           "conditions": [
             {
               "text": "自分のステージに、このメンバー",
@@ -26403,6 +26410,7 @@
         "text": "このターン、エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合か、または自分が余剰ハートを2つ以上持っている場合、このカードのスコアは4になる",
         "condition": {
           "type": "or_condition",
+          "operator": "or",
           "conditions": [
             {
               "type": "location_condition",
@@ -30889,6 +30897,7 @@
         "text": "エールにより公開された自分のカードの中にライブカードが2枚以上あるか、自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち合計5種類以上あるか、このターンに自分のステージにいるメンバーがエリアを移動している場合、このカードのスコアを+1する",
         "condition": {
           "type": "or_condition",
+          "operator": "or",
           "conditions": [
             {
               "type": "card_count_condition",

@@ -5,7 +5,8 @@
 ///   ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。
 ///
 /// The condition checks success_live_card_zone for ≥1 card AND total score ≤ 1.
-/// Effect: gain_ability applies a +1 score modifier via `gs.mods.add_score_modifier`.
+/// Effect: gain_ability grants 「常時：ライブの合計スコア＋１する」 — observed
+/// via the live-total accumulator (p1_constant_total_score_bonus).
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
@@ -33,17 +34,18 @@ fn nozomi_condition_met_gains_score_boost() {
     game.state.player1.hand.cards.push(nozomi);
     game.give_energy(15);
 
-    let score_before = game.state.mods.get_score_modifier(nozomi);
+    let bonus_before = game.state.mods.p1_constant_total_score_bonus;
 
     // Natural debut: 登場 trigger fires during play_to_stage
     game.play_to_stage(nozomi, MemberArea::LeftSide);
 
-    let score_after = game.state.mods.get_score_modifier(nozomi);
+    game.state.recalculate_constants();
+    let bonus_after = game.state.mods.p1_constant_total_score_bonus;
     assert!(
-        score_after > score_before,
-        "Condition met: score modifier should increase (before={}, after={})",
-        score_before,
-        score_after
+        bonus_after > bonus_before,
+        "Condition met: live-total bonus should increase (before={}, after={})",
+        bonus_before,
+        bonus_after
     );
 }
 
@@ -71,12 +73,13 @@ fn nozomi_score_too_high_condition_fails() {
     game.state.player1.hand.cards.push(nozomi);
     game.give_energy(15);
 
-    let score_before = game.state.mods.get_score_modifier(nozomi);
+    let bonus_before = game.state.mods.p1_constant_total_score_bonus;
     game.play_to_stage(nozomi, MemberArea::LeftSide);
-    let score_after = game.state.mods.get_score_modifier(nozomi);
+    game.state.recalculate_constants();
+    let bonus_after = game.state.mods.p1_constant_total_score_bonus;
 
     assert_eq!(
-        score_after, score_before,
+        bonus_after, bonus_before,
         "Total score 2 > 1 → condition fails → no modifier change"
     );
 }
@@ -100,12 +103,13 @@ fn nozomi_empty_zone_condition_fails() {
     game.state.player1.hand.cards.push(nozomi);
     game.give_energy(15);
 
-    let score_before = game.state.mods.get_score_modifier(nozomi);
+    let bonus_before = game.state.mods.p1_constant_total_score_bonus;
     game.play_to_stage(nozomi, MemberArea::LeftSide);
-    let score_after = game.state.mods.get_score_modifier(nozomi);
+    game.state.recalculate_constants();
+    let bonus_after = game.state.mods.p1_constant_total_score_bonus;
 
     assert_eq!(
-        score_after, score_before,
+        bonus_after, bonus_before,
         "Empty success zone → condition fails → no modifier change"
     );
 }
@@ -131,12 +135,13 @@ fn nozomi_p_rarity_same_behavior() {
     game.state.player1.hand.cards.push(nozomi);
     game.give_energy(15);
 
-    let score_before = game.state.mods.get_score_modifier(nozomi);
+    let bonus_before = game.state.mods.p1_constant_total_score_bonus;
     game.play_to_stage(nozomi, MemberArea::LeftSide);
-    let score_after = game.state.mods.get_score_modifier(nozomi);
+    game.state.recalculate_constants();
+    let bonus_after = game.state.mods.p1_constant_total_score_bonus;
 
     assert!(
-        score_after > score_before,
+        bonus_after > bonus_before,
         "P rarity: condition passes, score modifier increases"
     );
 }

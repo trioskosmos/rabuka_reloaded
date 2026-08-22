@@ -1465,6 +1465,16 @@ impl AbilityResolver {
                     filter.cost_limit = Some(cost);
                 }
             }
+            // 「デッキの上からN番目に置いてもよい」: the answer-time handler
+            // (handle_select_cards_looked_at) has no access to this effect, so
+            // capture the numeric deck position now and let it ride on the
+            // resolver until the selection is answered.
+            self.looked_at_deck_position = effect
+                .position_any()
+                .and_then(|pi| pi.get_position())
+                .and_then(|s| s.parse::<usize>().ok())
+                .filter(|&n| n > 0)
+                .filter(|_| effect.destination.as_ref() == Some(&Zone::DeckTop));
             self.pending_choice = Some(
                 Choice::select_cards(Zone::LookedAt.to_str(), max_take, description, true)
                     .description_en(description_en)
@@ -3023,6 +3033,15 @@ impl AbilityResolver {
                 })
             });
         let current = self.current_effect.as_ref();
+        // Whether the EFFECT TEXT explicitly says what happens to the
+        // unselected remainder (e.g. 「残りを控え室に置く」). When it does NOT,
+        // a fully-declined optional selection must return the cards to where
+        // they were looked at from — not to the discard fallback.
+        let explicit_discard = select_action
+            .as_ref()
+            .and_then(|sa| sa.discard_remaining_any())
+            .or_else(|| current.and_then(|c| c.discard_remaining_any()))
+            .or_else(|| ctx_discard_remaining);
         let (destination, discard_remaining, placement_order) = (
             select_action
                 .as_ref()
@@ -3030,12 +3049,7 @@ impl AbilityResolver {
                 .or_else(|| current.and_then(|c| c.destination.clone().map(|s| s.to_string())))
                 .or_else(|| ctx_destination)
                 .unwrap_or_else(|| Zone::Hand.to_str().to_string().into()),
-            select_action
-                .as_ref()
-                .and_then(|sa| sa.discard_remaining_any())
-                .or_else(|| current.and_then(|c| c.discard_remaining_any()))
-                .or_else(|| ctx_discard_remaining)
-                .unwrap_or(true),
+            explicit_discard.unwrap_or(true),
             select_action
                 .as_ref()
                 .and_then(|sa| sa.placement_order_any().clone())
@@ -3153,8 +3167,38 @@ impl AbilityResolver {
         }
 
         let player = gs.resolve_target_player_mut(&target);
-        for &card_id in &selected_cards {
-            util::place_card_in_zone(player, card_id, &destination, None, false, 1);
+        // 「デッキの上からN番目に置く」— numeric deck position insert
+        // (PositionInfo position "4" = 4th from the TOP = index N-1).
+        // The effect context is gone at answer time, so also honor the
+        // position captured when the optional looked_at choice was spawned.
+        // The stash is consumed unconditionally so a stale value can never
+        // leak into an unrelated later selection.
+        let stashed_deck_pos = self.looked_at_deck_position.take();
+        let numeric_deck_pos: Option<usize> = select_action
+            .as_ref()
+            .and_then(|sa| sa.position_any())
+            .or_else(|| current.and_then(|c| c.position_any()))
+            .and_then(|pi| pi.get_position())
+            .and_then(|s| s.parse::<usize>().ok())
+            .or(stashed_deck_pos)
+            .filter(|&n| n > 0)
+            .filter(|_| {
+                Zone::from_str(&destination) == Some(Zone::DeckTop)
+                    || Zone::from_str(&destination) == Some(Zone::Deck)
+            });
+        if let Some(n) = numeric_deck_pos {
+            for &card_id in &selected_cards {
+                let idx = (n - 1).min(player.main_deck.cards.len());
+                player.main_deck.cards.insert(idx, card_id);
+                log::debug!(
+                    "[LA_DECK_POS] inserted card {} at index {} ({}th from top)",
+                    card_id, idx, n
+                );
+            }
+        } else {
+            for &card_id in &selected_cards {
+                util::place_card_in_zone(player, card_id, &destination, None, false, 1);
+            }
         }
         self.moved_cards.extend(selected_cards.iter().copied());
 
@@ -3244,6 +3288,29 @@ impl AbilityResolver {
         }
 
         let player = gs.resolve_target_player_mut(&target);
+
+        // Optional move DECLINED outright (nothing selected, no explicit
+        // remainder directive): the looked-at cards go back where they came
+        // from. Rule 5.7 — 見る only informs; skipping 「置いてもよい」 must not
+        // discard or reposition anything.
+        if selected_cards.is_empty() && explicit_discard.is_none() {
+            let origin = self
+                .looked_at_origin
+                .clone()
+                .unwrap_or_else(|| Zone::DeckTop.to_str().to_string());
+            for &card_id in &remaining_cards {
+                util::place_card_in_zone(player, card_id, &origin, None, false, 1);
+            }
+            log::debug!(
+                "[LA_SKIP_RETURN] {} card(s) returned to origin {}",
+                remaining_cards.len(),
+                origin
+            );
+            gs.looked_at_cards.clear();
+            self.pending_choice = None;
+            return Ok(());
+        }
+
         // If the effect specifies where the REMAINING (unselected) looked-at cards
         // go (e.g. "残りを好きな順番でデッキの下に置く" → deck_bottom), honor that.
         // Otherwise fall back to discard_remaining (discard) or deck top.

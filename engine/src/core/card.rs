@@ -2741,6 +2741,10 @@ pub struct ConditionCommon {
     pub no_excess_heart: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub operator: Option<ArcStr>,
+    /// "元々のスコアより高いスコアの…" — compare a card's CURRENT value
+    /// against its ORIGINAL printed value instead of a fixed threshold.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub original_value: Option<bool>,
     pub phase: Option<ArcStr>,
     pub phase_target: Option<ArcStr>,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -3639,6 +3643,9 @@ impl Condition {
         match self {
             Condition::Location { sub_checks, .. } => {
                 sub_checks.as_ref().and_then(|sc| sc.original_value)
+            }
+            Condition::Compound { common, .. } | Condition::Comparison { common, .. } => {
+                common.original_value
             }
             _ => None,
         }

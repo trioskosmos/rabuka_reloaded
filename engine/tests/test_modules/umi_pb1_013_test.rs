@@ -65,10 +65,11 @@ fn q176_reveal_live_card_gains_plus1_score() {
         game.select_indices(&[0]);
     }
 
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(umi),
+        game.state.mods.p1_constant_total_score_bonus,
         1,
-        "Score modifier should be +1 when a live card is revealed"
+        "Gained 常時 live-total bonus should be +1 when a live card is revealed"
     );
 }
 
@@ -88,10 +89,11 @@ fn q176_reveal_non_live_card_no_score_modifier() {
         game.select_indices(&[0]);
     }
 
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(umi),
+        game.state.mods.p1_constant_total_score_bonus,
         0,
-        "Score modifier should be 0 when non-live card is revealed"
+        "No bonus when non-live card is revealed"
     );
 }
 
@@ -162,10 +164,12 @@ fn q176_score_modifier_persists_through_phase_changes() {
         game.select_indices(&[0]);
     }
 
-    assert_eq!(game.state.mods.get_score_modifier(umi), 1);
+    game.state.recalculate_constants();
+    assert_eq!(game.state.mods.p1_constant_total_score_bonus, 1);
     game.pass();
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(umi),
+        game.state.mods.p1_constant_total_score_bonus,
         1,
         "Persists through phase changes"
     );
@@ -186,12 +190,15 @@ fn q176_score_modifier_cleared_when_member_leaves_stage() {
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
-    assert_eq!(game.state.mods.get_score_modifier(umi), 1, "Should have +1");
+    game.state.recalculate_constants();
+    assert_eq!(game.state.mods.p1_constant_total_score_bonus, 1, "Should have +1");
 
     game.state.player1.stage.stage[1] = -1;
     game.state.mods.clear_all_for_card(umi);
+    game.state.clear_gained_abilities_for_card(umi);
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(umi),
+        game.state.mods.p1_constant_total_score_bonus,
         0,
         "Should be 0 after leaving stage"
     );
@@ -251,10 +258,11 @@ fn q176_choice_path_pick_live_from_mixed_hand() {
         game.select_indices(&[0]);
     }
 
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(umi),
+        game.state.mods.p1_constant_total_score_bonus,
         1,
-        "Pick live card → +1 score"
+        "Pick live card → live-total +1"
     );
     assert!(
         game.state.revealed_cards.contains(&live),
@@ -287,10 +295,11 @@ fn q176_choice_path_pick_non_live_from_mixed_hand() {
         game.select_indices(&[0]);
     }
 
+    game.state.recalculate_constants();
     assert_eq!(
-        game.state.mods.get_score_modifier(umi),
+        game.state.mods.p1_constant_total_score_bonus,
         0,
-        "Pick non-live card → no score modifier"
+        "Pick non-live card → no bonus"
     );
     assert!(
         game.state.revealed_cards.contains(&non_live),

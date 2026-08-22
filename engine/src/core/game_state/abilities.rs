@@ -156,21 +156,39 @@ impl GameState {
         &self,
         cids: impl IntoIterator<Item = i16>,
     ) -> Vec<(i16, usize)> {
+        const GAINED_ABILITY_INDEX_BASE: usize = 10_000;
         let mut ids = Vec::new();
         for cid in cids {
-            let card = match self.card_database.get_card(cid) {
-                Some(card) => card,
-                None => continue,
-            };
-            for (idx, ar) in card.abilities.iter().enumerate() {
-                let ability = ar.resolve();
-                if Self::ability_matches_trigger(
-                    &ability,
-                    &crate::game_state::AbilityTrigger::Constant,
-                ) {
-                    if ability.effect.is_some() {
-                        ids.push((cid, idx));
+            if let Some(card) = self.card_database.get_card(cid) {
+                for (idx, ar) in card.abilities.iter().enumerate() {
+                    let ability = ar.resolve();
+                    if Self::ability_matches_trigger(
+                        &ability,
+                        &crate::game_state::AbilityTrigger::Constant,
+                    ) {
+                        if ability.effect.is_some() {
+                            ids.push((cid, idx));
+                        }
                     }
+                }
+            }
+            // Runtime-gained abilities (「…を得る」 grants a 常時 etc.) live in
+            // gained_card_abilities, not the card database. Encode them with an
+            // offset base so resolve_constant_ability can tell them apart;
+            // resolve() filters by trigger like printed abilities.
+            for (gidx, ability) in self
+                .gained_card_abilities
+                .get(&cid)
+                .into_iter()
+                .flatten()
+                .enumerate()
+            {
+                if Self::ability_matches_trigger(
+                    ability,
+                    &crate::game_state::AbilityTrigger::Constant,
+                ) && ability.effect.is_some()
+                {
+                    ids.push((cid, GAINED_ABILITY_INDEX_BASE + gidx));
                 }
             }
         }
@@ -198,12 +216,23 @@ impl GameState {
 
     /// Helper: look up and resolve a constant ability by (card_id, ability_index).
     /// Returns the resolved Arc<Ability> so the caller can borrow effect from it.
+    /// Indices >= [`Self::GAINED_ABILITY_INDEX_BASE`] address runtime-gained
+    /// abilities (see collect_constant_ids_for).
     pub(crate) fn resolve_constant_ability(
-        card_db: &crate::card::CardDatabase,
+        &self,
         card_id: i16,
         ability_idx: usize,
     ) -> Option<crate::Arc<crate::card::Ability>> {
-        let ar = card_db.get_card(card_id)?.abilities.get(ability_idx)?;
+        const GAINED_ABILITY_INDEX_BASE: usize = 10_000;
+        if ability_idx >= GAINED_ABILITY_INDEX_BASE {
+            let gidx = ability_idx - GAINED_ABILITY_INDEX_BASE;
+            return self
+                .gained_card_abilities
+                .get(&card_id)?
+                .get(gidx)
+                .map(|a| crate::Arc::new(a.clone()));
+        }
+        let ar = self.card_database.get_card(card_id)?.abilities.get(ability_idx)?;
         Some(ar.resolve())
     }
 

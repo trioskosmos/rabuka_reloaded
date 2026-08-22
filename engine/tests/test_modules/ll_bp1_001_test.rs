@@ -112,7 +112,12 @@ fn joint_live_start_discard_three_gains_score3() {
         hand_before - 3,
         "3 discarded"
     );
-    assert_eq!(game.state.mods.get_score_modifier(joint), 3, "+3 score");
+    game.state.recalculate_constants();
+    assert_eq!(
+        game.state.mods.p1_constant_total_score_bonus,
+        3,
+        "+3 live-total bonus"
+    );
 }
 
 #[test]
@@ -141,7 +146,12 @@ fn joint_live_start_discard_two_gains_score3() {
         hand_before - 2,
         "2 discarded"
     );
-    assert_eq!(game.state.mods.get_score_modifier(joint), 3, "+3 score");
+    game.state.recalculate_constants();
+    assert_eq!(
+        game.state.mods.p1_constant_total_score_bonus,
+        3,
+        "+3 live-total bonus"
+    );
 }
 
 #[test]
@@ -228,5 +238,10 @@ fn joint_live_start_discard_mixed_named_gains_score3() {
         hand_before - 2,
         "2 mixed discarded"
     );
-    assert_eq!(game.state.mods.get_score_modifier(joint), 3, "+3 score");
+    game.state.recalculate_constants();
+    assert_eq!(
+        game.state.mods.p1_constant_total_score_bonus,
+        3,
+        "+3 live-total bonus"
+    );
 }
