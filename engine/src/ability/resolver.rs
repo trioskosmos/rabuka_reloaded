@@ -133,6 +133,9 @@ pub struct AbilityResolver {
     /// is spawned. The answer-time handler has no effect context, so the
     /// position rides here (consumed on first looked_at selection).
     pub looked_at_deck_position: Option<usize>,
+    /// Declared intent of the pending Stage SelectCard choice, if its producer
+    /// declared one. Consumed by handle_stage_selection.
+    pub stage_select_intent: Option<crate::ability::types::StageSelectIntent>,
 }
 
 impl AbilityResolver {
@@ -173,6 +176,7 @@ impl AbilityResolver {
             last_offered_sig: None,
             looked_at_origin: None,
             looked_at_deck_position: None,
+            stage_select_intent: None,
         }
     }
 

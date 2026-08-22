@@ -296,6 +296,23 @@ pub enum ExecutionContext {
     },
 }
 
+/// Explicit statement of what a pending Stage `SelectCard` choice is FOR.
+/// Set by the effect that creates the prompt; consumed by
+/// handle_stage_selection so it dispatches on declared intent instead of
+/// sniffing queue/effect context (which mis-routed selections into
+/// under-member energy moves and stage exits).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StageSelectIntent {
+    /// change_state wait-COST: apply "wait" to the chosen members right now
+    /// (the cost handler will not re-enter for deferred choices).
+    WaitCost,
+    /// Move the chosen members' under-cards into the energy zone (Burn!!).
+    UnderMemberMove,
+    /// Only collect the chosen members into selected_cards; a stored pending
+    /// action re-applies using them.
+    CollectTargets,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 
 pub enum LookAndSelectStep {

@@ -1733,6 +1733,8 @@ impl AbilityResolver {
                     .is_select_action(true)
                     .build(),
                 );
+                self.stage_select_intent =
+                    Some(crate::ability::types::StageSelectIntent::UnderMemberMove);
                 self.execution_context = crate::ability::types::ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(vec![]);
             }
@@ -1760,6 +1762,8 @@ impl AbilityResolver {
             .is_select_action(true)
             .build(),
         );
+        self.stage_select_intent =
+            Some(crate::ability::types::StageSelectIntent::UnderMemberMove);
         self.execution_context = crate::ability::types::ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(vec![])
     }

@@ -1052,6 +1052,8 @@ impl AbilityResolver {
                         .is_select_action(true)
                         .build(),
                 );
+                self.stage_select_intent =
+                    Some(crate::ability::types::StageSelectIntent::CollectTargets);
                 // Don't call store_pending_choice — keep self.pending_choice set
                 // so the caller (e.g. resume_pending_commands) can detect the
                 // sub-choice and properly save remaining commands before returning.
