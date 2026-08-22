@@ -387,7 +387,6 @@ impl AbilityResolver {
                 }
                 // A gained 常時 changes the constant landscape — make sure the
                 // next recalculation picks it up.
-                gs.mark_constants_dirty();
                 self.last_gain_effect_data = Some(crate::core::types::EffectData::GainAbility {
                     card_id,
                     amount: immediate_val as i16,

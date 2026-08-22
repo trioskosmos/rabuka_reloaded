@@ -54,7 +54,6 @@ pub(crate) fn drain_under_cards_to_energy_zone(
             .unwrap_or_else(|| "p1".to_string());
         gs.push_movement_event(cid, "under_member", "energy_zone", gs.activating_card, &pid, true);
     }
-    gs.mark_constants_dirty();
     gs.recalculate_constants();
     moved
 }
@@ -2385,7 +2384,6 @@ impl AbilityResolver {
         // constants (「〜あるかぎり」) are live state and must re-evaluate now,
         // not at the next phase boundary.
         if !moved_cards.is_empty() {
-            gs.mark_constants_dirty();
             gs.recalculate_constants();
         }
 
@@ -2490,7 +2488,6 @@ impl AbilityResolver {
                 util::place_card_in_zone(player, *card_id, dst, None, false, 1);
             }
         }
-        gs.mark_constants_dirty();
         gs.recalculate_constants();
         // Don't save energy card IDs in selected_cards — they would leak
         // into downstream sequential actions (e.g. gain_resource heart targets).
@@ -3484,7 +3481,6 @@ impl AbilityResolver {
                 true,
             );
         }
-        gs.mark_constants_dirty();
         gs.recalculate_constants();
         let pp = self.player_prefix(gs);
         let act_name = gs
@@ -3546,3 +3542,4 @@ impl AbilityResolver {
         self.execute_move_cards(gs, &self_eff)
     }
 }
+

@@ -643,7 +643,7 @@ impl super::TurnEngine {
             return Ok(());
         }
 
-        // Play-time cost reduction choice (常時「このカードをプレイする際…コスト�E減る、E.
+        // Play-time cost reduction choice (play-time cost reduction):
         if let crate::ability::types::Choice::SelectTarget { target, .. } = &choice {
             if target == "play_time_cost_reduction" {
                 let accepted = card_id == Some(1); // option "Yes"
@@ -1289,7 +1289,6 @@ impl super::TurnEngine {
                 .cards
                 .extend(waitroom.iter().copied());
             game_state.player1.main_deck.shuffle();
-            game_state.mark_constants_dirty();
             tdbg!("CHECK_TIMING:1b p1 refresh shuffled");
         }
         if p2_needs_refresh {
@@ -1300,7 +1299,6 @@ impl super::TurnEngine {
                 .cards
                 .extend(waitroom.iter().copied());
             game_state.player2.main_deck.shuffle();
-            game_state.mark_constants_dirty();
             tdbg!("CHECK_TIMING:2b p2 refresh shuffled");
         }
         tdbg!("CHECK_TIMING:3 refresh done");
@@ -1321,18 +1319,12 @@ impl super::TurnEngine {
             Self::check_invalid_energy_cards(&mut game_state.player1, &game_state.card_database);
         let e2 =
             Self::check_invalid_energy_cards(&mut game_state.player2, &game_state.card_database);
-        if e2 > 0 || e1 > 0 {
-            game_state.mark_constants_dirty();
-        }
-        tdbg!("CHECK_TIMING:7 invalid energy OK");
+        tdbg!("CHECK_TIMING:7 invalid energy OK ({} invalid)", e1 + e2);
         let o1 =
             Self::check_orphaned_under_cards(&mut game_state.player1, &game_state.card_database);
         let o2 =
             Self::check_orphaned_under_cards(&mut game_state.player2, &game_state.card_database);
-        if o1 > 0 || o2 > 0 {
-            game_state.mark_constants_dirty();
-        }
-        tdbg!("CHECK_TIMING:8 orphaned under OK");
+        tdbg!("CHECK_TIMING:8 orphaned under OK ({} orphaned)", o1 + o2);
         {
             #[cfg(not(feature = "no_std"))]
             let _t = crate::timer::Timer::start("check_timing::recalculate_constants");
@@ -1439,7 +1431,6 @@ impl super::TurnEngine {
             game_state.player2.id.clone()
         };
         // Live-zone membership changed ↁEconstant outputs may differ.
-        game_state.mark_constants_dirty();
         let mut moved = Vec::new();
         for &(i, card_id, is_energy) in invalids.iter().rev() {
             let player = if is_p1 {

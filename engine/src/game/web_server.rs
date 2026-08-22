@@ -1243,7 +1243,6 @@ async fn exec_code(
         with_player!(p, {
             p.success_live_card_zone.cards.clear();
         });
-        game_state.mark_constants_dirty();
         game_state.recalculate_constants();
     }
 
@@ -2852,3 +2851,4 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
     .run()
     .await
 }
+

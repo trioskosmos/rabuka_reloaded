@@ -154,7 +154,6 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                         .activate_all_energy_exclude(excluded_energy);
                     tdbg!("PHASE_ACTIVE:6 activate_all_energy OK");
                     // Orientation + energy activation changed → constant outputs stale.
-                    game_state.mark_constants_dirty();
                     Self::check_timing(game_state);
                     tdbg!("PHASE_ACTIVE:7 check_timing OK");
                     Self::log_phase(game_state, "phase_energy");
@@ -170,7 +169,6 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                     // check_timing removed: redundant with the Draw-phase call that
                     // immediately follows (only log_phase sits between them); the
                     // full suite passes without it.
-                    game_state.mark_constants_dirty();
                     Self::log_phase(game_state, "phase_draw");
                     game_state.current_phase = Phase::Draw;
                 }
@@ -179,7 +177,6 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                     let _t = crate::timer::Timer::start("advance_phase::draw");
                     let _drawn = game_state.active_player_mut().draw_card();
                     // recalculate_constants skipped — check_timing below calls it
-                    game_state.mark_constants_dirty();
                     Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_main");
                     game_state.current_phase = Phase::Main;
@@ -905,7 +902,6 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         // Recalculate constant cost modifiers (hand-based cost reductions, etc.)
         // BEFORE paying cost, so the modifiers are in effect.
         tdbg!("PHASE_EXEC:0 recalc");
-        game_state.mark_constants_dirty();
         game_state.recalculate_constants();
         tdbg!("PHASE_EXEC:1 recalc OK");
 
@@ -1111,7 +1107,6 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             Self::trigger_auto_abilities_for_player(game_state, &db_opponent_id);
             game_state.process_pending_auto_abilities(&player_id);
             tdbg!("PHASE_AUTO:0 recalc");
-            game_state.mark_constants_dirty();
             game_state.recalculate_constants();
             tdbg!("PHASE_AUTO:1 recalc OK");
 
@@ -1194,7 +1189,6 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         // are ahead of appearance-triggered in the queue, so they resolve first.
         game_state.process_pending_auto_abilities(&player_id);
         tdbg!("PHASE_AUTO2:0 recalc");
-        game_state.mark_constants_dirty();
         game_state.recalculate_constants();
         tdbg!("PHASE_AUTO2:1 recalc OK");
 

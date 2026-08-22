@@ -81,11 +81,6 @@ pub struct GameState {
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub card_database: Arc<CardDatabase>,
     pub mods: GameModifiers,
-    /// When false, `recalculate_constants` may skip its work. Mutators
-    /// that change stage/live/energy/hand/orientation/success-zone state call
-    /// `mark_constants_dirty` so constants are re-evaluated exactly when needed.
-    #[cfg_attr(feature = "serde_support", serde(skip))]
-    pub constants_dirty: bool,
     pub resolution_zone: ResolutionZone,
     pub heart_color_decision_phase: String,
     /// Engine-internal loop-detection history. Skipped on the wire: the 3DS
@@ -403,7 +398,6 @@ impl GameState {
             ability_queue: AbilityQueue::new(),
             card_database,
             mods: GameModifiers::new(),
-            constants_dirty: true,
             resolution_zone: ResolutionZone::new(),
             heart_color_decision_phase: "none".to_string(),
             game_state_history: Vec::new(),
@@ -598,14 +592,6 @@ impl GameState {
                 }
             },
         }
-    }
-
-    /// Mark constant (常時) ability outputs as stale. Any mutation that can
-    /// change what `recalculate_constants` computes — stage/live/energy/hand
-    /// membership, orientations, success zone, deck refresh — must call this so
-    /// the next `recalculate_constants` re-evaluates instead of early-returning.
-    pub fn mark_constants_dirty(&mut self) {
-        self.constants_dirty = true;
     }
 
     pub fn first_attacker(&self) -> &Player {

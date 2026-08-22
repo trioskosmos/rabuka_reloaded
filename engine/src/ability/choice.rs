@@ -765,7 +765,6 @@ impl super::resolver::AbilityResolver {
                 }
                 // Energy-count constants (「エネルギーがちょうどN枚あるかぎり」)
                 // are live state — re-evaluate right after the payment.
-                gs.mark_constants_dirty();
                 gs.recalculate_constants();
             }
             let energy_left = {
@@ -865,7 +864,6 @@ impl super::resolver::AbilityResolver {
                         &pid,
                         true,
                     );
-                    gs.mark_constants_dirty();
                     gs.recalculate_constants();
                 }
                 return self.resume_pending_actions(gs);
@@ -3537,3 +3535,4 @@ modified.destination = Some(Zone::from_source_str(dest));
         }
     }
 }
+

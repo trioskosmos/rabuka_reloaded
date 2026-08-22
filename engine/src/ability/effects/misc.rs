@@ -2132,7 +2132,6 @@ impl AbilityResolver {
                     break;
                 }
             }
-            gs.mark_constants_dirty();
             gs.recalculate_constants();
             return;
         }
@@ -2728,7 +2727,6 @@ impl AbilityResolver {
                 ..Default::default()
             },
         );
-        gs.mark_constants_dirty();
         gs.recalculate_constants();
         Ok(())
     }
@@ -2932,7 +2930,6 @@ impl AbilityResolver {
         }
 
         gs.position_change_occurred_this_turn = true;
-        gs.mark_constants_dirty();
         gs.recalculate_constants();
         self.formation_plan.clear();
         Ok(())
@@ -3117,7 +3114,6 @@ impl AbilityResolver {
                     ..Default::default()
                 },
             );
-            gs.mark_constants_dirty();
             gs.recalculate_constants();
             return Ok(());
         }
@@ -3215,7 +3211,6 @@ impl AbilityResolver {
                             ..Default::default()
                         },
                     );
-                    gs.mark_constants_dirty();
                     gs.recalculate_constants();
                     return Ok(());
                 }
@@ -3330,7 +3325,6 @@ impl AbilityResolver {
                 ..Default::default()
             },
         );
-        gs.mark_constants_dirty();
         gs.recalculate_constants();
         Ok(())
     }
@@ -3393,7 +3387,6 @@ impl AbilityResolver {
         }
 
         gs.position_change_occurred_this_turn = true;
-        gs.mark_constants_dirty();
         gs.recalculate_constants();
         let pid = gs
             .ability_queue
@@ -3593,7 +3586,6 @@ impl AbilityResolver {
             player.energy_zone.pay_energy(count)?;
             // Energy-count constants (「エネルギーがちょうどN枚あるかぎり」)
             // are live state — re-evaluate right after the payment.
-            gs.mark_constants_dirty();
             gs.recalculate_constants();
         }
         let pp = self.player_prefix(gs);

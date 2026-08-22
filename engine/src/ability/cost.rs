@@ -841,7 +841,6 @@ let source = cost.source_str().unwrap_or("");
                 }
                 // Energy-count constants (「エネルギーがちょうどN枚あるかぎり」)
                 // are live state — re-evaluate right after the payment.
-                gs.mark_constants_dirty();
                 gs.recalculate_constants();
                 Ok(())
             }
@@ -1301,3 +1300,4 @@ let source = cost.source_str().unwrap_or("");
         Ok(())
     }
 }
+

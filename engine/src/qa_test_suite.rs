@@ -2480,7 +2480,6 @@ fn test_constant_gain_ability_score() {
     );
 
     // Run recalculate_constants — should evaluate 常時 ability and apply score bonus
-    game_state.mark_constants_dirty();
     game_state.recalculate_constants();
 
     let score_mod = game_state.mods.get_score_modifier(target_id);

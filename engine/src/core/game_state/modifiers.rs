@@ -211,12 +211,11 @@ impl GameState {
     /// Handles gain_resource(blade, heart), modify_score, modify_cost.
     /// Clears old constant-derived values and re-applies those whose conditions pass.
     ///
-    /// NOTE: deliberately NOT gated on `constants_dirty`. Constant ability
-    /// *conditions* read live state (energy counts, positions, success zone)
-    /// that mutates on paths which never mark the flag dirty (e.g. paying
+    /// NOTE: deliberately runs unconditionally (no staleness gating). Constant
+    /// ability *conditions* read live state (energy counts, positions, success
+    /// zone) that mutates on paths a dirty-flag scheme cannot see (e.g. paying
     /// energy costs); gating breaks 51 tests (wien dynamic energy, ruby front
-    /// blade, ayumu/ayumu-style zone-leave constants). The flag remains
-    /// write-only bookkeeping.
+    /// blade, ayumu/ayumu-style zone-leave constants).
     #[inline(never)]
     pub fn recalculate_constants(&mut self) {
         tdbg!("RC:0 ENTERED");
