@@ -1225,9 +1225,11 @@ impl GameState {
     }
 }
 
-include!("tracking.rs");
-include!("modifiers.rs");
-include!("abilities.rs");
+// Real child modules now (were textual include!() splices). Each contains
+// inherent `impl GameState` blocks split out of this file.
+mod abilities;
+mod modifiers;
+mod tracking;
 
 #[cfg(test)]
 mod serde_roundtrip_tests {

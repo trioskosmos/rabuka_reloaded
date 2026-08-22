@@ -1,3 +1,9 @@
+use super::GameState;
+use crate::ability::enums::Zone;
+use crate::core::types::{Duration, TemporaryEffect};
+use crate::{HashMap, HashSet};
+use smallvec::SmallVec;
+
 extern "C" {
     // Outputs to both debug console (svcOutputDebugString) AND top screen (consoleSelect+printf)
     fn _3ds_tdbg(msg: *const u8);

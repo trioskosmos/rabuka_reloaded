@@ -1,3 +1,5 @@
+use super::GameState;
+
 impl GameState {
     pub fn reset_keyword_tracking(&mut self) {
         self.turn1_abilities_played.clear();

@@ -1,3 +1,10 @@
+use super::GameState;
+use crate::ability::enums::Zone;
+use crate::core::types::{AbilityTrigger, Duration, Phase, ReplacementEffect, TurnPhase};
+use crate::player::Player;
+use crate::HashMap;
+use smallvec::SmallVec;
+
 /// Check whether a prohibition_effects entry of the form
 /// "restriction:cannot_place:<destination>" blocks placing in the given zone.
 /// LiveCardZone and SuccessLiveZone are interchangeable for placement purposes.

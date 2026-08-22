@@ -1,2 +1,9 @@
 [alias]
 t = "test --no-fail-fast -- --test-threads=1 --quiet"
+# Fast iteration: build+run only the integration test suite (skips all bins)
+tt = "test --test run_all --no-fail-fast -- --test-threads=1 --quiet"
+
+# rust-lld ships with the toolchain and links far faster than link.exe on
+# Windows (bare `cargo test` links ~16 binaries per run).
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "linker=rust-lld"]
