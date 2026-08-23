@@ -32,28 +32,71 @@ fn sumire_pr_center_position_grants_blade() {
     );
 }
 
-/// PL!N-bp4-007-R+ 近江彼方: 常時 自分と相手のエネルギー合計が15枚以上 → heart02×2。
-/// TODO: card_no needs verification — bp4-007-R+ not found in DB.
+/// PL!N-bp4-007-R+ 優木せつ菜: 常時 自分と相手のエネルギー合計が15枚以上
+/// のかぎり、heart02×2を得る。
 #[test]
-#[ignore = "card_no PL!N-bp4-007-R+ not found in database"]
-fn kanata_energy_15_grants_heart02x2() {
+fn bp4_007_setsuna_both_energy_15_grants_heart02x2() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    // Use a member that actually has this ability — 近江彼方 PL!N-bp4-007-R
-    let kanata = game.id("PL!N-bp4-007-R\u{ff0b}");
-    game.state.player1.stage.stage = [kanata, -1, -1];
+    let setsuna = game.id("PL!N-bp4-007-R\u{ff0b}");
+    game.state.player1.stage.stage = [setsuna, -1, -1];
     game.give_energy(8);
-    game.state.player2.energy_zone
-        .cards
-        .push(game.id("LL-E-001-SD"));
+    // Opponent energy must be real cards in the zone (active counter alone
+    // doesn't create them).
+    for _ in 0..7 {
+        game.state
+            .player2
+            .energy_zone
+            .cards
+            .push(game.id("LL-E-001-SD"));
+    }
     game.state.player2.energy_zone.add_active(7);
     game.state.recalculate_constants();
 
     let h02 = game
         .state
         .mods
-        .get_heart_modifier(kanata, rabuka_engine::card::HeartColor::Heart02);
+        .get_heart_modifier(setsuna, rabuka_engine::card::HeartColor::Heart02);
     assert_eq!(h02, 2, "total energy >= 15 -> +2 heart02");
+
+    // Negative: drop total below 15 → modifier gone.
+    game.state.player2.energy_zone.cards.truncate(3);
+    game.state.player2.energy_zone.set_active_count(3);
+    game.state.recalculate_constants();
+    let h02_low = game
+        .state
+        .mods
+        .get_heart_modifier(setsuna, rabuka_engine::card::HeartColor::Heart02);
+    assert_eq!(h02_low, 0, "total energy < 15 -> no heart02");
+
+    // Wait-state energy still counts: the condition says 「エネルギーの合計が
+    // 15枚以上ある」 with no state qualifier (unlike effects that explicitly
+    // require アクティブ状態のエネルギー), so every card in the zone counts.
+    // 15 total cards but only 10 active — an active-only implementation
+    // would grant nothing here.
+    for _ in 0..4 {
+        game.state
+            .player2
+            .energy_zone
+            .cards
+            .push(game.id("LL-E-001-SD"));
+    }
+    game.state.player2.energy_zone.set_active_count(2);
+    game.state.recalculate_constants();
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len()
+            + game.state.player2.energy_zone.cards.len(),
+        15,
+        "precondition: 15 total energy cards"
+    );
+    let h02_wait = game
+        .state
+        .mods
+        .get_heart_modifier(setsuna, rabuka_engine::card::HeartColor::Heart02);
+    assert_eq!(
+        h02_wait, 2,
+        "15 total cards incl. wait-state energy -> +2 heart02"
+    );
 }
 

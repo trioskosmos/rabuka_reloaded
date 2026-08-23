@@ -16,24 +16,22 @@ fn sp_bp4_003_center_blade() {
 }
 
 /// PL!HS-bp2-006-R: 常時 ほかの『みらくらぱーく！』メンバー1人につき、ブレード+1。
-/// TODO: needs investigation — Mirakuraku group matching may require
-/// specific card data or unit field setup.
 #[test]
-#[ignore = "Mirakuraku group matching needs investigation"]
 fn hs_bp2_006_per_other_mirakuraku_member_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
     let member = game.id("PL!HS-bp2-006-R");
-    // Another みらくらぱーく！ member on stage
-    let other_mk = game.id("PL!HS-sd1-005-SD");
-    game.state.player1.stage.stage = [other_mk, member, -1];
+    // Another みらくらぱーく！ member + a non-Mirakuraku member
+    let other_mk = game.id("PL!HS-bp1-005-R");
+    let not_mk = game.id("PL!HS-sd1-005-SD"); // DOLLCHESTRA
+    game.state.player1.stage.stage = [other_mk, member, not_mk];
     game.state.recalculate_constants();
 
     let blade = game.state.mods.get_blade_modifier(member);
-    assert!(
-        blade >= 1,
-        "one other Mirakuraku member should grant >= +1 blade"
+    assert_eq!(
+        blade, 1,
+        "one other Mirakuraku member → exactly +1 blade (DOLLCHESTRA must not count)"
     );
 }
 

@@ -51,11 +51,6 @@ fn mogyu_live_success_surplus_heart01_draws_one() {
     );
 }
 
-fn filler_id(game: &TestGame) -> i16 {
-    let id = game.id_ref("PL!-sd1-010-SD");
-    id
-}
-
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
     for _ in 0..5 {
         game.pass();

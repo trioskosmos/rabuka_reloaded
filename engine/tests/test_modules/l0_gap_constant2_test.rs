@@ -24,7 +24,6 @@ fn sp_bp4_003_center_grants_blade() {
 /// PL!-bp3-002-R: 常時 相手のステージにいるウェイト状態のメンバー1人につき、
 /// ブレード+1。
 #[test]
-#[ignore = "per_unit opponent-wait counting needs investigation"]
 fn bp3_002_per_opponent_waited_member_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

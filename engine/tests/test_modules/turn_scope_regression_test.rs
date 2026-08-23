@@ -36,7 +36,7 @@ fn first_attacker_window_facts_survive_second_active_phase_and_live_start() {
     let mut game = TestGame::new(db);
 
     let member = game.id("PL!S-bp2-001-R"); // Aqours Chika
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
     let live = game.id("PL!-sd1-019-SD");
     fill(&mut game);
 
@@ -102,7 +102,7 @@ fn round_scoped_trackers_clear_at_turn_rollover() {
     let mut game = TestGame::new(db);
 
     let member = game.id("PL!S-bp2-001-R");
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
     let live = game.id("PL!-sd1-019-SD");
     fill(&mut game);
 

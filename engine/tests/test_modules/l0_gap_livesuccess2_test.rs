@@ -1,64 +1,55 @@
 /// L0 gap coverage: additional LiveSuccess abilities — score modifiers,
 /// per-unit scoring, and card retrieval from revealed cards.
 use crate::helpers::*;
-use rabuka_engine::ability::types::Choice;
 
-fn drain_skips(game: &mut TestGame) {
-    let mut guard = 0;
-    while game.has_pending_choice() && guard < 30 {
-        guard += 1;
-        match game.get_pending_choice() {
-            Choice::SelectAutoAbility { .. } => game.select_indices(&[]),
-            Choice::SelectCard { allow_skip: true, .. } => game.select_indices(&[]),
-            _ => break,
-        }
-    }
-}
-
-fn advance_live(game: &mut TestGame) {
-    for _ in 0..7 {
-        game.pass();
-        drain_skips(game);
-    }
-}
-
-fn fill_decks(game: &mut TestGame, filler: i16) {
-    for _ in 0..20 {
-        game.state.player1.main_deck.cards.push(filler);
-        game.state.player2.main_deck.cards.push(filler);
-    }
-}
-
-/// PL!N-bp3-031-L: LiveSuccess → per WAITED member on own stage,
-/// this card's score +1.
-/// TODO: needs investigation — per-waited-member score trigger path.
+/// PL!N-bp3-031-L: ライブ成功時 自分のステージにいるウェイト状態の
+/// メンバー1人につき、このカードのスコアを＋１する。
 #[test]
-#[ignore = "per-waited-member score needs investigation"]
 fn bp3_031_per_waited_member_score_plus1() {
+    use rabuka_engine::core::types::AbilityTrigger;
+
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
     let live = game.id("PL!N-bp3-031-L");
-    // Two waited members on stage
+    game.state.player1.live_card_zone.cards.push(live);
+    // Two waited members on stage + one active member (must not count)
     let m1 = game.new_id("PL!N-sd1-002-SD");
     let m2 = game.new_id("PL!N-sd1-003-SD");
-    game.state.player1.stage.stage = [m1, m2, -1];
+    let active = game.new_id("PL!N-sd1-001-SD");
+    game.state.player1.stage.stage = [m1, m2, active];
     game.state.mods.add_orientation_modifier(m1, "wait");
     game.state.mods.add_orientation_modifier(m2, "wait");
-    let fid = game.id_ref("PL!-sd1-010-SD");
-    fill_decks(&mut game, fid);
-    game.state.player1.hand.cards.push(live);
 
-    advance_live(&mut game);
+    // Fire the LiveSuccess trigger through the real ability pipeline.
+    let ability_id = {
+        let card = game.db.get_card(live).unwrap();
+        let ab = card
+            .resolved_abilities()
+            .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
+            .expect("card lacks ライブ成功時 ability");
+        format!("{}_{}", card.card_no, ab.full_text)
+    };
+    let pid = game.state.player1.id.clone();
+    game.state.trigger_auto_ability(
+        ability_id,
+        AbilityTrigger::LiveSuccess,
+        pid.clone(),
+        Some(game.db.get_card(live).unwrap().card_no.to_string()),
+        Some(live),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(live);
+    game.state.process_pending_auto_abilities(&pid);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
 
-    let score = game
-        .state
-        .mods
-        .get_score_modifier(live)
-        .abs();
-    assert!(
-        score >= 2,
-        "two waited members → >= +2 score modifier"
+    let score = game.state.mods.get_score_modifier(live);
+    assert_eq!(
+        score, 2,
+        "two waited members → exactly +2 (active member must not count)"
     );
 }
 

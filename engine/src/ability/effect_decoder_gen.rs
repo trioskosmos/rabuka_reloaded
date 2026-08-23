@@ -215,6 +215,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "opponent_action" => { ek.opponent_action = bc.read_effect_value(); return Some(true); }
             "energy" => { ek.energy_count = bc.read_u8_value(); return Some(true); }
             "max_repeats" => { ek.repeat_limit = bc.read_u8_value(); return Some(true); }
+            "zone" => { ek.location = bc.read_arc_str_value(); return Some(true); }
             _ => { log::warn!("[bytecode] unknown effect field: {}", key); bc.skip_value()?; return Some(true); }
         }
     }

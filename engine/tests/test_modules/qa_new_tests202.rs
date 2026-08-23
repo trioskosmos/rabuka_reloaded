@@ -252,7 +252,7 @@ fn q201_miyashita_decline_leaves_opponents_active() {
     let opp_b = game.new_id("PL!-sd1-010-SD"); // cost 4, distinct copy
     game.state.player2.stage.stage = [opp_a, opp_b, -1];
 
-    let (target, spare) = deploy_target(&mut game, "PL!N-pb1-017-R", "PL!N-bp4-005-R");
+    let (target, _spare) = deploy_target(&mut game, "PL!N-pb1-017-R", "PL!N-bp4-005-R");
 
     // DECLINE the deployed debut's optional cost (empty selection = skip).
     match game.get_pending_choice() {

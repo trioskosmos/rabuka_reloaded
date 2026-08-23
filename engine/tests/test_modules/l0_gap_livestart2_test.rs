@@ -1,7 +1,6 @@
 /// L0 gap coverage: additional LiveStart blade gain abilities.
 use crate::helpers::*;
 use rabuka_engine::ability::types::Choice;
-use rabuka_engine::card::HeartColor;
 
 fn drain_skips(game: &mut TestGame) {
     let mut guard = 0;
@@ -20,14 +19,6 @@ fn advance_live(game: &mut TestGame) {
         game.pass();
         drain_skips(game);
     }
-}
-
-fn setup(game: &mut TestGame, card_no: &str) -> i16 {
-    let member = game.id(card_no);
-    game.state.player1.stage.stage = [-1, member, -1];
-    fill_decks(game, game.id_ref("PL!-sd1-010-SD"));
-    game.give_energy(15);
-    member
 }
 
 fn fill_decks(game: &mut TestGame, filler: i16) {
@@ -61,16 +52,15 @@ fn sp_bp2_009_per_two_hand_cards_blade() {
     assert!(blade >= 2, "4 hand cards → >= +2 blade, got {blade}");
 }
 
-/// PL!N-bp7-003-R+: LiveStart → per distinct under-member, +1 blade.
+/// PL!N-bp7-003-R+: ライブ開始時 ライブ終了時まで、このメンバーの下に置かれている
+/// 名前の異なるメンバーカード1枚につき、ブレードを得る。
 /// No cost — fires automatically.
-/// TODO: needs investigation — under-member trigger path.
 #[test]
-#[ignore = "under-member trigger path needs investigation"]
 fn bp7_003_per_under_member_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let member = game.id("PL!N-bp7-003-R");
+    let member = game.id("PL!N-bp7-003-R\u{ff0b}");
     let under_a = game.new_id("PL!S-bp2-001-R");
     let under_b = game.new_id("PL!S-bp2-002-R");
     game.state.player1.stage.stage = [-1, member, -1];

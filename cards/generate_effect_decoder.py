@@ -313,6 +313,9 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
     bytecode_key_aliases = {
         "energy": "energy_count",
         "max_repeats": "repeat_limit",
+        # Cost objects carry a redundant "zone" (e.g. hand/energy_zone) that
+        # duplicates source/location — decode it into the generic location.
+        "zone": "location",
     }
     for alias, target in bytecode_key_aliases.items():
         if alias in ae_cb_keys or alias in ek_field_map or alias in ek_aliases:

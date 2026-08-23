@@ -78,6 +78,18 @@ pub fn constant_per_unit_units(
             units = units.min(cap as i32);
         }
     }
+    log::debug!(
+        "[CONST_PER_UNIT] host={} player={} zone={} state={:?} target={:?} raw_count={} per_unit_divisor={:?} units={} capped={}",
+        host_card_id,
+        player.id,
+        zone,
+        effect.state_any().as_deref(),
+        effect.target_any(),
+        per_count,
+        effect.per_unit_count_any(),
+        per_count as i32 / effect.per_unit_count_any().unwrap_or(1).max(1) as i32,
+        units
+    );
     units
 }
 

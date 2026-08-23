@@ -2,10 +2,10 @@
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
-/// PL!-bp3-002-R (絢瀬絵里) ab#1 Q144: 「常時」自分のステージにいる
+/// PL!-bp3-002-R (絢瀬絵里) ab#1 Q144: 「常時」相手のステージにいる
 /// ウェイト状態のメンバー1人につき、ブレードを得る。
 ///
-/// For each wait member on your stage, gain 1 blade.
+/// For each wait member on the OPPONENT's stage, gain 1 blade.
 /// Test: recalculate constant modifiers → blade is added.
 #[test]
 fn eri_constant_blade_per_wait_member() {
@@ -13,11 +13,12 @@ fn eri_constant_blade_per_wait_member() {
     let mut game = TestGame::new(db.clone());
 
     let eri = game.id("PL!-bp3-002-R");
-    let friend = game.id("PL!-sd1-010-SD");
+    let opp1 = game.new_id("PL!-sd1-010-SD");
 
-    // Stage: eri center, friend left
-    game.state.player1.stage.stage = [friend, eri, -1];
-    game.state.mods.add_orientation_modifier(friend, "wait");
+    // Stage: eri center (p1), one waited opponent member (p2)
+    game.state.player1.stage.stage = [-1, eri, -1];
+    game.state.player2.stage.stage = [opp1, -1, -1];
+    game.state.mods.add_orientation_modifier(opp1, "wait");
 
     // Recalculate constant blade modifiers
     game.state.recalculate_constants();

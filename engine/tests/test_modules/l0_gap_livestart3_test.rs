@@ -51,14 +51,28 @@ fn bp1_001_pay_energy_blade() {
     assert!(blade >= 1, "pay 1E → at least +1 blade");
 }
 
-/// PL!N-bp1-005-R: LiveStart, optional hand discard 1 → until live end, +1 blade.
-/// TODO: needs investigation - optional cost prompt shape may differ.
+/// PL!N-bp1-005-R 宮下愛: ライブ開始時 手札を1枚控え室に置いてもよい：
+/// ライブ終了時まで、ブレードを得る。
 #[test]
-#[ignore = "optional cost prompt shape needs investigation"]
 fn bp1_005_discard_gains_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let member = setup_and_advance(&mut game, "PL!N-bp1-005-R");
+
+    let member = game.id("PL!N-bp1-005-R");
+    let fid = game.id_ref("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [-1, member, -1];
+    fill_decks(&mut game, fid);
+    // The optional cost needs a hand card to discard — without one the
+    // ability correctly self-declines.
+    let hf = game.new_id("PL!-sd1-010-SD");
+    game.add_to_hand(hf);
+    game.give_energy(15);
+
+    for _ in 0..7 {
+        game.pass();
+        drain_pay_costs(&mut game);
+    }
+
     let blade = game.state.mods.get_blade_modifier(member);
     assert!(blade >= 1, "optional discard paid → at least +1 blade");
 }

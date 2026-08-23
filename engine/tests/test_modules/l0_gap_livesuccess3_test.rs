@@ -51,7 +51,7 @@ fn pb1_004_pay_4e_draw_1() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let live = setup_stage_and_live(&mut game, "PL!SP-pb1-004-R");
+    let _live = setup_stage_and_live(&mut game, "PL!SP-pb1-004-R");
     let deck_before = game.state.player1.main_deck.cards.len();
 
     advance_live(&mut game);
@@ -75,7 +75,7 @@ fn bp5_020_pay_1e_draw_1() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let live = setup_stage_and_live(&mut game, "PL!SP-bp5-020-N");
+    let _live = setup_stage_and_live(&mut game, "PL!SP-bp5-020-N");
     let deck_before = game.state.player1.main_deck.cards.len();
 
     advance_live(&mut game);

@@ -399,12 +399,28 @@ impl GameState {
                                                 Some(card_id),
                                             ) as i32
                                         } else if effect.per_unit_any().unwrap_or(false) {
-                                            let player =
-                                                if self.player1.stage.stage.contains(&card_id) {
-                                                    &self.player1
-                                                } else {
-                                                    &self.player2
-                                                };
+                                            // Per-unit constants count units on a stage.
+                                            // `target: "opponent"` (相手のステージにいる…)
+                                            // counts the OPPOSING player's stage; anything
+                                            // else defaults to the host's own side.
+                                            let host_on_p1 =
+                                                self.player1.stage.stage.contains(&card_id);
+                                            let player = match effect.target_any().as_deref() {
+                                                Some("opponent") => {
+                                                    if host_on_p1 {
+                                                        &self.player2
+                                                    } else {
+                                                        &self.player1
+                                                    }
+                                                }
+                                                _ => {
+                                                    if host_on_p1 {
+                                                        &self.player1
+                                                    } else {
+                                                        &self.player2
+                                                    }
+                                                }
+                                            };
                                             let units = crate::ability::util::constant_per_unit_units(
                                                 effect,
                                                 player,
@@ -502,12 +518,26 @@ impl GameState {
                                                     Some(card_id),
                                                 ) as i32
                                         } else if effect.per_unit_any().unwrap_or(false) {
-                                            let player =
-                                                if self.player1.stage.stage.contains(&card_id) {
-                                                    &self.player1
-                                                } else {
-                                                    &self.player2
-                                                };
+                                            // Same target=opponent resolution as the
+                                            // blade path above.
+                                            let host_on_p1 =
+                                                self.player1.stage.stage.contains(&card_id);
+                                            let player = match effect.target_any().as_deref() {
+                                                Some("opponent") => {
+                                                    if host_on_p1 {
+                                                        &self.player2
+                                                    } else {
+                                                        &self.player1
+                                                    }
+                                                }
+                                                _ => {
+                                                    if host_on_p1 {
+                                                        &self.player1
+                                                    } else {
+                                                        &self.player2
+                                                    }
+                                                }
+                                            };
                                             crate::ability::util::constant_per_unit_units(
                                                 effect,
                                                 player,

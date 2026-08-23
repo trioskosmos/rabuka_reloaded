@@ -4,9 +4,7 @@ use rabuka_engine::card::HeartColor;
 
 /// PL!-pb1-002-R: 常時 相手のステージにいるウェイト状態のメンバー1人につき、
 /// heart06を得る。
-/// TODO: needs investigation - per-opponent-waited counting path.
 #[test]
-#[ignore = "per-opponent-waited heart06 needs investigation"]
 fn pb1_002_per_opponent_waited_heart06() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
@@ -54,17 +52,15 @@ fn sp_bp7_009_left_right_grants_heart02() {
 
 /// PL!-bp5-111-R: 常時 自分のステージにいる自分以外の『A-RISE』メンバー
 /// 1人につき、heart05を得る。
-/// TODO: needs investigation - A-RISE group matching may need specific data.
 #[test]
-#[ignore = "A-RISE group matching needs investigation"]
 fn bp5_111_per_other_arise_member_heart05() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
     let member = game.id("PL!-bp5-111-R");
-    // A-RISE members on stage
-    let arise1 = game.new_id("PL!-sd1-003-SD");
-    let arise2 = game.new_id("PL!-sd1-004-SD");
+    // Real A-RISE members (優木あんじゅ / 統堂英玲奈)
+    let arise1 = game.id("PL!-bp5-222-R");
+    let arise2 = game.id("PL!-bp5-333-R");
     game.state.player1.stage.stage = [arise1, member, arise2];
     game.state.recalculate_constants();
 
@@ -72,8 +68,8 @@ fn bp5_111_per_other_arise_member_heart05() {
         .state
         .mods
         .get_heart_modifier(member, HeartColor::Heart05);
-    assert!(
-        h05 >= 2,
-        "two other A-RISE members should grant >= +2 heart05"
+    assert_eq!(
+        h05, 2,
+        "two other A-RISE members → exactly +2 heart05"
     );
 }
