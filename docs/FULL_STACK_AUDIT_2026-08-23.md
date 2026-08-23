@@ -15,6 +15,10 @@
 | 08-24 | 6a414e0a | Special rules: generic `_try_play_time_cost_set` handler for 「プレイに際し…コストはNになる」 (priority -10); LL-bp7-001 override deleted. Output matches engine contract |
 | 08-24 | cfbe79f8 | Engine side of LL-bp7-001 de-hardcoded: `play_time_alt_cost_chars` (any N/any char-count), k-slot backtracking assignment replaces fixed [Vec;3], prompts derived from card data. 17-test card harness incl. fuzz green |
 | 08-24 | 2b452d27 | vm.rs draw-count=1 fixup removed — redundant with `effects/draw.rs` `count_or(1)` default. Suite 2591/0 |
+| 08-24 | aab5f54b | R2: shared `restore_performance_need_heart_modifiers` replaces the copy-pasted block in live-victory + live-success flows |
+| 08-24 | 44a7830d | R2: baton-protection scan unified (player.rs / phases.rs / game_setup.rs → `ability::util::has_cannot_baton_touch_protection`) |
+| 08-24 | ce245103 | R2: single `activation_position_index` helper (3 copies with divergent unknown-token policies preserved per site) |
+| 08-24 | e377673c | **F1 describe-parity gate landed**: new test walks all effect nodes of all 936 abilities, fails on any raw-text fallback in EN or JA. Fixed the 8 gaps it found: templates for select_number, modify_yell_source, suppress_ability_trigger (both langs) and reduce_live_card_set_limit EN arm (the audit's i18n bug). 1683 nodes now fully templated |
 
 Verification loop used per step: regen abilities.json → byte-diff vs pre-step copy
 (only `generated_at`/`engine_commit` may differ) → python parser tests → `cargo test --test run_all`.
