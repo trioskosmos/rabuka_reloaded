@@ -7007,35 +7007,10 @@ def _try_per_unit(text):
         result["resource_icon_count"] = action["count"]
     # When action is a sequential, propagate per-unit config into each sub-action
     # so the engine can resolve per-unit counts for each sub-action individually.
-    # Exclude condition — it should remain on the sequential wrapper only.
     if action.get("action") == "sequential":
         first_put = None
         for sub in action.get("actions", []):
-            for k in (
-                "per_unit",
-                "per_unit_count",
-                "per_unit_type",
-                "per_unit_heart_colors",
-                "per_unit_source",
-                "card_type",
-                "group_names",
-                "exclude_group_names",
-                "exclude_heart_colors",
-                "distinct",
-                "timing_condition",
-                "state",
-                "location",
-                "cost_limit",
-                "cost_limit_operator",
-                "duration",
-                "target",
-                "exclude_self",
-                "card_property",
-                "negation",
-                "resource_icon_count",
-            ):
-                if k in result and k not in sub:
-                    sub[k] = result[k]
+            _propagate(result, sub, skip_existing=True)
             if first_put is None and sub.get("per_unit_type"):
                 first_put = sub
         # When the first per-unit sub-action counts from discard (e.g. replaced by
@@ -11091,10 +11066,18 @@ def _normalize_effect_tree(effect, original_text=None):
     _full_text = effect.get("text") or original_text or ""
     effect = _walk(effect, _full_text, original_text, original_text)
     effect = _collapse_position_changes(effect)
-    # Strip leaked group from draw that doesn't contain the group in its own text
+    # Strip leaked group from draw that doesn't contain the group in its own text.
+    # Exception: per_unit_type="discard" draws (「バトンタッチによって控え室に置かれた
+    # 『X』のメンバーカード1枚につき、カードを1枚引く」, Q-pb2-000). Their text is
+    # stored as the tail AFTER「につき」, so the group can never appear in it —
+    # yet the group legitimately defines WHICH discarded cards count.
     def _strip_leaked_draw_g(node):
         if isinstance(node, dict):
-            if node.get("action") == "draw_card" and node.get("group_names"):
+            if (
+                node.get("action") == "draw_card"
+                and node.get("group_names")
+                and node.get("per_unit_type") != "discard"
+            ):
                 txt = node.get("text") or ""
                 if not any(g in txt for g in node["group_names"]):
                     node.pop("group_names", None)

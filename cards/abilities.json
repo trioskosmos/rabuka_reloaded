@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-23T12:52:45.253658",
+  "generated_at": "2026-08-23T13:17:02.506623",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "57c4e46c",
+  "engine_commit": "2ff07119",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -20186,7 +20186,22 @@
             "per_unit": true,
             "per_unit_count": 1,
             "per_unit_type": "discard",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "group_names": [
+              "Liella!"
+            ],
+            "condition": {
+              "type": "movement_condition",
+              "movement": "baton_touch",
+              "target": "self",
+              "baton_touch_trigger": true,
+              "text": "バトンタッチして登場した場合",
+              "trigger_event": {
+                "type": "baton_touch",
+                "tense": "past",
+                "location": "stage"
+              }
+            }
           },
           {
             "text": "ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -20206,7 +20221,19 @@
             },
             "group_names": [
               "Liella!"
-            ]
+            ],
+            "condition": {
+              "type": "movement_condition",
+              "movement": "baton_touch",
+              "target": "self",
+              "baton_touch_trigger": true,
+              "text": "バトンタッチして登場した場合",
+              "trigger_event": {
+                "type": "baton_touch",
+                "tense": "past",
+                "location": "stage"
+              }
+            }
           }
         ],
         "per_unit": true,
