@@ -1,28 +1,28 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T19:41:48.323325+00:00",
+  "generated_at": "2026-08-23T20:00:06.131206+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 430,
-  "n_tests": 2632,
+  "n_files": 431,
+  "n_tests": 2636,
   "total_cards": 771,
-  "covered_cards": 615,
-  "abilities_on_covered": 777,
+  "covered_cards": 618,
+  "abilities_on_covered": 780,
   "trigger_counts": {
     "起動": [
       80,
       96
     ],
     "登場": [
-      215,
+      217,
       269
     ],
     "ライブ開始時": [
-      215,
+      216,
       268
     ],
     "(none)": [
@@ -34,7 +34,7 @@
       122
     ],
     "常時": [
-      106,
+      107,
       117
     ],
     "自動": [
@@ -52,7 +52,7 @@
       71
     ],
     "gain_resource": [
-      134,
+      136,
       160
     ],
     "sequential": [
@@ -68,7 +68,7 @@
       44
     ],
     "change_state": [
-      56,
+      57,
       60
     ],
     "play_baton_touch": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      448,
+      450,
       545
     ],
     "temporal_condition": [
@@ -190,7 +190,7 @@
       13
     ],
     "comparison_condition": [
-      49,
+      50,
       60
     ],
     "card_count_condition": [
@@ -296,24 +296,24 @@
       137
     ],
     "sd2": [
-      22,
+      23,
       31
     ],
     "pb2": [
-      32,
+      33,
       43
     ],
     "cl1": [
-      2,
+      3,
       10
     ]
   },
   "depth_counts": {
     "L2+choice": 593,
-    "none": 159,
+    "none": 156,
     "L1+choice": 134,
     "L2": 24,
-    "L1": 26
+    "L1": 29
   },
   "qa_rulings": {
     "covered": 272,
@@ -9627,7 +9627,8 @@
         "engine/tests/test_modules/jellyfish_test.rs",
         "engine/tests/test_modules/kanon_pb2_test.rs",
         "engine/tests/test_modules/tang_keke_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch10_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch10_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch11_test.rs"
       ],
       "covering_tests": [
         "chika_bp5_baton_touch_draw_triggers_refresh",
@@ -9646,6 +9647,7 @@
         "chika_wait_can_select_any_member",
         "chika_wait_target_stays_on_stage",
         "chika_waited_member_gets_score_boost",
+        "cl1_006_debut_gains_three_blades",
         "go_master_start_equal_success_cards_no_score",
         "go_master_start_fewer_success_cards_scores",
         "jellyfish_member_moved_by_position_change_without_appearing_this_turn_counts",
@@ -9658,10 +9660,9 @@
         "jellyfish_q99_one_member_both_flags_counts_once",
         "jellyfish_three_members_all_qualify_reduce_by_3",
         "jellyfish_two_members_appeared_reduce_by_2",
-        "kanon_cost_above_4_rejected",
-        "kanon_max_1_enforced"
+        "kanon_cost_above_4_rejected"
       ],
-      "covering_test_count": 50,
+      "covering_test_count": 54,
       "is_null": false
     },
     {
@@ -11842,17 +11843,22 @@
       "has_choice": false,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/untested_abilities_batch10_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch10_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch11_test.rs"
       ],
       "covering_tests": [
+        "cl1_006_debut_gains_three_blades",
         "go_master_start_equal_success_cards_no_score",
         "go_master_start_fewer_success_cards_scores",
         "note_mermaid_duplicate_kaleidoscope_names_no_score",
         "note_mermaid_two_distinct_kaleidoscope_members_score",
         "pb1013_higher_cost_member_on_stage_draws",
-        "pb1013_only_lower_cost_members_no_draw"
+        "pb1013_only_lower_cost_members_no_draw",
+        "pb2_029_debut_rests_low_cost_member",
+        "sd2_008_constant_heart_while_cost13_member_on_stage",
+        "sd2_008_constant_heart_without_expensive_member"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 10,
       "is_null": false
     },
     {
@@ -36848,14 +36854,21 @@
         "PL!HS-cl1-006-CL"
       ],
       "base": "PL!HS-cl1-006",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch11_test.rs"
+      ],
+      "covering_tests": [
+        "cl1_006_debut_gains_three_blades",
+        "pb2_029_debut_rests_low_cost_member",
+        "sd2_008_constant_heart_while_cost13_member_on_stage",
+        "sd2_008_constant_heart_without_expensive_member"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -37094,14 +37107,21 @@
         "PL!SP-sd2-008-SD2"
       ],
       "base": "PL!SP-sd2-008",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch11_test.rs"
+      ],
+      "covering_tests": [
+        "cl1_006_debut_gains_three_blades",
+        "pb2_029_debut_rests_low_cost_member",
+        "sd2_008_constant_heart_while_cost13_member_on_stage",
+        "sd2_008_constant_heart_without_expensive_member"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -37595,14 +37615,21 @@
         "PL!SP-pb2-029-N"
       ],
       "base": "PL!SP-pb2-029",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch11_test.rs"
+      ],
+      "covering_tests": [
+        "cl1_006_debut_gains_three_blades",
+        "pb2_029_debut_rests_low_cost_member",
+        "sd2_008_constant_heart_while_cost13_member_on_stage",
+        "sd2_008_constant_heart_without_expensive_member"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
