@@ -27,6 +27,7 @@
 | 08-24 | c71b8937..7716714e | Phase 5 triage continued: FIX 7/7b, 9, 9b all verified LOAD-BEARING (1–2 abilities each) and documented; FIX 14 comment corrected (stats-only counter, never did source inference). PARSER_NOTES.md now carries the full triage table + Phase 8 marked done |
 | 08-24 | 3bd92579 | Test-gap burn-down: batch 10 covers 3 depth-none abilities with positive+negative cases (higher-cost-member draw gate, success-zone comparison score, distinct-name KALEIDOSCORE count). depth=none 164→159, covered cards 600→615, suite 2598/0 |
 | 08-24 | cf1c640f | Test-gap burn-down: batch 11 covers 4 cl1/sd2/pb2 abilities (debut blade-3, conditional constant heart03 pos+neg, opponent-side cost≤2 rest). depth=none →156, suite **2602/0**. Note: dual-trigger cards (「登場, ライブ開始時」) need `contains` matching, not equality, in trigger lookup |
+| 08-24 | e0b58d66 | Test-gap burn-down: batch 12 covers 3 pb1/bp6 abilities (DOLLCHESTRA live-zone draw gate, opponent-energy comparison score pos+neg, スリーズブーケ teammate energy activation). depth=none →153, covered cards →621, suite **2607/0**. Lesson: mojibake in console output misleads — verify card text via codepoints/files, not terminal |
 | — | — | R8 condition-cache keys assessed & deferred: `format!("{:?}")` is a complete content-addressing scheme over the struct; changing it risks subtle cache-hit changes for no correctness gain |
 
 Verification loop used per step: regen abilities.json → byte-diff vs pre-step copy
