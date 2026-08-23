@@ -519,22 +519,15 @@ fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&s
     let unit = card.as_ref().and_then(|c| c.unit.as_deref()).unwrap_or("?");
     let checks = match group_name {
         Some(g) => {
-            fn norm(s: &str) -> Cow<'_, str> {
-                if s.contains('\u{FF01}') {
-                    Cow::Owned(s.replace('\u{FF01}', "!"))
-                } else {
-                    Cow::Borrowed(s)
-                }
-            }
-            let gn = norm(g);
+            let gn = norm_group_name(g);
             card.as_ref()
                 .map(|c| {
-                    let unit_ok = norm(c.unit.as_deref().unwrap_or("")).as_ref() == gn.as_ref();
+                    let unit_ok = norm_group_name(c.unit.as_deref().unwrap_or("")).as_ref() == gn.as_ref();
                     let group_ok = c.group.as_ref() == g;
                     let name_ok = card_db
                         .get_card_names(card_id)
                         .iter()
-                        .any(|n| norm(n).as_ref().contains(gn.as_ref()));
+                        .any(|n| norm_group_name(n).as_ref().contains(gn.as_ref()));
                     let series_ok =
                         !c.series.contains('\n') && card_series_matches_group(&c.series, g);
                     format!(
@@ -556,6 +549,28 @@ fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&s
     );
 }
 
+/// Normalize full-width/half-width exclamation marks so that group names like
+/// "みらくらぱーく！" match unit fields using either ！(U+FF01) or !(U+0021).
+/// Also normalize µ (micro sign U+00B5) to μ (mu U+03BC) for μ's group matching.
+/// Single source of truth shared by group matching and its debug logger.
+fn norm_group_name(s: &str) -> Cow<'_, str> {
+    let has_ff01 = s.contains('\u{FF01}');
+    let has_mu = s.contains('\u{00B5}');
+    if has_ff01 || has_mu {
+        let mut r = if has_ff01 {
+            s.replace('\u{FF01}', "!")
+        } else {
+            s.to_string()
+        };
+        if has_mu {
+            r = r.replace('\u{00B5}', "\u{03BC}");
+        }
+        Cow::Owned(r)
+    } else {
+        Cow::Borrowed(s)
+    }
+}
+
 pub fn card_matches_group_str(
     card_db: &CardDatabase,
     card_id: i16,
@@ -563,39 +578,17 @@ pub fn card_matches_group_str(
 ) -> bool {
     let result = match group_name {
         Some(g) => {
-            // Normalize full-width/half-width exclamation marks so that
-            // group names like "みらくらぱーく！" match unit fields using
-            // either ！(U+FF01) or !(U+0021).
-            // Also normalize µ (micro sign U+00B5) to μ (mu U+03BC) for
-            // μ's group matching.
-            fn norm(s: &str) -> Cow<'_, str> {
-                let has_ff01 = s.contains('\u{FF01}');
-                let has_mu = s.contains('\u{00B5}');
-                if has_ff01 || has_mu {
-                    let mut r = if has_ff01 {
-                        s.replace('\u{FF01}', "!")
-                    } else {
-                        s.to_string()
-                    };
-                    if has_mu {
-                        r = r.replace('\u{00B5}', "\u{03BC}");
-                    }
-                    Cow::Owned(r)
-                } else {
-                    Cow::Borrowed(s)
-                }
-            }
-            let gn = norm(g);
+            let gn = norm_group_name(g);
             card_db
                 .get_card(card_id)
                 .map(|c| {
                     let unit = c.unit.as_deref().unwrap_or("");
                     let unit_match = unit == gn.as_ref()
-                        || ((unit.contains('\u{FF01}') || unit.contains('\u{00B5}')) && norm(unit).as_ref() == gn.as_ref());
+                        || ((unit.contains('\u{FF01}') || unit.contains('\u{00B5}')) && norm_group_name(unit).as_ref() == gn.as_ref());
                     unit_match
                 || c.group.as_ref() == g
                 || card_db.get_card_names(card_id).iter().any(|n| n.contains(gn.as_ref())
-                    || ((n.contains('\u{FF01}') || n.contains('\u{00B5}')) && norm(n).as_ref().contains(gn.as_ref())))
+                    || ((n.contains('\u{FF01}') || n.contains('\u{00B5}')) && norm_group_name(n).as_ref().contains(gn.as_ref())))
                 // Multi-name cards (e.g. 渡辺曜&鬼塚夏美&大沢瑠璃乃) should match
                 // group names through any of their constituent series (Q105).
                 // Example: LL-bp2-001-R+ matches "Aqours" via ラブライブ！サンシャイン!!
@@ -608,7 +601,7 @@ pub fn card_matches_group_str(
                     ar.resolve().effect.as_ref().is_some_and(|eff| {
                         eff.action == ActionType::SetCardIdentity
                             && eff.identities_any().as_ref().is_some_and(|ids| {
-                                ids.iter().any(|id| id == gn.as_ref() || ((id.contains('\u{FF01}') || id.contains('\u{00B5}')) && norm(id).as_ref() == gn.as_ref()))
+                                ids.iter().any(|id| id == gn.as_ref() || ((id.contains('\u{FF01}') || id.contains('\u{00B5}')) && norm_group_name(id).as_ref() == gn.as_ref()))
                             })
                     })
                 })
