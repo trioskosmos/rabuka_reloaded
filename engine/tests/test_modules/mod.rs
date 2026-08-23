@@ -457,6 +457,7 @@ pub mod l0_gap_constant3_test;
 pub mod l0_gap_constant5_test;
 pub mod l0_gap_position_blade_test;
 pub mod l0_gap_livesuccess3_test;
+pub mod l0_gap_constant6_test;
 pub mod l0_gap_livesuccess2_test;
 pub mod l0_gap_livestart2_test;
 pub mod l0_gap_livestart3_test;
