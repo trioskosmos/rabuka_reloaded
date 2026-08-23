@@ -12887,6 +12887,37 @@ def _validate_semantic(abilities):
         return False
 
     RULES = [
+        # ─── Per-unit scaling ───
+        # Scaling sense only ("…1枚/1人/1つにつき"); "各グループ名につき" is
+        # per-group selection inside look_and_select, not a count multiplier.
+        (
+            "per_unit",
+            r"[枚人つ個]につき",
+            lambda e, eff: _json_has_field(eff, "per_unit", True)
+            or _json_has_field(eff, "dynamic_count")
+            or _json_has_field(eff, "type", "dynamic_count"),
+            "Per-unit scaling (につき) but no per_unit/dynamic_count structure",
+        ),
+        # ─── Negation / prohibition scope ───
+        (
+            "cannot_restriction",
+            r"できない",
+            lambda e, eff: _json_has_field(eff, "restriction_type")
+            or _json_has_field(eff, "negation")
+            or _json_has_field(eff, "conditional_negation")
+            or _json_has_action(eff, "restriction"),
+            "できない but no restriction/negation structure",
+        ),
+        # ─── Self-referential effect clamps ───
+        # 「この効果ではライブの合計スコアは０未満にならない」 style clauses have
+        # no structural home yet (score.rs hardcodes the behavior); flag them so
+        # new occurrences are visible.
+        (
+            "effect_self_clamp",
+            r"この効果では.{0,20}ない",
+            lambda e, eff: False,
+            "Self-referential effect clamp (この効果では…) has no structural representation",
+        ),
         # ─── Number selection ───
         (
             "select_number",
