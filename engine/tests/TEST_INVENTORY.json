@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T21:36:11.270495+00:00",
+  "generated_at": "2026-08-23T21:44:48.786562+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 434,
-  "n_tests": 2651,
+  "n_files": 435,
+  "n_tests": 2655,
   "total_cards": 771,
-  "covered_cards": 627,
-  "abilities_on_covered": 789,
+  "covered_cards": 629,
+  "abilities_on_covered": 792,
   "trigger_counts": {
     "起動": [
       80,
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      217,
+      220,
       268
     ],
     "(none)": [
@@ -104,7 +104,7 @@
       2
     ],
     "modify_score": [
-      65,
+      68,
       73
     ],
     "conditional_alternative": [
@@ -194,7 +194,7 @@
       60
     ],
     "card_count_condition": [
-      76,
+      78,
       88
     ],
     "location_condition": [
@@ -210,7 +210,7 @@
       2
     ],
     "group_condition": [
-      35,
+      36,
       44
     ],
     "or_condition": [
@@ -256,7 +256,7 @@
   },
   "set_counts": {
     "sd1": [
-      52,
+      54,
       58
     ],
     "PR": [
@@ -292,7 +292,7 @@
       111
     ],
     "pb1": [
-      112,
+      113,
       137
     ],
     "sd2": [
@@ -310,10 +310,10 @@
   },
   "depth_counts": {
     "L2+choice": 593,
-    "none": 147,
+    "none": 144,
     "L1+choice": 134,
     "L2": 24,
-    "L1": 38
+    "L1": 41
   },
   "qa_rulings": {
     "covered": 272,
@@ -10989,6 +10989,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch15_test.rs",
         "engine/tests/test_modules/untested_secondary_abilities_test.rs"
       ],
       "covering_tests": [
@@ -10998,9 +10999,13 @@
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
         "karin_bpb4004_cap_counts_waited_opponents_only",
         "nozomi_bp3007_paid_look_splits_three_ways",
-        "ruby_bp6009_blades_equal_success_pile_difference"
+        "ruby_bp6009_blades_equal_success_pile_difference",
+        "sd1026_energy_below_nine_no_score",
+        "sd1026_energy_nine_or_more_scores",
+        "treco_please_aqours_h04_below_ten_no_score",
+        "treco_please_aqours_h04_total_ten_scores_two"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 11,
       "is_null": false
     },
     {
@@ -27566,14 +27571,21 @@
         "PL!SP-sd1-026-SD"
       ],
       "base": "PL!SP-sd1-026",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch15_test.rs"
+      ],
+      "covering_tests": [
+        "sd1026_energy_below_nine_no_score",
+        "sd1026_energy_nine_or_more_scores",
+        "treco_please_aqours_h04_below_ten_no_score",
+        "treco_please_aqours_h04_total_ten_scores_two"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -28713,14 +28725,21 @@
         "PL!S-pb1-020-L"
       ],
       "base": "PL!S-pb1-020",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch15_test.rs"
+      ],
+      "covering_tests": [
+        "sd1026_energy_below_nine_no_score",
+        "sd1026_energy_nine_or_more_scores",
+        "treco_please_aqours_h04_below_ten_no_score",
+        "treco_please_aqours_h04_total_ten_scores_two"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -38078,14 +38097,21 @@
         "PL!SP-sd1-026-SRL"
       ],
       "base": "PL!SP-sd1-026",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch15_test.rs"
+      ],
+      "covering_tests": [
+        "sd1026_energy_below_nine_no_score",
+        "sd1026_energy_nine_or_more_scores",
+        "treco_please_aqours_h04_below_ten_no_score",
+        "treco_please_aqours_h04_total_ten_scores_two"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
