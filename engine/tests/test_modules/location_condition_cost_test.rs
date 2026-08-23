@@ -44,9 +44,9 @@ fn cost13_on_opponent_stage_meets_condition() {
     rabuka_engine::turn::TurnEngine::process_constant_abilities(&mut game.state, &pid);
 
     let blade = game.state.mods.get_blade_modifier(you);
-    assert!(
-        blade >= 2,
-        "Cost-13+ on opponent stage should trigger condition (got blade={})",
-        blade
+    assert_eq!(
+        blade, 2,
+        "Cost-13+ on opponent stage should grant exactly +2 (got {blade}); \
+         a >= bound would mask over-application"
     );
 }
