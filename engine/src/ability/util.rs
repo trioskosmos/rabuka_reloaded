@@ -632,6 +632,31 @@ pub fn card_matches_any_group(card_db: &CardDatabase, card_id: i16, groups: &[St
             .any(|g| card_matches_group_str(card_db, card_id, Some(g)))
 }
 
+/// Returns true if `existing_card` (the member already on the stage area)
+/// prevents a baton touch by `incoming_card_id` — i.e. it has a
+/// `cannot_baton_touch` restriction that is not excluded by the incoming
+/// card's groups. Single source of truth shared by hand-play validation,
+/// double-baton play, and action generation.
+pub fn has_cannot_baton_touch_protection(
+    card_db: &CardDatabase,
+    incoming_card_id: i16,
+    existing_card: &crate::card::Card,
+) -> bool {
+    existing_card.resolved_abilities().any(|ability| {
+        ability.effect.as_ref().is_some_and(|ef| {
+            if ef.restriction_type_any().as_deref() != Some("cannot_baton_touch") {
+                return false;
+            }
+            if let Some(ref exclude_groups) = ef.exclude_group_names_any() {
+                if card_matches_any_group(card_db, incoming_card_id, exclude_groups) {
+                    return false;
+                }
+            }
+            true
+        })
+    })
+}
+
 fn card_series_matches_group(series: &str, group: &str) -> bool {
     if group == "μ's" {
         // For μ's, check each series line individually to handle multi-series

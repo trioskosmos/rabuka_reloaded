@@ -1347,19 +1347,7 @@ fn has_cannot_baton_touch(
     card_id: i16,
     existing_card: &crate::card::Card,
 ) -> bool {
-    existing_card.resolved_abilities().any(|ability| {
-        ability.effect.as_ref().is_some_and(|ef| {
-            if ef.restriction_type_any().as_deref() != Some("cannot_baton_touch") {
-                return false;
-            }
-            if let Some(ref exclude_groups) = ef.exclude_group_names_any() {
-                if crate::ability::util::card_matches_any_group(card_db, card_id, exclude_groups) {
-                    return false;
-                }
-            }
-            true
-        })
-    })
+    crate::ability::util::has_cannot_baton_touch_protection(card_db, card_id, existing_card)
 }
 
 fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {

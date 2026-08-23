@@ -295,27 +295,15 @@ impl Player {
             // Check cannot_baton_touch protection BEFORE paying energy
             if baton_touch_used {
                 if let Some(member_id) = self.stage.get_area(stage_area) {
-                    let has_protection = card_db.get_card(member_id).is_some_and(|existing_card| {
-                        existing_card.abilities.iter().any(|ar| {
-                            ar.resolve().effect.as_ref().is_some_and(|ef| {
-                                if ef.restriction_type_any().as_deref()
-                                    != Some("cannot_baton_touch")
-                                {
-                                    return false;
-                                }
-                                if let Some(ref exclude_groups) = ef.exclude_group_names_any() {
-                                    if crate::ability::util::card_matches_any_group(
-                                        &card_db,
-                                        card_id,
-                                        exclude_groups,
-                                    ) {
-                                        return false;
-                                    }
-                                }
-                                true
-                            })
-                        })
-                    });
+                    let has_protection = card_db
+                        .get_card(member_id)
+                        .is_some_and(|existing_card| {
+                            crate::ability::util::has_cannot_baton_touch_protection(
+                                &card_db,
+                                card_id,
+                                existing_card,
+                            )
+                        });
                     if has_protection {
                         self.hand.cards.insert(hand_index, card_id);
                         return Err(
