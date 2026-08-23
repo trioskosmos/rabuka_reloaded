@@ -1277,30 +1277,6 @@ impl super::TurnEngine {
         tdbg!("CHECK_TIMING:1 p1.refresh OK");
         game_state.player2.refresh();
         tdbg!("CHECK_TIMING:2 p2.refresh OK");
-        let p1_needs_refresh = game_state.player1.main_deck.cards.is_empty()
-            && !game_state.player1.waitroom.cards.is_empty();
-        let p2_needs_refresh = game_state.player2.main_deck.cards.is_empty()
-            && !game_state.player2.waitroom.cards.is_empty();
-        if p1_needs_refresh {
-            let waitroom = core::mem::take(&mut game_state.player1.waitroom.cards);
-            game_state
-                .player1
-                .main_deck
-                .cards
-                .extend(waitroom.iter().copied());
-            game_state.player1.main_deck.shuffle();
-            tdbg!("CHECK_TIMING:1b p1 refresh shuffled");
-        }
-        if p2_needs_refresh {
-            let waitroom = core::mem::take(&mut game_state.player2.waitroom.cards);
-            game_state
-                .player2
-                .main_deck
-                .cards
-                .extend(waitroom.iter().copied());
-            game_state.player2.main_deck.shuffle();
-            tdbg!("CHECK_TIMING:2b p2 refresh shuffled");
-        }
         tdbg!("CHECK_TIMING:3 refresh done");
         {
             #[cfg(not(feature = "no_std"))]
@@ -1334,12 +1310,10 @@ impl super::TurnEngine {
             game_state.game_ended = true;
         }
         tdbg!("CHECK_TIMING:11 perm_loop OK");
-        {
-            #[cfg(not(feature = "no_std"))]
-            let _t = crate::timer::Timer::start("check_timing::check_victory_condition");
-            Self::check_victory_condition(game_state);
-        }
-        tdbg!("CHECK_TIMING:12 victory2 OK");
+        // NOTE: check_victory_condition already ran above; the steps between
+        // (invalid-card cleanup, recalculate_constants, resolution-zone check,
+        // permanent-loop detection) cannot add success-zone cards, so a second
+        // pass would be a no-op.
         let active_player_id = game_state.active_player().id.clone();
         {
             #[cfg(not(feature = "no_std"))]
