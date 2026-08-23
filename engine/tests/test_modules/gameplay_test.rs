@@ -2451,14 +2451,13 @@ fn lovepeace_q172_ability_gained_hearts_count_but_not_blade() {
     game.pass(); // → Active (processes LiveSuccess)
 
     // The blade hearts from cheered cards are in resolution zone during performance
-    // but do NOT count as base hearts. The total hearts calculation only uses base_heart.
-    // If the live card survived, its score was calculated correctly.
-    // Q172 confirms: blade hearts don't count toward total, only base hearts do.
-    // Check that the card survived: it should be in success_live_zone
-    assert!(
-        game.state.player1.success_live_card_zone.cards.len() >= 1
-            || game.state.player1.live_card_zone.cards.len() >= 1,
-        "Live card should have survived heart satisfaction"
+    // but do NOT count as base hearts. Q172 confirms: blade hearts don't count
+    // toward total, only base hearts do.
+    assert_eq!(
+        game.state.player1.success_live_card_zone.cards.as_slice(),
+        &[live][..],
+        "Q172: the live succeeded and was placed (blade-hearts satisfied \
+         hearts without adding blades)"
     );
 }
 
@@ -2673,16 +2672,22 @@ fn wien_q117_another_member_triggers_yell_reduction() {
     game.set_live_card(live_card);
     advance_to_live_start(&mut game);
 
-    // Q117: Condition should be met, yell count modified
-    // LiveStart ability fires → modify_yell_count(subtract, 8)
-    // Verify the stage still has both members
-    assert!(
-        game.state.player1.stage.stage[1] != -1,
-        "Wien should remain"
+    // Q117: condition met → Wien's LiveStart subtracts 8 from the yell
+    // count. Read back the actual modifier instead of asserting setup state.
+    let delta: i32 = game
+        .state
+        .yell_count_modifiers
+        .iter()
+        .filter(|(slot, _)| *slot == 1)
+        .map(|(_, d)| *d)
+        .sum();
+    assert_eq!(
+        delta, -8,
+        "Q117: another member on stage triggers the -8 yell modifier"
     );
     assert!(
-        game.state.player1.stage.stage[2] != -1,
-        "partner should remain"
+        game.state.player1.stage.stage[1] != -1 && game.state.player1.stage.stage[2] != -1,
+        "both members remain on stage"
     );
 }
 
