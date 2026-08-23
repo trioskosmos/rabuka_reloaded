@@ -148,4 +148,4 @@ platforms/*/target/
 # Tweet mood analysis (personal data, regenerable)
 /tweet_mood/
 
-ell_dbg.txt
+ll_dbg.txt
