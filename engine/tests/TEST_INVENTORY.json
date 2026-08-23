@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T22:54:04.152600+00:00",
+  "generated_at": "2026-08-23T23:12:13.675900+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 437,
-  "n_tests": 2662,
+  "n_files": 438,
+  "n_tests": 2665,
   "total_cards": 771,
-  "covered_cards": 635,
-  "abilities_on_covered": 798,
+  "covered_cards": 637,
+  "abilities_on_covered": 801,
   "trigger_counts": {
     "起動": [
       83,
@@ -30,7 +30,7 @@
       2
     ],
     "ライブ成功時": [
-      97,
+      100,
       122
     ],
     "常時": [
@@ -44,7 +44,7 @@
   },
   "action_counts": {
     "move_cards": [
-      121,
+      122,
       146
     ],
     "look_and_select": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      172,
+      173,
       219
     ],
     "unknown": [
@@ -104,7 +104,7 @@
       2
     ],
     "modify_score": [
-      69,
+      70,
       73
     ],
     "conditional_alternative": [
@@ -194,11 +194,11 @@
       60
     ],
     "card_count_condition": [
-      78,
+      79,
       88
     ],
     "location_condition": [
-      64,
+      66,
       73
     ],
     "movement:baton_touch": [
@@ -276,7 +276,7 @@
       68
     ],
     "bp4": [
-      75,
+      78,
       88
     ],
     "bp5": [
@@ -310,10 +310,10 @@
   },
   "depth_counts": {
     "L2+choice": 593,
-    "none": 138,
+    "none": 135,
     "L1+choice": 137,
     "L2": 24,
-    "L1": 44
+    "L1": 47
   },
   "qa_rulings": {
     "covered": 272,
@@ -9116,9 +9116,11 @@
       "has_negative": false,
       "covering_files": [
         "engine/tests/test_modules/poppin_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch10_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch10_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch18_test.rs"
       ],
       "covering_tests": [
+        "bp4006_three_distinct_members_retrieves_liella_live_from_revealed",
         "go_master_start_equal_success_cards_no_score",
         "go_master_start_fewer_success_cards_scores",
         "note_mermaid_duplicate_kaleidoscope_names_no_score",
@@ -9131,9 +9133,11 @@
         "poppin_multiple_cards_lower_total_fails",
         "poppin_multiple_niji_revealed_picks_one",
         "poppin_no_niji_revealed_effect_fails",
-        "poppin_q66_has_cards_beats_no_cards"
+        "poppin_q66_has_cards_beats_no_cards",
+        "wish_song_five_distinct_liella_revealed_scores",
+        "wish_song_four_distinct_liella_revealed_no_score"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 16,
       "is_null": false
     },
     {
@@ -9433,12 +9437,14 @@
         "engine/tests/test_modules/chisato_natsumi_test.rs",
         "engine/tests/test_modules/hazuki_test.rs",
         "engine/tests/test_modules/l0_gap_constant_test.rs",
-        "engine/tests/test_modules/sumire_bp4_test.rs"
+        "engine/tests/test_modules/sumire_bp4_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch18_test.rs"
       ],
       "covering_tests": [
         "ayumu_empty_energy_deck_no_effect",
         "ayumu_energy_into_zone_not_under_member_no_trigger",
         "ayumu_energy_under_member_triggers_energy_deck_move",
+        "bp4006_three_distinct_members_retrieves_liella_live_from_revealed",
         "bp4_007_setsuna_both_energy_15_grants_heart02x2",
         "chisato_natsumi_baton_replacing_non_liella_counts_only_liella",
         "chisato_natsumi_blade_bonus_expires_at_live_end",
@@ -9464,10 +9470,9 @@
         "q266_cost_b4_waits_blade2_not_blade3",
         "q266_skip_cost_waits_nothing",
         "sumire_action_type_string_parsing_play_member_to_stage",
-        "sumire_double_baton_integration_via_string_path",
-        "sumire_double_baton_to_left_does_not_activate_debut"
+        "sumire_double_baton_integration_via_string_path"
       ],
-      "covering_test_count": 42,
+      "covering_test_count": 45,
       "is_null": false
     },
     {
@@ -9500,6 +9505,7 @@
         "engine/tests/test_modules/nonfiction_cost_comparison_test.rs",
         "engine/tests/test_modules/sumire_bp2_center_cost_test.rs",
         "engine/tests/test_modules/untested_abilities_batch16_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch18_test.rs",
         "engine/tests/test_modules/zero_tested_action_types_test.rs"
       ],
       "covering_tests": [
@@ -9507,6 +9513,7 @@
         "blade_goes_to_stage_member_not_live_card",
         "both_players_get_own_live_start_effects",
         "bp3004_rest_self_and_discard_retrieves_niji_live",
+        "bp4006_three_distinct_members_retrieves_liella_live_from_revealed",
         "bp4018_rests_self_to_waitroom_retrieves_liella",
         "center_equal_cost_no_heart",
         "center_highest_among_three_different_costs",
@@ -9531,10 +9538,9 @@
         "karin_position_change_removes_not_moved_blade",
         "keke_look_select_liella_no_blade_heart_excluded",
         "keke_look_select_liella_with_blade_heart",
-        "keke_look_select_sunny_passion_member",
-        "left_side_heart_below_ignores_center_high"
+        "keke_look_select_sunny_passion_member"
       ],
-      "covering_test_count": 85,
+      "covering_test_count": 88,
       "is_null": false
     },
     {
@@ -9567,6 +9573,7 @@
         "engine/tests/test_modules/nonfiction_cost_comparison_test.rs",
         "engine/tests/test_modules/sumire_bp2_center_cost_test.rs",
         "engine/tests/test_modules/untested_abilities_batch16_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch18_test.rs",
         "engine/tests/test_modules/zero_tested_action_types_test.rs"
       ],
       "covering_tests": [
@@ -9574,6 +9581,7 @@
         "blade_goes_to_stage_member_not_live_card",
         "both_players_get_own_live_start_effects",
         "bp3004_rest_self_and_discard_retrieves_niji_live",
+        "bp4006_three_distinct_members_retrieves_liella_live_from_revealed",
         "bp4018_rests_self_to_waitroom_retrieves_liella",
         "center_equal_cost_no_heart",
         "center_highest_among_three_different_costs",
@@ -9598,10 +9606,9 @@
         "karin_position_change_removes_not_moved_blade",
         "keke_look_select_liella_no_blade_heart_excluded",
         "keke_look_select_liella_with_blade_heart",
-        "keke_look_select_sunny_passion_member",
-        "left_side_heart_below_ignores_center_high"
+        "keke_look_select_sunny_passion_member"
       ],
-      "covering_test_count": 85,
+      "covering_test_count": 88,
       "is_null": false
     },
     {
@@ -18300,14 +18307,20 @@
         "PL!SP-bp4-006-P"
       ],
       "base": "PL!SP-bp4-006",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch18_test.rs"
+      ],
+      "covering_tests": [
+        "bp4006_three_distinct_members_retrieves_liella_live_from_revealed",
+        "wish_song_five_distinct_liella_revealed_scores",
+        "wish_song_four_distinct_liella_revealed_no_score"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -18645,14 +18658,20 @@
         "PL!SP-bp4-026-SRL"
       ],
       "base": "PL!SP-bp4-026",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch18_test.rs"
+      ],
+      "covering_tests": [
+        "bp4006_three_distinct_members_retrieves_liella_live_from_revealed",
+        "wish_song_five_distinct_liella_revealed_scores",
+        "wish_song_four_distinct_liella_revealed_no_score"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -18670,14 +18689,20 @@
         "PL!SP-bp4-026-SRL"
       ],
       "base": "PL!SP-bp4-026",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch18_test.rs"
+      ],
+      "covering_tests": [
+        "bp4006_three_distinct_members_retrieves_liella_live_from_revealed",
+        "wish_song_five_distinct_liella_revealed_scores",
+        "wish_song_four_distinct_liella_revealed_no_score"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -26884,9 +26909,11 @@
       "covering_files": [
         "engine/tests/test_modules/bp7_auto_gap_test.rs",
         "engine/tests/test_modules/kanon_bp5_constant_test.rs",
-        "engine/tests/test_modules/start_true_dreams_test.rs"
+        "engine/tests/test_modules/start_true_dreams_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch18_test.rs"
       ],
       "covering_tests": [
+        "bp4006_three_distinct_members_retrieves_liella_live_from_revealed",
         "chisato_area_move_gains_blade",
         "fuyumari_area_move_gains_heart03",
         "kanon_area_move_gains_heart02",
@@ -26910,9 +26937,11 @@
         "shioriko_live_phase_wait_discard_activates",
         "start_true_dreams_q66_opponent_no_card_score_higher",
         "toko_stage_to_discard_draws_2_discards_1",
+        "wish_song_five_distinct_liella_revealed_scores",
+        "wish_song_four_distinct_liella_revealed_no_score",
         "yuiguri_stage_to_discard_adds_live"
       ],
-      "covering_test_count": 24,
+      "covering_test_count": 27,
       "is_null": false
     },
     {
@@ -37455,9 +37484,11 @@
       "covering_files": [
         "engine/tests/test_modules/bp7_auto_gap_test.rs",
         "engine/tests/test_modules/kanon_bp5_constant_test.rs",
-        "engine/tests/test_modules/start_true_dreams_test.rs"
+        "engine/tests/test_modules/start_true_dreams_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch18_test.rs"
       ],
       "covering_tests": [
+        "bp4006_three_distinct_members_retrieves_liella_live_from_revealed",
         "chisato_area_move_gains_blade",
         "fuyumari_area_move_gains_heart03",
         "kanon_area_move_gains_heart02",
@@ -37481,9 +37512,11 @@
         "shioriko_live_phase_wait_discard_activates",
         "start_true_dreams_q66_opponent_no_card_score_higher",
         "toko_stage_to_discard_draws_2_discards_1",
+        "wish_song_five_distinct_liella_revealed_scores",
+        "wish_song_four_distinct_liella_revealed_no_score",
         "yuiguri_stage_to_discard_adds_live"
       ],
-      "covering_test_count": 24,
+      "covering_test_count": 27,
       "is_null": false
     },
     {
