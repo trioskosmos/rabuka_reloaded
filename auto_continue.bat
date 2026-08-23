@@ -7,9 +7,9 @@ exit /b
 #>
 
 param(
-    [int]$IntervalMinutes = 21,
+    [int]$IntervalMinutes = 4,
     [string]$WindowTitle = "",
-    [string]$Message = "is what is in the md done. if not, continue through it. if it is, go do another deep dive on the engine and parser to find more issues."
+    [string]$Message = "continue."
 )
 
 Add-Type -AssemblyName System.Windows.Forms

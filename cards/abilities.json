@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-23T13:17:02.506623",
+  "generated_at": "2026-08-23T14:17:45.160160",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "2ff07119",
+  "engine_commit": "d1cdd5ce",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -28717,32 +28717,64 @@
       "effect": {
         "text": "このターン、自分の『虹ヶ咲』のカードの効果によってウェイト状態の自分のエネルギーをアクティブにしていた場合、このカードのスコアを+1する。さらに、自分の『虹ヶ咲』のカードの効果によって自分のステージにいるウェイト状態のメンバーもアクティブにしていた場合、代わりにスコアを+2する",
         "action": "conditional_alternative",
-        "alternative_effect": {
-          "text": "スコアを+2する",
-          "action": "modify_score",
-          "value": 2,
-          "operation": "add"
-        },
         "condition": {
           "type": "state_condition",
-          "state": "wait",
-          "text": "このターン、自分の『虹ヶ咲』のカードの効果によってウェイト状態の自分のエネルギーをアクティブにしていた場合",
+          "state": "active",
+          "from_state": "wait",
+          "to_state": "active",
+          "temporal": "this_turn",
+          "card_type": "energy_card",
           "target": "self",
+          "text": "このターン、自分の『虹ヶ咲』のカードの効果によってウェイト状態の自分のエネルギーをアクティブにしていた場合",
           "group_names": [
             "虹ヶ咲"
           ]
         },
         "primary_effect": {
-          "text": "このカードのスコアを+1する。さらに、自分の『虹ヶ咲』のカードの効果によって自分のステージにいるウェイト状態のメンバーもアクティブにしていた場合、",
-          "source": "stage",
-          "state_change": "active",
-          "card_type": "member_card",
-          "target": "self",
-          "group_names": [
-            "虹ヶ咲"
-          ],
-          "action": "change_state",
+          "text": "このカードのスコアを+1する",
+          "action": "modify_score",
+          "value": 1,
+          "operation": "add",
           "self_target": true
+        },
+        "alternative_condition": {
+          "type": "compound",
+          "operator": "and",
+          "conditions": [
+            {
+              "type": "state_condition",
+              "state": "active",
+              "from_state": "wait",
+              "to_state": "active",
+              "temporal": "this_turn",
+              "card_type": "energy_card",
+              "target": "self",
+              "text": "このターン、自分の『虹ヶ咲』のカードの効果によってウェイト状態の自分のエネルギーをアクティブにしていた場合",
+              "group_names": [
+                "虹ヶ咲"
+              ]
+            },
+            {
+              "type": "state_condition",
+              "state": "active",
+              "from_state": "wait",
+              "to_state": "active",
+              "temporal": "this_turn",
+              "card_type": "member_card",
+              "target": "self",
+              "text": "このターン、自分の『虹ヶ咲』のカードの効果によって自分のステージにいるウェイト状態のメンバーもアクティブにしていた場合",
+              "group_names": [
+                "虹ヶ咲"
+              ]
+            }
+          ],
+          "text": "さらに、自分の『虹ヶ咲』のカードの効果によって自分のステージにいるウェイト状態のメンバーもアクティブにしていた場合"
+        },
+        "alternative_effect": {
+          "text": "スコアを+2する",
+          "action": "modify_score",
+          "value": 2,
+          "operation": "add"
         },
         "group_names": [
           "虹ヶ咲"

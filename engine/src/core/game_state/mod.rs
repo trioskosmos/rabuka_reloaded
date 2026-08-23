@@ -195,6 +195,14 @@ pub struct GameState {
     /// After a change_state effect executes, records what actually changed:
     /// (card_id, from_state, to_state). Cleared after post-resolution TAS scan.
     pub recently_state_changed: SmallVec<[(i16, String, String); 2]>,
+    /// Turn-scoped state-change log WITH source attribution:
+    /// (source activating card, target card, from_state, to_state).
+    /// Unlike `recently_state_changed` this survives intermediate ability
+    /// processing and is only cleared at the turn boundary, so ライブ開始時
+    /// conditions can look back across the whole turn — e.g.
+    /// 「このターン、自分の『虹ヶ咲』のカードの効果によってウェイト状態の
+    /// 自分のエネルギーをアクティブにしていた場合」(PL!N-pb1-037-L Q203).
+    pub turn_state_changes: Vec<(i16, i16, String, String)>,
     pub debut_ability_triggers: SmallVec<[(String, i16); 4]>,
     pub last_vacated_stage_area: Option<u8>,
     // --- 4-byte aligned (u8, Option<i32>) ---
@@ -462,6 +470,7 @@ impl GameState {
             movement_event_counter: 0,
             state_snapshot_before_change: None,
             recently_state_changed: SmallVec::new(),
+            turn_state_changes: Vec::new(),
             debut_ability_triggers: SmallVec::new(),
             last_vacated_stage_area: None,
             // 4-byte aligned

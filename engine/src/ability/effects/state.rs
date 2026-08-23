@@ -633,6 +633,15 @@ impl AbilityResolver {
                             from_str.clone(),
                             to_str.clone(),
                         ));
+                        // Turn-scoped attributed log (cleared only at the turn
+                        // boundary) — consumed by temporal state-change
+                        // conditions like Q203.
+                        gs.turn_state_changes.push((
+                            gs.activating_card.unwrap_or(-1),
+                            *card_id,
+                            from_str.clone(),
+                            to_str.clone(),
+                        ));
                         log::debug!(
                             "[STATE_CHANGE] detected: card={} {}→{}",
                             card_id,
@@ -883,6 +892,13 @@ impl AbilityResolver {
             "active" | "アクティブ" => {
                 for card_id in &active_cards {
                     gs.mods.add_orientation_modifier(*card_id, "active");
+                    // Turn-scoped attributed log (see GameState::turn_state_changes).
+                    gs.turn_state_changes.push((
+                        gs.activating_card.unwrap_or(-1),
+                        *card_id,
+                        "wait".to_string(),
+                        "active".to_string(),
+                    ));
                 }
                 let player = gs.resolve_target_player_mut(target);
                 player.energy_zone.add_active(active_cards.len() as u8);

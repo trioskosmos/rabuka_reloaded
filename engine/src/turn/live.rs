@@ -758,7 +758,6 @@ impl super::TurnEngine {
 
         // Push performance summary to rule log
 
-        let card_db = game_state.card_database.clone();
         if ABILITY_DEBUG.load(Ordering::Relaxed) {
             for snap in &game_state.performance_snapshots {
                 let player = fmt_player_id(&snap.player_id);

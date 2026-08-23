@@ -1030,6 +1030,63 @@ impl<'a> ConditionContext<'a> {
             log::debug!(
                 "[STATE_CHANGE_COND] no matching transition found in recently_state_changed"
             );
+            // Turn-scoped attributed fallback: temporal conditions
+            // (「このターン…アクティブにしていた場合」, Q203) look back across the
+            // WHOLE turn — including activations by earlier main-phase effects —
+            // and can filter on the SOURCE effect's group (『虹ヶ咲』のカードの効果)
+            // and the TARGET kind (energy vs member).
+            if condition.get_temporal().map(|t| t.as_ref()) == Some("this_turn") {
+                let card_db = &self.game_state.card_database;
+                let want_kind = condition
+                    .get_card_type()
+                    .map(|ct| ct.as_str().to_string());
+                // The target card must belong to the conditioned player.
+                let mut owned: HashSet<i16> = target_player.stage.stage.iter().copied().collect();
+                owned.extend(target_player.energy_zone.cards.iter().copied());
+                owned.extend(target_player.hand.cards.iter().copied());
+                let groups = condition.get_group_names();
+                let groups_nonempty = groups.is_some_and(|g| !g.is_empty());
+                for (source, cid, cfrom, cto) in &self.game_state.turn_state_changes {
+                    if cfrom != from || cto != to {
+                        continue;
+                    }
+                    if !owned.contains(cid) {
+                        continue;
+                    }
+                    if let Some(want) = &want_kind {
+                        let matches_kind = card_db
+                            .get_card(*cid)
+                            .is_some_and(|c| c.card_type.as_card_str() == want.as_str());
+                        if !matches_kind {
+                            continue;
+                        }
+                    }
+                    if groups_nonempty {
+                        let src_ok = *source >= 0
+                            && groups.unwrap().iter().any(|g| {
+                                crate::ability::util::card_matches_group_str(
+                                    card_db,
+                                    *source,
+                                    Some(g),
+                                )
+                            });
+                        if !src_ok {
+                            continue;
+                        }
+                    }
+                    log::debug!(
+                        "[STATE_CHANGE_COND] card={} {}→{} via source={} matches (turn_state_changes)",
+                        cid,
+                        cfrom,
+                        cto,
+                        source
+                    );
+                    return true;
+                }
+                log::debug!(
+                    "[STATE_CHANGE_COND] no matching transition in turn_state_changes"
+                );
+            }
             return false;
         }
         true

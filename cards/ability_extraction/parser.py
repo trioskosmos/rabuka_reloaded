@@ -7149,6 +7149,90 @@ def _try_yell_source_modifier(text):
     }
 
 
+def _try_activation_history_tiers(text):
+    """このターン…アクティブにしていた場合 tiers (Q203 Cara Tesoro).
+
+    「このターン、自分の『G』のカードの効果によってウェイト状態の自分の
+    エネルギーをアクティブにしていた場合、E1。さらに、…メンバーもアクティブに
+    していた場合、代わりにE2。」
+
+    The clauses are HISTORICAL conditions over this turn's activations — not
+    state checks. Emitted as from/to state_change conditions with turn scope
+    and source-group attribution; the engine evaluates them against
+    GameState::turn_state_changes (see evaluate_state_change_condition).
+    """
+    if "アクティブにしていた場合" not in text or "さらに" not in text:
+        return None
+
+    def activation_cond(clause):
+        gm = re.search(r"『([^』]+)』のカードの効果によって", clause)
+        kind = "energy_card" if "エネルギー" in clause else "member_card"
+        body = clause if clause.startswith("このターン") else "このターン、" + clause
+        cond = {
+            "type": "state_condition",
+            "state": "active",
+            "from_state": "wait",
+            "to_state": "active",
+            "temporal": "this_turn",
+            "card_type": kind,
+            "target": "self",
+            "text": body,
+        }
+        if gm:
+            cond["group_names"] = [gm.group(1)]
+        else:
+            return None
+        return cond
+
+    parts = [p.strip() for p in text.split("。") if p.strip()]
+    if len(parts) < 2 or "さらに" not in parts[1]:
+        return None
+
+    m1 = re.match(r"^(.*?アクティブにしていた場合)、?(.*)$", parts[0])
+    if not m1:
+        return None
+    cond1 = activation_cond(m1.group(1))
+    if cond1 is None:
+        return None
+    effect1_text = m1.group(2).strip().lstrip("、")
+    e1 = parse_effect(effect1_text)
+    if e1.get("action") in ("custom", "do_nothing", None):
+        return None
+
+    second = parts[1]
+    if second.startswith("さらに、"):
+        second = second[len("さらに、"):]
+    elif second.startswith("さらに"):
+        second = second[len("さらに"):]
+    m2 = re.match(r"^(.*?アクティブにしていた場合)、?(.*)$", second)
+    if not m2:
+        return None
+    cond2 = activation_cond(m2.group(1))
+    if cond2 is None:
+        return None
+    effect2_text = m2.group(2).strip().lstrip("、")
+    if effect2_text.startswith("代わりに"):
+        effect2_text = effect2_text[len("代わりに"):]
+    e2 = parse_effect(effect2_text)
+    if e2.get("action") in ("custom", "do_nothing", None):
+        return None
+
+    # Tier 2 requires BOTH activations: energy AND member.
+    return {
+        "text": text,
+        "action": "conditional_alternative",
+        "condition": cond1,
+        "primary_effect": dict(e1, text=effect1_text),
+        "alternative_condition": {
+            "type": "compound",
+            "operator": "and",
+            "conditions": [cond1, cond2],
+            "text": "さらに、" + m2.group(1),
+        },
+        "alternative_effect": dict(e2, text=effect2_text),
+    }
+
+
 def _try_conditional_alternative(text):
     """代わりに — conditional alternative effects."""
     if ALTERNATIVE_MARKER not in text:
@@ -9867,6 +9951,7 @@ _EFFECT_HANDLERS = [
     _try_self_and_other,  # XとYを得る (two different targets)
     _try_per_unit,  # XにつきY (per-unit gain — restructures text)
     _try_yell_source_modifier,  # エールはデッキの下から行う (yell-source modifier)
+    _try_activation_history_tiers,  # このターン…アクティブにしていた場合 tiers (Q203)
     _try_conditional_alternative,  # X場合Y、そうでない場合Z (if/else)
     _try_character_specific,  # 「X」のキャラ specific effect
     _try_activation_suffix,  # （この能力は...） activation conditions

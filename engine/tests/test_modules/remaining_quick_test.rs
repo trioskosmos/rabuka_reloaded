@@ -208,36 +208,194 @@ fn eternalize_three_all_different_no_trigger() {
     );
 }
 
-/// Q203: Cara Tesoro — LiveStart fires. Verify the conditional_alternative is evaluated.
-#[test]
-fn cara_tesoro_q203_live_start_fires() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
+/// Q203: Cara Tesoro (PL!N-pb1-037-L) ライブ開始時:
+/// 「このターン、自分の『虹ヶ咲』のカードの効果によってウェイト状態の自分の
+/// エネルギーをアクティブにしていた場合、このカードのスコアを＋１する。
+/// さらに、…ウェイト状態のメンバーもアクティブにしていた場合、代わりに
+/// スコアを＋２する。」
+///
+/// The bonus tiers are driven by real 虹ヶ咲 effects in the same turn:
+/// エマ PL!N-bp4-008-R 起動 activates 1 energy OR 1 member,
+/// エマ PL!N-pb1-008-R 登場 activates 1 member OR 2 energy.
+use crate::helpers::*;
+use rabuka_engine::ability::types::Choice;
+use rabuka_engine::core::types::AbilityTrigger;
+
+fn fire_debut(game: &mut TestGame, cid: i16) {
+    let card = game.db.get_card(cid).unwrap();
+    let ab = card
+        .resolved_abilities()
+        .find(|a| a.triggers.as_deref() == Some("登場"))
+        .expect("card should have a 登場 ability");
+    let pid = game.state.player1.id.clone();
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ab.full_text),
+        AbilityTrigger::Debut,
+        pid.clone(),
+        Some(card.card_no.to_string()),
+        Some(cid),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(cid);
+    game.state.process_pending_auto_abilities(&pid);
+}
+
+fn drain_cost_then_pick(game: &mut TestGame, option: usize, fodder: i16) {
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 20 {
+        guard += 1;
+        match game.get_pending_choice() {
+            Choice::SelectCard { .. } => {
+                // Discard-cost prompts must eat the FODDER card, never Cara.
+                let pos = game
+                    .state
+                    .player1
+                    .hand
+                    .cards
+                    .iter()
+                    .position(|&c| c == fodder)
+                    .expect("fodder still in hand for the activation cost");
+                game.select_indices(&[pos]);
+            }
+            Choice::SelectTarget { target, .. } if target == "conditional_optional" => {
+                game.select_option(option as i16);
+            }
+            _ => game.select_option(option as i16),
+        }
+    }
+}
+
+/// Shared board: エマ (虹ヶ咲 activator) on stage, 2 waited energy cards,
+/// an optional waited member, and Cara Tesoro ready to be set as the live.
+fn setup_cara_board(game: &mut TestGame, waited_member: Option<i16>) -> i16 {
+    let filler = game.id("PL!-sd1-010-SD");
+    let emma_activator = game.id("PL!N-bp4-008-R");
+    match waited_member {
+        Some(m) => {
+            game.state.player1.stage.stage = [m, emma_activator, -1];
+            game.state.mods.add_orientation_modifier(m, "wait");
+        }
+        None => {
+            game.state.player1.stage.stage = [emma_activator, filler, -1];
+        }
+    }
+    // 5 energy cards, only 3 active → 2 WAITED energy for effects to activate.
+    game.give_energy(5);
+    game.state.player1.energy_zone.set_active_count(3);
 
     let cara = game.id("PL!N-pb1-037-L");
-    let filler = game.id("PL!-sd1-010-SD");
-
-    game.state.player1.stage.stage = [filler, filler, -1];
-    game.state.player1.hand.cards.push(cara);
-    game.state.player1.hand.cards.push(filler);
+    game.add_to_hand(cara);
+    game.add_to_hand(filler); // discard fodder for エマ's 起動 cost
     for _ in 0..60 {
         game.state.player1.main_deck.cards.push(filler);
-    }
-    for _ in 0..60 {
         game.state.player2.main_deck.cards.push(filler);
     }
     game.give_energy(15);
+    cara
+}
 
-    advance_live(&mut game);
+fn run_cara_live_start(game: &mut TestGame, cara: i16) {
+    advance_live(game);
     game.set_live_card(cara);
     game.pass();
     game.pass();
-    while game.has_pending_choice() {
-        game.select_option(0);
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 20 {
+        guard += 1;
+        match game.get_pending_choice() {
+            Choice::SelectAutoAbility { .. } => game.select_indices(&[]),
+            _ => game.select_indices(&[0]),
+        }
     }
+}
 
-    let mod_val = game.state.mods.get_score_modifier(cara);
-    assert_eq!(mod_val, 0, "Q203: Score modifier evaluated to 0");
+/// Control: nothing was activated by 虹ヶ咲 effects this turn → no bonus.
+#[test]
+fn cara_q203_no_nijigasaki_activation_no_bonus() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let cara = setup_cara_board(&mut game, None);
+    run_cara_live_start(&mut game, cara);
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(cara),
+        0,
+        "no 虹ヶ咲 activation this turn → +0"
+    );
+}
+
+/// +1 tier: a 虹ヶ咲 effect activated WAITED ENERGY (エマ 起動, energy side).
+#[test]
+fn cara_q203_nijigasaki_energy_activation_gives_plus1() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let cara = setup_cara_board(&mut game, None);
+
+    let active_before = game.state.player1.energy_zone.active_count();
+    let emma = game.state.player1.stage.stage[0];
+    let fodder = game.id("PL!-sd1-010-SD");
+    game.add_to_hand(fodder);
+    game.activate_ability(emma);
+    drain_cost_then_pick(&mut game, 0, fodder); // energy side
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        active_before + 1,
+        "precondition: エマ activated one energy"
+    );
+
+    run_cara_live_start(&mut game, cara);
+    assert_eq!(
+        game.state.mods.get_score_modifier(cara),
+        1,
+        "energy activated by a 虹ヶ咲 effect this turn → +1"
+    );
+}
+
+/// +2 tier: energy AND member were activated by 虹ヶ咲 effects this turn
+/// (エマ pb1 登場 member side + エマ bp4 起動 energy side).
+#[test]
+fn cara_q203_energy_and_member_gives_plus2() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let waited_member = game.id("PL!N-bp3-006-R"); // 虹ヶ咲 member, starts waited
+    let cara = setup_cara_board(&mut game, Some(waited_member));
+
+    // Member side: another エマ debuts and activates the waited member.
+    let emma_pb1 = game.id("PL!N-pb1-008-R");
+    game.state.player1.stage.stage[2] = emma_pb1;
+    game.give_energy(10);
+    fire_debut(&mut game, emma_pb1);
+    assert!(
+        game.has_pending_choice(),
+        "debut either/or must present the choice"
+    );
+    game.select_option(0); // member side
+
+    // Energy side: エマ bp4 起動 activates one waited energy.
+    let active_before = game.state.player1.energy_zone.active_count();
+    let emma_bp4 = game.state.player1.stage.stage[1];
+    let fodder = game.id("PL!-sd1-010-SD");
+    game.add_to_hand(fodder);
+    game.activate_ability(emma_bp4);
+    drain_cost_then_pick(&mut game, 0, fodder);
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        active_before + 1,
+        "precondition: エマ activated one energy"
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(waited_member),
+        Some("active"),
+        "precondition: the waited member was activated"
+    );
+
+    run_cara_live_start(&mut game, cara);
+    assert_eq!(
+        game.state.mods.get_score_modifier(cara),
+        2,
+        "energy AND member activated by 虹ヶ咲 effects → +2"
+    );
 }
 
 /// Q218: Chika (PL!S-bp5-001-R+) ab#1 permanent reduces cost by 1 for no-ability

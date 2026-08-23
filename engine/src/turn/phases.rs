@@ -270,7 +270,15 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                     // 0 baton offers across every traced game).
                     game_state.player1.deployed_this_turn.clear();
                     game_state.player2.deployed_this_turn.clear();
+                    // Round-scoped counters (「このターン」 spans both players'
+                    // normal phases): cleared only here at the turn rollover.
+                    game_state.player1.debut_count_this_turn = 0;
+                    game_state.player2.debut_count_this_turn = 0;
                     game_state.turn_number += 1;
+                    // Round-scoped activation history (「このターン…アクティブに
+                    // していた場合」, Q203): spans both players' main phases and
+                    // the live, ending exactly here at the turn rollover.
+                    game_state.turn_state_changes.clear();
                     Self::log_turn_start(game_state);
                     Self::log_phase(game_state, "phase_active_first");
                     game_state.current_turn_phase =

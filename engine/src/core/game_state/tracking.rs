@@ -9,21 +9,25 @@ impl GameState {
     pub fn reset_keyword_tracking(&mut self) {
         self.turn1_abilities_played.clear();
         self.turn2_abilities_played.clear();
+        // NOTE: debut_count_this_turn and appearance tracking are NOT cleared
+        // here. This method runs on every Active-phase entry — twice per round
+        // (each player's normal phase) — but 「このターン」 spans the WHOLE
+        // round. Clearing here truncated first-attacker-window facts before
+        // live-start/live-success conditions could read them
+        // (e.g. PL!N-pb1-037-L Q203, PL!N-bp3-005-R＋, PL!HS-bp2-021-L).
+        // Round-scoped trackers now clear together at the turn rollover in
+        // advance_phase (victory determination), alongside
+        // clear_card_movement_tracking().
         self.player1_cheer_blade_heart_count = 0;
         self.player2_cheer_blade_heart_count = 0;
-        self.player1.debut_count_this_turn = 0;
-        self.player2.debut_count_this_turn = 0;
         self.player1.deck_refreshed_this_turn = false;
         self.player2.deck_refreshed_this_turn = false;
         self.player1.last_resolution_cards.clear();
         self.player2.last_resolution_cards.clear();
-        self.clear_card_appearance_tracking();
         self.clear_auto_ability_trigger_tracking();
         self.reset_change_flags();
         self.cheer_check_completed = false;
         self.reset_loop_detection();
-        self.player1.deployed_this_turn.clear();
-        self.player2.deployed_this_turn.clear();
         self.baton_touch_count_p1 = 0;
         self.baton_touch_count_p2 = 0;
         self.baton_touch_arriving_card_ids.clear();

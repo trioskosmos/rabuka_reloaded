@@ -2561,6 +2561,11 @@ impl GameState {
         self.live_success_p2_extra = 0;
         self.last_state_change_wait_to_active_count = 0;
         self.recently_state_changed.clear();
+        // NOTE: turn_state_changes is NOT cleared here — this runs on every
+        // Active-phase entry (each player's normal phase), but 「このターン」
+        // spans the whole round (both players' main phases + live). It is
+        // cleared at the real turn boundary in advance_phase (victory
+        // determination, turn_number increment).
         self.self_no_excess_heart_this_turn = false;
     }
 
