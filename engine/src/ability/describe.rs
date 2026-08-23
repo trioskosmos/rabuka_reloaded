@@ -501,11 +501,29 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
             }
         }
 
+        "select_number" => format!("Choose a number ({})", c.unwrap_or(1)),
+        "modify_yell_source" => {
+            if effect.yell_source_any().as_deref() == Some("deck_bottom") {
+                "Perform yells from the bottom of the deck instead of the top".to_string()
+            } else {
+                "Modify the yell source".to_string()
+            }
+        }
+        "reduce_live_card_set_limit" => format!(
+            "Reduce the live card placement limit next Live Set phase by {}",
+            c.unwrap_or(1)
+        ),
+        "suppress_ability_trigger" => match effect.suppressed_trigger_any().as_deref() {
+            Some("live_start") => {
+                "Live Start abilities do not activate".to_string()
+            }
+            _ => "Abilities do not activate".to_string(),
+        },
+
         _ => effect.text.to_string(),
     }
 }
 
-/// Describe a single cost item in English (used for combined cost prompts).
 pub fn describe_cost_en(cost: &AbilityEffect) -> String {
     match cost.action {
         ActionType::PayEnergy => {
@@ -1119,6 +1137,18 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
                 (None, None) => effect.text.to_string(),
             }
         }
+        "select_number" => format!("数を{}つ選ぶ", c.unwrap_or(1)),
+        "modify_yell_source" => {
+            if effect.yell_source_any().as_deref() == Some("deck_bottom") {
+                "エールはデッキの下から行う".to_string()
+            } else {
+                "エールの行う場所を変更".to_string()
+            }
+        }
+        "suppress_ability_trigger" => match effect.suppressed_trigger_any().as_deref() {
+            Some("live_start") => "ライブ開始時能力は発動しない".to_string(),
+            _ => "能力は発動しない".to_string(),
+        },
         _ => effect.text.to_string(),
     }
 }
