@@ -1,4 +1,9 @@
 use super::GameState;
+#[cfg(feature = "no_std")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use crate::ability::enums::Zone;
 use crate::core::types::{AbilityTrigger, Duration, Phase, ReplacementEffect, TurnPhase};
 use crate::player::Player;

@@ -1,4 +1,9 @@
 use super::GameState;
+#[cfg(feature = "no_std")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 impl GameState {
     pub fn reset_keyword_tracking(&mut self) {

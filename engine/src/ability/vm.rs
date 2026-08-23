@@ -103,17 +103,42 @@ fn get_decompressed_bytecode() -> &'static [u8] {
 #[cfg(all(not(feature = "snes"), feature = "no_std"))]
 fn get_decompressed_bytecode() -> &'static [u8] {
     use core::cell::UnsafeCell;
+    use core::sync::atomic::{AtomicU8, Ordering};
+
     struct SyncUnsafeCell<T>(UnsafeCell<T>);
     unsafe impl<T> Sync for SyncUnsafeCell<T> {}
+
+    // Once-initialized cache: 0 = uninitialized, 1 = initializing, 2 = ready.
+    // After state 2 the Vec is never mutated again, so unlocked reads of a
+    // ready cache are sound; only the init transition needs coordination.
+    // (The previous plain-bool + UnsafeCell version had no synchronization
+    // at all — two concurrent first-callers could race the decompression.)
     static CACHE: SyncUnsafeCell<Option<Vec<u8>>> = SyncUnsafeCell(UnsafeCell::new(None));
-    static INIT: SyncUnsafeCell<bool> = SyncUnsafeCell(UnsafeCell::new(false));
-    unsafe {
-        if !*INIT.0.get() {
-            let decompressed = miniz_oxide::inflate::decompress_to_vec_zlib(COMPRESSED_BYTECODE).expect("bytecode decompress failed");
-            *CACHE.0.get() = Some(decompressed);
-            *INIT.0.get() = true;
+    static STATE: AtomicU8 = AtomicU8::new(0);
+
+    loop {
+        match STATE.load(Ordering::Acquire) {
+            2 => {
+                return unsafe { (*CACHE.0.get()).as_ref().unwrap().as_slice() };
+            }
+            0 => {
+                if STATE
+                    .compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed)
+                    .is_ok()
+                {
+                    let decompressed = miniz_oxide::inflate::decompress_to_vec_zlib(
+                        COMPRESSED_BYTECODE,
+                    )
+                    .expect("bytecode decompress failed");
+                    unsafe {
+                        *CACHE.0.get() = Some(decompressed);
+                    }
+                    STATE.store(2, Ordering::Release);
+                }
+                // Lost the init race or just finished initializing — re-check.
+            }
+            _ => core::hint::spin_loop(),
         }
-        (*CACHE.0.get()).as_ref().unwrap().as_slice()
     }
 }
 
