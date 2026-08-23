@@ -1,4 +1,4 @@
-/// Comprehensive tests for live success/failure mechanics (Rules §8.3, §8.4, QA entries)
+﻿/// Comprehensive tests for live success/failure mechanics (Rules §8.3, §8.4, QA entries)
 use crate::helpers::*;
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
@@ -39,9 +39,22 @@ fn live_fails_with_insufficient_hearts() {
         game.select_indices(&[]);
     }
     advance_to_live_victory(&mut game);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    // One more pass finalizes victory determination (winner placement).
+    game.pass();
+
+    // Q35: the failed live card must end in the WAITROOM — never the
+    // success zone. A bare "!has_pending_choice()" cannot distinguish this
+    // from any other terminal state.
     assert!(
-        !game.has_pending_choice(),
-        "Q35: Live fails when need_heart not satisfied (8.3.16)"
+        game.state.player1.waitroom.cards.contains(&live),
+        "Q35: failed live card goes to the waitroom"
+    );
+    assert!(
+        game.state.player1.success_live_card_zone.cards.is_empty(),
+        "Q35: insufficient hearts → nothing enters the success zone"
     );
 }
 
@@ -110,13 +123,17 @@ fn q147_empty_need_heart_live_succeeds() {
         game.select_indices(&[]);
     }
     advance_to_live_victory(&mut game);
-    assert!(
-        game.has_pending_choice(),
-        "Q147: Score-0 live succeeds when hearts met"
-    );
+    // Drain the live's own ライブ成功時 ability chain (look_and_select etc.)
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
+    // One more pass finalizes winner placement.
+    game.pass();
+    assert_eq!(
+        game.state.player1.success_live_card_zone.cards.as_slice(),
+        &[live][..],
+        "Q147: score-0 live placed on success"
+    );
 }
 
 /// Both players have lives -> both scores compared, each may have LiveSuccess.
@@ -138,7 +155,11 @@ fn both_players_have_live_cards() {
     }
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(p1_live);
-    advance_to_live_start(&mut game);
+    // Transition to SecondAttacker so P2 can set theirs too — without this,
+    // P2 never performs and the scenario is a walkover, not a tie.
+    game.pass();
+    game.set_live_card(p2_live);
+    advance_to_live_victory(&mut game);
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
@@ -147,10 +168,18 @@ fn both_players_have_live_cards() {
         game.select_indices(&[0]);
     }
     game.pass();
-    assert!(
-        game.state.player1.success_live_card_zone.cards.len() > 0
-            || game.state.player2.success_live_card_zone.cards.len() > 0,
-        "Both players' live cards processed through score comparison (8.4.3.3)"
+    // Rule 8.4.6.2: equal scores → BOTH win and BOTH place (neither has
+    // ≥2 cards in their success zone yet). An OR here would mask one side
+    // silently failing to place.
+    assert_eq!(
+        game.state.player1.success_live_card_zone.cards.as_slice(),
+        &[p1_live][..],
+        "tie: P1 places their winning live"
+    );
+    assert_eq!(
+        game.state.player2.success_live_card_zone.cards.as_slice(),
+        &[p2_live][..],
+        "tie: P2 also wins and places"
     );
 }
 
@@ -184,6 +213,20 @@ fn one_player_live_auto_higher_score() {
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
+    // One more pass finalizes winner placement.
+    game.pass();
+
+    // Q47 walkover: P2 never performed, so P1 places unopposed.
+    assert_eq!(
+        game.state.player1.success_live_card_zone.cards.as_slice(),
+        &[live][..],
+        "Q47: P1's live reaches the success zone"
+    );
+    assert!(
+        game.state.player2.success_live_card_zone.cards.is_empty()
+            && game.state.player2.live_card_zone.cards.is_empty(),
+        "Q47: P2 has nothing in play"
+    );
 }
 
 /// No live card set -> no yell, no LiveSuccess (Q32).
@@ -220,12 +263,14 @@ fn no_live_card_no_yell_no_success() {
         "Q32: Deck should not lose >5 cards from yell (no live card set)"
     );
     assert!(
-        !game.has_pending_choice(),
-        "No LiveSuccess when no live card performed"
+        game.state.player1.success_live_card_zone.cards.is_empty()
+            && game.state.player2.success_live_card_zone.cards.is_empty(),
+        "Q32: no live performed → nobody places"
     );
 }
 
-/// Multiple live cards: if any fails hearts, all fail (8.3.16, Q35)
+/// Multiple live cards: if any fails hearts, all fail (8.3.16, Q35).
+/// BOTH cards are in the zone; the shared heart pool cannot satisfy both.
 #[test]
 fn any_card_fails_hearts_all_fail() {
     let db = load_real_database();
@@ -245,14 +290,27 @@ fn any_card_fails_hearts_all_fail() {
     }
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live_a);
+    // Second live card joins the zone (same as having set 2 cards).
+    game.state.player1.live_card_zone.cards.push(live_b);
     advance_to_live_start(&mut game);
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
     advance_to_live_victory(&mut game);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    game.pass();
+
+    // 8.3.16: one failure fails ALL — nothing places, both cards to waitroom.
     assert!(
-        !game.has_pending_choice(),
-        "Q35: All live cards fail when any card's need_heart is unmet"
+        game.state.player1.success_live_card_zone.cards.is_empty(),
+        "Q35: no placement when any live card failed"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live_a)
+            && game.state.player1.waitroom.cards.contains(&live_b),
+        "Q35: ALL live cards go to the waitroom"
     );
 }
 
@@ -284,9 +342,23 @@ fn winner_takes_one_to_success_zone() {
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
+    game.pass();
+    // Q83: exactly ONE card places even though two succeeded; the other
+    // must end in the waitroom.
+    assert_eq!(
+        game.state.player1.success_live_card_zone.cards.len(),
+        1,
+        "Q83: winner moves exactly 1 live card to success zone"
+    );
+    let placed = game.state.player1.success_live_card_zone.cards[0];
     assert!(
-        game.state.player1.success_live_card_zone.cards.len() <= 1,
-        "Q83: Winner moves at most 1 live card to success zone"
+        placed == live_a || placed == live_b,
+        "placed card is one of the performed lives"
+    );
+    let other = if placed == live_a { live_b } else { live_a };
+    assert!(
+        !game.state.player1.success_live_card_zone.cards.contains(&other),
+        "Q83: only ONE of the successful lives places"
     );
 }
 
