@@ -387,27 +387,7 @@ impl super::TurnEngine {
         // Restore performance-time need_heart_modifiers that were cleared above.
         // This preserves modifications from live_start triggers and other non-constant
         // sources, ensuring should_trigger_live_success uses the correct requirements.
-        // IMPORTANT: use a set to deduplicate (cid,color) pairs — the same global
-        // modifier may appear in multiple players' snapshots, causing double-counting.
-        let mut restored: HashSet<(i16, crate::card::HeartColor)> = HashSet::default();
-        for snap in &game_state.performance_snapshots {
-            for &(cid, color, ref entry) in &snap.performance_need_heart_modifiers {
-                if !restored.insert((cid, color)) {
-                    continue;
-                }
-                let target = game_state
-                    .mods
-                    .need_heart_modifiers
-                    .entry(cid)
-                    .or_default()
-                    .entry(color)
-                    .or_insert(crate::core::game_modifiers::ModifierEntry::default());
-                if entry.set != 0 && target.set == 0 {
-                    target.set = entry.set;
-                }
-                target.additive += entry.additive;
-            }
-        }
+        game_state.restore_performance_need_heart_modifiers();
 
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();

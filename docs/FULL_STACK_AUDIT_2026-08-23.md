@@ -10,6 +10,11 @@
 | 08-24 | e98c1ef8 | Phase-1 leftover: deleted unused `segment_clauses` Stage-A IR (+helpers `_segment_sentence`/`_CONDITION_MARKERS_IR`/`_LINK_PREFIXES`, header comment, test file ~230L). Kept `_ir_depth_scan`/`_split_sentences_nesting`/`_find_depth0`/`_split_marker_depth0` (live callers). Byte-identical |
 | 08-24 | — | Discovery: PARSER_NOTES "Phase 8: 33 tuple-format _ACTION_RULES entries" is STALE — all registrations already go through the ActionRule-normalizing `_register_action`; dispatch has no TypeError workaround. Phase 8 = done |
 | 08-24 | 2121cacd | P1: extract script now calls real `parse_ability` (deleted the weaker inline copy). Fixes needed along the way: `normalize()` collapsed `\n`-bullets and broke choice parsing → added `normalize_multiline`; back-fill loop was re-scanning cost text and double-gating existing conditions → now effect-text-only, only when no condition exists, leading-gate-only. Net 46/936 abilities improved (leading gates captured + `_clean` of empty/default fields). Suite 2591/0. **This closes audit item P1 and retires the dead `parse_ability` twin** |
+| 08-24 | 2d159cd0 | Phase-1 leftover closed: `_try_phase_gate` now delegates to `extract_phase_gate` (corpus output unchanged — the flagged behavioral diffs never fired on this corpus) |
+| 08-24 | f1f6a1ed | Special rules: 「ブレードの数はNつになる」 generalized from hardcoded count=3; extra_checks block documented as position-sensitive by design (E2b verdict) |
+| 08-24 | 6a414e0a | Special rules: generic `_try_play_time_cost_set` handler for 「プレイに際し…コストはNになる」 (priority -10); LL-bp7-001 override deleted. Output matches engine contract |
+| 08-24 | cfbe79f8 | Engine side of LL-bp7-001 de-hardcoded: `play_time_alt_cost_chars` (any N/any char-count), k-slot backtracking assignment replaces fixed [Vec;3], prompts derived from card data. 17-test card harness incl. fuzz green |
+| 08-24 | 2b452d27 | vm.rs draw-count=1 fixup removed — redundant with `effects/draw.rs` `count_or(1)` default. Suite 2591/0 |
 
 Verification loop used per step: regen abilities.json → byte-diff vs pre-step copy
 (only `generated_at`/`engine_commit` may differ) → python parser tests → `cargo test --test run_all`.

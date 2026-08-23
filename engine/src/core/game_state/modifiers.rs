@@ -1301,6 +1301,38 @@ impl GameState {
         self.evaluate_success_zone_constant_modifiers();
     }
 
+    /// Restore performance-time need_heart_modifiers that were cleared by
+    /// evaluate_success_zone_constant_abilities. This preserves modifications
+    /// from live_start triggers and other non-constant sources, ensuring
+    /// should_trigger_live_success uses the correct requirements.
+    ///
+    /// Single source of truth shared by the victory-determination flow
+    /// (turn/live.rs) and live-success triggering (turn/triggers.rs).
+    pub fn restore_performance_need_heart_modifiers(&mut self) {
+        use crate::core::game_modifiers::ModifierEntry;
+        // IMPORTANT: deduplicate (cid,color) pairs — the same global modifier
+        // may appear in multiple players' snapshots, causing double-counting.
+        let mut restored: HashSet<(i16, crate::card::HeartColor)> = HashSet::default();
+        for snap in &self.performance_snapshots {
+            for &(cid, color, ref entry) in &snap.performance_need_heart_modifiers {
+                if !restored.insert((cid, color)) {
+                    continue;
+                }
+                let target = self
+                    .mods
+                    .need_heart_modifiers
+                    .entry(cid)
+                    .or_default()
+                    .entry(color)
+                    .or_insert(ModifierEntry::default());
+                if entry.set != 0 && target.set == 0 {
+                    target.set = entry.set;
+                }
+                target.additive += entry.additive;
+            }
+        }
+    }
+
     /// Evaluate constant abilities on success zone cards for tracked bonuses
     /// (blade, heart, score). Does NOT touch need_heart_modifiers.
     /// Called from recalculate_constants on every state change, and from

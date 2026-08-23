@@ -1331,7 +1331,7 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
     // derivation (single source of truth shared with the JSON deep-compare path).
     let filter = build_filter(&ek);
     let kind = EffectKind::from_action(action.to_str(), filter).map(ek_box_new);
-    let mut effect = AbilityEffect {
+    let effect = AbilityEffect {
         text,
         action,
         source,
