@@ -11806,7 +11806,13 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
                     eff.pop("actions", None)
                     fix_stats["each_time"] += 1
 
-    # FIX 3: conditional_on_optional cleanup
+    # FIX 3: conditional_on_optional cleanup (LOAD-BEARING).
+    # The positive/negative renames have no current producer, but the
+    # sub-action "optional" strip is essential: handlers emit optional=True on
+    # the inner nodes (from 「〜してもよい」), yet within the
+    # conditional_on_optional container the optionality belongs to the
+    # container itself. Without this strip the engine would double-prompt.
+    # Verified 2026-08: removing changes 4 corpus abilities.
     if eff.get("action") == "conditional_on_optional":
         if "positive_action" in eff and "conditional_action" not in eff:
             eff["conditional_action"] = eff.pop("positive_action")
