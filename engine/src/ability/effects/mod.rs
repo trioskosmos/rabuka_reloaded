@@ -281,23 +281,11 @@ impl AbilityResolver {
                 Ok(())
             }
             ActionType::DiscardCard => {
-                let pp = self.player_prefix(gs);
-                let cn = gs
-                    .activating_card
-                    .and_then(|id| gs.card_database.get_card(id))
-                    .map(|c| c.name.to_string())
-                    .unwrap_or_default();
-                gs.push_rule_log(format!("{} {}: [[log_discard]]", pp, cn));
+                self.rule_log_activated(gs, "[[log_discard]]");
                 self.execute_move_cards(gs, effect)
             }
             ActionType::MoveCards => {
-                let pp = self.player_prefix(gs);
-                let cn = gs
-                    .activating_card
-                    .and_then(|id| gs.card_database.get_card(id))
-                    .map(|c| c.name.to_string())
-                    .unwrap_or_default();
-                gs.push_rule_log(format!("{} {}: [[log_move]]", pp, cn));
+                self.rule_log_activated(gs, "[[log_move]]");
                 self.execute_move_cards(gs, effect)
             }
             ActionType::GainResource => self.execute_gain_resource(gs, effect),
@@ -327,13 +315,7 @@ impl AbilityResolver {
             ActionType::PlayBatonTouch => self.execute_play_baton_touch(gs, effect),
             ActionType::Reveal => self.execute_reveal_effect(gs, effect),
             ActionType::Select => {
-                let pp = self.player_prefix(gs);
-                let cn = gs
-                    .activating_card
-                    .and_then(|id| gs.card_database.get_card(id))
-                    .map(|c| c.name.to_string())
-                    .unwrap_or_default();
-                gs.push_rule_log(format!("{} {}: [[log_select]]", pp, cn));
+                self.rule_log_activated(gs, "[[log_select]]");
                 self.execute_select_effect(gs, effect)
             }
             ActionType::SelectNumber => self.execute_select_number(gs, effect),

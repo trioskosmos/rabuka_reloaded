@@ -1470,6 +1470,45 @@ impl<'a> ConditionContext<'a> {
         ))
     }
 
+    /// Stage members eligible as "others" for greater-than-all comparisons:
+    /// non-empty slots matching `card_type`, minus `exclude_id`, optionally
+    /// including the opponent's stage. Shared by the heart and blade variants.
+    fn collect_other_stage_ids(
+        &self,
+        exclude_id: Option<i16>,
+        card_type: Option<&str>,
+        include_opponent: bool,
+    ) -> Vec<i16> {
+        let card_db = &self.game_state.card_database;
+        let mut ids: Vec<i16> = self
+            .resolve_condition_player("self")
+            .stage
+            .stage
+            .iter()
+            .filter(|&&cid| {
+                cid != -1
+                    && Some(cid) != exclude_id
+                    && util::card_matches_type(card_db, cid, card_type)
+            })
+            .copied()
+            .collect();
+        if include_opponent {
+            ids.extend(
+                self.resolve_condition_player("opponent")
+                    .stage
+                    .stage
+                    .iter()
+                    .filter(|&&cid| {
+                        cid != -1
+                            && Some(cid) != exclude_id
+                            && util::card_matches_type(card_db, cid, card_type)
+                    })
+                    .copied(),
+            );
+        }
+        ids
+    }
+
     fn evaluate_heart_greater_than_all(&self, condition: &Condition, is_both: bool) -> bool {
         let activating_id = match self.activating_card_id {
             Some(id) => id,
@@ -1481,52 +1520,17 @@ impl<'a> ConditionContext<'a> {
             return false;
         }
 
-        let card_db = &self.game_state.card_database;
-        let card_type = condition.get_card_type().map(|ct| ct.as_str());
+        // Note: the heart variant only drops the activator itself when the
+        // condition explicitly says exclude_self — the blade variant always
+        // excludes its reference member.
         let excl_self = condition.get_exclude_self().unwrap_or(false);
-
-        let self_player = self.resolve_condition_player("self");
-        let mut other_ids: Vec<i16> = self_player
-            .stage
-            .stage
-            .iter()
-            .filter(|&&cid| {
-                if cid == -1 {
-                    return false;
-                }
-                if excl_self && Some(cid) == self.activating_card_id {
-                    return false;
-                }
-                if !util::card_matches_type(card_db, cid, card_type) {
-                    return false;
-                }
-                true
-            })
-            .copied()
-            .collect();
-
-        if is_both {
-            let opp_player = self.resolve_condition_player("opponent");
-            let opp_ids: Vec<i16> = opp_player
-                .stage
-                .stage
-                .iter()
-                .filter(|&&cid| {
-                    if cid == -1 {
-                        return false;
-                    }
-                    if excl_self && Some(cid) == self.activating_card_id {
-                        return false;
-                    }
-                    if !util::card_matches_type(card_db, cid, card_type) {
-                        return false;
-                    }
-                    true
-                })
-                .copied()
-                .collect();
-            other_ids.extend(opp_ids);
-        }
+        let exclude_id = if excl_self {
+            self.activating_card_id
+        } else {
+            None
+        };
+        let other_ids =
+            self.collect_other_stage_ids(exclude_id, condition.get_card_type().map(|ct| ct.as_str()), is_both);
 
         if other_ids.is_empty() {
             return true;
@@ -1558,43 +1562,17 @@ impl<'a> ConditionContext<'a> {
         let reference_id = match self.selected_card_ids.last() {
             Some(&id) => id,
             None => return false,
-        };        let reference_blade = self
+        };
+        let reference_blade = self
             .game_state
             .card_database
             .get_card(reference_id)
             .map(|c| c.blade)
             .unwrap_or(0);
-        let card_db = &self.game_state.card_database;
-        let card_type = condition.get_card_type().map(|ct| ct.as_str());
 
-        let mut other_ids: Vec<i16> = self
-            .resolve_condition_player("self")
-            .stage
-            .stage
-            .iter()
-            .filter(|&&cid| {
-                cid != -1
-                    && cid != reference_id
-                    && util::card_matches_type(card_db, cid, card_type)
-            })
-            .copied()
-            .collect();
-
-        if is_both {
-            let opp_ids: Vec<i16> = self
-                .resolve_condition_player("opponent")
-                .stage
-                .stage
-                .iter()
-                .filter(|&&cid| {
-                    cid != -1
-                        && cid != reference_id
-                        && util::card_matches_type(card_db, cid, card_type)
-                })
-                .copied()
-                .collect();
-            other_ids.extend(opp_ids);
-        }
+        // The reference member itself is always excluded from the comparison.
+        let other_ids =
+            self.collect_other_stage_ids(Some(reference_id), condition.get_card_type().map(|ct| ct.as_str()), is_both);
 
         // No other members → the predicate is vacuously true.
         if other_ids.is_empty() {

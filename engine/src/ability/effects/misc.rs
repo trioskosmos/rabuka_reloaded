@@ -4053,8 +4053,20 @@ impl AbilityResolver {
             .push(format!("{} {}: [[log_shuffle]]", pp, act_name));
     }
 
-    pub(crate) fn player_prefix(&self, gs: &GameState) -> String {
-        if let Some(card_id) = gs.activating_card {
+    /// Log that an activated ability dispatched an action of `label`, as
+    /// "P1 <card name>: <label>". Shared by the DiscardCard/MoveCards/Select
+    /// dispatch arms in effects/mod.rs.
+    pub(crate) fn rule_log_activated(&self, gs: &mut GameState, label: &str) {
+        let pp = self.player_prefix(gs);
+        let cn = gs
+            .activating_card
+            .and_then(|id| gs.card_database.get_card(id))
+            .map(|c| c.name.to_string())
+            .unwrap_or_default();
+        gs.push_rule_log(format!("{} {}: {}", pp, cn, label));
+    }
+
+    pub(crate) fn player_prefix(&self, gs: &GameState) -> String {        if let Some(card_id) = gs.activating_card {
             if gs.player1.stage.stage.contains(&card_id)
                 || gs.player1.live_card_zone.cards.contains(&card_id)
                 || gs.player1.hand.cards.contains(&card_id)
