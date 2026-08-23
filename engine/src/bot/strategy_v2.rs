@@ -17,7 +17,8 @@
 //! Fairness: opponent info is public-only (stage, success count). Own deck
 //! composition is fair game — a real player knows their own list.
 
-use crate::card::{CardDatabase, CardType, HeartColor, HeartMap};
+use crate::bot::strategy_common as sc;
+use crate::card::{CardDatabase, CardType, HeartColor};
 use crate::game_setup::{self, Action};
 use crate::game_state::GameState;
 use crate::player::Player;
@@ -57,45 +58,6 @@ impl Clone for V2Policy {
 /// order (Heart00..Heart06, BAll, Draw, Score, All).
 type Acc = [i32; 11];
 
-fn hc_index(c: HeartColor) -> usize {
-    match c {
-        HeartColor::Heart00 => 0,
-        HeartColor::Heart01 => 1,
-        HeartColor::Heart02 => 2,
-        HeartColor::Heart03 => 3,
-        HeartColor::Heart04 => 4,
-        HeartColor::Heart05 => 5,
-        HeartColor::Heart06 => 6,
-        HeartColor::BAll => 7,
-        HeartColor::Draw => 8,
-        HeartColor::Score => 9,
-        HeartColor::All => 10,
-    }
-}
-
-fn acc_add(acc: &mut Acc, hearts: &HeartMap) {
-    for (c, v) in hearts.iter() {
-        acc[hc_index(*c)] += *v as i32;
-    }
-}
-
-/// Sum of stage members' base hearts (all members; wait state only affects
-/// blades per Q133).
-fn stage_hearts(p: &Player, db: &CardDatabase) -> Acc {
-    let mut acc = [0i32; 11];
-    for &cid in p.stage.stage.iter() {
-        if cid < 0 {
-            continue;
-        }
-        if let Some(card) = db.get_card(cid) {
-            if let Some(bh) = &card.base_heart {
-                acc_add(&mut acc, &bh.hearts);
-            }
-        }
-    }
-    acc
-}
-
 /// Active-member blade count for yell flips (Q133: waited members don't yell).
 fn yell_flips(gs: &GameState, p: &Player, db: &CardDatabase) -> usize {
     p.stage
@@ -120,31 +82,6 @@ impl McRng {
     }
 }
 
-/// Rule-faithful satisfaction check.
-/// - Specific colors (Heart01-06) must be met exactly; `All` supply and
-///   `BAll` blade-hearts are wildcards for specific colors.
-/// - `Heart00` requirement is the "any color" total bucket (rule 2.1.1.2 /
-///   2.11.3): filled by colorless hearts and any leftover hearts.
-/// - Draw/Score icons are not heart requirements.
-fn requirements_met(have: &Acc, need: &Acc) -> bool {
-    let mut wildcard = have[10] + have[7]; // All + BAll
-    let mut specific_surplus = 0i32;
-    for c in 1..=6 {
-        let deficit = need[c] - have[c];
-        if deficit > 0 {
-            wildcard -= deficit;
-            if wildcard < 0 {
-                return false;
-            }
-        } else {
-            specific_surplus += -deficit;
-        }
-    }
-    // Heart00 bucket: colorless hearts, plus any leftover specific/wild hearts.
-    let leftover = specific_surplus + wildcard.max(0) + have[0];
-    leftover >= need[0]
-}
-
 /// Monte Carlo pass probability: sample `flips` cards from the known
 /// remaining deck and check whether own hearts + flipped blade-hearts
 /// satisfy the combined requirements of the candidate lives.
@@ -158,7 +95,7 @@ fn pass_probability(
     rng: &mut McRng,
 ) -> f64 {
     if flips == 0 || deck.is_empty() {
-        return if requirements_met(own, need) { 1.0 } else { 0.0 };
+        return if sc::requirements_met(own, need) { 1.0 } else { 0.0 };
     }
     // Pre-extract blade-heart maps for deck cards (most have none).
     let pool: Vec<Option<Acc>> = deck
@@ -167,7 +104,7 @@ fn pass_probability(
             db.get_card(cid).and_then(|c| c.blade_heart.as_ref()).map(
                 |bh| {
                     let mut a = [0i32; 11];
-                    acc_add(&mut a, &bh.hearts);
+                    sc::acc_add(&mut a, &bh.hearts);
                     a
                 },
             )
@@ -193,7 +130,7 @@ fn pass_probability(
         for k in 0..11 {
             total[k] = own[k] + flipped[k];
         }
-        if requirements_met(&total, need) {
+        if sc::requirements_met(&total, need) {
             hits += 1;
         }
     }
@@ -215,7 +152,7 @@ fn hand_live_candidates(p: &Player, db: &CardDatabase) -> Vec<LiveCandidate> {
             }
             let mut need = [0i32; 11];
             if let Some(nh) = &card.need_heart {
-                acc_add(&mut need, &nh.hearts);
+                sc::acc_add(&mut need, &nh.hearts);
             }
             out.push(LiveCandidate {
                 hand_index,
@@ -243,15 +180,10 @@ pub fn choose_live_set_action_v2(
     let my_success = me.success_live_card_zone.cards.len();
     let opp_success = opp.success_live_card_zone.cards.len();
 
-    let my_hearts = stage_hearts(me, db);
+    let my_hearts = sc::stage_base_hearts(me, db);
     let my_flips = yell_flips(gs, me, db);
 
     let candidates = hand_live_candidates(me, db);
-    let selected: Vec<usize> = gs
-        .live_card_selected_indices
-        .iter()
-        .map(|&i| i as usize)
-        .collect();
 
     // Plan: minimal subset of lives meeting a (target, threshold) rung of
     // the ladder; first rung that yields a feasible plan wins.
@@ -379,43 +311,7 @@ pub fn choose_live_set_action_v2(
 
     // Emit one action: select the first desired-not-selected, else deselect
     // anything selected-but-not-desired, else confirm.
-    let find_select = |hand_index: usize| -> Option<Action> {
-        actions
-            .iter()
-            .find(|a| {
-                a.action_type == game_setup::ActionType::SelectLiveCard
-                    && a.selected == Some(false)
-                    && a.parameters
-                        .as_ref()
-                        .and_then(|p| p.card_index)
-                        == Some(hand_index)
-            })
-            .cloned()
-    };
-    for &hi in &desired {
-        if !selected.contains(&hi) {
-            if let Some(a) = find_select(hi) {
-                return a;
-            }
-        }
-    }
-    for &hi in &selected {
-        if !desired.contains(&hi) {
-            if let Some(a) = actions.iter().find(|a| {
-                a.action_type == game_setup::ActionType::SelectLiveCard
-                    && a.selected == Some(true)
-                    && a.parameters.as_ref().and_then(|p| p.card_index) == Some(hi)
-            }) {
-                return a.clone();
-            }
-        }
-    }
-    actions
-        .iter()
-        .find(|a| a.action_type == game_setup::ActionType::ConfirmLiveCardSet)
-        .or_else(|| actions.first())
-        .cloned()
-        .expect("live set actions non-empty")
+    sc::emit_live_set(gs, actions, &desired)
 }
 
 /// V2 mulligan policy (S7 — curve completion, per the play guides):
@@ -482,44 +378,7 @@ pub fn choose_mulligan_action_v2(
         }
     }
 
-    let selected: Vec<usize> = gs
-        .mulligan_selected_indices
-        .iter()
-        .map(|&i| i as usize)
-        .collect();
-    for &hi in &discard {
-        if !selected.contains(&hi) {
-            if let Some(a) = actions.iter().find(|a| {
-                a.action_type == game_setup::ActionType::SelectMulligan
-                    && a.selected == Some(false)
-                    && a.parameters.as_ref().and_then(|p| p.card_index) == Some(hi)
-            }) {
-                return a.clone();
-            }
-        }
-    }
-    for &hi in &selected {
-        if !discard.contains(&hi) {
-            if let Some(a) = actions.iter().find(|a| {
-                a.action_type == game_setup::ActionType::SelectMulligan
-                    && a.selected == Some(true)
-                    && a.parameters.as_ref().and_then(|p| p.card_index) == Some(hi)
-            }) {
-                return a.clone();
-            }
-        }
-    }
-    actions
-        .iter()
-        .find(|a| {
-            matches!(
-                a.action_type,
-                game_setup::ActionType::ConfirmMulligan | game_setup::ActionType::SkipMulligan
-            )
-        })
-        .or_else(|| actions.first())
-        .cloned()
-        .expect("mulligan actions non-empty")
+    sc::emit_mulligan(gs, actions, &discard)
 }
 
 /// V2 main-phase evaluation: v1's heuristic with three adjustments.
@@ -563,7 +422,7 @@ pub fn evaluate_state_v2(gs: &GameState, me: u8, w: &crate::bot::strategy::Strat
             if matches!(card.card_type, CardType::Live) {
                 if let Some(nh) = &card.need_heart {
                     for (c, v) in nh.hearts.iter() {
-                        let idx = hc_index(*c);
+                        let idx = sc::hc_index(*c);
                         if idx < 7 {
                             need_by_color[idx] += *v as i32;
                         }
@@ -573,7 +432,7 @@ pub fn evaluate_state_v2(gs: &GameState, me: u8, w: &crate::bot::strategy::Strat
         }
     }
     if need_by_color.iter().sum::<i32>() > 0 {
-        let have = stage_hearts(my, db);
+        let have = sc::stage_base_hearts(my, db);
         let covered = (0..7)
             .map(|i| have[i].min(need_by_color[i]))
             .sum::<i32>()

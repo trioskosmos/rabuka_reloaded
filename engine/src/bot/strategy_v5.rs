@@ -11,7 +11,7 @@
 
 use crate::bot::strategy_v4::{alloc, flip_stats, hand_lives, heart_pool};
 use crate::card::{CardDatabase, CardType};
-use crate::game_setup::{self, Action};
+use crate::game_setup::Action;
 use crate::game_state::{GameState, Phase};
 
 /// P(Bin(n, p) >= k), exact for small n (blade counts stay ≤ ~20).
@@ -405,41 +405,7 @@ pub(crate) fn nearest_miss_life(gs: &GameState, me: u8, db: &CardDatabase) -> Op
 }
 
 pub(crate) fn emit(gs: &GameState, actions: &[Action], desired: &[usize]) -> Action {
-    let selected: Vec<usize> = gs
-        .live_card_selected_indices
-        .iter()
-        .map(|&i| i as usize)
-        .collect();
-    let find = |hi: usize, want: bool| -> Option<Action> {
-        actions
-            .iter()
-            .find(|a| {
-                a.action_type == game_setup::ActionType::SelectLiveCard
-                    && a.selected == Some(want)
-                    && a.parameters.as_ref().and_then(|p| p.card_index) == Some(hi)
-            })
-            .cloned()
-    };
-    for &hi in desired {
-        if !selected.contains(&hi) {
-            if let Some(a) = find(hi, false) {
-                return a;
-            }
-        }
-    }
-    for &hi in &selected {
-        if !desired.contains(&hi) {
-            if let Some(a) = find(hi, true) {
-                return a;
-            }
-        }
-    }
-    actions
-        .iter()
-        .find(|a| a.action_type == game_setup::ActionType::ConfirmLiveCardSet)
-        .or_else(|| actions.first())
-        .cloned()
-        .expect("live set actions non-empty")
+    crate::bot::strategy_common::emit_live_set(gs, actions, desired)
 }
 
 pub fn choose_mulligan_v5(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {

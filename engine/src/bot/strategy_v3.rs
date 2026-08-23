@@ -618,12 +618,7 @@ fn allocate_life(pool: &mut HeartAcc, need: &HeartAcc) -> bool {
 }
 
 fn confirm_live_set(actions: &[Action]) -> Action {
-    actions
-        .iter()
-        .find(|a| a.action_type == game_setup::ActionType::ConfirmLiveCardSet)
-        .or_else(|| actions.first())
-        .cloned()
-        .expect("live set actions non-empty")
+    crate::bot::strategy_common::confirm_live_set(actions)
 }
 
 /// How many heart icons short `pool` is of satisfying `need` (rough, for

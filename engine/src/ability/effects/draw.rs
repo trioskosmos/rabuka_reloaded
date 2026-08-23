@@ -360,6 +360,11 @@ impl AbilityResolver {
 
         let activating_id = gs.activating_card;
         let orientation_modifiers = gs.mods.orientation_modifiers.clone();
+        // Snapshot of members put to wait BY THIS COST (cleared/rebuilt on
+        // every cost payment). 「これにより…ウェイト状態にしたメンバー1人につき」
+        // must count these — not every member that happens to already be
+        // waited on stage.
+        let cost_waited_members = gs.last_cost_waited_members.clone();
         let (recently_moved_snapshot, entry_trigger_snapshot, last_discard_count) = (
             gs.recently_moved_cards.clone(),
             gs.entry_trigger_moved_cards(),
@@ -381,13 +386,24 @@ impl AbilityResolver {
                 );
                 discard_count / per_unit_count.max(1)
             } else {
-                let multiplier = util::calculate_per_unit_multiplier(
-                    per_unit,
-                    per_unit_type,
-                    player,
-                    &orientation_modifiers,
-                    effect.state_any().as_deref(),
-                );
+                // 「これにより」scoping: the draw is per member newly waited
+                // by this ability's own cost, so the tracked list replaces
+                // the whole-stage wait scan. Effects without これにより (e.g.
+                // 「ウェイト状態のメンバー1人につき…」) keep counting all
+                // currently-waited members.
+                let multiplier = if effect.text.contains("これにより")
+                    && effect.state_any().as_deref() == Some("wait")
+                {
+                    cost_waited_members.len() as u8
+                } else {
+                    util::calculate_per_unit_multiplier(
+                        per_unit,
+                        per_unit_type,
+                        player,
+                        &orientation_modifiers,
+                        effect.state_any().as_deref(),
+                    )
+                };
                 multiplier * per_unit_count
             };
             count * matching_count

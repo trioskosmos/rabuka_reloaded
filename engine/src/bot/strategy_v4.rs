@@ -487,41 +487,7 @@ pub fn choose_live_set_v4(gs: &GameState, actions: &[Action], db: &CardDatabase)
     }
 
     // Emit toward `desired`.
-    let selected: Vec<usize> = gs
-        .live_card_selected_indices
-        .iter()
-        .map(|&i| i as usize)
-        .collect();
-    let find = |hi: usize, want: bool| -> Option<Action> {
-        actions
-            .iter()
-            .find(|a| {
-                a.action_type == game_setup::ActionType::SelectLiveCard
-                    && a.selected == Some(want)
-                    && a.parameters.as_ref().and_then(|p| p.card_index) == Some(hi)
-            })
-            .cloned()
-    };
-    for &hi in &desired {
-        if !selected.contains(&hi) {
-            if let Some(a) = find(hi, false) {
-                return a;
-            }
-        }
-    }
-    for &hi in &selected {
-        if !desired.contains(&hi) {
-            if let Some(a) = find(hi, true) {
-                return a;
-            }
-        }
-    }
-    actions
-        .iter()
-        .find(|a| a.action_type == game_setup::ActionType::ConfirmLiveCardSet)
-        .or_else(|| actions.first())
-        .cloned()
-        .expect("live set actions non-empty")
+    crate::bot::strategy_common::emit_live_set(gs, actions, &desired)
 }
 
 // ── Mulligan: keep all lives, dump expensive non-lives ──────────────────

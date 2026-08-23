@@ -7,6 +7,7 @@ pub mod neural;
 pub mod observation;
 pub mod rollout;
 pub mod strategy;
+pub mod strategy_common;
 pub mod strategy_v2;
 pub mod strategy_v3;
 pub mod strategy_v4;

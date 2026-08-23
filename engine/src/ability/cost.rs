@@ -509,6 +509,10 @@ let source = cost.source_str().unwrap_or("");
         gs: &mut GameState,
         cost: &AbilityEffect,
     ) -> Result<(), String> {
+        // 「これにより…したメンバー1人につき」 effects read this list right
+        // after their own cost resolves; starting a new cost payment always
+        // resets it so a previous ability's waits can never leak in.
+        gs.last_cost_waited_members.clear();
         let state_change_binding = cost.state_change_any();
         let state_change = state_change_binding.unwrap_or("");
         let target = cost.target.as_deref().unwrap_or("self");
@@ -598,6 +602,7 @@ let source = cost.source_str().unwrap_or("");
                     );
                     gs.mods.add_orientation_modifier(card_id, "wait");
                     gs.last_cost_wait_member = Some(card_id);
+                    gs.last_cost_waited_members.push(card_id);
                 }
             } else {
                 let desc_ja = format!("ウェイトにするステージメンバーを{}体選択", count);
@@ -990,6 +995,10 @@ let source = cost.source_str().unwrap_or("");
         gs: &mut GameState,
         selected: &str,
     ) -> Result<(), String> {
+        // Fresh cost-payment attempt: reset the by-this-cost wait tracking
+        // (see pay_cost_change_state). A skip leaves the list empty so the
+        // following effect draws nothing.
+        gs.last_cost_waited_members.clear();
         if selected == "skip_optional_cost" || selected == "0" {
             self.pending_choice = None;
             self.pending_energy_payment = None;
@@ -1124,6 +1133,7 @@ let source = cost.source_str().unwrap_or("");
                             if state_change == "wait" {
                                 gs.mods.add_orientation_modifier(card_id, "wait");
                                 gs.last_cost_wait_member = Some(card_id);
+                                gs.last_cost_waited_members.push(card_id);
                             } else if state_change == "rest" || state_change == "rested" {
                                 gs.mods.add_orientation_modifier(card_id, "rest");
                             }

@@ -236,12 +236,7 @@ pub fn choose_live_set_action(
 
     match best_select {
         Some((i, _)) if selected_count < 3 => actions[i].clone(),
-        _ => actions
-            .iter()
-            .find(|a| a.action_type == game_setup::ActionType::ConfirmLiveCardSet)
-            .or_else(|| actions.first())
-            .cloned()
-            .expect("live set actions non-empty"),
+        _ => crate::bot::strategy_common::confirm_live_set(actions),
     }
 }
 

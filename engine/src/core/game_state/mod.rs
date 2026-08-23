@@ -219,6 +219,11 @@ pub struct GameState {
     pub effect_creation_counter: u8,
     pub last_state_change_wait_to_active_count: u8,
     pub last_cost_wait_member: Option<i16>,
+    /// All members put to wait by the cost currently being paid. Cleared at
+    /// the start of each cost payment; consumed by 「これにより…ウェイト状態に
+    /// したメンバー1人につき」 effects, which must count only members newly
+    /// waited BY THIS COST, not members that were already waited beforehand.
+    pub last_cost_waited_members: Vec<i16>,
     pub player1_rps_choice: Option<u8>,
     pub player2_rps_choice: Option<u8>,
     pub baton_touch_replaced_member_cost: Option<u8>,
@@ -474,6 +479,7 @@ impl GameState {
             effect_creation_counter: 0,
             last_state_change_wait_to_active_count: 0,
         last_cost_wait_member: None,
+            last_cost_waited_members: Vec::new(),
             player1_rps_choice: None,
             player2_rps_choice: None,
             baton_touch_replaced_member_cost: None,
