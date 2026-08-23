@@ -1,24 +1,24 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T22:08:51.560694+00:00",
+  "generated_at": "2026-08-23T22:54:04.152600+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 436,
-  "n_tests": 2658,
+  "n_files": 437,
+  "n_tests": 2662,
   "total_cards": 771,
-  "covered_cards": 632,
-  "abilities_on_covered": 795,
+  "covered_cards": 635,
+  "abilities_on_covered": 798,
   "trigger_counts": {
     "起動": [
       83,
       96
     ],
     "登場": [
-      219,
+      220,
       269
     ],
     "ライブ開始時": [
@@ -34,7 +34,7 @@
       122
     ],
     "常時": [
-      111,
+      113,
       117
     ],
     "自動": [
@@ -52,7 +52,7 @@
       71
     ],
     "gain_resource": [
-      141,
+      143,
       160
     ],
     "sequential": [
@@ -104,7 +104,7 @@
       2
     ],
     "modify_score": [
-      68,
+      69,
       73
     ],
     "conditional_alternative": [
@@ -198,7 +198,7 @@
       88
     ],
     "location_condition": [
-      62,
+      64,
       73
     ],
     "movement:baton_touch": [
@@ -210,7 +210,7 @@
       2
     ],
     "group_condition": [
-      36,
+      37,
       44
     ],
     "or_condition": [
@@ -260,7 +260,7 @@
       58
     ],
     "PR": [
-      42,
+      43,
       52
     ],
     "bp1": [
@@ -284,11 +284,11 @@
       134
     ],
     "bp6": [
-      66,
+      67,
       82
     ],
     "bp7": [
-      95,
+      96,
       111
     ],
     "pb1": [
@@ -310,10 +310,10 @@
   },
   "depth_counts": {
     "L2+choice": 593,
-    "none": 141,
+    "none": 138,
     "L1+choice": 137,
     "L2": 24,
-    "L1": 41
+    "L1": 44
   },
   "qa_rulings": {
     "covered": 272,
@@ -412,6 +412,7 @@
         "engine/tests/test_modules/sayaka_test.rs",
         "engine/tests/test_modules/setsuna_test.rs",
         "engine/tests/test_modules/sunny_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch17_test.rs",
         "engine/tests/test_modules/untested_abilities_batch4_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
@@ -441,16 +442,16 @@
         "bouken_gain_ability_draws_on_live_success",
         "bouken_gain_ability_no_draw_on_failed_live",
         "bouken_three_options",
+        "bp6009_center_side_blade2_members_live_total_plus1",
+        "bp7024_debut_heart01_with_three_r3birth",
+        "bp7024_debut_no_heart01_with_two_r3birth",
         "center_mus_with_2_heart03_reduces_1",
         "center_mus_zero_heart03_no_reduction",
         "center_non_mus_no_reduction",
         "choice_condition_shows_proper_labels_in_actions",
-        "cutie_panther_live_start_reduce_hearts",
-        "dia_choose_blade",
-        "dia_position_change_no_saintsnow_skips_gracefully",
-        "dia_position_change_saintsnow_source_any_destination"
+        "cutie_panther_live_start_reduce_hearts"
       ],
-      "covering_test_count": 393,
+      "covering_test_count": 397,
       "is_null": false
     },
     {
@@ -21852,14 +21853,21 @@
         "PL!-bp6-009-P"
       ],
       "base": "PL!-bp6-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch17_test.rs"
+      ],
+      "covering_tests": [
+        "bp6009_center_side_blade2_members_live_total_plus1",
+        "bp7024_debut_heart01_with_three_r3birth",
+        "bp7024_debut_no_heart01_with_two_r3birth",
+        "spr022_constant_hearts_at_six_combined_members"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -25397,11 +25405,15 @@
         "engine/tests/test_modules/ginko_baton_touch_hasu_search_test.rs",
         "engine/tests/test_modules/qa_new_tests256.rs",
         "engine/tests/test_modules/qa_new_tests257.rs",
-        "engine/tests/test_modules/sunny_test.rs"
+        "engine/tests/test_modules/sunny_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch17_test.rs"
       ],
       "covering_tests": [
         "baton_touch_cleared_between_actions",
         "baton_touch_search_adds_hasu_live_to_hand",
+        "bp6009_center_side_blade2_members_live_total_plus1",
+        "bp7024_debut_heart01_with_three_r3birth",
+        "bp7024_debut_no_heart01_with_two_r3birth",
         "empty_waitroom_resolves_cleanly",
         "equal_cost_replaced_no_trigger",
         "hanaho_baton_touch_low_cost_no_trigger",
@@ -25426,12 +25438,9 @@
         "q266_cost_b0_waits_nothing_incl_blade0",
         "q266_cost_b1_waits_nothing",
         "q266_cost_b2_waits_blade0_not_blade1",
-        "q266_cost_b4_waits_blade2_not_blade3",
-        "q266_skip_cost_waits_nothing",
-        "serasu_double_trigger_regression",
-        "serasu_edelnote_appears_fires_once"
+        "q266_cost_b4_waits_blade2_not_blade3"
       ],
-      "covering_test_count": 57,
+      "covering_test_count": 61,
       "is_null": false
     },
     {
@@ -26237,14 +26246,21 @@
         "PL!SP-PR-022-PR"
       ],
       "base": "PL!SP-PR-022",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch17_test.rs"
+      ],
+      "covering_tests": [
+        "bp6009_center_side_blade2_members_live_total_plus1",
+        "bp7024_debut_heart01_with_three_r3birth",
+        "bp7024_debut_no_heart01_with_two_r3birth",
+        "spr022_constant_hearts_at_six_combined_members"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -39080,14 +39096,21 @@
         "PL!N-bp7-024-N"
       ],
       "base": "PL!N-bp7-024",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch17_test.rs"
+      ],
+      "covering_tests": [
+        "bp6009_center_side_blade2_members_live_total_plus1",
+        "bp7024_debut_heart01_with_three_r3birth",
+        "bp7024_debut_no_heart01_with_two_r3birth",
+        "spr022_constant_hearts_at_six_combined_members"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {

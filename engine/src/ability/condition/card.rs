@@ -1605,6 +1605,22 @@ impl<'a> ConditionContext<'a> {
         if !condition.get_original_value().unwrap_or(false) {
             return true;
         }
+        // Explicit per-card blade limit (「元々のブレードの数がNつ」): compare
+        // the card's printed blade against blade_limit. This must run for
+        // members too — the early return below only covers conditions whose
+        // threshold rides on count/operator (heart-style comparisons).
+        if let Some(limit) = condition.get_blade_limit() {
+            let op = condition
+                .get_blade_limit_operator()
+                .map(|o| o.as_str());
+            let card_blade = self
+                .game_state
+                .card_database
+                .get_card(card_id)
+                .map(|c| c.blade)
+                .unwrap_or(0);
+            return compare_counts(op, card_blade, limit);
+        }
         // For member cards, check_original_heart_filter handles the comparison
         if let Some(card) = self.game_state.card_database.get_card(card_id) {
             if card.is_member() {
@@ -2682,6 +2698,29 @@ impl<'a> ConditionContext<'a> {
             });
         let group_names: Option<&[String]> = group_names_owned.as_deref();
         let hc: &[String] = condition.get_heart_colors().unwrap_or(&[]);
+
+        // Cross-position pair requirement (e.g. bp6-009-R: 「右サイドエリアと
+        // 左サイドエリアに、元々のブレードの数が2つのメンバーがいるかぎり」):
+        // when position AND position_compare are both set, EACH named area
+        // must hold a member matching the per-card filters (blade limit etc.).
+        if let (Some(pos), Some(pos_cmp)) = (
+            condition.get_position().and_then(|p| p.get_position()),
+            condition.get_position_compare(),
+        ) {
+            return [pos, pos_cmp].iter().all(|slot| {
+                util::card_at_position(player, slot)
+                    .map(|cid| {
+                        card_db.get_card(cid).is_some_and(|c| {
+                            c.is_member()
+                                && condition
+                                    .get_blade_limit()
+                                    .map(|lim| c.blade == lim)
+                                    .unwrap_or(true)
+                        })
+                    })
+                    .unwrap_or(false)
+            });
+        }
 
         // Early-out for aggregate total (sum heart colors, not count cards)
         if let Some(res) = self.check_aggregate_total(condition, player, location) {

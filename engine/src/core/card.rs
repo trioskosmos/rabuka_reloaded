@@ -2743,10 +2743,14 @@ pub struct ConditionCommon {
     pub all: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub all_areas: Option<bool>,
-    #[cfg_attr(feature = "serde_support", serde(default))]
-    pub baton_touch_trigger: Option<bool>,
-    #[cfg_attr(feature = "serde_support", serde(default))]
-    pub blade_greater_than_all: Option<bool>,
+#[cfg_attr(feature = "serde_support", serde(default))]
+pub baton_touch_trigger: Option<bool>,
+#[cfg_attr(feature = "serde_support", serde(default))]
+pub blade_limit: Option<u8>,
+#[cfg_attr(feature = "serde_support", serde(default))]
+pub blade_limit_operator: Option<Operator>,
+#[cfg_attr(feature = "serde_support", serde(default))]
+pub blade_greater_than_all: Option<bool>,
     pub cache: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub card_property: Option<CardProperty>,
@@ -3278,6 +3282,14 @@ impl Condition {
 
     pub fn get_cost_limit(&self) -> Option<u8> {
         self.common().and_then(|c| c.cost_limit)
+    }
+
+    pub fn get_blade_limit(&self) -> Option<u8> {
+        self.common().and_then(|c| c.blade_limit)
+    }
+
+    pub fn get_blade_limit_operator(&self) -> Option<Operator> {
+        self.common().and_then(|c| c.blade_limit_operator)
     }
 
     pub fn get_cost_limit_operator(&self) -> Option<Operator> {
