@@ -542,6 +542,12 @@ def main():
         action="store_true",
         help="Rewrite validation_baseline.json with current issue counts",
     )
+    ap.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Extract and validate WITHOUT writing abilities.json or "
+        "regenerating bytecode/decoders (for CI round-trip checks)",
+    )
     args = ap.parse_args()
 
     test_parsing()
@@ -563,10 +569,13 @@ def main():
 
     result = process_abilities(result)
 
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
+    if not args.validate_only:
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
 
-    print(f"Output written to {output_file}")
+        print(f"Output written to {output_file}")
+    else:
+        print("--validate-only: abilities.json left untouched.")
 
     # Run basic validation: check for known gap patterns
     semantic_issues = _validate_semantic(result["unique_abilities"])
@@ -612,6 +621,9 @@ def main():
                 print(f"  {rule}: {base} -> {now}")
             print("Consider refreshing the baseline with --update-baseline.")
         print("--check passed: no validation regressions.")
+
+    if args.validate_only:
+        return
 
     # Auto-regenerate bytecode so abilities_gen.rs stays in sync
     import subprocess, sys

@@ -35,11 +35,9 @@ jobs:
           python cards/test_inventory.py --check
           echo "Coverage inventory is up-to-date."
 
-      - name: Validate parser still round-trips
+      - name: Validate parser round-trip against baseline
         run: |
-          if [ -f "cards/ability_extraction/extract_card_abilities.py" ]; then
-            python cards/ability_extraction/extract_card_abilities.py --validate-only || echo "Parser validation skipped (known gaps)"
-          fi
+          python cards/ability_extraction/extract_card_abilities.py --validate-only --check
 
       - name: Summary
         run: |

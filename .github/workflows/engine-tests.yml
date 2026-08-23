@@ -1,0 +1,42 @@
+name: Engine Tests
+
+on:
+  push:
+    paths:
+      - 'engine/**'
+      - 'cards/abilities.json'
+      - 'cards/cards.json'
+      - 'cards/compile_abilities.py'
+      - '.github/workflows/engine-tests.yml'
+  pull_request:
+    paths:
+      - 'engine/**'
+      - 'cards/abilities.json'
+      - 'cards/cards.json'
+      - 'cards/compile_abilities.py'
+      - '.github/workflows/engine-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  engine-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            engine/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('engine/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Run engine test suite
+        working-directory: engine
+        run: cargo test --test run_all --locked
