@@ -17,6 +17,9 @@ Unified roadmap merging the original engine audit, `docs/CASTING_AUDIT.md` (~1,0
 | 9 | game_state `include!()` splices → real child modules with own imports | core/game_state/{tracking,modifiers,abilities}.rs |
 | 10 | Post-movement TriggerEvent snapshot deduped into 2 helpers (11 copies, −110 lines) | abilities.rs, choice.rs, misc.rs |
 | 11 | Distinct-count eligibility gate unified; `modified_cost()` helper replaces 3 formula copies | condition/card.rs |
+| 12 | **A1** `max_distinct_names`: exact bitmask DP w/ domination pruning replaces exponential DFS + undercounting greedy; greedy only as >128-name safety net; brute-force cross-validation test (2000 cases) | util.rs + tests/test_modules/max_distinct_names_test.rs |
+| 13 | **A2** web_server mutex poisoning recovered (LockRecoverExt) instead of unwrap-cascade; 52 sites converted | game/web_server.rs, main.rs |
+| 14 | **A3** single shared no_std-safe `Lcg` in rng.rs — six identical binary-local copies deleted | rng.rs, src/bin/* |
 
 ---
 
@@ -99,8 +102,16 @@ Non-conforming steps get skipped and logged in the plan's "Deferred" section, no
 
 ---
 
-## Execution order
+## Execution order (rev 3 — impact-first)
 
-A1 → A2 → A3+A2(D2 partially) → A5 → B1 → B4 → B3 → B2 → C1 → C3 → C2 → D1 → D4 → E1..E5 → D3 last (bot consolidation benefits from stable API after B2's CardId).
+**C1 → C3 → C2 → B1 → B4 → B3 → B2 → A4 → A5 → D1 → D4 → E1..E5 → D2 → D3**
 
-Rationale: A-tier is small and correctness-flavored; B builds the type foundation that makes C/D diffs mechanical; E is independent of the engine and can interleave anytime a Rust item is blocked.
+Rationale: C1 (`execute_gain_resource`) is the highest-value item left — a 1,162-line god function with 17 duplicated JA/EN string comparisons; splitting it eliminates an entire divergence bug class. C-tier god-function surgery comes before B's type-system work because the split is easier while the function is still in one piece to read. A5/D2/D3 are bookkeeping and go last. The Python track (E) is independent and can interleave anytime.
+
+### C1 progress notes
+Full body read (misc.rs:740-1902). Split plan, each step test-gated:
+1. `ResourceKind` enum derived once from the resource string; replaces 17 ad-hoc `"blade"|"ブレード"|"heart"|"ハート"` comparisons.
+2. Extract target-resolution block (~330 lines: blade_targets/heart_targets/heart_color/final_count) into `resolve_gain_resource_targets()` returning a `GainTargets` struct; shared params bundled into a context struct.
+3. Extract target_count pre-choice pass (~140 lines) into `try_create_target_selection_choice()`.
+4. Extract blade application (~120 lines) → `apply_blade_resource()`.
+5. Extract heart application (~140 lines) → `apply_heart_resource()`.

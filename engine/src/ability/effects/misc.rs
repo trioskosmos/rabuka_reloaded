@@ -17,6 +17,35 @@ use smallvec::SmallVec;
 #[cfg(not(feature = "no_std"))]
 use std::borrow::Cow;
 
+/// Normalized resource kind for gain_resource effects. Card data spells the
+/// resource in English or Japanese; matching raw strings ad hoc at every use
+/// site is how EN/JA divergence bugs happen. Normalize once, match on this.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResourceKind {
+    Blade,
+    Heart,
+    /// Any other resource string (surplus_heart, etc.).
+    Other,
+}
+
+impl ResourceKind {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "blade" | "ブレード" => ResourceKind::Blade,
+            "heart" | "ハート" => ResourceKind::Heart,
+            _ => ResourceKind::Other,
+        }
+    }
+}
+
+/// Target sets resolved by [`AbilityResolver::resolve_gain_resource_targets`].
+struct GainTargets {
+    blade_targets: SmallVec<[i16; 8]>,
+    heart_targets: Vec<i16>,
+    heart_color_str: Option<String>,
+    final_count: u8,
+}
+
 impl AbilityResolver {
     pub(crate) fn execute_reveal_effect(
         &mut self,
@@ -741,8 +770,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
-    ) -> Result<(), String> {
-        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
+    ) -> Result<(), String> {        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!("[GR_ENTER] resource={:?} count={:?} target_count={:?} source={:?} card_type={:?} target={:?} exclude_self={:?} target_from_sel={:?}",
                 effect.resource_any(), effect.count_any(), effect.target_count_any(), effect.source_any(), effect.card_type_any(), effect.target_any(), effect.exclude_self_any(), effect.target_from_selection_any());
         }
@@ -766,6 +794,10 @@ impl AbilityResolver {
             return Ok(());
         }
         let resource = effect.resource_any().as_deref().unwrap_or("").to_string();
+        // Normalize once — card data spells resources in EN or JA; ad-hoc
+        // string matching scattered through this function is how the two
+        // spellings drift apart.
+        let kind = ResourceKind::from_str(&resource);
         let count = effect
             .resource_icon_count_any()
             .unwrap_or(effect.count_or(1));
@@ -828,7 +860,7 @@ impl AbilityResolver {
                 });
         let single_fixed_heart = if let Some(chosen) = existing_choice {
             Some(chosen)
-        } else if per_unit && resource == "heart" {
+        } else if per_unit && kind == ResourceKind::Heart {
             gs.ability_queue
                 .current_entry()
                 .and_then(|e| match &e.conditional_choice {
@@ -852,7 +884,7 @@ impl AbilityResolver {
                 return Ok(());
             }
             result.or_else(|| {
-                if resource == "heart" || resource == "ハート" {
+                if kind == ResourceKind::Heart {
                     gs.ability_queue
                         .current_entry()
                         .and_then(|e| match &e.conditional_choice {
@@ -923,143 +955,22 @@ impl AbilityResolver {
             None
         };
 
-        if effect.target_count_any().is_some()
-            && !is_self_target
-            && (selected_for_current.is_empty() || effect.distinct_any().is_some())
-            && !per_unit
-            && (resource == "blade"
-                || resource == "ブレード"
-                || resource == "heart"
-                || resource == "ハート")
-        {
-            let stage_ids: Vec<i16> = {
-                let p = gs.resolve_target_player(&target);
-                p.stage
-                    .stage
-                    .iter()
-                    .copied()
-                    .filter(|&id| id != -1)
-                    .collect()
-            };
-            let mut prelim_filter = effect.filter_subset();
-            prelim_filter.exclude_self = exclude_self_id;
-            let exclude_names: Vec<String> = effect
-                .exclude_by_name_source_any()
-                .as_deref()
-                .filter(|&s| s == "preceding_moved")
-                .and_then(|_| preceding_moved.as_ref())
-                .map(|moved| {
-                    moved
-                        .iter()
-                        .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
-                        .collect()
-                })
-                .unwrap_or_default();
-            if !exclude_names.is_empty() {
-                prelim_filter.exclude_names = Some(&exclude_names);
-            }
-            let choice_exclude = if (effect.target_count_any().is_some()
-                || effect.distinct_any().is_some())
-                && !all_selected.is_empty()
-            {
-                Some(all_selected.as_slice())
-            } else {
-                None
-            };
-            let mut candidates = util::matching_ids_filtered(
-                &stage_ids,
-                &card_db,
-                &prelim_filter,
-                true,
-                None,
-                if resource == "blade"
-                    || resource == "ブレード"
-                    || resource == "heart"
-                    || resource == "ハート"
-                {
-                    effect.distinct_any()
-                } else {
-                    None
-                },
-                choice_exclude,
-            );
-            // "ブレードをNつ以上持つ" (no 元々) — filter by CURRENT blade total
-            // (base or set + modifiers); matches() only handles printed values.
-            if prelim_filter.has_current_blade_filter() {
-                candidates = util::filter_current_blade(
-                    candidates,
-                    gs,
-                    prelim_filter.current_blade_limit,
-                    prelim_filter.current_blade_operator,
-                );
-            }
-            // Filter target_count candidates by position if specified.
-            if let Some(ref pos) = effect.position_any() {
-                if let Some(p) = pos.get_position() {
-                    if let Some(stage_idx) = util::stage_position_index(p) {
-                        let p = gs.resolve_target_player(&target);
-                        let expected = p.stage.stage.get(stage_idx).copied().unwrap_or(-1);
-                        candidates.retain(|cid| *cid == expected);
-                    }
-                }
-            }
-            // Filter candidates by group_reference: "same_group_name" — use the
-            // cost-discarded card's group (c.group, card position ②) so the target
-            // prompt shows only members matching that group name.
-            if effect.group_reference_any().as_deref() == Some("same_group_name") {
-                let ref_group: Option<String> = self
-                    .moved_cards
-                    .first()
-                    .and_then(|cid| gs.card_database.get_card(*cid))
-                    .map(|c| c.group.to_string());
-                if let Some(ref group) = ref_group {
-                    candidates.retain(|cid| {
-                        util::card_matches_group_str(&gs.card_database, *cid, Some(group.as_str()))
-                    });
-                }
-            }
-            let tc = effect.target_count_any().unwrap_or(1) as usize;
-            if candidates.len() > tc {
-                let stage_snapshot: Vec<i16> = {
-                    let p = gs.resolve_target_player(&target);
-                    p.stage.stage.to_vec()
-                };
-                let filtered_indices: Vec<usize> = candidates
-                    .iter()
-                    .filter_map(|&cid| stage_snapshot.iter().position(|&s| s == cid))
-                    .collect();
-                let mut saved = effect.clone();
-                saved.set_target_count(None);
-                self.selected_count_at_save = Some(self.selected_cards.len() as u8);
-                let mut pending = gs.ability_queue.take_pending_actions();
-                pending.insert(0, saved);
-                gs.ability_queue.set_pending_actions(pending);
-                let desc_en = format!("Select {} card(s) to receive {} {}", tc, count, resource);
-                let resource_label =
-                    crate::ability::describe::resource_label_ja(Some(resource.as_str()));
-                let desc_ja = format!(
-                    "リソースを受け取る{}枚のカードを選択（{} {}）",
-                    tc, count, resource_label
-                );
-                self.pending_choice = Some(
-                    Choice::select_cards(Zone::Stage.to_str().to_string(), tc, desc_en, false)
-                        .description_ja(Some(desc_ja))
-                        .card_type(effect.card_type_any().map(|s| s.to_string()))
-                        .group(effect.group_name().map(|s| s.to_string()))
-                        .characters(effect.characters_any().cloned())
-                        .filtered_indices(Some(filtered_indices))
-                        .target_player_id(Some(target.clone()))
-                        .is_select_action(true)
-                        .build(),
-                );
-                self.stage_select_intent =
-                    Some(crate::ability::types::StageSelectIntent::CollectTargets);
-                // Don't call store_pending_choice — keep self.pending_choice set
-                // so the caller (e.g. resume_pending_commands) can detect the
-                // sub-choice and properly save remaining commands before returning.
-                self.sub_choice_created = true;
-                return Ok(());
-            }
+        let choice_created = self.try_create_target_selection_choice(
+            gs,
+            effect,
+            kind,
+            &resource,
+            count,
+            &target,
+            is_self_target,
+            per_unit,
+            exclude_self_id,
+            &preceding_moved,
+            all_selected.as_slice(),
+            &selected_for_current,
+        )?;
+        if choice_created {
+            return Ok(());
         }
 
         let orientation_modifiers = gs.mods.orientation_modifiers.clone();
@@ -1101,347 +1012,44 @@ impl AbilityResolver {
             } else {
                 HashSet::default()
             };
-        let (blade_targets, mut heart_targets, heart_color_str, final_count) = {
-            let mut filter = effect.filter_subset();
-            filter.exclude_self = exclude_self_id;
-            let exclude_names: Vec<String> = effect
-                .exclude_by_name_source_any()
-                .as_deref()
-                .filter(|&s| s == "preceding_moved")
-                .and_then(|_| preceding_moved.as_ref())
-                .map(|moved| {
-                    moved
-                        .iter()
-                        .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
-                        .collect()
-                })
-                .unwrap_or_default();
-            if !exclude_names.is_empty() {
-                filter.exclude_names = Some(&exclude_names);
-            }
-
-            let final_count = self.calculate_gain_multiplier(
-                gs,
-                effect,
-                per_unit,
-                count,
-                per_unit_type_str.as_deref(),
-                &target,
-                &recently_moved,
-                &entry_snapshot,
-                last_energy,
-                last_discard_count,
-                &orientation_modifiers,
-                &filter,
-            );
-
-            // "ブレードをNつ以上持つ" (no 元々) — CURRENT blade total filter
-            // (base or set + modifiers). Snapshot the eligible stage members
-            // BEFORE the mutable `player` borrow (matches() only handles
-            // printed/original blade values).
-            let current_blade_eligible: SmallVec<[i16; 8]> = if filter.has_current_blade_filter() {
-                let stage_ids: Vec<i16> = {
-                    let p = gs.resolve_target_player(&target);
-                    util::zone_cards(p, Zone::Stage.to_str()).to_vec()
-                };
-                util::filter_current_blade(
-                    stage_ids,
-                    gs,
-                    filter.current_blade_limit,
-                    filter.current_blade_operator,
-                )
-                .into()
-            } else {
-                SmallVec::new()
-            };
-
-            let player = gs.resolve_target_player_mut(&target);
-
-            let has_selection_filter =
-                effect.target_count_any().is_some() || effect.distinct_any().is_some();
-            // When a distinct choice was saved (target_count cleared), exclude
-            // only cards selected BEFORE the choice, not the card selected BY it.
-            let saved_exclude: Option<SmallVec<[i16; 8]>> = if effect.target_count_any().is_none()
-                && effect.distinct_any().is_some()
-                && !all_selected.is_empty()
-            {
-                if let Some(save_len) = self.selected_count_at_save {
-                    if (save_len as usize) < all_selected.len() {
-                        let prev: SmallVec<[i16; 8]> =
-                            all_selected[..save_len as usize].iter().copied().collect();
-                        if !prev.is_empty() {
-                            Some(prev)
-                        } else {
-                            None
-                        }
-                    } else {
-                        Some(all_selected.clone())
-                    }
-                } else {
-                    Some(all_selected.clone())
-                }
-            } else {
-                None
-            };
-            let exclude: Option<&[i16]> = if let Some(ref saved) = saved_exclude {
-                Some(saved.as_slice())
-            } else if has_selection_filter && !all_selected.is_empty() {
-                Some(all_selected.as_slice())
-            } else {
-                None
-            };
-            let tc = effect.target_count_any();
-            let dn = effect.distinct_any();
-
-            let has_characters = effect.characters_any().is_some_and(|c| !c.is_empty());
-            let has_blade_filter =
-                card_type_filter.is_some() || group_filter.is_some() || has_characters;
-            // When has_selection_filter is set (target_count/distinct), don't blindly
-            // use all_selected — apply the filter with exclusion to find the right targets.
-            // Only use all_selected directly for pure sequential select→gain_resource.
-            // When distinct is set, the saved action must filter by exclude to
-            // prevent cards selected in previous steps from also getting the resource.
-            let use_raw = !all_selected.is_empty()
-                && !has_selection_filter
-                && effect.distinct_any().is_none();
-            let mut all_candidates: SmallVec<[i16; 8]> = if use_raw {
-                all_selected.clone()
-            } else if has_blade_filter || is_all {
-                util::matching_ids_filtered(
-                    util::zone_cards(player, Zone::Stage.to_str()),
-                    &card_db,
-                    &filter,
-                    true,
-                    None, // don't truncate yet — we may need a player choice
-                    if resource == "blade" || resource == "ブレード" {
-                        dn
-                    } else {
-                        None
-                    },
-                    exclude,
-                )
-                .into()
-            } else {
-                SmallVec::new()
-            };
-
-            // "ブレードをNつ以上持つ" (no 元々) — restrict to the snapshot of
-            // current-blade-eligible stage members computed before the borrow.
-            if filter.has_current_blade_filter() {
-                all_candidates.retain(|cid| current_blade_eligible.contains(cid));
-            }
-
-            // Filter by position if the effect specifies one (e.g. "center").
-            if let Some(ref pos) = effect.position_any() {
-                if let Some(p) = pos.get_position() {
-                    if let Some(stage_idx) = util::stage_position_index(p) {
-                        let expected = player.stage.stage[stage_idx];
-                        all_candidates.retain(|cid| *cid == expected);
-                    }
-                }
-            }
-            // Issue 6: Filter by timing_condition (e.g. "appeared_this_turn")
-            log::debug!(
-                "[APP_IDS] appeared_ids={:?} all_candidates before={:?}",
-                appeared_ids,
-                all_candidates
-            );
-            if effect.timing_condition_any().is_some() {
-                all_candidates.retain(|cid| appeared_ids.contains(cid));
-                log::debug!("[APP_IDS] all_candidates after={:?}", all_candidates);
-            }
-            // same_name: filter candidates to only members whose name matches
-            // the card(s) moved as cost (self.moved_cards).
-            if effect.same_name_any().unwrap_or(false) {
-                let ref_names: Vec<String> = self
-                    .moved_cards
-                    .iter()
-                    .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
-                    .collect();
-                log::debug!(
-                    "[SAME_NAME] ref_names={:?} before={}",
-                    ref_names,
-                    all_candidates.len()
-                );
-                if !ref_names.is_empty() {
-                    all_candidates.retain(|cid| {
-                        card_db
-                            .get_card(*cid)
-                            .map(|c| ref_names.contains(&c.name.to_string()))
-                            .unwrap_or(false)
-                    });
-                } else {
-                    all_candidates.clear();
-                }
-                log::debug!("[SAME_NAME] after={}", all_candidates.len());
-            }
-
-            // If target_count is set and more candidates than needed,
-            // create a choice for the player (unless already selected via previous choice).
-            log::debug!("[GAIN_RESOURCE] res={} is_all={} has_filter={} tc={:?} dn={:?} all_cand={} selected={}",
-                resource, is_all, has_blade_filter, tc, dn, all_candidates.len(), self.selected_cards.len());
-            log::debug!(
-                "[GAIN_RESOURCE] blade_targets computation starts ({} candidates)",
-                all_candidates.len()
-            );
-            let blade_targets: SmallVec<[i16; 8]> =
-                if effect.target_from_selection_any().unwrap_or(false) {
-                    selected_for_current.iter().copied().collect()
-                } else if let Some(tgt_count) = tc {
-                    if !selected_for_current.is_empty() {
-                        selected_for_current
-                            .iter()
-                            .take(tgt_count as usize)
-                            .copied()
-                            .collect()
-                    } else if (tgt_count as usize) < all_candidates.len() {
-                        // Multiple candidates — truncate to target_count for now
-                        // (future: create a SelectTarget choice for the player)
-                        all_candidates.truncate(tgt_count as usize);
-                        all_candidates
-                    } else {
-                        all_candidates.truncate(tgt_count as usize);
-                        all_candidates
-                    }
-                } else if !selected_for_current.is_empty() && effect.distinct_any().is_none() {
-                    selected_for_current.iter().copied().collect()
-                } else {
-                    all_candidates
-                };
-
-            let heart_color_inner = single_fixed_heart
-                .clone()
-                .or_else(|| effect.heart_color_any().map(|s| s.to_string()))
-                .or_else(|| effect.heart_colors_any().first().map(|s| s.to_string()));
-            let mut heart_targets: Vec<i16> = if effect.target_from_selection_any().unwrap_or(false)
-            {
-                // Explicitly target only the cards selected by the preceding
-                // sequential action (e.g. a change_state that activated a member).
-                log::debug!(
-                    "[TARGET_FROM_SEL] heart: selected_cards={:?} selected_for_current={:?} all_selected={:?}",
-                    self.selected_cards, selected_for_current, all_selected
-                );
-                selected_for_current
-            } else if use_raw && !selected_for_current.is_empty() && effect.distinct_any().is_none()
-            {
-                if effect.multiple_targets_any().unwrap_or(false) {
-                    let mut targets = selected_for_current;
-                    if let Some(aid) = activating_card_id {
-                        if !targets.contains(&aid) {
-                            targets.push(aid);
-                        }
-                    }
-                    targets
-                } else {
-                    selected_for_current
-                }
-            } else if use_raw {
-                all_selected.iter().copied().collect()
-            } else if resource == "heart" || resource == "ハート" {
-                let mut h = if !selected_for_current.is_empty() && effect.distinct_any().is_none() {
-                    selected_for_current
-                } else if !selected_for_current.is_empty()
-                    && effect.target_count_any().is_none()
-                    && effect.distinct_any().is_some()
-                {
-                    // Saved action from distinct choice: target only the
-                    // NEWLY selected cards (after the pre-choice save point).
-                    if let Some(save_len) = self.selected_count_at_save {
-                        if (save_len as usize) < selected_for_current.len() {
-                            selected_for_current[save_len as usize..].to_vec()
-                        } else {
-                            selected_for_current
-                        }
-                    } else {
-                        selected_for_current
-                    }
-                } else if effect.card_type_any().is_none()
-                    && effect.group_names_any().is_none()
-                    && effect.characters_any().is_none()
-                    && effect.target_count_any().is_none()
-                    && effect.distinct_any().is_none()
-                    && !is_all
-                {
-                    // No targeting info: default to activating card only.
-                    // Prevents heart from leaking to all stage members when
-                    // no card_type/group/characters/target_count filter is set.
-                    activating_card_id.map_or(vec![], |id| vec![id])
-                } else {
-                    util::matching_ids_filtered(
-                        util::zone_cards(player, Zone::Stage.to_str()),
-                        &card_db,
-                        &filter,
-                        true,
-                        if is_self_target { None } else { tc },
-                        dn,
-                        exclude,
-                    )
-                    .to_vec()
-                };
-                if effect.timing_condition_any().is_some() {
-                    h.retain(|cid| appeared_ids.contains(cid));
-                }
-                // same_name: filter heart_targets to same-name members
-                if effect.same_name_any().unwrap_or(false) {
-                    let ref_names: Vec<String> = self
-                        .moved_cards
-                        .iter()
-                        .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
-                        .collect();
-                    if !ref_names.is_empty() {
-                        h.retain(|cid| {
-                            card_db
-                                .get_card(*cid)
-                                .map(|c| ref_names.contains(&c.name.to_string()))
-                                .unwrap_or(false)
-                        });
-                    } else {
-                        h.clear();
-                    }
-                }
-                h
-            } else {
-                vec![]
-            };
-            if let Some(ref pos) = effect.position_any() {
-                if let Some(p) = pos.get_position() {
-                    if let Some(stage_idx) = util::stage_position_index(p) {
-                        let expected = player.stage.stage[stage_idx];
-                        heart_targets.retain(|&cid| cid == expected);
-                    }
-                }
-            }
-
-            // "ブレードをNつ以上持つ" (no 元々) — heart targets are resolved via
-            // a SEPARATE matching_ids_filtered call, so apply the current-blade
-            // post-filter here as well (the blade_targets path already filters).
-            if filter.has_current_blade_filter() {
-                heart_targets.retain(|cid| current_blade_eligible.contains(cid));
-            }
-
-            // Apply heart_colors as a target filter when the effect
-            // specifies that targets must already possess the heart color.
-            if effect.filter_targets_by_heart_colors_any().unwrap_or(false)
-                && !effect.heart_colors_any().is_empty()
-            {
-                heart_targets.retain(|&id| {
-                    if effect.require_all_heart_colors_any().unwrap_or(false) {
-                        util::card_matches_all_heart_colors(&card_db, id, effect.heart_colors_any())
-                    } else {
-                        util::card_matches_heart_colors(&card_db, id, effect.heart_colors_any())
-                    }
-                });
-            }
-
-            (blade_targets, heart_targets, heart_color_inner, final_count)
-        };
+        let GainTargets {
+            blade_targets,
+            mut heart_targets,
+            heart_color_str,
+            final_count,
+        } = self.resolve_gain_resource_targets(
+            gs,
+            effect,
+            kind,
+            resource.as_str(),
+            count,
+            per_unit,
+            per_unit_type_str.as_deref(),
+            &target,
+            is_all,
+            is_self_target,
+            exclude_self_id,
+            activating_card_id,
+            single_fixed_heart.clone(),
+            &all_selected,
+            &selected_for_current,
+            &appeared_ids,
+            &recently_moved,
+            &entry_snapshot,
+            &preceding_moved,
+            last_energy,
+            last_discard_count,
+            &orientation_modifiers,
+            card_type_filter.as_deref(),
+            group_filter.as_deref(),
+        );
 
         // Store selected card IDs when target_count/distinct is set
         // so the next sequential action can exclude these cards.
         // Only store when we have explicit selection limits to avoid
         // polluting all_selected for blanket effects like "both players gain blade".
         if effect.target_count_any().is_some() || effect.distinct_any().is_some() {
-            let selected_targets: Vec<i16> = if resource == "blade" || resource == "ブレード" {
+            let selected_targets: Vec<i16> = if kind == ResourceKind::Blade {
                 blade_targets.to_vec()
             } else {
                 heart_targets.clone()
@@ -1502,7 +1110,7 @@ impl AbilityResolver {
                             .to_string(),
                     );
                 }
-                if resource == "blade" || resource == "ブレード" {
+                if kind == ResourceKind::Blade {
                     gs.mods.add_blade_modifier_with_trace(
                         card_id,
                         blades_to_add,
@@ -1515,7 +1123,7 @@ impl AbilityResolver {
                             Some(Self::make_card_effect_data(card_id, blades_to_add, None));
                     }
                 }
-                if resource == "heart" || resource == "ハート" {
+                if kind == ResourceKind::Heart {
                     for (color, color_amount) in &heart_distribution {
                         let amount = if is_negative {
                             -(*color_amount as i16)
@@ -1559,124 +1167,19 @@ impl AbilityResolver {
         }
 
         let blade_targets_save = blade_targets.clone();
-        if resource == "blade" || resource == "ブレード" {
-            if blade_targets.is_empty() {
-                if is_all
-                    && effect.group_names_any().is_none()
-                    && effect.card_type_any().is_none()
-                    && effect.characters_any().is_none()
-                    && effect.timing_condition_any().is_none()
-                    && effect.position_any().is_none()
-                {
-                    let stage_ids: Vec<i16> = {
-                        let player = gs.resolve_target_player(&target);
-                        player
-                            .stage
-                            .stage
-                            .iter()
-                            .copied()
-                            .filter(|&id| id != -1)
-                            .collect()
-                    };
-                    for card_id in stage_ids {
-                        gs.mods.add_blade_modifier_with_trace(
-                            card_id,
-                            blades_to_add,
-                            &mut gs.ability_applications,
-                            gs.activating_card.unwrap_or(-1),
-                            &effect.text,
-                        );
-                    }
-                    if is_temporary {
-                        effect_data = Some(crate::core::types::EffectData::AllCards {
-                            amount: blades_to_add,
-                        });
-                    }
-                } else if effect.position_any().is_some() {
-                    // Position-based target: apply to the stage member at that position
-                    if resource == "blade" || resource == "ブレード" {
-                        if let Some(pos_info) = effect.position_any().as_ref() {
-                            if let Some(p) = pos_info.get_position() {
-                                if let Some(stage_idx) = util::stage_position_index(p) {
-                                    let player = gs.resolve_target_player_mut(&target);
-                                    let card_id = player.stage.stage[stage_idx];
-                                    if card_id != -1 {
-                                        gs.mods.add_blade_modifier_with_trace(
-                                            card_id,
-                                            blades_to_add,
-                                            &mut gs.ability_applications,
-                                            gs.activating_card.unwrap_or(-1),
-                                            &effect.text,
-                                        );
-                                        if is_temporary {
-                                            effect_data = Some(Self::make_card_effect_data(
-                                                card_id,
-                                                blades_to_add,
-                                                None,
-                                            ));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else if effect.target_count_any().is_none()
-                    && (effect.exclude_self_any().is_none() || effect.target_player() == Some(TargetPlayer::Self_))
-                {
-                    if let Some(card_id) = activating_card_id {
-                        gs.mods.add_blade_modifier_with_trace(
-                            card_id,
-                            blades_to_add,
-                            &mut gs.ability_applications,
-                            gs.activating_card.unwrap_or(-1),
-                            &effect.text,
-                        );
-                        if is_temporary {
-                            effect_data =
-                                Some(Self::make_card_effect_data(card_id, blades_to_add, None));
-                        }
-                    }
-                }
-            } else if !all_selected.is_empty() && effect.source_any().is_none() {
-                // Pure sequential select→gain_resource: apply to ALL selected cards with full count
-                for &card_id in &blade_targets {
-                    gs.mods.add_blade_modifier_with_trace(
-                        card_id,
-                        blades_to_add,
-                        &mut gs.ability_applications,
-                        gs.activating_card.unwrap_or(-1),
-                        &effect.text,
-                    );
-                }
-            } else {
-                let targets: Vec<i16> = if is_all {
-                    blade_targets.iter().copied().collect()
-                } else {
-                    blade_targets
-                        .into_iter()
-                        .take(final_count as usize)
-                        .collect()
-                };
-                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
-                {
-                    log::debug!(
-                        "[BLADE_APPLY] targets={:?} is_all={} final_count={} blades_to_add={}",
-                        targets,
-                        is_all,
-                        final_count,
-                        blades_to_add
-                    );
-                }
-                for &card_id in &targets {
-                    gs.mods.add_blade_modifier_with_trace(
-                        card_id,
-                        blades_to_add,
-                        &mut gs.ability_applications,
-                        gs.activating_card.unwrap_or(-1),
-                        &effect.text,
-                    );
-                }
-            }
+        if let Some(ed) = self.apply_blade_resource(
+            gs,
+            effect,
+            kind,
+            &blade_targets,
+            activating_card_id,
+            &all_selected,
+            is_all,
+            is_temporary,
+            final_count,
+            blades_to_add,
+        ) {
+            effect_data = Some(ed);
         }
 
         // group_reference: "same_group_name" — filter heart targets to only
@@ -1719,151 +1222,26 @@ impl AbilityResolver {
             }
         }
 
-        if resource == "heart" || resource == "ハート" {
-            if heart_targets.is_empty() {
-                if effect.position_any().is_some() {
-                    if let Some(pos_info) = effect.position_any().as_ref() {
-                        if let Some(p) = pos_info.get_position() {
-                            if let Some(stage_idx) = util::stage_position_index(p) {
-                                let player = gs.resolve_target_player_mut(&target);
-                                let card_id = player.stage.stage[stage_idx];
-                                if card_id != -1 {
-                                    self.apply_heart_to_card(
-                                        gs,
-                                        card_id,
-                                        &heart_distribution,
-                                        is_negative,
-                                        is_temporary,
-                                        &mut effect_data,
-                                        &heart_color_str,
-                                        heart_to_add,
-                                        &effect.text,
-                                    );
-                                }
-                            }
-                        }
-                    }
-                } else if effect.target_count_any().is_none()
-                    && (effect.exclude_self_any().is_none() || effect.target_player() == Some(TargetPlayer::Self_))
-                {
-                    if let Some(card_id) = activating_card_id {
-                        self.apply_heart_to_card(
-                            gs,
-                            card_id,
-                            &heart_distribution,
-                            is_negative,
-                            is_temporary,
-                            &mut effect_data,
-                            &heart_color_str,
-                            heart_to_add,
-                            &effect.text,
-                        );
-                    }
-                }
-            } else if is_self_target
-                || (effect.target_name_player() == Some(TargetPlayer::Self_)
-                    && activating_card_id.is_some()
-                    && effect.source_any().is_none()
-                    && effect.card_type_any().is_none()
-                    && !effect.target_from_selection_any().unwrap_or(false)
-                    && !effect.multiple_targets_any().unwrap_or(false)
-                    && effect.group_names_any().map_or(true, |g| g.is_empty())
-                    && !effect.all_any().unwrap_or(false))
-            {
-                if let Some(card_id) = activating_card_id {
-                    self.apply_heart_to_card(
-                        gs,
-                        card_id,
-                        &heart_distribution,
-                        is_negative,
-                        is_temporary,
-                        &mut effect_data,
-                        &heart_color_str,
-                        heart_to_add,
-                        &effect.text,
-                    );
-                }
-            } else {
-                let targets: Vec<i16> = if is_all || effect.multiple_targets_any().unwrap_or(false)
-                {
-                    heart_targets.clone()
-                } else {
-                    heart_targets
-                        .into_iter()
-                        .take(final_count as usize)
-                        .collect()
-                };
-                log::debug!(
-                    "[HEART_APPLY] targets={:?} is_all={} final_count={}",
-                    targets,
-                    is_all,
-                    final_count
-                );
-                for &card_id in &targets {
-                    log::debug!(
-                        "[HEART_APPLY] adding heart04 to card_id={}, activating={:?}",
-                        card_id,
-                        gs.activating_card
-                    );
-                    for &(color, _) in &heart_distribution {
-                        log::debug!(
-                            "[HEART_APPLY]   color={:?} current_mod={}",
-                            color,
-                            gs.mods.get_heart_modifier(card_id, color)
-                        );
-                    }
-                    for &(color, dist_count) in &heart_distribution {
-                        let dist_amount = if is_negative {
-                            -(dist_count as i16)
-                        } else {
-                            dist_count as i16
-                        };
-                        gs.mods.add_heart_modifier_with_trace(
-                            card_id,
-                            color,
-                            dist_amount,
-                            &mut gs.ability_applications,
-                            gs.activating_card.unwrap_or(-1),
-                            &effect.text,
-                        );
-                    }
-                }
-                // Build effect_data for heart cleanup on expiry
-                if is_temporary && effect_data.is_none() && !targets.is_empty() {
-                    if heart_distribution.len() > 1 {
-                        let items: Vec<crate::core::types::CardEffectItem> = targets
-                            .iter()
-                            .flat_map(|&cid| {
-                                heart_distribution.iter().map(move |&(c, dc)| {
-                                    let amount = if is_negative { -(dc as i16) } else { dc as i16 };
-                                    crate::core::types::CardEffectItem {
-                                        card_id: cid,
-                                        amount,
-                                        color: Some(format!("{:?}", c)),
-                                    }
-                                })
-                            })
-                            .collect();
-                        effect_data = Some(crate::core::types::EffectData::MultiCard { items });
-                    } else {
-                        let color_name = heart_color_str.as_deref().unwrap_or("heart01");
-                        let items: Vec<crate::core::types::CardEffectItem> = targets
-                            .iter()
-                            .map(|&cid| crate::core::types::CardEffectItem {
-                                card_id: cid,
-                                amount: heart_to_add,
-                                color: Some(color_name.to_string()),
-                            })
-                            .collect();
-                        effect_data = Some(crate::core::types::EffectData::MultiCard { items });
-                    }
-                }
-            }
+        if let Some(ed) = self.apply_heart_resource(
+            gs,
+            effect,
+            kind,
+            heart_targets,
+            activating_card_id,
+            is_self_target,
+            is_all,
+            is_temporary,
+            is_negative,
+            &heart_distribution,
+            &heart_color_str,
+            heart_to_add,
+            final_count,
+        ) {
+            effect_data = Some(ed);
         }
 
         // Store effect_data for blade cleanup.
-        if is_temporary && effect_data.is_none() && (resource == "blade" || resource == "ブレード")
-        {
+        if is_temporary && effect_data.is_none() && kind == ResourceKind::Blade {
             let items: Vec<crate::core::types::CardEffectItem> = blade_targets_save
                 .iter()
                 .map(|&cid| crate::core::types::CardEffectItem {
@@ -1899,6 +1277,820 @@ impl AbilityResolver {
             effect.resource_any().as_deref().unwrap_or("?")
         ));
         Ok(())
+    }
+
+    /// Apply heart modifiers to the resolved targets. Returns the effect data
+    /// to register for temporary-effect cleanup, if any. Extracted verbatim
+    /// from `execute_gain_resource` — see docs/CODE_AUDIT_2026-08-23.md (C1).
+    #[allow(clippy::too_many_arguments)]
+    fn apply_heart_resource(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        kind: ResourceKind,
+        heart_targets: Vec<i16>,
+        activating_card_id: Option<i16>,
+        is_self_target: bool,
+        is_all: bool,
+        is_temporary: bool,
+        is_negative: bool,
+        heart_distribution: &[(crate::card::HeartColor, u8)],
+        heart_color_str: &Option<String>,
+        heart_to_add: i16,
+        final_count: u8,
+    ) -> Option<crate::core::types::EffectData> {
+        if kind != ResourceKind::Heart {
+            return None;
+        }
+        let mut effect_data: Option<crate::core::types::EffectData> = None;
+        if heart_targets.is_empty() {
+            if effect.position_any().is_some() {
+                if let Some(pos_info) = effect.position_any().as_ref() {
+                    if let Some(p) = pos_info.get_position() {
+                        if let Some(stage_idx) = util::stage_position_index(p) {
+                            let player = gs.resolve_target_player_mut(&effect.target_name());
+                            let card_id = player.stage.stage[stage_idx];
+                            if card_id != -1 {
+                                self.apply_heart_to_card(
+                                    gs,
+                                    card_id,
+                                    heart_distribution,
+                                    is_negative,
+                                    is_temporary,
+                                    &mut effect_data,
+                                    heart_color_str,
+                                    heart_to_add,
+                                    &effect.text,
+                                );
+                            }
+                        }
+                    }
+                }
+            } else if effect.target_count_any().is_none()
+                && (effect.exclude_self_any().is_none()
+                    || effect.target_player() == Some(TargetPlayer::Self_))
+            {
+                if let Some(card_id) = activating_card_id {
+                    self.apply_heart_to_card(
+                        gs,
+                        card_id,
+                        heart_distribution,
+                        is_negative,
+                        is_temporary,
+                        &mut effect_data,
+                        heart_color_str,
+                        heart_to_add,
+                        &effect.text,
+                    );
+                }
+            }
+        } else if is_self_target
+            || (effect.target_name_player() == Some(TargetPlayer::Self_)
+                && activating_card_id.is_some()
+                && effect.source_any().is_none()
+                && effect.card_type_any().is_none()
+                && !effect.target_from_selection_any().unwrap_or(false)
+                && !effect.multiple_targets_any().unwrap_or(false)
+                && effect.group_names_any().map_or(true, |g| g.is_empty())
+                && !effect.all_any().unwrap_or(false))
+        {
+            if let Some(card_id) = activating_card_id {
+                self.apply_heart_to_card(
+                    gs,
+                    card_id,
+                    heart_distribution,
+                    is_negative,
+                    is_temporary,
+                    &mut effect_data,
+                    heart_color_str,
+                    heart_to_add,
+                    &effect.text,
+                );
+            }
+        } else {
+            let targets: Vec<i16> =
+                if is_all || effect.multiple_targets_any().unwrap_or(false) {
+                    heart_targets.clone()
+                } else {
+                    heart_targets
+                        .into_iter()
+                        .take(final_count as usize)
+                        .collect()
+                };
+            log::debug!(
+                "[HEART_APPLY] targets={:?} is_all={} final_count={}",
+                targets,
+                is_all,
+                final_count
+            );
+            for &card_id in &targets {
+                log::debug!(
+                    "[HEART_APPLY] adding heart04 to card_id={}, activating={:?}",
+                    card_id,
+                    gs.activating_card
+                );
+                for &(color, _) in heart_distribution {
+                    log::debug!(
+                        "[HEART_APPLY]   color={:?} current_mod={}",
+                        color,
+                        gs.mods.get_heart_modifier(card_id, color)
+                    );
+                }
+                for &(color, dist_count) in heart_distribution {
+                    let dist_amount = if is_negative {
+                        -(dist_count as i16)
+                    } else {
+                        dist_count as i16
+                    };
+                    gs.mods.add_heart_modifier_with_trace(
+                        card_id,
+                        color,
+                        dist_amount,
+                        &mut gs.ability_applications,
+                        gs.activating_card.unwrap_or(-1),
+                        &effect.text,
+                    );
+                }
+            }
+            // Build effect_data for heart cleanup on expiry
+            if is_temporary && effect_data.is_none() && !targets.is_empty() {
+                if heart_distribution.len() > 1 {
+                    let items: Vec<crate::core::types::CardEffectItem> = targets
+                        .iter()
+                        .flat_map(|&cid| {
+                            heart_distribution.iter().map(move |&(c, dc)| {
+                                let amount = if is_negative { -(dc as i16) } else { dc as i16 };
+                                crate::core::types::CardEffectItem {
+                                    card_id: cid,
+                                    amount,
+                                    color: Some(format!("{:?}", c)),
+                                }
+                            })
+                        })
+                        .collect();
+                    effect_data = Some(crate::core::types::EffectData::MultiCard { items });
+                } else {
+                    let color_name = heart_color_str.as_deref().unwrap_or("heart01");
+                    let items: Vec<crate::core::types::CardEffectItem> = targets
+                        .iter()
+                        .map(|&cid| crate::core::types::CardEffectItem {
+                            card_id: cid,
+                            amount: heart_to_add,
+                            color: Some(color_name.to_string()),
+                        })
+                        .collect();
+                    effect_data = Some(crate::core::types::EffectData::MultiCard { items });
+                }
+            }
+        }
+        effect_data
+    }
+
+    /// When target_count is set and there are more eligible stage members
+    /// than the count allows, park a saved copy of this effect and prompt the
+    /// player to pick which members receive it. Returns Ok(true) when a
+    /// choice was created (caller must stop processing this effect now).
+    #[allow(clippy::too_many_arguments)]
+    fn try_create_target_selection_choice(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        kind: ResourceKind,
+        resource: &str,
+        count: u8,
+        target: &str,
+        is_self_target: bool,
+        per_unit: bool,
+        exclude_self_id: Option<i16>,
+        preceding_moved: &Option<SmallVec<[i16; 4]>>,
+        all_selected: &[i16],
+        selected_for_current: &[i16],
+    ) -> Result<bool, String> {
+        if effect.target_count_any().is_none()
+            || is_self_target
+            || per_unit
+            || kind == ResourceKind::Other
+            || !(selected_for_current.is_empty() || effect.distinct_any().is_some())
+        {
+            return Ok(false);
+        }
+        let card_db = self.card_db();
+        let stage_ids: Vec<i16> = {
+            let p = gs.resolve_target_player(target);
+            p.stage
+                .stage
+                .iter()
+                .copied()
+                .filter(|&id| id != -1)
+                .collect()
+        };
+        let mut prelim_filter = effect.filter_subset();
+        prelim_filter.exclude_self = exclude_self_id;
+        let exclude_names: Vec<String> = effect
+            .exclude_by_name_source_any()
+            .as_deref()
+            .filter(|&s| s == "preceding_moved")
+            .and_then(|_| preceding_moved.as_ref())
+            .map(|moved| {
+                moved
+                    .iter()
+                    .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        if !exclude_names.is_empty() {
+            prelim_filter.exclude_names = Some(&exclude_names);
+        }
+        let choice_exclude = if all_selected.is_empty() {
+            None
+        } else {
+            Some(all_selected)
+        };
+        let mut candidates = util::matching_ids_filtered(
+            &stage_ids,
+            &card_db,
+            &prelim_filter,
+            true,
+            None,
+            effect.distinct_any(),
+            choice_exclude,
+        );
+        // "ブレードをNつ以上持つ" (no 元々) — filter by CURRENT blade total
+        // (base or set + modifiers); matches() only handles printed values.
+        if prelim_filter.has_current_blade_filter() {
+            candidates = util::filter_current_blade(
+                candidates,
+                gs,
+                prelim_filter.current_blade_limit,
+                prelim_filter.current_blade_operator,
+            );
+        }
+        // Filter target_count candidates by position if specified.
+        if let Some(ref pos) = effect.position_any() {
+            if let Some(p) = pos.get_position() {
+                if let Some(stage_idx) = util::stage_position_index(p) {
+                    let p = gs.resolve_target_player(target);
+                    let expected = p.stage.stage.get(stage_idx).copied().unwrap_or(-1);
+                    candidates.retain(|cid| *cid == expected);
+                }
+            }
+        }
+        // Filter candidates by group_reference: "same_group_name" — use the
+        // cost-discarded card's group (c.group, card position ②) so the target
+        // prompt shows only members matching that group name.
+        if effect.group_reference_any().as_deref() == Some("same_group_name") {
+            let ref_group: Option<String> = self
+                .moved_cards
+                .first()
+                .and_then(|cid| gs.card_database.get_card(*cid))
+                .map(|c| c.group.to_string());
+            if let Some(ref group) = ref_group {
+                candidates.retain(|cid| {
+                    util::card_matches_group_str(&gs.card_database, *cid, Some(group.as_str()))
+                });
+            }
+        }
+        let tc = effect.target_count_any().unwrap_or(1) as usize;
+        if candidates.len() <= tc {
+            return Ok(false);
+        }
+        let stage_snapshot: Vec<i16> = {
+            let p = gs.resolve_target_player(target);
+            p.stage.stage.to_vec()
+        };
+        let filtered_indices: Vec<usize> = candidates
+            .iter()
+            .filter_map(|&cid| stage_snapshot.iter().position(|&s| s == cid))
+            .collect();
+        let mut saved = effect.clone();
+        saved.set_target_count(None);
+        self.selected_count_at_save = Some(self.selected_cards.len() as u8);
+        let mut pending = gs.ability_queue.take_pending_actions();
+        pending.insert(0, saved);
+        gs.ability_queue.set_pending_actions(pending);
+        let desc_en = format!("Select {} card(s) to receive {} {}", tc, count, resource);
+        let resource_label =
+            crate::ability::describe::resource_label_ja(Some(resource));
+        let desc_ja = format!(
+            "リソースを受け取る{}枚のカードを選択（{} {}）",
+            tc, count, resource_label
+        );
+        self.pending_choice = Some(
+            Choice::select_cards(Zone::Stage.to_str().to_string(), tc, desc_en, false)
+                .description_ja(Some(desc_ja))
+                .card_type(effect.card_type_any().map(|s| s.to_string()))
+                .group(effect.group_name().map(|s| s.to_string()))
+                .characters(effect.characters_any().cloned())
+                .filtered_indices(Some(filtered_indices))
+                .target_player_id(Some(target.to_string()))
+                .is_select_action(true)
+                .build(),
+        );
+        self.stage_select_intent =
+            Some(crate::ability::types::StageSelectIntent::CollectTargets);
+        // Don't call store_pending_choice — keep self.pending_choice set
+        // so the caller (e.g. resume_pending_commands) can detect the
+        // sub-choice and properly save remaining commands before returning.
+        self.sub_choice_created = true;
+        Ok(true)
+    }
+
+    /// Apply blade modifiers to the resolved targets. Returns the effect data
+    /// to register for temporary-effect cleanup, if any. Extracted verbatim
+    /// from `execute_gain_resource` — see docs/CODE_AUDIT_2026-08-23.md (C1).
+    #[allow(clippy::too_many_arguments)]
+    fn apply_blade_resource(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        kind: ResourceKind,
+        blade_targets: &SmallVec<[i16; 8]>,
+        activating_card_id: Option<i16>,
+        all_selected: &[i16],
+        is_all: bool,
+        is_temporary: bool,
+        final_count: u8,
+        blades_to_add: i16,
+    ) -> Option<crate::core::types::EffectData> {
+        if kind != ResourceKind::Blade {
+            return None;
+        }
+        let mut effect_data: Option<crate::core::types::EffectData> = None;
+        if blade_targets.is_empty() {
+            if is_all
+                && effect.group_names_any().is_none()
+                && effect.card_type_any().is_none()
+                && effect.characters_any().is_none()
+                && effect.timing_condition_any().is_none()
+                && effect.position_any().is_none()
+            {
+                let stage_ids: Vec<i16> = {
+                    let player = gs.resolve_target_player(&effect.target_name());
+                    player
+                        .stage
+                        .stage
+                        .iter()
+                        .copied()
+                        .filter(|&id| id != -1)
+                        .collect()
+                };
+                for card_id in stage_ids {
+                    gs.mods.add_blade_modifier_with_trace(
+                        card_id,
+                        blades_to_add,
+                        &mut gs.ability_applications,
+                        gs.activating_card.unwrap_or(-1),
+                        &effect.text,
+                    );
+                }
+                if is_temporary {
+                    effect_data = Some(crate::core::types::EffectData::AllCards {
+                        amount: blades_to_add,
+                    });
+                }
+            } else if effect.position_any().is_some() {
+                // Position-based target: apply to the stage member at that position
+                if let Some(pos_info) = effect.position_any().as_ref() {
+                    if let Some(p) = pos_info.get_position() {
+                        if let Some(stage_idx) = util::stage_position_index(p) {
+                            let player = gs.resolve_target_player_mut(&effect.target_name());
+                            let card_id = player.stage.stage[stage_idx];
+                            if card_id != -1 {
+                                gs.mods.add_blade_modifier_with_trace(
+                                    card_id,
+                                    blades_to_add,
+                                    &mut gs.ability_applications,
+                                    gs.activating_card.unwrap_or(-1),
+                                    &effect.text,
+                                );
+                                if is_temporary {
+                                    effect_data = Some(Self::make_card_effect_data(
+                                        card_id,
+                                        blades_to_add,
+                                        None,
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if effect.target_count_any().is_none()
+                && (effect.exclude_self_any().is_none()
+                    || effect.target_player() == Some(TargetPlayer::Self_))
+            {
+                if let Some(card_id) = activating_card_id {
+                    gs.mods.add_blade_modifier_with_trace(
+                        card_id,
+                        blades_to_add,
+                        &mut gs.ability_applications,
+                        gs.activating_card.unwrap_or(-1),
+                        &effect.text,
+                    );
+                    if is_temporary {
+                        effect_data =
+                            Some(Self::make_card_effect_data(card_id, blades_to_add, None));
+                    }
+                }
+            }
+        } else if !all_selected.is_empty() && effect.source_any().is_none() {
+            // Pure sequential select→gain_resource: apply to ALL selected cards with full count
+            for &card_id in blade_targets.iter() {
+                gs.mods.add_blade_modifier_with_trace(
+                    card_id,
+                    blades_to_add,
+                    &mut gs.ability_applications,
+                    gs.activating_card.unwrap_or(-1),
+                    &effect.text,
+                );
+            }
+        } else {
+            let targets: Vec<i16> = if is_all {
+                blade_targets.iter().copied().collect()
+            } else {
+                blade_targets
+                    .iter()
+                    .take(final_count as usize)
+                    .copied()
+                    .collect()
+            };
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
+                log::debug!(
+                    "[BLADE_APPLY] targets={:?} is_all={} final_count={} blades_to_add={}",
+                    targets,
+                    is_all,
+                    final_count,
+                    blades_to_add
+                );
+            }
+            for &card_id in &targets {
+                gs.mods.add_blade_modifier_with_trace(
+                    card_id,
+                    blades_to_add,
+                    &mut gs.ability_applications,
+                    gs.activating_card.unwrap_or(-1),
+                    &effect.text,
+                );
+            }
+        }
+        effect_data
+    }
+
+    /// Resolve which stage members receive the resource and in what amount.
+    /// Extracted verbatim from `execute_gain_resource` — see the audit doc
+    /// (docs/CODE_AUDIT_2026-08-23.md, C1).
+    #[allow(clippy::too_many_arguments)]
+    fn resolve_gain_resource_targets(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        kind: ResourceKind,
+        resource: &str,
+        count: u8,
+        per_unit: bool,
+        per_unit_type_str: Option<&str>,
+        target: &str,
+        is_all: bool,
+        is_self_target: bool,
+        exclude_self_id: Option<i16>,
+        activating_card_id: Option<i16>,
+        single_fixed_heart: Option<String>,
+        all_selected: &[i16],
+        selected_for_current: &[i16],
+        appeared_ids: &HashSet<i16>,
+        recently_moved: &Option<SmallVec<[i16; 4]>>,
+        entry_snapshot: &Option<SmallVec<[i16; 4]>>,
+        preceding_moved: &Option<SmallVec<[i16; 4]>>,
+        last_energy: u8,
+        last_discard_count: u8,
+        orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
+        card_type_filter: Option<&str>,
+        group_filter: Option<&str>,
+    ) -> GainTargets {
+        let card_db = self.card_db();
+        let mut filter = effect.filter_subset();
+        filter.exclude_self = exclude_self_id;
+        let exclude_names: Vec<String> = effect
+            .exclude_by_name_source_any()
+            .as_deref()
+            .filter(|&s| s == "preceding_moved")
+            .and_then(|_| preceding_moved.as_ref())
+            .map(|moved| {
+                moved
+                    .iter()
+                    .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        if !exclude_names.is_empty() {
+            filter.exclude_names = Some(&exclude_names);
+        }
+
+        let final_count = self.calculate_gain_multiplier(
+            gs,
+            effect,
+            per_unit,
+            count,
+            per_unit_type_str,
+            target,
+            recently_moved,
+            entry_snapshot,
+            last_energy,
+            last_discard_count,
+            orientation_modifiers,
+            &filter,
+        );
+
+        // "ブレードをNつ以上持つ" (no 元々) — CURRENT blade total filter
+        // (base or set + modifiers). Snapshot the eligible stage members
+        // BEFORE the mutable `player` borrow (matches() only handles
+        // printed/original blade values).
+        let current_blade_eligible: SmallVec<[i16; 8]> = if filter.has_current_blade_filter() {
+            let stage_ids: Vec<i16> = {
+                let p = gs.resolve_target_player(target);
+                util::zone_cards(p, Zone::Stage.to_str()).to_vec()
+            };
+            util::filter_current_blade(
+                stage_ids,
+                gs,
+                filter.current_blade_limit,
+                filter.current_blade_operator,
+            )
+            .into()
+        } else {
+            SmallVec::new()
+        };
+
+        let player = gs.resolve_target_player_mut(target);
+
+        let has_selection_filter =
+            effect.target_count_any().is_some() || effect.distinct_any().is_some();
+        // When a distinct choice was saved (target_count cleared), exclude
+        // only cards selected BEFORE the choice, not the card selected BY it.
+        let saved_exclude: Option<SmallVec<[i16; 8]>> = if effect.target_count_any().is_none()
+            && effect.distinct_any().is_some()
+            && !all_selected.is_empty()
+        {
+            if let Some(save_len) = self.selected_count_at_save {
+                if (save_len as usize) < all_selected.len() {
+                    let prev: SmallVec<[i16; 8]> =
+                        all_selected[..save_len as usize].iter().copied().collect();
+                    if !prev.is_empty() {
+                        Some(prev)
+                    } else {
+                        None
+                    }
+                } else {
+                    Some(all_selected.to_vec().into())
+                }
+            } else {
+                Some(all_selected.to_vec().into())
+            }
+        } else {
+            None
+        };
+        let exclude: Option<&[i16]> = if let Some(ref saved) = saved_exclude {
+            Some(saved.as_slice())
+        } else if has_selection_filter && !all_selected.is_empty() {
+            Some(all_selected)
+        } else {
+            None
+        };
+        let tc = effect.target_count_any();
+        let dn = effect.distinct_any();
+
+        let has_characters = effect.characters_any().is_some_and(|c| !c.is_empty());
+        let has_blade_filter =
+            card_type_filter.is_some() || group_filter.is_some() || has_characters;
+        // When has_selection_filter is set (target_count/distinct), don't blindly
+        // use all_selected — apply the filter with exclusion to find the right targets.
+        // Only use all_selected directly for pure sequential select→gain_resource.
+        // When distinct is set, the saved action must filter by exclude to
+        // prevent cards selected in previous steps from also getting the resource.
+        let use_raw = !all_selected.is_empty() && !has_selection_filter && effect.distinct_any().is_none();
+        let mut all_candidates: SmallVec<[i16; 8]> = if use_raw {
+            all_selected.iter().copied().collect()
+        } else if has_blade_filter || is_all {
+            util::matching_ids_filtered(
+                util::zone_cards(player, Zone::Stage.to_str()),
+                &card_db,
+                &filter,
+                true,
+                None, // don't truncate yet — we may need a player choice
+                if kind == ResourceKind::Blade { dn } else { None },
+                exclude,
+            )
+            .into()
+        } else {
+            SmallVec::new()
+        };
+
+        // "ブレードをNつ以上持つ" (no 元々) — restrict to the snapshot of
+        // current-blade-eligible stage members computed before the borrow.
+        if filter.has_current_blade_filter() {
+            all_candidates.retain(|cid| current_blade_eligible.contains(cid));
+        }
+
+        // Filter by position if the effect specifies one (e.g. "center").
+        if let Some(ref pos) = effect.position_any() {
+            if let Some(p) = pos.get_position() {
+                if let Some(stage_idx) = util::stage_position_index(p) {
+                    let expected = player.stage.stage[stage_idx];
+                    all_candidates.retain(|cid| *cid == expected);
+                }
+            }
+        }
+        // Issue 6: Filter by timing_condition (e.g. "appeared_this_turn")
+        log::debug!(
+            "[APP_IDS] appeared_ids={:?} all_candidates before={:?}",
+            appeared_ids,
+            all_candidates
+        );
+        if effect.timing_condition_any().is_some() {
+            all_candidates.retain(|cid| appeared_ids.contains(cid));
+            log::debug!("[APP_IDS] all_candidates after={:?}", all_candidates);
+        }
+        // same_name: filter candidates to only members whose name matches
+        // the card(s) moved as cost (self.moved_cards).
+        if effect.same_name_any().unwrap_or(false) {
+            let ref_names: Vec<String> = self
+                .moved_cards
+                .iter()
+                .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
+                .collect();
+            log::debug!(
+                "[SAME_NAME] ref_names={:?} before={}",
+                ref_names,
+                all_candidates.len()
+            );
+            if !ref_names.is_empty() {
+                all_candidates.retain(|cid| {
+                    card_db
+                        .get_card(*cid)
+                        .map(|c| ref_names.contains(&c.name.to_string()))
+                        .unwrap_or(false)
+                });
+            } else {
+                all_candidates.clear();
+            }
+            log::debug!("[SAME_NAME] after={}", all_candidates.len());
+        }
+
+        // If target_count is set and more candidates than needed,
+        // create a choice for the player (unless already selected via previous choice).
+        log::debug!("[GAIN_RESOURCE] res={} is_all={} has_filter={} tc={:?} dn={:?} all_cand={} selected={}",
+            resource, is_all, has_blade_filter, tc, dn, all_candidates.len(), self.selected_cards.len());
+        log::debug!(
+            "[GAIN_RESOURCE] blade_targets computation starts ({} candidates)",
+            all_candidates.len()
+        );
+        let blade_targets: SmallVec<[i16; 8]> =
+            if effect.target_from_selection_any().unwrap_or(false) {
+                selected_for_current.iter().copied().collect()
+            } else if let Some(tgt_count) = tc {
+                if !selected_for_current.is_empty() {
+                    selected_for_current
+                        .iter()
+                        .take(tgt_count as usize)
+                        .copied()
+                        .collect()
+                } else {
+                    all_candidates.truncate(tgt_count as usize);
+                    all_candidates
+                }
+            } else if !selected_for_current.is_empty() && effect.distinct_any().is_none() {
+                selected_for_current.iter().copied().collect()
+            } else {
+                all_candidates
+            };
+
+        let heart_color_inner = single_fixed_heart
+            .clone()
+            .or_else(|| effect.heart_color_any().map(|s| s.to_string()))
+            .or_else(|| effect.heart_colors_any().first().map(|s| s.to_string()));
+        let mut heart_targets: Vec<i16> = if effect.target_from_selection_any().unwrap_or(false) {
+            // Explicitly target only the cards selected by the preceding
+            // sequential action (e.g. a change_state that activated a member).
+            log::debug!(
+                "[TARGET_FROM_SEL] heart: selected_cards={:?} selected_for_current={:?} all_selected={:?}",
+                self.selected_cards, selected_for_current, all_selected
+            );
+            selected_for_current.to_vec()
+        } else if use_raw && !selected_for_current.is_empty() && effect.distinct_any().is_none() {
+            if effect.multiple_targets_any().unwrap_or(false) {
+                let mut targets = selected_for_current.to_vec();
+                if let Some(aid) = activating_card_id {
+                    if !targets.contains(&aid) {
+                        targets.push(aid);
+                    }
+                }
+                targets
+            } else {
+                selected_for_current.to_vec()
+            }
+        } else if use_raw {
+            all_selected.iter().copied().collect()
+        } else if kind == ResourceKind::Heart {
+            let mut h = if !selected_for_current.is_empty() && effect.distinct_any().is_none() {
+                selected_for_current.to_vec()
+            } else if !selected_for_current.is_empty()
+                && effect.target_count_any().is_none()
+                && effect.distinct_any().is_some()
+            {
+                // Saved action from distinct choice: target only the
+                // NEWLY selected cards (after the pre-choice save point).
+                if let Some(save_len) = self.selected_count_at_save {
+                    if (save_len as usize) < selected_for_current.len() {
+                        selected_for_current[save_len as usize..].to_vec()
+                    } else {
+                        selected_for_current.to_vec()
+                    }
+                } else {
+                    selected_for_current.to_vec()
+                }
+            } else if effect.card_type_any().is_none()
+                && effect.group_names_any().is_none()
+                && effect.characters_any().is_none()
+                && effect.target_count_any().is_none()
+                && effect.distinct_any().is_none()
+                && !is_all
+            {
+                // No targeting info: default to activating card only.
+                // Prevents heart from leaking to all stage members when
+                // no card_type/group/characters/target_count filter is set.
+                activating_card_id.map_or(vec![], |id| vec![id])
+            } else {
+                util::matching_ids_filtered(
+                    util::zone_cards(player, Zone::Stage.to_str()),
+                    &card_db,
+                    &filter,
+                    true,
+                    if is_self_target { None } else { tc },
+                    dn,
+                    exclude,
+                )
+                .to_vec()
+            };
+            if effect.timing_condition_any().is_some() {
+                h.retain(|cid| appeared_ids.contains(cid));
+            }
+            // same_name: filter heart_targets to same-name members
+            if effect.same_name_any().unwrap_or(false) {
+                let ref_names: Vec<String> = self
+                    .moved_cards
+                    .iter()
+                    .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
+                    .collect();
+                if !ref_names.is_empty() {
+                    h.retain(|cid| {
+                        card_db
+                            .get_card(*cid)
+                            .map(|c| ref_names.contains(&c.name.to_string()))
+                            .unwrap_or(false)
+                    });
+                } else {
+                    h.clear();
+                }
+            }
+            h
+        } else {
+            vec![]
+        };
+        if let Some(ref pos) = effect.position_any() {
+            if let Some(p) = pos.get_position() {
+                if let Some(stage_idx) = util::stage_position_index(p) {
+                    let expected = player.stage.stage[stage_idx];
+                    heart_targets.retain(|&cid| cid == expected);
+                }
+            }
+        }
+
+        // "ブレードをNつ以上持つ" (no 元々) — heart targets are resolved via
+        // a SEPARATE matching_ids_filtered call, so apply the current-blade
+        // post-filter here as well (the blade_targets path already filters).
+        if filter.has_current_blade_filter() {
+            heart_targets.retain(|cid| current_blade_eligible.contains(cid));
+        }
+
+        // Apply heart_colors as a target filter when the effect
+        // specifies that targets must already possess the heart color.
+        if effect.filter_targets_by_heart_colors_any().unwrap_or(false)
+            && !effect.heart_colors_any().is_empty()
+        {
+            heart_targets.retain(|&id| {
+                if effect.require_all_heart_colors_any().unwrap_or(false) {
+                    util::card_matches_all_heart_colors(&card_db, id, effect.heart_colors_any())
+                } else {
+                    util::card_matches_heart_colors(&card_db, id, effect.heart_colors_any())
+                }
+            });
+        }
+
+        GainTargets {
+            blade_targets,
+            heart_targets,
+            heart_color_str: heart_color_inner,
+            final_count,
+        }
     }
 
     pub(crate) fn execute_play_baton_touch(
