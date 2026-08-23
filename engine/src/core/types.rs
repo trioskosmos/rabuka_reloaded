@@ -503,6 +503,36 @@ pub struct YellCardResult {
     pub card_no: ArcStr,
 }
 
+/// Rebuilt yell data produced by `execute_perform_yell` (rule 8.3.13.1).
+///
+/// Dia-style re-yells pause mid-choice, so `execute_performance_phase` may
+/// reach its success check BEFORE the `[re_yell, perform_yell]` sequential has
+/// run. perform_yell stashes the rebuilt icon tallies here; the phase applies
+/// them to its `LivePerformanceData` right before `check_live_success`.
+///
+/// If the owning player's performance window already closed (their paused
+/// ability resumed only after the phase moved on), the stash survives until
+/// `execute_live_victory_determination`, which patches the owner's snapshot.
+///
+/// Draw icons are executed immediately by perform_yell (rule 8.3.12.1 —
+/// "after all yells are done"), so only the tallies travel.
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+pub struct PendingReyellRebuild {
+    /// Player id of the re-yelling performer (stash consumer must match).
+    pub owner: String,
+    pub yell_cards: Vec<YellCardResult>,
+    pub total_hearts: [u8; 8],
+    /// Score icons across the FINAL (re-yelled) reveal set — rule 8.4.2.1.
+    pub note_icons: u8,
+    /// Cheer count that was already banked from the discarded first yell
+    /// (0 in most flows); the owner's total must shift by the difference.
+    pub prev_note_icons: u8,
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(
     feature = "serde_support",

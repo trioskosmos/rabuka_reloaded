@@ -434,68 +434,53 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         game_state.process_pending_auto_abilities(&performer_id);
         game_state.yell_occurred = false;
 
-        // Rule 8.3.13.1: If a re-yell occurred, replace yell data with newly-revealed cards.
-        if game_state.re_yell_occurred {
-            // Save re-yell revealed cards for display
-            game_state.re_yell_revealed_cards = game_state.revealed_cards.clone();
-            let card_db = &game_state.card_database;
-            let mut new_yell_cards: Vec<crate::core::types::YellCardResult> = Vec::new();
-            let mut new_total_hearts = [0u8; 8];
-            let mut new_cheer_count = 0u8;
-            for &cid in &game_state.revealed_cards {
-                if let Some(card) = card_db.get_card(cid) {
-                    let mut bh = [0u8; 8];
-                    let mut notes = 0u8;
-                    if let Some(ref bheart) = card.blade_heart {
-                        for (color, count) in &bheart.hearts {
-                            use crate::card::HeartColor;
-                            // b_heart07 mechanic: the key parses to HeartColor::Heart00
-                            // (colorless), and `b_heart07: N` means 2×N colorless hearts.
-                            // Colorless hearts can ONLY replace heart0 requirements —
-                            // never a specific color (heart01-heart06).
-                            let amount = if *color == HeartColor::Heart00 {
-                                count * 2
-                            } else {
-                                *count
-                            };
-                            match color {
-                                HeartColor::Draw => {}
-                                HeartColor::Score => {
-                                    notes += amount;
-                                    new_cheer_count += amount;
-                                }
-                                _ => {
-                                    let idx = color.index();
-                                    if idx < 8 {
-                                        bh[idx] += amount;
-                                        new_total_hearts[idx] += amount;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    new_yell_cards.push(crate::core::types::YellCardResult {
-                        card_id: cid,
-                        blade_hearts: bh,
-                        note_icons: notes,
-                        draw_icons: 0,
-                        card_no: card.card_no.to_string().into(),
-                    });
-                }
+        // Rule 8.3.13.1: If a re-yell occurred, apply the rebuilt yell data
+        // stashed by execute_perform_yell. The rebuild lives there (not here)
+        // because this ability can pause on the optional discard choice AFTER
+        // the original yell data below was computed — by the time control
+        // reaches this point the [re_yell, perform_yell] sequential may not
+        // have executed yet, and its draws are handled inside perform_yell.
+        let rebuild_for_this_performer = game_state
+            .pending_reyell_rebuild
+            .as_ref()
+            .is_some_and(|rb| rb.owner == performer_id);
+        if let Some(rebuilt) = game_state.pending_reyell_rebuild.take() {
+            if !rebuild_for_this_performer {
+                // Belongs to the OTHER player's window (or to a paused ability
+                // whose owner already finalized) — put it back untouched.
+                game_state.pending_reyell_rebuild = Some(rebuilt);
+            } else {
+                let applied_nos: Vec<String> = rebuilt
+                    .yell_cards
+                    .iter()
+                    .map(|yc| yc.card_no.to_string())
+                    .collect();
+                log::debug!(
+                    "[REYELL_APPLY] n={} cards={:?} note_icons={}",
+                    rebuilt.yell_cards.len(),
+                    applied_nos,
+                    rebuilt.note_icons
+                );
+                // QA ruling: only the re-yelled cards participate — the first
+                // yell's blade-hearts were lost and its score icons do not count.
+                yell_data.yell_cards = rebuilt.yell_cards;
+                yell_data.total_hearts = rebuilt.total_hearts;
+                yell_data.note_icons = rebuilt.note_icons;
+                game_state.re_yell_occurred = false;
             }
-            yell_data.yell_cards = new_yell_cards;
-            yell_data.total_hearts = new_total_hearts;
-            yell_data.note_icons = new_cheer_count;
-            game_state.re_yell_occurred = false;
         }
 
         // Rule 8.3.14-8.3.16: Heart calculation + live success check.
         // hm (captured above from player_perform_live) is reused here — same data.
+        // NOTE: select the performer by ID, not by `is_first` position — when
+        // rule 8.4.13 makes P2 the first attacker, `is_first == true` still
+        // means "the FIRST attacker's window", and the first attacker is P2.
+        let performer_is_p1 = performer_id == game_state.player1.id;
         let perf_data = {
             let current_ho = &game_state.mods.heart_override;
             let current_hcm = &game_state.mods.heart_color_multiplier;
             let current_hcopy = &game_state.mods.heart_copy;
-            let player = if is_first {
+            let player = if performer_is_p1 {
                 &mut game_state.player1
             } else {
                 &mut game_state.player2

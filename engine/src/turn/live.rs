@@ -23,6 +23,117 @@ struct CardNeed {
     need: [u8; 8],
 }
 
+/// Icon tallies contributed by one yell-revealed card (rule 8.3.12).
+pub(crate) struct YellIconOutcome {
+    pub blade_hearts: [u8; 8],
+    pub note_icons: u8,
+    pub draw_icons: u8,
+}
+
+/// Rule 8.3.11 recolor mapping for set_blade_type effects.
+pub(crate) fn blade_color_to_heart(bc: BladeColor) -> HeartColor {
+    match bc {
+        BladeColor::Peach => HeartColor::Heart01,
+        BladeColor::Red => HeartColor::Heart02,
+        BladeColor::Yellow => HeartColor::Heart03,
+        BladeColor::Green => HeartColor::Heart04,
+        BladeColor::Blue => HeartColor::Heart05,
+        BladeColor::Purple => HeartColor::Heart06,
+        // ALL blade = "any one color heart" (rule 2.1.1.3), i.e. icon_all
+        // (HeartColor::All, index 7) — NOT colorless Heart00.
+        BladeColor::All => HeartColor::All,
+    }
+}
+
+/// Process the blade-heart and special-heart icons of ONE yell-revealed card.
+///
+/// Single source of truth shared by the primary yell (`player_perform_live`)
+/// and the re-yell rebuild (`execute_performance_phase`). Implements:
+/// - rule 8.3.15.1.1: ALL-blade counts as any one color heart (index 7 wildcard);
+/// - rule 8.3.12.1: each draw icon yields 1 draw (`draw_icons`; the caller executes it);
+/// - rule 8.4.2.1: each score icon adds +1 to the live total (`cheer_count`);
+/// - b_heart07: colorless hearts count double but never satisfy specific colors;
+/// - set_blade_type recoloring applies to colored blades only (Draw/Score pass through).
+///
+/// Heart contributions are added to `owned_hearts` and `total_hearts`. Callers
+/// that recompute the heart pool afterwards may pass a scratch `owned_hearts`.
+pub(crate) fn process_yell_revealed_card_icons(
+    card: &crate::card::Card,
+    override_color: Option<HeartColor>,
+    owned_hearts: &mut BaseHeart,
+    total_hearts: &mut [u8; 8],
+    cheer_count: &mut u8,
+) -> YellIconOutcome {
+    let mut bh_arr = EMPTY_H8;
+    let mut note_icons = 0u8;
+    let mut draw_icons = 0u8;
+
+    if let Some(ref bh) = card.blade_heart {
+        for (color, count) in &bh.hearts {
+            // b_heart07 mechanic: the key parses to HeartColor::Heart00
+            // (colorless), and `b_heart07: N` means 2×N colorless hearts.
+            // A colorless heart can ONLY be used to replace heart0
+            // requirements — never a specific color (heart01-heart06).
+            // The ×2 is applied on the ORIGINAL color (before any
+            // set_blade_type recoloring), so a recolored b_heart07 still
+            // contributes 2 hearts of the new color.
+            let amount = if *color == HeartColor::Heart00 {
+                count * 2
+            } else {
+                *count
+            };
+            // Draw/Score special icons are never converted by
+            // set_blade_type — they pass through unchanged.
+            let effective_color =
+                if matches!(*color, HeartColor::Draw | HeartColor::Score) {
+                    *color
+                } else {
+                    override_color.unwrap_or(*color)
+                };
+            // Q45: ALL-blade (BAll) can be treated as any color heart.
+            // Mapped to HeartColor::All (icon_all, index 7) so the UI
+            // displays icon_all.png for BAll yell hearts.
+            if effective_color == HeartColor::BAll {
+                *owned_hearts.hearts.entry_or_default(HeartColor::All) += amount;
+                bh_arr[7] += amount;
+                total_hearts[7] += amount;
+            } else if effective_color == HeartColor::Draw {
+                draw_icons += amount;
+            // Q44: Each score icon revealed during yell adds 1 to total score.
+            } else if effective_color == HeartColor::Score {
+                note_icons += amount;
+                *cheer_count += amount;
+            } else {
+                let idx = effective_color.index();
+                if idx < 8 {
+                    *owned_hearts.hearts.entry_or_default(effective_color) += amount;
+                    bh_arr[idx] += amount;
+                    total_hearts[idx] += amount;
+                }
+            }
+        }
+    }
+
+    // Special hearts printed on the revealed card itself (e.g. the ドロー icon
+    // on Solitude Rain when it is milled back into the deck and revealed).
+    if let Some(ref sh) = card.special_heart {
+        for (color, count) in &sh.hearts {
+            if *color == HeartColor::Draw {
+                draw_icons += count;
+            } else if *color == HeartColor::Score {
+                note_icons += count;
+                *cheer_count += count;
+            }
+        }
+    }
+
+    YellIconOutcome {
+        blade_hearts: bh_arr,
+        note_icons,
+        draw_icons,
+    }
+}
+
 impl super::TurnEngine {
     fn score_delta_since(
         current: &HashMap<i16, i32>,
@@ -39,6 +150,38 @@ impl super::TurnEngine {
     }
 
     pub fn execute_live_victory_determination(game_state: &mut GameState) {
+        // Rule 8.3.13.1 corrective path: a re-yell whose owner's performance
+        // window closed while their ability was paused on the optional discard
+        // choice never got applied by execute_performance_phase (that window
+        // had already computed its original yell data). Patch the owner's
+        // last snapshot and cheer count here, before scoring re-reads them.
+        if let Some(rb) = game_state.pending_reyell_rebuild.take() {
+            let is_p1 = rb.owner == game_state.player1.id;
+            log::debug!(
+                "[REYELL_APPLY_DEFERRED] owner={} n={} note_icons={} prev={}",
+                rb.owner,
+                rb.yell_cards.len(),
+                rb.note_icons,
+                rb.prev_note_icons
+            );
+            if let Some(snap) = game_state
+                .performance_snapshots
+                .iter_mut()
+                .rev()
+                .find(|s| s.player_id == rb.owner)
+            {
+                snap.yell_cards = rb.yell_cards.clone();
+                snap.total_hearts = rb.total_hearts;
+            }
+            // Rule 8.4.2.1: only the FINAL yell's score icons count.
+            if is_p1 {
+                game_state.player1_cheer_blade_heart_count = rb.note_icons;
+            } else {
+                game_state.player2_cheer_blade_heart_count = rb.note_icons;
+            }
+            game_state.re_yell_occurred = false;
+        }
+
         // Evaluate constant modify_required_hearts abilities on cards in the
         // success_live_card_zone (e.g. PL!-bp6-022-L) before any scoring or
         // heart requirement checks.
@@ -1413,19 +1556,7 @@ impl super::TurnEngine {
             heart_copy,
         );
 
-        let blade_to_heart = |bc: BladeColor| -> HeartColor {
-            match bc {
-                BladeColor::Peach => HeartColor::Heart01,
-                BladeColor::Red => HeartColor::Heart02,
-                BladeColor::Yellow => HeartColor::Heart03,
-                BladeColor::Green => HeartColor::Heart04,
-                BladeColor::Blue => HeartColor::Heart05,
-                BladeColor::Purple => HeartColor::Heart06,
-                // ALL blade = "any one color heart" (rule 2.1.1.3), i.e. icon_all
-                // (HeartColor::All, index 7) — NOT colorless Heart00.
-                BladeColor::All => HeartColor::All,
-            }
-        };
+        let blade_to_heart = blade_color_to_heart;
         let override_color = (0..3)
             .filter_map(|i| {
                 let cid = player.stage.stage[i];
@@ -1477,75 +1608,20 @@ impl super::TurnEngine {
 
         for card_id in &resolution_zone.cards {
             if let Some(card) = card_db.get_card(*card_id) {
-                let mut bh_arr = EMPTY_H8;
-                let mut note_icons = 0u8;
-                let mut draw_icons = 0u8;
-
-                if let Some(ref bh) = card.blade_heart {
-                    for (color, count) in &bh.hearts {
-                        // b_heart07 mechanic: the key parses to HeartColor::Heart00
-                        // (colorless), and `b_heart07: N` means 2×N colorless hearts.
-                        // A colorless heart can ONLY be used to replace heart0
-                        // requirements — never a specific color (heart01-heart06).
-                        // The ×2 is applied on the ORIGINAL color (before any
-                        // set_blade_type recoloring), so a recolored b_heart07 still
-                        // contributes 2 hearts of the new color.
-                        let amount = if *color == HeartColor::Heart00 {
-                            count * 2
-                        } else {
-                            *count
-                        };
-                        // Draw/Score special icons are never converted by
-                        // set_blade_type — they pass through unchanged.
-                        let effective_color =
-                            if matches!(*color, HeartColor::Draw | HeartColor::Score) {
-                                *color
-                            } else {
-                                override_color.unwrap_or(*color)
-                            };
-                        // Q45: ALL-blade (BAll) can be treated as any color heart.
-                        // Mapped to HeartColor::All (icon_all, index 7) so the UI
-                        // displays icon_all.png for BAll yell hearts.
-                        if effective_color == HeartColor::BAll {
-                            *owned_hearts.hearts.entry_or_default(HeartColor::All) += amount;
-                            bh_arr[7] += amount;
-                            total_hearts_arr[7] += amount;
-                        } else if effective_color == HeartColor::Draw {
-                            draw_icons += amount;
-                        // Q44: Each score icon revealed during yell adds 1 to total score.
-                        } else if effective_color == HeartColor::Score {
-                            note_icons += amount;
-                            cheer_icon_count += amount;
-                        } else {
-                            let idx = effective_color.index();
-                            if idx < 8 {
-                                *owned_hearts.hearts.entry_or_default(effective_color) += amount;
-                                bh_arr[idx] += amount;
-                                total_hearts_arr[idx] += amount;
-                            }
-                        }
-                    }
-                }
-
-                // Also process special_heart on yell cards (e.g. draw-from-エール)
-                if let Some(ref sh) = card.special_heart {
-                    for (color, count) in &sh.hearts {
-                        if *color == HeartColor::Draw {
-                            draw_icons += count;
-                        } else if *color == HeartColor::Score {
-                            note_icons += count;
-                            cheer_icon_count += count;
-                        }
-                    }
-                }
-
-                total_draw_icons += draw_icons;
+                let outcome = process_yell_revealed_card_icons(
+                    card,
+                    override_color,
+                    &mut owned_hearts,
+                    &mut total_hearts_arr,
+                    &mut cheer_icon_count,
+                );
+                total_draw_icons += outcome.draw_icons;
 
                 yell_cards.push(YellCardResult {
                     card_id: *card_id,
-                    blade_hearts: bh_arr,
-                    note_icons,
-                    draw_icons,
+                    blade_hearts: outcome.blade_hearts,
+                    note_icons: outcome.note_icons,
+                    draw_icons: outcome.draw_icons,
                     card_no: card_db
                         .get_card(*card_id)
                         .map(|c| crate::types::ArcStr::from(c.card_no.as_ref()))
@@ -1586,31 +1662,12 @@ impl super::TurnEngine {
             value: total_blade,
         });
 
-        // Live card special hearts
-        // Collect draw counts first (immutable), then draw with refresh (mutable).
-        let mut special_draw_count = 0u8;
-        for &lc_id in &player.live_card_zone.cards {
-            if let Some(card) = card_db.get_card(lc_id) {
-                if let Some(ref sh) = card.special_heart {
-                    for (color, count) in &sh.hearts {
-                        if *color == HeartColor::Draw {
-                            special_draw_count += count;
-                        } else if *color == HeartColor::Score {
-                            cheer_icon_count += count;
-                        }
-                    }
-                }
-            }
-        }
-        // Q104 / Rule 10.2.1: refresh from waitroom mid-draw
-        for _ in 0..special_draw_count {
-            if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
-                player.refresh();
-            }
-            if let Some(new_card) = player.main_deck.draw() {
-                player.hand.add_card(new_card);
-            }
-        }
+        // NOTE: Special hearts on cards sitting in the live_card_zone do NOT
+        // apply here. Both the draw note (rule 8.3.12.1) and the score note
+        // (rule 8.4.2.1) are scoped to icons revealed by the yell
+        // (「エールで出た」) — i.e. cards in the resolution zone only. A live
+        // card in the live zone contributes its icon only when an effect has
+        // put it into the deck and the yell reveals it.
 
         let live_card_ids: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
         let allocations =

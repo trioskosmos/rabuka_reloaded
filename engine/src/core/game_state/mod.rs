@@ -244,6 +244,11 @@ pub struct GameState {
     /// Set by execute_re_yell when a card's ability triggers a re-yell.
     /// The phase code checks this to re-compute yell data for live success.
     pub re_yell_occurred: bool,
+    /// Stashed by execute_perform_yell: rebuilt yell tallies for the re-yelled
+    /// cards, applied by the performance phase before its success check.
+    /// Necessary because re-yell abilities can pause on a player choice AFTER
+    /// the phase has already computed its original yell data.
+    pub pending_reyell_rebuild: Option<crate::types::PendingReyellRebuild>,
 
     // --- 2-byte aligned (i16, Option<i16>) ---
     pub activating_card: Option<i16>,
@@ -496,6 +501,7 @@ impl GameState {
             baton_touch_arriving_card_id: None,
             yell_occurred: false,
             re_yell_occurred: false,
+            pending_reyell_rebuild: None,
             // 2-byte aligned
             activating_card: None,
             activating_ability_index: None,

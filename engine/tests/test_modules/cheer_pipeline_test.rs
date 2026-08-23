@@ -84,7 +84,15 @@ fn cheer_pipeline_draw_and_score_icons() {
     );
 }
 
-/// Test that special_heart score icon adds to the cheer count
+/// Rule 8.4.2.1: a score icon counts toward the cheer total only when its card
+/// is REVEALED BY THE YELL (「エールで出た」). START:DASH!! is milled onto the
+/// deck top so the yell reveals it; its special スコア icon then adds +1.
+///
+/// (This test previously expected START:DASH!!'s score icon to count while the
+/// card sat in the LIVE ZONE — but rule 8.3.12 scopes blade-heart confirmation
+/// to the resolution zone, and rule 8.4.2.1 scopes score icons to "icons of
+/// your yell". An in-zone live card contributes nothing; see
+/// special_blade_heart_rules_test.rs::live_zone_special_icons_do_not_apply.)
 #[test]
 fn cheer_pipeline_score_icon() {
     let db = load_real_database();
@@ -92,47 +100,84 @@ fn cheer_pipeline_score_icon() {
     let fill = game.id("PL!-sd1-010-SD");
     for _ in 0..20 {
         game.state.player1.main_deck.cards.push(fill);
-    }
-    for _ in 0..20 {
         game.state.player2.main_deck.cards.push(fill);
     }
 
-    // Stage: 絢瀬絵里 (PL!-sd1-002-SD) — blade=1, base_heart={heart06:1}
-    let stage_member = game.id("PL!-sd1-002-SD");
-    game.add_to_stage(MemberArea::Center, stage_member);
+    // Stage covers heart01+heart03 (ことり fillers) and heart06 (絢瀬絵里) so
+    // START:DASH!! succeeds without any yell help.
+    let kotori_a = game.id("PL!-sd1-010-SD"); // base_heart={heart01:1,heart03:1}, blade=1
+    let kotori_b = game.new_id("PL!-sd1-010-SD");
+    let eri = game.id("PL!-sd1-002-SD"); // base_heart={heart06:1}, blade=1
+    game.add_to_stage(MemberArea::LeftSide, kotori_a);
+    game.add_to_stage(MemberArea::Center, kotori_b);
+    game.add_to_stage(MemberArea::RightSide, eri);
 
-    // Live card: START:DASH!! (PL!-sd1-019-SD) — special_heart={score:1}, need_heart={heart01:1, heart03:1, heart06:1}
-    // This live card has score icon in special_heart
+    // A second START:DASH!! copy goes ON TOP of the deck → revealed by yell.
+    let dash_on_deck = game.id("PL!-sd1-019-SD");
+    let sacrificial_fill = game.id("PL!-sd1-010-SD");
+
     let live_card = game.id("PL!-sd1-019-SD");
     game.add_to_hand(live_card);
 
-    // Need stage members providing heart01, heart03, heart06 for the need_heart requirement
-    // 絢瀬絵里 provides heart06, need heart01 and heart03 too — put more members
-    let filler_member = game.id("PL!-sd1-010-SD"); // 南ことり: heart01:1, heart03:1
-    game.add_to_stage(MemberArea::LeftSide, filler_member);
-    game.add_to_stage(MemberArea::RightSide, filler_member);
-
-    // Seed deck for yell (1 blade from 絢瀬絵里)
-    let filler = game.id("PL!-sd1-010-SD");
-    game.state.player1.main_deck.cards.push(filler);
-    for _ in 0..10 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live_card);
+    // Deck layout applied AFTER set_live_card (index 0 = top): position 0 is
+    // consumed by the LiveCardSet refill draw, so the yell then reveals
+    // [DASH copy, filler, filler].
+    game.state.player1.main_deck.cards.insert(0, dash_on_deck);
+    game.state
+        .player1
+        .main_deck
+        .cards
+        .insert(0, sacrificial_fill);
+
     advance_to_live_start(&mut game);
 
-    game.pass(); // FirstAttackerPerformance
+    game.pass(); // FirstAttackerPerformance — yell reveals dash_on_deck + 2 fillers
     game.pass(); // SecondAttackerPerformance
+    game.pass(); // → Live Result
 
-    // The score icon from special_heart should contribute to cheer count
-    // The live card has special_heart={score:1}, blade_heart={} (no blade_heart on START:DASH)
-    // But the yell card has blade_heart too? No, filler has no blade_heart.
-    // So cheer count comes from special_heart.score = 1
+    // DASH's own ライブ成功時 ability ("look at top 3, arrange any number")
+    // now queues an optional SelectCard prompt INSIDE victory determination;
+    // victory defers finalizing while a choice is pending, so answer it
+    // (skip = arrange zero cards, legal) and continue until finalized.
+    let mut saw_result = false;
+    for _ in 0..10 {
+        if game.has_pending_choice() {
+            game.select_indices(&[]);
+            continue;
+        }
+        let phase = game.state.current_phase.to_string();
+        if phase.contains("Live Result") {
+            saw_result = true;
+        }
+        if saw_result && phase == "Active" {
+            break;
+        }
+        game.pass();
+    }
+
+    // The revealed copy's special_heart={score:1} feeds the cheer count...
+    assert_eq!(
+        game.state.player1_cheer_blade_heart_count, 1,
+        "score icon from the YELL-REVEALED special_heart adds exactly 1 (rule 8.4.2.1)"
+    );
+
+    // ...and the live total becomes card score 1 + cheer 1 = 2.
+    let snap = game
+        .state
+        .performance_snapshots
+        .iter()
+        .rev()
+        .find(|s| s.player_id == "p1")
+        .expect("P1 snapshot");
+    assert!(snap.success, "stage hearts satisfy heart01+03+06");
+    assert_eq!(snap.total_score, 2, "card score 1 + one revealed score icon");
+
+    // The revealed copy went to the waitroom with the rest of the yell.
     assert!(
-        game.state.player1_cheer_blade_heart_count >= 1,
-        "Score icon from special_heart should contribute to cheer count"
+        game.state.player1.waitroom.cards.contains(&dash_on_deck),
+        "yell-revealed START:DASH!! should end up in the waitroom"
     );
 }
 

@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T13:44:15.219798+00:00",
+  "generated_at": "2026-08-23T16:10:10.468450+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 426,
-  "n_tests": 2614,
+  "n_files": 428,
+  "n_tests": 2623,
   "total_cards": 771,
   "covered_cards": 611,
   "abilities_on_covered": 772,
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 592,
+    "L2+choice": 593,
     "none": 164,
     "L1+choice": 134,
-    "L2": 25,
+    "L2": 24,
     "L1": 21
   },
   "qa_rulings": {
@@ -500,6 +500,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/attacker_order_performance_test.rs",
         "engine/tests/test_modules/batch5_test.rs",
         "engine/tests/test_modules/blade_heart_colorless_test.rs",
         "engine/tests/test_modules/bp7_audrey_blade_max_test.rs",
@@ -540,6 +541,7 @@
         "engine/tests/test_modules/rina_bp3_test.rs",
         "engine/tests/test_modules/sayaka_test.rs",
         "engine/tests/test_modules/solitude_test.rs",
+        "engine/tests/test_modules/special_blade_heart_rules_test.rs",
         "engine/tests/test_modules/stage_to_discard_ability_test.rs",
         "engine/tests/test_modules/untested_abilities_batch4_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
@@ -579,7 +581,7 @@
         "bella_q174_no_member_on_stage_ability_does_not_fire",
         "bp3_002_per_opponent_waited_member_blade"
       ],
-      "covering_test_count": 389,
+      "covering_test_count": 398,
       "is_null": false
     },
     {
@@ -9951,6 +9953,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/attacker_order_performance_test.rs",
         "engine/tests/test_modules/aurora_flower_identity_test.rs",
         "engine/tests/test_modules/blade_heart_colorless_test.rs",
         "engine/tests/test_modules/fixed_customs_test.rs",
@@ -9968,6 +9971,7 @@
         "engine/tests/test_modules/qa_new_tests256.rs",
         "engine/tests/test_modules/qa_new_tests257.rs",
         "engine/tests/test_modules/shioriko_bp4_swap_test.rs",
+        "engine/tests/test_modules/special_blade_heart_rules_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs"
       ],
       "covering_tests": [
@@ -9995,14 +9999,14 @@
         "butterfly_wing_to_butterfly_no_match",
         "colorless_hearts_cannot_fill_colored_requirement",
         "colorless_hearts_fill_heart0_when_colored_hearts_present",
+        "discarded_first_yell_hearts_are_lost",
         "dream_believers_104_to_105_no_match",
         "dream_believers_105_to_104_no_match",
         "dream_believers_105_to_base_no_match",
         "dream_believers_to_105_matches",
-        "duplicate_names_fails_condition",
-        "duplicate_names_fails_distinct_condition"
+        "duplicate_names_fails_condition"
       ],
-      "covering_test_count": 138,
+      "covering_test_count": 147,
       "is_null": true
     },
     {
@@ -12182,6 +12186,7 @@
         "engine/tests/test_modules/setsuna_bp5_test.rs",
         "engine/tests/test_modules/setsuna_pb1_heart_constant_test.rs",
         "engine/tests/test_modules/shizuku_bp4_aggregate_test.rs",
+        "engine/tests/test_modules/special_blade_heart_rules_test.rs",
         "engine/tests/test_modules/stellar_phoenix_test.rs",
         "engine/tests/test_modules/toubatsu_test.rs",
         "engine/tests/test_modules/turn_scope_regression_test.rs",
@@ -12227,7 +12232,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 766,
+      "covering_test_count": 774,
       "is_null": false
     },
     {
@@ -14339,6 +14344,7 @@
         "engine/tests/test_modules/daisuki_test.rs",
         "engine/tests/test_modules/kurosawa_dia_re_yell_test.rs",
         "engine/tests/test_modules/qa_new_tests202.rs",
+        "engine/tests/test_modules/special_blade_heart_rules_test.rs",
         "engine/tests/test_modules/yoshiko_center_ability_test.rs",
         "engine/tests/test_modules/yoshiko_edge_cases_test.rs"
       ],
@@ -14351,8 +14357,11 @@
         "condition_5_revealed_all_blade_heart_no_trigger",
         "discard_accept_then_re_yells",
         "discard_skip_no_re_yell",
+        "discarded_first_yell_hearts_are_lost",
+        "failed_live_still_resolves_yell_draw_icons",
         "filler_deck_select_dia_first",
         "full_flow_accept_discard_and_re_yell",
+        "live_zone_special_icons_do_not_apply",
         "mixed_deck_daisuki_first_then_dia",
         "mixed_deck_dia_first_then_daisuki",
         "once_per_turn_does_not_trigger_again_same_turn",
@@ -14362,19 +14371,16 @@
         "q201_miyashita_decline_leaves_opponents_active",
         "q201_miyashita_deploy_triggers_opponent_wait",
         "q202_mia_deploy_look_top3_adds_one_rest_to_waitroom",
+        "re_yell_revealed_draw_icon_draws",
+        "re_yelled_ball_counts_as_wildcard_not_colorless",
+        "score_icon_revealed_by_yell_adds_to_cheer_and_score",
+        "solitude_rain_revealed_by_yell_draws_one_card",
         "test_yoshiko_center_ability_basic_success",
         "test_yoshiko_center_ability_cost_calculation",
         "test_yoshiko_center_ability_exclude_self",
-        "test_yoshiko_center_ability_fails_no_hand_cards",
-        "test_yoshiko_center_ability_fails_not_in_center",
-        "test_yoshiko_center_ability_no_other_aqours_on_stage",
-        "test_yoshiko_center_ability_no_valid_discard_targets",
-        "test_yoshiko_center_ability_use_limit",
-        "test_yoshiko_cost_reference_uses_sacrificed_not_self",
-        "test_yoshiko_no_valid_target_after_sacrifice",
-        "with_dia_mixed_deck_both_trigger"
+        "test_yoshiko_center_ability_fails_no_hand_cards"
       ],
-      "covering_test_count": 40,
+      "covering_test_count": 48,
       "is_null": false
     },
     {
@@ -25526,9 +25532,9 @@
       ],
       "base": "PL!-sd1-022",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/bp7_q271_colorful_dreams_test.rs",
@@ -26586,9 +26592,12 @@
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/pl_n_bp1_027_test.rs",
         "engine/tests/test_modules/solitude_test.rs",
+        "engine/tests/test_modules/special_blade_heart_rules_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs"
       ],
       "covering_tests": [
+        "discarded_first_yell_hearts_are_lost",
+        "failed_live_still_resolves_yell_draw_icons",
         "fu_pb1_debut_heart06_member_auto_gains_heart06",
         "fu_pb1_debut_no_heart06_member_no_effect",
         "fu_pb1_debut_two_heart06_members_prompts_choice",
@@ -26616,11 +26625,9 @@
         "issue1_kanon_invalidate_and_recover",
         "issue1_kanon_no_liella_on_stage_no_recovery",
         "issue2_rina_cost_total_10_no_bonus",
-        "issue2_rina_cost_total_6_draws_card",
-        "issue3_karin_live_start_draw_card",
-        "issue4_you_exclude_aqours_live_start"
+        "issue2_rina_cost_total_6_draws_card"
       ],
-      "covering_test_count": 106,
+      "covering_test_count": 114,
       "is_null": false
     },
     {
