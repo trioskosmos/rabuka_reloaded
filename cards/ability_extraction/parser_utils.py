@@ -5,6 +5,7 @@ pattern lists, and normalization used across the parsing pipeline.
 """
 
 import re
+import inspect
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Callable
 
@@ -994,6 +995,42 @@ def action_rule(registry: PriorityRegistry, priority: int, name: str = ""):
     return decorator
 
 
+def _accepts_two_positional(f: Callable) -> bool:
+    """True when `f` can be called with two positional args (text, action)."""
+    try:
+        sig = inspect.signature(f)
+    except (TypeError, ValueError):
+        return True  # builtins / C callables — assume permissive
+    for p in sig.parameters.values():
+        if p.kind is inspect.Parameter.VAR_POSITIONAL:
+            return True
+        if p.kind is inspect.Parameter.KEYWORD_ONLY and p.default is inspect.Parameter.empty:
+            return False
+    n = sum(
+        1
+        for p in sig.parameters.values()
+        if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    )
+    return n >= 2
+
+
+def _as_two_arg(f: Optional[Callable]) -> Optional[Callable]:
+    """Normalize a 1-arg predicate/setter to the (text, action) contract.
+
+    Registered rules historically mixed 1-arg and 2-arg lambdas; dispatch
+    papered over the difference with try/except TypeError. Arity is now fixed
+    once here so dispatch can call unconditionally.
+    """
+    if f is None or _accepts_two_positional(f):
+        return f
+
+    def wrapped(text, action=None, _f=f):
+        return _f(text)
+
+    wrapped.__name__ = getattr(f, "__name__", "wrapped")
+    return wrapped
+
+
 @dataclass
 class ActionRule:
     """Declarative action parsing rule: text pattern → action type + field defaults.
@@ -1019,6 +1056,10 @@ class ActionRule:
     setter: Optional[Callable] = None  # complex setter (text, action) → None
     extract_optional: bool = False  # auto-detect optional from "もよい"
 
+    def __post_init__(self):
+        self.condition = _as_two_arg(self.condition)
+        self.setter = _as_two_arg(self.setter)
+
     def matches(self, text: str, action: Optional[Dict] = None) -> bool:
         if self.match and self.match not in text:
             return False
@@ -1031,13 +1072,21 @@ class ActionRule:
         if self.exclude_any and any(e in text for e in self.exclude_any):
             return False
         if self.condition and action is not None:
+            # Arity normalized in __post_init__ — call directly. A raised
+            # exception is a real predicate bug; log loudly, treat as no-match
+            # (same outcome as the old silent swallow) so behavior is stable.
             try:
                 if not self.condition(text, action):
                     return False
-            except TypeError:
-                if not self.condition(text):
-                    return False
-            except Exception:
+            except Exception as e:
+                try:
+                    from parser import _DEBUG_LOG
+
+                    _DEBUG_LOG.append(
+                        f"ActionRule({self.action}) condition raised: {e!r} on {text!r}"
+                    )
+                except Exception:
+                    pass
                 return False
         return True
 
@@ -1052,10 +1101,9 @@ class ActionRule:
         if self.setter:
             try:
                 self.setter(text, action)
-            except TypeError:
-                pass  # arity mismatch on shared setters is expected
             except Exception as e:
                 # Surface real setter bugs instead of silently dropping fields.
+                # (Arity mismatches are normalized in __post_init__.)
                 try:
                     from parser import _DEBUG_LOG
 

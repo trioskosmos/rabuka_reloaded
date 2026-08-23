@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 21,
     [string]$WindowTitle = "",
-    [string]$Message = "continue, if the md is done do another deep dive for engine and parser and reprioritize, edit the md, then continue. no file splitting. there is a lot to work with so get to it, only get to tests if you really think the engine and parser is perfect. only if there is really nothing to do make sure abilities work as written in conjunction when playing off other abilities and make the tests hard with all possible edge cases. "
+    [string]$Message = "is what is in the md done. if not, continue through it. if it is, go do another deep dive on the engine and parser to find more issues."
 )
 
 Add-Type -AssemblyName System.Windows.Forms
