@@ -217,7 +217,6 @@ fn eternalize_three_all_different_no_trigger() {
 /// The bonus tiers are driven by real 虹ヶ咲 effects in the same turn:
 /// エマ PL!N-bp4-008-R 起動 activates 1 energy OR 1 member,
 /// エマ PL!N-pb1-008-R 登場 activates 1 member OR 2 energy.
-use crate::helpers::*;
 use rabuka_engine::ability::types::Choice;
 use rabuka_engine::core::types::AbilityTrigger;
 
