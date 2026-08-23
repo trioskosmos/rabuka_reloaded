@@ -249,7 +249,21 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         "restriction" => {
             let rt_binding = effect.restriction_type_any();
             let rt = rt_binding.unwrap_or("restriction");
-            format!("Apply {} restriction", rt)
+            match rt {
+                "cannot_baton_touch" => {
+                    "Cannot be replaced by a baton touch (except from excluded groups)"
+                        .to_string()
+                }
+                "cannot_activate" => "Cannot be activated".to_string(),
+                "cannot_activate_by_effect" => {
+                    "Cannot be activated by card effects".to_string()
+                }
+                "cannot_live" => "Cannot perform a live".to_string(),
+                "cannot_place" => {
+                    "Cannot be placed in the success live card zone".to_string()
+                }
+                other => format!("Restriction: {}", other),
+            }
         }
 
         "gain_ability" => {
@@ -366,11 +380,20 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         "modify_cost" => {
             let op_binding = effect.operation_any();
             let op = op_binding.unwrap_or("subtract");
-            let amt = c.unwrap_or(1);
-            if op == "subtract" {
-                format!("Reduce cost by {}", amt)
+            // Set-cost (「コストはNになる」) uses the absolute `value` field,
+            // not the additive count — e.g. LL-bp7-001 sets cost to 10.
+            if op == "set" {
+                match effect.value_any().and_then(|v| i16::try_from(v).ok()) {
+                    Some(v) => format!("Cost becomes {}", v),
+                    None => "Set cost".to_string(),
+                }
             } else {
-                format!("Increase cost by {}", amt)
+                let amt = c.unwrap_or(1);
+                if op == "subtract" {
+                    format!("Reduce cost by {}", amt)
+                } else {
+                    format!("Increase cost by {}", amt)
+                }
             }
         }
 
@@ -922,8 +945,18 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
         }
         "restriction" => {
             let rt_binding = effect.restriction_type_any();
-            let rt = rt_binding.unwrap_or("制限");
-            format!("{}制限を適用", rt)
+            match rt_binding.unwrap_or("制限") {
+                "cannot_baton_touch" => {
+                    "バトンタッチでは控え室に置かれない".to_string()
+                }
+                "cannot_activate" => "起動できない".to_string(),
+                "cannot_activate_by_effect" => "効果によってはアクティブにならない".to_string(),
+                "cannot_live" => "ライブできない".to_string(),
+                "cannot_place" => {
+                    "成功ライブカード置き場に置くことができない".to_string()
+                }
+                other => format!("{}制限を適用", other),
+            }
         }
         "gain_ability" => {
             if let Some(ref ga) = effect.ability_gain_any() {
@@ -1022,11 +1055,19 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
         "modify_cost" => {
             let op_binding = effect.operation_any();
             let op = op_binding.unwrap_or("subtract");
-            let amt = c.unwrap_or(1);
-            if op == "subtract" {
-                format!("{{{{icon_energy.png|E}}}}を{}減らす", amt)
+            // Set-cost (「コストはNになる」) uses the absolute `value` field.
+            if op == "set" {
+                match effect.value_any().and_then(|v| i16::try_from(v).ok()) {
+                    Some(v) => format!("コストは{}になる", v),
+                    None => "コストを設定".to_string(),
+                }
             } else {
-                format!("{{{{icon_energy.png|E}}}}を{}増やす", amt)
+                let amt = c.unwrap_or(1);
+                if op == "subtract" {
+                    format!("{{{{icon_energy.png|E}}}}を{}減らす", amt)
+                } else {
+                    format!("{{{{icon_energy.png|E}}}}を{}増やす", amt)
+                }
             }
         }
         "modify_yell_count" => {
