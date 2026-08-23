@@ -3029,12 +3029,8 @@ impl<'a> ConditionContext<'a> {
         if let Some(ref act_pos) = condition.get_activation_position() {
             let card_id = self.activating_card_id;
             let passes = act_pos.split(',').any(|p| {
-                let trimmed = p.trim();
-                let idx = match trimmed {
-                    "left" | "left_side" => 0,
-                    "center" => 1,
-                    "right" | "right_side" => 2,
-                    _ => return false,
+                let Some(idx) = crate::ability::util::activation_position_index(p) else {
+                    return false;
                 };
                 idx < player.stage.stage.len()
                     && card_id.is_some()

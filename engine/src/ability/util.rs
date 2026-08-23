@@ -632,6 +632,18 @@ pub fn card_matches_any_group(card_db: &CardDatabase, card_id: i16, groups: &[St
             .any(|g| card_matches_group_str(card_db, card_id, Some(g)))
 }
 
+/// Map an `activation_position` token ("left"/"left_side"/"center"/
+/// "right"/"right_side") to the stage slot index. Single source of truth;
+/// callers decide their own policy for unknown tokens.
+pub fn activation_position_index(p: &str) -> Option<usize> {
+    match p.trim() {
+        "left" | "left_side" => Some(0),
+        "center" => Some(1),
+        "right" | "right_side" => Some(2),
+        _ => None,
+    }
+}
+
 /// Returns true if `existing_card` (the member already on the stage area)
 /// prevents a baton touch by `incoming_card_id` — i.e. it has a
 /// `cannot_baton_touch` restriction that is not excluded by the incoming

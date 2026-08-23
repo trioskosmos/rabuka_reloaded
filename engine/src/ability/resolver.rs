@@ -329,11 +329,8 @@ impl AbilityResolver {
                 let card_id = gs.activating_card;
                 let player = gs.resolve_target_player("self");
                 let passes = act_pos.split(',').any(|p| {
-                    let idx = match p.trim() {
-                        "left" | "left_side" => 0,
-                        "center" => 1,
-                        "right" | "right_side" => 2,
-                        _ => return false,
+                    let Some(idx) = crate::ability::util::activation_position_index(p) else {
+                        return false;
                     };
                     idx < player.stage.stage.len()
                         && card_id.is_some()
