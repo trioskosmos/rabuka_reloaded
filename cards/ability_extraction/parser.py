@@ -11828,7 +11828,10 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
     # opponent_action wrapper anymore — _try_opponent_action flattens at
     # parse time. Kept as history note only.
 
-    # FIX 7: Ability filter — 能力を持たない → ability_filter:no_ability
+    # FIX 7/7b: Ability filter (LOAD-BEARING, verified 2026-08: removal changes
+    # 2 corpus abilities). 「能力を持たない」 on modify_cost and on select
+    # sub-actions must become ability_filter=no_ability; the generic handlers
+    # don't derive it from text.
     if "能力を持たない" in t:
         if eff.get("action") == "modify_cost" and not eff.get("ability_filter"):
             eff["ability_filter"] = "no_ability"
@@ -11849,7 +11852,9 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
 
     _fix_condition_enrichment(eff, t, fix_stats)
 
-    # FIX 9: Result condition enrichment in conditional_on_result
+    # FIX 9: Result condition enrichment in conditional_on_result (LOAD-BEARING,
+    # verified 2026-08: removal changes 1 corpus ability — ブレードハート /
+    # スコア icon card_property derivation on result_condition).
     rc = eff.get("result_condition")
     if isinstance(rc, dict) and not rc.get("card_property"):
         rct = rc.get("text", "")
@@ -11864,7 +11869,8 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
         _infer_heart_source(rc, rct)
         _infer_baton_touch(rc, rct)
 
-    # FIX 9b: followup_action with "このメンバー" → self_target / self_cost
+    # FIX 9b: followup_action self_target/self_cost (LOAD-BEARING, verified
+    # 2026-08: removal changes 2 corpus abilities).
     fa = eff.get("followup_action")
     if isinstance(fa, dict) and "このメンバー" in fa.get("text", ""):
         if not fa.get("target") and fa.get("self_target") is None:
