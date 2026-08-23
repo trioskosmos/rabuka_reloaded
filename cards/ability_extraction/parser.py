@@ -1650,14 +1650,25 @@ def parse_effect(text: str) -> Dict[str, Any]:
         effect["activation_position"] = extra_activation_pos
     _propagate_optional(effect)
 
-    # Post-fallback exact text matches
+    # Post-fallback disambiguation overrides. NOTE: their position AFTER
+    # parse_action is their semantics — they override wrong registry
+    # decisions using normalized pattern_text. Do not fold these into the
+    # main registry (dispatch order would change).
     normalized = re.sub(r"\s+", "", fallback_text)
     pattern_text = re.sub(r"\{\{[^|]+\|([^}]+)\}\}", r"\1", normalized)
 
+    # 「（元々持つ）ブレードの数はNつになる」 → set_blade_count(N).
+    # Generalized handler for play-time/continuous blade-count setting;
+    # the icon template sits between ブレード and の数 in raw text, so
+    # match on the icon-stripped form.
+    blade_set_m = re.search(r"ブレードの数は(\d+)つになる", pattern_text)
+
     extra_checks = [
         (
-            lambda: "ブレードの数は3つになる" in pattern_text,
-            lambda: effect.update({"action": "set_blade_count", "count": 3})
+            lambda: blade_set_m is not None,
+            lambda: effect.update(
+                {"action": "set_blade_count", "count": int(blade_set_m.group(1))}
+            )
             or (
                 effect.update({"duration": "live_end"})
                 if "duration" not in effect and "ライブ終了時まで" in pattern_text
