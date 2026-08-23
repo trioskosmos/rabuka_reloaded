@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T11:30:54.248809+00:00",
+  "generated_at": "2026-08-23T12:01:20.724298+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 424,
-  "n_tests": 2599,
+  "n_files": 426,
+  "n_tests": 2601,
   "total_cards": 771,
-  "covered_cards": 607,
-  "abilities_on_covered": 768,
+  "covered_cards": 610,
+  "abilities_on_covered": 771,
   "trigger_counts": {
     "起動": [
       80,
@@ -30,11 +30,11 @@
       2
     ],
     "ライブ成功時": [
-      93,
+      94,
       122
     ],
     "常時": [
-      103,
+      105,
       117
     ],
     "自動": [
@@ -52,11 +52,11 @@
       71
     ],
     "gain_resource": [
-      131,
+      133,
       160
     ],
     "sequential": [
-      171,
+      172,
       219
     ],
     "unknown": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      446,
+      447,
       546
     ],
     "temporal_condition": [
@@ -210,7 +210,7 @@
       2
     ],
     "group_condition": [
-      30,
+      32,
       43
     ],
     "or_condition": [
@@ -280,11 +280,11 @@
       88
     ],
     "bp5": [
-      111,
+      112,
       134
     ],
     "bp6": [
-      62,
+      64,
       82
     ],
     "bp7": [
@@ -310,10 +310,10 @@
   },
   "depth_counts": {
     "L2+choice": 592,
-    "none": 168,
-    "L1+choice": 133,
+    "none": 165,
+    "L1+choice": 134,
     "L2": 25,
-    "L1": 18
+    "L1": 20
   },
   "qa_rulings": {
     "covered": 272,
@@ -397,6 +397,7 @@
         "engine/tests/test_modules/kanata_bp1_test.rs",
         "engine/tests/test_modules/kidou_softlock_test.rs",
         "engine/tests/test_modules/konata_test.rs",
+        "engine/tests/test_modules/l0_gap_subunit_success_test.rs",
         "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs",
         "engine/tests/test_modules/love_wing_bell_test.rs",
         "engine/tests/test_modules/miracle_stay_tune_test.rs",
@@ -524,6 +525,7 @@
         "engine/tests/test_modules/joint_card_live_start_test.rs",
         "engine/tests/test_modules/konata_bp4_test.rs",
         "engine/tests/test_modules/l0_gap_constant2_test.rs",
+        "engine/tests/test_modules/l0_gap_subunit_success_test.rs",
         "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs",
         "engine/tests/test_modules/love_u_test.rs",
         "engine/tests/test_modules/miracle_stay_tune_test.rs",
@@ -5963,14 +5965,19 @@
         "PL!SP-sd2-017-SD2"
       ],
       "base": "PL!N-bp5-016",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/l0_gap_constant6_test.rs"
+      ],
+      "covering_tests": [
+        "karin_bp5_016_energy_10_heart06x2",
+        "nsd1_001_no_other_niji_no_boost"
+      ],
+      "covering_test_count": 2,
       "is_null": false
     },
     {
@@ -10018,6 +10025,7 @@
         "engine/tests/test_modules/dive_edge_test.rs",
         "engine/tests/test_modules/emma_test.rs",
         "engine/tests/test_modules/joint_card_live_start_test.rs",
+        "engine/tests/test_modules/l0_gap_constant6_test.rs",
         "engine/tests/test_modules/l0_gap_livestart3_test.rs",
         "engine/tests/test_modules/mifune_test.rs",
         "engine/tests/test_modules/mymai_tonight_test.rs",
@@ -10046,6 +10054,7 @@
         "emma_q163_nijigasaki_member_pays_cost",
         "emma_q163_self_excluded_no_other_niko_cost_fails",
         "full_chain_setsuna_debut_retrieval",
+        "karin_bp5_016_energy_10_heart06x2",
         "mifune_q231_excess_heart_2_score_cancels_to_0",
         "mymai_q121_all_stage_members_gain_blade",
         "mymai_tonight_alone_no_blade",
@@ -10053,10 +10062,9 @@
         "mymai_tonight_with_aqours_live_gains_blade",
         "mymai_tonight_with_aqours_member_no_blade",
         "mymai_tonight_with_non_aqours_live_no_blade",
-        "mymai_two_aqours_live_gains_blade_once",
-        "mymai_two_copies_plus_aqours_live_both_fire"
+        "mymai_two_aqours_live_gains_blade_once"
       ],
-      "covering_test_count": 65,
+      "covering_test_count": 67,
       "is_null": false
     },
     {
@@ -10086,6 +10094,7 @@
         "engine/tests/test_modules/dive_edge_test.rs",
         "engine/tests/test_modules/emma_test.rs",
         "engine/tests/test_modules/joint_card_live_start_test.rs",
+        "engine/tests/test_modules/l0_gap_constant6_test.rs",
         "engine/tests/test_modules/l0_gap_livestart3_test.rs",
         "engine/tests/test_modules/mifune_test.rs",
         "engine/tests/test_modules/mymai_tonight_test.rs",
@@ -10114,6 +10123,7 @@
         "emma_q163_nijigasaki_member_pays_cost",
         "emma_q163_self_excluded_no_other_niko_cost_fails",
         "full_chain_setsuna_debut_retrieval",
+        "karin_bp5_016_energy_10_heart06x2",
         "mifune_q231_excess_heart_2_score_cancels_to_0",
         "mymai_q121_all_stage_members_gain_blade",
         "mymai_tonight_alone_no_blade",
@@ -10121,10 +10131,9 @@
         "mymai_tonight_with_aqours_live_gains_blade",
         "mymai_tonight_with_aqours_member_no_blade",
         "mymai_tonight_with_non_aqours_live_no_blade",
-        "mymai_two_aqours_live_gains_blade_once",
-        "mymai_two_copies_plus_aqours_live_both_fire"
+        "mymai_two_aqours_live_gains_blade_once"
       ],
-      "covering_test_count": 65,
+      "covering_test_count": 67,
       "is_null": false
     },
     {
@@ -24862,6 +24871,7 @@
         "engine/tests/test_modules/l0_gap_constant5_test.rs",
         "engine/tests/test_modules/l0_gap_livesuccess3_test.rs",
         "engine/tests/test_modules/l0_gap_livesuccess_test.rs",
+        "engine/tests/test_modules/l0_gap_subunit_success_test.rs",
         "engine/tests/test_modules/live_success_rules_test.rs",
         "engine/tests/test_modules/modify_required_hearts_exclude_heart_test.rs",
         "engine/tests/test_modules/movement_condition_test.rs",
@@ -24975,6 +24985,7 @@
         "engine/tests/test_modules/l0_gap_constant5_test.rs",
         "engine/tests/test_modules/l0_gap_livesuccess3_test.rs",
         "engine/tests/test_modules/l0_gap_livesuccess_test.rs",
+        "engine/tests/test_modules/l0_gap_subunit_success_test.rs",
         "engine/tests/test_modules/live_success_rules_test.rs",
         "engine/tests/test_modules/modify_required_hearts_exclude_heart_test.rs",
         "engine/tests/test_modules/movement_condition_test.rs",
@@ -32384,6 +32395,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/l0_gap_constant6_test.rs",
         "engine/tests/test_modules/untested_abilities_playthrough_test.rs"
       ],
       "covering_tests": [
@@ -32400,14 +32412,16 @@
         "hs_bp5_021_score_bonus_with_three_mirakura_members",
         "hs_bp5_021_single_hasunosora_member_heart_conversion",
         "hs_bp5_021_three_members_pick_middle",
+        "karin_bp5_016_energy_10_heart06x2",
         "n_pb1_006_activates_wait_energy_to_active",
         "n_pb1_006_can_activate_multiple_times",
         "n_pb1_006_wait_self_activates_one_energy",
+        "nsd1_001_no_other_niji_no_boost",
         "sp_bp5_016_constant_evaluated_during_live_phase",
         "sp_bp5_016_energy_ge_10_grants_heart06_x2",
         "sp_bp5_016_energy_lt_10_grants_no_heart06"
       ],
-      "covering_test_count": 19,
+      "covering_test_count": 21,
       "is_null": false
     },
     {
@@ -35063,7 +35077,8 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/card_filter_test.rs"
+        "engine/tests/test_modules/card_filter_test.rs",
+        "engine/tests/test_modules/l0_gap_subunit_success_test.rs"
       ],
       "covering_tests": [
         "ayase_accepts_jyouji_rejects_debut",
@@ -35115,12 +35130,14 @@
         "PL!-bp6-014-N"
       ],
       "base": "PL!-bp6-014",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
+      "covering_files": [
+        "engine/tests/test_modules/l0_gap_subunit_success_test.rs"
+      ],
       "covering_tests": [],
       "covering_test_count": 0,
       "is_null": false
@@ -35139,12 +35156,14 @@
         "PL!-bp6-015-N"
       ],
       "base": "PL!-bp6-015",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
+      "covering_files": [
+        "engine/tests/test_modules/l0_gap_subunit_success_test.rs"
+      ],
       "covering_tests": [],
       "covering_test_count": 0,
       "is_null": false
