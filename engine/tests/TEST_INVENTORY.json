@@ -1,24 +1,24 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T23:30:28.958608+00:00",
+  "generated_at": "2026-08-23T23:44:00.927540+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 439,
-  "n_tests": 2668,
+  "n_files": 440,
+  "n_tests": 2671,
   "total_cards": 771,
-  "covered_cards": 639,
-  "abilities_on_covered": 803,
+  "covered_cards": 642,
+  "abilities_on_covered": 806,
   "trigger_counts": {
     "起動": [
       84,
       96
     ],
     "登場": [
-      220,
+      223,
       269
     ],
     "ライブ開始時": [
@@ -48,7 +48,7 @@
       146
     ],
     "look_and_select": [
-      44,
+      47,
       71
     ],
     "gain_resource": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      456,
+      459,
       545
     ],
     "temporal_condition": [
@@ -264,11 +264,11 @@
       52
     ],
     "bp1": [
-      53,
+      54,
       56
     ],
     "bp3": [
-      63,
+      64,
       66
     ],
     "bp2": [
@@ -292,7 +292,7 @@
       111
     ],
     "pb1": [
-      114,
+      115,
       137
     ],
     "sd2": [
@@ -310,9 +310,9 @@
   },
   "depth_counts": {
     "L2+choice": 595,
-    "none": 133,
-    "L1+choice": 137,
+    "L1+choice": 140,
     "L2": 24,
+    "none": 130,
     "L1": 47
   },
   "qa_rulings": {
@@ -1902,14 +1902,20 @@
         "PL!HS-bp6-022-N"
       ],
       "base": "PL!HS-bp1-011",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch20_test.rs"
+      ],
+      "covering_tests": [
+        "bp1011_look5_reveals_live_card_to_hand",
+        "bp3012_look4_reveals_niji_card_to_hand",
+        "pb1028_look2_adds_one_to_hand"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -10452,7 +10458,8 @@
         "engine/tests/test_modules/hanamusubi_exclude_self_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs",
         "engine/tests/test_modules/link_to_future_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch12_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch12_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch20_test.rs"
       ],
       "covering_tests": [
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
@@ -10464,6 +10471,8 @@
         "aurora_flower_same_name_no_score",
         "aurora_flower_treated_as_three_groups_in_stage",
         "aurora_flower_two_members_no_score",
+        "bp1011_look5_reveals_live_card_to_hand",
+        "bp3012_look4_reveals_niji_card_to_hand",
         "bp6012_debut_activates_energy_with_sbuuke_teammate",
         "bp6022_equal_or_fewer_opp_energy_no_score",
         "bp6022_more_opp_energy_scores",
@@ -10482,11 +10491,9 @@
         "hinoshita_no_live_card_in_hand_fails",
         "hinoshita_no_matching_live_in_discard_fails",
         "hinoshita_q236_name_contains_all_matches",
-        "hinoshita_q237_name_contains_all_no_match",
-        "hinoshita_reveal_choice_keeps_card_in_hand",
-        "hinoshita_use_limit_once_per_turn"
+        "hinoshita_q237_name_contains_all_no_match"
       ],
-      "covering_test_count": 42,
+      "covering_test_count": 45,
       "is_null": false
     },
     {
@@ -16466,14 +16473,18 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/untested_abilities_batch16_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch16_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch20_test.rs"
       ],
       "covering_tests": [
+        "bp1011_look5_reveals_live_card_to_hand",
         "bp3004_rest_self_and_discard_retrieves_niji_live",
+        "bp3012_look4_reveals_niji_card_to_hand",
         "bp4018_rests_self_to_waitroom_retrieves_liella",
+        "pb1028_look2_adds_one_to_hand",
         "proteinbar_discard2_retrieves_niji_member"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -16634,14 +16645,20 @@
         "PL!N-bp3-012-P"
       ],
       "base": "PL!N-bp3-012",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch20_test.rs"
+      ],
+      "covering_tests": [
+        "bp1011_look5_reveals_live_card_to_hand",
+        "bp3012_look4_reveals_niji_card_to_hand",
+        "pb1028_look2_adds_one_to_hand"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -20103,14 +20120,20 @@
         "PL!N-pb1-035-N"
       ],
       "base": "PL!N-pb1-028",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch20_test.rs"
+      ],
+      "covering_tests": [
+        "bp1011_look5_reveals_live_card_to_hand",
+        "bp3012_look4_reveals_niji_card_to_hand",
+        "pb1028_look2_adds_one_to_hand"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -34335,7 +34358,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/aurora_flower_identity_test.rs",
-        "engine/tests/test_modules/hinoshita_test.rs"
+        "engine/tests/test_modules/hinoshita_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch20_test.rs"
       ],
       "covering_tests": [
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
@@ -34343,6 +34367,8 @@
         "aoku_haruka_live_start_scores_with_aurora_in_discard",
         "aurora_flower_does_not_match_unrelated_groups",
         "aurora_flower_treated_as_three_groups_in_stage",
+        "bp1011_look5_reveals_live_card_to_hand",
+        "bp3012_look4_reveals_niji_card_to_hand",
         "butterfly_to_butterfly_wing_matches",
         "butterfly_wing_to_butterfly_no_match",
         "dream_believers_104_to_105_no_match",
@@ -34357,9 +34383,10 @@
         "hinoshita_reveal_choice_keeps_card_in_hand",
         "hinoshita_use_limit_once_per_turn",
         "link_to_the_future_104_to_base_no_match",
-        "link_to_the_future_to_104_matches"
+        "link_to_the_future_to_104_matches",
+        "pb1028_look2_adds_one_to_hand"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 23,
       "is_null": false
     },
     {
