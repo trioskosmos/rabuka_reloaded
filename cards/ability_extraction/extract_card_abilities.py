@@ -39,14 +39,9 @@ def _encode_safe(text):
 sys.path.append(str(Path(__file__).parent.parent))
 
 from parser import (
-    parse_cost,
-    parse_effect,
-    extract_phase_gate,
-    split_cost_effect,
-    _normalize_effect_tree,
+    parse_ability,
     _enrich_effect_type,
     _validate_semantic,
-    _promote_self_cost_reduction,
 )
 
 TRIGGER_PATTERN = re.compile(r"\{\{([^|]+)\|([^}]+)\}\}")
@@ -356,12 +351,6 @@ def extract_all_abilities(cards_file: Path) -> dict:
     for full_text, card_examples in ability_groups.items():
         sample = next(a for a in all_abilities if a["full_text"] == full_text)
 
-        # Parse semantic effect and cost
-        effect_text = sample["triggerless_text"]
-
-        # Extract phase gate as its own condition before splitting
-        phase_gate, remaining_text = extract_phase_gate(effect_text)
-
         # Skip parsing for is_null abilities (notes without triggers)
         if sample.get("is_null", False):
             unique_abilities.append(
@@ -381,59 +370,30 @@ def extract_all_abilities(cards_file: Path) -> dict:
             )
             continue
 
-        # Split cost and effect
-        cost_text = None
-        if "：" in remaining_text:
-            c_text, e_text = split_cost_effect(remaining_text)
-            if c_text:
-                cost_text = c_text
-                effect_text = e_text
-            else:
-                effect_text = remaining_text
-        else:
-            effect_text = remaining_text
-
-        # Parse cost
-        cost = None
-        if cost_text:
-            try:
-                cost = parse_cost(cost_text)
-            except Exception as e:
-                print(f"WARNING: parse_cost failed for '{cost_text}': {e}")
-                cost = None
-
-        # Parse effect
-        effect = {}
+        # Single parsing owner: parser.parse_ability handles phase-gate
+        # extraction, cost/effect split, condition back-fill, activation
+        # position, tree normalization, and cost promotion.
         try:
-            effect = parse_effect(effect_text)
-            # Run post-processing normalizer (propagates exclude_self, distinct, position, original_value, etc.)
-            effect = _normalize_effect_tree(effect, sample["triggerless_text"])
-            # Check if effect has empty actions array
+            parsed = parse_ability(sample["triggerless_text"])
+            cost = parsed.get("cost")
+            effect = parsed.get("effect", {})
             if (
                 isinstance(effect, dict)
                 and "actions" in effect
                 and not effect.get("actions")
             ):
-                print(f"Warning: Effect parsed with empty actions: {effect_text[:100]}")
+                print(f"Warning: Effect parsed with empty actions: {sample['triggerless_text'][:100]}")
                 print(f"Effect dict: {effect}")
-            _enrich_effect_type(effect, triggerless=sample["triggerless_text"])
-
         except Exception as e:
-            print(f"Error parsing effect: {effect_text}")
+            print(f"Error parsing effect: {sample['triggerless_text']}")
             print(f"Exception: {e}")
             import traceback
 
             traceback.print_exc()
-            effect = {"text": effect_text, "actions": []}
+            cost = None
+            effect = {"text": sample["triggerless_text"], "actions": []}
 
-        # If the effect handler embedded a cost (e.g. "unless pay N energy"),
-        # lift it to the ability level (Q92: player chooses whether to pay)
-        if isinstance(effect, dict) and "cost" in effect:
-            cost = effect.pop("cost")
-
-        # Promote self-cost reduction clauses onto the pay_energy cost
-        # (e.g. 海未 bp5-004 "グループ名1種類につき、E減る").
-        _promote_self_cost_reduction({"cost": cost, "effect": effect})
+        _enrich_effect_type(effect, triggerless=sample["triggerless_text"])
 
         ability_entry = {
             "full_text": full_text,
@@ -446,18 +406,6 @@ def extract_all_abilities(cards_file: Path) -> dict:
             "cost": cost,
             "effect": effect,
         }
-        # Merge phase gate into effect["condition"] (not ability_entry["condition"])
-        # so the Rust Ability struct picks it up via AbilityEffect.condition.
-        if phase_gate and isinstance(effect, dict):
-            existing_cond = effect.get("condition")
-            if existing_cond and isinstance(existing_cond, dict):
-                effect["condition"] = {
-                    "type": "compound",
-                    "operator": "and",
-                    "conditions": [phase_gate, existing_cond],
-                }
-            else:
-                effect["condition"] = phase_gate
         unique_abilities.append(ability_entry)
 
     # Sort by card count

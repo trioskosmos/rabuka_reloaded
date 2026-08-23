@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-24T02:57:20.746590",
+  "generated_at": "2026-08-24T03:14:58.332152",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "e040e30a",
+  "engine_commit": "e98c1ef8",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -342,8 +342,7 @@
           "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
-          "any_number": true,
-          "reveal": false
+          "any_number": true
         },
         "parenthetical": [
           "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
@@ -383,8 +382,7 @@
           "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
-          "any_number": true,
-          "reveal": false
+          "any_number": true
         }
       }
     },
@@ -872,7 +870,6 @@
         "card_type": "member_card",
         "optional": true,
         "action": "position_change",
-        "target": null,
         "exclude_self": true,
         "parenthetical": [
           "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
@@ -1592,8 +1589,7 @@
           "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
-          "any_number": true,
-          "reveal": false
+          "any_number": true
         }
       }
     },
@@ -3133,7 +3129,6 @@
         },
         "card_type": "member_card",
         "action": "position_change",
-        "target": null,
         "exclude_position": "center",
         "exclude_self": true,
         "parenthetical": [
@@ -3777,7 +3772,6 @@
         "card_type": "member_card",
         "optional": true,
         "action": "position_change",
-        "target": null,
         "exclude_self": true,
         "parenthetical": [
           "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
@@ -4251,7 +4245,6 @@
             "duration": "live_end",
             "card_type": "member_card",
             "target": "self",
-            "group_names": [],
             "action": "gain_resource",
             "resource": "heart",
             "exclude_group_names": [
@@ -4909,7 +4902,8 @@
             "target": "self",
             "text": "自分のすべてのエネルギーをアクティブにする"
           }
-        ]
+        ],
+        "activation_position": "center"
       }
     },
     {
@@ -5283,7 +5277,6 @@
         "card_type": "member_card",
         "optional": true,
         "action": "position_change",
-        "target": null,
         "target_member": "select"
       }
     },
@@ -5351,7 +5344,6 @@
           "SaintSnow"
         ],
         "action": "position_change",
-        "target": null,
         "exclude_self": true
       }
     },
@@ -6013,7 +6005,6 @@
           "action": "select_cards",
           "discard_remaining": true,
           "text": "1枚をデッキの一番上に置き、残りを控え室に置く",
-          "reveal": false,
           "destination": "deck_top",
           "count": 1
         }
@@ -6221,7 +6212,6 @@
       "effect": {
         "text": "このメンバーは『みらくらぱーく！』以外のメンバーカードとのバトンタッチで控え室に置けない",
         "card_type": "member_card",
-        "group_names": [],
         "action": "restriction",
         "restriction_type": "cannot_baton_touch",
         "exclude_group_names": [
@@ -6322,7 +6312,6 @@
         "options": [
           {
             "text": "ライブ終了時まで、自分のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下の『Aqours』のメンバーは、相手の効果によってはウェイトしない。",
-            "duration": null,
             "source": "stage",
             "count": 3,
             "card_type": "member_card",
@@ -6344,7 +6333,6 @@
               "SaintSnow"
             ],
             "action": "position_change",
-            "target": null,
             "exclude_self": true
           }
         ],
@@ -6612,7 +6600,6 @@
           {
             "text": "ライブ終了時まで、このメンバーが元々持つハートは、これにより下に置いたメンバーカードが持つハートと同じになる",
             "action": "set_heart_type",
-            "heart_type": null,
             "ref_value": "placed_under",
             "original_value": true,
             "self_target": true,
@@ -6911,7 +6898,6 @@
               "count": 1,
               "card_type": "card",
               "target": "self",
-              "optional": false,
               "text": "このカードがデッキから控え室に置かれたとき、手札を1枚控え室に置いてもよい。"
             },
             {
@@ -6926,12 +6912,11 @@
           ],
           "text": "このカードがデッキから控え室に置かれたとき、手札を1枚控え室に置いてもよい。そうしたとき、控え室からこのカードを手札に加える"
         },
-        "conditional_negation": false,
         "condition": {
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "text": "このカードがデッキから控え室に置かれたとき",
+          "text": "このカードがデッキから控え室に置かれたとき、",
           "trigger_event": {
             "type": "zone_change",
             "source": "deck",
@@ -9538,7 +9523,6 @@
         "text": "このメンバーはポジションチェンジする",
         "card_type": "member_card",
         "action": "position_change",
-        "target": null,
         "exclude_self": true,
         "parenthetical": [
           "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
@@ -10203,8 +10187,7 @@
           "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
-          "any_number": true,
-          "reveal": false
+          "any_number": true
         }
       }
     },
@@ -12179,7 +12162,7 @@
           "type": "location_condition",
           "location": "revealed_cards",
           "target": "self",
-          "text": "エールにより公開された自分のカードの中にライブカードがないとき",
+          "text": "エールにより公開された自分のカードの中にライブカードがないとき、",
           "negation": true,
           "card_type": "live_card"
         }
@@ -12665,8 +12648,7 @@
           "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
-          "any_number": true,
-          "reveal": false
+          "any_number": true
         }
       }
     },
@@ -12840,8 +12822,7 @@
           "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
-          "any_number": true,
-          "reveal": false
+          "any_number": true
         }
       }
     },
@@ -13052,7 +13033,6 @@
             "text": "そうしなかった場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
             "action": "conditional_on_optional",
             "optional_action": {
-              "text": "",
               "action": "do_nothing"
             },
             "conditional_action": {
@@ -13171,7 +13151,6 @@
             "text": "そうしなかった場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
             "action": "conditional_on_optional",
             "optional_action": {
-              "text": "",
               "action": "do_nothing"
             },
             "conditional_action": {
@@ -13253,8 +13232,7 @@
               "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
               "destination": "deck_top",
               "placement_order": "any_order",
-              "any_number": true,
-              "reveal": false
+              "any_number": true
             }
           }
         ]
@@ -13577,7 +13555,6 @@
             "source": "looked_at",
             "destination": "hand",
             "count": 1,
-            "discard_remaining": false,
             "remainder_destination": "looked_at",
             "target": "self",
             "text": "1枚を手札に加え"
@@ -14247,7 +14224,6 @@
                   "action": "select_cards",
                   "discard_remaining": true,
                   "text": "1枚までをデッキの上に置き、残りを控え室に置く",
-                  "reveal": false,
                   "destination": "deck_top",
                   "count": 1,
                   "max": true
@@ -14348,7 +14324,6 @@
               "member_card"
             ],
             "count": 1,
-            "all": false,
             "cost_limit": 10,
             "cost_limit_operator": ">=",
             "exclude_self": true,
@@ -14360,7 +14335,6 @@
             "source": "deck_top",
             "count": 1,
             "multiple_targets": true,
-            "all": false,
             "cost_limit": 10,
             "cost_limit_operator": ">=",
             "exclude_self": true,
@@ -14372,7 +14346,6 @@
             "source": "looked_at",
             "destination": "hand",
             "count": 1,
-            "all": false,
             "exclude_self": true,
             "activation_position": "center",
             "text": "ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを1枚ずつ公開する。そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く"
@@ -16743,7 +16716,6 @@
             "text": "このメンバーはポジションチェンジする",
             "card_type": "member_card",
             "action": "position_change",
-            "target": null,
             "exclude_self": true,
             "condition": {
               "text": "公開したカードがコスト9以下のメンバーカードの場合",
@@ -19005,8 +18977,7 @@
           "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
-          "any_number": true,
-          "reveal": false
+          "any_number": true
         }
       }
     },
@@ -20077,7 +20048,6 @@
         "text": "このメンバーをポジションチェンジする",
         "card_type": "member_card",
         "action": "position_change",
-        "target": null,
         "exclude_self": true
       }
     },
@@ -20760,7 +20730,6 @@
         "blade_limit_from_cost_member": true,
         "blade_limit_offset": 2,
         "blade_limit_operator": "<=",
-        "source": null,
         "parenthetical": [
           "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
         ]
@@ -20918,7 +20887,6 @@
         "card_type": "member_card",
         "optional": true,
         "action": "position_change",
-        "target": null,
         "exclude_self": true
       }
     },
@@ -21403,8 +21371,7 @@
           "text": "好きな枚数を好きな順番でデッキの下に置き、残りを控え室に置く",
           "destination": "deck_bottom",
           "placement_order": "any_order",
-          "any_number": true,
-          "reveal": false
+          "any_number": true
         }
       }
     },
@@ -21491,7 +21458,6 @@
           "destination": "deck_top",
           "placement_order": "any_order",
           "any_number": true,
-          "reveal": false,
           "remainder_destination": "deck_bottom",
           "remainder_placement_order": "any_order"
         }
@@ -21822,8 +21788,7 @@
         "original_value": true,
         "blade_limit_from_energy_under": true,
         "blade_limit_offset": 1,
-        "blade_limit_operator": "<=",
-        "source": null
+        "blade_limit_operator": "<="
       }
     },
     {
@@ -30833,7 +30798,6 @@
         "action": "set_heart_type",
         "heart_type": "heart01",
         "original_value": true,
-        "self_target": false,
         "heart_colors": [
           "heart01"
         ]
@@ -33100,7 +33064,6 @@
         },
         "card_type": "member_card",
         "action": "position_change",
-        "target": null,
         "exclude_self": true,
         "position": "center"
       }
@@ -33947,7 +33910,6 @@
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "group_names": [],
         "action": "change_state",
         "exclude_group_names": [
           "DOLLCHESTRA"
@@ -34456,8 +34418,7 @@
           "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
-          "any_number": true,
-          "reveal": false
+          "any_number": true
         }
       }
     },
@@ -34500,7 +34461,6 @@
           "action": "select_cards",
           "text": "1枚を手札に加え、残りをデッキの上に戻す",
           "destination": "hand",
-          "reveal": false,
           "remainder_destination": "deck_top",
           "count": 1
         },
@@ -36398,7 +36358,8 @@
           },
           "optional": true,
           "action": "position_change",
-          "multiple_targets": true
+          "multiple_targets": true,
+          "location": "stage"
         },
         "result_condition": {
           "type": "movement_condition",
@@ -36418,12 +36379,25 @@
           "duration": "live_end",
           "action": "gain_resource",
           "resource": "blade",
-          "count": 2
+          "count": 2,
+          "location": "stage"
         },
         "group_names": [
           "Aqours",
           "SaintSnow"
-        ]
+        ],
+        "condition": {
+          "text": "自分のステージに『Aqours』か『SaintSnow』のメンバーのみがいる場合、",
+          "group_names": [
+            "Aqours",
+            "SaintSnow"
+          ],
+          "target": "self",
+          "location": "stage",
+          "card_type": "member_card",
+          "all_members": true,
+          "type": "group_condition"
+        }
       }
     },
     {
@@ -36817,7 +36791,6 @@
         "action": "set_heart_type",
         "heart_type": "heart04",
         "original_value": true,
-        "self_target": false,
         "heart_colors": [
           "heart04"
         ]
@@ -37387,7 +37360,8 @@
               "all": true,
               "shuffle": true,
               "target": "self",
-              "text": "自分の控え室にあるすべてのカードをシャッフルし、デッキの下に置いてもよい"
+              "text": "自分の控え室にあるすべてのカードをシャッフルし、デッキの下に置いてもよい",
+              "optional": true
             },
             {
               "action": "gain_resource",
@@ -37413,7 +37387,6 @@
           "shuffle": true,
           "all": true
         },
-        "conditional_negation": false,
         "group_names": [
           "虹ヶ咲"
         ],
@@ -37578,7 +37551,6 @@
               "card_type": "live_card",
               "count": 1,
               "target": "self",
-              "optional": false,
               "text": "それらのカードの中から『虹ヶ咲』のライブカードを1枚手札に加えてもよい。",
               "group_names": [
                 "虹ヶ咲"
@@ -37600,7 +37572,6 @@
             "虹ヶ咲"
           ]
         },
-        "conditional_negation": false,
         "trigger_type": "each_time",
         "condition": {
           "type": "card_count_condition",
@@ -37754,7 +37725,6 @@
             "5yncri5e!"
           ]
         },
-        "conditional_negation": false,
         "group_names": [
           "CatChu!",
           "KALEIDOSCORE",
@@ -38075,7 +38045,6 @@
         "text": "このメンバーはポジションチェンジする",
         "card_type": "member_card",
         "action": "position_change",
-        "target": null,
         "exclude_self": true,
         "parenthetical": [
           "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
@@ -38270,7 +38239,6 @@
               "card_type": "member_card",
               "target": "self",
               "placement_order": "any_order",
-              "optional": false,
               "text": "自分の控え室にある『Liella!』のメンバーカードを9枚選び、それらをシャッフルし、デッキの一番下に置いてもよい。",
               "shuffle": true,
               "group_names": [
@@ -38296,7 +38264,6 @@
           "shuffle": true,
           "all": true
         },
-        "conditional_negation": false,
         "group_names": [
           "Liella!"
         ],

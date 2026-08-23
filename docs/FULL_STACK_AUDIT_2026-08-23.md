@@ -1,5 +1,20 @@
 # Full-Stack Audit & Prioritised Plan — 2026-08-23
 
+## Progress log (update as fixes land)
+
+| Date | Commit | What |
+|---|---|---|
+| 08-24 | 20094f5a | W0/H1+H2+H3: real `--validate-only` flag added to extract_card_abilities.py, coverage.yml no longer swallows failure, new `.github/workflows/engine-tests.yml` runs `cargo test --test run_all` on push. Baseline seeded (= `{}` — semantic validation currently reports **0 issues** on the whole corpus, so any future issue fails `--check`). Baseline suite: **2591 passed / 0 failed** (~1.4s after build — cheap enough to gate every step) |
+| 08-24 | 213590a4 | P2: deleted FieldExtractor (~180L, 0 callers), `_DEBUG_LOG`/`set_debug_section` plumbing + stale docstring claims, compile_abilities.py dead vocab/ENCODE/norm/encode block (~260L). Output byte-identical |
+| 08-24 | e040e30a | P8: removed typo pattern `控え室か ら` (0 corpus hits) + later duplicate rows in SOURCE/DESTINATION_PATTERNS (earlier guards kept — they precede over-matching patterns like `からライブカード`). Byte-identical |
+| 08-24 | e98c1ef8 | Phase-1 leftover: deleted unused `segment_clauses` Stage-A IR (+helpers `_segment_sentence`/`_CONDITION_MARKERS_IR`/`_LINK_PREFIXES`, header comment, test file ~230L). Kept `_ir_depth_scan`/`_split_sentences_nesting`/`_find_depth0`/`_split_marker_depth0` (live callers). Byte-identical |
+| 08-24 | — | Discovery: PARSER_NOTES "Phase 8: 33 tuple-format _ACTION_RULES entries" is STALE — all registrations already go through the ActionRule-normalizing `_register_action`; dispatch has no TypeError workaround. Phase 8 = done |
+
+Verification loop used per step: regen abilities.json → byte-diff vs pre-step copy
+(only `generated_at`/`engine_commit` may differ) → python parser tests → `cargo test --test run_all`.
+
+---
+
 Scope: `cards/abilities.json` + Python parser ecosystem + Rust engine, read end-to-end.
 Goal framing: **the game must behave exactly as written in the Japanese ability text.**
 Complements (does not replace) `CODE_AUDIT_2026-08-23.md`, `REFACTOR_BACKLOG.md`,

@@ -512,6 +512,19 @@ def normalize(text: str) -> str:
     return text
 
 
+def normalize_multiline(text: str) -> str:
+    """Like normalize(), but preserves line structure.
+
+    Choice bullets are delimited by newlines (「\\n・」); collapsing all
+    whitespace would break the choice parser's bullet splitting.
+    """
+    text = re.sub(r"'([^']{1,10})'", r"『\1』", text)
+    text = text.replace("ライブ終了まで", "ライブ終了時まで")
+    text = normalize_fullwidth_digits(text)
+    lines = [re.sub(r"[ \t\u3000]+", " ", ln).strip() for ln in text.splitlines()]
+    return "\n".join(ln for ln in lines if ln).strip()
+
+
 def extract_name_exclusions(text):
     """Extract name inclusion/exclusion from 「X」以外 patterns.
     Returns (include_names, exclude_names) as lists.
@@ -1121,7 +1134,7 @@ def _promote_self_cost_reduction(ability: Dict[str, Any]) -> None:
 
 def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     """Parse a complete ability text."""
-    triggerless_text = normalize(triggerless_text.strip())
+    triggerless_text = normalize_multiline(triggerless_text.strip())
 
     ability: Dict[str, Any] = {
         "triggerless_text": triggerless_text,
@@ -1163,64 +1176,58 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         # 場合/とき inside 「」 quotes or （） notes never creates a bogus gate
         # (the old code approximated this by rejecting prefixes containing
         # any paren, which also rejected legitimate gates).
+        #
+        # Scan ONLY the effect text (never the cost) and ONLY when the
+        # effect handler did not already produce a condition — otherwise
+        # this pass would double-gate or re-derive a worse copy of an
+        # existing condition.
         trigger_condition = None
-        txt = remaining_text
-        if SEQUENTIAL_MARKER in txt:
-            txt = txt.split(SEQUENTIAL_MARKER)[-1].lstrip("、").strip()
-        for sep in ["とき、", "場合、", "たび、", "なら、"]:
-            idx = _find_depth0(txt, sep)
-            if idx >= 0:
-                cond_text = txt[: idx + len(sep)]
-                tc = parse_condition(cond_text)
-                if tc and tc.get("type") not in (None, "custom"):
-                    trigger_condition = tc
-                    break
-        # Merge trigger condition with any condition already on the effect
-        # (e.g. promoted from a sub-action by _try_re_yell). When the effect's
-        # own condition text is empty (as with conditionals parsed by
-        # _try_conditional), the re-derived trigger condition is the SAME
-        # logical gate — merging would double it. Skip if the effect text
-        # already contains the re-derived condition text.
         existing = effect.get("condition")
-        dup_cond = (
-            existing is not None
-            and trigger_condition is not None
-            and isinstance(existing, dict)
-            and (tc_text := trigger_condition.get("text"))
-            and tc_text in (effect.get("text") or "")
-        )
-        if (
-            existing
-            and isinstance(existing, dict)
-            and trigger_condition
-            and not dup_cond
-        ):
-            effect["condition"] = {
-                "type": "compound",
-                "operator": "and",
-                "conditions": [trigger_condition, existing],
-            }
-        elif not existing and trigger_condition:
+        if not existing:
+            txt = effect_text
+            if SEQUENTIAL_MARKER in txt:
+                txt = txt.split(SEQUENTIAL_MARKER)[-1].lstrip("、").strip()
+            for sep in ["とき、", "場合、", "たび、", "なら、"]:
+                idx = _find_depth0(txt, sep)
+                if idx >= 0:
+                    # Only a LEADING gate qualifies as the ability-level trigger
+                    # condition: the marker must sit in the first sentence,
+                    # before any sentence break or choice bullet. A 場合/とき
+                    # deeper in the text belongs to a sub-action (or a later
+                    # bullet), not to the whole ability.
+                    prefix = txt[:idx]
+                    if "。" in prefix or "・" in prefix or "\n" in prefix:
+                        continue
+                    cond_text = txt[: idx + len(sep)]
+                    tc = parse_condition(cond_text)
+                    if tc and tc.get("type") not in (None, "custom"):
+                        trigger_condition = tc
+                        break
+        # The back-fill above only runs when no condition exists, so there is
+        # nothing to merge — attach the gate directly (non-sequential only;
+        # sequential gating is handled by the そうした場合 executor), or fall
+        # back to promoting a sub-action's condition.
+        if not existing:
             if effect.get("action") != "sequential":
-                effect["condition"] = trigger_condition
-        elif not existing:
-            if effect.get("action") != "sequential":
-                for key in ("actions", "primary_effect", "conditional_action"):
-                    sub = effect.get(key)
-                    if isinstance(sub, dict):
-                        sv = sub.get("condition")
-                        if sv and isinstance(sv, dict):
-                            effect["condition"] = copy.deepcopy(sv)
-                            break
-                    elif isinstance(sub, list):
-                        for item in sub:
-                            if isinstance(item, dict):
-                                sv = item.get("condition")
-                                if sv and isinstance(sv, dict):
-                                    effect["condition"] = copy.deepcopy(sv)
-                                    break
-                        if effect.get("condition"):
-                            break
+                if trigger_condition:
+                    effect["condition"] = trigger_condition
+                else:
+                    for key in ("actions", "primary_effect", "conditional_action"):
+                        sub = effect.get(key)
+                        if isinstance(sub, dict):
+                            sv = sub.get("condition")
+                            if sv and isinstance(sv, dict):
+                                effect["condition"] = copy.deepcopy(sv)
+                                break
+                        elif isinstance(sub, list):
+                            for item in sub:
+                                if isinstance(item, dict):
+                                    sv = item.get("condition")
+                                    if sv and isinstance(sv, dict):
+                                        effect["condition"] = copy.deepcopy(sv)
+                                        break
+                            if effect.get("condition"):
+                                break
 
         # Apply activation_position from cost text to the effect
         if extra_pos_from_cost and "activation_position" not in effect:
