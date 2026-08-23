@@ -23,6 +23,7 @@
 | 08-24 | 0fd0d1c2 | **F2 validation rules landed**: per_unit scaling, cannot_restriction scope, effect_self_clamp. Baseline records exactly 1 known gap (bp5-010 score clamp) as regression floor. The other two rules pass clean on the whole corpus |
 | 08-24 | b97b5621 | **F3 fidelity report landed**: `describe_dump` bin + `cards/describe_fidelity_report.py`. Immediately surfaced + fixed 2 real describe bugs: LL-bp7-001 rendered as 「Eを3増やす」 (modify_cost arm used additive count instead of set value) and restriction arms rendering raw tokens. Remaining low-overlap entries are F4-class (conditions not rendered by describe) |
 | — | — | Deferred with rationale: R1 movement-tracking unification (54 refs/12 files; direct writes to recently_moved_* are scratch-channel assignments from choice/move handlers — needs characterization tests before touching); owner-resolution boilerplate (~17 sites but borrow contexts differ per site) |
+| 08-24 | d5e30686..7d17afe5 | Phase 5 FIX-block triage started (empirical removal + byte-diff per block): **FIX 6 removed** (opponent_action flattening has no producer anymore); **FIX 2 & FIX 3 verified load-bearing** and documented (removal changes 4 resp. 2 corpus abilities). Lesson: these blocks are mostly live compensations for handler-emitted shapes — dissolution requires fixing the producers first, exactly as PARSER_UNTANGLE_PLAN warned |
 
 Verification loop used per step: regen abilities.json → byte-diff vs pre-step copy
 (only `generated_at`/`engine_commit` may differ) → python parser tests → `cargo test --test run_all`.
