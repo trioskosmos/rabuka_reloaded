@@ -302,19 +302,6 @@ pub mod wien_bp5_test;
 pub mod wien_cost_mod_test;
 pub mod wien_n_test;
 pub mod wien_pb2_test;
-pub mod yoshiko_card_check_test;
-pub mod yoshiko_center_ability_test;
-pub mod yoshiko_debug_move_test;
-pub mod yoshiko_debug_test;
-pub mod yoshiko_debut_test;
-pub mod yoshiko_detailed_test;
-pub mod yoshiko_edge_cases_test;
-pub mod yoshiko_filter_test;
-pub mod yoshiko_fixed_test;
-pub mod yoshiko_group_check_test;
-pub mod yoshiko_main_effect_only_test;
-pub mod yoshiko_single_target_test;
-pub mod yoshiko_test;
 pub mod you_debut_test;
 pub mod zero_tested_action_types_test;
 
@@ -457,3 +444,7 @@ pub mod kasumi_turn_limit_test;
 pub mod sayaka_loop_test;
 pub mod max_distinct_names_test;
 
+pub mod yoshiko_center_ability_test;
+pub mod yoshiko_debut_test;
+pub mod yoshiko_edge_cases_test;
+pub mod yoshiko_filter_test;

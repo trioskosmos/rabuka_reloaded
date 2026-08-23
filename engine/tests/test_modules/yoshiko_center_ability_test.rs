@@ -47,7 +47,14 @@ fn test_yoshiko_center_ability_basic_success() {
         game.select_indices(&[0]);
     }
 
-    // Verify cost: Yoshiko in wait state, hand card discarded
+    // Verify cost: Yoshiko WAITED (orientation, not merely present), hand
+    // card discarded. "Still on stage" alone passes even if the engine
+    // forgot to rest her.
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(yoshiko),
+        Some("wait"),
+        "cost clause 1: Yoshiko must be put to wait"
+    );
     assert!(
         game.player().stage.stage[1] == yoshiko,
         "Yoshiko should still be on stage but in wait state"
@@ -295,7 +302,16 @@ fn test_yoshiko_center_ability_cost_calculation() {
         !game.player().waitroom.cards.contains(&dia),
         "Dia should no longer be in discard"
     );
-    // You (cost 9) stays in discard — cost 9 ≠ 11, not a valid summon target
+    // You (cost 9) stays in discard — cost 9 ≠ 11, not a valid summon target.
+    // This assertion IS the test: without it a cost-blind summon passes.
+    assert!(
+        game.player().waitroom.cards.contains(&you),
+        "wrong-cost You must remain in the waitroom"
+    );
+    assert!(
+        !game.player().stage.stage.contains(&you),
+        "wrong-cost You must not be summoned"
+    );
 }
 
 /// Test case 7: Use limit test - can only use once per turn
