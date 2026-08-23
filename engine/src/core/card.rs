@@ -344,12 +344,87 @@ pub struct Card {
     pub abilities: Vec<AbilityRef>,
 }
 
+/// Typed card identity. Replaces bare `i16` card IDs so the compiler can
+/// separate "a card ID" from "an arbitrary small integer" — IDs must be
+/// explicitly converted before they can index arithmetic or narrow to other
+/// types, which funnels every conversion into one auditable place.
+///
+/// Migration is incremental (see docs/CODE_AUDIT_2026-08-23.md QUEUE B2):
+/// new APIs take/return `CardId`; legacy i16 call sites bridge via
+/// [`CardId::from_raw`] / [`CardId::raw`]. The sentinel [`CardId::EMPTY`]
+/// (-1) preserves existing "no card" conventions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct CardId(i16);
+
+impl CardId {
+    /// The "no card" placeholder (legacy -1).
+    pub const EMPTY: CardId = CardId(-1);
+
+    pub const fn from_raw(v: i16) -> Self {
+        CardId(v)
+    }
+
+    pub const fn raw(self) -> i16 {
+        self.0
+    }
+
+    /// True for both the EMPTY sentinel and any negative value (which has
+    /// never been a valid ID).
+    pub fn is_empty(self) -> bool {
+        self.0 < 0
+    }
+}
+
+impl From<i16> for CardId {
+    fn from(v: i16) -> Self {
+        CardId(v)
+    }
+}
+
+/// For indexing into per-card arrays. Negative IDs (EMPTY) would wrap under
+/// `as usize`; callers at array boundaries should check `is_empty()` first —
+/// this impl deliberately does NOT hide that decision.
+impl From<CardId> for usize {
+    fn from(id: CardId) -> Self {
+        id.0 as usize
+    }
+}
+
 #[derive(Debug, Clone)]
 
 pub struct CardDatabase {
     pub cards: HashMap<i16, Card>,
     pub card_no_to_id: HashMap<String, i16>,
     pub next_id: i16,
+}
+
+#[cfg(all(test, not(feature = "no_std")))]
+mod card_id_tests {
+    use super::*;
+
+    #[test]
+    fn conversions_round_trip() {
+        let id = CardId::from(42_i16);
+        assert_eq!(id.raw(), 42);
+        assert_eq!(CardId::from_raw(-1), CardId::EMPTY);
+        assert_eq!(usize::from(CardId::from_raw(7)), 7usize);
+    }
+
+    #[test]
+    fn empty_and_negative_detection() {
+        assert!(CardId::EMPTY.is_empty());
+        assert!(CardId::from_raw(-5).is_empty());
+        assert!(!CardId::from_raw(0).is_empty());
+        assert!(!CardId::from_raw(1).is_empty());
+    }
+
+    #[test]
+    fn usable_as_map_key() {
+        let mut m = HashMap::new();
+        m.insert(CardId::from_raw(3), "x");
+        assert_eq!(m.get(&CardId::from_raw(3)), Some(&"x"));
+        assert_eq!(m.get(&CardId::from_raw(4)), None);
+    }
 }
 
 impl Default for CardDatabase {
