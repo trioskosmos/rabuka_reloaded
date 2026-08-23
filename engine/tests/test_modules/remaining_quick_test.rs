@@ -398,6 +398,75 @@ fn cara_q203_energy_and_member_gives_plus2() {
     );
 }
 
+/// Q203 ruling verbatim (2025.12.17): activating ONLY a waited member — no
+/// energy activation — gives NO score increase.
+#[test]
+fn cara_q203_member_only_activation_gives_nothing() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let waited_member = game.id("PL!N-bp3-006-R");
+    let cara = setup_cara_board(&mut game, Some(waited_member));
+
+    // エマ pb1 debut, member side only — no energy is ever activated.
+    let emma_pb1 = game.id("PL!N-pb1-008-R");
+    game.state.player1.stage.stage[2] = emma_pb1;
+    game.give_energy(10);
+    let active_before = game.state.player1.energy_zone.active_count();
+    fire_debut(&mut game, emma_pb1);
+    assert!(game.has_pending_choice());
+    game.select_option(0); // member side
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(waited_member),
+        Some("active"),
+        "precondition: waited member was activated"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        active_before,
+        "precondition: no energy touched"
+    );
+
+    run_cara_live_start(&mut game, cara);
+    assert_eq!(
+        game.state.mods.get_score_modifier(cara),
+        0,
+        "Q203: member-only activation → +0"
+    );
+}
+
+/// The activating effect must come from a 『虹ヶ咲』 card — the same energy
+/// activation by a non-Nijigasaki card (蓮ノ空 エマ PL!HS-bp1-001-R) grants
+/// nothing.
+#[test]
+fn cara_q203_non_nijigasaki_activation_gives_nothing() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let cara = setup_cara_board(&mut game, None);
+
+    // Replace the Nijigasaki Emma with the Hasunosora one before her debut.
+    let hasu_emma = game.id("PL!HS-bp1-001-R");
+    game.state.player1.stage.stage[0] = hasu_emma;
+    let active_before = game.state.player1.energy_zone.active_count();
+    fire_debut(&mut game, hasu_emma);
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 10 {
+        guard += 1;
+        game.select_indices(&[]);
+    }
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        active_before + 2,
+        "precondition: energy WAS activated (2 cards) — by a non-虹ヶ咲 effect"
+    );
+
+    run_cara_live_start(&mut game, cara);
+    assert_eq!(
+        game.state.mods.get_score_modifier(cara),
+        0,
+        "non-虹ヶ咲 source → +0 even though energy was activated"
+    );
+}
+
 /// Q218: Chika (PL!S-bp5-001-R+) ab#1 permanent reduces cost by 1 for no-ability
 /// member cards, and this applies even when playing via baton touch.
 #[test]
