@@ -146,10 +146,10 @@ impl GameState {
         tdbg!("RC:7 BLADE");
         let old_blade = core::mem::take(&mut self.mods.constant_blade_bonuses);
         for (cid, val) in &old_blade {
-            self.mods.remove_blade_modifier(*cid, *val as i16);
+            self.mods.remove_blade_modifier(*cid, *val);
         }
         for (&cid, &val) in &exp_blade {
-            self.mods.add_blade_modifier(cid, val as i16);
+            self.mods.add_blade_modifier(cid, val);
         }
         self.mods.constant_blade_bonuses = exp_blade;
         self.scratch_exp_blade = old_blade;
@@ -158,10 +158,10 @@ impl GameState {
         tdbg!("RC:9 SCORE");
         let old_score = core::mem::take(&mut self.mods.constant_score_bonuses);
         for (cid, val) in &old_score {
-            self.mods.remove_score_modifier(*cid, *val as i16);
+            self.mods.remove_score_modifier(*cid, *val);
         }
         for (&cid, &val) in &exp_score {
-            self.mods.add_score_modifier(cid, val as i16);
+            self.mods.add_score_modifier(cid, val);
         }
         self.mods.constant_score_bonuses = exp_score;
         self.scratch_exp_score = old_score;
@@ -1541,7 +1541,8 @@ impl GameState {
                     },
                     _ => owner_player,
                 };
-                let value = effect.value_or_count(1) as i32;
+                // value_or_count is u8-bounded, so i16 storage never truncates here.
+                let value = i16::from(effect.value_or_count(1));
                 let op_binding = effect.operation_any();
                 let op = op_binding.unwrap_or("add");
                 // When self_target is true, apply the score modifier to the
@@ -1555,18 +1556,18 @@ impl GameState {
                 for &target_id in &targets {
                     match op {
                         "set" => {
-                            self.mods.set_score_modifier(target_id, value as i16);
+                            self.mods.set_score_modifier(target_id, value);
                             self.mods
                                 .success_zone_score_bonuses
-                                .insert(target_id, value as i16);
+                                .insert(target_id, value);
                         }
                         _ => {
-                            self.mods.add_score_modifier(target_id, value as i16);
+                            self.mods.add_score_modifier(target_id, value);
                             *self
                                 .mods
                                 .success_zone_score_bonuses
                                 .entry(target_id)
-                                .or_insert(0) += value as i16;
+                                .or_insert(0) += value;
                         }
                     }
                 }

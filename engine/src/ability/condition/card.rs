@@ -4048,8 +4048,9 @@ impl<'a> ConditionContext<'a> {
                         continue;
                     }
                     if let Some(base) = card_db.get_card(id).and_then(|c| c.cost) {
-                        let v = (base as i32 + self.game_state.mods.get_cost_modifier(id)).max(0)
-                            as u8;
+                        let v = crate::constants::saturate_u8(
+                            base as i32 + self.game_state.mods.get_cost_modifier(id),
+                        );
                         if v > max_cost {
                             max_cost = v;
                         }

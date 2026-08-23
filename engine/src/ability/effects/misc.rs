@@ -312,9 +312,9 @@ impl AbilityResolver {
     ) {
         for &(color, dist_count) in heart_distribution {
             let dist_amount = if is_negative {
-                -(dist_count as i16)
+                -i16::from(dist_count)
             } else {
-                dist_count as i16
+                i16::from(dist_count)
             };
             gs.mods.add_heart_modifier_with_trace(
                 card_id,
@@ -738,7 +738,7 @@ impl AbilityResolver {
             }
         });
         if let Some(card_id) = card_id {
-            let amount = effect.count_or(1) as i16;
+            let amount = i16::from(effect.count_or(1));
             gs.mods.add_heart_modifier_with_trace(
                 card_id,
                 crate::card::HeartColor::All,
@@ -1064,14 +1064,14 @@ impl AbilityResolver {
         let mut effect_data: Option<crate::core::types::EffectData> = None;
         let is_negative = sign == Some("negative");
         let blades_to_add = if is_negative {
-            -(final_count as i16)
+            -i16::from(final_count)
         } else {
-            final_count as i16
+            i16::from(final_count)
         };
         let heart_to_add = if is_negative {
-            -(final_count as i16)
+            -i16::from(final_count)
         } else {
-            final_count as i16
+            i16::from(final_count)
         };
         let heart_color_val = crate::card::parse_heart_color(
             heart_color_str
@@ -1126,9 +1126,9 @@ impl AbilityResolver {
                 if kind == ResourceKind::Heart {
                     for (color, color_amount) in &heart_distribution {
                         let amount = if is_negative {
-                            -(*color_amount as i16)
+                            -i16::from(*color_amount)
                         } else {
-                            *color_amount as i16
+                            i16::from(*color_amount)
                         };
                         gs.mods.add_heart_modifier_with_trace(
                             card_id,
@@ -1398,9 +1398,9 @@ impl AbilityResolver {
                 }
                 for &(color, dist_count) in heart_distribution {
                     let dist_amount = if is_negative {
-                        -(dist_count as i16)
+                        -i16::from(dist_count)
                     } else {
-                        dist_count as i16
+                        i16::from(dist_count)
                     };
                     gs.mods.add_heart_modifier_with_trace(
                         card_id,
@@ -1419,7 +1419,7 @@ impl AbilityResolver {
                         .iter()
                         .flat_map(|&cid| {
                             heart_distribution.iter().map(move |&(c, dc)| {
-                                let amount = if is_negative { -(dc as i16) } else { dc as i16 };
+                        let amount = if is_negative { -i16::from(dc) } else { i16::from(dc) };
                                 crate::core::types::CardEffectItem {
                                     card_id: cid,
                                     amount,

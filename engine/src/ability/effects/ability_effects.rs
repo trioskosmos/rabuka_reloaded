@@ -378,7 +378,7 @@ impl AbilityResolver {
                 // (target="live_total" gains route through the constant scanner
                 // into p*_constant_total_score_bonus instead.)
                 if immediate_val != 0 {
-                    gs.mods.add_score_modifier(card_id, immediate_val as i16);
+                    gs.mods.add_score_modifier(card_id, i16::from(immediate_val));
                     log::debug!(
                         "[GAINED_ABILITY] immediate +{} score to card {}",
                         immediate_val,
@@ -389,7 +389,7 @@ impl AbilityResolver {
                 // next recalculation picks it up.
                 self.last_gain_effect_data = Some(crate::core::types::EffectData::GainAbility {
                     card_id,
-                    amount: immediate_val as i16,
+                    amount: i16::from(immediate_val),
                     is_live_total,
                 });
             }
