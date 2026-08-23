@@ -22,6 +22,21 @@ Unified roadmap merging the original engine audit, `docs/CASTING_AUDIT.md` (~1,0
 | 14 | **A3** single shared no_std-safe `Lcg` in rng.rs — six identical binary-local copies deleted | rng.rs, src/bin/* |
 | 15 | **C1** `execute_gain_resource` split: `ResourceKind` enum replaces 13 ad-hoc EN/JA string comparisons; four focused units extracted (`try_create_target_selection_choice`, `resolve_gain_resource_targets`, `apply_blade_resource`, `apply_heart_resource`) | effects/misc.rs |
 | 16 | **B4** `saturate_u8`/`saturate_i16` helpers replace all 51 `.max(0) as u8` clamp sites — and fix silent top-end wraparound (>255 wrapped instead of saturating) | core/constants.rs + 11 files |
+| 17 | **B1** cast-hygiene clippy lints enabled crate-wide (cast_possible_truncation/sign_loss/possible_wrap, warn) | lib.rs |
+| 18 | **A4** no_std bytecode cache: atomic 3-state init protocol replaces unsynchronized bool+UnsafeCell race; also fixed latent no_std build breakage in game_state child modules (lost alloc imports) | vm.rs, core/game_state/* |
+| 19 | **A5** dead QA corpus evicted from lib (2498L qa_test_suite + phantom run_qa_tests bin — never invoked by cargo test/CI, failed on first real run); `[lib] test = false` removed so src unit tests actually execute | src/lib.rs, Cargo.toml |
+| 20 | **E1** parser untangle Phase 1: duplicate 登場させ registration, unreachable tail, unused categorized assignment — all byte-gated identical; _try_phase_gate delegation skipped with documented behavioral diffs | parser.py |
+| 21 | **E2a** ActionRule arity normalized at construction (`__post_init__`); TypeError workarounds removed from matches()/apply(); predicate exceptions logged instead of swallowed. Byte-gated identical | parser_utils.py |
+| 22 | **C3** greater_than_all scaffolding deduped (`collect_other_stage_ids`); `rule_log_activated()` replaces 3 copy-paste log blocks | condition/card.rs, effects/mod.rs, misc.rs |
+| 23 | **B3** GameModifiers boundary hygiene: 12 lossless `i16::from()` conversions, no-op casts removed, one flagged clamp fix; narrow storage kept per policy; 4 unprovable truncate→clamp sites documented as skipped | misc.rs, ability_effects.rs, game_state/modifiers.rs, condition/card.rs |
+
+### E2b verdict (skipped by design)
+The six `extra_checks` lambdas in parse_effect's fallback (parser.py ~1775) are **post-fallback disambiguation overrides** — their position after parse_action is their semantics (they override wrong registry decisions using normalized pattern_text). Folding them into the registry changes dispatch order; not provably identical → skipped per ground rules.
+
+### B3 skipped-conversion ledger (review if clamp semantics ever wanted)
+- condition/card.rs:1664 `current_hearts += modifier as u8` — wrapping u8 accumulator, not type-bounded
+- turn/live.rs:615 `-delta as i16`, :620 `pre_total as i16` — i32 modifier-total diffs
+- game_state/modifiers.rs:170-171 `p{1,2}_constant_score_bonus as i16` — accumulated i32
 
 ---
 
@@ -108,8 +123,8 @@ Non-conforming steps get skipped and logged in the plan's "Deferred" section, no
 
 ---
 
-## Execution order (rev 5)
+## Execution order (rev 6)
 
-**B1 (cast lints) → B3 (conversion hygiene at GameModifiers boundary) → parser E-track Phase 1-2 → B2 (CardId, zone-boundary-first) → A4 → A5 → D1 → D4 → E3..E5 → D2 → D3**
+**B2 (CardId newtype, zone-boundary-first) → E3 (FieldExtractor single-pass) → D1 → D4 → E4 → E5 → A-done ✓ → D2 → D3**
 
-B4 done; C1 done; A-tier done. Test-writing stays parked unless a queue item demands it — the matrix gap cells get filled as a side effect of ability-specific refactors.
+Done: A-tier, B1, B3, B4, C1, C3, E1, E2a. B2 is the last big structural item; E3 the biggest parser item. Test-writing remains parked.
