@@ -1562,6 +1562,7 @@ pub fn filter_from_parts_full<'a>(
     exclude_self: Option<i16>,
     cost_total: Option<u8>,
     cost_total_operator: Option<&'a str>,
+    exclude_characters: Option<&'a Vec<String>>,
 ) -> CardFilter<'a> {
     CardFilter {
         card_type,
@@ -1574,6 +1575,7 @@ pub fn filter_from_parts_full<'a>(
         name_fragments,
         distinct,
         exclude_self,
+        exclude_characters,
         ..CardFilter::default()
     }
 }

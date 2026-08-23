@@ -491,16 +491,12 @@ let source = cost.source_str().unwrap_or("");
             }
         }
 
-        let effect = AbilityEffect {
-            text: cost.text.clone(),
-            action: cost.action.clone(),
-            source: cost.source.clone(),
-            destination: cost.destination.clone(),
-            count: cost.count,
-            target: cost.target.clone(),
-            kind: cost.kind.clone(),
-            ..Default::default()
-        };
+        // Execute from a FULL clone of the parsed cost. The previous
+        // hand-picked 7-field copy dropped every card-filter field
+        // (exclude_characters, group_names, characters, ...), so e.g.
+        // Fuyumari's stage cost offered HERSELF as the sacrifice despite
+        // the parsed 「鬼塚冬毬」以外 exclusion.
+        let effect = cost.clone();
         self.execute_move_cards(gs, &effect)
     }
 

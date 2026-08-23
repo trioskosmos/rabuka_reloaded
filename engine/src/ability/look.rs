@@ -495,6 +495,7 @@ impl AbilityResolver {
                 None,
                 None,
                 None,
+                None,
             );
             let distinct_indices =
                 super::util::filter_distinct(&filtered, &card_db, &distinct_filter, false);

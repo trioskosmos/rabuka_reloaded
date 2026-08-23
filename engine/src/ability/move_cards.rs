@@ -1,4 +1,4 @@
-﻿use super::enums::Zone;
+use super::enums::Zone;
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ExecutionContext, LookAndSelectStep};
 use super::util;
@@ -187,13 +187,15 @@ impl AbilityResolver {
         filtered_indices: Option<Vec<usize>>,
     ) {
         log::debug!(
-            "[PROMPT_SEL] zone={} count={} can_skip={} prop={:?} neg={:?} filtered={:?}",
+            "[PROMPT_SEL@{}] zone={} count={} can_skip={} prop={:?} neg={:?} filtered={:?} excl_chars={:?}",
+            line!(),
             zone,
             count,
             can_skip,
             filter.card_property,
             filter.negation,
-            filtered_indices
+            filtered_indices,
+            filter.exclude_characters
         );
         let zone_display = crate::ability::describe::zone_label(Some(zone));
         let zone_display_ja = crate::ability::describe::zone_label_ja(Some(zone));
@@ -442,6 +444,13 @@ impl AbilityResolver {
         activating_card_id: Option<i16>,
     ) -> Result<Option<Vec<i16>>, String> {
         let cards = util::zone_card_ids(player, zone_name);
+        log::debug!(
+            "[TAKE] zone={zone_name} excl_chars={:?} chars={:?} group={:?} cards={:?}",
+            filter.exclude_characters,
+            filter.characters,
+            filter.group,
+            cards
+        );
         let filtered_indices = util::matching_indices(&cards, card_db, filter, false);
 
         match util::resolve_selection(
@@ -735,13 +744,14 @@ impl AbilityResolver {
             card_type_filter,
             group_name,
             cost_limit,
-            None,
+            None, // cost_operator
             character_filter,
             name_fragments,
-            None,
-            None,
+            None, // distinct
+            None, // exclude_self
             cost_total,
             cost_total_operator,
+            effect.exclude_characters_any(),
         );
         let neg = effect.negation_any().unwrap_or(false);
         let matching: Vec<usize> = (0..gs.revealed_cards.len())
@@ -1184,6 +1194,7 @@ impl AbilityResolver {
                 },
                 c.cost_total,
                 c.cost_total_operator,
+                c.effect.exclude_characters_any(),
             );
             match util::resolve_selection(
                 &player.stage.stage,
@@ -1235,6 +1246,7 @@ impl AbilityResolver {
                         },
                         c.cost_total,
                         c.cost_total_operator,
+                        c.effect.exclude_characters_any(),
                     );
                     let stage_indices: Vec<usize> = (0..player.stage.stage.len())
                         .filter(|&i| filter.matches(card_db, player.stage.stage[i], true))
@@ -1345,6 +1357,7 @@ impl AbilityResolver {
             } else {
                 None
             },
+            effect.exclude_characters_any(),
         );
         filter.need_heart_total = effect.need_heart_total_any();
         let nho_binding = effect.need_heart_operator_any();
@@ -1655,13 +1668,14 @@ impl AbilityResolver {
                 c.card_type_filter,
                 c.group_name,
                 c.cost_limit,
-                None,
+                None, // cost_operator
                 c.character_filter,
-                None,
-                None,
-                None,
-                None,
-                None,
+                None, // name_fragments
+                None, // distinct
+                None, // exclude_self
+                None, // cost_total
+                None, // cost_total_operator
+                c.effect.exclude_characters_any(),
             );
             let matching: Vec<usize> = (0..gs.revealed_cards.len())
                 .filter(|&i| filter.matches(&gs.card_database, gs.revealed_cards[i], false))
