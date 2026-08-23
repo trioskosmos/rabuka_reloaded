@@ -1259,7 +1259,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
     ) -> Result<Option<crate::game_state::PlayTimeCostPlay>, String> {
         let player_id = game_state.active_player().id.clone();
         let reduction = Self::play_time_cost_reduction_amount(game_state, card_id);
-        let ll_chars = Self::ll_bp7_001_required_chars(game_state, card_id);
+        let alt_cost = Self::play_time_alt_cost_chars(game_state, card_id);
 
         // Re-entry: we already offered the choice and it was answered.
         if let Some(play) = game_state.play_time_cost_play.take() {
@@ -1277,14 +1277,16 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                         "{} uses play-time cost reduction: {} cost reduced by {}, waitroom members shuffled to deck bottom",
                         player_id, card_id, red
                     ));
-                } else if let Some(chars) = ll_chars.clone() {
-                    // LL-bp7-001: discard 3 named members from hand, set cost to 10
-                    if !Self::discard_ll_bp7_001_cost(game_state, &player_id, card_id, &chars) {
-                        return Err("Required hand cards for LL-bp7-001 cost not found".to_string());
+                } else if let Some((chars, set_value)) = alt_cost.clone() {
+                    // Play-time alternative cost: discard one named member
+                    // per slot from hand, set cost to the ability's value.
+                    let n = chars.len();
+                    if !Self::discard_play_time_alt_cost(game_state, &player_id, card_id, &chars) {
+                        return Err("Required hand cards for play-time alternative cost not found".to_string());
                     }
-                    game_state.mods.set_cost_modifier(card_id, 10);
+                    game_state.mods.set_cost_modifier(card_id, set_value);
                     game_state.push_rule_log(format!(
-                        "{} uses LL-bp7-001 alternative cost: discarded 3 members, cost set to 10",
+                        "{} uses play-time alternative cost: discarded {n} members, cost set to {set_value}",
                         player_id
                     ));
                 }
@@ -1312,21 +1314,30 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             );
             return Ok(Some(play));
         }
-        if let Some(chars) = ll_chars {
-            if Self::has_ll_bp7_001_hand_cards(game_state, card_id, &chars) {
+        if let Some((chars, set_value)) = alt_cost {
+            if Self::has_play_time_alt_cost_hand_cards(game_state, card_id, &chars) {
+                let base = game_state
+                    .card_database
+                    .get_card(card_id)
+                    .and_then(|c| c.cost)
+                    .unwrap_or(0);
+                let n = chars.len();
                 let play = crate::game_state::PlayTimeCostPlay { card_id, area };
                 game_state.ability_queue.pause_for_choice(
                     crate::ability::types::Choice::SelectTarget {
                         target: "play_time_cost_reduction".into(),
-                        options: Some(vec!["15で出す".to_string(), "10で出す(手札3枚) ".to_string()]),
+                        options: Some(vec![
+                            format!("{base}で出す"),
+                            format!("{set_value}で出す(手札{n}枚)"),
+                        ]),
                         allow_skip: true,
-                        description: "LL-bp7-001: 手札3枚を捨ててコスト10にしますか？".to_string(),
-                        description_en: Some(
-                            "LL-bp7-001: Discard 3 named members to set cost to 10?".to_string(),
-                        ),
-                        description_ja: Some(
-                            "手札から「国木田花丸」「優木せつ菜」「嵐千砂都」を各1枚捨ててコスト10にしますか？".to_string(),
-                        ),
+                        description: "プレイ時コスト軽減を使用しますか？".to_string(),
+                        description_en: Some(format!(
+                            "Discard {n} named members to set cost to {set_value}?"
+                        )),
+                        description_ja: Some(format!(
+                            "手札から指定のメンバー{n}枚を捨ててコスト{set_value}にしますか？"
+                        )),
                     },
                 );
                 return Ok(Some(play));
@@ -1367,7 +1378,14 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         })
     }
 
-    fn ll_bp7_001_required_chars(game_state: &GameState, card_id: i16) -> Option<Vec<String>> {
+    /// Detect a generic play-time alternative cost on `card_id`:
+    /// 「プレイに際し、<hand discard>。そうしたとき、このカードのコストはNになる。」
+    ///
+    /// Parsed shape: 常時 ModifyCost with operation=set, location=hand,
+    /// optional, and a named-character list (one distinct hand card each).
+    /// Returns (required character names, set-cost value). Generalizes the
+    /// former LL-bp7-001-only hardcode.
+    fn play_time_alt_cost_chars(game_state: &GameState, card_id: i16) -> Option<(Vec<String>, i16)> {
         use crate::ability::enums::ActionType;
         let card = game_state.card_database.get_card(card_id)?;
         for ab in card.resolved_abilities() {
@@ -1379,15 +1397,18 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             if effect.action != ActionType::ModifyCost {
                 continue;
             }
-            if effect.operation_any().as_deref() != Some("set") || effect.value_any() != Some(10) {
+            let Some(value) = effect.value_any().and_then(|v| i16::try_from(v).ok()) else {
+                continue;
+            };
+            if effect.operation_any().as_deref() != Some("set") {
                 continue;
             }
             if effect.location_any().as_deref() != Some("hand") || !effect.optional.unwrap_or(false) {
                 continue;
             }
             if let Some(chars) = effect.characters_any() {
-                if chars.len() == 3 {
-                    return Some(chars.to_vec());
+                if !chars.is_empty() {
+                    return Some((chars.to_vec(), value));
                 }
             }
         }
@@ -1399,30 +1420,34 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         s.replace(' ', "").replace('　', "")
     }
 
-    fn has_ll_bp7_001_hand_cards(game_state: &GameState, card_id: i16, chars: &[String]) -> bool {
+    fn has_play_time_alt_cost_hand_cards(
+        game_state: &GameState,
+        card_id: i16,
+        chars: &[String],
+    ) -> bool {
         let hand_ids: Vec<i16> = game_state.active_player().hand.cards.to_vec();
-        Self::can_assign_hand_for_ll(game_state, &hand_ids, chars, Some(card_id))
+        Self::can_assign_hand_for_alt_cost(game_state, &hand_ids, chars, Some(card_id))
     }
 
-    fn can_assign_hand_for_ll(
+    fn can_assign_hand_for_alt_cost(
         game_state: &GameState,
         hand_ids: &[i16],
         chars: &[String],
         exclude_id: Option<i16>,
     ) -> bool {
-        Self::build_ll_candidates(game_state, hand_ids, chars, exclude_id)
-            .map(|c| Self::has_distinct_assignment(&c))
+        Self::build_alt_cost_candidates(game_state, hand_ids, chars, exclude_id)
+            .map(|c| Self::has_distinct_assignment_k(&c))
             .unwrap_or(false)
     }
 
-    fn build_ll_candidates(
+    fn build_alt_cost_candidates(
         game_state: &GameState,
         hand_ids: &[i16],
         chars: &[String],
         exclude_id: Option<i16>,
-    ) -> Option<[Vec<i16>; 3]> {
-        let mut out: [Vec<i16>; 3] = [Vec::new(), Vec::new(), Vec::new()];
-        for (i, name) in chars.iter().enumerate().take(3) {
+    ) -> Option<Vec<Vec<i16>>> {
+        let mut out: Vec<Vec<i16>> = vec![Vec::new(); chars.len()];
+        for (i, name) in chars.iter().enumerate() {
             let needle = Self::normalize_member_name(name);
             for &cid in hand_ids {
                 if Some(cid) == exclude_id {
@@ -1441,41 +1466,41 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         Some(out)
     }
 
-    fn has_distinct_assignment(cands: &[Vec<i16>; 3]) -> bool {
-        for &a in &cands[0] {
-            for &b in &cands[1] {
-                if b == a {
+    /// Backtracking distinct assignment over k slots (k = number of required
+    /// characters; small, so plain recursion is fine).
+    fn has_distinct_assignment_k(cands: &[Vec<i16>]) -> bool {
+        Self::find_distinct_assignment_k(cands).is_some()
+    }
+
+    fn find_distinct_assignment_k(cands: &[Vec<i16>]) -> Option<Vec<i16>> {
+        fn backtrack(cands: &[Vec<i16>], used: &mut Vec<i16>, acc: &mut Vec<i16>) -> bool {
+            if cands.is_empty() {
+                return true;
+            }
+            for &cid in &cands[0] {
+                if used.contains(&cid) {
                     continue;
                 }
-                for &c in &cands[2] {
-                    if c == a || c == b {
-                        continue;
-                    }
+                used.push(cid);
+                acc.push(cid);
+                if backtrack(&cands[1..], used, acc) {
                     return true;
                 }
+                acc.pop();
+                used.pop();
             }
+            false
         }
-        false
+        let mut used = Vec::new();
+        let mut acc = Vec::new();
+        if backtrack(cands, &mut used, &mut acc) {
+            Some(acc)
+        } else {
+            None
+        }
     }
 
-    fn find_distinct_assignment(cands: &[Vec<i16>; 3]) -> Option<[i16; 3]> {
-        for &a in &cands[0] {
-            for &b in &cands[1] {
-                if b == a {
-                    continue;
-                }
-                for &c in &cands[2] {
-                    if c == a || c == b {
-                        continue;
-                    }
-                    return Some([a, b, c]);
-                }
-            }
-        }
-        None
-    }
-
-    fn discard_ll_bp7_001_cost(
+    fn discard_play_time_alt_cost(
         game_state: &mut GameState,
         player_id: &str,
         played_card_id: i16,
@@ -1486,7 +1511,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         } else {
             game_state.player2.hand.cards.to_vec()
         };
-        let cands = match Self::build_ll_candidates(
+        let cands = match Self::build_alt_cost_candidates(
             game_state,
             &hand_snapshot,
             chars,
@@ -1495,8 +1520,8 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             Some(c) => c,
             None => return false,
         };
-        let to_discard = match Self::find_distinct_assignment(&cands) {
-            Some(a) => a.to_vec(),
+        let to_discard = match Self::find_distinct_assignment_k(&cands) {
+            Some(a) => a,
             None => return false,
         };
         // Remove from hand first, collect events, then push movements without double borrow
