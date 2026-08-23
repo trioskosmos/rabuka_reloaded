@@ -1,4 +1,4 @@
-﻿/// Tests for Q202/Q201/Q200 — deploy from hand via debut ability, then
+/// Tests for Q202/Q201/Q200 — deploy from hand via debut ability, then
 /// the deployed card's own debut ability fires separately.
 ///
 /// All three deployers share the pattern:
@@ -17,7 +17,6 @@
 ///        （登場 カードを1枚引き、手札を1枚控え室に置く。← mandatory）
 use crate::helpers::*;
 use rabuka_engine::ability::types::Choice;
-use rabuka_engine::card::HeartColor;
 use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;

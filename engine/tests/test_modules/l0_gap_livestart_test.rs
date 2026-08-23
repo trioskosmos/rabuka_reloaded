@@ -4,7 +4,6 @@
 /// asserts the exact modifier value at live start resolution time.
 use crate::helpers::*;
 use rabuka_engine::ability::types::Choice;
-use rabuka_engine::card::HeartColor;
 
 fn drain_skips(game: &mut TestGame) {
     let mut guard = 0;
