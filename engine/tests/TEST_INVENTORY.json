@@ -1,24 +1,24 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T20:24:45.146476+00:00",
+  "generated_at": "2026-08-23T21:05:10.169213+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 432,
-  "n_tests": 2641,
+  "n_files": 433,
+  "n_tests": 2646,
   "total_cards": 771,
-  "covered_cards": 621,
-  "abilities_on_covered": 783,
+  "covered_cards": 624,
+  "abilities_on_covered": 786,
   "trigger_counts": {
     "起動": [
       80,
       96
     ],
     "登場": [
-      218,
+      219,
       269
     ],
     "ライブ開始時": [
@@ -34,7 +34,7 @@
       122
     ],
     "常時": [
-      107,
+      109,
       117
     ],
     "自動": [
@@ -52,7 +52,7 @@
       71
     ],
     "gain_resource": [
-      136,
+      138,
       160
     ],
     "sequential": [
@@ -64,7 +64,7 @@
       2
     ],
     "draw_card": [
-      41,
+      42,
       44
     ],
     "change_state": [
@@ -194,11 +194,11 @@
       60
     ],
     "card_count_condition": [
-      74,
+      76,
       88
     ],
     "location_condition": [
-      61,
+      62,
       73
     ],
     "movement:baton_touch": [
@@ -260,7 +260,7 @@
       58
     ],
     "PR": [
-      40,
+      42,
       52
     ],
     "bp1": [
@@ -272,7 +272,7 @@
       66
     ],
     "bp2": [
-      61,
+      62,
       68
     ],
     "bp4": [
@@ -310,10 +310,10 @@
   },
   "depth_counts": {
     "L2+choice": 593,
-    "none": 153,
+    "none": 150,
     "L1+choice": 134,
     "L2": 24,
-    "L1": 32
+    "L1": 35
   },
   "qa_rulings": {
     "covered": 272,
@@ -12587,14 +12587,22 @@
         "PL!N-PR-024-PR"
       ],
       "base": "PL!S-PR-039",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch13_test.rs"
+      ],
+      "covering_tests": [
+        "bp2017_debut_draws_with_10_card_waitroom",
+        "bp2017_debut_no_draw_with_9_card_waitroom",
+        "spr039_constant_blades_off_below_four_combined",
+        "spr039_constant_blades_with_combined_success_cards",
+        "spr042_constant_hearts_with_six_staged_members"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -25836,14 +25844,22 @@
         "PL!S-PR-042-PR"
       ],
       "base": "PL!S-PR-042",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch13_test.rs"
+      ],
+      "covering_tests": [
+        "bp2017_debut_draws_with_10_card_waitroom",
+        "bp2017_debut_no_draw_with_9_card_waitroom",
+        "spr039_constant_blades_off_below_four_combined",
+        "spr039_constant_blades_with_combined_success_cards",
+        "spr042_constant_hearts_with_six_staged_members"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -28095,14 +28111,22 @@
         "PL!HS-bp2-017-N"
       ],
       "base": "PL!HS-bp2-017",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch13_test.rs"
+      ],
+      "covering_tests": [
+        "bp2017_debut_draws_with_10_card_waitroom",
+        "bp2017_debut_no_draw_with_9_card_waitroom",
+        "spr039_constant_blades_off_below_four_combined",
+        "spr039_constant_blades_with_combined_success_cards",
+        "spr042_constant_hearts_with_six_staged_members"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {

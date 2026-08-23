@@ -357,6 +357,7 @@ impl GameState {
                         .condition
                         .as_ref()
                         .is_none_or(|c| ctx.evaluate_condition(c));
+                    log::debug!("[RC_PROBE] card={} cond_met={}", card_id, cond_met);
 
                     if cond_met {
                         // Record jyouji status for this card (lazily capture

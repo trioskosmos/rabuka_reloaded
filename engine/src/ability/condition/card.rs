@@ -1011,7 +1011,13 @@ impl<'a> ConditionContext<'a> {
                 }
                 _ => None,
             }
-        } else if Zone::from_str(location) == Some(Zone::Stage) {
+        } else if Zone::from_str(location) == Some(Zone::Stage)
+            // The Stage branch sums BLADE totals for 「自分のステージ…ブレードの
+            // 合計」 conditions (target=self). Cross-player member counts
+            // (「自分と相手のステージにメンバーが合計6人」, target=both) must
+            // fall through to the normal combined counting path instead.
+            && condition.get_target().map(|t| t != "both").unwrap_or(true)
+        {
             Some(compare_counts(
                 condition.get_operator(),
                 player.stage.total_blades(
