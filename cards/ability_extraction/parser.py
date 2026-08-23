@@ -11788,7 +11788,9 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
     # --- 2. Targeted fixes logic ---
     t = ability.get("triggerless_text", "")
 
-    # FIX 2: each_time sequential → conditional_on_optional
+    # FIX 2: each_time sequential → conditional_on_optional (LOAD-BEARING).
+    # Verified 2026-08: removal changes 2 corpus abilities (自動 per-discard
+    # optional-energy cards reshaped as conditional_on_optional).
     if eff.get("trigger_type") == "each_time" and eff.get("action") == "sequential":
         acts = eff.get("actions", [])
         if len(acts) == 2:
@@ -11822,17 +11824,9 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
             if isinstance(sub, dict):
                 sub.pop("optional", None)
 
-    # FIX 6: Flatten opponent_action wrappers
-    if eff.get("opponent_action") and isinstance(eff["opponent_action"], dict):
-        oa = eff.pop("opponent_action")
-        for k, v in oa.items():
-            if k not in eff:
-                eff[k] = v
-        inner_action = oa.get("action")
-        if inner_action:
-            eff["action"] = inner_action
-        eff.setdefault("target", "opponent")
-        eff.setdefault("action_by", "opponent")
+    # FIX 6 removed 2026-08 (byte-diff verified): no pipeline producer emits an
+    # opponent_action wrapper anymore — _try_opponent_action flattens at
+    # parse time. Kept as history note only.
 
     # FIX 7: Ability filter — 能力を持たない → ability_filter:no_ability
     if "能力を持たない" in t:
