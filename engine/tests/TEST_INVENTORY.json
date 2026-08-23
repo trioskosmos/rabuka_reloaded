@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T12:56:40.250899+00:00",
+  "generated_at": "2026-08-23T13:44:15.219798+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 426,
-  "n_tests": 2613,
+  "n_tests": 2614,
   "total_cards": 771,
   "covered_cards": 611,
   "abilities_on_covered": 772,
@@ -661,6 +661,7 @@
         "bella_positive_surplus_heart04_ability_fires",
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "bella_q174_no_member_on_stage_ability_does_not_fire",
+        "bp3_031_fires_from_real_live_victory_flow",
         "bp3_031_per_waited_member_score_plus1",
         "burn_multiple_under_all_moved_and_scores",
         "burn_no_under_no_move_no_score",
@@ -677,10 +678,9 @@
         "center_tied_with_right_no_heart",
         "chika_adds_non_matching_member_gets_no_blades",
         "chika_adds_riko_gets_2_blades",
-        "chika_adds_yo_gets_2_blades",
-        "choice_condition_shows_proper_labels_in_actions"
+        "chika_adds_yo_gets_2_blades"
       ],
-      "covering_test_count": 211,
+      "covering_test_count": 212,
       "is_null": false
     },
     {
@@ -10055,6 +10055,7 @@
         "ab1_two_niji_members_only_one_gets_blade",
         "bp1_001_pay_energy_blade",
         "bp1_005_discard_gains_blade",
+        "bp3_031_fires_from_real_live_victory_flow",
         "bp3_031_per_waited_member_score_plus1",
         "emma_live_start_activates_wait_both_gain_heart04",
         "emma_live_start_active_member_not_affected",
@@ -10069,10 +10070,9 @@
         "mymai_q121_all_stage_members_gain_blade",
         "mymai_tonight_alone_no_blade",
         "mymai_tonight_blade_disappears_after_live_end",
-        "mymai_tonight_with_aqours_live_gains_blade",
-        "mymai_tonight_with_aqours_member_no_blade"
+        "mymai_tonight_with_aqours_live_gains_blade"
       ],
-      "covering_test_count": 70,
+      "covering_test_count": 71,
       "is_null": false
     },
     {
@@ -10125,6 +10125,7 @@
         "ab1_two_niji_members_only_one_gets_blade",
         "bp1_001_pay_energy_blade",
         "bp1_005_discard_gains_blade",
+        "bp3_031_fires_from_real_live_victory_flow",
         "bp3_031_per_waited_member_score_plus1",
         "emma_live_start_activates_wait_both_gain_heart04",
         "emma_live_start_active_member_not_affected",
@@ -10139,10 +10140,9 @@
         "mymai_q121_all_stage_members_gain_blade",
         "mymai_tonight_alone_no_blade",
         "mymai_tonight_blade_disappears_after_live_end",
-        "mymai_tonight_with_aqours_live_gains_blade",
-        "mymai_tonight_with_aqours_member_no_blade"
+        "mymai_tonight_with_aqours_live_gains_blade"
       ],
-      "covering_test_count": 70,
+      "covering_test_count": 71,
       "is_null": false
     },
     {
@@ -18140,6 +18140,7 @@
       ],
       "covering_tests": [
         "bp3_002_per_opponent_waited_member_blade",
+        "bp3_031_fires_from_real_live_victory_flow",
         "bp3_031_per_waited_member_score_plus1",
         "chisato_center_does_not_activate",
         "chisato_left_side_draws_and_discards",
@@ -18153,7 +18154,7 @@
         "sp_bp4_003_center_grants_blade",
         "spb1_005_opponent_more_energy_grants_blade"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -18184,6 +18185,7 @@
       ],
       "covering_tests": [
         "bp3_002_per_opponent_waited_member_blade",
+        "bp3_031_fires_from_real_live_victory_flow",
         "bp3_031_per_waited_member_score_plus1",
         "chisato_center_does_not_activate",
         "chisato_left_side_draws_and_discards",
@@ -18197,7 +18199,7 @@
         "sp_bp4_003_center_grants_blade",
         "spb1_005_opponent_more_energy_grants_blade"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -29709,12 +29711,13 @@
         "engine/tests/test_modules/l0_gap_livesuccess2_test.rs"
       ],
       "covering_tests": [
+        "bp3_031_fires_from_real_live_victory_flow",
         "bp3_031_per_waited_member_score_plus1",
         "live_success_per_wait_member_adds_score",
         "live_success_yell_reveal_live_to_deck_bottom",
         "sp_bp4_003_center_blade"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 5,
       "is_null": false
     },
     {
