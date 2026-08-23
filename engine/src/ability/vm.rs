@@ -1361,24 +1361,6 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
         kind,
     };
 
-    // Draw-count fix
-    if let Some(ref actions) = effect.compound.actions {
-        let fixed: Vec<Box<AbilityEffect>> = actions
-            .iter()
-            .map(|a| {
-                let mut f = (**a).clone();
-                if f.action == ActionType::DrawCard
-                    && f.count.is_none()
-                    && f.dynamic_count_any().is_none()
-                {
-                    f.count = Some(1);
-                }
-                Box::new(f)
-            })
-            .collect();
-        effect.compound.actions = Some(fixed);
-    }
-
     Some(effect)
 }
 
