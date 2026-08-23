@@ -119,6 +119,13 @@ correction into the handler that produced the wrong shape; delete the
 patch. One FIX per step, each byte-gated. Blocks whose correction cannot
 be localized stay as documented patches.
 
-## Deferred / explicitly skipped (updated as phases run)
+## Status (2026-08-23)
 
-_(empty — fill with any step that failed the byte-identical gate)_
+### Phase 1 — partially done
+- ✅ Duplicate `登場させ` registration deleted (was 2570 & 2816; kept the first). Byte-identical.
+- ✅ Unreachable comment tail after `parse_condition`'s return deleted. Byte-identical.
+- ✅ Unused `categorized = categorize_quoted_text(quoted_exclusions)` deleted (parser.py ~3224). Byte-identical. NOTE: structured exclusion lists ("「X」以外") are still NOT captured anywhere — flagged as a potential future feature, not a refactor.
+- ⏸ `segment_clauses` decision deferred to after Phase 2/3: pipeline-unused but has its own passing test suite (12 tests); its fate depends on whether single-pass extraction adopts it.
+- ❌ `_try_phase_gate` → `extract_phase_gate` delegation SKIPPED, not byte-identical: three behavioral differences — (a) output "text" field is full text vs gate phrase only, (b) consequence-skip (次の/来) exists only in extract_phase_gate, (c) phase_target detection scope differs (full text startswith vs gate phrase). Unifying changes outputs for whichever side yields; needs an explicit decision on which behavior is correct before it can proceed.
+
+### Phase 2/3/4/5 — not started

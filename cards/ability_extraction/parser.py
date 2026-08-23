@@ -1939,9 +1939,6 @@ def parse_condition(text: str) -> Dict[str, Any]:
     )
     return _infer_condition_type(condition, text)
 
-    # Parse gained ability text into structured effect
-    # Note: NOT done here — done in parse_ability to avoid recursion
-
 
 def _ic(t, tag):
     return t.count(tag) or None
@@ -2813,7 +2810,6 @@ _register_action(
     )
 )
 _register_action(ActionRule(match="必要ハートを選ぶ", action="choose_required_hearts"))
-_register_action(ActionRule(match="登場させ", action="move_cards", defaults={"destination": "stage"}))
 _register_action(
     ActionRule(
         match_all=[
@@ -3222,10 +3218,9 @@ def parse_action(text: str) -> Dict[str, Any]:
     # Also check for specific character name exclusions like "「鬼塚冬毬」以外"
     if re.search(r"「.+」以外", text):
         action["exclude_self"] = True
-        # Extract the quoted character names being excluded
-        quoted_exclusions = extract_all_quoted_names(text)
-        if quoted_exclusions:
-            categorized = categorize_quoted_text(quoted_exclusions)
+        # NOTE: the quoted names themselves are NOT captured here — a previous
+        # revision computed categorize_quoted_text(...) and dropped the result.
+        # If an effect ever needs structured exclusion lists, capture them here.
 
     # Extract group names from 『』 brackets
     group_names = extract_all_groups(text)
