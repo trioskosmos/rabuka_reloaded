@@ -21,10 +21,15 @@ Unified roadmap merging the original engine audit, `docs/CASTING_AUDIT.md` (~1,0
 | 13 | **A2** web_server mutex poisoning recovered (LockRecoverExt) instead of unwrap-cascade; 52 sites converted | game/web_server.rs, main.rs |
 | 14 | **A3** single shared no_std-safe `Lcg` in rng.rs — six identical binary-local copies deleted | rng.rs, src/bin/* |
 | 15 | **C1** `execute_gain_resource` split: `ResourceKind` enum replaces 13 ad-hoc EN/JA string comparisons; four focused units extracted (`try_create_target_selection_choice`, `resolve_gain_resource_targets`, `apply_blade_resource`, `apply_heart_resource`) | effects/misc.rs |
+| 16 | **B4** `saturate_u8`/`saturate_i16` helpers replace all 51 `.max(0) as u8` clamp sites — and fix silent top-end wraparound (>255 wrapped instead of saturating) | core/constants.rs + 11 files |
 
 ---
 
 ## QUEUE A — Correctness / robustness leftovers
+
+### ~~A1. max_distinct_names~~ ✅ DONE (#12)
+### ~~A2. web_server lock poisoning~~ ✅ DONE (#13)
+### ~~A3. RNG consolidation~~ ✅ DONE (#14 — Lcg unified; desktop constant-seed policy left as-is intentionally, bots seed their own streams)
 
 ### A1. `max_distinct_names`: exponential DFS + undercounting greedy
 `ability/util.rs:778-834`. ≤12-card branch clones a HashSet per DFS node (branching = names per card, unbounded). >12 branch is first-fit greedy which **undercounts** → wrong condition verdicts on big boards.
@@ -103,8 +108,8 @@ Non-conforming steps get skipped and logged in the plan's "Deferred" section, no
 
 ---
 
-## Execution order (rev 4)
+## Execution order (rev 5)
 
-**[test-writing track: hard, ability-specific tests against the biggest coverage-gap cells] → C3 → C2 → B1 → B4 → B3 → B2 → A4 → A5 → D1 → D4 → E1..E5 → D2 → D3**
+**B1 (cast lints) → B3 (conversion hygiene at GameModifiers boundary) → parser E-track Phase 1-2 → B2 (CardId, zone-boundary-first) → A4 → A5 → D1 → D4 → E3..E5 → D2 → D3**
 
-C1 done. Current focus: the ABILITY_MATRIX gap cells (LiveStart×gain_resource 43/60, LiveSuccess×move_zones 30/40, Constant×gain_resource 55/67, group_condition 29/43) get new adversarial tests before further refactors — the refactored gain_resource paths especially need the coverage. The Python track (E) remains independent and can interleave.
+B4 done; C1 done; A-tier done. Test-writing stays parked unless a queue item demands it — the matrix gap cells get filled as a side effect of ability-specific refactors.
