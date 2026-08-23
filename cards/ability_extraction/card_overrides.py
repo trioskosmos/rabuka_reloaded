@@ -165,13 +165,9 @@ OVERRIDES: list = [
         "ab_index": 1,
         "pred": _apply_mari_gain_ability,
     },
-    {
-        "name": "ll_bp7_001_play_cost",
-        "cards": ["LL-bp7-001"],
-        "ab_index": 0,
-        "text_any": ["プレイに際し", "コストは10になる"],
-        "pred": _apply_ll_bp7_001,
-    },
+    # ll_bp7_001_play_cost removed: replaced by the generic
+    # parser._try_play_time_cost_set handler for
+    # 「プレイに際し…コストはNになる」.
     {
         "name": "burn_under_move",
         "cards": ["N-bp7-029-L"],

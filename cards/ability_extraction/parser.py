@@ -10003,6 +10003,66 @@ for _i, _h in enumerate(_EFFECT_HANDLERS):
     _hn = getattr(_h, "__name__", f"handler_{_i}")
     _effect_registry.register(100 + _i, _hn, _h)
 
+
+def _try_play_time_cost_set(text):
+    """「このカードのプレイに際し、<move>。そうしたとき、このカードのコストはNになる。」
+
+    Play-time alternative cost (rule 7.x): <move> is an optional payment
+    made when playing the card; if paid, this card's play cost becomes N.
+    Generic handler for any card with this template — replaces the former
+    LL-bp7-001-specific override.
+
+    Shape contract with the engine's play-time cost hook:
+      effect = {action: modify_cost, operation: set, value: N,
+                source/location: hand, characters, count, optional}
+      cost   = the move itself (move_cards, per_character) — embedded as
+               effect["cost"]; parse_ability lifts it to ability level.
+    """
+    if "プレイに際し" not in text:
+        return None
+    vm = re.search(r"このカードのコストは(\d+)になる", text)
+    mm = re.search(r"プレイに際し、(.+?)。そうしたとき、", text)
+    if not vm or not mm:
+        return None
+    move_text = mm.group(1)
+    characters = extract_all_quoted_names(move_text)
+    # 控え室に置く / 置いて / 置き — any placement form
+    if not characters or "控え室に置" not in move_text:
+        return None
+    optional = "てもよい" in move_text or "てもよい" in text
+    effect = {
+        "text": text,
+        "action": "modify_cost",
+        "operation": "set",
+        "value": int(vm.group(1)),
+        "source": "hand",
+        "location": "hand",
+        "card_type": "member_card",
+        "characters": characters,
+        "count": len(characters),
+        "optional": optional,
+        # Embedded play-time payment; parse_ability lifts this to
+        # ability["cost"].
+        "cost": {
+            "text": move_text,
+            "type": "move_cards",
+            "source": "hand",
+            "zone": "hand",
+            "destination": "discard",
+            "card_type": "member_card",
+            "characters": characters,
+            "count": 1,
+            "per_character": True,
+            "optional": optional,
+        },
+    }
+    return effect
+
+
+# Negative priority: play-time costs are the most specific shape in effect
+# text and must win before generic handlers mis-parse them.
+_effect_registry.register(-10, "play_time_cost_set", _try_play_time_cost_set)
+
 # ======================================================================
 # POST-PROCESSING NORMALIZERS & CHAINING
 # ======================================================================
