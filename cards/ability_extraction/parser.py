@@ -672,34 +672,6 @@ def split_condition_action(text: str) -> Tuple[str, str]:
     return "", text
 
 
-# ======================================================================
-# CLAUSE SEGMENTATION (Stage A IR)
-# ======================================================================
-# A deterministic, purely structural pass: raw ability text → clause tree.
-# No semantics here — leaf clauses are still parsed by the existing
-# condition/action registries. Goal: sentence boundaries, cost/effect split,
-# leading condition gates, inter-clause links (その後/そうしたとき/さらに/
-# 代わりに) and choice bullets get recognized ONCE, here, instead of being
-# re-derived by every structural handler.
-#
-# Node shape:
-#   {"kind": "ability", "text", "cost_text"?, "children": [<sentence|choice>]}
-#   {"kind": "sentence", "text", "body", "link"?,
-#    "condition": {"text", "marker"}?}
-#   {"kind": "choice", "text", "intro", "options": [str]}
-# `link` is how this node attaches to the previous sibling:
-#   "then" (その後、) | "on_accept" (そうした場合/そうしたとき、) |
-#   "furthermore" (さらに) | "alternative" (代わりに)
-# ======================================================================
-
-_CONDITION_MARKERS_IR = ("場合、", "とき、", "なら、", "たび、", "かぎり、")
-
-_LINK_PREFIXES = (
-    ("そうした場合", "on_accept"),
-    ("そうしたとき", "on_accept"),
-    ("その後、", "then"),
-    ("さらに", "furthermore"),
-)
 
 
 def _ir_depth_scan(text: str):
@@ -760,78 +732,6 @@ def _split_marker_depth0(text: str, marker: str):
     return text[:idx], text[idx + len(marker) :]
 
 
-def _segment_sentence(s: str) -> Dict[str, Any]:
-    """Classify one sentence: optional link prefix + optional leading gate."""
-    link = None
-    for prefix, lk in _LINK_PREFIXES:
-        if s.startswith(prefix):
-            link = lk
-            s = s[len(prefix) :].lstrip("、，").strip()
-            break
-    best = None
-    for marker in _CONDITION_MARKERS_IR:
-        idx = _find_depth0(s, marker)
-        if idx >= 0 and (best is None or idx < best[0]):
-            best = (idx, marker)
-    node: Dict[str, Any] = {"kind": "sentence", "text": s, "body": s}
-    if link:
-        node["link"] = link
-    if best:
-        idx, marker = best
-        cond_text = s[: idx + len(marker)]
-        node["condition"] = {"text": cond_text, "marker": marker.rstrip("、")}
-        node["body"] = s[idx + len(marker) :].strip()
-    return node
-
-
-def segment_clauses(text: str) -> Dict[str, Any]:
-    """Segment a raw triggerless ability text into a structural clause tree.
-
-    Purely syntactic — see the CLAUSE SEGMENTATION header above for the node
-    shape. Never raises on unexpected input; worst case it returns the whole
-    text as a single unclassified sentence.
-    """
-    text = normalize(text.strip())
-    node: Dict[str, Any] = {"kind": "ability", "text": text, "children": []}
-    cost_text, effect_text = split_cost_effect(text)
-    if cost_text:
-        node["cost_text"] = cost_text
-
-    # Choice blocks: bullet options (・) may exist with or without the
-    # 以下から1つを選ぶ marker; everything from the first top-level ・ on is
-    # option material.
-    bullet_idx = _find_depth0(effect_text, "・")
-    if bullet_idx >= 0:
-        intro = effect_text[:bullet_idx].strip()
-        if intro.endswith("。"):
-            intro = intro[:-1].strip()
-        choice: Dict[str, Any] = {
-            "kind": "choice",
-            "text": effect_text[bullet_idx:].strip(),
-            "intro": intro,
-            "options": [],
-        }
-        for raw in effect_text[bullet_idx:].split("・")[1:]:
-            opt = raw.strip()
-            opt = _split_sentences_nesting(opt)
-            if opt:
-                choice["options"].append("。".join(opt))
-        node["children"].append(choice)
-        return node
-
-    prev_kind = None
-    for s in _split_sentences_nesting(effect_text):
-        sent = _segment_sentence(s)
-        # "そうした場合/とき" may also open with the marker mid-sentence when
-        # the previous sentence had no terminal 。; treat as on_accept link.
-        if prev_kind is not None and sent.get("link") is None:
-            for prefix, lk in (("そうした場合", "on_accept"), ("そうしたとき", "on_accept")):
-                if s.startswith(prefix):
-                    sent["link"] = lk
-                    break
-        node["children"].append(sent)
-        prev_kind = "sentence"
-    return node
 
 
 def parse_complex_condition(text: str) -> Optional[Dict[str, Any]]:
