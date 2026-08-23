@@ -205,6 +205,152 @@ Part-0 holes; several silent-fallback paths can eat a regression unnoticed.
 
 ---
 
+## Part 4 — Ability text ↔ code expressiveness audit
+
+How faithfully each representation layer carries the meaning of the Japanese text, with concrete
+traced abilities. Layers: **JA text → parser JSON → bytecode/EffectKind → handlers**.
+
+### 4.1 The same sentence has multiple encodings (and handlers must sniff all of them)
+
+**「〜につき」 per-unit scaling** — 66 occurrences. `per_unit_type` is a soup of Japanese counters,
+English zone names, and pseudo-zones, resolved by *sniffing other fields*:
+
+| per_unit_type value in corpus | count | resolved as (util.rs:2108-2121, :2167-2184) |
+|---|---|---|
+| `"枚"` | 26 | Hand — *unless* `filter.card_type == member_card`, then UnderMember |
+| `"人"` | 24 | Stage members |
+| `"discard"` | 8 | actually Waitroom (控え室) — naming drift baked into data |
+| `"live_card_zone"`, `"energy_deck"`, `"group_name"`, `"heart_colors"`, `"下"`, `"つ"` | ~10 | special-cased per handler |
+| `None` (with per_unit=true) | 2 | falls through `_ => return 1` |
+
+The real zone sometimes lives in a *different field* (`location`), so the same sentence
+「自分の成功ライブカード置き場にあるカード1枚につき」 is encoded zone-in-per_unit_type for some cards
+and counter+location for others; misc.rs:524-586, score.rs:33-88, state.rs:1522-1532 each re-derive
+it differently. **Improvement:** a typed `PerUnit { zone: Zone, filter: CardFilter, n: u16 }` node;
+one resolver; migrate the 66 abilities via golden-gated regeneration.
+
+**「そうした場合／そうしたとき」 consequences** — 44 occurrences, **three different encodings**:
+- implicit gate on `sequential` (31): compound.rs:584-601 sets `condition_failed` when the gating
+  action moved *and* selected nothing (`was_moved == 0 && was_selected == 0`). Works for the traced
+  cases (PL!-bp3-004-R＋ optional discard→retrieve; PL!S-bp3-006-R＋ cost-move→debut-with-cost+2),
+  but it's a proxy: any future consequence shape that neither moves nor selects silently always-fires.
+- explicit `conditional_on_optional` (7): PL!N-bp7-011-R＋ etc. — a second, better shape for the
+  identical semantics.
+- `conditional_alternative` / ad-hoc `last_move_moved_any` (compound.rs:411-422): a third path that
+  only recognizes modify_score and two move shapes as "consequences".
+  **Improvement:** one first-class `Consequent { gate: PreviousActionSucceeded, effect }` node;
+  delete the was_moved/was_selected heuristics.
+
+**Referential clauses 「これにより〜したカード」** — no structural home at all. Threading happens
+through game-state globals: `mods.last_cost_moved_card_ids` written at choice.rs:558/:741 and
+move_cards.rs:2916, read at misc.rs:933-948; plus resolver-scoped `moved_cards`/`selected_cards`.
+E.g. PL!HS-bp1-005-PR 「これにより置いた枚数分カードを引く」 and PL!HS-pb1-003-R
+「その枚数に1を足した枚数のカードを引く」 are implemented entirely off these globals. One global
+overwrite mid-chain = wrong draw count, with nothing pointing from the ability JSON to that fact.
+
+### 4.2 Duration semantics
+
+Corpus durations: `live_end` ×251, `as_long_as` ×62(71 nodes), `this_turn` ×1, `unless` ×1.
+- The 62 「〜かぎり」 abilities (e.g. PL!SP-bp4-005-R＋ 「エネルギーが10枚以上あるかぎり」) are
+  常時-style constants handled by `recalculate_constants` re-evaluation — correct behavior, but their
+  `Duration::AsLongAs` tag is never what executes.
+- `check_expired_effects` (abilities.rs:2324-2330) stubs AsLongAs/Unless to expire at live end. Today
+  no handler appears to store an as_long_as *temporary* effect (the tag is dead weight), but the trap
+  is armed: the first triggered 「〜するかぎり」 temporary bonus will silently become ThisLive.
+  **Improvement:** either implement condition-re-eval expiry or make decode reject
+  duration=as_long_as outside constant context (loud, not silent).
+
+### 4.3 use_limit 「この能力は1ターンにN回まで」
+
+Worse than documented: recording is spread over **6 sites across 2 files**, not 4 in one —
+resolver.rs:646-675 (guard helper), :760-774 (pre-cost check), :836-1028 (four recording paths:
+early-record-if-condition-met, activation-failure, post-choice, post-effect), *plus*
+choice.rs:3034-3123 and :3249-3260 (optional-effect variants record inside choice resume).
+Traced example PL!N-bp7-006-R＋ (起動, ターン1回... use_limit semantics) depends on which of the six
+paths its choice flow takes. **Improvement:** single `record_use(phase)` funnel; phases named after
+the rule reason (activation_started / effect_completed / optional_accepted).
+
+### 4.4 Draw-count fixup is masking missing structure (vm.rs:1364-1380)
+
+Exactly **2 corpus abilities** hit it (PL!HS-bp1-005-PR, PL!HS-pb1-003-R) — both are dynamic draws
+whose true count comes from `last_cost_moved_card_ids`. The decoder injects `count=1` so generic code
+doesn't divide-by-none, but the *real* semantic (draw N where N = cards discarded) exists nowhere in
+the JSON. **Improvement:** a `DynamicCount::FromPreviousMove{offset}` variant (dynamic_count.rs
+already exists as a home); then delete the fixup.
+
+### 4.5 What describe.rs says about expressiveness
+
+`describe_effect_en/ja` template-render EffectKind back to text — the closest thing to a round-trip
+fidelity check:
+- Structural coverage: **EN 929/936, JA 931/936** fall through to raw-text fallback
+  (describe.rs:504/:1122); 7 EN / 5 JA abilities have no template at all.
+- Bug found: `reduce_live_card_set_limit` has a JA arm (describe.rs:967) but **no EN arm** — English
+  prompts show raw Japanese for those cards.
+- **Conditions are never rendered anywhere** — 47% of effects carry conditions, so even
+  "templated" descriptions omit half the sentence. Choice options dropped too ("Choose 1").
+- No bin/test dumps all descriptions today; a ~40-line loop over `get_ability(0..NUM_ABILITIES)`
+  would enable a normalized diff report against `full_text` (strip `{{icons}}`, digits→N).
+
+### 4.6 Dead expressive capacity vs forced-generic shapes
+
+- `ActionType` has ~66 variants; the parser produces 44. **20 dead variants** incl. `shuffle`,
+  `discard_card`, `set_cost`, `custom` (=the Default!), `reveal_per_group`, … — several still decoded
+  and handled engine-side (card.rs:1107-1170). Parser-side capacity that was built but never wired.
+- Conversely ~15 sub-node `type` strings (`area_move`, `baton_touch`, `per_unit`, `temporal_count`,
+  `zone_change`, …) live *outside* both ActionType and ConditionType enums — stringly-typed shadow
+  schema that decoders skip silently when unknown (see C1).
+- `EffectKind` is only 14 coarse variants; nearly all meaning lives in `EffectFilter`. Fine as design,
+  but it means enum-count lints overstate expressiveness.
+
+### 4.7 Text markers without structural counterparts (quantified)
+
+| Marker | occurrences | covered? |
+|---|---|---|
+| 「〜につき」 | 66 | 58 yes; **8 uncovered** (parenthetical post-yell bonuses riding on perform_yell/score nodes — e.g. PL!N-bp1-029-L Eutopia) |
+| 「その後」 | 30 | 29/30 via sequential |
+| 「「X」以外」 exclusion lists | 44 | mostly covered (PARSER_UNTANGLE_PLAN note partially stale — 『group』以外/「name」以外 ARE parsed at parser.py:5719/:6520/:6850); remaining gaps: 選んだカード以外-shuffles, 手札以外から登場, Q&A それ以外 branches (~6 abilities) |
+| 「この効果では…ない」 self-clamps | 9 (1 real) | **0** — e.g. PL!N-bp5-010-R's 「スコアは０未満にならない」 clamp has no structural home; check if hardcoded in score.rs |
+| 「できない」 negation | 11 (5 non-parenthetical) | covered via restriction/negation/conditional_negation |
+| 「〜ごとに」「最大まで」「直後」 | 0 | not in this game's dialect |
+
+### 4.8 Fidelity CI ladder (new recommendations, ranked)
+
+These complement Part 3's waves — they're detection tooling specifically for *text↔code fidelity*:
+
+1. **F1 — describe-parity engine test** (hours): loop 0..NUM_ABILITIES asserting (a) no node hits the
+   describe fallback arm, (b) EN/JA arm-set equality (catches the reduce_live_card_set_limit class).
+   Gates every future parser→enum addition automatically.
+2. **F2 — three new `_validate_semantic` rules** (a day): につき-without-per-field (8 hits now),
+   non-parenthetical できない-without-restriction, この効果で-self-clamp. Baseline-seed them (H3).
+3. **F3 — describe-dump + normalized diff report** (non-gating): the bin above + python normalizer;
+   weekly top-N worst matches. Also directly improves UI prompts (describe feeds choices at
+   game_state/abilities.rs:1871/:1894).
+4. **F4 — typed PerUnit + Consequent nodes** (Wave-3 work, golden-gated): dissolves the sniffing in
+   util.rs/misc.rs/score.rs/state.rs and the was_moved/was_selected proxy. This is the single biggest
+   *expressiveness* upgrade available.
+5. **F5 — dead-capacity lint**: extend test_inventory.py to emit ActionType×corpus tables flagging
+   unused variants (like ABILITY_MATRIX.md) so dead variants get deleted-or-wired decisions instead
+   of accumulating.
+
+### 4.9 Traced-example verdict table (spot checks)
+
+| Ability | Text pattern | Code path | Verdict |
+|---|---|---|---|
+| PL!-bp3-004-R＋ | optional discard、そうした場合 retrieve | sequential + implicit gate (compound.rs:584) | faithful; mechanism fragile |
+| PL!S-bp3-006-R＋ | cost-move、そうした場合 debut w/ cost+2 in same area | sequential + was_moved gate + area shim | approximate — area tracking rides last_area_move shims |
+| PL!N-bp7-011-R＋ | optional discard、そうしたとき self-retrieve ×2 | conditional_on_optional (explicit) | faithful — but proves 2nd encoding exists |
+| PL!HS-bp1-005-PR | draw = number discarded | last_cost_moved globals + decoder fixup | unrepresentable in JSON (works via globals) |
+| PL!HS-pb1-003-R | draw = discarded+1 | same globals | same |
+| PL!-bp3-004-R＋ (登場) | draw per member on stage | per_unit_type:"人" | faithful |
+| PL!SP-bp2-009-R＋ | blade per 2 cards in hand | per_unit_type:"枚",count=2 | faithful but counter-string typed |
+| PL!N-bp5-010-R | score floor clamp この効果では | ? (no structural node) | needs verification vs score.rs hardcode |
+| 62× 「かぎり」 constants | conditional constant bonus | recalculate_constants path | faithful; Duration::AsLongAs stub latent-trap |
+
+Items marked "needs verification" should become targeted tests before any Wave-3 refactor touches
+their handler.
+
+---
+
 ## Appendix — Notable facts worth remembering
 
 - `vm.rs` is not a VM: tagged binary-JSON serialization, eagerly decoded per ability, cached per slot.

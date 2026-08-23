@@ -1,4 +1,4 @@
-use super::enums::Zone;
+﻿use super::enums::Zone;
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ExecutionContext, LookAndSelectStep};
 use super::util;
@@ -292,6 +292,12 @@ impl AbilityResolver {
                     })
                     .collect::<Vec<_>>()
                     .join(",");
+                let pos_str_dbg = pos_str.clone();
+                let card_no_dbg = gs
+                    .card_database
+                    .get_card(card_id)
+                    .map_or("card", |c| c.card_no.as_ref())
+                    .to_string();
                 self.pending_choice = Some(Choice::SelectPosition {
                     position: pos_str,
                     description: format!(
@@ -314,12 +320,18 @@ impl AbilityResolver {
                     )),
                     allow_skip: false,
                 });
+                let pos_str_dbg = pos_str_dbg;
+                let card_id_dbg = card_id;
                 self.execution_context = ExecutionContext::MoveCardsPosition {
                     card_id,
                     state_change,
                     target: pos_target,
                     source_zone: source_zone.to_string(),
                 };
+                log::debug!(
+                    "[DEPLOY] {card_no_dbg} (id={card_id_dbg}) waits for the player to choose \
+                     a position from [{pos_str_dbg}] — its 登場 fires after placement",
+                );
                 return Ok(true);
             } else {
                 // Exactly 1 available slot (either empty or, with allow_occupied_stage, occupied)
@@ -333,6 +345,14 @@ impl AbilityResolver {
                     // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
                     player.track_deployment(card_id);
                 }
+                log::debug!(
+                    "[DEPLOY] {} (id={card_id}) placed immediately at slot {slot}",
+                    gs.card_database
+                        .get_card(card_id)
+                        .map_or("card", |c| c.card_no.as_ref()),
+                    card_id = card_id,
+                    slot = slot
+                );
                 return Ok(false);
             }
         }
@@ -2268,11 +2288,29 @@ impl AbilityResolver {
                 if state_change.as_deref() == Some("wait") {
                     gs.mods.add_orientation_modifier(card_id, "wait");
                 }
+                log::debug!(
+                    "[DEPLOY] player answered the position choice for id={card_id} — \
+                     firing its 登場 now",
+                    card_id = card_id
+                );
                 self.fire_debut_side_effects(gs, card_id, &target);
             }
             _ => {}
         }
-        self.pending_choice = None;
+        // Clear only the position choice itself. fire_debut_side_effects may
+        // have queued the placed card's OWN debut (Q200/Q201/Q202), whose
+        // cost/effect prompts must survive — a blanket clear here silently
+        // swallowed them.
+        if matches!(
+            self.pending_choice,
+            Some(Choice::SelectPosition { .. })
+        ) {
+            self.pending_choice = None;
+        }
+        log::debug!(
+            "[DEPLOY] after position handling: pending={:?}",
+            format!("{:?}", self.pending_choice)
+        );
         self.execution_context = ExecutionContext::None;
         // Place remaining cards deferred by multi-card stage selection
         // BEFORE resuming pending commands, so deferred cards get their
@@ -2311,6 +2349,10 @@ impl AbilityResolver {
             }
         }
         self.resume_pending_actions(gs)?;
+        log::debug!(
+            "[DEPLOY] after resume_pending_actions: pending={:?}",
+            format!("{:?}", self.pending_choice)
+        );
         Ok(())
     }
 
@@ -2517,13 +2559,19 @@ impl AbilityResolver {
                 gs.player2.debut_count_this_turn += 1;
             }
 
+            let mut debut_abilities = 0;
             for ar in &card.abilities {
                 let ability = ar.resolve();
                 if GameState::ability_matches_trigger(
                     &ability,
                     &crate::core::types::AbilityTrigger::Debut,
                 ) {
+                    debut_abilities += 1;
                     let ability_id = format!("{}_{}", card_no, ability.full_text);
+                    log::debug!(
+                        "[DEBUT_CHAIN] enqueueing debut of {card_no} (id={card_id}, \
+                         controller={player_id}): {ability_id}"
+                    );
                     gs.trigger_auto_ability(
                         ability_id,
                         crate::core::types::AbilityTrigger::Debut,
@@ -2535,6 +2583,14 @@ impl AbilityResolver {
                     );
                 }
             }
+            if debut_abilities == 0 {
+                log::debug!(
+                    "[DEBUT_CHAIN] {card_no} (id={card_id}) has no 登場 abilities — \
+                     nothing to enqueue"
+                );
+            }
+        } else {
+            log::debug!("[DEBUT_CHAIN] fire_debut_side_effects: unknown card id {card_id}");
         }
 
         // Cascade to other stage members that watch for ally debuts.
