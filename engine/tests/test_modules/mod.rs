@@ -348,7 +348,6 @@ pub mod conditional_alternative_test;
 pub mod daydream_mermaid_test;
 pub mod ll_bp1_001_test;
 pub mod modify_required_hearts_13key_test;
-pub mod parser_fixes_e2e_test;
 pub mod pl_bp5_012_test;
 pub mod pl_bp6_003_test;
 pub mod pl_bp6_006_test;

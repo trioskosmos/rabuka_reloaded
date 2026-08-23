@@ -89,14 +89,39 @@ fn location_condition_negative_too_few_cards() {
 
     game.add_to_stage(MemberArea::Center, emma);
     game.state.player1.hand.cards.clear(); // Empty hand
+    let waitroom_member = game.id("PL!N-bp1-001-R");
     game.state
         .player1
         .waitroom
         .cards
-        .push(game.id("PL!N-bp1-001-R")); // Valid target in discard
+        .push(waitroom_member); // Valid target in discard
 
-    // Attempt to activate ability
+    // Attempt to activate ability with an unpayable cost (empty hand).
+    // The engine answers Ok with a partial-resolution no-op — acceptable —
+    // but the board MUST be untouched: the waitroom member is a valid
+    // *effect* target sitting in the WRONG zone for the *cost* (hand), and
+    // a buggy implementation could grab it from there.
     let _ = game.try_activate_ability(emma);
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 10 {
+        guard += 1;
+        game.select_indices(&[]);
+    }
+
+    let wait = &game.state.player1.waitroom.cards;
+    assert_eq!(
+        wait.len(),
+        1,
+        "waitroom must be unchanged by the failed activation"
+    );
+    assert!(
+        wait.contains(&waitroom_member),
+        "the waitroom member stays in the waitroom"
+    );
+    assert!(
+        !game.state.player1.stage.stage.contains(&waitroom_member),
+        "waitroom member must not be deployed by the failed activation"
+    );
 
     // Hand should still be empty because the ability cost failed
     assert_eq!(

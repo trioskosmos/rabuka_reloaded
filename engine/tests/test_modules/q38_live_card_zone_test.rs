@@ -135,13 +135,11 @@ fn rainbow_q38_member_on_stage_per_live_card_blade() {
         game.select_indices(&[0]);
     }
 
-    // 1 live card in zone → per_unit → gain blade
-    eprintln!(
-        "[RAINBOW] blade_mod = {:?}",
-        game.state.mods.blade_modifiers.get(&rainbow)
-    );
-    assert!(
-        game.state.mods.get_blade_modifier(rainbow) >= 1,
-        "Q38: 1 live card in zone, Rainbow on stage → blade gained"
+    // 1 live card in zone → per_unit → exactly +1 blade.
+    // A >= bound would mask double-application / stacking bugs.
+    assert_eq!(
+        game.state.mods.get_blade_modifier(rainbow),
+        1,
+        "Q38: 1 live card in zone, Rainbow on stage → exactly +1 blade"
     );
 }
