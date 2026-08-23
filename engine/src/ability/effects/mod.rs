@@ -398,10 +398,6 @@ impl AbilityResolver {
                 self.execute_all_blade_timing(gs, effect);
                 Ok(())
             }
-            ActionType::SetCardIdentityAllRegions => {
-                self.execute_set_card_identity_all_regions(gs, effect);
-                Ok(())
-            }
             ActionType::Shuffle => {
                 self.execute_shuffle(gs, effect);
                 Ok(())

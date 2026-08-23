@@ -730,9 +730,6 @@ impl Ability {
 #[cfg_attr(feature = "serde_support", serde(transparent))]
 pub struct AbilityCost(pub AbilityEffect);
 
-impl AbilityCost {
-}
-
 impl From<AbilityCost> for AbilityEffect {
     fn from(cost: AbilityCost) -> Self {
         cost.0
@@ -1128,9 +1125,7 @@ impl EffectKind {
             | "modify_required_hearts_global"
             | "modify_required_hearts_success" => EffectKind::ModifyHearts { filter },
             "gain_resource" | "pay_energy" => EffectKind::GainResource { filter },
-            "change_state" | "set_card_identity" | "set_card_identity_all_regions" => {
-                EffectKind::ChangeState { filter }
-            }
+            "change_state" | "set_card_identity" => EffectKind::ChangeState { filter },
             "gain_ability"
             | "gain_ability_from_source"
             | "invalidate_ability"
