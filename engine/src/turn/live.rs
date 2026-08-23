@@ -789,8 +789,12 @@ impl super::TurnEngine {
             }
         }
 
-        Self::move_restricted_cards_to_discard(&mut game_state.player1, &card_db);
-        Self::move_restricted_cards_to_discard(&mut game_state.player2, &card_db);
+        // NOTE: cannot-place restrictions (メビウスループ PL!S-pb1-022-L) are NOT
+        // pre-discarded here. Their conditions (「合計スコアが同じ場合」) are
+        // evaluated when the ライブ成功時 ability resolves: on a tie it pushes a
+        // dynamic prohibition_effects entry and move_live_to_success_and_
+        // handle_wins routes the card to the waitroom via can_place_card_in_zone;
+        // untied, no prohibition exists and the winner places normally.
         let p1_before = game_state.player1.success_live_card_zone.cards.len();
         let p2_before = game_state.player2.success_live_card_zone.cards.len();
         log::debug!(
@@ -882,42 +886,6 @@ impl super::TurnEngine {
                 category: "live_result".into(),
                 metadata: None,
             });
-        }
-    }
-
-    fn move_restricted_cards_to_discard(
-        player: &mut crate::player::Player,
-        card_db: &CardDatabase,
-    ) {
-        let mut cards_to_remove = Vec::new();
-        for (index, card_id) in player.live_card_zone.cards.iter().enumerate() {
-            if let Some(card) = card_db.get_card(*card_id) {
-                let has_restriction = card.abilities.iter().any(|ar| {
-                    let ability = ar.resolve();
-                    if let Some(ref effect) = ability.effect {
-                        let rd_binding = effect.restricted_destination_any();
-                        let dest_binding = effect.destination.map(|z| z.as_str());
-                        let restricted_dest = rd_binding.or(dest_binding);
-                        effect.action == crate::ability::enums::ActionType::Restriction
-                            && effect.restriction_type_any().as_deref() == Some("cannot_place")
-                            && matches!(
-                                restricted_dest.and_then(Zone::from_str),
-                                Some(Zone::SuccessLiveZone | Zone::LiveCardZone)
-                            )
-                    } else {
-                        false
-                    }
-                });
-                if has_restriction {
-                    cards_to_remove.push(index);
-                }
-            }
-        }
-        for &idx in cards_to_remove.iter().rev() {
-            if idx < player.live_card_zone.cards.len() {
-                let card_id = player.live_card_zone.cards.remove(idx);
-                player.waitroom.cards.push(card_id);
-            }
         }
     }
 

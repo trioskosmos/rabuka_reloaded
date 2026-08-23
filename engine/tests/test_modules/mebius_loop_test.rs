@@ -132,9 +132,11 @@ fn mebius_does_not_fire_on_untied_scores() {
     let mut game = TestGame::new(db);
 
     let mebius_p1 = game.id("PL!S-pb1-022-L");
-    // PL!N-sd1-025-SD Colorful Dreams! has score 1 (different from mebius's
-    // 2) and need_heart: heart0×4 — succeeds on any 4 hearts.
-    let normal_live_p2 = game.id("PL!N-sd1-025-SD");
+    // P2 sets a live whose requirements (heart06×5 + heart0×7) are impossible
+    // for this board, so its life FAILS: totals are 2 vs 0 — genuinely
+    // untied. (The previous "score-1" picks all carried エール score-icon
+    // riders that tied the game at 2-2.)
+    let normal_live_p2 = game.id("PL!N-bp1-028-L");
     let filler = game.id("PL!-sd1-010-SD");
 
     fill_p1_stage_with_heart04(&mut game);
@@ -164,37 +166,26 @@ fn mebius_does_not_fire_on_untied_scores() {
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
+    // One more pass finalizes victory determination (winner placement),
+    // matching live_success_rules_test::both_players_live_score_compared.
+    game.pass();
 
-    // Since mebius (score 2) and the normal live (score 1) are NOT tied,
-    // the mebius condition fails. The cannot_place restriction does NOT
-    // fire, and the normal live outcome applies. Verify that:
-    //   1. The mebius ability's restriction did NOT block placement —
-    //      exactly one of the two live cards reached its success zone.
-    //   2. P1's mebius did NOT remain in P1's success zone (it lost or
-    //      was discarded).
-    //   3. P2's normal live did NOT remain in P2's success zone
-    //      (if P2 lost, it goes to waitroom).
-    //
-    // We just verify that the live cards were NOT kept in their
-    // respective success zones (which would indicate the restriction
-    // fired despite the condition failing).
+    // Untied totals (P1's successful mebius 2 vs P2's failed live 0): the
+    // 「合計スコアが同じ場合」condition FAILS, so the cannot-place restriction
+    // must not fire and P1 places normally as the winner.
+    let p1_success = game.state.player1.success_live_card_zone.cards.clone();
+    let p2_success = game.state.player2.success_live_card_zone.cards.clone();
+    assert_eq!(
+        p1_success.as_slice(),
+        &[mebius_p1][..],
+        "untied 2-vs-0: P1's winning mebius reaches its own success zone"
+    );
     assert!(
-        !game
-            .state
-            .player1
-            .success_live_card_zone
-            .cards
-            .contains(&mebius_p1)
-            || !game
-                .state
-                .player2
-                .success_live_card_zone
-                .cards
-                .contains(&normal_live_p2),
-        "When scores are untied, the mebius restriction should NOT fire, \
-         and the normal winner should be allowed to place in success zone. \
-         Got P1_success={:?}, P2_success={:?}",
-        game.state.player1.success_live_card_zone.cards,
-        game.state.player2.success_live_card_zone.cards
+        !p2_success.contains(&normal_live_p2),
+        "untied: P2's failed live places nothing"
+    );
+    assert!(
+        game.state.player2.waitroom.cards.contains(&normal_live_p2),
+        "P2's failed live card ends in the waitroom"
     );
 }
