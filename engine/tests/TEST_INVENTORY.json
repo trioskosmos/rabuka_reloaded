@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T21:05:10.169213+00:00",
+  "generated_at": "2026-08-23T21:36:11.270495+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 433,
-  "n_tests": 2646,
+  "n_files": 434,
+  "n_tests": 2651,
   "total_cards": 771,
-  "covered_cards": 624,
-  "abilities_on_covered": 786,
+  "covered_cards": 627,
+  "abilities_on_covered": 789,
   "trigger_counts": {
     "起動": [
       80,
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      216,
+      217,
       268
     ],
     "(none)": [
@@ -34,7 +34,7 @@
       122
     ],
     "常時": [
-      109,
+      111,
       117
     ],
     "自動": [
@@ -52,7 +52,7 @@
       71
     ],
     "gain_resource": [
-      138,
+      141,
       160
     ],
     "sequential": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      450,
+      451,
       545
     ],
     "temporal_condition": [
@@ -190,7 +190,7 @@
       13
     ],
     "comparison_condition": [
-      51,
+      53,
       60
     ],
     "card_count_condition": [
@@ -256,7 +256,7 @@
   },
   "set_counts": {
     "sd1": [
-      51,
+      52,
       58
     ],
     "PR": [
@@ -288,7 +288,7 @@
       82
     ],
     "bp7": [
-      93,
+      95,
       111
     ],
     "pb1": [
@@ -310,10 +310,10 @@
   },
   "depth_counts": {
     "L2+choice": 593,
-    "none": 150,
+    "none": 147,
     "L1+choice": 134,
     "L2": 24,
-    "L1": 35
+    "L1": 38
   },
   "qa_rulings": {
     "covered": 272,
@@ -11845,9 +11845,14 @@
       "has_negative": false,
       "covering_files": [
         "engine/tests/test_modules/untested_abilities_batch10_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch11_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch11_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch14_test.rs"
       ],
       "covering_tests": [
+        "bp7014_constant_heart_lost_when_tied",
+        "bp7014_constant_heart_while_opp_energy_ahead",
+        "bp7020_constant_blades_off_when_behind",
+        "bp7020_constant_blades_while_energy_ahead",
         "cl1_006_debut_gains_three_blades",
         "go_master_start_equal_success_cards_no_score",
         "go_master_start_fewer_success_cards_scores",
@@ -11856,10 +11861,11 @@
         "pb1013_higher_cost_member_on_stage_draws",
         "pb1013_only_lower_cost_members_no_draw",
         "pb2_029_debut_rests_low_cost_member",
+        "sd1022_live_start_grants_blade_to_all_aqours_members",
         "sd2_008_constant_heart_while_cost13_member_on_stage",
         "sd2_008_constant_heart_without_expensive_member"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 15,
       "is_null": false
     },
     {
@@ -34297,6 +34303,7 @@
         "engine/tests/test_modules/stage_to_discard_ability_test.rs",
         "engine/tests/test_modules/strawberry_test.rs",
         "engine/tests/test_modules/tokimeki_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch14_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
@@ -34310,6 +34317,10 @@
         "aquarium_yell_from_bottom_short_deck",
         "aquarium_yell_from_bottom_two_yells",
         "baton_touch_cleared_between_actions",
+        "bp7014_constant_heart_lost_when_tied",
+        "bp7014_constant_heart_while_opp_energy_ahead",
+        "bp7020_constant_blades_off_when_behind",
+        "bp7020_constant_blades_while_energy_ahead",
         "buffers_are_bounded",
         "c10_reveal_top_adds_to_hand",
         "c11_peek_per_niji_selects_keep1",
@@ -34328,13 +34339,9 @@
         "c8_both_shuffle_under_deck",
         "c8_q242_19_below_threshold",
         "c8_q242_both_shuffle_and_retrieve_and_blade",
-        "c8_q242_exactly_20_threshold_met",
-        "c8_q242_no_live_card_still_gains_blade",
-        "c8_q242_p1_only_20_threshold",
-        "c9_arise_activate_and_recover",
-        "c9_arise_constant_heart_with_other_arise"
+        "c8_q242_exactly_20_threshold_met"
       ],
-      "covering_test_count": 244,
+      "covering_test_count": 249,
       "is_null": false
     },
     {
@@ -34357,11 +34364,17 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch14_test.rs",
         "engine/tests/test_modules/untested_abilities_test.rs",
         "engine/tests/test_modules/you_debut_test.rs"
       ],
       "covering_tests": [
+        "bp7014_constant_heart_lost_when_tied",
+        "bp7014_constant_heart_while_opp_energy_ahead",
+        "bp7020_constant_blades_off_when_behind",
+        "bp7020_constant_blades_while_energy_ahead",
         "honoka_cost_limit_wait_blocked_by_wait_immunity",
+        "sd1022_live_start_grants_blade_to_all_aqours_members",
         "test_change_state_choice_bug",
         "test_dia_gain_resource_choice",
         "test_dia_gain_resource_no_targets",
@@ -34380,7 +34393,7 @@
         "you_select_2_then_ends",
         "you_select_3_then_ends"
       ],
-      "covering_test_count": 18,
+      "covering_test_count": 23,
       "is_null": false
     },
     {
@@ -34787,14 +34800,22 @@
         "PL!S-sd1-022-SD"
       ],
       "base": "PL!S-sd1-022",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch14_test.rs"
+      ],
+      "covering_tests": [
+        "bp7014_constant_heart_lost_when_tied",
+        "bp7014_constant_heart_while_opp_energy_ahead",
+        "bp7020_constant_blades_off_when_behind",
+        "bp7020_constant_blades_while_energy_ahead",
+        "sd1022_live_start_grants_blade_to_all_aqours_members"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -38316,14 +38337,22 @@
         "PL!S-bp7-014-N"
       ],
       "base": "PL!S-bp7-014",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch14_test.rs"
+      ],
+      "covering_tests": [
+        "bp7014_constant_heart_lost_when_tied",
+        "bp7014_constant_heart_while_opp_energy_ahead",
+        "bp7020_constant_blades_off_when_behind",
+        "bp7020_constant_blades_while_energy_ahead",
+        "sd1022_live_start_grants_blade_to_all_aqours_members"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -39510,14 +39539,22 @@
         "PL!SP-bp7-020-N"
       ],
       "base": "PL!SP-bp7-020",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch14_test.rs"
+      ],
+      "covering_tests": [
+        "bp7014_constant_heart_lost_when_tied",
+        "bp7014_constant_heart_while_opp_energy_ahead",
+        "bp7020_constant_blades_off_when_behind",
+        "bp7020_constant_blades_while_energy_ahead",
+        "sd1022_live_start_grants_blade_to_all_aqours_members"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
