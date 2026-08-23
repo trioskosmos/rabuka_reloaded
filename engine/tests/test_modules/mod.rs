@@ -1,4 +1,4 @@
-﻿pub mod ability_engine_fixes_test;
+pub mod ability_engine_fixes_test;
 pub mod ability_from_source_test;
 pub mod abundant_test;
 pub mod action_coverage_test;
@@ -449,3 +449,4 @@ pub mod yoshiko_debut_test;
 pub mod yoshiko_edge_cases_test;
 pub mod yoshiko_filter_test;
 pub mod turn_scope_regression_test;
+pub mod l0_gap_livesuccess_test;
