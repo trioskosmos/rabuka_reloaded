@@ -1,20 +1,20 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T23:12:13.675900+00:00",
+  "generated_at": "2026-08-23T23:30:28.958608+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 438,
-  "n_tests": 2665,
+  "n_files": 439,
+  "n_tests": 2668,
   "total_cards": 771,
-  "covered_cards": 637,
-  "abilities_on_covered": 801,
+  "covered_cards": 639,
+  "abilities_on_covered": 803,
   "trigger_counts": {
     "起動": [
-      83,
+      84,
       96
     ],
     "登場": [
@@ -30,7 +30,7 @@
       2
     ],
     "ライブ成功時": [
-      100,
+      101,
       122
     ],
     "常時": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      173,
+      175,
       219
     ],
     "unknown": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      454,
+      456,
       545
     ],
     "temporal_condition": [
@@ -264,7 +264,7 @@
       52
     ],
     "bp1": [
-      52,
+      53,
       56
     ],
     "bp3": [
@@ -292,7 +292,7 @@
       111
     ],
     "pb1": [
-      113,
+      114,
       137
     ],
     "sd2": [
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 593,
-    "none": 135,
+    "L2+choice": 595,
+    "none": 133,
     "L1+choice": 137,
     "L2": 24,
     "L1": 47
@@ -13345,14 +13345,20 @@
         "PL!SP-bp1-009-P"
       ],
       "base": "PL!SP-bp1-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch19_test.rs"
+      ],
+      "covering_tests": [
+        "bp1009_activation_draws_one_discards_one",
+        "pb1024_live_success_draws_two_discards_two_empty_hand",
+        "pb1024_live_success_keeps_non_selected_cards"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -15753,14 +15759,20 @@
         "PL!-bp6-011-N"
       ],
       "base": "PL!S-pb1-024",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch19_test.rs"
+      ],
+      "covering_tests": [
+        "bp1009_activation_draws_one_discards_one",
+        "pb1024_live_success_draws_two_discards_two_empty_hand",
+        "pb1024_live_success_keeps_non_selected_cards"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {

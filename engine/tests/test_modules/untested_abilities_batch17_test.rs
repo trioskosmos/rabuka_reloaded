@@ -5,7 +5,6 @@
 /// - PL!-bp6-009-R (常時 center): live total +1 while both side areas hold
 ///   members with original blade 2
 use crate::helpers::*;
-use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
 
