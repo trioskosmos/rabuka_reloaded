@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T16:10:10.468450+00:00",
+  "generated_at": "2026-08-23T19:41:48.323325+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 428,
-  "n_tests": 2623,
+  "n_files": 430,
+  "n_tests": 2632,
   "total_cards": 771,
-  "covered_cards": 611,
-  "abilities_on_covered": 772,
+  "covered_cards": 615,
+  "abilities_on_covered": 777,
   "trigger_counts": {
     "起動": [
       80,
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      212,
+      215,
       268
     ],
     "(none)": [
@@ -30,11 +30,11 @@
       2
     ],
     "ライブ成功時": [
-      94,
+      95,
       122
     ],
     "常時": [
-      105,
+      106,
       117
     ],
     "自動": [
@@ -48,11 +48,11 @@
       146
     ],
     "look_and_select": [
-      43,
+      44,
       71
     ],
     "gain_resource": [
-      133,
+      134,
       160
     ],
     "sequential": [
@@ -64,7 +64,7 @@
       2
     ],
     "draw_card": [
-      39,
+      40,
       44
     ],
     "change_state": [
@@ -104,7 +104,7 @@
       2
     ],
     "modify_score": [
-      62,
+      64,
       73
     ],
     "conditional_alternative": [
@@ -174,8 +174,8 @@
   },
   "cond_counts": {
     "none": [
-      447,
-      546
+      448,
+      545
     ],
     "temporal_condition": [
       16,
@@ -190,7 +190,7 @@
       13
     ],
     "comparison_condition": [
-      47,
+      49,
       60
     ],
     "card_count_condition": [
@@ -198,7 +198,7 @@
       88
     ],
     "location_condition": [
-      60,
+      61,
       73
     ],
     "movement:baton_touch": [
@@ -210,8 +210,8 @@
       2
     ],
     "group_condition": [
-      32,
-      43
+      33,
+      44
     ],
     "or_condition": [
       9,
@@ -272,7 +272,7 @@
       66
     ],
     "bp2": [
-      60,
+      61,
       68
     ],
     "bp4": [
@@ -280,7 +280,7 @@
       88
     ],
     "bp5": [
-      112,
+      113,
       134
     ],
     "bp6": [
@@ -292,7 +292,7 @@
       111
     ],
     "pb1": [
-      108,
+      111,
       137
     ],
     "sd2": [
@@ -310,10 +310,10 @@
   },
   "depth_counts": {
     "L2+choice": 593,
-    "none": 164,
+    "none": 159,
     "L1+choice": 134,
     "L2": 24,
-    "L1": 21
+    "L1": 26
   },
   "qa_rulings": {
     "covered": 272,
@@ -769,7 +769,7 @@
         "c9_arise_activate_and_recover",
         "c9_arise_constant_heart_with_other_arise"
       ],
-      "covering_test_count": 152,
+      "covering_test_count": 153,
       "is_null": false
     },
     {
@@ -1307,6 +1307,7 @@
         "joint_live_start_discard_mixed_named_gains_score3",
         "joint_live_start_discard_three_gains_score3",
         "joint_live_start_discard_two_gains_score3",
+        "joint_live_start_hand_copy_counts_as_named_card",
         "joint_live_start_no_named_skips_gracefully",
         "joint_live_start_skip_optional_no_effect",
         "kosuzu_bp6_condition_met_gains_heart05_and_blade",
@@ -1319,10 +1320,9 @@
         "q251_member_no_blade_can_move",
         "q251_mixed_pool_only_member_can_move",
         "q251_skip_optional",
-        "q251_wrong_group_filtered",
-        "q278_ayumu_plus_joint_is_two_blades"
+        "q251_wrong_group_filtered"
       ],
-      "covering_test_count": 36,
+      "covering_test_count": 37,
       "is_null": false
     },
     {
@@ -9113,9 +9113,16 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/poppin_test.rs"
+        "engine/tests/test_modules/poppin_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch10_test.rs"
       ],
       "covering_tests": [
+        "go_master_start_equal_success_cards_no_score",
+        "go_master_start_fewer_success_cards_scores",
+        "note_mermaid_duplicate_kaleidoscope_names_no_score",
+        "note_mermaid_two_distinct_kaleidoscope_members_score",
+        "pb1013_higher_cost_member_on_stage_draws",
+        "pb1013_only_lower_cost_members_no_draw",
         "poppin_equal_score_fails",
         "poppin_lower_score_fails",
         "poppin_mixed_revealed_picks_niji_only",
@@ -9124,7 +9131,7 @@
         "poppin_no_niji_revealed_effect_fails",
         "poppin_q66_has_cards_beats_no_cards"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -9619,7 +9626,8 @@
         "engine/tests/test_modules/chika_test.rs",
         "engine/tests/test_modules/jellyfish_test.rs",
         "engine/tests/test_modules/kanon_pb2_test.rs",
-        "engine/tests/test_modules/tang_keke_test.rs"
+        "engine/tests/test_modules/tang_keke_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch10_test.rs"
       ],
       "covering_tests": [
         "chika_bp5_baton_touch_draw_triggers_refresh",
@@ -9638,6 +9646,8 @@
         "chika_wait_can_select_any_member",
         "chika_wait_target_stays_on_stage",
         "chika_waited_member_gets_score_boost",
+        "go_master_start_equal_success_cards_no_score",
+        "go_master_start_fewer_success_cards_scores",
         "jellyfish_member_moved_by_position_change_without_appearing_this_turn_counts",
         "jellyfish_member_neither_appeared_nor_moved_does_not_count",
         "jellyfish_mixed_qualifying_and_non_qualifying",
@@ -9649,11 +9659,9 @@
         "jellyfish_three_members_all_qualify_reduce_by_3",
         "jellyfish_two_members_appeared_reduce_by_2",
         "kanon_cost_above_4_rejected",
-        "kanon_max_1_enforced",
-        "kanon_no_matching_cards_discard_all",
-        "kanon_non_liella_cost4_rejected"
+        "kanon_max_1_enforced"
       ],
-      "covering_test_count": 44,
+      "covering_test_count": 50,
       "is_null": false
     },
     {
@@ -11828,14 +11836,23 @@
         "PL!HS-bp5-004-AR"
       ],
       "base": "PL!HS-bp5-004",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch10_test.rs"
+      ],
+      "covering_tests": [
+        "go_master_start_equal_success_cards_no_score",
+        "go_master_start_fewer_success_cards_scores",
+        "note_mermaid_duplicate_kaleidoscope_names_no_score",
+        "note_mermaid_two_distinct_kaleidoscope_members_score",
+        "pb1013_higher_cost_member_on_stage_draws",
+        "pb1013_only_lower_cost_members_no_draw"
+      ],
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -12938,7 +12955,7 @@
         "c8_q242_both_shuffle_and_retrieve_and_blade",
         "c8_q242_exactly_20_threshold_met"
       ],
-      "covering_test_count": 91,
+      "covering_test_count": 92,
       "is_null": false
     },
     {
@@ -13166,6 +13183,7 @@
         "joint_live_start_discard_mixed_named_gains_score3",
         "joint_live_start_discard_three_gains_score3",
         "joint_live_start_discard_two_gains_score3",
+        "joint_live_start_hand_copy_counts_as_named_card",
         "joint_live_start_no_named_skips_gracefully",
         "joint_live_start_skip_optional_no_effect",
         "kanon_alone_cannot_live",
@@ -13173,10 +13191,9 @@
         "liella_at_left_side_excluded_by_position",
         "liella_at_right_side_excluded_by_position",
         "liella_blade_1_also_gets_set_to_3",
-        "liella_blade_1_gets_correct_modifier",
-        "liella_blade_2_gets_correct_modifier"
+        "liella_blade_1_gets_correct_modifier"
       ],
-      "covering_test_count": 55,
+      "covering_test_count": 56,
       "is_null": false
     },
     {
@@ -14134,14 +14151,23 @@
         "PL!SP-pb1-024-SRL"
       ],
       "base": "PL!SP-pb1-024",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch10_test.rs"
+      ],
+      "covering_tests": [
+        "go_master_start_equal_success_cards_no_score",
+        "go_master_start_fewer_success_cards_scores",
+        "note_mermaid_duplicate_kaleidoscope_names_no_score",
+        "note_mermaid_two_distinct_kaleidoscope_members_score",
+        "pb1013_higher_cost_member_on_stage_draws",
+        "pb1013_only_lower_cost_members_no_draw"
+      ],
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -14822,14 +14848,23 @@
         "PL!SP-bp2-023-SRL"
       ],
       "base": "PL!SP-bp2-023",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch10_test.rs"
+      ],
+      "covering_tests": [
+        "go_master_start_equal_success_cards_no_score",
+        "go_master_start_fewer_success_cards_scores",
+        "note_mermaid_duplicate_kaleidoscope_names_no_score",
+        "note_mermaid_two_distinct_kaleidoscope_members_score",
+        "pb1013_higher_cost_member_on_stage_draws",
+        "pb1013_only_lower_cost_members_no_draw"
+      ],
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -14957,6 +14992,7 @@
         "eri_constant_blade_per_wait_member",
         "exclude_position_and_exclude_self_combine_correctly",
         "exclude_position_center_not_offered",
+        "formation_change_destination_excludes_already_claimed_area",
         "formation_change_still_offers_all_positions",
         "formation_change_with_group_names_and_empty_slots",
         "hanamaru_constant_cost_per_success_card",
@@ -14971,10 +15007,9 @@
         "non_optional_pc_excludes_self_from_center",
         "non_optional_pc_excludes_self_from_left",
         "non_optional_pc_excludes_self_from_right",
-        "non_optional_pc_executes_move_correctly",
-        "non_optional_pc_with_all_positions_excluded_fizzles"
+        "non_optional_pc_executes_move_correctly"
       ],
-      "covering_test_count": 78,
+      "covering_test_count": 79,
       "is_null": false
     },
     {
@@ -15022,6 +15057,7 @@
         "eri_constant_blade_per_wait_member",
         "exclude_position_and_exclude_self_combine_correctly",
         "exclude_position_center_not_offered",
+        "formation_change_destination_excludes_already_claimed_area",
         "formation_change_still_offers_all_positions",
         "formation_change_with_group_names_and_empty_slots",
         "hanamaru_constant_cost_per_success_card",
@@ -15036,10 +15072,9 @@
         "non_optional_pc_excludes_self_from_center",
         "non_optional_pc_excludes_self_from_left",
         "non_optional_pc_excludes_self_from_right",
-        "non_optional_pc_executes_move_correctly",
-        "non_optional_pc_with_all_positions_excluded_fizzles"
+        "non_optional_pc_executes_move_correctly"
       ],
-      "covering_test_count": 78,
+      "covering_test_count": 79,
       "is_null": false
     },
     {
@@ -18627,6 +18662,7 @@
         "engine/tests/test_modules/position_change_multi_test.rs"
       ],
       "covering_tests": [
+        "formation_change_destination_excludes_already_claimed_area",
         "formation_change_with_group_names_and_empty_slots",
         "position_change_filters_by_group_names",
         "position_change_group_names_excludes_self",
@@ -18639,7 +18675,7 @@
         "position_change_two_members",
         "position_change_with_swap"
       ],
-      "covering_test_count": 11,
+      "covering_test_count": 12,
       "is_null": false
     },
     {
@@ -21004,6 +21040,7 @@
       "covering_tests": [
         "exclude_position_and_exclude_self_combine_correctly",
         "exclude_position_center_not_offered",
+        "formation_change_destination_excludes_already_claimed_area",
         "formation_change_still_offers_all_positions",
         "formation_change_with_group_names_and_empty_slots",
         "himeno_pb1_no_valid_destinations_skips",
@@ -21027,7 +21064,7 @@
         "position_change_two_members",
         "position_change_with_swap"
       ],
-      "covering_test_count": 24,
+      "covering_test_count": 25,
       "is_null": false
     },
     {
@@ -21371,14 +21408,23 @@
         "PL!HS-pb1-013-P＋"
       ],
       "base": "PL!HS-pb1-013",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch10_test.rs"
+      ],
+      "covering_tests": [
+        "go_master_start_equal_success_cards_no_score",
+        "go_master_start_fewer_success_cards_scores",
+        "note_mermaid_duplicate_kaleidoscope_names_no_score",
+        "note_mermaid_two_distinct_kaleidoscope_members_score",
+        "pb1013_higher_cost_member_on_stage_draws",
+        "pb1013_only_lower_cost_members_no_draw"
+      ],
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -21396,14 +21442,23 @@
         "PL!HS-pb1-013-P＋"
       ],
       "base": "PL!HS-pb1-013",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch10_test.rs"
+      ],
+      "covering_tests": [
+        "go_master_start_equal_success_cards_no_score",
+        "go_master_start_fewer_success_cards_scores",
+        "note_mermaid_duplicate_kaleidoscope_names_no_score",
+        "note_mermaid_two_distinct_kaleidoscope_members_score",
+        "pb1013_higher_cost_member_on_stage_draws",
+        "pb1013_only_lower_cost_members_no_draw"
+      ],
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -26432,7 +26487,7 @@
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "bella_q174_no_member_on_stage_ability_does_not_fire"
       ],
-      "covering_test_count": 149,
+      "covering_test_count": 150,
       "is_null": false
     },
     {
@@ -26500,7 +26555,7 @@
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "bella_q174_no_member_on_stage_ability_does_not_fire"
       ],
-      "covering_test_count": 149,
+      "covering_test_count": 150,
       "is_null": false
     },
     {
@@ -33918,6 +33973,7 @@
         "condition_passes_with_momoo",
         "condition_passes_with_sd_osawa",
         "condition_passes_with_two_bp_osawa",
+        "formation_change_destination_excludes_already_claimed_area",
         "formation_change_with_group_names_and_empty_slots",
         "hanaho_baton_touch_low_cost_no_trigger",
         "hanaho_baton_touch_triggers_activates_energy",
@@ -33928,10 +33984,9 @@
         "himeno_all_three_on_stage_triggers",
         "himeno_empty_stage_does_not_trigger",
         "himeno_front_1_opponent_at_left_moves_to_center",
-        "himeno_front_3_opponents_select_left_moves_to_center",
-        "himeno_front_constant_evaluates"
+        "himeno_front_3_opponents_select_left_moves_to_center"
       ],
-      "covering_test_count": 70,
+      "covering_test_count": 71,
       "is_null": false
     },
     {
@@ -34075,6 +34130,7 @@
         "engine/tests/test_modules/position_change_multi_test.rs"
       ],
       "covering_tests": [
+        "formation_change_destination_excludes_already_claimed_area",
         "formation_change_with_group_names_and_empty_slots",
         "himeno_pb1_no_valid_destinations_skips",
         "himeno_pb1_one_mirakura_one_position_change",
@@ -34091,7 +34147,7 @@
         "position_change_two_members",
         "position_change_with_swap"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 16,
       "is_null": false
     },
     {
@@ -38102,7 +38158,7 @@
         "登場"
       ],
       "action": "conditional_on_result",
-      "condition": "none",
+      "condition": "group_condition",
       "set": "bp7",
       "cards": [
         "PL!S-bp7-012-N"
