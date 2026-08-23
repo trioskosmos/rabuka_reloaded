@@ -3847,41 +3847,16 @@ def _try_temporal_this_turn(text):
 
 
 def _try_phase_gate(text):
-    """Simple phase gate: Xフェイズの場合/の間/に — restricts activation to a specific phase."""
-    m = re.search(
-        r"(?:このゲームの\d+ターン目の)?(?:自分の|相手の)?(メイン|ライブ|セット|エール|アクティブ)フェイズ(?:の場合|の間|に)",
-        text,
-    )
-    if not m:
+    """Simple phase gate: Xフェイズの場合/の間/に — restricts activation to a specific phase.
+
+    Single owner: delegates to extract_phase_gate (same regex, phase map,
+    turn-number/phase-target extraction, and consequence-skip for 次の/来
+    references). The condition-registry path previously duplicated all of
+    this with subtly different behavior."""
+    gate, remaining = extract_phase_gate(text)
+    if not gate:
         return None
-    phase_name = m.group(1)
-    phase_map = {
-        "メイン": "main",
-        "ライブ": "live_phase",
-        "セット": "set_phase",
-        "エール": "yell_phase",
-        "アクティブ": "active_phase",
-    }
-    phase = phase_map.get(phase_name)
-    if not phase:
-        return None
-    result = {
-        "type": "temporal_condition",
-        "phase": phase,
-        "text": text,
-        "trigger_event": {"type": "temporal", "phase": phase},
-    }
-    if text.startswith("自分の"):
-        result["phase_target"] = "self"
-        result["trigger_event"]["phase_target"] = "self"
-    elif text.startswith("相手の"):
-        result["phase_target"] = "opponent"
-        result["trigger_event"]["phase_target"] = "opponent"
-    turn_m = re.search(r"(\d+)ターン目", text)
-    if turn_m:
-        result["turn_number"] = int(turn_m.group(1))
-        result["trigger_event"]["turn_number"] = int(turn_m.group(1))
-    return result
+    return gate
 
 
 def _try_temporal_turn_phase(text):
