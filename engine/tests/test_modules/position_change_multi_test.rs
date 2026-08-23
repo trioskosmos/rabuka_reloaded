@@ -1,4 +1,4 @@
-/// Tests for position_change/formation_change with multiple_targets=true (それぞれ) pattern.
+﻿/// Tests for position_change/formation_change with multiple_targets=true (それぞれ) pattern.
 ///
 /// Card: PL!HS-bp2-006-R/P (藤島 慈) ab#0
 /// 登場: 自分のステージにいるメンバーを、それぞれ好きなエリアに移動させてもよい。
@@ -64,9 +64,14 @@ fn position_change_two_members() {
     assert!(game.has_pending_choice(), "First choice");
     game.select_option(0);
     assert!(game.has_pending_choice(), "Second choice");
-    game.select_option(1);
+    // Collision rule: later members see only unclaimed areas.
+    let opts = pending_target_options(&game);
+    assert!(opts.len() < 3 && opts.len() >= 1, "claimed areas excluded");
+    game.select_option(opts.len() as i16 - 1);
     assert!(game.has_pending_choice(), "Third choice");
-    game.select_option(2);
+    let opts = pending_target_options(&game);
+    assert_eq!(opts.len(), 1, "only one area remains for the last member");
+    game.select_option(0);
 
     assert!(!game.has_pending_choice());
     assert_ne!(game.state.player1.stage.stage[0], -1);
@@ -74,7 +79,7 @@ fn position_change_two_members() {
     assert_ne!(game.state.player1.stage.stage[2], -1);
 }
 
-/// 2 members (1 existing + 慈), 2 choices.
+/// 2 members (1 existing + ち), 2 choices.
 #[test]
 fn position_change_one_member() {
     let db = load_real_database();
@@ -217,12 +222,14 @@ fn position_change_skip_optional() {
 
     assert!(game.has_pending_choice(), "First choice");
     game.select_option(0);
-
     assert!(game.has_pending_choice(), "Second choice");
-    game.select_option(1);
-
+    let opts = pending_target_options(&game);
+    assert!(opts.len() < 3 && opts.len() >= 1, "claimed areas excluded");
+    game.select_option(opts.len() as i16 - 1);
     assert!(game.has_pending_choice(), "Third choice");
-    game.select_option(2);
+    let opts = pending_target_options(&game);
+    assert_eq!(opts.len(), 1, "last member: single remaining area");
+    game.select_option(0);
 
     assert!(!game.has_pending_choice());
     assert_ne!(game.state.player1.stage.stage[0], -1);
@@ -591,4 +598,105 @@ fn formation_change_with_group_names_and_empty_slots() {
         offered.contains(&"right"),
         "Right should be offered (empty slot)"
     );
+}
+
+/// Rule pin for Chance Day's parenthetical: 「この効果で1つのエリアに2人以上の
+/// メンバーを移動させることはできない。」 During a multi-member formation
+/// change, each member's destination choice must EXCLUDE areas already claimed
+/// by an earlier member of the same effect.
+#[test]
+fn formation_change_destination_excludes_already_claimed_area() {
+    use rabuka_engine::card::{HeartColor, HeartMap};
+    use rabuka_engine::turn::TurnEngine;
+
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let chance_day = game.id("PL!SP-bp4-027-L");
+    let liella_a = game.id("PL!SP-bp1-014-N"); // 唐 可可 copy A
+    let liella_b = game.new_id("PL!SP-bp1-014-N"); // copy B
+    let filler = game.id("PL!-sd1-010-SD");
+
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // Two Liella! members at Left and Center; Right empty.
+    game.state.player1.stage.stage = [liella_a, liella_b, -1];
+    game.state.player1.live_card_zone.cards.push(chance_day);
+
+    let mut heart_map = HeartMap::new();
+    heart_map.insert(HeartColor::Heart02, 1);
+    heart_map.insert(HeartColor::Heart00, 2);
+    game.state.player1.stage_hearts =
+        Some(rabuka_engine::card::BaseHeart { hearts: heart_map });
+
+    let player_id = game.state.player1.id.clone();
+    game.state.current_phase =
+        rabuka_engine::game_state::Phase::LiveVictoryDetermination;
+    game.state.live_success_triggered_this_turn = false;
+    TurnEngine::trigger_live_success_abilities(&mut game_state_ref(&mut game), &player_id);
+    game.state.process_pending_auto_abilities(&player_id);
+
+    // First member's destination choice.
+    assert!(game.has_pending_choice(), "first destination choice");
+    let first_opts = pending_target_options(&game);
+    eprintln!("[FORMATION] first options={:?}", first_opts);
+    assert_eq!(first_opts.len(), 3, "first member sees all 3 areas");
+
+    // Claim RIGHT for the first member.
+    let right_idx = first_opts.iter().position(|o| o == "right").unwrap();
+    game.select_option(right_idx as i16);
+
+    // Second member's destination choice: RIGHT must now be excluded.
+    assert!(game.has_pending_choice(), "second destination choice");
+    let second_opts = pending_target_options(&game);
+    eprintln!("[FORMATION] second options={:?}", second_opts);
+    assert!(
+        !second_opts.contains(&"right".to_string()),
+        "collision rule: an area claimed by the first member must not be \
+         offered to the second member (options={:?})",
+        second_opts
+    );
+    assert_eq!(
+        second_opts.len(),
+        2,
+        "exactly the two unclaimed areas remain"
+    );
+
+    // Send the second member LEFT and confirm the final arrangement has no
+    // collisions and matches the plan.
+    let left_idx = second_opts.iter().position(|o| o == "left").unwrap();
+    game.select_option(left_idx as i16);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    let st = game.state.player1.stage.stage;
+    eprintln!("[FORMATION] final stage={:?}", st);
+    assert_eq!(
+        st[2], liella_a,
+        "first member moved to the RIGHT area it claimed"
+    );
+    assert_eq!(
+        st[0], liella_b,
+        "second member moved to LEFT"
+    );
+    assert_eq!(st[1], -1, "center ends empty — no collision occurred");
+}
+
+fn game_state_ref(
+    game: &mut crate::helpers::TestGame,
+) -> &mut rabuka_engine::game_state::GameState {
+    &mut game.state
+}
+
+fn pending_target_options(game: &crate::helpers::TestGame) -> Vec<String> {
+    match game.get_pending_choice() {
+        rabuka_engine::ability::types::Choice::SelectTarget { options, .. } => {
+            options.as_ref().map(|o| o.to_vec()).unwrap_or_default()
+        }
+        _ => Vec::new(),
+    }
 }

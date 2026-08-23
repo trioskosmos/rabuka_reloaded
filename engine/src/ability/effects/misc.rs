@@ -3070,9 +3070,21 @@ impl AbilityResolver {
                 new_stage[from_idx] = member_id;
                 new_under[from_idx] = old_under[from_idx].clone();
             } else {
-                // Evicted occupant goes to the mover's vacated position
+                // Evicted occupant goes to the mover's vacated position.
+                // Skip occupants that are themselves planned movers — they
+                // were already relocated in Phase 1 (e.g. a clean two-way
+                // swap vacates both origins; nobody is evicted). Re-inserting
+                // them here would duplicate one member across two areas.
                 let evicted_id = old_stage[dest_idx];
-                if evicted_id != -1 && evicted_id != member_id && new_stage[from_idx] == -1 {
+                let evicted_is_planned = self
+                    .formation_plan
+                    .iter()
+                    .any(|(id, _)| *id == evicted_id);
+                if evicted_id != -1
+                    && evicted_id != member_id
+                    && !evicted_is_planned
+                    && new_stage[from_idx] == -1
+                {
                     new_stage[from_idx] = evicted_id;
                     new_under[from_idx] = old_under[dest_idx].clone();
                     events.push((evicted_id, dest_idx as u8, from_idx as u8));

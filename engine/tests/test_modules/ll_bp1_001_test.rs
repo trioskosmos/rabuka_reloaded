@@ -245,3 +245,61 @@ fn joint_live_start_discard_mixed_named_gains_score3() {
         "+3 live-total bonus"
     );
 }
+
+// (手札のこのカードもこの効果で控え室に置ける。) — a hand copy of the joint
+// card itself qualifies as one of the named members for the optional discard.
+#[test]
+fn joint_live_start_hand_copy_counts_as_named_card() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let joint_on_stage = game.id("LL-bp1-001-R+");
+    let joint_in_hand = game.new_id("LL-bp1-001-R+");
+    let kanon = game.id("PL!SP-bp1-001-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [-1, joint_on_stage, -1];
+    game.state.player1.hand.cards.clear();
+    game.state.player1.hand.cards.push(joint_in_hand);
+    game.state.player1.hand.cards.push(kanon);
+    game.state.player1.hand.cards.push(filler);
+    fill_decks(&mut game, filler);
+    game.give_energy(5);
+
+    let hand_before = game.state.player1.hand.cards.len();
+    trigger_live_start_ability(&mut game, joint_on_stage);
+    handle_optional_cost(&mut game, &[0, 1]);
+
+    eprintln!(
+        "[SELF_DISCARD] hand={:?} wait={:?}",
+        game.state
+            .player1
+            .hand
+            .cards
+            .iter()
+            .map(|&id| game.name(id))
+            .collect::<Vec<_>>(),
+        game.state
+            .player1
+            .waitroom
+            .cards
+            .iter()
+            .map(|&id| game.name(id))
+            .collect::<Vec<_>>(),
+    );
+
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before - 2,
+        "hand copy of the joint card + 澁谷かのん discarded"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&joint_in_hand),
+        "the self-copy counts as a named card and is discarded"
+    );
+    game.state.recalculate_constants();
+    assert_eq!(
+        game.state.mods.p1_constant_total_score_bonus,
+        3,
+        "+3 live-total bonus with the self-copy counting as a named card"
+    );
+}
