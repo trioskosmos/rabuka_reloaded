@@ -37,15 +37,19 @@ fn konata_bp4_deploy_blade_heart_member_waits() {
     // Play Kanata to stage — triggers debut ability
     game.play_to_stage(konata, MemberArea::Center);
 
-    // Pay the optional cost (2E)
-    if game.has_pending_choice() {
-        game.select_option(1);
-    }
+    // Pay the optional cost (2E) - must be offered.
+    assert!(
+        game.has_pending_choice(),
+        "optional 2E cost must be offered"
+    );
+    game.select_option(1);
 
-    // Choose a position for the deployed member
-    if game.has_pending_choice() {
-        game.select_generated(0);
-    }
+    // Choose a position for the deployed member.
+    assert!(
+        game.has_pending_choice(),
+        "position choice for the deployed member must appear"
+    );
+    game.select_generated(0);
     let konata_waited = game
         .state
         .mods
@@ -54,6 +58,12 @@ fn konata_bp4_deploy_blade_heart_member_waits() {
     assert!(
         konata_waited,
         "Kanata should become wait when deploying BH member"
+    );
+    // The deployed member must actually be ON STAGE — otherwise the wait
+    // could come from a failed deploy path.
+    assert!(
+        game.state.player1.stage.stage.contains(&bh_member),
+        "BH member was deployed to the stage"
     );
 }
 
@@ -86,6 +96,13 @@ fn konata_bp4_deploy_non_blade_heart_member_stays_active() {
         game.select_generated(0); // choose position
     }
 
+    // The deployed member must actually be on stage for this negative to
+    // mean anything.
+    assert!(
+        game.state.player1.stage.stage.contains(&non_bh_member),
+        "non-BH member was deployed (precondition)"
+    );
+
     // Assert Kanata is still active (deployed member has no blade heart)
     let konata_waited = game
         .state
@@ -111,20 +128,23 @@ fn konata_bp4_skip_cost_no_effect() {
     game.state.player1.hand.cards.push(konata);
     game.state.player1.hand.cards.push(bh_member);
     fill_decks(&mut game, filler);
-    game.give_energy(11);
+    game.give_energy(15); // ample: the 2E cost must be payable so skipping is a real choice
 
     game.play_to_stage(konata, MemberArea::Center);
 
-    if game.has_pending_choice() {
-        game.select_option(0); // skip optional cost
-    }
+    // The optional cost must be offered even when we intend to skip.
+    assert!(
+        game.has_pending_choice(),
+        "optional cost prompt must appear before it can be skipped"
+    );
+    game.select_option(0); // skip optional cost
 
     // No more pending choices (cost was skipped, no effect)
-    let remaining = game.has_pending_choice();
-    if remaining {
-        eprintln!("[DEBUG] Unexpected pending choice after skip");
-    }
-    assert!(!remaining, "No more choices after skipping cost");
+    assert!(
+        !game.has_pending_choice(),
+        "No more choices after skipping cost: {}",
+        game.pending_choice_summary()
+    );
 
     // Kanata should still be active
     let konata_waited = game
