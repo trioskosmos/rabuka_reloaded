@@ -108,43 +108,45 @@ fn yoshiko_debut_over_cost_filtered() {
     );
 
     // Verify initial prompt's filtered_indices only includes cards with cost ≤ 4 (Bug 1 fix)
-    if let Choice::SelectCard {
-        cost_total,
-        filtered_indices,
-        ..
-    } = game.get_pending_choice()
-    {
-        assert_eq!(
-            *cost_total,
-            Some(4),
-            "cost_total should be 4 on initial prompt"
-        );
-        assert!(
-            filtered_indices.is_some(),
-            "filtered_indices should be Some on initial prompt"
-        );
-        let fi = filtered_indices.as_ref().unwrap();
-        assert!(
-            !fi.contains(&3),
-            "cost_high (index 3) should NOT be in filtered_indices (cost > 4)"
-        );
-        assert!(
-            fi.contains(&0),
-            "cost_2 (index 0) should be in filtered_indices"
-        );
-        assert!(
-            fi.contains(&1),
-            "cost_4 (index 1) should be in filtered_indices"
-        );
-        assert!(
-            fi.contains(&2),
-            "cost_2b (index 2) should be in filtered_indices"
-        );
-        assert_eq!(
-            fi.len(),
-            3,
-            "filtered_indices should have exactly 3 entries (cost ≤ 4)"
-        );
+    match game.get_pending_choice() {
+        Choice::SelectCard {
+            cost_total,
+            filtered_indices,
+            ..
+        } => {
+            assert_eq!(
+                *cost_total,
+                Some(4),
+                "cost_total should be 4 on initial prompt"
+            );
+            assert!(
+                filtered_indices.is_some(),
+                "filtered_indices should be Some on initial prompt"
+            );
+            let fi = filtered_indices.as_ref().unwrap();
+            assert!(
+                !fi.contains(&3),
+                "cost_high (index 3) should NOT be in filtered_indices (cost > 4)"
+            );
+            assert!(
+                fi.contains(&0),
+                "cost_2 (index 0) should be in filtered_indices"
+            );
+            assert!(
+                fi.contains(&1),
+                "cost_4 (index 1) should be in filtered_indices"
+            );
+            assert!(
+                fi.contains(&2),
+                "cost_2b (index 2) should be in filtered_indices"
+            );
+            assert_eq!(
+                fi.len(),
+                3,
+                "filtered_indices should have exactly 3 entries (cost ≤ 4)"
+            );
+        }
+        other => panic!("expected SelectCard cost prompt, got {:?}", other),
     }
 
     // Select first card (cost_2) from discard
@@ -165,25 +167,27 @@ fn yoshiko_debut_over_cost_filtered() {
         "Re-prompt for second card should appear"
     );
     // Verify re-prompt's filtered_indices: remaining budget = 2, only cost_2b (index 0 in current waitroom) fits
-    if let Choice::SelectCard {
-        cost_total,
-        filtered_indices,
-        ..
-    } = game.get_pending_choice()
-    {
-        assert_eq!(
-            *cost_total,
-            Some(2),
-            "cost_total should be 2 (remaining budget)"
-        );
-        let fi = filtered_indices.as_ref().unwrap();
-        assert_eq!(fi.len(), 1, "only one card should fit remaining budget");
-        let cid = game.state.player1.waitroom.cards[fi[0]];
-        assert_eq!(
-            get_cost(&game, cid),
-            2,
-            "only cost-2 card should be in filtered_indices"
-        );
+    match game.get_pending_choice() {
+        Choice::SelectCard {
+            cost_total,
+            filtered_indices,
+            ..
+        } => {
+            assert_eq!(
+                *cost_total,
+                Some(2),
+                "cost_total should be 2 (remaining budget)"
+            );
+            let fi = filtered_indices.as_ref().unwrap();
+            assert_eq!(fi.len(), 1, "only one card should fit remaining budget");
+            let cid = game.state.player1.waitroom.cards[fi[0]];
+            assert_eq!(
+                get_cost(&game, cid),
+                2,
+                "only cost-2 card should be in filtered_indices"
+            );
+        }
+        other => panic!("expected SelectCard re-prompt, got {:?}", other),
     }
     game.select_waitroom_card_filtered(cards[2]); // cost_2b
 
@@ -470,15 +474,23 @@ fn yoshiko_debit_stage_full_graceful() {
 
     game.play_to_stage(yoshiko, MemberArea::Center);
 
-    if game.has_pending_choice() {
-        game.select_option(1);
-    }
-    if game.has_pending_choice() {
-        game.select_waitroom_card_filtered(cost_2a);
-    }
-    if game.has_pending_choice() {
-        game.select_waitroom_card_filtered(cost_2b);
-    }
+    // Hard chain: optional cost offered → both discard selections appear.
+    // A guard here would let the whole graceful scenario silently no-op.
+    assert!(
+        game.has_pending_choice(),
+        "optional cost must still be offered on a full stage"
+    );
+    game.select_option(1);
+    assert!(
+        game.has_pending_choice(),
+        "discard selection must appear (waitroom has candidates)"
+    );
+    game.select_waitroom_card_filtered(cost_2a);
+    assert!(
+        game.has_pending_choice(),
+        "second discard selection must appear"
+    );
+    game.select_waitroom_card_filtered(cost_2b);
 
     // Stage full → cards stay in discard, NOT moved to hand
     assert!(

@@ -448,3 +448,4 @@ pub mod yoshiko_center_ability_test;
 pub mod yoshiko_debut_test;
 pub mod yoshiko_edge_cases_test;
 pub mod yoshiko_filter_test;
+pub mod turn_scope_regression_test;

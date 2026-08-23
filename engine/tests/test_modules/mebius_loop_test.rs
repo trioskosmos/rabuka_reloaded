@@ -83,6 +83,35 @@ fn mebius_blocks_both_success_zones_on_tied_live() {
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
+    // One more pass finalizes victory determination (winner placement).
+    game.pass();
+
+    // Both lives must have SUCCEEDED (stage supplies 9 heart04 vs need
+    // heart04×3+heart0×3) with EQUAL totals. Proven success + equal scores +
+    // non-placement together isolate the cannot-place restriction as the
+    // blocker — the transient prohibition itself is already cleaned up by
+    // live end and cannot be inspected here.
+    let mut p1_snap: Option<(bool, u8)> = None;
+    let mut p2_snap: Option<(bool, u8)> = None;
+    for snap in &game.state.performance_snapshots {
+        let entry = (snap.success, snap.total_score);
+        if snap.player_id == game.state.player1.id {
+            p1_snap = Some(entry);
+        } else {
+            p2_snap = Some(entry);
+        }
+        assert!(
+            snap.success,
+            "[{}] live must have succeeded; otherwise non-placement \
+             proves nothing about the restriction",
+            snap.player_id
+        );
+    }
+    assert_eq!(
+        p1_snap.map(|(_, s)| s),
+        p2_snap.map(|(_, s)| s),
+        "totals must be tied for the restriction's condition"
+    );
 
     // With both mebius' restrictions fired, neither card should be in
     // either player's success zone.
@@ -104,19 +133,19 @@ fn mebius_blocks_both_success_zones_on_tied_live() {
             .contains(&mebius_p2),
         "Mebius restriction should prevent P2's mebius from success zone"
     );
-    // The mebius cards should be in one of the waitrooms (the one whose
-    // owner won/participated in the live).
+    // Each player's own mebius ends in their OWN waitroom (Rule 8.4 cleanup):
+    // exact per-player placement, no cross-player ambiguity.
     let p1_waitroom = &game.state.player1.waitroom.cards;
     let p2_waitroom = &game.state.player2.waitroom.cards;
     assert!(
-        p1_waitroom.contains(&mebius_p1) || p2_waitroom.contains(&mebius_p1),
-        "P1's mebius should be in a waitroom (got p1_waitroom={:?}, p2_waitroom={:?})",
+        p1_waitroom.contains(&mebius_p1) && !p2_waitroom.contains(&mebius_p1),
+        "P1's mebius should be in P1's OWN waitroom (p1={:?}, p2={:?})",
         p1_waitroom,
         p2_waitroom
     );
     assert!(
-        p1_waitroom.contains(&mebius_p2) || p2_waitroom.contains(&mebius_p2),
-        "P2's mebius should be in a waitroom (got p1_waitroom={:?}, p2_waitroom={:?})",
+        p2_waitroom.contains(&mebius_p2) && !p1_waitroom.contains(&mebius_p2),
+        "P2's mebius should be in P2's OWN waitroom (p1={:?}, p2={:?})",
         p1_waitroom,
         p2_waitroom
     );
