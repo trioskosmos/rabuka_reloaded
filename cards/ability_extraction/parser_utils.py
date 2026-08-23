@@ -760,191 +760,6 @@ def extract_card_type(text: str) -> Optional[str]:
     return extract_by_pattern(text, _CARD_TYPE_LONGEST_FIRST)
 
 
-class FieldExtractor:
-    """Single-pass extraction of all common fields from ability text.
-    Computes all fields once at init; access via attributes or .update_dict()."""
-
-    __slots__ = (
-        "text",
-        "ctx",
-        "count",
-        "card_type",
-        "target",
-        "source",
-        "destination",
-        "heart_colors",
-        "require_all_heart_colors",
-        "blade_count",
-        "group_names",
-        "characters",
-        "card_names",
-        "cost_limit",
-        "cost_limit_operator",
-        "position",
-        "optional",
-        "all_",
-        "distinct",
-        "original_value",
-        "exclude_self",
-        "shuffle",
-        "group_reference",
-        "same_unit_name",
-        "state_change",
-        "card_property",
-        "ability_filter",
-        "operator",
-        "negation",
-        "self_target",
-        "multiple_targets",
-        "non_stackable",
-    )
-
-    def __init__(self, text: str, context_text: str = ""):
-        self.text = text
-        self.ctx = context_text or text
-        self._extract_all()
-
-    def _extract_all(self):
-        t = self.text
-        c = self.ctx
-
-        self.count = extract_count(t)
-        self.card_type = extract_card_type(t)
-        self.target = extract_target(t)
-        self.source = extract_source(t)
-        self.destination = extract_destination(t)
-
-        hm = HEART_PATTERN.findall(t)
-        if hm:
-            self.heart_colors = sorted(set(f"heart{m.zfill(2)}" for m in hm))
-            self.require_all_heart_colors = detect_require_all_hearts(t) or None
-        else:
-            self.heart_colors = None
-            self.require_all_heart_colors = None
-
-        self.blade_count = extract_blade_count(t)
-
-        self.group_names = extract_all_groups(c) or None
-        self.characters = extract_all_quoted_names(c) or None
-        cn = re.search(r"カード名に「([^」]+)」を含む", t)
-        if not cn:
-            cn = re.search(r"カード名が「([^」]+)」のカード", t)
-        if not cn:
-            cn = re.search(r"カード名(?:に|が)[「『]([^」』]+)[」』]", t)
-        self.card_names = [cn.group(1)] if cn else None
-
-        self.cost_limit = extract_cost_limit(t)
-        if self.cost_limit is not None:
-            if "以下" in t:
-                self.cost_limit_operator = "<="
-            elif "以上" in t:
-                self.cost_limit_operator = ">="
-            elif "未満" in t:
-                self.cost_limit_operator = "<"
-            elif "より大きい" in t:
-                self.cost_limit_operator = ">"
-            else:
-                self.cost_limit_operator = "="
-        else:
-            self.cost_limit_operator = None
-
-        self.position = extract_position(t)
-
-        self.optional = _OPTIONAL_RE.search(t) is not None if t else None
-        self.all_ = _ALL_KW_RE.search(t) is not None if t else None
-        self.distinct = (
-            "card_name"
-            if _DISTINCT_NAME_RE.search(t)
-            else ("cost" if _DISTINCT_COST_RE.search(t) else None)
-        )
-        self.original_value = _ORIGINAL_VALUE_RE.search(t) is not None if t else None
-        self.exclude_self = _check_exclude_self_broad(t) if t else None
-        self.shuffle = _SHUFFLE_RE.search(t) is not None if t else None
-        self.group_reference = (
-            "same_group_name"
-            if _SAME_GROUP_RE.search(t)
-            else ("different_group_names" if _DIFF_GROUP_RE.search(t) else None)
-        )
-        self.same_unit_name = _SAME_UNIT_RE.search(t) is not None if t else None
-        self.non_stackable = _NON_STACKABLE_RE.search(t) is not None if t else None
-        self.multiple_targets = (
-            _MULTIPLE_TARGETS_RE.search(t) is not None if t else None
-        )
-
-        self.state_change = (
-            "wait"
-            if _STATE_CHANGE_WAIT.search(t)
-            else ("active" if _STATE_CHANGE_ACTIVE.search(t) else None)
-        )
-
-        if _CARD_PROPERTY_BLADE.search(t):
-            self.card_property = "has_blade_heart"
-        elif _CARD_PROPERTY_BLADE_POS.search(t):
-            self.card_property = "has_blade_heart"
-        elif _CARD_PROPERTY_SCORE.search(t):
-            self.card_property = "has_score_icon"
-        else:
-            self.card_property = None
-
-        if _ABILITY_FILTER_HAS.search(t) and not _ABILITY_FILTER_NO.search(t):
-            self.ability_filter = "has_ability"
-        elif _ABILITY_FILTER_NO.search(t):
-            self.ability_filter = "no_ability"
-        else:
-            self.ability_filter = None
-
-        self.operator = extract_operator(t)
-        self.negation = _NEGATION_RE.search(t) is not None if t else None
-        self.self_target = (
-            (bool(_SELF_TARGET_RE.search(t)) and "以外" not in t) if t else None
-        )
-
-    def update_dict(self, d: dict) -> dict:
-        """Insert all non-None fields into d (no overwrite of existing keys)."""
-        for key in (
-            "count",
-            "card_type",
-            "target",
-            "source",
-            "destination",
-            "heart_colors",
-            "require_all_heart_colors",
-            "group_names",
-            "characters",
-            "card_names",
-            "cost_limit",
-            "cost_limit_operator",
-            "position",
-            "state_change",
-            "card_property",
-            "ability_filter",
-            "operator",
-        ):
-            val = getattr(self, key, None)
-            if val is not None and key not in d:
-                d[key] = val
-        for key in (
-            "optional",
-            "original_value",
-            "exclude_self",
-            "shuffle",
-            "same_unit_name",
-            "non_stackable",
-            "multiple_targets",
-            "negation",
-            "self_target",
-        ):
-            val = getattr(self, key, None)
-            if val and val is not None and key not in d:
-                d[key] = val
-        if self.all_ and "all" not in d:
-            d["all"] = True
-        if self.distinct and "distinct" not in d:
-            d["distinct"] = self.distinct
-        if self.group_reference and "group_reference" not in d:
-            d["group_reference"] = self.group_reference
-        return d
-
 
 class PriorityRegistry:
     """Priority-sorted handler registry. No fragile ordering — add handlers at any priority."""
@@ -1078,15 +893,7 @@ class ActionRule:
             try:
                 if not self.condition(text, action):
                     return False
-            except Exception as e:
-                try:
-                    from parser import _DEBUG_LOG
-
-                    _DEBUG_LOG.append(
-                        f"ActionRule({self.action}) condition raised: {e!r} on {text!r}"
-                    )
-                except Exception:
-                    pass
+            except Exception:
                 return False
         return True
 
@@ -1103,15 +910,7 @@ class ActionRule:
                 self.setter(text, action)
             except Exception as e:
                 # Surface real setter bugs instead of silently dropping fields.
-                # (Arity mismatches are normalized in __post_init__.)
-                try:
-                    from parser import _DEBUG_LOG
-
-                    _DEBUG_LOG.append(
-                        f"ActionRule({self.action}) setter raised: {e!r} on {text!r}"
-                    )
-                except ImportError:
-                    pass
+                print(f"ActionRule({self.action}) setter raised: {e!r} on {text!r}")
         if self.extract_optional and ("もよい" in text or "してもよい" in text):
             action["optional"] = True
 

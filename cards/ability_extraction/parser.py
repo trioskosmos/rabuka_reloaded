@@ -75,8 +75,6 @@ Condition types produced (type field in condition dict):
   temporal_during_live   - "ライブ中" (without count) → {temporal: "during_live"}
   custom                 - fallback when no handler matches
 
-On every run, abilities_debug.txt is written next to abilities.json
-with a trace of every condition and effect handler call.
 """
 
 import json
@@ -84,19 +82,6 @@ import re
 import copy
 import sys
 from typing import Dict, Any, Optional, Tuple, List, Union
-
-# Debug log accumulator: every parse_condition and parse_effect call appends
-# a trace entry. Written to abilities_debug.txt at the end of the pipeline.
-_DEBUG_LOG: List[str] = []
-_DEBUG_CURRENT_SECTION: str = ""
-
-
-def set_debug_section(section: str) -> None:
-    """Emit a section header when starting to parse a new ability."""
-    global _DEBUG_CURRENT_SECTION
-    if section != _DEBUG_CURRENT_SECTION:
-        _DEBUG_LOG.append(f"\n==== {section} ====")
-        _DEBUG_CURRENT_SECTION = section
 
 
 from parser_utils import (
@@ -1679,11 +1664,6 @@ def parse_effect(text: str) -> Dict[str, Any]:
     for _priority, hn, handler in _effect_registry.sorted_handlers():
         result = handler(text)
         if result is not None:
-            _DEBUG_LOG.append(
-                f"parse_effect({text!r})\n"
-                f"  [effect] {hn}: MATCH → action={result.get('action')}\n"
-                f"  output: {json.dumps(result, ensure_ascii=False)}"
-            )
             _merge_parenthetical(result, parenthetical)
             # Apply duration prefix info
             if "duration" in effect and "duration" not in result:
@@ -1755,11 +1735,6 @@ def parse_effect(text: str) -> Dict[str, Any]:
 
     action = parse_action(fallback_text)
     effect.update(action)
-    _DEBUG_LOG.append(
-        f"parse_effect({text!r})\n"
-        f"  → no handler matched, parse_action fallback\n"
-        f"  output: {json.dumps(effect, ensure_ascii=False)}"
-    )
 
     _merge_parenthetical(effect, parenthetical)
     if extra_activation_cond and "activation_condition_parsed" not in effect:
@@ -1900,11 +1875,6 @@ def parse_condition(text: str) -> Dict[str, Any]:
     for _priority, name, handler in _condition_registry.sorted_handlers():
         result = handler(text)
         if result is not None:
-            _DEBUG_LOG.append(
-                f"parse_condition({text!r})\n"
-                f"  [{name}]: MATCH → type={result['type']}\n"
-                f"  output: {json.dumps(result, ensure_ascii=False)}"
-            )
             # Extract cost_limit and card_property from text for handlers
             # that don't set these fields themselves (e.g. _try_heart_possession).
             # Only extract when the key is truly absent (not just None) to avoid
@@ -1932,11 +1902,6 @@ def parse_condition(text: str) -> Dict[str, Any]:
     condition: Dict[str, Any] = {"text": text}
     _extract_generic_fields(condition, text)
     _enrich_condition_common(condition, text)
-    _DEBUG_LOG.append(
-        f"parse_condition({text!r})\n"
-        f"  → no handler matched, fallthrough\n"
-        f"  output: {json.dumps(condition, ensure_ascii=False)}"
-    )
     return _infer_condition_type(condition, text)
 
 
@@ -11812,8 +11777,6 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
     # 3. Infer action for effects with no action; apply sequential chain fixes.
     # ─────────────────────────────────────────────────────────────────────────────
     ability_text = ability.get("full_text") or ability.get("triggerless_text", "")
-    if ability_text:
-        set_debug_section(f"Ability: {ability_text}")
     eff = ability.get("effect")
     if not isinstance(eff, dict):
         return
