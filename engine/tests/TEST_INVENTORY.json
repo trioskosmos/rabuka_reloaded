@@ -1,20 +1,20 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T21:44:48.786562+00:00",
+  "generated_at": "2026-08-23T22:08:51.560694+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 435,
-  "n_tests": 2655,
+  "n_files": 436,
+  "n_tests": 2658,
   "total_cards": 771,
-  "covered_cards": 629,
-  "abilities_on_covered": 792,
+  "covered_cards": 632,
+  "abilities_on_covered": 795,
   "trigger_counts": {
     "起動": [
-      80,
+      83,
       96
     ],
     "登場": [
@@ -44,7 +44,7 @@
   },
   "action_counts": {
     "move_cards": [
-      118,
+      121,
       146
     ],
     "look_and_select": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      451,
+      454,
       545
     ],
     "temporal_condition": [
@@ -256,7 +256,7 @@
   },
   "set_counts": {
     "sd1": [
-      54,
+      55,
       58
     ],
     "PR": [
@@ -268,7 +268,7 @@
       56
     ],
     "bp3": [
-      62,
+      63,
       66
     ],
     "bp2": [
@@ -276,7 +276,7 @@
       68
     ],
     "bp4": [
-      74,
+      75,
       88
     ],
     "bp5": [
@@ -310,8 +310,8 @@
   },
   "depth_counts": {
     "L2+choice": 593,
-    "none": 144,
-    "L1+choice": 134,
+    "none": 141,
+    "L1+choice": 137,
     "L2": 24,
     "L1": 41
   },
@@ -882,6 +882,7 @@
         "engine/tests/test_modules/live_success_rules_test.rs",
         "engine/tests/test_modules/rurino_test.rs",
         "engine/tests/test_modules/score_condition_integration_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch16_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs"
       ],
       "covering_tests": [
@@ -896,6 +897,8 @@
         "ayumu_bp5n_heart01_condition_passes_but_modifier_not_found",
         "both_players_have_live_cards",
         "both_players_live_score_compared",
+        "bp3004_rest_self_and_discard_retrieves_niji_live",
+        "bp4018_rests_self_to_waitroom_retrieves_liella",
         "compound_dododo_hasunosora_on_stage_passes",
         "compound_dododo_no_hasunosora_fails",
         "compound_dododo_tied_score_with_hasunosora_fails",
@@ -912,11 +915,9 @@
         "himeno_bp6_cost_no_reduction_without_mirakura",
         "himeno_bp6_cost_reduced_by_mirakura_on_stage",
         "himeno_bp6_cost_reduced_by_two_mirakura",
-        "himeno_bp6_delayed_cannot_active_blocks_activation",
-        "himeno_bp6_delayed_cannot_active_stack_resets_on_second_set",
-        "himeno_bp6_q249_cost_reduced_by_three_mirakura"
+        "himeno_bp6_delayed_cannot_active_blocks_activation"
       ],
-      "covering_test_count": 86,
+      "covering_test_count": 89,
       "is_null": true
     },
     {
@@ -9497,12 +9498,15 @@
         "engine/tests/test_modules/kanon_test.rs",
         "engine/tests/test_modules/nonfiction_cost_comparison_test.rs",
         "engine/tests/test_modules/sumire_bp2_center_cost_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch16_test.rs",
         "engine/tests/test_modules/zero_tested_action_types_test.rs"
       ],
       "covering_tests": [
         "all_equal_cost_no_heart",
         "blade_goes_to_stage_member_not_live_card",
         "both_players_get_own_live_start_effects",
+        "bp3004_rest_self_and_discard_retrieves_niji_live",
+        "bp4018_rests_self_to_waitroom_retrieves_liella",
         "center_equal_cost_no_heart",
         "center_highest_among_three_different_costs",
         "center_highest_cost_gains_heart",
@@ -9527,11 +9531,9 @@
         "keke_look_select_liella_no_blade_heart_excluded",
         "keke_look_select_liella_with_blade_heart",
         "keke_look_select_sunny_passion_member",
-        "left_side_heart_below_ignores_center_high",
-        "left_side_heart_meets_threshold_gains_blade",
-        "natsumi_009_draw_with_other_5yncri5e"
+        "left_side_heart_below_ignores_center_high"
       ],
-      "covering_test_count": 82,
+      "covering_test_count": 85,
       "is_null": false
     },
     {
@@ -9563,12 +9565,15 @@
         "engine/tests/test_modules/kanon_test.rs",
         "engine/tests/test_modules/nonfiction_cost_comparison_test.rs",
         "engine/tests/test_modules/sumire_bp2_center_cost_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch16_test.rs",
         "engine/tests/test_modules/zero_tested_action_types_test.rs"
       ],
       "covering_tests": [
         "all_equal_cost_no_heart",
         "blade_goes_to_stage_member_not_live_card",
         "both_players_get_own_live_start_effects",
+        "bp3004_rest_self_and_discard_retrieves_niji_live",
+        "bp4018_rests_self_to_waitroom_retrieves_liella",
         "center_equal_cost_no_heart",
         "center_highest_among_three_different_costs",
         "center_highest_cost_gains_heart",
@@ -9593,11 +9598,9 @@
         "keke_look_select_liella_no_blade_heart_excluded",
         "keke_look_select_liella_with_blade_heart",
         "keke_look_select_sunny_passion_member",
-        "left_side_heart_below_ignores_center_high",
-        "left_side_heart_meets_threshold_gains_blade",
-        "natsumi_009_draw_with_other_5yncri5e"
+        "left_side_heart_below_ignores_center_high"
       ],
-      "covering_test_count": 82,
+      "covering_test_count": 85,
       "is_null": false
     },
     {
@@ -12744,14 +12747,20 @@
         "PL!N-sd1-005-SD"
       ],
       "base": "PL!N-sd1-005",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch16_test.rs"
+      ],
+      "covering_tests": [
+        "bp3004_rest_self_and_discard_retrieves_niji_live",
+        "bp4018_rests_self_to_waitroom_retrieves_liella",
+        "proteinbar_discard2_retrieves_niji_member"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -16431,14 +16440,20 @@
         "PL!N-bp3-004-P"
       ],
       "base": "PL!N-bp3-004",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch16_test.rs"
+      ],
+      "covering_tests": [
+        "bp3004_rest_self_and_discard_retrieves_niji_live",
+        "bp4018_rests_self_to_waitroom_retrieves_liella",
+        "proteinbar_discard2_retrieves_niji_member"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -31201,14 +31216,20 @@
         "PL!SP-bp4-018-N"
       ],
       "base": "PL!SP-bp4-018",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch16_test.rs"
+      ],
+      "covering_tests": [
+        "bp3004_rest_self_and_discard_retrieves_niji_live",
+        "bp4018_rests_self_to_waitroom_retrieves_liella",
+        "proteinbar_discard2_retrieves_niji_member"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
