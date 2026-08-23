@@ -1,24 +1,24 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T20:00:06.131206+00:00",
+  "generated_at": "2026-08-23T20:24:45.146476+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 431,
-  "n_tests": 2636,
+  "n_files": 432,
+  "n_tests": 2641,
   "total_cards": 771,
-  "covered_cards": 618,
-  "abilities_on_covered": 780,
+  "covered_cards": 621,
+  "abilities_on_covered": 783,
   "trigger_counts": {
     "起動": [
       80,
       96
     ],
     "登場": [
-      217,
+      218,
       269
     ],
     "ライブ開始時": [
@@ -30,7 +30,7 @@
       2
     ],
     "ライブ成功時": [
-      95,
+      97,
       122
     ],
     "常時": [
@@ -64,11 +64,11 @@
       2
     ],
     "draw_card": [
-      40,
+      41,
       44
     ],
     "change_state": [
-      57,
+      58,
       60
     ],
     "play_baton_touch": [
@@ -104,7 +104,7 @@
       2
     ],
     "modify_score": [
-      64,
+      65,
       73
     ],
     "conditional_alternative": [
@@ -190,7 +190,7 @@
       13
     ],
     "comparison_condition": [
-      50,
+      51,
       60
     ],
     "card_count_condition": [
@@ -210,7 +210,7 @@
       2
     ],
     "group_condition": [
-      33,
+      35,
       44
     ],
     "or_condition": [
@@ -284,7 +284,7 @@
       134
     ],
     "bp6": [
-      64,
+      66,
       82
     ],
     "bp7": [
@@ -292,7 +292,7 @@
       111
     ],
     "pb1": [
-      111,
+      112,
       137
     ],
     "sd2": [
@@ -310,10 +310,10 @@
   },
   "depth_counts": {
     "L2+choice": 593,
-    "none": 156,
+    "none": 153,
     "L1+choice": 134,
     "L2": 24,
-    "L1": 29
+    "L1": 32
   },
   "qa_rulings": {
     "covered": 272,
@@ -10440,7 +10440,8 @@
         "engine/tests/test_modules/aurora_flower_test.rs",
         "engine/tests/test_modules/hanamusubi_exclude_self_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs",
-        "engine/tests/test_modules/link_to_future_test.rs"
+        "engine/tests/test_modules/link_to_future_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch12_test.rs"
       ],
       "covering_tests": [
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
@@ -10452,6 +10453,9 @@
         "aurora_flower_same_name_no_score",
         "aurora_flower_treated_as_three_groups_in_stage",
         "aurora_flower_two_members_no_score",
+        "bp6012_debut_activates_energy_with_sbuuke_teammate",
+        "bp6022_equal_or_fewer_opp_energy_no_score",
+        "bp6022_more_opp_energy_scores",
         "butterfly_to_butterfly_wing_matches",
         "butterfly_wing_to_butterfly_no_match",
         "dream_believers_104_to_105_no_match",
@@ -10469,12 +10473,9 @@
         "hinoshita_q236_name_contains_all_matches",
         "hinoshita_q237_name_contains_all_no_match",
         "hinoshita_reveal_choice_keeps_card_in_hand",
-        "hinoshita_use_limit_once_per_turn",
-        "link_to_future_one_member_plus_2",
-        "link_to_future_three_distinct_members_plus_6",
-        "link_to_future_zero_members_score_0"
+        "hinoshita_use_limit_once_per_turn"
       ],
-      "covering_test_count": 37,
+      "covering_test_count": 42,
       "is_null": false
     },
     {
@@ -28200,7 +28201,8 @@
       "covering_files": [
         "engine/tests/test_modules/aurora_flower_identity_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs",
-        "engine/tests/test_modules/link_to_future_test.rs"
+        "engine/tests/test_modules/link_to_future_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch12_test.rs"
       ],
       "covering_tests": [
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
@@ -28208,6 +28210,9 @@
         "aoku_haruka_live_start_scores_with_aurora_in_discard",
         "aurora_flower_does_not_match_unrelated_groups",
         "aurora_flower_treated_as_three_groups_in_stage",
+        "bp6012_debut_activates_energy_with_sbuuke_teammate",
+        "bp6022_equal_or_fewer_opp_energy_no_score",
+        "bp6022_more_opp_energy_scores",
         "butterfly_to_butterfly_wing_matches",
         "butterfly_wing_to_butterfly_no_match",
         "dream_believers_104_to_105_no_match",
@@ -28225,9 +28230,11 @@
         "link_to_future_three_distinct_members_plus_6",
         "link_to_future_zero_members_score_0",
         "link_to_the_future_104_to_base_no_match",
-        "link_to_the_future_to_104_matches"
+        "link_to_the_future_to_104_matches",
+        "pb1021_dollchestra_in_live_zone_draws",
+        "pb1021_no_dollchestra_no_draw"
       ],
-      "covering_test_count": 23,
+      "covering_test_count": 28,
       "is_null": false
     },
     {
@@ -34828,14 +34835,22 @@
         "PL!HS-pb1-021-N"
       ],
       "base": "PL!HS-pb1-021",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch12_test.rs"
+      ],
+      "covering_tests": [
+        "bp6012_debut_activates_energy_with_sbuuke_teammate",
+        "bp6022_equal_or_fewer_opp_energy_no_score",
+        "bp6022_more_opp_energy_scores",
+        "pb1021_dollchestra_in_live_zone_draws",
+        "pb1021_no_dollchestra_no_draw"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -35842,14 +35857,22 @@
         "PL!S-bp6-022-L"
       ],
       "base": "PL!S-bp6-022",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch12_test.rs"
+      ],
+      "covering_tests": [
+        "bp6012_debut_activates_energy_with_sbuuke_teammate",
+        "bp6022_equal_or_fewer_opp_energy_no_score",
+        "bp6022_more_opp_energy_scores",
+        "pb1021_dollchestra_in_live_zone_draws",
+        "pb1021_no_dollchestra_no_draw"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -36066,14 +36089,22 @@
         "PL!HS-bp6-012-R"
       ],
       "base": "PL!HS-bp6-012",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L1",
+      "has_assert": true,
       "has_choice": false,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch12_test.rs"
+      ],
+      "covering_tests": [
+        "bp6012_debut_activates_energy_with_sbuuke_teammate",
+        "bp6022_equal_or_fewer_opp_energy_no_score",
+        "bp6022_more_opp_energy_scores",
+        "pb1021_dollchestra_in_live_zone_draws",
+        "pb1021_no_dollchestra_no_draw"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
