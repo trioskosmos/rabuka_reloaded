@@ -2702,30 +2702,58 @@ fn turn_limit_prevents_second_activation() {
 
     let chika = game.id("PL!S-bp2-009-R"); // Chika has ターン1 limit
     let filler = game.id("PL!-sd1-010-SD");
+    let live = game.id("PL!-sd1-020-SD");
 
     game.state.player1.hand.cards.push(chika);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.hand.cards.push(filler);
+    // Seed the waitroom so the recover effect is observable.
+    game.state.player1.waitroom.cards.push(live);
     game.give_energy(10);
     game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
 
-    // First activation succeeds (cost discards Chika from stage, effect retrieves live from discard)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
+    // First activation succeeds: self-cost sends Chika to the waitroom,
+    // effect retrieves the live card into hand.
+    game.activate_ability(chika);
+    let mut guard = 0;
+    while game.has_pending_choice() && guard < 10 {
+        guard += 1;
+        match game.get_pending_choice() {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => game.select_indices(&[0]),
+            _ => break,
+        }
     }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.state.player1.waitroom.cards.contains(&chika),
+        "self-cost moved Chika to the waitroom"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&live),
+        "effect recovered the live card"
+    );
 
-    // After first activation, Chika is no longer on stage (cost moved her to discard).
-    // Second activation might still resolve without error (engine returns Ok for
-    // non-stage cards), but no additional state change should occur.
+    // Second activation attempt must FAIL (use limit / off-stage) and must
+    // not change anything.
     let hand_before = game.state.player1.hand.cards.len();
-    let _ = game.try_activate_ability(chika);
+    let wait_before = game.state.player1.waitroom.cards.len();
+    let result = game.try_activate_ability(chika);
+    if let Ok(_) = result {
+        // Some paths answer Ok but no-op; either way nothing may change.
+    }
+    let mut guard2 = 0;
+    while game.has_pending_choice() && guard2 < 10 {
+        guard2 += 1;
+        game.select_indices(&[]);
+    }
     assert_eq!(
         game.state.player1.hand.cards.len(),
         hand_before,
-        "No additional effect from second activation after card left stage"
+        "no additional draw/effect from the blocked second activation"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        wait_before,
+        "waitroom untouched by the blocked second activation"
     );
 }
 
