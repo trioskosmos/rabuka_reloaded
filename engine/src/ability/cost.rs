@@ -1,4 +1,4 @@
-use super::debug::AbDebug;
+﻿use super::debug::AbDebug;
 use super::enums::{ActionType, Zone};
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ChoiceRoute};
@@ -601,7 +601,6 @@ let source = cost.source_str().unwrap_or("");
                         gs.player1.stage.stage
                     );
                     gs.mods.add_orientation_modifier(card_id, "wait");
-                    gs.last_cost_wait_member = Some(card_id);
                     gs.last_cost_waited_members.push(card_id);
                 }
             } else {
@@ -1132,7 +1131,6 @@ let source = cost.source_str().unwrap_or("");
                         for &card_id in &candidates {
                             if state_change == "wait" {
                                 gs.mods.add_orientation_modifier(card_id, "wait");
-                                gs.last_cost_wait_member = Some(card_id);
                                 gs.last_cost_waited_members.push(card_id);
                             } else if state_change == "rest" || state_change == "rested" {
                                 gs.mods.add_orientation_modifier(card_id, "rest");

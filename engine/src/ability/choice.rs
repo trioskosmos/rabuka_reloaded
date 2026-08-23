@@ -1,4 +1,4 @@
-use super::condition::ConditionContext;
+﻿use super::condition::ConditionContext;
 use super::enums::{ActionType, Zone};
 use super::types::{
     Choice, ChoiceBuilder, ChoiceResult, ChoiceRoute, ExecutionContext, LookAndSelectStep,
@@ -1955,7 +1955,6 @@ impl super::resolver::AbilityResolver {
                     {
                         for &cid in &cards {
                             gs.mods.add_orientation_modifier(cid, "wait");
-                            gs.last_cost_wait_member = Some(cid);
                             gs.last_cost_waited_members.push(cid);
                         }
                     }

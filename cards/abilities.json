@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-23T12:15:19.591266",
+  "generated_at": "2026-08-23T12:52:45.253658",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "ec9ed965",
+  "engine_commit": "57c4e46c",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -14773,6 +14773,7 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "人",
+        "per_unit_source": "this_cost_waited",
         "state": "wait"
       }
     },
@@ -22774,7 +22775,8 @@
         "self_target": true,
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "人"
+        "per_unit_type": "人",
+        "per_unit_source": "this_cost_waited"
       }
     },
     {

@@ -1,18 +1,18 @@
 {
   "schema": "compiled_abilities.v1",
   "compiler": "cards/compile_abilities.py",
-  "engine_commit": "ec9ed965",
+  "engine_commit": "57c4e46c",
   "input": {
     "source": "cards/abilities.json",
-    "sha256": "fec9804ceff6ad5e",
+    "sha256": "e5602ffeeffd567e",
     "unique_abilities": 936
   },
   "output": {
-    "bytecode_bytes": 92645,
-    "compressed_bytes": 28588,
-    "interned_strings": 5711,
+    "bytecode_bytes": 92659,
+    "compressed_bytes": 28584,
+    "interned_strings": 5712,
     "card_ability_pairs": 2011,
-    "sha256": "b26dc299f4734f6f",
-    "compressed_sha256": "68376f8323598ba5"
+    "sha256": "c8c66e509688f278",
+    "compressed_sha256": "dfba403dfa0a7def"
   }
 }

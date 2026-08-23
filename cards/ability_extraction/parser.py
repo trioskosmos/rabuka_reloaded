@@ -6921,6 +6921,16 @@ def _try_per_unit(text):
     elif "アクティブ状態" in per_text:
         result["state"] = "active"
 
+    # Issue 15: 「これにより…ウェイト（状態）にしたメンバー1人につき」 counts
+    # members newly waited BY THIS ABILITY'S COST, not all currently-waited
+    # members on stage (Q183). The engine resolves this via the cost-wait
+    # tracker (GameState::last_cost_waited_members) instead of a stage scan.
+    if (
+        "これにより" in text
+        and ("ウェイト状態にした" in per_text or "ウェイトにした" in per_text)
+    ):
+        result["per_unit_source"] = "this_cost_waited"
+
     # Extract target from per_text
     tgt = extract_target(per_text)
     if tgt:
@@ -7006,6 +7016,7 @@ def _try_per_unit(text):
                 "per_unit_count",
                 "per_unit_type",
                 "per_unit_heart_colors",
+                "per_unit_source",
                 "card_type",
                 "group_names",
                 "exclude_group_names",
@@ -7111,6 +7122,7 @@ _PROPAGATE_FIELDS = (
     "per_unit_count",
     "per_unit_type",
     "per_unit_heart_colors",
+    "per_unit_source",
     "card_type",
     "group_names",
     "exclude_group_names",
