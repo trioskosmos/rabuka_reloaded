@@ -307,7 +307,8 @@ fn q209_kasumi_discard_niji_live_recover_same() {
     );
 }
 
-/// No 虹ヶ咲 live in waitroom → effect skips.
+/// No 虹ヶ咲 live in waitroom → cost still payable, effect skips.
+/// (Merged with the former "energy available" variant — identical setup.)
 #[test]
 fn q209_kasumi_no_niji_in_discard_skips() {
     let db = load_real_database();
@@ -350,52 +351,6 @@ fn q209_kasumi_no_niji_in_discard_skips() {
     // After play_to_stage: [filler, filler] = 2
     // After discard: [filler] = 1
     // After effect (no match): still [filler] = 1
-    assert_eq!(game.state.player1.hand.cards.len(), 1);
-}
-
-/// No 虹ヶ咲 live in waitroom and energy is available → cost can be paid
-/// but effect finds nothing → hand decreases by 1 (the discarded card).
-#[test]
-fn q209_kasumi_energy_available_no_target_in_discard() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let kasumi = game.id(KASUMI);
-    let filler = game.id(FILLER_MEMBER);
-
-    game.state.player1.hand.cards.push(kasumi);
-    game.state.player1.hand.cards.push(filler);
-    game.state.player1.hand.cards.push(filler);
-    game.give_energy(10);
-
-    game.play_to_stage(kasumi, MemberArea::Center);
-
-    TurnEngine::execute_main_phase_action(
-        &mut game.state,
-        &ActionType::UseAbility,
-        Some(kasumi),
-        None,
-        None,
-        None,
-    )
-    .expect("activate");
-
-    // Pay 2 energy
-    if game.has_pending_choice() {
-        game.select_generated(0);
-    }
-
-    // Discard 1 card
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-
-    // No 虹ヶ咲 live in waitroom → no retrieval
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-
-    // Hand: initially 3, after play: 2, after discard: 1, no retrieval: 1
     assert_eq!(game.state.player1.hand.cards.len(), 1);
 }
 
