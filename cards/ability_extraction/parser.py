@@ -12003,6 +12003,8 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
             eff["actions"] = new_actions
 
     # FIX 14: sequential chaining — infer select_cards → move_cards implied source
+    # NOTE (2026-08): the line below used to claim "infer select_cards →
+    # move_cards implied source" but has only ever been a stats counter.
     fix_stats["compound_split"] += 1
 
     # FIX 13: Auto abilities with no condition — extract from text

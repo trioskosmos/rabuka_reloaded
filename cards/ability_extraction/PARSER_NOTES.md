@@ -1,17 +1,34 @@
 # Parser Notes — debt, history, and status
 
-**File**: `cards/ability_extraction/parser.py` (~15K lines)
+**File**: `cards/ability_extraction/parser.py` (~13.5K lines)
 Consolidates the former `PARSER_REFACTOR.md`, `PARSER_DEEP_REFACTOR.md`, and
 `PARSER_DEBT.md` (all completed sessions; kept in git history).
 
 ## Remaining debt (live)
 
-### Phase 8 — Standardize `_ACTION_RULES` format
-- 33 tuple-format entries still need conversion to `ActionRule` objects
-- Remove the try/except TypeError arity workaround in dispatch
-- Low priority: mechanical work, no behavioral change
+### Phase 8 — Standardize `_ACTION_RULES` format — DONE (stale entry)
+All registrations already go through the ActionRule-normalizing
+`_register_action` (`__post_init__` arity normalization, E2a session); the
+dispatch loop has no TypeError workaround. Nothing to do.
 
-### Fundamental structural issues (from the deep-refactor review)
+### `_process_pre_fix` FIX-block triage (2026-08-24 session)
+Empirically verified by removal + regen byte-diff, one block at a time:
+
+| Block | Verdict | Evidence |
+|---|---|---|
+| FIX 6 (opponent_action flatten) | **DEAD — removed** | 0 output change; no producer emits the wrapper |
+| FIX 2 (each_time → conditional_on_optional) | LOAD-BEARING | 2 abilities change without it |
+| FIX 3 (conditional_on_optional cleanup) | LOAD-BEARING | 4 abilities change; `optional` strip prevents engine double-prompting. positive/negative renames have no producer (dead but harmless) |
+| FIX 7/7b (ability_filter backfill) | LOAD-BEARING | 2 abilities |
+| FIX 9 (result_condition card_property) | LOAD-BEARING | 1 ability |
+| FIX 9b (followup self_target/self_cost) | LOAD-BEARING | 2 abilities |
+| FIX 10–15, N | presumed live (same pattern); untested | — |
+
+Conclusion: these blocks are compensations for shapes that *handlers emit*.
+Dissolving them (Phase 5) means fixing each producing handler first — the
+blocks themselves are correct code.
+
+## Fundamental structural issues (from the deep-refactor review)
 1. **`_fill_defaults` re-extracts fields `parse_action` already set**
    Re-extracts source, destination, cost_limit, optional, max, position,
    group_names, heart_colors. Reader can't tell which function sets which field.
@@ -25,13 +42,23 @@ Consolidates the former `PARSER_REFACTOR.md`, `PARSER_DEEP_REFACTOR.md`, and
    (~240 lines) runs after `_process_pre_fix`. Overlapping work; merging requires
    understanding the timing dependency (propagate needs pre_fix output).
 4. **`_process_pre_fix` is ~340 lines of compensating patches**
-   18+ FIX blocks patching handler output. Each should be fixed in the handler
-   that produced the wrong output.
+   See triage table above: most are load-bearing; dissolution = producer fixes.
 5. **Double/triple extraction of the same fields**
    `extract_source`, `extract_destination`, `extract_card_type`, etc. are called
    3–4 times on the same text across `parse_action`, `_fill_defaults`, `_walk`.
 
 ## Completed work (history)
+
+### Session: extract script single-owner parsing (2026-08-24)
+- extract_card_abilities.py now calls parser's real `parse_ability()`;
+  deleted the divergent weaker inline copy
+- Added `normalize_multiline()` (old normalize collapsed `\n` choice bullets)
+- Hardened condition back-fill: effect text only, only when no condition
+  exists, leading-gate only (was re-scanning cost text and double-gating)
+- Generic 「プレイに際し…コストはNになる」 handler (`_try_play_time_cost_set`)
+  replaced the LL-bp7-001-specific override
+- Deleted dead code: FieldExtractor, _DEBUG_LOG plumbing, segment_clauses
+  Stage-A IR (+tests), compile_abilities vocab/encode block, typo'd patterns
 
 ### Session: dedup + helper extraction (PARSER_DEBT)
 - Extracted shared helpers: `detect_exclude_self()`, `extract_heart_colors_from_text()`,
