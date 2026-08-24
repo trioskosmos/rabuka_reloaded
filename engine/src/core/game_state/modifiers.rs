@@ -1219,6 +1219,28 @@ impl GameState {
         self.cards_moved_this_turn.iter().any(|x| x == &card_id)
     }
 
+    /// R1 choke point: the ONLY way effect/choice code may write the
+    /// recently-batch scratch views (`recently_moved_cards` /
+    /// `recently_moved_from_zone`). Centralizing these writes means the
+    /// planned unification (deriving them from the event log, deleting the
+    /// shadow fields) touches this method alone instead of a dozen sites.
+    pub fn set_recently_moved_batch(
+        &mut self,
+        cards: SmallVec<[i16; 4]>,
+        from_zone: Option<&str>,
+    ) {
+        self.recently_moved_cards = Some(cards);
+        if let Some(z) = from_zone {
+            self.recently_moved_from_zone = Some(z.to_string());
+        }
+    }
+
+    /// R1 choke point companion: clears the recently-batch scratch views.
+    pub fn clear_recently_moved_batch(&mut self) {
+        self.recently_moved_cards = None;
+        self.recently_moved_from_zone = None;
+    }
+
     pub fn clear_card_movement_tracking(&mut self) {
         self.cards_moved_this_turn.clear();
         self.turn_movements.clear();

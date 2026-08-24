@@ -571,8 +571,7 @@ impl super::resolver::AbilityResolver {
                     log::debug!("[KANAN_DEBUG] cost finalize: moved_cards={:?}, setting optional_cost_result=true", self.moved_cards);
                     gs.mods.last_cost_discard_count = self.moved_cards.len() as u8;
                     gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
-                    gs.recently_moved_cards = Some(self.moved_cards.clone());
-                    gs.recently_moved_from_zone = Some("hand".to_string());
+gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
                         entry.cost_paid = true;
                         entry.optional_cost_result = Some(true);
@@ -754,8 +753,7 @@ impl super::resolver::AbilityResolver {
             let final_count = self.moved_cards.len() as u8;
             gs.mods.last_cost_discard_count = final_count;
             gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
-            gs.recently_moved_cards = Some(self.moved_cards.clone());
-            gs.recently_moved_from_zone = Some("hand".to_string());
+gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.cost_paid = true;
             }
@@ -993,8 +991,7 @@ impl super::resolver::AbilityResolver {
                                 self.selected_cards.push(cid);
                             }
                         }
-                        gs.recently_moved_cards = Some(card_ids.into());
-                        gs.recently_moved_from_zone = Some(Zone::LiveCardZone.to_string());
+gs.set_recently_moved_batch(card_ids.into(), Some(Zone::LiveCardZone.to_str()));
                     }
                 }
             }
@@ -1659,8 +1656,7 @@ impl super::resolver::AbilityResolver {
                 );
                 if mc > 0 {
                     self.moved_cards = valid_ids.clone().into();
-                    gs.recently_moved_cards = Some(valid_ids.into());
-                    gs.recently_moved_from_zone = Some(Zone::SuccessLiveZone.to_str().to_string());
+gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str()));
                 }
             }
         }
@@ -1910,7 +1906,7 @@ impl super::resolver::AbilityResolver {
                 }) {
                     self.last_move_moved_any = Some(false);
                     self.moved_cards.clear();
-                    gs.recently_moved_cards = Some(SmallVec::new());
+                    gs.clear_recently_moved_batch();
                 }
                 log::debug!("[SELECT_STAGE] no selection: cleared pending commands");
             }
@@ -2002,8 +1998,7 @@ impl super::resolver::AbilityResolver {
                         }
                         if !moved.is_empty() {
                             self.moved_cards.extend(moved.iter().copied());
-                            gs.recently_moved_cards = Some(moved.clone().into());
-                            gs.recently_moved_from_zone = Some("under_member".to_string());
+gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                             self.last_move_moved_any = Some(true);
                         } else {
                             self.last_move_moved_any = Some(false);
@@ -2056,8 +2051,7 @@ impl super::resolver::AbilityResolver {
                 }
                 self.selected_cards = valid_ids.clone().into();
                 self.moved_cards = valid_ids.clone().into();
-                gs.recently_moved_cards = Some(valid_ids.into());
-                gs.recently_moved_from_zone = Some("stage".to_string());
+gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
             }
         }
         Ok(())

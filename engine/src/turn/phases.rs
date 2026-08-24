@@ -423,7 +423,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         // (cannot_live path), set recently_moved_cards so the 8.3.13 check
         // captures auto abilities that trigger on that zone change (e.g. Riko BP6).
         if !yell_data.moved_live_card_ids.is_empty() {
-            game_state.recently_moved_cards = Some(yell_data.moved_live_card_ids.into());
+            game_state.set_recently_moved_batch(yell_data.moved_live_card_ids.into(), None);
         }
 
         // Rule 8.3.13: Check timing — auto abilities fire here.
@@ -511,7 +511,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         // (requirement failure path), set recently_moved_cards and re-check
         // auto abilities so zone-change triggers fire (e.g. Riko BP6).
         if !perf_data.moved_live_card_ids.is_empty() {
-            game_state.recently_moved_cards = Some(perf_data.moved_live_card_ids.clone().into());
+            game_state.set_recently_moved_batch(perf_data.moved_live_card_ids.clone().into(), None);
             game_state.trigger_auto_abilities_for_player(&performer_id);
             game_state.process_pending_auto_abilities(&performer_id);
         }

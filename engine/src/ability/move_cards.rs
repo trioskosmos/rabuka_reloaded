@@ -1720,8 +1720,7 @@ impl AbilityResolver {
                 let moved = drain_under_cards_to_energy_zone(gs, target, idx);
                 self.last_move_moved_any = Some(!moved.is_empty());
                 if !moved.is_empty() {
-                    gs.recently_moved_cards = Some(moved.clone().into());
-                    gs.recently_moved_from_zone = Some("under_member".to_string());
+gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                 }
                 self.selected_cards.clear();
                 return Ok(moved);
@@ -1772,8 +1771,7 @@ impl AbilityResolver {
             let moved = drain_under_cards_to_energy_zone(gs, target, idx);
             self.last_move_moved_any = Some(!moved.is_empty());
             if !moved.is_empty() {
-                gs.recently_moved_cards = Some(moved.clone().into());
-                gs.recently_moved_from_zone = Some("under_member".to_string());
+gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             }
             return Ok(moved);
         }

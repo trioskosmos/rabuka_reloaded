@@ -1167,8 +1167,7 @@ impl super::TurnEngine {
         }
 
         if !moved_to_waitroom.is_empty() {
-            game_state.recently_moved_cards = Some(moved_to_waitroom.into());
-            game_state.recently_moved_from_zone = Some("live_card_zone".to_string());
+game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zone"));
 
             // Scan and queue triggers for both players
             Self::trigger_auto_abilities_for_player(game_state, &p1_id);

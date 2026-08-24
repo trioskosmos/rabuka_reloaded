@@ -1194,10 +1194,9 @@ impl GameState {
             self.process_current_ability();
             let had_recent_moves = self.recently_moved_cards.is_some();
             let had_recent_appearances = !self.recently_appeared_cards.is_empty();
-            self.recently_moved_cards = None;
+            self.clear_recently_moved_batch();
             self.recently_appeared_cards.clear();
             self.recently_state_changed.clear();
-            self.recently_moved_from_zone = None;
             // Save flag for the post-loop batch scan below;
             // process_current_ability's internal scan (line 742) already ran
             // before the clear above, so each_time watchers from the
@@ -1205,7 +1204,7 @@ impl GameState {
             // batch movements (look_and_select, etc.) that finalize card
             // movement outside individual ability resolution.
             if had_recent_moves {
-                self.recently_moved_cards = Some(SmallVec::new());
+                self.set_recently_moved_batch(SmallVec::new(), None);
             }
             if had_recent_appearances {
                 self.recently_appeared_cards.push(-1);
