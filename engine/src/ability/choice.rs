@@ -535,6 +535,21 @@ impl super::resolver::AbilityResolver {
                     None,
                     &card_db,
                 );
+                // R1 unification: cost discards are real zone changes and must
+                // feed the movement-tracking views (cards_moved_this_turn,
+                // turn/batch logs) like every other move. Cost payment ⇒
+                // effect_only=false.
+                for &cid in &new_card_ids {
+                    let cause = gs.activating_card;
+                    gs.push_movement_event(
+                        cid,
+                        Zone::Hand.to_str(),
+                        Zone::Discard.to_str(),
+                        cause,
+                        &target,
+                        false,
+                    );
+                }
                 gs.mods.last_cost_discard_count += new_card_ids.len() as u8;
                 gs.mods
                     .last_cost_moved_card_ids

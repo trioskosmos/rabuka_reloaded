@@ -135,19 +135,11 @@ fn activation_discard_cost_feeds_movement_views() {
         game.select_indices(&[0, 1]);
     }
 
-    // KNOWN GAP (R1 target): cost discards paid through the choice path do
-    // NOT feed cards_moved_this_turn nor emit hand->waitroom events. Only the
-    // effect-side retrieval is tracked. These assertions pin that divergence
-    // so the R1 unification flips them deliberately.
-    //
-    // Desired post-R1 semantics (uncomment when the choke point lands):
-    // assert!(game.state.has_card_moved_this_turn(f1), "fodder 1 tracked");
-    // assert!(game.state.has_card_moved_this_turn(f2), "fodder 2 tracked");
-
-    assert!(
-        !game.state.has_card_moved_this_turn(f1) && !game.state.has_card_moved_this_turn(f2),
-        "current behavior: choice-path cost discards are invisible to turn tracking"
-    );
+    // R1 UNIFIED (2026-08): cost discards paid through the choice path now
+    // emit hand->waitroom events and feed cards_moved_this_turn like every
+    // other move. (Previously they were invisible to all tracking views.)
+    assert!(game.state.has_card_moved_this_turn(f1), "fodder 1 tracked");
+    assert!(game.state.has_card_moved_this_turn(f2), "fodder 2 tracked");
 
     // The effect-side retrieval DOES emit an event (discard->hand).
     let retrievals = game.state.turn_movements[events_before..]
