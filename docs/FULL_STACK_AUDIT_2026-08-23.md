@@ -46,6 +46,7 @@
 | 08-24 | 7b01d3f8 | Test-gap burn-down: batch 24 covers named-baton-source debut draws (東條希 replacing 優木せつ菜, エマ・ヴェルデ replacing herself; draw 2 + hand-discard 2, pos+neg). Finding: this ability shape resolves fully inside the play action — no pending choice reaches the caller. depth=none →120, suite **2665/0** |
 | 08-24 | db4b0862 | Corrected overstated audit claims (Q118 per-entry gate already tested ×5; multiplier bulk-wipe verified deliberate; AsLongAs arms now warn loudly) |
 | 08-24 | 49cc73d4 | Test-gap burn-down: batch 25 covers set_heart_type (bp7-024-L) — lone Aqours member transformed to heart04, non-Aqours untouched, no-Aqours negative. depth=none →119, suite **2667/0** |
+| 08-24 | d063399f | Test-gap burn-down: batch 26 covers 3 look_and_select sub-unit/name-filter debuts (pb1-015 CatChu!, pb1-016 KALEIDOSCORE, sd2-012 虹ヶ咲). depth=none →116, suite **2670/0** |
 | — | — | R8 condition-cache keys assessed & deferred: `format!("{:?}")` is a complete content-addressing scheme over the struct; changing it risks subtle cache-hit changes for no correctness gain |
 
 Verification loop used per step: regen abilities.json → byte-diff vs pre-step copy
