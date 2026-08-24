@@ -169,7 +169,7 @@ def s5_validation(data):
 
 def s6_untested(data):
     # Collect every card id quoted in the Rust test suite.
-    pat = re.compile(r'"([A-Z]{1,4}![A-Za-z0-9!\.\-]+-[A-Z]{2}\d-\d{3}[A-Z\-]*)"?')
+    pat = re.compile(r'"([A-Z]{1,4}![A-Za-z0-9!\.\-]+-[A-Za-z]{2}\d-\d{3}[A-Za-z\-]*)"?')
     covered = set()
     for root, _dirs, files in os.walk(TESTS_DIR):
         for fn in files:
@@ -181,8 +181,7 @@ def s6_untested(data):
     def base_ids(cards):
         out = set()
         for c in cards or []:
-            m = re.match(r"^([A-Z]{1,4}![^|]+?) \(", c)
-            out.add((m.group(1) if m else c).strip())
+            out.add(c.split(" | ")[0].strip())
         return out
 
     missing = []

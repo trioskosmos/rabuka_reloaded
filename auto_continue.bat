@@ -7,7 +7,7 @@ exit /b
 #>
 
 param(
-    [int]$IntervalMinutes = 4,
+    [int]$IntervalMinutes = 5,
     [string]$WindowTitle = "",
     [string]$Message = "continue."
 )
