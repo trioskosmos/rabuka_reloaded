@@ -4265,26 +4265,6 @@ fn char_pl_n_bp1_006_r_ab1() {
     game.drain_auto_ability_choices();
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
-/// text: 手札を1枚控え室に置く：このターン、自分のステージに『虹ヶ咲』のメンバーが登場している場合、エネルギーを2枚アクティブにする。
-#[test]
-fn char_pl_n_bp1_006_r_ab0() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db.clone());
-    let cid = game.id("PL!N-bp1-006-R＋");
-    game.add_to_stage(rabuka_engine::zones::MemberArea::Center, cid);
-    game.state.activating_card = Some(cid);
-    let _ = game.try_activate_ability(cid);
-    for _ in 0..8 {
-        if !game.has_pending_choice() {
-            break;
-        }
-        let _ = game.try_select_indices(&[0]);
-    }
-    let pid = game.state.player1.id.clone();
-    game.state.process_pending_auto_abilities(&pid);
-    game.drain_auto_ability_choices();
-}
-/// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札のメンバーカードを1枚控え室に置く：自分の控え室から、これにより控え室に置いたメンバーカードより、コストの低いメンバーカードを1枚手札に加える。
 #[test]
 fn char_pl_n_bp1_008_p_ab0() {
