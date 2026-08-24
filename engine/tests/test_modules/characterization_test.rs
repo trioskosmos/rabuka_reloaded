@@ -6,6 +6,7 @@ use crate::helpers::*;
 
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室からメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=member_card target=self
 #[test]
 fn char_ll_bp1_001_r_ab0() {
     let db = load_real_database();
@@ -26,6 +27,7 @@ fn char_ll_bp1_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札の「上原歩夢」と「澁谷かのん」と「日野下花帆」を、好きな組み合わせで合計3枚、控え室に置いてもよい：ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋３する。」を得る。 （手札のこのカードも
+/// expect: - gain_ability duration=live_end
 #[test]
 fn char_ll_bp1_001_r_ab1() {
     let db = load_real_database();
@@ -46,6 +48,8 @@ fn char_ll_bp1_001_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札にあるこのメンバーカードのコストは、このカード以外の自分の手札1枚につき、1少なくなる。
+/// expect: - modify_cost operation=subtract value=1 per_unit_type=枚
+/// expect:   ? condition: type=location_condition location=hand
 #[test]
 fn char_ll_bp2_001_r_ab0() {
     let db = load_real_database();
@@ -66,6 +70,7 @@ fn char_ll_bp2_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーはバトンタッチで控え室に置けない。
+/// expect: - restriction count=1 card_type=member_card
 #[test]
 fn char_ll_bp2_001_r_ab1() {
     let db = load_real_database();
@@ -86,6 +91,7 @@ fn char_ll_bp2_001_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札の「渡辺曜」と「鬼塚夏美」と「大沢瑠璃乃」を、好きな枚数控え室に置いてもよい：ライブ終了時まで、これによって控え室に置いた枚数1枚につき、{{icon_blade.png|ブレード}}を得る。 （手札のこのカードもこ
+/// expect: - gain_resource count=1 resource=blade duration=live_end per_unit_type=discard
 #[test]
 fn char_ll_bp2_001_r_ab2() {
     let db = load_real_database();
@@ -106,6 +112,7 @@ fn char_ll_bp2_001_r_ab2() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室にある「園田海未」と「津島善子」と「天王寺璃奈」を、合計6枚をシャッフルしてデッキの一番下に置く：エネルギーを6枚までアクティブにする。
+/// expect: - change_state count=6 state_change=active card_type=energy_card
 #[test]
 fn char_ll_bp3_001_r_ab0() {
     let db = load_real_database();
@@ -126,6 +133,7 @@ fn char_ll_bp3_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{ico
+/// expect: - gain_resource count=3 resource=blade duration=live_end
 #[test]
 fn char_ll_bp3_001_r_ab1() {
     let db = load_real_database();
@@ -146,6 +154,8 @@ fn char_ll_bp3_001_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを5枚見る。その中から「絢瀬絵里」か「朝香果林」か「葉月恋」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。その後、相手のステージにいる、これにより公開したカードのコスト以
+/// expect: - look_and_select
+/// expect:   - change_state count=3 source=stage state_change=wait card_type=member_card target=opponent cost_limit_operator=<=
 #[test]
 fn char_ll_bp4_001_r_ab0() {
     let db = load_real_database();
@@ -166,6 +176,7 @@ fn char_ll_bp4_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを6枚見る。その中からカードを2枚手札に加え、残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_ll_bp6_001_r_ab0() {
     let db = load_real_database();
@@ -186,6 +197,7 @@ fn char_ll_bp6_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札の「南ことり」と「黒澤ダイヤ」と「徒町小鈴」を、好きな枚数控え室に置いてもよい：ライブ終了時まで、これにより控え室に置いたそれらのカードが持つハートの色1つにつき、その色のハートを1つずつ得る。
+/// expect: - gain_resource count=1 resource=heart duration=live_end per_unit_type=discard
 #[test]
 fn char_ll_bp6_001_r_ab1() {
     let db = load_real_database();
@@ -206,6 +218,7 @@ fn char_ll_bp6_001_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは10になる。
+/// expect: - modify_cost count=3 source=hand card_type=member_card operation=set value=10
 #[test]
 fn char_ll_bp7_001_r_ab0() {
     let db = load_real_database();
@@ -226,6 +239,7 @@ fn char_ll_bp7_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室からライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_ll_bp7_001_r_ab1() {
     let db = load_real_database();
@@ -246,6 +260,7 @@ fn char_ll_bp7_001_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室からメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=member_card target=self
 #[test]
 fn char_ll_bp7_001_r_ab2() {
     let db = load_real_database();
@@ -266,6 +281,9 @@ fn char_ll_bp7_001_r_ab2() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにする：カードを1枚引き、手札を1枚控え室に置く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl__bp3_001_p_ab0() {
     let db = load_real_database();
@@ -286,6 +304,7 @@ fn char_pl__bp3_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバーを1人までアクティブにする。
+/// expect: - change_state count=1 source=stage state_change=active card_type=member_card target=self
 #[test]
 fn char_pl__bp3_001_p_ab1() {
     let db = load_real_database();
@@ -306,6 +325,7 @@ fn char_pl__bp3_001_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：相手のステージにいるコスト4以下のメンバーを2人までウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+/// expect: - change_state count=2 source=stage state_change=wait card_type=member_card target=opponent cost_limit=4 cost_limit_operator=<=
 #[test]
 fn char_pl__bp3_002_p_ab0() {
     let db = load_real_database();
@@ -326,6 +346,7 @@ fn char_pl__bp3_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手のステージにいるウェイト状態のメンバー1人につき、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade target=opponent per_unit_type=人
 #[test]
 fn char_pl__bp3_002_p_ab1() {
     let db = load_real_database();
@@ -346,6 +367,7 @@ fn char_pl__bp3_002_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにしてもよい：自分の控え室から『μ's』のメンバーカードを1枚手札に加える。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+/// expect: - move_cards count=1 source=discard destination=hand card_type=member_card target=self
 #[test]
 fn char_pl__bp3_003_p_ab0() {
     let db = load_real_database();
@@ -366,6 +388,9 @@ fn char_pl__bp3_003_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバー1人につき、カードを1枚引く。その後、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand target=self per_unit_type=人
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl__bp3_004_r_ab0() {
     let db = load_real_database();
@@ -386,6 +411,10 @@ fn char_pl__bp3_004_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の成功ライブカード置き場にカードがある場合、手札を1枚控え室に置いてもよい。そうした場合、自分の控え室から『μ's』のライブカードを1枚手札に加える。
+/// expect: - sequential
+/// expect:   ? condition: type=location_condition location=success_live_card_zone
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl__bp3_004_r_ab1() {
     let db = load_real_database();
@@ -406,6 +435,7 @@ fn char_pl__bp3_004_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるすべてのメンバーをアクティブにする。
+/// expect: - change_state source=stage state_change=active card_type=member_card target=self
 #[test]
 fn char_pl__bp3_005_p_ab0() {
     let db = load_real_database();
@@ -426,6 +456,7 @@ fn char_pl__bp3_005_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：ライブ終了時まで、自分の成功ライブカード置き場にあるカード1枚につき、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade target=self duration=live_end per_unit_type=枚
 #[test]
 fn char_pl__bp3_006_r_ab0() {
     let db = load_real_database();
@@ -446,6 +477,10 @@ fn char_pl__bp3_006_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を2枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、1枚をデッキの上に置き、1枚を控え室に置く。
+/// expect: - sequential
+/// expect:   - look_at count=3 source=deck_top target=self
+/// expect:   - select_cards count=1 source=looked_at destination=hand target=self
+/// expect:   - select_cards count=1 source=looked_at destination=deck_top target=self
 #[test]
 fn char_pl__bp3_007_p_ab0() {
     let db = load_real_database();
@@ -466,6 +501,7 @@ fn char_pl__bp3_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにする：自分の控え室から『μ's』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl__bp3_008_r_ab0() {
     let db = load_real_database();
@@ -486,6 +522,7 @@ fn char_pl__bp3_008_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 『μ's』のメンバー1人をウェイトにしてもよい：ライブ終了時まで、{{heart_03.png|heart03}}{{heart_03.png|heart03}}を得る。
+/// expect: - gain_resource count=2 resource=heart heart_colors=heart03/heart03 duration=live_end
 #[test]
 fn char_pl__bp3_008_r_ab1() {
     let db = load_real_database();
@@ -506,6 +543,8 @@ fn char_pl__bp3_008_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにコスト13以上のメンバーがいる場合、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=comparison_condition count=13 operator=>= location=stage
 #[test]
 fn char_pl__bp3_009_r_ab0() {
     let db = load_real_database();
@@ -526,6 +565,9 @@ fn char_pl__bp3_009_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにする：{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、選ん
+/// expect: - sequential heart_colors=heart01/heart03/heart06
+/// expect:   - select count=1 heart_colors=heart01/heart03/heart06
+/// expect:   - gain_resource count=1 resource=heart duration=live_end
 #[test]
 fn char_pl__bp3_009_r_ab1() {
     let db = load_real_database();
@@ -546,6 +588,9 @@ fn char_pl__bp3_009_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分の成功ライブカード置き場にある
+/// expect: - sequential heart_colors=heart01/heart03/heart06
+/// expect:   - select count=1 heart_colors=heart01/heart03/heart06
+/// expect:   - gain_resource count=1 resource=heart target=self duration=live_end per_unit_type=枚
 #[test]
 fn char_pl__bp3_012_rm_ab0() {
     let db = load_real_database();
@@ -566,6 +611,8 @@ fn char_pl__bp3_012_rm_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバーのコストの合計が相手より低い場合、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=comparison_condition operator=< location=stage
 #[test]
 fn char_pl__bp4_001_p_ab0() {
     let db = load_real_database();
@@ -586,6 +633,8 @@ fn char_pl__bp4_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブ中のライブカードに、{{live_start.png|ライブ開始時}}能力も{{live_success.png|ライブ成功時}}能力も持たないカードがあるかぎり、{{heart_06.png|heart06
+/// expect: - gain_resource count=2 resource=heart heart_colors=heart06/heart06 duration=as_long_as
+/// expect:   ? condition: type=ability_filter_condition
 #[test]
 fn char_pl__bp4_002_r_ab0() {
     let db = load_real_database();
@@ -606,6 +655,7 @@ fn char_pl__bp4_002_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を2枚控え室に置く：自分の控え室から『μ's』のライブカードを1枚手札に加える。この能力は、自分の成功ライブカード置き場にあるカードのスコアの合計が６以上の場合のみ起動できる。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl__bp4_002_r_ab1() {
     let db = load_real_database();
@@ -626,6 +676,7 @@ fn char_pl__bp4_002_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を2枚控え室に置く：自分の控え室から『μ's』のライブカードを1枚手札に加える。この能力は、自分の成功ライブカード置き場にあるカードのスコアの合計が6以上の場合のみ起動できる。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl__bp4_002_sec_ab1() {
     let db = load_real_database();
@@ -646,6 +697,8 @@ fn char_pl__bp4_002_sec_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の成功ライブカード置き場にあるカードのスコアの合計が６以上の場合、エネルギーを2枚アクティブにする。
+/// expect: - change_state count=2 state_change=active card_type=energy_card
+/// expect:   ? condition: type=comparison_condition count=6 operator=>= location=success_live_card_zone
 #[test]
 fn char_pl__bp4_004_p_ab0() {
     let db = load_real_database();
@@ -666,6 +719,7 @@ fn char_pl__bp4_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室からコスト2以下のメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=member_card target=self cost_limit=2 cost_limit_operator=<=
 #[test]
 fn char_pl__bp4_005_r_ab0() {
     let db = load_real_database();
@@ -686,6 +740,7 @@ fn char_pl__bp4_005_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}ライブの合計スコアを＋１する。
+/// expect: - modify_score target=live_total operation=add value=1
 #[test]
 fn char_pl__bp4_005_r_ab1() {
     let db = load_real_database();
@@ -706,6 +761,8 @@ fn char_pl__bp4_005_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに{{icon_blade.png|ブレード}}を5つ以上持つ『μ's』のメンバーがいない場合、このメンバーはセンターエリア以外にポジションチェンジする。(このメンバーを今いるエリア以外のエリアに移動させる
+/// expect: - position_change card_type=member_card
+/// expect:   ? condition: type=group_condition count=5 operator=>= location=stage group_names=["μ's"] negation=True
 #[test]
 fn char_pl__bp4_005_r_ab2() {
     let db = load_real_database();
@@ -726,6 +783,8 @@ fn char_pl__bp4_005_r_ab2() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の成功ライブカード置き場にあるカードのスコアの合計が３以上の場合、自分のデッキの上からカードを5枚見る。その中から『μ's』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
+/// expect:   ? condition: type=comparison_condition count=3 operator=>= location=success_live_card_zone
 #[test]
 fn char_pl__bp4_006_r_ab0() {
     let db = load_real_database();
@@ -746,6 +805,7 @@ fn char_pl__bp4_006_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent
 #[test]
 fn char_pl__bp4_009_p_ab0() {
     let db = load_real_database();
@@ -766,6 +826,7 @@ fn char_pl__bp4_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにしてもよい：ライブ終了時まで、自分のセンターエリアにいる『μ's』のメンバーは、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl__bp4_011_n_ab0() {
     let db = load_real_database();
@@ -786,6 +847,7 @@ fn char_pl__bp4_011_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：ライブ終了時まで、自分のステージにいるこのメンバー以外のメンバー1人は、{{heart_01.png|heart01}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart01 card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl__bp4_013_n_ab0() {
     let db = load_real_database();
@@ -806,6 +868,8 @@ fn char_pl__bp4_013_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブ中のライブカードに、{{live_start.png|ライブ開始時}}能力も{{live_success.png|ライブ成功時}}能力も持たないカードがある場合、ライブ終了時まで、自分のステージにいるこのメン
+/// expect: - gain_resource count=2 resource=blade card_type=member_card target=self duration=live_end
+/// expect:   ? condition: type=ability_filter_condition
 #[test]
 fn char_pl__bp4_014_n_ab0() {
     let db = load_real_database();
@@ -826,6 +890,8 @@ fn char_pl__bp4_014_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の成功ライブカード置き場にあるカードのスコアの合計が３以上の場合、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=comparison_condition count=3 operator=>= location=success_live_card_zone
 #[test]
 fn char_pl__bp4_016_n_ab0() {
     let db = load_real_database();
@@ -846,6 +912,7 @@ fn char_pl__bp4_016_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにしてもよい：ライブ終了時まで、自分のセンターエリアにいる『μ's』のメンバーは、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl__bp4_017_n_ab0() {
     let db = load_real_database();
@@ -866,6 +933,8 @@ fn char_pl__bp4_017_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のセンターエリアに{{icon_blade.png|ブレード}}を9つ以上持つ『μ's』のメンバーがいる場合、このカードのスコアを＋２する。
+/// expect: - modify_score operation=add value=2
+/// expect:   ? condition: type=group_condition count=9 operator=>= group_names=["μ's"]
 #[test]
 fn char_pl__bp4_022_l_ab0() {
     let db = load_real_database();
@@ -886,6 +955,7 @@ fn char_pl__bp4_022_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブ終了時まで、自分のステージにいる『μ's』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl__bp4_024_l_ab0() {
     let db = load_real_database();
@@ -906,6 +976,7 @@ fn char_pl__bp4_024_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上から、自分のライブの合計スコアに2を足した数に等しい枚数見る。その中からカードを1枚手札に加える。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl__bp5_001_r_ab0() {
     let db = load_real_database();
@@ -926,6 +997,7 @@ fn char_pl__bp5_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにし、手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からコスト9以上の『μ's』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl__bp5_002_p_ab0() {
     let db = load_real_database();
@@ -946,6 +1018,8 @@ fn char_pl__bp5_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに名前が異なるメンバーが3人以上いるかぎり、{{heart_03.png|heart03}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart03 target=self duration=as_long_as
+/// expect:   ? condition: type=location_condition count=3 operator=>= location=stage
 #[test]
 fn char_pl__bp5_003_r_ab0() {
     let db = load_real_database();
@@ -966,6 +1040,10 @@ fn char_pl__bp5_003_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く：これにより控え室に置いたカードが『μ's』のカードの場合、自分のデッキの上からカードを4枚見る。その中からカード
+/// expect: - conditional_alternative
+/// expect:   ? condition: type=group_condition group_names=["μ's"] negation=True
+/// expect:   - look_and_select
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl__bp5_003_r_ab1() {
     let db = load_real_database();
@@ -986,6 +1064,9 @@ fn char_pl__bp5_003_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}：相手のステージにいるコスト10以下のメンバー1人を
+/// expect: - sequential
+/// expect:   - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent cost_limit=10 cost_limit_operator=<=
+/// expect:   - modify_cost count=1 operation=subtract per_unit_type=group_name
 #[test]
 fn char_pl__bp5_004_r_ab0() {
     let db = load_real_database();
@@ -1006,6 +1087,8 @@ fn char_pl__bp5_004_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分がエールしたとき、エールにより公開された自分のカードの中にブレードハートを持たないメンバーカードが3枚以上ある場合、ライブ終了時まで、{{icon_all.png|ハート}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_type=all target=self duration=live_end
+/// expect:   ? condition: type=card_count_condition count=3 operator=>= location=revealed_cards negation=True
 #[test]
 fn char_pl__bp5_004_r_ab1() {
     let db = load_real_database();
@@ -1026,6 +1109,8 @@ fn char_pl__bp5_004_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の成功ライブカード置き場にあるカードのスコアの合計が６以上の場合、自分のエネルギーデッキから、エネルギーカードを1枚アクティブ状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone card_type=energy_card target=self
+/// expect:   ? condition: type=comparison_condition count=6 operator=>= location=success_live_card_zone
 #[test]
 fn char_pl__bp5_005_p_ab0() {
     let db = load_real_database();
@@ -1046,6 +1131,8 @@ fn char_pl__bp5_005_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブカード置き場にカードが2枚以上ある場合、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=card_count_condition count=2 operator=>= location=live_card_zone
 #[test]
 fn char_pl__bp5_006_p_ab0() {
     let db = load_real_database();
@@ -1066,6 +1153,10 @@ fn char_pl__bp5_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーよりコストが低いメンバーからバトンタッチして登場した場合、自分と相手はそれぞれ自身の手札の枚数が3枚になるまで手札を控え室に置き、その後、自分と相手はそれぞれカードを3枚引く。
+/// expect: - sequential
+/// expect:   - discard_until_count count=3 source=hand destination=discard target=both
+/// expect:     ? condition: type=movement_condition
+/// expect:   - draw_card count=3 source=deck destination=hand target=both
 #[test]
 fn char_pl__bp5_007_p_ab0() {
     let db = load_real_database();
@@ -1086,6 +1177,8 @@ fn char_pl__bp5_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の成功ライブカード置き場にあるカードのスコアの合計が６以上であるかぎり、{{heart_03.png|heart03}}{{heart_03.png|heart03}}を得る。
+/// expect: - gain_resource count=2 resource=heart heart_colors=heart03/heart03 target=self duration=as_long_as
+/// expect:   ? condition: type=comparison_condition count=6 operator=>= location=success_live_card_zone
 #[test]
 fn char_pl__bp5_008_p_ab0() {
     let db = load_real_database();
@@ -1106,6 +1199,7 @@ fn char_pl__bp5_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を2枚控え室に置く：自分の控え室から必要ハートに{{heart_06.png|heart06}}を3以上含むライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 heart_colors=heart06 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl__bp5_009_p_ab0() {
     let db = load_real_database();
@@ -1126,6 +1220,9 @@ fn char_pl__bp5_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚控え室に置く。その後、自分の控え室から『A-RISE』のメンバーカードを1枚手札に加える。
+/// expect: - sequential
+/// expect:   - move_cards count=3 source=deck_top destination=discard card_type=card target=self
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=member_card target=self
 #[test]
 fn char_pl__bp5_010_n_ab0() {
     let db = load_real_database();
@@ -1146,6 +1243,7 @@ fn char_pl__bp5_010_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを4枚見る。その中からハートに{{heart_05.png|heart05}}か{{heart_06.png|heart06}}を持つメンバーカードを1枚公開して
+/// expect: - look_and_select heart_colors=heart05/heart06
 #[test]
 fn char_pl__bp5_014_n_ab0() {
     let db = load_real_database();
@@ -1166,6 +1264,12 @@ fn char_pl__bp5_014_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに『A-RISE』のメンバーがいる場合、以下から1つを選ぶ。 ・ウェイト状態のメンバー1人をアクティブにし、ライブ終了時まで、そのメンバーは{{icon_blade.png|ブレード}}を得る。 ・相手のス
+/// expect: - choice count=1
+/// expect:   ? condition: type=group_condition location=stage group_names=['A-RISE']
+/// expect:   - sequential
+/// expect:     - change_state count=1 state_change=active card_type=member_card
+/// expect:     - gain_resource count=1 resource=blade card_type=member_card duration=live_end
+/// expect:   - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent
 #[test]
 fn char_pl__bp5_024_l_ab0() {
     let db = load_real_database();
@@ -1186,6 +1290,7 @@ fn char_pl__bp5_024_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるこのメンバー以外の『A-RISE』のメンバー1人につき、{{heart_05.png|heart05}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart05 target=self per_unit_type=人
 #[test]
 fn char_pl__bp5_111_p_ab0() {
     let db = load_real_database();
@@ -1206,6 +1311,9 @@ fn char_pl__bp5_111_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置く：ウェイト状態のメンバー1人をアクティブにする。これにより相手のステージにいるメンバーをアクティブにした場合、自分の控え室からライブカードを1枚手札に加える。
+/// expect: - conditional_on_result
+/// expect:   - change_state count=1 state_change=active card_type=member_card target=both
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl__bp5_111_p_ab1() {
     let db = load_real_database();
@@ -1226,6 +1334,7 @@ fn char_pl__bp5_111_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにし、手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加える。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl__bp5_222_p_ab0() {
     let db = load_real_database();
@@ -1246,6 +1355,7 @@ fn char_pl__bp5_222_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにしてもよい：相手のステージにいるコスト9以下のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent cost_limit=9 cost_limit_operator=<=
 #[test]
 fn char_pl__bp5_333_p_ab0() {
     let db = load_real_database();
@@ -1266,6 +1376,8 @@ fn char_pl__bp5_333_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーがウェイト状態であるかぎり、{{heart_05.png|heart05}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart05 duration=as_long_as
+/// expect:   ? condition: type=state_condition
 #[test]
 fn char_pl__bp5_333_p_ab1() {
     let db = load_real_database();
@@ -1286,6 +1398,8 @@ fn char_pl__bp5_333_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}自分のライブカード置き場に『µ's』のカードがある場合、ライブ終了時まで、自分のステージにいるすべての『μ's』のメンバーは{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource resource=blade card_type=member_card target=self duration=live_end
+/// expect:   ? condition: type=group_condition location=live_card_zone group_names=["µ's"]
 #[test]
 fn char_pl__bp6_001_r_ab0() {
     let db = load_real_database();
@@ -1306,6 +1420,10 @@ fn char_pl__bp6_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中に、ブレードハートを持たない『μ's』のメンバーカードがある場合、カードを1枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   ? condition: type=location_condition location=revealed_cards group_names=["μ's"] negation=True
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl__bp6_001_r_ab1() {
     let db = load_real_database();
@@ -1326,6 +1444,7 @@ fn char_pl__bp6_001_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを2枚見る。その中から能力を持たない『μ's』のカードか{{jyouji.png|常時}}能力を持つ『μ's』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl__bp6_002_p_ab0() {
     let db = load_real_database();
@@ -1346,6 +1465,11 @@ fn char_pl__bp6_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}手札にあるコスト2以下の『μ's』のメンバーカードを1枚公開し、このメンバーの下に置いてもよい。そうした場合、好きなハートの色を1つ指定する。ライブ終了時まで、そのハートを1つ得る。
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=hand destination=under_member card_type=member_card cost_limit=2 cost_limit_operator=<=
+/// expect:   - sequential
+/// expect:     - specify_heart_color count=1 target=self
+/// expect:     - gain_resource count=1 resource=heart duration=live_end
 #[test]
 fn char_pl__bp6_003_r_ab0() {
     let db = load_real_database();
@@ -1366,6 +1490,7 @@ fn char_pl__bp6_003_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーの下にあるコスト2以下の『μ's』のメンバーカードを1枚、メンバーのいないエリアに登場させてもよい。
+/// expect: - place_energy_under_member count=1 source=under_member destination=empty_area card_type=member_card cost_limit=2 cost_limit_operator=<=
 #[test]
 fn char_pl__bp6_003_r_ab1() {
     let db = load_real_database();
@@ -1386,6 +1511,7 @@ fn char_pl__bp6_003_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『μ's』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl__bp6_004_p_ab0() {
     let db = load_real_database();
@@ -1406,6 +1532,9 @@ fn char_pl__bp6_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を2枚控え室に置いてもよい：自分の控え室にある{{heart_03.png|heart03}}を持つメンバーカード1枚までと、必要ハートに{{heart_03.png|heart03}}を含むライブカード1枚までを手
+/// expect: - sequential count=1 heart_colors=heart03 source=discard destination=hand target=self
+/// expect:   - move_cards count=1 heart_colors=heart03 source=discard destination=hand card_type=member_card target=self
+/// expect:   - move_cards count=1 heart_colors=heart03 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl__bp6_005_p_ab0() {
     let db = load_real_database();
@@ -1426,6 +1555,14 @@ fn char_pl__bp6_005_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置く：好きなハートの色を1つ指定する。その後、自分のデッキの上からカードを5枚公開する。公開されたカードの中に指定した色のハートを持つメンバーカードと必要ハートに指定した色を含むライブカードが合計5枚含
+/// expect: - sequential
+/// expect:   - specify_heart_color target=self
+/// expect:   - conditional_on_result
+/// expect:     - reveal count=5 source=deck_top target=self
+/// expect:     - sequential
+/// expect:       - select_cards count=1 source=revealed_cards destination=hand
+/// expect:       - gain_resource count=3 resource=blade duration=live_end
+/// expect:   - move_cards count=0 source=revealed_cards destination=discard
 #[test]
 fn char_pl__bp6_006_r_ab0() {
     let db = load_real_database();
@@ -1446,6 +1583,10 @@ fn char_pl__bp6_006_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの一番上のカードを公開し、手札に加える。それがブレードハートを持たないメンバーカードの場合、ライブの合計スコアを＋１する。
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=deck_top destination=hand card_type=card target=self
+/// expect:   - modify_score target=live_total operation=add value=1
+/// expect:     ? condition: type=location_condition location=stage negation=True
 #[test]
 fn char_pl__bp6_007_r_ab0() {
     let db = load_real_database();
@@ -1466,6 +1607,7 @@ fn char_pl__bp6_007_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにする：自分のステージにいるほかのメンバー1人をアクティブにする。
+/// expect: - change_state count=1 source=stage state_change=active card_type=member_card target=self
 #[test]
 fn char_pl__bp6_008_p_ab0() {
     let db = load_real_database();
@@ -1486,6 +1628,8 @@ fn char_pl__bp6_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}自分のステージの右サイドエリアと左サイドエリアに、元々持つ{{icon_blade.png|ブレード}}の数が2つのメンバーがいるかぎり、ライブの合計スコアを＋１する。
+/// expect: - modify_score target=live_total duration=as_long_as operation=add value=1
+/// expect:   ? condition: type=location_condition count=2 operator== location=stage
 #[test]
 fn char_pl__bp6_009_p_ab0() {
     let db = load_real_database();
@@ -1506,6 +1650,9 @@ fn char_pl__bp6_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを2枚引き、手札を2枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=2 source=hand destination=discard card_type=card
 #[test]
 fn char_pl__bp6_011_n_ab0() {
     let db = load_real_database();
@@ -1526,6 +1673,8 @@ fn char_pl__bp6_011_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の成功ライブカード置き場にあるカードのスコアの合計が６以上の場合、自分の控え室から『μ's』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
+/// expect:   ? condition: type=comparison_condition count=6 operator=>= location=success_live_card_zone
 #[test]
 fn char_pl__bp6_013_n_ab0() {
     let db = load_real_database();
@@ -1546,6 +1695,9 @@ fn char_pl__bp6_013_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを3枚見る。それらを好きな順番でデッキの上に置く。
+/// expect: - sequential
+/// expect:   - look_at count=3 source=deck_top target=self
+/// expect:   - move_cards count=1 source=looked_at destination=deck_top card_type=card
 #[test]
 fn char_pl__bp6_016_n_ab0() {
     let db = load_real_database();
@@ -1566,6 +1718,9 @@ fn char_pl__bp6_016_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 『μ's』のメンバー1人をステージから控え室に置いてもよい：このカードのスコアを＋１し、自分の控え室から『μ's』のライブカード1枚を手札に加える。
+/// expect: - sequential
+/// expect:   - modify_score operation=add value=1
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl__bp6_021_l_ab0() {
     let db = load_real_database();
@@ -1586,6 +1741,10 @@ fn char_pl__bp6_021_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを1枚引く。自分の成功ライブカード置き場に『μ's』のカードがある場合、さらにカードを1枚引く。
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:     ? condition: type=group_condition location=success_live_card_zone group_names=["μ's"]
 #[test]
 fn char_pl__bp6_023_l_ab0() {
     let db = load_real_database();
@@ -1606,6 +1765,11 @@ fn char_pl__bp6_023_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}このメンバーをウェイトにし、手札を1枚控え室に置く：ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを１
+/// expect: - sequential
+/// expect:   - select count=1 cost_limit=10 cost_limit_operator=>=
+/// expect:   - reveal count=1 source=deck_top cost_limit=10 cost_limit_operator=>=
+/// expect:   - move_cards count=1 source=looked_at destination=hand
+/// expect:   - move_cards source=looked_at_remaining destination=discard
 #[test]
 fn char_pl__pb1_001_p_ab0() {
     let db = load_real_database();
@@ -1626,6 +1790,8 @@ fn char_pl__pb1_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにしてもよい：自分のステージにいるメンバーが『BiBi』のみの場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent
+/// expect:   ? condition: type=group_condition location=stage group_names=['BiBi']
 #[test]
 fn char_pl__pb1_002_p_ab0() {
     let db = load_real_database();
@@ -1646,6 +1812,7 @@ fn char_pl__pb1_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手のステージにいるウェイト状態のメンバー1人につき、{{heart_06.png|heart06}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart06 target=opponent per_unit_type=人
 #[test]
 fn char_pl__pb1_002_p_ab1() {
     let db = load_real_database();
@@ -1666,6 +1833,7 @@ fn char_pl__pb1_002_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにしてもよい：自分のステージにいる『Printemps』のメンバー1人につき、エネルギーを1枚アクティブにする。
+/// expect: - change_state count=1 state_change=active card_type=energy_card target=self per_unit_type=人
 #[test]
 fn char_pl__pb1_003_p_ab0() {
     let db = load_real_database();
@@ -1686,6 +1854,10 @@ fn char_pl__pb1_003_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードが1枚ある場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計ス
+/// expect: - conditional_alternative
+/// expect:   ? condition: type=card_count_condition count=1 operator=>= location=success_live_card_zone group_names=["μ's"]
+/// expect:   - gain_ability duration=live_end
+/// expect:   - gain_ability
 #[test]
 fn char_pl__pb1_004_p_ab0() {
     let db = load_real_database();
@@ -1706,6 +1878,8 @@ fn char_pl__pb1_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の成功ライブカード置き場にカードがある場合、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=location_condition location=success_live_card_zone
 #[test]
 fn char_pl__pb1_005_p_ab0() {
     let db = load_real_database();
@@ -1726,6 +1900,10 @@ fn char_pl__pb1_005_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室から『μ's』のライブカードを1枚までデッキの一番上に置く。その後、相手のステージにウェイト状態のメンバーがいる場合、カードを1枚引く。
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=discard destination=deck_top card_type=live_card target=self
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:     ? condition: type=state_condition count=1 operator=>= location=stage
 #[test]
 fn char_pl__pb1_006_p_ab0() {
     let db = load_real_database();
@@ -1746,6 +1924,10 @@ fn char_pl__pb1_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を3枚控え室に置く：自分のステージにほかの『lilywhite』のメンバーがいる場合、自分の控え室から『μ's』のライブカードを1枚手札に加える。この能力を起動するためのコストは、自分の成功ライブカード置き場にあるカ
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=live_card target=self
+/// expect:     ? condition: type=group_condition location=stage group_names=['lilywhite']
+/// expect:   - modify_cost count=1 source=hand destination=discard card_type=card operation=subtract per_unit_type=live_card_zone
 #[test]
 fn char_pl__pb1_007_r_ab0() {
     let db = load_real_database();
@@ -1766,6 +1948,7 @@ fn char_pl__pb1_007_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: メンバーを3人までウェイトにしてもよい：これによりウェイト状態にしたメンバー1人につき、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand per_unit_type=人
 #[test]
 fn char_pl__pb1_008_p_ab0() {
     let db = load_real_database();
@@ -1786,6 +1969,7 @@ fn char_pl__pb1_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が1つ以下のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent
 #[test]
 fn char_pl__pb1_009_p_ab0() {
     let db = load_real_database();
@@ -1806,6 +1990,7 @@ fn char_pl__pb1_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このターン、自分と相手のステージにいるメンバーは、効果によってはアクティブにならない。
+/// expect: - restriction card_type=member_card target=both duration=this_turn
 #[test]
 fn char_pl__pb1_009_p_ab1() {
     let db = load_real_database();
@@ -1826,6 +2011,7 @@ fn char_pl__pb1_009_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：ライブ終了時まで、自分のステージにいるほかのメンバーは{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl__pb1_010_r_ab0() {
     let db = load_real_database();
@@ -1846,6 +2032,8 @@ fn char_pl__pb1_010_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに名前の異なる『BiBi』のメンバーが2人以上いる場合、相手のステージにいるコスト4以下のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent cost_limit=4 cost_limit_operator=<=
+/// expect:   ? condition: type=location_condition count=2 operator=>= location=stage group_names=['BiBi']
 #[test]
 fn char_pl__pb1_011_p_ab0() {
     let db = load_real_database();
@@ -1866,6 +2054,7 @@ fn char_pl__pb1_011_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいる『Printemps』のメンバーを1人までアクティブにする。
+/// expect: - change_state count=1 source=stage state_change=active card_type=member_card target=self
 #[test]
 fn char_pl__pb1_012_p_ab0() {
     let db = load_real_database();
@@ -1886,6 +2075,9 @@ fn char_pl__pb1_012_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}：自分の手札を、相手は見ないで1枚選び公開する。これにより公開されたカードがライブカードの場合、ライブ終了時まで、このメンバーは「{{j
+/// expect: - conditional_on_result
+/// expect:   - reveal count=1 source=hand target=self
+/// expect:   - gain_ability card_type=member_card duration=live_end
 #[test]
 fn char_pl__pb1_013_p_ab0() {
     let db = load_real_database();
@@ -1906,6 +2098,8 @@ fn char_pl__pb1_013_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の成功ライブカード置き場に『lilywhite』のカードがある場合、手札にあるこのメンバーカードのコストは2減る。
+/// expect: - modify_cost count=2 source=hand card_type=member_card operation=subtract value=2
+/// expect:   ? condition: type=group_condition location=success_live_card_zone group_names=['lilywhite']
 #[test]
 fn char_pl__pb1_014_p_ab0() {
     let db = load_real_database();
@@ -1926,6 +2120,7 @@ fn char_pl__pb1_014_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}『BiBi』のメンバー1人をウェイトにしてもよい：相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。（この能力はセンターエリアにいる場合のみ発動する。）
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent
 #[test]
 fn char_pl__pb1_015_p_ab0() {
     let db = load_real_database();
@@ -1946,6 +2141,8 @@ fn char_pl__pb1_015_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のカードの効果によって、相手のステージにいるアクティブ状態のコスト4以下のメンバーがウェイト状態になったとき、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=state_change_condition operator=<= location=stage
 #[test]
 fn char_pl__pb1_015_p_ab1() {
     let db = load_real_database();
@@ -1966,6 +2163,7 @@ fn char_pl__pb1_015_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを4枚見る。その中から『lilywhite』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl__pb1_016_r_ab0() {
     let db = load_real_database();
@@ -1986,6 +2184,10 @@ fn char_pl__pb1_016_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにしてもよい：カードを1枚引く。その後、このメンバーが『Printemps』のメンバーからバトンタッチして登場していないかぎり、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card duration=unless
+/// expect:     ? condition: type=appearance_condition location=stage group_names=['Printemps'] negation=True
 #[test]
 fn char_pl__pb1_017_p_ab0() {
     let db = load_real_database();
@@ -2006,6 +2208,7 @@ fn char_pl__pb1_017_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分と相手はそれぞれ、自身の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。（この効果で登場したメンバーのいるエリアには、このターンにメンバーは登場できない。）
+/// expect: - move_cards count=1 source=discard destination=empty_area state_change=wait card_type=member_card target=both cost_limit=2 cost_limit_operator=<=
 #[test]
 fn char_pl__pb1_018_p_ab0() {
     let db = load_real_database();
@@ -2026,6 +2229,7 @@ fn char_pl__pb1_018_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをステージから控え室に置く：自分の控え室からメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=member_card target=self
 #[test]
 fn char_pl__pb1_019_pr_ab0() {
     let db = load_real_database();
@@ -2046,6 +2250,7 @@ fn char_pl__pb1_019_pr_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl__sd1_011_pr_ab0() {
     let db = load_real_database();
@@ -2066,6 +2271,7 @@ fn char_pl__sd1_011_pr_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エネルギーを2枚アクティブにする。
+/// expect: - change_state count=2 state_change=active card_type=energy_card
 #[test]
 fn char_pl_hs_bp1_001_p_ab0() {
     let db = load_real_database();
@@ -2086,6 +2292,7 @@ fn char_pl_hs_bp1_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}、このメンバーをステージから控え室に置く：自分の控え室からコスト15以下の『蓮ノ空』のメンバーカードを1枚、このメンバーがいたエリアに登
+/// expect: - move_cards count=1 source=discard destination=same_area card_type=member_card target=self cost_limit=15 cost_limit_operator=<=
 #[test]
 fn char_pl_hs_bp1_002_p_ab0() {
     let db = load_real_database();
@@ -2106,6 +2313,7 @@ fn char_pl_hs_bp1_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く：自分の控え室からコスト15以下の『蓮ノ空』のメンバーカードを1枚、このメンバーがいたエリアに登場
+/// expect: - move_cards count=1 source=discard destination=same_area card_type=member_card target=self cost_limit=15 cost_limit_operator=<=
 #[test]
 fn char_pl_hs_bp1_002_rm_ab0() {
     let db = load_real_database();
@@ -2126,6 +2334,8 @@ fn char_pl_hs_bp1_002_rm_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージのエリアすべてに『蓮ノ空』のメンバーが登場しており、かつ名前が異なる場合、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。
+/// expect: - gain_ability
+/// expect:   ? condition: type=compound operator=and location=stage group_names=['蓮ノ空']
 #[test]
 fn char_pl_hs_bp1_003_r_ab0() {
     let db = load_real_database();
@@ -2146,6 +2356,7 @@ fn char_pl_hs_bp1_003_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}：自分の控え室から4コスト以下の『蓮ノ空』のメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=member_card target=self cost_limit=4 cost_limit_operator=<=
 #[test]
 fn char_pl_hs_bp1_003_r_ab1() {
     let db = load_real_database();
@@ -2166,6 +2377,7 @@ fn char_pl_hs_bp1_003_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}：自分の控え室から『蓮ノ空』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_hs_bp1_004_r_ab0() {
     let db = load_real_database();
@@ -2186,6 +2398,7 @@ fn char_pl_hs_bp1_004_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、自分のライブ中のカード1枚につき、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade target=self duration=live_end per_unit_type=live_card_zone
 #[test]
 fn char_pl_hs_bp1_004_r_ab1() {
     let db = load_real_database();
@@ -2206,6 +2419,9 @@ fn char_pl_hs_bp1_004_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを2枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_hs_bp1_006_r_ab0() {
     let db = load_real_database();
@@ -2226,6 +2442,10 @@ fn char_pl_hs_bp1_006_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のステージにほかのメンバーがいる場合、好きなハートの色を1つ指定する。ライブ終了時まで、そのハートを1つ得る。
+/// expect: - sequential
+/// expect:   ? condition: type=location_condition location=stage
+/// expect:   - specify_heart_color count=1 target=self
+/// expect:   - gain_resource count=1 resource=heart duration=live_end
 #[test]
 fn char_pl_hs_bp1_006_r_ab1() {
     let db = load_real_database();
@@ -2246,6 +2466,10 @@ fn char_pl_hs_bp1_006_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを3枚控え室に置く。それらがすべてメンバーカードの場合、カードを1枚引く。
+/// expect: - sequential
+/// expect:   - move_cards count=3 source=deck_top destination=discard card_type=card target=self
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:     ? condition: type=card_count_condition count=3 operator==
 #[test]
 fn char_pl_hs_bp1_008_p_ab0() {
     let db = load_real_database();
@@ -2266,6 +2490,7 @@ fn char_pl_hs_bp1_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_hs_bp1_011_n_ab0() {
     let db = load_real_database();
@@ -2286,6 +2511,7 @@ fn char_pl_hs_bp1_011_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}：自分の控え室からスコア3以下の『蓮ノ空』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self cost_limit=3 cost_limit_operator=<=
 #[test]
 fn char_pl_hs_bp2_001_p_ab0() {
     let db = load_real_database();
@@ -2306,6 +2532,7 @@ fn char_pl_hs_bp2_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室からコスト2以下のメンバーカードを2枚まで手札に加える。
+/// expect: - move_cards count=2 source=discard destination=hand card_type=member_card target=self cost_limit=2 cost_limit_operator=<=
 #[test]
 fn char_pl_hs_bp2_002_r_ab0() {
     let db = load_real_database();
@@ -2326,6 +2553,8 @@ fn char_pl_hs_bp2_002_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに、このメンバーよりコストの大きいメンバーがいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=3 resource=blade
+/// expect:   ? condition: type=comparison_condition operator=> location=stage
 #[test]
 fn char_pl_hs_bp2_002_r_ab1() {
     let db = load_real_database();
@@ -2346,6 +2575,7 @@ fn char_pl_hs_bp2_002_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_hs_bp2_003_r_ab0() {
     let db = load_real_database();
@@ -2366,6 +2596,8 @@ fn char_pl_hs_bp2_003_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のステージにほかのメンバーがいる場合、自分の控え室から『みらくらぱーく！』のカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=card target=self
+/// expect:   ? condition: type=location_condition location=stage
 #[test]
 fn char_pl_hs_bp2_005_r_ab0() {
     let db = load_real_database();
@@ -2386,6 +2618,8 @@ fn char_pl_hs_bp2_005_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：自分のステージのエリアすべてにメンバーが登場している場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレー
+/// expect: - gain_resource count=2 resource=blade duration=live_end
+/// expect:   ? condition: type=appearance_condition location=stage
 #[test]
 fn char_pl_hs_bp2_005_r_ab1() {
     let db = load_real_database();
@@ -2406,6 +2640,7 @@ fn char_pl_hs_bp2_005_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバーを、それぞれ好きなエリアに移動させてもよい。
+/// expect: - position_change source=stage card_type=member_card target=self
 #[test]
 fn char_pl_hs_bp2_006_p_ab0() {
     let db = load_real_database();
@@ -2426,6 +2661,7 @@ fn char_pl_hs_bp2_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるほかの『みらくらぱーく！』のメンバー1人につき、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade target=self per_unit_type=人
 #[test]
 fn char_pl_hs_bp2_006_p_ab1() {
     let db = load_real_database();
@@ -2446,6 +2682,8 @@ fn char_pl_hs_bp2_006_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーよりコストが低い『スリーズブーケ』のメンバーからバトンタッチして登場した場合、自分の控え室から『蓮ノ空』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
+/// expect:   ? condition: type=movement_condition group_names=['スリーズブーケ']
 #[test]
 fn char_pl_hs_bp2_007_r_ab0() {
     let db = load_real_database();
@@ -2466,6 +2704,10 @@ fn char_pl_hs_bp2_007_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：これにより控え室に置いたカードがメンバーカードの場合、控え室に置いたカードと同じ名前を持つメンバー1人は、ライブ終了時まで、{{heart_04.png|heart04}}{{icon_b
+/// expect: - sequential heart_colors=heart04
+/// expect:   ? condition: type=location_condition location=discard
+/// expect:   - gain_resource count=1 resource=blade card_type=member_card duration=live_end
+/// expect:   - gain_resource count=1 resource=heart heart_colors=heart04 card_type=member_card duration=live_end
 #[test]
 fn char_pl_hs_bp2_007_r_ab1() {
     let db = load_real_database();
@@ -2486,6 +2728,8 @@ fn char_pl_hs_bp2_007_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーよりコストが低い『DOLLCHESTRA』のメンバーからバトンタッチして登場した場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade duration=live_end
+/// expect:   ? condition: type=movement_condition group_names=['DOLLCHESTRA']
 #[test]
 fn char_pl_hs_bp2_008_r_ab0() {
     let db = load_real_database();
@@ -2506,6 +2750,8 @@ fn char_pl_hs_bp2_008_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：このメンバーよりコストが低い『みらくらぱーく！』のメンバーからバトンタッチして登場した場合、ライブ終了時まで、{{heart_01.png|heart01}}{{
+/// expect: - gain_resource count=2 resource=heart heart_colors=heart01/heart01 target=self duration=live_end
+/// expect:   ? condition: type=movement_condition group_names=['みらくらぱーく！']
 #[test]
 fn char_pl_hs_bp2_009_p_ab0() {
     let db = load_real_database();
@@ -2526,6 +2772,7 @@ fn char_pl_hs_bp2_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_hs_bp2_010_pr_ab0() {
     let db = load_real_database();
@@ -2546,6 +2793,7 @@ fn char_pl_hs_bp2_010_pr_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: デッキの上からカードを5枚控え室に置く。
+/// expect: - move_cards count=5 source=deck_top destination=discard card_type=card
 #[test]
 fn char_pl_hs_bp2_011_n_ab0() {
     let db = load_real_database();
@@ -2566,6 +2814,8 @@ fn char_pl_hs_bp2_011_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室に『スリーズブーケ』のライブカードが3枚以上ある場合、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1
+/// expect:   ? condition: type=card_count_condition count=3 operator=>= location=discard group_names=['スリーズブーケ']
 #[test]
 fn char_pl_hs_bp2_022_l_ab0() {
     let db = load_real_database();
@@ -2586,6 +2836,8 @@ fn char_pl_hs_bp2_022_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに、このターン中にバトンタッチして登場した『蓮ノ空』のメンバーが2人以上いる場合、このカードを成功させるための必要ハートを{{heart_05.png|heart05}}減らす。
+/// expect: - modify_required_hearts count=1 heart_colors=heart05 operation=decrease value=1
+/// expect:   ? condition: type=card_count_condition count=2 operator=>= location=stage group_names=['蓮ノ空']
 #[test]
 fn char_pl_hs_bp2_023_l_ab0() {
     let db = load_real_database();
@@ -2606,6 +2858,8 @@ fn char_pl_hs_bp2_023_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに「徒町小鈴」が登場しており、かつ「徒町小鈴」よりコストの大きい「村野さやか」が登場している場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.
+/// expect: - modify_required_hearts heart_colors=heart00 operation=decrease value=3
+/// expect:   ? condition: type=compound operator=and location=stage
 #[test]
 fn char_pl_hs_bp2_024_l_ab0() {
     let db = load_real_database();
@@ -2626,6 +2880,8 @@ fn char_pl_hs_bp2_024_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに、このターン中にバトンタッチして登場した『蓮ノ空』のメンバーが2人以上いる場合、このカードを成功させるための必要ハートを{{heart_01.png|heart01}}減らす。
+/// expect: - modify_required_hearts count=1 heart_colors=heart01 operation=decrease value=1
+/// expect:   ? condition: type=card_count_condition count=2 operator=>= location=stage group_names=['蓮ノ空']
 #[test]
 fn char_pl_hs_bp2_025_l_ab0() {
     let db = load_real_database();
@@ -2646,6 +2902,8 @@ fn char_pl_hs_bp2_025_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージの右サイドエリアに「大沢瑠璃乃」が、左サイドエリアに「安養寺姫芽」が、センターエリアに「藤島慈」がそれぞれ登場している場合、このカードのスコアを＋２する。
+/// expect: - modify_score operation=add value=2
+/// expect:   ? condition: type=appearance_condition location=stage
 #[test]
 fn char_pl_hs_bp2_026_l_ab0() {
     let db = load_real_database();
@@ -2666,6 +2924,10 @@ fn char_pl_hs_bp2_026_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを4枚控え室に置く。それらの中にライブカードがある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - sequential
+/// expect:   - move_cards count=4 source=deck_top destination=discard card_type=card target=self
+/// expect:   - gain_resource count=2 resource=blade duration=live_end
+/// expect:     ? condition: type=card_count_condition count=1 operator=>=
 #[test]
 fn char_pl_hs_bp5_001_r_ab0() {
     let db = load_real_database();
@@ -2686,6 +2948,7 @@ fn char_pl_hs_bp5_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}手札のライブカードを1枚公開する：自分の控え室から、これにより公開したカードのカード名がすべて含まれるライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_hs_bp5_001_r_ab1() {
     let db = load_real_database();
@@ -2706,6 +2969,10 @@ fn char_pl_hs_bp5_001_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにコストがそれぞれ異なるメンバーが3人以上いるかぎり、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - sequential count=2 heart_colors=heart05 duration=as_long_as
+/// expect:   ? condition: type=card_count_condition count=3 operator=>= location=stage
+/// expect:   - gain_resource count=1 resource=blade card_type=card duration=as_long_as
+/// expect:   - gain_resource count=1 resource=heart heart_colors=heart05 card_type=card duration=as_long_as
 #[test]
 fn char_pl_hs_bp5_002_r_ab0() {
     let db = load_real_database();
@@ -2726,6 +2993,7 @@ fn char_pl_hs_bp5_002_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}：自分の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアに登場させる。
+/// expect: - move_cards count=1 source=discard destination=empty_area card_type=member_card target=self cost_limit=2 cost_limit_operator=<=
 #[test]
 fn char_pl_hs_bp5_002_r_ab1() {
     let db = load_real_database();
@@ -2746,6 +3014,8 @@ fn char_pl_hs_bp5_002_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーがステージから控え室に置かれたとき、メンバー1人をポジションチェンジさせてもよい。
+/// expect: - position_change count=1 card_type=member_card
+/// expect:   ? condition: type=card_count_condition count=1 operator=>=
 #[test]
 fn char_pl_hs_bp5_003_r_ab0() {
     let db = load_real_database();
@@ -2766,6 +3036,7 @@ fn char_pl_hs_bp5_003_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：ライブ終了時まで、これにより控え室に置いたカードと同じグループ名を持つメンバー1人は、{{heart_01.png|heart01}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart01 card_type=member_card duration=live_end
 #[test]
 fn char_pl_hs_bp5_003_r_ab1() {
     let db = load_real_database();
@@ -2786,6 +3057,7 @@ fn char_pl_hs_bp5_003_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるコスト4以上の『スリーズブーケ』以外のメンバー1人につき、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade target=self per_unit_type=人 cost_limit=4 cost_limit_operator=>=
 #[test]
 fn char_pl_hs_bp5_004_p_ab0() {
     let db = load_real_database();
@@ -2806,6 +3078,11 @@ fn char_pl_hs_bp5_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札の『DOLLCHESTRA』のカードを1枚控え室に置いてもよい：自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ。ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値
+/// expect: - conditional_on_result heart_colors=heart05
+/// expect:   - sequential
+/// expect:     - select count=1 source=stage card_type=member_card target=self
+/// expect:     - modify_cost card_type=member_card duration=live_end
+/// expect:   - gain_resource count=1 resource=heart heart_colors=heart05 duration=live_end
 #[test]
 fn char_pl_hs_bp5_005_r_ab0() {
     let db = load_real_database();
@@ -2826,6 +3103,7 @@ fn char_pl_hs_bp5_005_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を2枚控え室に置いてもよい：自分の控え室から『EdelNote』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_hs_bp5_007_p_ab0() {
     let db = load_real_database();
@@ -2846,6 +3124,8 @@ fn char_pl_hs_bp5_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにこのメンバー以外の『EdelNote』のメンバーがいるかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade duration=as_long_as
+/// expect:   ? condition: type=group_condition location=stage group_names=['EdelNote']
 #[test]
 fn char_pl_hs_bp5_007_p_ab1() {
     let db = load_real_database();
@@ -2866,6 +3146,7 @@ fn char_pl_hs_bp5_007_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにし、手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からコスト9以上の『蓮ノ空』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_hs_bp5_008_p_ab0() {
     let db = load_real_database();
@@ -2886,6 +3167,10 @@ fn char_pl_hs_bp5_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを3枚控え室に置く。それらがすべてメンバーカードの場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - sequential
+/// expect:   - move_cards count=3 source=deck_top destination=discard card_type=card target=self
+/// expect:   - gain_resource count=2 resource=blade duration=live_end
+/// expect:     ? condition: type=card_count_condition count=3 operator==
 #[test]
 fn char_pl_hs_bp5_013_n_ab0() {
     let db = load_real_database();
@@ -2906,6 +3191,10 @@ fn char_pl_hs_bp5_013_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分のステージにコスト9以上の『EdelNote』のメンバーがいる場合、以下から1つを選ぶ。 ・自分の控え室からコスト4
+/// expect: - choice count=1 heart_colors=heart06
+/// expect:   ? condition: type=comparison_condition count=9 operator=>= location=stage group_names=['EdelNote']
+/// expect:   - move_cards count=1 source=discard destination=empty_area card_type=member_card target=self cost_limit=4 cost_limit_operator=<=
+/// expect:   - modify_required_hearts count=1 heart_colors=heart06 operation=decrease value=1
 #[test]
 fn char_pl_hs_bp5_022_l_ab0() {
     let db = load_real_database();
@@ -2926,6 +3215,7 @@ fn char_pl_hs_bp5_022_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上から、自分のステージにいるメンバーの数に2を足した数に等しい枚数見る。その中から1枚をデッキの一番上に置き、残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_hs_bp6_001_r_ab0() {
     let db = load_real_database();
@@ -2946,6 +3236,7 @@ fn char_pl_hs_bp6_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中から、カードを1枚デッキの一番上に置いてもよい。
+/// expect: - move_cards count=1 source=revealed_cards destination=deck_top card_type=card target=self
 #[test]
 fn char_pl_hs_bp6_001_r_ab1() {
     let db = load_real_database();
@@ -2966,6 +3257,8 @@ fn char_pl_hs_bp6_001_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにほかのメンバーがいないかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade duration=as_long_as
+/// expect:   ? condition: type=location_condition location=stage negation=True
 #[test]
 fn char_pl_hs_bp6_002_p_ab0() {
     let db = load_real_database();
@@ -2986,6 +3279,9 @@ fn char_pl_hs_bp6_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるウェイト状態の『みらくらぱーく！』のメンバー1人をアクティブにしてもよい。そうした場合、自分の控え室から『みらくらぱーく！』のライブカードを1枚手札に加える。
+/// expect: - sequential
+/// expect:   - change_state count=1 source=stage state_change=active card_type=member_card target=self
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_hs_bp6_003_p_ab0() {
     let db = load_real_database();
@@ -3006,6 +3302,7 @@ fn char_pl_hs_bp6_003_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：ライブ終了時まで、自分のステージにいる『みらくらぱーく！』のメンバー1人は、{{heart_01.png|heart01}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart01 card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_hs_bp6_003_p_ab1() {
     let db = load_real_database();
@@ -3026,6 +3323,7 @@ fn char_pl_hs_bp6_003_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手のステージにいるコスト9以下のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent cost_limit=9 cost_limit_operator=<=
 #[test]
 fn char_pl_hs_bp6_004_p_ab0() {
     let db = load_real_database();
@@ -3046,6 +3344,9 @@ fn char_pl_hs_bp6_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。これにより「百生吟子」のメンバーカードを控え室に置いた場合、さらに{{icon_blade.png|ブレード}}を得
+/// expect: - conditional_on_result duration=live_end
+/// expect:   - gain_resource count=1 resource=blade duration=live_end
+/// expect:   - gain_resource count=1 resource=blade duration=live_end
 #[test]
 fn char_pl_hs_bp6_004_p_ab1() {
     let db = load_real_database();
@@ -3066,6 +3367,12 @@ fn char_pl_hs_bp6_004_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：ライブ終了時まで、このメンバーのコストを＋６する。その後、自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合、さらにライブ終了
+/// expect: - sequential heart_colors=heart05 duration=live_end
+/// expect:   - modify_cost count=6 card_type=member_card duration=live_end operation=add value=6
+/// expect:   - sequential duration=live_end
+/// expect:     ? condition: type=comparison_condition operator=> location=stage group_names=['蓮ノ空']
+/// expect:     - gain_resource count=1 resource=blade card_type=card duration=live_end
+/// expect:     - gain_resource count=1 resource=heart heart_colors=heart05 card_type=card duration=live_end
 #[test]
 fn char_pl_hs_bp6_005_r_ab0() {
     let db = load_real_database();
@@ -3086,6 +3393,7 @@ fn char_pl_hs_bp6_005_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中から、『DOLLCHESTRA』のメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=revealed_cards destination=hand card_type=member_card target=self
 #[test]
 fn char_pl_hs_bp6_005_r_ab1() {
     let db = load_real_database();
@@ -3106,6 +3414,8 @@ fn char_pl_hs_bp6_005_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札にあるこのメンバーカードのコストは、自分のステージにいる『みらくらぱーく！』のメンバー1人につき、2少なくなる。
+/// expect: - modify_cost operation=subtract value=2 per_unit_type=人
+/// expect:   ? condition: type=location_condition location=hand
 #[test]
 fn char_pl_hs_bp6_006_r_ab0() {
     let db = load_real_database();
@@ -3126,6 +3436,7 @@ fn char_pl_hs_bp6_006_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーは『みらくらぱーく！』以外のメンバーカードとのバトンタッチで控え室に置けない。
+/// expect: - restriction count=1 card_type=member_card
 #[test]
 fn char_pl_hs_bp6_006_r_ab1() {
     let db = load_real_database();
@@ -3146,6 +3457,9 @@ fn char_pl_hs_bp6_006_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにし、次のターンのアクティブフェイズにアクティブしない。
+/// expect: - sequential
+/// expect:   - change_state count=1 state_change=wait card_type=member_card
+/// expect:   - restriction count=1
 #[test]
 fn char_pl_hs_bp6_006_r_ab2() {
     let db = load_real_database();
@@ -3166,6 +3480,8 @@ fn char_pl_hs_bp6_006_r_ab2() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに『EdelNote』のメンバーが登場したとき、相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent
+/// expect:   ? condition: type=appearance_condition location=stage group_names=['EdelNote']
 #[test]
 fn char_pl_hs_bp6_007_p_ab0() {
     let db = load_real_database();
@@ -3186,6 +3502,9 @@ fn char_pl_hs_bp6_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにする。その後、自分の控え室からスコア４以下の『蓮ノ空』のライブカードを1枚手札に加える。
+/// expect: - sequential
+/// expect:   - change_state count=1 state_change=wait card_type=member_card
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=live_card target=self cost_limit=4 cost_limit_operator=<=
 #[test]
 fn char_pl_hs_bp6_008_p_ab0() {
     let db = load_real_database();
@@ -3206,6 +3525,8 @@ fn char_pl_hs_bp6_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブ中のカードにスコア２以下のライブカードがある場合、このメンバーをアクティブにする。
+/// expect: - change_state count=1 state_change=active card_type=member_card
+/// expect:   ? condition: type=temporal_condition
 #[test]
 fn char_pl_hs_bp6_008_p_ab1() {
     let db = load_real_database();
@@ -3226,6 +3547,10 @@ fn char_pl_hs_bp6_008_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを4枚控え室に置く。それらがすべて『蓮ノ空』のカードの場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。
+/// expect: - sequential
+/// expect:   - move_cards count=4 source=deck_top destination=discard card_type=card target=self
+/// expect:   - gain_resource count=1 resource=blade duration=live_end
+/// expect:     ? condition: type=card_count_condition count=4 operator== group_names=['蓮ノ空']
 #[test]
 fn char_pl_hs_bp6_009_r_ab0() {
     let db = load_real_database();
@@ -3246,6 +3571,7 @@ fn char_pl_hs_bp6_009_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下の『DOLLCHESTRA』以外のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent
 #[test]
 fn char_pl_hs_bp6_013_r_ab0() {
     let db = load_real_database();
@@ -3266,6 +3592,10 @@ fn char_pl_hs_bp6_013_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーが手札以外からステージに登場している場合、カードを2枚引き、手札を2枚控え室に置く。
+/// expect: - sequential
+/// expect:   ? condition: type=appearance_condition location=stage
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=2 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_hs_bp6_015_r_ab0() {
     let db = load_real_database();
@@ -3286,6 +3616,7 @@ fn char_pl_hs_bp6_015_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}：自分の控え室からコスト4以下の『蓮ノ空』のメンバー
+/// expect: - move_cards count=1 source=discard destination=empty_area card_type=member_card target=self cost_limit=4 cost_limit_operator=<=
 #[test]
 fn char_pl_hs_bp6_016_r_ab0() {
     let db = load_real_database();
@@ -3306,6 +3637,8 @@ fn char_pl_hs_bp6_016_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このターン、自分が余剰ハートを1つ以上持っている場合、自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。
+/// expect: - look_and_select
+/// expect:   ? condition: type=comparison_condition count=1 operator=>=
 #[test]
 fn char_pl_hs_bp6_028_l_ab0() {
     let db = load_real_database();
@@ -3326,6 +3659,9 @@ fn char_pl_hs_bp6_028_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを1枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_hs_bp6_030_l_ab0() {
     let db = load_real_database();
@@ -3346,6 +3682,7 @@ fn char_pl_hs_bp6_030_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中から、コスト4以下のメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=revealed_cards destination=hand card_type=member_card target=self cost_limit=4 cost_limit_operator=<=
 #[test]
 fn char_pl_hs_bp6_032_l_ab0() {
     let db = load_real_database();
@@ -3366,6 +3703,7 @@ fn char_pl_hs_bp6_032_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：自分の控え室から『DOLLCHESTRA』のカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=card target=self
 #[test]
 fn char_pl_hs_cl1_002_cl_ab0() {
     let db = load_real_database();
@@ -3386,6 +3724,9 @@ fn char_pl_hs_cl1_002_cl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 以下から1つを選ぶ。 ・自分のデッキの上からカードを3枚控え室に置く。 ・相手のステージにいるコスト2以下のメンバー1人をウェイトにする。
+/// expect: - choice count=1
+/// expect:   - move_cards count=3 source=deck_top destination=discard card_type=card target=self
+/// expect:   - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent cost_limit=2 cost_limit_operator=<=
 #[test]
 fn char_pl_hs_cl1_004_cl_ab0() {
     let db = load_real_database();
@@ -3406,6 +3747,7 @@ fn char_pl_hs_cl1_004_cl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをステージから控え室に置く：自分の控え室から『蓮ノ空』のカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=card target=self
 #[test]
 fn char_pl_hs_cl1_008_cl_ab0() {
     let db = load_real_database();
@@ -3426,6 +3768,7 @@ fn char_pl_hs_cl1_008_cl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中から、コスト4以上9以下の『蓮ノ空』のメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=revealed_cards destination=hand card_type=member_card target=self
 #[test]
 fn char_pl_hs_cl1_009_cl_ab0() {
     let db = load_real_database();
@@ -3446,6 +3789,7 @@ fn char_pl_hs_cl1_009_cl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブ終了時まで、自分のステージにいるコスト10以上の『蓮ノ空』のメンバー1人は、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade card_type=member_card target=self duration=live_end cost_limit=10 cost_limit_operator=>=
 #[test]
 fn char_pl_hs_cl1_010_cl_ab0() {
     let db = load_real_database();
@@ -3466,6 +3810,10 @@ fn char_pl_hs_cl1_010_cl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：以下から1つを選ぶ。 ・自分の控え室からメンバーカードを1枚手札に加える。 ・自分のライブカード置き場にカードが2枚以上ある場合、自分の控え室から『蓮ノ空』のライ
+/// expect: - choice count=1
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=member_card target=self
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=live_card target=self
+/// expect:     ? condition: type=card_count_condition count=2 operator=>= location=live_card_zone
 #[test]
 fn char_pl_hs_cl1_011_cl_ab0() {
     let db = load_real_database();
@@ -3486,6 +3834,8 @@ fn char_pl_hs_cl1_011_cl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分と相手のライブの合計スコアが同じ場合、エールにより公開された自分のカードの中から、コスト9以上のメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=revealed_cards destination=hand card_type=member_card target=self cost_limit=9 cost_limit_operator=>=
+/// expect:   ? condition: type=comparison_condition operator== location=live_card_zone
 #[test]
 fn char_pl_hs_cl1_012_cl_ab0() {
     let db = load_real_database();
@@ -3506,6 +3856,10 @@ fn char_pl_hs_cl1_012_cl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにほかの『スリーズブーケ』のメンバーが登場するたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、エネルギーを2枚アクティブにする。
+/// expect: - conditional_on_optional
+/// expect:   ? condition: type=appearance_condition location=stage group_names=['スリーズブーケ']
+/// expect:   - pay_energy count=1
+/// expect:   - change_state count=2 state_change=active card_type=energy_card
 #[test]
 fn char_pl_hs_pb1_001_p_ab0() {
     let db = load_real_database();
@@ -3526,6 +3880,9 @@ fn char_pl_hs_pb1_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{heart_04.png|heart04}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - sequential count=2 heart_colors=heart04 duration=live_end
+/// expect:   - gain_resource count=1 resource=blade card_type=card duration=live_end
+/// expect:   - gain_resource count=1 resource=heart heart_colors=heart04 card_type=card duration=live_end
 #[test]
 fn char_pl_hs_pb1_001_p_ab1() {
     let db = load_real_database();
@@ -3546,6 +3903,7 @@ fn char_pl_hs_pb1_001_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札の「村野さやか」のメンバーカードを1枚公開する：これにより公開したカードをこのメンバーの下に置く。
+/// expect: - move_cards count=1 source=revealed_cards destination=under_member card_type=member_card
 #[test]
 fn char_pl_hs_pb1_002_p_ab0() {
     let db = load_real_database();
@@ -3566,6 +3924,9 @@ fn char_pl_hs_pb1_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブ終了時まで、このメンバーの下にあるメンバーカード1枚につき、このカードのコストを＋４して{{heart_05.png|heart05}}を得る。この能力では下にあるメンバーカードは3枚までしか数えない。
+/// expect: - sequential heart_colors=heart05 duration=live_end
+/// expect:   - modify_cost count=4 card_type=member_card duration=live_end operation=add value=4 per_unit_type=枚
+/// expect:   - gain_resource count=3 resource=heart heart_colors=heart05 card_type=member_card duration=live_end per_unit_type=枚
 #[test]
 fn char_pl_hs_pb1_002_p_ab1() {
     let db = load_real_database();
@@ -3586,6 +3947,9 @@ fn char_pl_hs_pb1_002_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札の『みらくらぱーく！』のメンバーカードを好きな枚数控え室に置き、その後、その枚数に1を足した枚数のカードを引く。
+/// expect: - sequential
+/// expect:   - move_cards source=hand destination=discard card_type=member_card
+/// expect:   - draw_card source=deck destination=hand
 #[test]
 fn char_pl_hs_pb1_003_p_ab0() {
     let db = load_real_database();
@@ -3606,6 +3970,10 @@ fn char_pl_hs_pb1_003_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の手札からカードが1枚以上控え室に置かれるたび、ライブ終了時まで、{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - sequential count=2 heart_colors=heart01 duration=live_end
+/// expect:   ? condition: type=card_count_condition count=1 operator=>= location=discard
+/// expect:   - gain_resource count=1 resource=blade card_type=card duration=live_end
+/// expect:   - gain_resource count=1 resource=heart heart_colors=heart01 card_type=card duration=live_end
 #[test]
 fn char_pl_hs_pb1_003_p_ab1() {
     let db = load_real_database();
@@ -3626,6 +3994,9 @@ fn char_pl_hs_pb1_003_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚控え室に置く。その後、自分の控え室から『スリーズブーケ』のライブカードを1枚手札に加える。
+/// expect: - sequential
+/// expect:   - move_cards count=3 source=deck_top destination=discard card_type=card target=self
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_hs_pb1_004_r_ab0() {
     let db = load_real_database();
@@ -3646,6 +4017,13 @@ fn char_pl_hs_pb1_004_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 数1つを選ぶ。自分のデッキの一番上のカードを公開する。公開したカードがメンバーカードで、かつコストが選んだ数以上の場合、公開したカードを手札に加える。選んだ数以下の場合、ライブ終了時まで、{{icon_blade.png
+/// expect: - sequential
+/// expect:   - select_number count=1
+/// expect:   - reveal count=1 source=deck_top target=self
+/// expect:   - move_cards count=1 source=revealed_cards destination=hand card_type=card
+/// expect:     ? condition: type=compound operator=and
+/// expect:   - gain_resource count=2 resource=blade duration=live_end
+/// expect:     ? condition: type=comparison_condition count=1 operator=<=
 #[test]
 fn char_pl_hs_pb1_005_p_ab0() {
     let db = load_real_database();
@@ -3666,6 +4044,11 @@ fn char_pl_hs_pb1_005_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるほかの『みらくらぱーく！』のメンバーがいるエリアにポジションチェンジしてもよい。そうした場合、ライブ終了時まで、{{heart_01.png|heart01}}{{icon_blade.png|ブレー
+/// expect: - sequential heart_colors=heart01
+/// expect:   - position_change source=stage card_type=member_card target=self
+/// expect:   - sequential count=2 heart_colors=heart01 duration=live_end
+/// expect:     - gain_resource count=1 resource=blade card_type=card duration=live_end
+/// expect:     - gain_resource count=1 resource=heart heart_colors=heart01 card_type=card duration=live_end
 #[test]
 fn char_pl_hs_pb1_006_p_ab0() {
     let db = load_real_database();
@@ -3686,6 +4069,7 @@ fn char_pl_hs_pb1_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置いてもよい：自分の控え室から『蓮ノ空』のカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=card target=self
 #[test]
 fn char_pl_hs_pb1_007_p_ab0() {
     let db = load_real_database();
@@ -3706,6 +4090,8 @@ fn char_pl_hs_pb1_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにメンバーがちょうど2人おり、かつ相手のステージにメンバーが3人以上いるかぎり、{{heart_06.png|heart06}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart06 target=self duration=as_long_as
+/// expect:   ? condition: type=compound operator=and location=stage
 #[test]
 fn char_pl_hs_pb1_007_p_ab1() {
     let db = load_real_database();
@@ -3726,6 +4112,7 @@ fn char_pl_hs_pb1_007_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分と相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のすべてのメンバーをウェイトにする。
+/// expect: - change_state source=stage state_change=wait card_type=member_card target=both
 #[test]
 fn char_pl_hs_pb1_008_p_ab0() {
     let db = load_real_database();
@@ -3746,6 +4133,8 @@ fn char_pl_hs_pb1_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手のステージにいるメンバーはアクティブフェイズにアクティブにならない。
+/// expect: - restriction card_type=member_card target=opponent
+/// expect:   ? condition: type=temporal_condition
 #[test]
 fn char_pl_hs_pb1_008_p_ab1() {
     let db = load_real_database();
@@ -3766,6 +4155,8 @@ fn char_pl_hs_pb1_008_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}自分のステージに『蓮ノ空』のメンバーが登場するたび、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade duration=live_end
+/// expect:   ? condition: type=appearance_condition location=stage group_names=['蓮ノ空']
 #[test]
 fn char_pl_hs_pb1_009_p_ab0() {
     let db = load_real_database();
@@ -3786,6 +4177,10 @@ fn char_pl_hs_pb1_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーが持つ{{icon_blade.png|ブレード}}の数が8つ以上の場合、カードを2枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   ? condition: type=card_blade_condition count=8 operator=>=
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_hs_pb1_009_p_ab1() {
     let db = load_real_database();
@@ -3806,6 +4201,8 @@ fn char_pl_hs_pb1_009_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにコスト10以上のメンバーがいる場合、相手のステージにいるコスト4以下のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent cost_limit=4 cost_limit_operator=<=
+/// expect:   ? condition: type=comparison_condition count=10 operator=>= location=stage
 #[test]
 fn char_pl_hs_pb1_010_p_ab0() {
     let db = load_real_database();
@@ -3826,6 +4223,11 @@ fn char_pl_hs_pb1_010_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分と相手はそれぞれ、自身の控え室にあるすべてのメンバーカードをシャッフルし、自身のデッキの下に置く。これにより自分と相手のカードが合計20枚以上デッキの下に置かれた場合、自分の控え室からライブカードを1枚手札に加え、ラ
+/// expect: - conditional_on_result
+/// expect:   - move_cards source=discard destination=deck_bottom card_type=member_card target=deck
+/// expect:   - sequential
+/// expect:     - move_cards count=1 source=discard destination=hand card_type=live_card target=self
+/// expect:     - gain_resource count=2 resource=blade duration=live_end
 #[test]
 fn char_pl_hs_pb1_012_p_ab0() {
     let db = load_real_database();
@@ -3846,6 +4248,7 @@ fn char_pl_hs_pb1_012_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_hs_pb1_013_p_ab0() {
     let db = load_real_database();
@@ -3866,6 +4269,8 @@ fn char_pl_hs_pb1_013_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに、このメンバーよりコストが高いメンバーがいる場合、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=comparison_condition operator=> location=stage
 #[test]
 fn char_pl_hs_pb1_013_p_ab1() {
     let db = load_real_database();
@@ -3886,6 +4291,8 @@ fn char_pl_hs_pb1_013_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバーが『みらくらぱーく！』のみの場合、相手のステージにいるメンバー1人をこのメンバーの正面のエリアにポジションチェンジさせる。
+/// expect: - position_change count=1 source=stage destination=front card_type=member_card target=opponent
+/// expect:   ? condition: type=group_condition location=stage group_names=['みらくらぱーく！']
 #[test]
 fn char_pl_hs_pb1_014_p_ab0() {
     let db = load_real_database();
@@ -3906,6 +4313,8 @@ fn char_pl_hs_pb1_014_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーの正面のエリアにいる相手のメンバーのコストが、このメンバーのコストより高いかぎり、{{heart_01.png|heart01}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart01 target=opponent duration=as_long_as
+/// expect:   ? condition: type=comparison_condition operator=>
 #[test]
 fn char_pl_hs_pb1_014_p_ab1() {
     let db = load_real_database();
@@ -3926,6 +4335,8 @@ fn char_pl_hs_pb1_014_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにほかのメンバーがいないかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を失う。
+/// expect: - gain_resource count=3 resource=blade duration=as_long_as
+/// expect:   ? condition: type=location_condition location=stage negation=True
 #[test]
 fn char_pl_hs_pb1_015_p_ab0() {
     let db = load_real_database();
@@ -3946,6 +4357,7 @@ fn char_pl_hs_pb1_015_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるこのメンバー以外の{{heart_06.png|heart06}}を持つメンバー1人は、ライブ終了時まで、{{heart_06.png|heart06}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart06 card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_hs_pb1_016_p_ab0() {
     let db = load_real_database();
@@ -3966,6 +4378,7 @@ fn char_pl_hs_pb1_016_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『DOLLCHESTRA』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_hs_pb1_018_n_ab0() {
     let db = load_real_database();
@@ -3986,6 +4399,12 @@ fn char_pl_hs_pb1_018_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室にライブカードが3枚以上ある場合、手札を2枚控え室に置いてもよい。そうした場合、自分の控え室から『スリーズブーケ』のメンバーカード1枚と『蓮ノ空』のライブカード1枚を手札に加える。
+/// expect: - sequential
+/// expect:   ? condition: type=card_count_condition count=3 operator=>= location=discard
+/// expect:   - move_cards count=2 source=hand destination=discard card_type=card
+/// expect:   - sequential count=1 source=discard destination=hand target=self
+/// expect:     - move_cards count=1 source=discard destination=hand card_type=member_card target=self
+/// expect:     - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_hs_pb1_020_n_ab0() {
     let db = load_real_database();
@@ -4006,6 +4425,7 @@ fn char_pl_hs_pb1_020_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_hs_pb1_024_n_ab0() {
     let db = load_real_database();
@@ -4026,6 +4446,8 @@ fn char_pl_hs_pb1_024_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の、ステージと控え室に名前の異なる『蓮ノ空』のメンバーが6人以上いる場合、このカードの必要ハートは{{heart_00.png|heart0}}{{heart_00.png|heart0}}減る。
+/// expect: - modify_required_hearts heart_colors=heart00 operation=decrease value=2
+/// expect:   ? condition: type=location_condition count=6 operator=>= group_names=['蓮ノ空']
 #[test]
 fn char_pl_hs_pb1_026_l_ab0() {
     let db = load_real_database();
@@ -4046,6 +4468,11 @@ fn char_pl_hs_pb1_026_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに、元々持つハートの数より多い数のハートを持つ『みらくらぱーく！』のメンバーが1人以上いる場合、カードを1枚引く。2人以上いる場合、さらにこのカードの必要ハートを{{heart_00.png|heart0}
+/// expect: - sequential heart_colors=heart00
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:     ? condition: type=card_count_condition count=1 operator=>= location=stage group_names=['みらくらぱーく！']
+/// expect:   - modify_required_hearts heart_colors=heart00 operation=decrease value=2
+/// expect:     ? condition: type=card_count_condition count=2 operator=>= location=stage
 #[test]
 fn char_pl_hs_pb1_029_l_ab0() {
     let db = load_real_database();
@@ -4066,6 +4493,10 @@ fn char_pl_hs_pb1_029_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに『蓮ノ空』のメンバーがいる場合、カードを1枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   ? condition: type=group_condition location=stage group_names=['蓮ノ空']
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_hs_sd1_017_sd_ab0() {
     let db = load_real_database();
@@ -4086,6 +4517,8 @@ fn char_pl_hs_sd1_017_sd_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに『蓮ノ空』のメンバーが3人以上いて、かつ自分の控え室にカード名に「DreamBelievers」を含むライブカードがある場合、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1
+/// expect:   ? condition: type=compound operator=and location=discard group_names=['蓮ノ空']
 #[test]
 fn char_pl_hs_sd1_018_secl_ab0() {
     let db = load_real_database();
@@ -4106,6 +4539,7 @@ fn char_pl_hs_sd1_018_secl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade duration=live_end
 #[test]
 fn char_pl_n_bp1_001_p_ab0() {
     let db = load_real_database();
@@ -4126,6 +4560,7 @@ fn char_pl_n_bp1_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_n_bp1_002_r_ab0() {
     let db = load_real_database();
@@ -4146,6 +4581,7 @@ fn char_pl_n_bp1_002_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く：このカードを控え室からステージに登場させる。この能力は、このカードが控え室にある場合のみ起動できる。
+/// expect: - move_cards count=1 source=discard destination=stage card_type=card
 #[test]
 fn char_pl_n_bp1_002_r_ab1() {
     let db = load_real_database();
@@ -4166,6 +4602,7 @@ fn char_pl_n_bp1_002_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_n_bp1_003_r_ab0() {
     let db = load_real_database();
@@ -4186,6 +4623,9 @@ fn char_pl_n_bp1_003_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：好きなハートの色を1つ指定する。ライブ終了時まで、そのハートを1つ得る。
+/// expect: - sequential
+/// expect:   - specify_heart_color count=1 target=self
+/// expect:   - gain_resource count=1 resource=heart duration=live_end
 #[test]
 fn char_pl_n_bp1_003_r_ab1() {
     let db = load_real_database();
@@ -4206,6 +4646,8 @@ fn char_pl_n_bp1_003_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにほかの『虹ヶ咲』のメンバーがいる場合、エネルギーを1枚アクティブにする。
+/// expect: - change_state count=1 state_change=active card_type=energy_card
+/// expect:   ? condition: type=group_condition location=stage group_names=['虹ヶ咲']
 #[test]
 fn char_pl_n_bp1_004_p_ab0() {
     let db = load_real_database();
@@ -4226,6 +4668,7 @@ fn char_pl_n_bp1_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade duration=live_end
 #[test]
 fn char_pl_n_bp1_005_p_ab0() {
     let db = load_real_database();
@@ -4246,6 +4689,7 @@ fn char_pl_n_bp1_005_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}：カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
 #[test]
 fn char_pl_n_bp1_006_r_ab1() {
     let db = load_real_database();
@@ -4265,7 +4709,30 @@ fn char_pl_n_bp1_006_r_ab1() {
     game.drain_auto_ability_choices();
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
+/// text: 手札を1枚控え室に置く：このターン、自分のステージに『虹ヶ咲』のメンバーが登場している場合、エネルギーを2枚アクティブにする。
+/// expect: - change_state count=2 state_change=active card_type=energy_card
+/// expect:   ? condition: type=temporal_condition count=1 location=stage group_names=['虹ヶ咲']
+#[test]
+fn char_pl_n_bp1_006_r_ab0() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let cid = game.id("PL!N-bp1-006-R＋");
+    game.add_to_stage(rabuka_engine::zones::MemberArea::Center, cid);
+    game.state.activating_card = Some(cid);
+    let _ = game.try_activate_ability(cid);
+    for _ in 0..8 {
+        if !game.has_pending_choice() {
+            break;
+        }
+        let _ = game.try_select_indices(&[0]);
+    }
+    let pid = game.state.player1.id.clone();
+    game.state.process_pending_auto_abilities(&pid);
+    game.drain_auto_ability_choices();
+}
+/// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札のメンバーカードを1枚控え室に置く：自分の控え室から、これにより控え室に置いたメンバーカードより、コストの低いメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=member_card target=self cost_limit_operator=<
 #[test]
 fn char_pl_n_bp1_008_p_ab0() {
     let db = load_real_database();
@@ -4286,6 +4753,9 @@ fn char_pl_n_bp1_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを2枚控え室に置く。その後、自分の控え室からメンバーカードを1枚手札に加える。
+/// expect: - sequential
+/// expect:   - move_cards count=2 source=deck_top destination=discard card_type=card target=self
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=member_card target=self
 #[test]
 fn char_pl_n_bp1_009_r_ab0() {
     let db = load_real_database();
@@ -4306,6 +4776,10 @@ fn char_pl_n_bp1_009_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：ライブカードが公開されるまで、自分のデッキの一番上のカードを公開し続ける。そのライブカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く。
+/// expect: - sequential
+/// expect:   - reveal_until_live_card source=deck_top target=self
+/// expect:   - move_cards count=1 source=looked_at destination=hand card_type=live_card
+/// expect:   - move_cards source=looked_at_remaining destination=discard
 #[test]
 fn char_pl_n_bp1_011_p_ab0() {
     let db = load_real_database();
@@ -4326,6 +4800,7 @@ fn char_pl_n_bp1_011_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}：自分の控え室からライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_n_bp1_012_r_ab1() {
     let db = load_real_database();
@@ -4346,6 +4821,10 @@ fn char_pl_n_bp1_012_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブ中のカードが3枚以上あり、その中に『虹ヶ咲』のライブカードを1枚以上含む場合、{{icon_all.png|ハート}}{{icon_all.png|ハート}}{{icon_blade.png|ブレード}}{{
+/// expect: - sequential
+/// expect:   ? condition: type=compound operator=and group_names=['虹ヶ咲']
+/// expect:   - gain_resource count=2 resource=blade
+/// expect:   - gain_resource count=2 resource=heart heart_type=all
 #[test]
 fn char_pl_n_bp1_012_r_ab0() {
     let db = load_real_database();
@@ -4366,6 +4845,9 @@ fn char_pl_n_bp1_012_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを1枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_n_bp1_015_prproteinbar_ab0() {
     let db = load_real_database();
@@ -4386,6 +4868,8 @@ fn char_pl_n_bp1_015_prproteinbar_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=revealed_cards destination=hand card_type=card target=self
+/// expect:   ? condition: type=comparison_condition operator=>
 #[test]
 fn char_pl_n_bp1_026_secl_ab0() {
     let db = load_real_database();
@@ -4406,6 +4890,11 @@ fn char_pl_n_bp1_026_secl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。そうした場合、カードを1枚引き、ライブ終了時まで、自分のステージにいるメンバーは{{icon_blade.png|ブレード}}{{icon_bl
+/// expect: - sequential
+/// expect:   - place_energy_under_member count=1 source=energy_zone destination=under_member card_type=member_card target=self
+/// expect:   - sequential
+/// expect:     - draw_card count=1 source=deck destination=hand
+/// expect:     - gain_resource count=2 resource=blade card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_n_bp3_001_r_ab0() {
     let db = load_real_database();
@@ -4426,6 +4915,9 @@ fn char_pl_n_bp3_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：好きなハートの色を1つ指定する。ライブ終了時まで、自分のステージにいるこのメンバー以外の『虹ヶ咲』のメンバー1人は、そのハートを1つ得る。
+/// expect: - sequential
+/// expect:   - specify_heart_color count=1 target=self
+/// expect:   - gain_resource count=1 resource=heart card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_n_bp3_002_p_ab0() {
     let db = load_real_database();
@@ -4446,6 +4938,9 @@ fn char_pl_n_bp3_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室にあるコスト4以下の『虹ヶ咲』のメンバーカードを1枚選ぶ。そのカードの{{toujyou.png|登場}}能力1つを発動させる。 （{{toujyou.png|登場}}能力がコストを持つ場合、支払って発動させ
+/// expect: - sequential
+/// expect:   - select count=1 source=discard card_type=member_card target=self cost_limit=4 cost_limit_operator=<=
+/// expect:   - activate_ability count=1 target=そのカードの{{toujyou.png|登場}}能力
 #[test]
 fn char_pl_n_bp3_003_p_ab0() {
     let db = load_real_database();
@@ -4466,6 +4961,7 @@ fn char_pl_n_bp3_003_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにし、手札を1枚控え室に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_n_bp3_004_p_ab0() {
     let db = load_real_database();
@@ -4486,6 +4982,8 @@ fn char_pl_n_bp3_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このターン、自分のステージにメンバーが3回登場したとき、手札が5枚になるまでカードを引く。
+/// expect: - draw_until_count count=5 source=deck destination=hand
+/// expect:   ? condition: type=temporal_condition count=3 location=stage
 #[test]
 fn char_pl_n_bp3_005_r_ab0() {
     let db = load_real_database();
@@ -4506,6 +5004,8 @@ fn char_pl_n_bp3_005_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このターン、自分のステージにメンバーが2回以上登場している場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。
+/// expect: - gain_ability duration=live_end
+/// expect:   ? condition: type=temporal_condition count=2 location=stage
 #[test]
 fn char_pl_n_bp3_005_r_ab1() {
     let db = load_real_database();
@@ -4526,6 +5026,7 @@ fn char_pl_n_bp3_005_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+/// expect: - change_state count=1 state_change=wait card_type=member_card
 #[test]
 fn char_pl_n_bp3_006_p_ab0() {
     let db = load_real_database();
@@ -4546,6 +5047,9 @@ fn char_pl_n_bp3_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く：自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=hand destination=same_area card_type=member_card target=self cost_limit=13 cost_limit_operator=<=
+/// expect:   - place_energy_under_member count=1 source=energy_zone destination=under_member card_type=member_card target=self
 #[test]
 fn char_pl_n_bp3_007_pr_ab0() {
     let db = load_real_database();
@@ -4566,6 +5070,7 @@ fn char_pl_n_bp3_007_pr_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバー以外の『虹ヶ咲』のメンバー1人をウェイトにする：カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
 #[test]
 fn char_pl_n_bp3_008_r_ab0() {
     let db = load_real_database();
@@ -4586,6 +5091,9 @@ fn char_pl_n_bp3_008_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を2枚控え室に置いてもよい：自分のステージにいるこのメンバー以外のウェイト状態のメンバー1人をアクティブにする。そうした場合、ライブ終了時まで、これによりアクティブにしたメンバーと、このメンバーは、それぞれ{{hea
+/// expect: - sequential heart_colors=heart04
+/// expect:   - change_state count=1 source=stage state_change=active card_type=member_card target=self
+/// expect:   - gain_resource count=1 resource=heart heart_colors=heart04 duration=live_end
 #[test]
 fn char_pl_n_bp3_008_r_ab1() {
     let db = load_real_database();
@@ -4606,6 +5114,13 @@ fn char_pl_n_bp3_008_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 控え室にあるメンバーカード2枚を好きな順番でデッキの一番下に置いてもよい：それらのカードのコストの合計が、6の場合、カードを1枚引く。合計が8の場合、ライブ終了時まで、{{icon_all.png|ハート}}を得る。合計
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:     ? condition: type=comparison_condition count=6 operator==
+/// expect:   - gain_resource count=1 resource=heart heart_type=all duration=live_end
+/// expect:     ? condition: type=comparison_condition count=8 operator==
+/// expect:   - gain_ability duration=live_end
+/// expect:     ? condition: type=comparison_condition count=25 operator==
 #[test]
 fn char_pl_n_bp3_009_r_ab0() {
     let db = load_real_database();
@@ -4626,6 +5141,7 @@ fn char_pl_n_bp3_009_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるメンバーカードを2枚まで、好きな順番でデッキの一番下に置く。
+/// expect: - choose_target_player
 #[test]
 fn char_pl_n_bp3_010_p_ab0() {
     let db = load_real_database();
@@ -4646,6 +5162,12 @@ fn char_pl_n_bp3_010_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手のステージにいる「ミア・テイラー」以外のメンバーを1人選ぶ。そのメンバーが持つハートと、このメンバーが持つハートの中に同じ色のハートがある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。
+/// expect: - sequential
+/// expect:   - select count=1 source=stage card_type=member_card target=opponent
+/// expect:   - gain_resource count=1 resource=blade duration=live_end
+/// expect:     ? condition: type=card_count_condition count=1 operator==
+/// expect:   - gain_resource count=1 resource=blade
+/// expect:     ? condition: type=card_count_condition count=1 operator==
 #[test]
 fn char_pl_n_bp3_011_p_ab0() {
     let db = load_real_database();
@@ -4666,6 +5188,7 @@ fn char_pl_n_bp3_011_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを4枚見る。その中から『虹ヶ咲』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_n_bp3_012_p_ab0() {
     let db = load_real_database();
@@ -4686,6 +5209,13 @@ fn char_pl_n_bp3_012_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいる『虹ヶ咲』のメンバー1人につき、自分のデッキの上からカードを1枚見る。その中から1枚までをデッキの上に置き、残りを控え室に置く。その後、自分のデッキの一番上のカードを1枚公開する。これによりライブカー
+/// expect: - sequential
+/// expect:   - sequential target=self per_unit_type=人
+/// expect:     - look_at count=1 source=deck_top target=self per_unit_type=人
+/// expect:     - look_and_select target=self per_unit_type=人
+/// expect:   - conditional_on_result
+/// expect:     - reveal count=1 source=deck_top target=self
+/// expect:     - modify_score operation=add value=1
 #[test]
 fn char_pl_n_bp3_028_secl_ab0() {
     let db = load_real_database();
@@ -4706,6 +5236,7 @@ fn char_pl_n_bp3_028_secl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分か相手を選ぶ。自分は、そのプレイヤーのデッキの一番上のカードを見る。自分はそのカードを控え室に置いてもよい。
+/// expect: - choose_target_player
 #[test]
 fn char_pl_n_bp4_002_p_ab0() {
     let db = load_real_database();
@@ -4726,6 +5257,9 @@ fn char_pl_n_bp4_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを1枚引く。相手のステージにいるコスト9以下のメンバーを1人までウェイトにする。
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent cost_limit=9 cost_limit_operator=<=
 #[test]
 fn char_pl_n_bp4_004_r_ab0() {
     let db = load_real_database();
@@ -4746,6 +5280,9 @@ fn char_pl_n_bp4_004_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手のステージにいるウェイト状態のメンバーの数まで、自分の控え室にある『虹ヶ咲』のメンバーカードを選ぶ。それらを好きな順番でデッキの上に置く。
+/// expect: - sequential
+/// expect:   - select source=discard card_type=member_card target=self
+/// expect:   - move_cards source=selected_cards destination=deck_top card_type=card
 #[test]
 fn char_pl_n_bp4_004_r_ab1() {
     let db = load_real_database();
@@ -4766,6 +5303,9 @@ fn char_pl_n_bp4_004_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分の手札からコスト4以下の『虹ヶ咲』のメンバーカードを1枚ステージに登場させる。これにより登場したメンバーがブレードハ
+/// expect: - conditional_on_result
+/// expect:   - move_cards count=1 source=hand destination=stage card_type=member_card target=self cost_limit=4 cost_limit_operator=<=
+/// expect:   - change_state count=1 state_change=wait card_type=member_card
 #[test]
 fn char_pl_n_bp4_006_p_ab0() {
     let db = load_real_database();
@@ -4786,6 +5326,7 @@ fn char_pl_n_bp4_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分と相手はそれぞれ、自身の控え室からライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=both
 #[test]
 fn char_pl_n_bp4_007_r_ab0() {
     let db = load_real_database();
@@ -4806,6 +5347,8 @@ fn char_pl_n_bp4_007_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分と相手のエネルギーの合計が15枚以上あるかぎり、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。
+/// expect: - gain_resource count=2 resource=heart heart_colors=heart02/heart02 target=self duration=as_long_as
+/// expect:   ? condition: type=card_count_condition count=15 operator=>= location=energy_zone
 #[test]
 fn char_pl_n_bp4_007_r_ab1() {
     let db = load_real_database();
@@ -4826,6 +5369,7 @@ fn char_pl_n_bp4_007_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分と相手はそれぞれ、自身のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=both
 #[test]
 fn char_pl_n_bp4_007_r_ab2() {
     let db = load_real_database();
@@ -4846,6 +5390,9 @@ fn char_pl_n_bp4_007_r_ab2() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置く：エネルギー1枚か『虹ヶ咲』のメンバー1人をアクティブにする。
+/// expect: - choice count=1
+/// expect:   - change_state count=1 state_change=active card_type=energy_card target=self
+/// expect:   - change_state count=1 state_change=active card_type=member_card target=self
 #[test]
 fn char_pl_n_bp4_008_p_ab0() {
     let db = load_real_database();
@@ -4866,6 +5413,10 @@ fn char_pl_n_bp4_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバーのコストの合計が相手より低い場合、カードを2枚引き、自分の手札を1枚デッキの一番上に置く。
+/// expect: - sequential
+/// expect:   ? condition: type=comparison_condition operator=< location=stage
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=deck_top card_type=card target=self
 #[test]
 fn char_pl_n_bp4_009_p_ab0() {
     let db = load_real_database();
@@ -4886,6 +5437,9 @@ fn char_pl_n_bp4_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の成功ライブカード置き場にある『虹ヶ咲』のライブカードを1枚控え室に置いてもよい。そうした場合、自分の控え室にある『虹ヶ咲』のライブカードを1枚成功ライブカード置き場に置く。
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=success_live_zone destination=discard card_type=live_card target=self
+/// expect:   - move_cards count=1 source=discard destination=success_live_zone card_type=live_card target=self
 #[test]
 fn char_pl_n_bp4_010_r_ab0() {
     let db = load_real_database();
@@ -4906,6 +5460,10 @@ fn char_pl_n_bp4_010_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブ中の『虹ヶ咲』のライブカードを1枚選ぶ。それと同じカード名のカードが自分の成功ライブカード置き場にある場合、ライブ終了時まで、{{heart_04.png|heart04}}を得る。
+/// expect: - sequential heart_colors=heart04
+/// expect:   - select count=1 source=live_card_zone card_type=live_card target=self
+/// expect:   - gain_resource count=1 resource=heart heart_colors=heart04 duration=live_end
+/// expect:     ? condition: type=location_condition operator== location=success_live_card_zone
 #[test]
 fn char_pl_n_bp4_010_r_ab1() {
     let db = load_real_database();
@@ -4926,6 +5484,9 @@ fn char_pl_n_bp4_010_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札のライブカードを1枚控え室に置いてもよい：好きなハートの色を1つ指定する。ライブ終了時まで、そのハートを1つ得る。
+/// expect: - sequential
+/// expect:   - specify_heart_color count=1 target=self
+/// expect:   - gain_resource count=1 resource=heart duration=live_end
 #[test]
 fn char_pl_n_bp4_011_r_ab0() {
     let db = load_real_database();
@@ -4946,6 +5507,10 @@ fn char_pl_n_bp4_011_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを5枚控え室に置く。その後、自分の控え室にカード名の異なる『虹ヶ咲』のライブカードが3枚以上ある場合、自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。
+/// expect: - sequential
+/// expect:   - move_cards count=5 source=deck_top destination=discard card_type=card target=self
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=live_card target=self
+/// expect:     ? condition: type=card_count_condition count=3 operator=>= location=discard group_names=['虹ヶ咲']
 #[test]
 fn char_pl_n_bp4_011_r_ab1() {
     let db = load_real_database();
@@ -4966,6 +5531,8 @@ fn char_pl_n_bp4_011_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手の成功ライブカード置き場にあるカードのスコアの合計が６以上であるかぎり、ライブの合計スコアを＋１する。
+/// expect: - modify_score target=live_total duration=as_long_as operation=add value=1
+/// expect:   ? condition: type=comparison_condition count=6 operator=>= location=success_live_card_zone
 #[test]
 fn char_pl_n_bp4_012_r_ab0() {
     let db = load_real_database();
@@ -4986,6 +5553,7 @@ fn char_pl_n_bp4_012_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室にあるカード1枚をデッキの一番上に置いてもよい。
+/// expect: - move_cards count=1 source=discard destination=deck_top card_type=card target=self
 #[test]
 fn char_pl_n_bp4_021_n_ab0() {
     let db = load_real_database();
@@ -5006,6 +5574,12 @@ fn char_pl_n_bp4_021_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分がエールしたとき、エールにより公開された自分のカードが持つブレードハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|hear
+/// expect: - sequential heart_colors=heart01/heart02/heart03/heart04/heart05/heart06
+/// expect:   ? condition: type=location_condition location=revealed_cards
+/// expect:   - gain_resource count=1 resource=heart heart_colors=heart01 duration=live_end
+/// expect:     ? condition: type=card_count_condition count=3 operator=>= location=revealed_cards
+/// expect:   - gain_ability duration=live_end
+/// expect:     ? condition: type=card_count_condition count=6 operator=>= location=revealed_cards
 #[test]
 fn char_pl_n_bp5_001_r_ab0() {
     let db = load_real_database();
@@ -5026,6 +5600,8 @@ fn char_pl_n_bp5_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分と相手のステージの中で、このメンバーがほかのすべてのメンバーより多くのハートを持つかぎり、ライブの合計スコアを＋１する。
+/// expect: - modify_score target=live_total duration=as_long_as operation=add value=1
+/// expect:   ? condition: type=location_condition location=stage
 #[test]
 fn char_pl_n_bp5_002_p_ab0() {
     let db = load_real_database();
@@ -5046,6 +5622,10 @@ fn char_pl_n_bp5_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置く：自分の控え室にあるライブカードを1枚選び、そのカードのスコアに等しい数の{{icon_energy.png|E}}を支払ってもよい。そうした場合、そのライブカードを手札に加える。
+/// expect: - sequential
+/// expect:   - select count=1 source=discard card_type=live_card target=self
+/// expect:   - pay_energy
+/// expect:   - move_cards count=1 source=selected_cards destination=hand card_type=live_card
 #[test]
 fn char_pl_n_bp5_003_p_ab0() {
     let db = load_real_database();
@@ -5066,6 +5646,7 @@ fn char_pl_n_bp5_003_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにしてもよい：相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数がちょうど4つのメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.pn
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent
 #[test]
 fn char_pl_n_bp5_004_p_ab0() {
     let db = load_real_database();
@@ -5086,6 +5667,12 @@ fn char_pl_n_bp5_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーがステージから控え室に置かれたとき、このメンバーがコスト10以上のブレードハートを持たない『虹ヶ咲』のメンバーとバトンタッチしていた場合、エネルギーを2枚アクティブにする。コスト15以上のブレードハートを持た
+/// expect: - sequential
+/// expect:   ? condition: type=card_count_condition count=1 operator=>=
+/// expect:   - change_state count=2 state_change=active card_type=energy_card
+/// expect:     ? condition: type=movement_condition group_names=['虹ヶ咲'] negation=True
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:     ? condition: type=location_condition location=stage group_names=['虹ヶ咲'] negation=True
 #[test]
 fn char_pl_n_bp5_005_r_ab0() {
     let db = load_real_database();
@@ -5106,6 +5693,8 @@ fn char_pl_n_bp5_005_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーは自分のアクティブフェイズにアクティブにしない。
+/// expect: - restriction card_type=member_card
+/// expect:   ? condition: type=temporal_condition
 #[test]
 fn char_pl_n_bp5_006_p_ab0() {
     let db = load_real_database();
@@ -5126,6 +5715,8 @@ fn char_pl_n_bp5_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにこのメンバー以外のメンバーがいる場合、このメンバーをウェイトにする。
+/// expect: - change_state count=1 state_change=wait card_type=member_card
+/// expect:   ? condition: type=location_condition location=stage
 #[test]
 fn char_pl_n_bp5_006_p_ab1() {
     let db = load_real_database();
@@ -5146,6 +5737,8 @@ fn char_pl_n_bp5_006_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分と相手の成功ライブカード置き場にあるカードの枚数が同じ場合、ライブ終了時まで、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。
+/// expect: - gain_resource count=2 resource=heart heart_colors=heart02/heart02 target=self duration=live_end
+/// expect:   ? condition: type=location_condition operator== location=success_live_card_zone
 #[test]
 fn char_pl_n_bp5_007_r_ab0() {
     let db = load_real_database();
@@ -5166,6 +5759,10 @@ fn char_pl_n_bp5_007_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分が余剰ハートを1つ以上持っている場合、カードを2枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   ? condition: type=comparison_condition count=1 operator=>=
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_n_bp5_007_r_ab1() {
     let db = load_real_database();
@@ -5186,6 +5783,7 @@ fn char_pl_n_bp5_007_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：エネルギーを2枚アクティブにする。
+/// expect: - change_state count=2 state_change=active card_type=energy_card
 #[test]
 fn char_pl_n_bp5_008_p_ab0() {
     let db = load_real_database();
@@ -5206,6 +5804,7 @@ fn char_pl_n_bp5_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにし、手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からコスト9以上の『虹ヶ咲』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_n_bp5_009_p_ab0() {
     let db = load_real_database();
@@ -5226,6 +5825,11 @@ fn char_pl_n_bp5_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分が余剰ハートを持たない場合、ライブの合計スコアを＋１する。自分が余剰ハートを2つ以上持つ場合、ライブの合計スコアを－１する。この効果ではライブの合計スコアは０未満にはならない。
+/// expect: - sequential
+/// expect:   - modify_score target=live_total operation=add value=1
+/// expect:     ? condition: type=comparison_condition negation=True
+/// expect:   - modify_score target=live_total operation=remove value=1
+/// expect:     ? condition: type=comparison_condition count=2 operator=>=
 #[test]
 fn char_pl_n_bp5_010_p_ab0() {
     let db = load_real_database();
@@ -5246,6 +5850,11 @@ fn char_pl_n_bp5_010_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 以下から1つを選ぶ。 ・自分の控え室にカード名が異なるライブカードが3枚以上ある場合、自分の控え室からライブカードを1枚手札に加える。 ・自分の控え室にグループ名が異なるライブカードが3枚以上ある場合、自分の控え室からラ
+/// expect: - choice count=1
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=live_card target=self
+/// expect:     ? condition: type=card_count_condition count=3 operator=>= location=discard
+/// expect:   - move_cards count=2 source=discard destination=hand card_type=live_card target=self
+/// expect:     ? condition: type=card_count_condition count=3 operator=>= location=discard
 #[test]
 fn char_pl_n_bp5_011_p_ab0() {
     let db = load_real_database();
@@ -5266,6 +5875,9 @@ fn char_pl_n_bp5_011_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：カードを1枚引き、ライブ終了時まで、{{heart_01.png|heart01}}を得る。
+/// expect: - sequential heart_colors=heart01
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - gain_resource count=1 resource=heart heart_colors=heart01 duration=live_end
 #[test]
 fn char_pl_n_bp5_012_r_ab0() {
     let db = load_real_database();
@@ -5286,6 +5898,8 @@ fn char_pl_n_bp5_012_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、このメンバーの下にあるエネルギーカードの枚数に1を足した枚数のエネルギーカードをウェイト状態で置く。
+/// expect: - place_energy_under_member source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   ? condition: type=comparison_condition operator=>
 #[test]
 fn char_pl_n_bp5_012_r_ab1() {
     let db = load_real_database();
@@ -5306,6 +5920,8 @@ fn char_pl_n_bp5_012_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.p
+/// expect: - gain_resource count=2 resource=blade duration=live_end
+/// expect:   ? condition: type=location_condition location=stage
 #[test]
 fn char_pl_n_bp5_015_n_ab0() {
     let db = load_real_database();
@@ -5326,6 +5942,9 @@ fn char_pl_n_bp5_015_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを1枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_n_bp5_023_n_ab0() {
     let db = load_real_database();
@@ -5346,6 +5965,10 @@ fn char_pl_n_bp5_023_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに{{heart_02.png|heart02}}を4つ以上持つメンバーがいる場合、このカードのスコアを＋２し、必要ハートは{{heart_02.png|heart02}}{{heart_02.png|he
+/// expect: - sequential heart_colors=heart02
+/// expect:   ? condition: type=comparison_condition count=4 operator=>= location=stage
+/// expect:   - modify_score operation=add value=2
+/// expect:   - modify_required_hearts count=5 heart_colors=heart02 operation=set value=5
 #[test]
 fn char_pl_n_bp5_028_l_ab0() {
     let db = load_real_database();
@@ -5366,6 +5989,8 @@ fn char_pl_n_bp5_028_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギー置き場にあるエネルギーがメンバーの下に置かれたとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   ? condition: type=movement_condition location=energy_zone
 #[test]
 fn char_pl_n_bp7_001_p_ab0() {
     let db = load_real_database();
@@ -5386,6 +6011,8 @@ fn char_pl_n_bp7_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに『QU4RTZ』のメンバーが3人以上いる場合、自分の控え室からカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=card target=self
+/// expect:   ? condition: type=card_count_condition count=3 operator=>= location=stage group_names=['QU4RTZ']
 #[test]
 fn char_pl_n_bp7_002_r_ab0() {
     let db = load_real_database();
@@ -5406,6 +6033,9 @@ fn char_pl_n_bp7_002_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: デッキの上からカードを5枚控え室に置く：自分の控え室にあるコスト17以下の『虹ヶ咲』のメンバーカード1枚をこのメンバーの下に置く。そうしたとき、ライブ終了時まで、このメンバーが元々持つハートは、これにより下に置いたメンバ
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=discard destination=under_member card_type=member_card target=self cost_limit=17 cost_limit_operator=<=
+/// expect:   - set_heart_type card_type=member_card duration=live_end
 #[test]
 fn char_pl_n_bp7_003_r_ab0() {
     let db = load_real_database();
@@ -5426,6 +6056,7 @@ fn char_pl_n_bp7_003_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブ終了時まで、このメンバーの下に置かれている名前の異なるメンバーカード1枚につき、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade card_type=member_card duration=live_end per_unit_type=枚
 #[test]
 fn char_pl_n_bp7_003_r_ab1() {
     let db = load_real_database();
@@ -5446,6 +6077,10 @@ fn char_pl_n_bp7_003_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに名前の異なる『DiverDiva』のメンバーが2人いる場合、以下から1つを選ぶ。 ・エネルギーを2枚アクティブにする。 ・自分のエネルギーデッキから、エネルギーカード1枚を自分のステージにいる『虹ヶ咲』の
+/// expect: - choice count=1
+/// expect:   ? condition: type=location_condition count=2 operator=>= location=stage group_names=['DiverDiva']
+/// expect:   - change_state count=2 state_change=active card_type=energy_card
+/// expect:   - place_energy_under_member count=1 source=energy_deck destination=under_member card_type=energy_card target=self
 #[test]
 fn char_pl_n_bp7_005_p_ab0() {
     let db = load_real_database();
@@ -5466,6 +6101,9 @@ fn char_pl_n_bp7_005_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}：自分のデッキの上からカードを4枚見る。その後、それらを好きな順番でデッキの上に置く。
+/// expect: - sequential
+/// expect:   - look_at count=4 source=deck_top target=self
+/// expect:   - move_cards count=1 source=looked_at destination=deck_top card_type=card
 #[test]
 fn char_pl_n_bp7_006_r_ab0() {
     let db = load_real_database();
@@ -5486,6 +6124,10 @@ fn char_pl_n_bp7_006_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: デッキの上からカードを3枚控え室に置く：これにより控え室に置いたカードの中に『虹ヶ咲』のライブカードかブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合、以下から1つを選ぶ。 ・エネルギーを2枚アクティブにする
+/// expect: - choice count=1
+/// expect:   ? condition: type=or_condition operator=or group_names=['虹ヶ咲'] negation=True
+/// expect:   - change_state count=2 state_change=active card_type=energy_card
+/// expect:   - gain_resource count=2 resource=blade duration=live_end
 #[test]
 fn char_pl_n_bp7_006_r_ab1() {
     let db = load_real_database();
@@ -5506,6 +6148,7 @@ fn char_pl_n_bp7_006_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーの下にあるエネルギーカード1枚につき、{{heart_02.png|heart02}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart02 card_type=energy_card per_unit_type=枚
 #[test]
 fn char_pl_n_bp7_007_r_ab0() {
     let db = load_real_database();
@@ -5526,6 +6169,8 @@ fn char_pl_n_bp7_007_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーが6枚より多いかぎり、その差に等しい数の{{heart_02.png|heart02}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart02 target=self duration=as_long_as
+/// expect:   ? condition: type=comparison_condition count=6 operator=>
 #[test]
 fn char_pl_n_bp7_007_r_ab1() {
     let db = load_real_database();
@@ -5546,6 +6191,7 @@ fn char_pl_n_bp7_007_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーデッキから、エネルギーカード1枚をこのメンバーの下に置く。
+/// expect: - place_energy_under_member count=1 source=energy_deck destination=under_member card_type=energy_card target=self
 #[test]
 fn char_pl_n_bp7_007_r_ab2() {
     let db = load_real_database();
@@ -5566,6 +6212,9 @@ fn char_pl_n_bp7_007_r_ab2() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室からブレードハートを持たないメンバーカードを4枚まで好きな順番でデッキの下に置いてもよい。これによりデッキに置いたカード1枚につき、エネルギーを1枚アクティブにする。
+/// expect: - sequential
+/// expect:   - move_cards count=4 source=discard destination=deck_bottom card_type=member_card target=self
+/// expect:   - change_state count=1 state_change=active card_type=energy_card per_unit_type=枚
 #[test]
 fn char_pl_n_bp7_008_p_ab0() {
     let db = load_real_database();
@@ -5586,6 +6235,7 @@ fn char_pl_n_bp7_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分と相手はそれぞれ、自身のデッキの上からカードを7枚控え室に置く。
+/// expect: - move_cards count=7 source=deck_top destination=discard card_type=card target=both
 #[test]
 fn char_pl_n_bp7_009_p_ab0() {
     let db = load_real_database();
@@ -5606,6 +6256,7 @@ fn char_pl_n_bp7_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：自分の控え室からコスト2以下の『虹ヶ咲』のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。（この効果で登場したメンバーのいるエリアには
+/// expect: - move_cards count=1 source=discard destination=empty_area state_change=wait card_type=member_card target=self cost_limit=2 cost_limit_operator=<=
 #[test]
 fn char_pl_n_bp7_010_p_ab0() {
     let db = load_real_database();
@@ -5626,6 +6277,12 @@ fn char_pl_n_bp7_010_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このカードがデッキから控え室に置かれたとき、手札を1枚控え室に置いてもよい。そうしたとき、控え室からこのカードを手札に加える。
+/// expect: - conditional_on_optional
+/// expect:   ? condition: type=card_count_condition count=1 operator=>=
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card target=self
+/// expect:   - sequential
+/// expect:     - move_cards count=1 source=hand destination=discard card_type=card target=self
+/// expect:     - move_cards count=1 source=discard destination=hand card_type=card
 #[test]
 fn char_pl_n_bp7_011_r_ab0() {
     let db = load_real_database();
@@ -5646,6 +6303,8 @@ fn char_pl_n_bp7_011_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このカードをプレイする際、自分の控え室にあるすべてのメンバーカードをシャッフルし、デッキの下に置いてもよい。そうしたとき、このカードのコストは２減る。
+/// expect: - modify_cost count=2 operation=subtract value=2
+/// expect:   ? condition: type=location_condition location=discard
 #[test]
 fn char_pl_n_bp7_011_r_ab1() {
     let db = load_real_database();
@@ -5666,6 +6325,7 @@ fn char_pl_n_bp7_011_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室にある『虹ヶ咲』のカード1枚をデッキの一番上に置いてもよい。
+/// expect: - move_cards count=1 source=discard destination=deck_top card_type=card target=self
 #[test]
 fn char_pl_n_bp7_011_r_ab2() {
     let db = load_real_database();
@@ -5686,6 +6346,9 @@ fn char_pl_n_bp7_011_r_ab2() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 『虹ヶ咲』のメンバー1人をウェイトにしてもよい：好きなハートの色を1つ指定する。ライブ終了時まで、そのハートを1つ得る。
+/// expect: - sequential
+/// expect:   - specify_heart_color count=1 target=self
+/// expect:   - gain_resource count=1 resource=heart duration=live_end
 #[test]
 fn char_pl_n_bp7_012_r_ab0() {
     let db = load_real_database();
@@ -5706,6 +6369,9 @@ fn char_pl_n_bp7_012_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにする：カードを2枚引き、手札を2枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=2 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_n_bp7_023_n_ab0() {
     let db = load_real_database();
@@ -5726,6 +6392,7 @@ fn char_pl_n_bp7_023_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブ終了時まで、自分のステージにいる『虹ヶ咲』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_n_bp7_025_secl_ab0() {
     let db = load_real_database();
@@ -5746,6 +6413,8 @@ fn char_pl_n_bp7_025_secl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|
+/// expect: - modify_score heart_colors=heart01/heart02/heart03/heart04/heart05/heart06 operation=add value=1
+/// expect:   ? condition: type=card_count_condition count=3 operator=>= location=revealed_cards
 #[test]
 fn char_pl_n_bp7_025_secl_ab1() {
     let db = load_real_database();
@@ -5766,6 +6435,9 @@ fn char_pl_n_bp7_025_secl_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を2枚まで控え室に置いてもよい：自分のステージにいる『虹ヶ咲』のメンバーを、これにより控え室に置いたカードの枚数に等しい数まで選ぶ。ライブ終了時まで、それらは{{icon_blade.png|ブレード}}を得る。
+/// expect: - sequential
+/// expect:   - select source=stage card_type=member_card target=self
+/// expect:   - gain_resource count=1 resource=blade duration=live_end
 #[test]
 fn char_pl_n_bp7_026_secl_ab0() {
     let db = load_real_database();
@@ -5786,6 +6458,8 @@ fn char_pl_n_bp7_026_secl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中に、ブレードハートを持たないメンバーカードが2枚以上ある場合、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1
+/// expect:   ? condition: type=card_count_condition count=2 operator=>= location=revealed_cards negation=True
 #[test]
 fn char_pl_n_bp7_026_secl_ab1() {
     let db = load_real_database();
@@ -5806,6 +6480,8 @@ fn char_pl_n_bp7_026_secl_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のステージにこのメンバー以外のコスト11のメンバーがいる場合、自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
+/// expect:   ? condition: type=comparison_condition location=stage
 #[test]
 fn char_pl_n_pb1_001_p_ab0() {
     let db = load_real_database();
@@ -5826,6 +6502,8 @@ fn char_pl_n_pb1_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブ中のライブカードが2枚以上あるかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade duration=as_long_as
+/// expect:   ? condition: type=card_count_condition count=2 operator=>= location=live_card_zone
 #[test]
 fn char_pl_n_pb1_001_p_ab1() {
     let db = load_real_database();
@@ -5846,6 +6524,7 @@ fn char_pl_n_pb1_001_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギー置き場にあるエネルギー2枚をこのメンバーの下に置いてもよい。
+/// expect: - place_energy_under_member count=2 source=energy_zone destination=under_member card_type=member_card target=self
 #[test]
 fn char_pl_n_pb1_002_p_ab0() {
     let db = load_real_database();
@@ -5866,6 +6545,8 @@ fn char_pl_n_pb1_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーの下にエネルギーカードが2枚以上置かれているかぎり、ライブの合計スコアを＋１する。 (メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに戻す。)
+/// expect: - modify_score target=live_total duration=as_long_as operation=add value=1
+/// expect:   ? condition: type=card_count_condition count=2 operator=>= location=under_member
 #[test]
 fn char_pl_n_pb1_002_p_ab1() {
     let db = load_real_database();
@@ -5886,6 +6567,9 @@ fn char_pl_n_pb1_002_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}このカードを手札から控え室に置く：カードを1枚引き、ライブ終了時まで、自分のステージにいる『虹ヶ咲』のメンバー1人は{{icon_bla
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - gain_resource count=1 resource=blade card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_n_pb1_003_p_ab0() {
     let db = load_real_database();
@@ -5906,6 +6590,8 @@ fn char_pl_n_pb1_003_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このターンにこのメンバーが移動していないかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade duration=as_long_as
+/// expect:   ? condition: type=temporal_condition
 #[test]
 fn char_pl_n_pb1_004_p_ab0() {
     let db = load_real_database();
@@ -5926,6 +6612,14 @@ fn char_pl_n_pb1_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの一番上のカードを公開する。公開したカードがコスト9以下のメンバーカードの場合、公開したカードを手札に加え、このメンバーはポジションチェンジする。それ以外の場合、公開したカードを控え室に置く。
+/// expect: - sequential
+/// expect:   - reveal count=1 source=deck_top target=self
+/// expect:   - move_cards count=1 source=revealed_cards destination=hand card_type=card
+/// expect:     ? condition: type=comparison_condition operator=<= location=revealed_cards
+/// expect:   - position_change card_type=member_card
+/// expect:     ? condition: type=comparison_condition operator=<= location=revealed_cards
+/// expect:   - move_cards count=1 source=revealed_cards destination=discard card_type=card
+/// expect:     ? condition: type=otherwise_condition location=revealed_cards
 #[test]
 fn char_pl_n_pb1_004_p_ab1() {
     let db = load_real_database();
@@ -5946,6 +6640,8 @@ fn char_pl_n_pb1_004_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにコスト10のメンバーが登場したとき、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=appearance_condition location=stage
 #[test]
 fn char_pl_n_pb1_005_p_ab0() {
     let db = load_real_database();
@@ -5966,6 +6662,7 @@ fn char_pl_n_pb1_005_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにする：エネルギーを1枚アクティブにする。
+/// expect: - change_state count=1 state_change=active card_type=energy_card
 #[test]
 fn char_pl_n_pb1_006_p_ab0() {
     let db = load_real_database();
@@ -5986,6 +6683,8 @@ fn char_pl_n_pb1_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブ中のライブカードの必要ハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.p
+/// expect: - gain_resource count=1 resource=heart heart_type=all target=self duration=as_long_as
+/// expect:   ? condition: type=temporal_condition count=1 location=live_card_zone
 #[test]
 fn char_pl_n_pb1_007_p_ab0() {
     let db = load_real_database();
@@ -6006,6 +6705,8 @@ fn char_pl_n_pb1_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにウェイト状態の『虹ヶ咲』のメンバーがいるかぎり、手札にあるこのメンバーカードのコストは2減る。
+/// expect: - modify_cost count=2 source=hand card_type=member_card duration=as_long_as operation=subtract value=2
+/// expect:   ? condition: type=state_condition count=1 operator=>= location=stage group_names=['虹ヶ咲']
 #[test]
 fn char_pl_n_pb1_008_p_ab0() {
     let db = load_real_database();
@@ -6026,6 +6727,9 @@ fn char_pl_n_pb1_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバー1人か、エネルギーを2枚アクティブにする。
+/// expect: - choice count=1
+/// expect:   - change_state count=1 state_change=active card_type=member_card target=self
+/// expect:   - change_state count=2 state_change=active card_type=energy_card target=self
 #[test]
 fn char_pl_n_pb1_008_p_ab1() {
     let db = load_real_database();
@@ -6046,6 +6750,10 @@ fn char_pl_n_pb1_008_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このターン、ブレードハートを持たないメンバーカードが自分のライブカード置き場から控え室に置かれている場合、カードを1枚引き、ライブ終了時まで、{{heart_03.png|heart03}}{{heart_05.png|
+/// expect: - sequential heart_colors=heart03/heart05/heart06
+/// expect:   ? condition: type=card_count_condition count=1 operator=>= negation=True
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - gain_resource count=3 resource=heart heart_colors=heart03/heart05/heart06 duration=live_end
 #[test]
 fn char_pl_n_pb1_009_r_ab0() {
     let db = load_real_database();
@@ -6066,6 +6774,9 @@ fn char_pl_n_pb1_009_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 以下から1つを選ぶ。 ・エネルギーを1枚アクティブにする。 ・自分の控え室にある『虹ヶ咲』のライブカードを2枚まで好きな順番でデッキの上に置く。
+/// expect: - choice count=1
+/// expect:   - change_state count=1 state_change=active card_type=energy_card
+/// expect:   - move_cards count=2 source=discard destination=deck_top card_type=live_card target=self
 #[test]
 fn char_pl_n_pb1_010_p_ab0() {
     let db = load_real_database();
@@ -6086,6 +6797,7 @@ fn char_pl_n_pb1_010_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーの下にあるエネルギーカード1枚につき、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade card_type=energy_card per_unit_type=枚
 #[test]
 fn char_pl_n_pb1_011_p_ab0() {
     let db = load_real_database();
@@ -6106,6 +6818,7 @@ fn char_pl_n_pb1_011_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。 (メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに戻
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_n_pb1_011_p_ab1() {
     let db = load_real_database();
@@ -6126,6 +6839,8 @@ fn char_pl_n_pb1_011_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにこのメンバー以外のコスト11のメンバーが登場したとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   ? condition: type=appearance_condition location=stage
 #[test]
 fn char_pl_n_pb1_012_p_ab0() {
     let db = load_real_database();
@@ -6146,6 +6861,7 @@ fn char_pl_n_pb1_012_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中から、『虹ヶ咲』のメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=revealed_cards destination=hand card_type=member_card target=self
 #[test]
 fn char_pl_n_pb1_012_p_ab1() {
     let db = load_real_database();
@@ -6166,6 +6882,7 @@ fn char_pl_n_pb1_012_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：手札からコスト4以下の「上原歩夢」のメンバーカードを1枚ステージに登場させる。
+/// expect: - move_cards count=1 source=hand destination=stage card_type=member_card cost_limit=4 cost_limit_operator=<=
 #[test]
 fn char_pl_n_pb1_013_p_ab0() {
     let db = load_real_database();
@@ -6186,6 +6903,10 @@ fn char_pl_n_pb1_013_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 「中須かすみ」からバトンタッチして登場した場合、カードを2枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   ? condition: type=movement_condition
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_n_pb1_014_r_ab0() {
     let db = load_real_database();
@@ -6206,6 +6927,7 @@ fn char_pl_n_pb1_014_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：手札からコスト4以下の「桜坂しずく」のメンバーカードを1枚ステージに登場させる。
+/// expect: - move_cards count=1 source=hand destination=stage card_type=member_card cost_limit=4 cost_limit_operator=<=
 #[test]
 fn char_pl_n_pb1_015_p_ab0() {
     let db = load_real_database();
@@ -6226,6 +6948,7 @@ fn char_pl_n_pb1_015_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを2枚見る。その中から「朝香果林」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_n_pb1_016_r_ab0() {
     let db = load_real_database();
@@ -6246,6 +6969,7 @@ fn char_pl_n_pb1_016_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：手札からコスト4以下の「宮下愛」のメンバーカードを1枚ステージに登場させる。
+/// expect: - move_cards count=1 source=hand destination=stage card_type=member_card cost_limit=4 cost_limit_operator=<=
 #[test]
 fn char_pl_n_pb1_017_p_ab0() {
     let db = load_real_database();
@@ -6266,6 +6990,7 @@ fn char_pl_n_pb1_017_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを2枚見る。その中から「近江彼方」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_n_pb1_018_r_ab0() {
     let db = load_real_database();
@@ -6286,6 +7011,10 @@ fn char_pl_n_pb1_018_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 「優木せつ菜」からバトンタッチして登場した場合、カードを2枚引き、手札を2枚控え室に置く。
+/// expect: - sequential
+/// expect:   ? condition: type=movement_condition
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=2 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_n_pb1_019_r_ab0() {
     let db = load_real_database();
@@ -6306,6 +7035,10 @@ fn char_pl_n_pb1_019_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 「エマ・ヴェルデ」からバトンタッチして登場した場合、カードを2枚引き、手札を2枚控え室に置く。
+/// expect: - sequential
+/// expect:   ? condition: type=movement_condition
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=2 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_n_pb1_020_r_ab0() {
     let db = load_real_database();
@@ -6326,6 +7059,7 @@ fn char_pl_n_pb1_020_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを2枚見る。その中から「天王寺璃奈」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_n_pb1_021_r_ab0() {
     let db = load_real_database();
@@ -6346,6 +7080,10 @@ fn char_pl_n_pb1_021_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 「三船栞子」からバトンタッチして登場した場合、カードを2枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   ? condition: type=movement_condition
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_n_pb1_022_r_ab0() {
     let db = load_real_database();
@@ -6366,6 +7104,7 @@ fn char_pl_n_pb1_022_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：手札からコスト4以下の「ミア・テイラー」のメンバーカードを1枚ステージに登場させる。
+/// expect: - move_cards count=1 source=hand destination=stage card_type=member_card cost_limit=4 cost_limit_operator=<=
 #[test]
 fn char_pl_n_pb1_023_p_ab0() {
     let db = load_real_database();
@@ -6386,6 +7125,7 @@ fn char_pl_n_pb1_023_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを2枚見る。その中から「鐘嵐珠」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_n_pb1_024_r_ab0() {
     let db = load_real_database();
@@ -6406,6 +7146,9 @@ fn char_pl_n_pb1_024_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{heart_03.png|heart03}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}のうち1つを選ぶ。ライブ終了時まで、このメンバーが元々持つハートは選んだ
+/// expect: - sequential heart_colors=heart03/heart04/heart05
+/// expect:   - select count=1 heart_colors=heart03/heart04/heart05
+/// expect:   - set_heart_type heart_type=selected card_type=member_card duration=live_end
 #[test]
 fn char_pl_n_pb1_034_n_ab0() {
     let db = load_real_database();
@@ -6426,6 +7169,7 @@ fn char_pl_n_pb1_034_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを2枚見る。その中から1枚を手札に加え、残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_n_pb1_035_n_ab0() {
     let db = load_real_database();
@@ -6446,6 +7190,9 @@ fn char_pl_n_pb1_035_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{heart_01.png|heart01}}か{{heart_02.png|heart02}}か{{heart_06.png|heart06}}のうち1つを選ぶ。ライブ終了時まで、このメンバーが元々持つハートは選んだ
+/// expect: - sequential heart_colors=heart01/heart02/heart06
+/// expect:   - select count=1 heart_colors=heart01/heart02/heart06
+/// expect:   - set_heart_type heart_type=selected card_type=member_card duration=live_end
 #[test]
 fn char_pl_n_pb1_036_n_ab0() {
     let db = load_real_database();
@@ -6466,6 +7213,7 @@ fn char_pl_n_pb1_036_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを5枚見る。その中から『虹ヶ咲』のライブカードを1枚まで公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_n_sd1_001_p_ab0() {
     let db = load_real_database();
@@ -6486,6 +7234,7 @@ fn char_pl_n_sd1_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、自分のステージにいるほかの『虹ヶ咲』のメンバーは{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_n_sd1_001_p_ab1() {
     let db = load_real_database();
@@ -6506,6 +7255,7 @@ fn char_pl_n_sd1_001_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade duration=live_end
 #[test]
 fn char_pl_n_sd1_004_p_ab0() {
     let db = load_real_database();
@@ -6526,6 +7276,7 @@ fn char_pl_n_sd1_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を2枚控え室に置く：自分の控え室から『虹ヶ咲』のメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=member_card target=self
 #[test]
 fn char_pl_n_sd1_005_sd_ab0() {
     let db = load_real_database();
@@ -6546,6 +7297,7 @@ fn char_pl_n_sd1_005_sd_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_n_sd1_009_sd_ab0() {
     let db = load_real_database();
@@ -6566,6 +7318,7 @@ fn char_pl_n_sd1_009_sd_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_n_sd2_001_sd2_ab0() {
     let db = load_real_database();
@@ -6586,6 +7339,8 @@ fn char_pl_n_sd2_001_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の成功ライブカード置き場に『虹ヶ咲』のカードがあるかぎり、手札にあるこのメンバーカードのコストは２減る。
+/// expect: - modify_cost count=2 source=hand card_type=member_card duration=as_long_as operation=subtract value=2
+/// expect:   ? condition: type=group_condition location=success_live_card_zone group_names=['虹ヶ咲']
 #[test]
 fn char_pl_n_sd2_003_sd2_ab0() {
     let db = load_real_database();
@@ -6606,6 +7361,9 @@ fn char_pl_n_sd2_003_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を2枚控え室に置いてもよい：好きなハートの色を1つ指定する。ライブ終了時まで、そのハートを2つ得る。
+/// expect: - sequential
+/// expect:   - specify_heart_color count=1 target=self
+/// expect:   - gain_resource count=2 resource=heart duration=live_end
 #[test]
 fn char_pl_n_sd2_005_sd2_ab0() {
     let db = load_real_database();
@@ -6626,6 +7384,7 @@ fn char_pl_n_sd2_005_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 『虹ヶ咲』のメンバー1人をウェイトにしてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade duration=live_end
 #[test]
 fn char_pl_n_sd2_006_sd2_ab0() {
     let db = load_real_database();
@@ -6646,6 +7405,12 @@ fn char_pl_n_sd2_006_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを1枚引く。このターン、相手もライブを成功している場合、さらにカードを1枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - sequential
+/// expect:     ? condition: type=compound operator=and
+/// expect:     - draw_card count=1 source=deck destination=hand
+/// expect:     - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_n_sd2_007_p_ab0() {
     let db = load_real_database();
@@ -6666,6 +7431,7 @@ fn char_pl_n_sd2_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを3枚見る。その中から『虹ヶ咲』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_n_sd2_009_sd2_ab0() {
     let db = load_real_database();
@@ -6686,6 +7452,7 @@ fn char_pl_n_sd2_009_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを2枚引く。
+/// expect: - draw_card count=2 source=deck destination=hand
 #[test]
 fn char_pl_n_sd2_010_sd2_ab0() {
     let db = load_real_database();
@@ -6706,6 +7473,10 @@ fn char_pl_n_sd2_010_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいる『虹ヶ咲』のメンバー1人がウェイト状態になったとき、手札を1枚控え室に置いてもよい。そうしたとき、そのメンバーをアクティブにし、ライブ終了時まで、そのメンバーは{{icon_blade.png|ブレー
+/// expect: - sequential
+/// expect:   ? condition: type=group_condition count=1 location=stage group_names=['虹ヶ咲']
+/// expect:   - change_state count=1 state_change=active card_type=member_card
+/// expect:   - gain_resource count=2 resource=blade card_type=member_card duration=live_end
 #[test]
 fn char_pl_n_sd2_010_sd2_ab1() {
     let db = load_real_database();
@@ -6726,6 +7497,7 @@ fn char_pl_n_sd2_010_sd2_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から『虹ヶ咲』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_n_sd2_012_sd2_ab0() {
     let db = load_real_database();
@@ -6746,6 +7518,8 @@ fn char_pl_n_sd2_012_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバーが『虹ヶ咲』のみの場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_bl
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent
+/// expect:   ? condition: type=group_condition location=stage group_names=['虹ヶ咲']
 #[test]
 fn char_pl_n_sd2_013_sd2_ab0() {
     let db = load_real_database();
@@ -6766,6 +7540,7 @@ fn char_pl_n_sd2_013_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにし、手札を1枚控え室に置く：カードを1枚引く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+/// expect: - draw_card count=1 source=deck destination=hand
 #[test]
 fn char_pl_n_sd2_015_sd2_ab0() {
     let db = load_real_database();
@@ -6786,6 +7561,7 @@ fn char_pl_n_sd2_015_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：自分のステージにいるメンバー1人をアクティブにする。
+/// expect: - change_state count=1 source=stage state_change=active card_type=member_card target=self
 #[test]
 fn char_pl_n_sd2_017_sd2_ab0() {
     let db = load_real_database();
@@ -6806,6 +7582,7 @@ fn char_pl_n_sd2_017_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブ終了時まで、{{heart_05.png|heart05}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart05 duration=live_end
 #[test]
 fn char_pl_n_sd2_019_sd2_ab0() {
     let db = load_real_database();
@@ -6826,6 +7603,7 @@ fn char_pl_n_sd2_019_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手のステージにいるコスト2以下のメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent cost_limit=2 cost_limit_operator=<=
 #[test]
 fn char_pl_n_sd2_019_sd2_ab1() {
     let db = load_real_database();
@@ -6846,6 +7624,7 @@ fn char_pl_n_sd2_019_sd2_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手のステージにいるコスト4以下のメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent cost_limit=4 cost_limit_operator=<=
 #[test]
 fn char_pl_n_sd2_021_sd2_ab0() {
     let db = load_real_database();
@@ -6866,6 +7645,7 @@ fn char_pl_n_sd2_021_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいる『虹ヶ咲』のメンバー1人をアクティブにする。
+/// expect: - change_state count=1 source=stage state_change=active card_type=member_card target=self
 #[test]
 fn char_pl_n_sd2_025_sd2_ab0() {
     let db = load_real_database();
@@ -6886,6 +7666,7 @@ fn char_pl_n_sd2_025_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいる{{icon_blade.png|ブレード}}を4つ以上持つ『虹ヶ咲』のメンバー1人は、ライブ終了時まで、{{heart_02.png|heart02}}{{heart_02.png|heart02}
+/// expect: - gain_resource count=2 resource=heart heart_colors=heart02/heart02 card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_n_sd2_026_sd2_ab0() {
     let db = load_real_database();
@@ -6906,6 +7687,7 @@ fn char_pl_n_sd2_026_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 『虹ヶ咲』のメンバーを3人までウェイトにしてもよい：これによりウェイトにしたメンバー1人につき、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1 per_unit_type=人
 #[test]
 fn char_pl_n_sd2_027_sd2_ab0() {
     let db = load_real_database();
@@ -6926,6 +7708,8 @@ fn char_pl_n_sd2_027_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の成功ライブカード置き場のカードが0枚で、かつ相手の成功ライブカード置き場にカードが1枚以上ある場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blad
+/// expect: - gain_resource count=3 resource=blade
+/// expect:   ? condition: type=compound operator=and location=success_live_card_zone
 #[test]
 fn char_pl_s_bp2_001_p_ab0() {
     let db = load_real_database();
@@ -6946,6 +7730,10 @@ fn char_pl_s_bp2_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーがステージから控え室に置かれたとき、手札を1枚控え室に置いてもよい。そうした場合、自分の控え室から『Aqours』のライブカードを1枚手札に加える。
+/// expect: - sequential
+/// expect:   ? condition: type=card_count_condition count=1 operator=>=
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_s_bp2_002_p_ab0() {
     let db = load_real_database();
@@ -6966,6 +7754,8 @@ fn char_pl_s_bp2_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、{{heart_04.png|heart04}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart04 target=self duration=live_end
+/// expect:   ? condition: type=card_count_condition count=1 operator=>= location=revealed_cards
 #[test]
 fn char_pl_s_bp2_003_p_ab0() {
     let db = load_real_database();
@@ -6986,6 +7776,13 @@ fn char_pl_s_bp2_003_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中にライブカードがないとき、それらのカードをすべて控え室に置いてもよい。これにより1枚以上のカードが控え室に置かれた場合、そのエールで得たブレードハートを失い、もう一度エールを行う。
+/// expect: - conditional_on_result
+/// expect:   ? condition: type=location_condition location=revealed_cards negation=True
+/// expect:   - move_cards source=revealed_cards destination=discard card_type=card
+/// expect:     ? condition: type=location_condition location=revealed_cards negation=True
+/// expect:   - sequential
+/// expect:     - re_yell target=self
+/// expect:     - perform_yell count=1 target=self
 #[test]
 fn char_pl_s_bp2_004_p_ab0() {
     let db = load_real_database();
@@ -7006,6 +7803,7 @@ fn char_pl_s_bp2_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを7枚見る。その中から{{heart_02.png|heart02}}か{{heart_04.png|heart04}}か{{heart_05.png|heart
+/// expect: - look_and_select heart_colors=heart02/heart04/heart05
 #[test]
 fn char_pl_s_bp2_005_r_ab0() {
     let db = load_real_database();
@@ -7026,6 +7824,7 @@ fn char_pl_s_bp2_005_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分の控え室から、コストの合計が4以
+/// expect: - move_cards count=2 source=discard destination=stage card_type=member_card target=self
 #[test]
 fn char_pl_s_bp2_006_p_ab0() {
     let db = load_real_database();
@@ -7046,6 +7845,8 @@ fn char_pl_s_bp2_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、自分の手札が7枚以下の場合、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=compound operator=and
 #[test]
 fn char_pl_s_bp2_007_r_ab0() {
     let db = load_real_database();
@@ -7066,6 +7867,7 @@ fn char_pl_s_bp2_007_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札のライブカードを1枚公開し、デッキの一番下に置いてもよい：自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_s_bp2_007_r_ab1() {
     let db = load_real_database();
@@ -7086,6 +7888,7 @@ fn char_pl_s_bp2_007_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室からライブカードを1枚までデッキの一番下に置く。
+/// expect: - move_cards count=1 source=discard destination=deck_bottom card_type=live_card target=self
 #[test]
 fn char_pl_s_bp2_008_r_ab0() {
     let db = load_real_database();
@@ -7106,6 +7909,8 @@ fn char_pl_s_bp2_008_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合、「{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが1枚以上ある場合
+/// expect: - gain_ability count=1 source=revealed_cards card_type=live_card target=self
+/// expect:   ? condition: type=compound operator=and location=stage group_names=['Aqours']
 #[test]
 fn char_pl_s_bp2_008_r_ab1() {
     let db = load_real_database();
@@ -7126,6 +7931,9 @@ fn char_pl_s_bp2_008_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを2枚引き、手札を2枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=2 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_s_bp2_010_n_ab0() {
     let db = load_real_database();
@@ -7146,6 +7954,8 @@ fn char_pl_s_bp2_010_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブカード置き場に「MY舞☆TONIGHT」以外の『Aqours』のライブカードがある場合、ライブ終了時まで、自分のステージのメンバーは{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade card_type=member_card target=self duration=live_end
+/// expect:   ? condition: type=group_condition location=live_card_zone group_names=['Aqours']
 #[test]
 fn char_pl_s_bp2_023_secl_ab0() {
     let db = load_real_database();
@@ -7166,6 +7976,7 @@ fn char_pl_s_bp2_023_secl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このカードは成功ライブカード置き場に置くことができない。
+/// expect: - restriction count=1 destination=success_live_zone card_type=live_card
 #[test]
 fn char_pl_s_bp2_024_secl_ab0() {
     let db = load_real_database();
@@ -7186,6 +7997,7 @@ fn char_pl_s_bp2_024_secl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}メンバー1人をウェイトにする：ライブ終了時まで、これによってウェイト状態になったメンバーは、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。（この能力はセ
+/// expect: - gain_ability card_type=member_card duration=live_end
 #[test]
 fn char_pl_s_bp3_001_r_ab0() {
     let db = load_real_database();
@@ -7206,6 +8018,8 @@ fn char_pl_s_bp3_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブの合計スコアが相手より高い場合、このカードを手札に加えてもよい。この能力は、このカードが自分のエールによって公開されている場合のみ発動する。
+/// expect: - move_cards count=1 source=revealed_cards destination=hand card_type=card
+/// expect:   ? condition: type=comparison_condition operator=>
 #[test]
 fn char_pl_s_bp3_002_p_ab0() {
     let db = load_real_database();
@@ -7226,6 +8040,7 @@ fn char_pl_s_bp3_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札のライブカードを1枚控え室に置いてもよい：カードを3枚引く。
+/// expect: - draw_card count=3 source=deck destination=hand
 #[test]
 fn char_pl_s_bp3_003_r_ab0() {
     let db = load_real_database();
@@ -7246,6 +8061,7 @@ fn char_pl_s_bp3_003_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を2枚まで控え室に置いてもよい：ライブ終了時まで、これによって控え室に置いたカード1枚につき、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade duration=live_end per_unit_type=discard
 #[test]
 fn char_pl_s_bp3_003_r_ab1() {
     let db = load_real_database();
@@ -7266,6 +8082,7 @@ fn char_pl_s_bp3_003_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを4枚見る。その中からメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_s_bp3_004_p_ab0() {
     let db = load_real_database();
@@ -7286,6 +8103,8 @@ fn char_pl_s_bp3_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの枚数が、相手がエールによって公開したカードの枚数より少ない場合、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=location_condition location=revealed_cards negation=True
 #[test]
 fn char_pl_s_bp3_005_p_ab0() {
     let db = load_real_database();
@@ -7306,6 +8125,9 @@ fn char_pl_s_bp3_005_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}このメンバーをウェイトにし、手札を1枚控え室に置く：このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から、そのメンバーのコ
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=stage destination=discard card_type=member_card target=self
+/// expect:   - move_cards count=1 source=discard destination=same_area card_type=member_card target=self cost_limit_operator==
 #[test]
 fn char_pl_s_bp3_006_r_ab0() {
     let db = load_real_database();
@@ -7326,6 +8148,7 @@ fn char_pl_s_bp3_006_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}：自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。そうした場合、自分はカードを1枚引く。
+/// expect: - choose_target_player
 #[test]
 fn char_pl_s_bp3_007_p_ab0() {
     let db = load_real_database();
@@ -7346,6 +8169,10 @@ fn char_pl_s_bp3_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。それがスコア6以上の『Aqours』のライブカードの場合、エネルギーを4枚アクティブにする。
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=live_card target=self
+/// expect:   - change_state count=4 state_change=active card_type=energy_card
+/// expect:     ? condition: type=comparison_condition count=6 operator=>= group_names=['Aqours']
 #[test]
 fn char_pl_s_bp3_008_p_ab0() {
     let db = load_real_database();
@@ -7366,6 +8193,7 @@ fn char_pl_s_bp3_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを6枚見る。その中から『Aqours』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_s_bp3_009_p_ab0() {
     let db = load_real_database();
@@ -7386,6 +8214,7 @@ fn char_pl_s_bp3_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバーを1人までアクティブにする。
+/// expect: - change_state count=1 source=stage state_change=active card_type=member_card target=self
 #[test]
 fn char_pl_s_bp3_011_n_ab0() {
     let db = load_real_database();
@@ -7406,6 +8235,7 @@ fn char_pl_s_bp3_011_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにしてもよい：相手のステージにいるコスト4以下のメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent cost_limit=4 cost_limit_operator=<=
 #[test]
 fn char_pl_s_bp3_012_n_ab0() {
     let db = load_real_database();
@@ -7426,6 +8256,9 @@ fn char_pl_s_bp3_012_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室にあるメンバーカード1枚をデッキの一番上に置いてもよい。そうした場合、ライブ終了時まで、自分のステージにいるメンバー1人は、{{icon_blade.png|ブレード}}を得る。
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=discard destination=deck_top card_type=member_card target=self
+/// expect:   - gain_resource count=1 resource=blade card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_s_bp3_021_l_ab0() {
     let db = load_real_database();
@@ -7446,6 +8279,8 @@ fn char_pl_s_bp3_021_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 能力を持たないメンバーからバトンタッチして登場した場合、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=movement_condition
 #[test]
 fn char_pl_s_bp5_001_r_ab0() {
     let db = load_real_database();
@@ -7466,6 +8301,7 @@ fn char_pl_s_bp5_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 能力を持たないメンバーカードを自分の手札から登場させるためのコストは1減る。
+/// expect: - modify_cost count=1 source=hand destination=stage card_type=member_card target=self operation=subtract value=1
 #[test]
 fn char_pl_s_bp5_001_r_ab1() {
     let db = load_real_database();
@@ -7486,6 +8322,8 @@ fn char_pl_s_bp5_001_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のすべてのメン
+/// expect: - change_state source=stage state_change=wait card_type=member_card target=opponent
+/// expect:   ? condition: type=location_condition operator== location=stage
 #[test]
 fn char_pl_s_bp5_002_r_ab0() {
     let db = load_real_database();
@@ -7506,6 +8344,7 @@ fn char_pl_s_bp5_002_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札のブレードハートを持たないメンバーカードを2枚まで控え室に置いてもよい：自分の控え室から、これにより控え室に置いたカードと同じ枚数の『Aqours』のライブカードを手札に加える。
+/// expect: - move_cards source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_s_bp5_003_p_ab0() {
     let db = load_real_database();
@@ -7526,6 +8365,9 @@ fn char_pl_s_bp5_003_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 以下から1つを選ぶ。 ・自分のステージにいるこのメンバー以外の『Aqours』のメンバー1人は、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。 ・自分のステージにいる『SaintSnow』のメン
+/// expect: - choice count=1
+/// expect:   - gain_resource count=1 resource=blade card_type=member_card target=self duration=live_end
+/// expect:   - position_change count=1 source=stage card_type=member_card target=self
 #[test]
 fn char_pl_s_bp5_004_p_ab0() {
     let db = load_real_database();
@@ -7546,6 +8388,9 @@ fn char_pl_s_bp5_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：{{heart_03.png|heart03}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}のうち、1つを選ぶ。ライブ終了時まで、自
+/// expect: - sequential heart_colors=heart03/heart04/heart05
+/// expect:   - select count=1 heart_colors=heart03/heart04/heart05
+/// expect:   - gain_resource resource=heart card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_s_bp5_005_r_ab0() {
     let db = load_real_database();
@@ -7566,6 +8411,7 @@ fn char_pl_s_bp5_005_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにし、手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からコスト9以上の『Aqours』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_s_bp5_006_p_ab0() {
     let db = load_real_database();
@@ -7586,6 +8432,7 @@ fn char_pl_s_bp5_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを4枚見る。その中からハートに{{heart_04.png|heart04}}を2つ以上持つメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select heart_colors=heart04
 #[test]
 fn char_pl_s_bp5_007_p_ab0() {
     let db = load_real_database();
@@ -7606,6 +8453,8 @@ fn char_pl_s_bp5_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手の余剰ハートが2つ以上あるかぎり、自分のライブの合計スコアを＋１する。
+/// expect: - modify_score target=live_total duration=as_long_as operation=add value=1
+/// expect:   ? condition: type=comparison_condition count=2 operator=>=
 #[test]
 fn char_pl_s_bp5_008_p_ab0() {
     let db = load_real_database();
@@ -7626,6 +8475,9 @@ fn char_pl_s_bp5_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：自分の控え室から『SaintSnow』のカードを1枚手札に加える。そうした場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_bl
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=card target=self
+/// expect:   - gain_resource count=2 resource=blade duration=live_end
 #[test]
 fn char_pl_s_bp5_009_p_ab0() {
     let db = load_real_database();
@@ -7646,6 +8498,8 @@ fn char_pl_s_bp5_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブカード置き場にあるカードの必要ハートに含まれる{{heart_04.png|heart04}}の合計が4以上の場合、ライブ終了時まで、{{heart_04.png|heart04}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart04 target=self duration=live_end
+/// expect:   ? condition: type=location_condition count=4 operator=>= location=live_card_zone
 #[test]
 fn char_pl_s_bp5_013_n_ab0() {
     let db = load_real_database();
@@ -7666,6 +8520,7 @@ fn char_pl_s_bp5_013_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを10枚控え室に置く。
+/// expect: - move_cards count=10 source=deck_top destination=discard card_type=card target=self
 #[test]
 fn char_pl_s_bp5_015_n_ab0() {
     let db = load_real_database();
@@ -7686,6 +8541,8 @@ fn char_pl_s_bp5_015_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブカード置き場にあるカードの必要ハートに含まれる{{heart_05.png|heart05}}の合計が4以上の場合、ライブ終了時まで、{{heart_05.png|heart05}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart05 target=self duration=live_end
+/// expect:   ? condition: type=location_condition count=4 operator=>= location=live_card_zone
 #[test]
 fn char_pl_s_bp5_017_n_ab0() {
     let db = load_real_database();
@@ -7706,6 +8563,8 @@ fn char_pl_s_bp5_017_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分か相手の成功ライブカード置き場にカードが2枚以上ある場合、エールにより公開された自分のカードの中から、メンバーカードを2枚まで手札に加える。
+/// expect: - move_cards count=2 source=revealed_cards destination=hand card_type=member_card target=self
+/// expect:   ? condition: type=card_count_condition count=2 operator=>= location=success_live_zone
 #[test]
 fn char_pl_s_bp5_019_l_ab0() {
     let db = load_real_database();
@@ -7726,6 +8585,7 @@ fn char_pl_s_bp5_019_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}：このメンバーを『Aqours』か『SaintSnow』のメンバーがいるエリアにポジションチェンジする。
+/// expect: - position_change card_type=member_card
 #[test]
 fn char_pl_s_bp5_111_p_ab0() {
     let db = load_real_database();
@@ -7746,6 +8606,8 @@ fn char_pl_s_bp5_111_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーがエリアを移動したとき、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent
+/// expect:   ? condition: type=movement_condition
 #[test]
 fn char_pl_s_bp5_111_p_ab1() {
     let db = load_real_database();
@@ -7766,6 +8628,8 @@ fn char_pl_s_bp5_111_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーがエリアを移動したとき、エネルギーを2枚アクティブにする。
+/// expect: - change_state count=2 state_change=active card_type=energy_card
+/// expect:   ? condition: type=movement_condition
 #[test]
 fn char_pl_s_bp5_222_p_ab1() {
     let db = load_real_database();
@@ -7786,6 +8650,8 @@ fn char_pl_s_bp5_222_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 控え室から登場している場合、相手のステージの右サイドエリアか左サイドエリアにいるコスト13以上のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 state_change=wait card_type=member_card target=opponent cost_limit=13 cost_limit_operator=>=
+/// expect:   ? condition: type=appearance_condition location=stage
 #[test]
 fn char_pl_s_bp6_001_p_ab0() {
     let db = load_real_database();
@@ -7806,6 +8672,8 @@ fn char_pl_s_bp6_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 『Aqours』のライブカードが自分のライブカード置き場から控え室に置かれたとき、そのライブカードをデッキの一番上か一番下に置いてもよい。
+/// expect: - move_cards count=1 source=those_cards destination=deck_top_or_bottom card_type=live_card
+/// expect:   ? condition: type=card_count_condition count=1 operator=>= group_names=['Aqours']
 #[test]
 fn char_pl_s_bp6_002_r_ab0() {
     let db = load_real_database();
@@ -7826,6 +8694,8 @@ fn char_pl_s_bp6_002_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブカード置き場にあるカードが『Aqours』のみで、かつそれらの必要ハートに含まれる{{heart_02.png|heart02}}と{{heart_04.png|heart04}}と{{heart_05.pn
+/// expect: - gain_resource count=2 resource=heart heart_type=all target=self duration=live_end
+/// expect:   ? condition: type=compound operator=and location=live_card_zone group_names=['Aqours']
 #[test]
 fn char_pl_s_bp6_002_r_ab1() {
     let db = load_real_database();
@@ -7846,6 +8716,9 @@ fn char_pl_s_bp6_002_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く：このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=stage destination=discard card_type=member_card target=self
+/// expect:   - move_cards count=1 source=discard destination=same_area card_type=member_card target=self cost_limit_operator==
 #[test]
 fn char_pl_s_bp6_003_r_ab0() {
     let db = load_real_database();
@@ -7866,6 +8739,11 @@ fn char_pl_s_bp6_003_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブカード置き場にカードが2枚以上ある場合、その中から{{live_start.png|ライブ開始時}}能力を持たない『Aqours』のライブカードを1枚選び、デッキの一番上に置いてもよい。そうした場合、ライブ終
+/// expect: - sequential heart_colors=heart02/heart04
+/// expect:   ? condition: type=card_count_condition count=2 operator=>= location=live_card_zone
+/// expect:   - select count=1 source=live_card_zone card_type=live_card
+/// expect:   - move_cards heart_colors=heart02/heart04 source=selected_cards destination=deck_top target=self duration=live_end
+/// expect:   - gain_resource count=2 resource=heart heart_colors=heart02/heart04 duration=live_end
 #[test]
 fn char_pl_s_bp6_004_r_ab0() {
     let db = load_real_database();
@@ -7886,6 +8764,7 @@ fn char_pl_s_bp6_004_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを2枚見る。その中から{{heart_02.png|heart02}}と{{heart_04.png|heart04}}と{{heart_05.png|heart05}}をすべて持つメンバーカー
+/// expect: - look_and_select heart_colors=heart02/heart04/heart05
 #[test]
 fn char_pl_s_bp6_005_p_ab0() {
     let db = load_real_database();
@@ -7906,6 +8785,10 @@ fn char_pl_s_bp6_005_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを2枚引く。その後、控え室から登場している場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - sequential
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - gain_resource count=3 resource=blade duration=live_end
+/// expect:     ? condition: type=appearance_condition location=stage
 #[test]
 fn char_pl_s_bp6_006_p_ab0() {
     let db = load_real_database();
@@ -7926,6 +8809,8 @@ fn char_pl_s_bp6_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}支払うか手札を2枚控え室に置いてもよい：自分の成功ライブカード置き場にカードがなく、かつ相手の成功ライブカード置き場にカードが2枚以上あ
+/// expect: - gain_ability count=2 source=stage card_type=member_card target=self duration=live_end
+/// expect:   ? condition: type=compound operator=and location=success_live_card_zone
 #[test]
 fn char_pl_s_bp6_007_p_ab0() {
     let db = load_real_database();
@@ -7946,6 +8831,7 @@ fn char_pl_s_bp6_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く：自分の控え室からコスト17以下の『Aqours』のメンバーカードを1枚、このメンバーがいたエリア
+/// expect: - move_cards count=1 source=discard destination=same_area card_type=member_card target=self cost_limit=17 cost_limit_operator=<=
 #[test]
 fn char_pl_s_bp6_008_p_ab0() {
     let db = load_real_database();
@@ -7966,6 +8852,8 @@ fn char_pl_s_bp6_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手の成功ライブカード置き場にあるカードの枚数が自分より多いかぎり、その差に等しい数の{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade duration=as_long_as
+/// expect:   ? condition: type=comparison_condition operator=> location=success_live_card_zone
 #[test]
 fn char_pl_s_bp6_009_r_ab0() {
     let db = load_real_database();
@@ -7986,6 +8874,8 @@ fn char_pl_s_bp6_009_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}エールにより公開された自分のカードの中に、{{icon_score.png|スコア}}を持つ『Aqours』のライブカードがある場合、ライブの合計スコアを＋１する。
+/// expect: - modify_score target=live_total operation=add value=1
+/// expect:   ? condition: type=location_condition location=revealed_cards group_names=['Aqours']
 #[test]
 fn char_pl_s_bp6_009_r_ab1() {
     let db = load_real_database();
@@ -8006,6 +8896,8 @@ fn char_pl_s_bp6_009_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブ中のライブカードの必要ハートに含まれる{{heart_02.png|heart02}}の合計が4以上の場合、ライブ終了時まで、{{heart_02.png|heart02}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart02 target=self duration=live_end
+/// expect:   ? condition: type=temporal_condition count=4
 #[test]
 fn char_pl_s_bp6_010_n_ab0() {
     let db = load_real_database();
@@ -8026,6 +8918,10 @@ fn char_pl_s_bp6_010_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 控え室から登場している場合、カードを2枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   ? condition: type=appearance_condition location=stage
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_s_bp6_011_n_ab0() {
     let db = load_real_database();
@@ -8046,6 +8942,7 @@ fn char_pl_s_bp6_011_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを5枚控え室に置く。
+/// expect: - move_cards count=5 source=deck_top destination=discard card_type=card target=self
 #[test]
 fn char_pl_s_bp6_012_n_ab0() {
     let db = load_real_database();
@@ -8066,6 +8963,8 @@ fn char_pl_s_bp6_012_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 控え室から登場している場合、自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。
+/// expect: - look_and_select
+/// expect:   ? condition: type=appearance_condition location=stage
 #[test]
 fn char_pl_s_bp6_016_n_ab0() {
     let db = load_real_database();
@@ -8086,6 +8985,7 @@ fn char_pl_s_bp6_016_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにしてもよい：自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}
+/// expect: - look_and_select
 #[test]
 fn char_pl_s_bp6_018_n_ab0() {
     let db = load_real_database();
@@ -8106,6 +9006,9 @@ fn char_pl_s_bp6_018_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分の控え室からコスト10以上のメンバーカードを1枚手札に加える。これにより「桜内梨子」か「渡辺曜」を手札に加えた場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{
+/// expect: - conditional_on_result
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=member_card target=self cost_limit=10 cost_limit_operator=>=
+/// expect:   - gain_resource count=2 resource=blade duration=live_end
 #[test]
 fn char_pl_s_bp7_001_p_ab0() {
     let db = load_real_database();
@@ -8126,6 +9029,8 @@ fn char_pl_s_bp7_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにコスト9以上の『Aqours』のメンバーがいる場合、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=comparison_condition count=9 operator=>= location=stage group_names=['Aqours']
 #[test]
 fn char_pl_s_bp7_002_p_ab0() {
     let db = load_real_database();
@@ -8146,6 +9051,9 @@ fn char_pl_s_bp7_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの一番上のカードを見る。それをデッキの一番下に置いてもよい。
+/// expect: - sequential
+/// expect:   - look_at count=1 source=deck_top target=self
+/// expect:   - move_cards count=1 source=looked_at destination=deck_bottom card_type=card
 #[test]
 fn char_pl_s_bp7_003_r_ab0() {
     let db = load_real_database();
@@ -8166,6 +9074,9 @@ fn char_pl_s_bp7_003_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 以下から1つを選ぶ。 ・ライブ終了時まで、自分のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下の『Aqours』のメンバーは、相手の効果によってはウェイトしない。 ・このメンバーを『A
+/// expect: - choice count=1
+/// expect:   - restriction count=3 source=stage card_type=member_card target=opponent
+/// expect:   - position_change card_type=member_card
 #[test]
 fn char_pl_s_bp7_003_r_ab1() {
     let db = load_real_database();
@@ -8186,6 +9097,7 @@ fn char_pl_s_bp7_003_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室にあるメンバーカード1枚を、自分のステージにいるメンバー1人の下に置く。
+/// expect: - move_cards count=1 source=discard destination=under_member card_type=member_card target=self
 #[test]
 fn char_pl_s_bp7_005_r_ab0() {
     let db = load_real_database();
@@ -8206,6 +9118,7 @@ fn char_pl_s_bp7_005_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいる、メンバーカードが下に置かれている『Aqours』のメンバーは、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade card_type=member_card target=self
 #[test]
 fn char_pl_s_bp7_005_r_ab1() {
     let db = load_real_database();
@@ -8226,6 +9139,9 @@ fn char_pl_s_bp7_005_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}手札を2枚控え室に置く：このメンバーと自分のステージにいるほかの『Aqours』のメンバー1人を選ぶ。それらが持つ{{toujyou.png|登場}}能力それぞれ1つを発動させる。
+/// expect: - sequential
+/// expect:   - select count=2 source=stage card_type=member_card target=self
+/// expect:   - activate_ability count=1 target=それらが持つ{{toujyou.png|登場}}能力
 #[test]
 fn char_pl_s_bp7_005_r_ab2() {
     let db = load_real_database();
@@ -8246,6 +9162,10 @@ fn char_pl_s_bp7_005_r_ab2() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの下からカードを3枚控え室に置く。それらがすべて『Aqours』のメンバーカードの場合、ライブ終了時まで、{{heart_04.png|heart04}}を得る。
+/// expect: - sequential heart_colors=heart04
+/// expect:   - move_cards count=3 source=deck_bottom destination=discard card_type=card target=self
+/// expect:   - gain_resource count=1 resource=heart heart_colors=heart04 duration=live_end
+/// expect:     ? condition: type=card_count_condition count=3 operator== group_names=['Aqours']
 #[test]
 fn char_pl_s_bp7_006_p_ab0() {
     let db = load_real_database();
@@ -8266,6 +9186,9 @@ fn char_pl_s_bp7_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室からコスト2以下のメンバーカードを1枚手札に加える。これによって「津島善子」か「黒澤ルビィ」を手札に加えた場合、そのカードを自分のステージのメンバーのいないエリアに登場させてもよい。
+/// expect: - conditional_on_result
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=member_card target=self cost_limit=2 cost_limit_operator=<=
+/// expect:   - move_cards count=1 source=preceding_moved destination=empty_area card_type=member_card target=self
 #[test]
 fn char_pl_s_bp7_007_r_ab0() {
     let db = load_real_database();
@@ -8286,6 +9209,9 @@ fn char_pl_s_bp7_007_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室から『Aqours』のメンバーカードを3枚まで好きな順番でデッキの下に置く。ライブ終了時まで、これによりデッキに置かれたカード1枚につき、{{icon_blade.png|ブレード}}を得る。
+/// expect: - sequential
+/// expect:   - move_cards count=3 source=discard destination=deck_bottom card_type=member_card target=self
+/// expect:   - gain_resource count=1 resource=blade duration=live_end per_unit_type=枚
 #[test]
 fn char_pl_s_bp7_007_r_ab1() {
     let db = load_real_database();
@@ -8306,6 +9232,7 @@ fn char_pl_s_bp7_007_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを好きな順番でデッキの下に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_s_bp7_008_p_ab0() {
     let db = load_real_database();
@@ -8326,6 +9253,10 @@ fn char_pl_s_bp7_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの一番下のカードを控え室に置いてもよい。それが「松浦果南」か「黒澤ダイヤ」の場合、それを手札に加える。
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=deck_bottom destination=discard card_type=card target=self
+/// expect:   - move_cards count=1 source=preceding_moved destination=hand card_type=card
+/// expect:     ? condition: type=location_condition count=1 operator=>=
 #[test]
 fn char_pl_s_bp7_008_p_ab1() {
     let db = load_real_database();
@@ -8346,6 +9277,7 @@ fn char_pl_s_bp7_008_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーの正面のエリアにいるコスト4以下のメンバーは、{{icon_blade.png|ブレード}}を1つ失う。
+/// expect: - gain_resource count=1 resource=blade cost_limit=4 cost_limit_operator=<=
 #[test]
 fn char_pl_s_bp7_009_p_ab0() {
     let db = load_real_database();
@@ -8366,6 +9298,7 @@ fn char_pl_s_bp7_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室から『Aqours』のカードを2枚まで好きな順番でデッキの下に置く。
+/// expect: - move_cards count=2 source=discard destination=deck_bottom card_type=card target=self
 #[test]
 fn char_pl_s_bp7_019_l_ab0() {
     let db = load_real_database();
@@ -8386,6 +9319,8 @@ fn char_pl_s_bp7_019_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるすべてのメンバーがアクティブ状態の場合、このカードの必要ハートを{{heart_00.png|heart0}}減らす。
+/// expect: - modify_required_hearts heart_colors=heart00 operation=decrease value=1
+/// expect:   ? condition: type=state_condition count=1 operator=>= location=stage
 #[test]
 fn char_pl_s_bp7_020_secl_ab0() {
     let db = load_real_database();
@@ -8406,6 +9341,10 @@ fn char_pl_s_bp7_020_secl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの下からカードを1枚控え室に置く。それが『Aqours』のメンバーカードの場合、このカードの必要ハートを{{heart_00.png|heart0}}減らす。
+/// expect: - sequential heart_colors=heart00
+/// expect:   - move_cards count=1 source=deck_bottom destination=discard card_type=card target=self
+/// expect:   - modify_required_hearts heart_colors=heart00 operation=decrease value=1
+/// expect:     ? condition: type=group_condition group_names=['Aqours']
 #[test]
 fn char_pl_s_bp7_020_secl_ab1() {
     let db = load_real_database();
@@ -8426,6 +9365,7 @@ fn char_pl_s_bp7_020_secl_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエールは、デッキの上から行う代わりにデッキの下から行う。
+/// expect: - modify_yell_source
 #[test]
 fn char_pl_s_bp7_022_secl_ab0() {
     let db = load_real_database();
@@ -8446,6 +9386,8 @@ fn char_pl_s_bp7_022_secl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中に、{{heart_02.png|heart02}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}を持つ『Aqours』のメンバ
+/// expect: - modify_score heart_colors=heart02/heart04/heart05 operation=add value=1
+/// expect:   ? condition: type=location_condition location=revealed_cards group_names=['Aqours']
 #[test]
 fn char_pl_s_bp7_022_secl_ab1() {
     let db = load_real_database();
@@ -8466,6 +9408,10 @@ fn char_pl_s_bp7_022_secl_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに『Aqours』のメンバーが2人以上いる場合、自分のエネルギー1枚をエネルギーデッキに置いてもよい。そうしたとき、相手のエネルギーが自分より1枚多い場合、このカードのスコアを＋１する。2枚以上多い場合、代
+/// expect: - conditional_alternative
+/// expect:   ? condition: type=card_count_condition count=2 operator=>= location=stage group_names=['Aqours']
+/// expect:   - move_cards count=1 source=energy_zone destination=energy_deck card_type=energy_card target=both
+/// expect:   - modify_score operation=add value=2
 #[test]
 fn char_pl_s_bp7_023_l_ab0() {
     let db = load_real_database();
@@ -8486,6 +9432,7 @@ fn char_pl_s_bp7_023_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブ終了時まで、自分のステージにいる『Aqours』のメンバー1人は、元々持つハートがすべて{{heart_04.png|heart04}}になる。
+/// expect: - set_heart_type count=1 heart_colors=heart04 heart_type=heart04 source=stage card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_s_bp7_024_l_ab0() {
     let db = load_real_database();
@@ -8506,6 +9453,8 @@ fn char_pl_s_bp7_024_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手の手札の枚数が自分より2枚以上多い場合、自分の控え室からライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
+/// expect:   ? condition: type=card_count_condition count=2 operator=>= location=hand
 #[test]
 fn char_pl_s_pb1_001_p_ab0() {
     let db = load_real_database();
@@ -8526,6 +9475,11 @@ fn char_pl_s_pb1_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手は手札からライブカードを1枚控え室に置いてもよい。そうしなかった場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=live_card target=opponent
+/// expect:   - conditional_on_optional
+/// expect:     - do_nothing
+/// expect:     - gain_ability duration=live_end
 #[test]
 fn char_pl_s_pb1_002_p_ab0() {
     let db = load_real_database();
@@ -8546,6 +9500,7 @@ fn char_pl_s_pb1_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、このメンバーが元々持つハートはすべて{{heart_04.png|heart04}}になる。
+/// expect: - set_heart_type count=1 heart_colors=heart04 heart_type=heart04 card_type=member_card duration=live_end
 #[test]
 fn char_pl_s_pb1_003_p_ab0() {
     let db = load_real_database();
@@ -8566,6 +9521,7 @@ fn char_pl_s_pb1_003_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中から、ライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=revealed_cards destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_s_pb1_003_p_ab1() {
     let db = load_real_database();
@@ -8586,6 +9542,8 @@ fn char_pl_s_pb1_003_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手のエネルギーが自分より多い場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=3 resource=blade
+/// expect:   ? condition: type=comparison_condition operator=>
 #[test]
 fn char_pl_s_pb1_005_p_ab0() {
     let db = load_real_database();
@@ -8606,6 +9564,11 @@ fn char_pl_s_pb1_005_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札のライブカードを1枚公開する：相手は手札を1枚控え室に置いてもよい。そうしなかった場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_bl
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card target=opponent
+/// expect:   - conditional_on_optional
+/// expect:     - do_nothing
+/// expect:     - gain_resource count=4 resource=blade duration=live_end
 #[test]
 fn char_pl_s_pb1_006_p_ab0() {
     let db = load_real_database();
@@ -8626,6 +9589,8 @@ fn char_pl_s_pb1_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   ? condition: type=card_count_condition count=1 operator=>= location=revealed_cards
 #[test]
 fn char_pl_s_pb1_007_p_ab0() {
     let db = load_real_database();
@@ -8646,6 +9611,7 @@ fn char_pl_s_pb1_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分か相手を選ぶ。自分は、そのプレイヤーのデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。
+/// expect: - choose_target_player
 #[test]
 fn char_pl_s_pb1_008_p_ab0() {
     let db = load_real_database();
@@ -8666,6 +9632,8 @@ fn char_pl_s_pb1_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分と相手の成功ライブカード置き場にカードが合計3枚以上ある場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=3 resource=blade
+/// expect:   ? condition: type=card_count_condition count=3 operator=>= location=success_live_card_zone
 #[test]
 fn char_pl_s_pb1_009_p_ab0() {
     let db = load_real_database();
@@ -8686,6 +9654,7 @@ fn char_pl_s_pb1_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを4枚見る。その中からハートに{{heart_04.png|heart04}}を2個以上持つメンバーカードか、必要ハートに{{heart_04.png|heart
+/// expect: - look_and_select heart_colors=heart04
 #[test]
 fn char_pl_s_pb1_013_n_ab0() {
     let db = load_real_database();
@@ -8706,6 +9675,7 @@ fn char_pl_s_pb1_013_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを4枚見る。その中からハートに{{heart_02.png|heart02}}を2個以上持つメンバーカードか、必要ハートに{{heart_02.png|heart
+/// expect: - look_and_select heart_colors=heart02
 #[test]
 fn char_pl_s_pb1_014_n_ab0() {
     let db = load_real_database();
@@ -8726,6 +9696,8 @@ fn char_pl_s_pb1_014_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このターン、ライブに勝利するプレイヤーを決定するとき、自分と相手のライブの合計スコアが同じ場合、ライブ終了時まで、自分と相手は成功ライブカード置き場にカードを置くことができない。
+/// expect: - restriction count=1 destination=success_live_zone card_type=live_card target=both duration=live_end
+/// expect:   ? condition: type=comparison_condition operator== location=live_card_zone
 #[test]
 fn char_pl_s_pb1_022_l_ab0() {
     let db = load_real_database();
@@ -8746,6 +9718,9 @@ fn char_pl_s_pb1_022_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札の『Aqours』のカードを1枚公開してもよい：これにより公開したカードをデッキの一番上か一番下に置き、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=revealed_cards destination=deck_top_or_bottom card_type=card
+/// expect:   - gain_resource count=1 resource=blade duration=live_end
 #[test]
 fn char_pl_s_sd1_009_sd_ab0() {
     let db = load_real_database();
@@ -8766,6 +9741,8 @@ fn char_pl_s_sd1_009_sd_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ステージの左サイドエリアに登場しているなら、カードを2枚引く。
+/// expect: - draw_card count=2 source=deck destination=hand
+/// expect:   ? condition: type=appearance_condition location=stage
 #[test]
 fn char_pl_sp_bp1_002_r_ab0() {
     let db = load_real_database();
@@ -8786,6 +9763,8 @@ fn char_pl_sp_bp1_002_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札にあるメンバーカードを好きな枚数公開する：公開したカードのコストの合計が、10、20、30、40、50のいずれかの場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。
+/// expect: - gain_ability duration=live_end
+/// expect:   ? condition: type=comparison_condition count=10 operator== location=revealed_cards
 #[test]
 fn char_pl_sp_bp1_003_r_ab0() {
     let db = load_real_database();
@@ -8806,6 +9785,8 @@ fn char_pl_sp_bp1_003_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ステージのセンターエリアにいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}
+/// expect: - gain_resource count=5 resource=blade
+/// expect:   ? condition: type=position_condition location=stage
 #[test]
 fn char_pl_sp_bp1_004_p_ab0() {
     let db = load_real_database();
@@ -8826,6 +9807,7 @@ fn char_pl_sp_bp1_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『Liella!』のカードを1枚まで公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_sp_bp1_005_p_ab0() {
     let db = load_real_database();
@@ -8846,6 +9828,7 @@ fn char_pl_sp_bp1_005_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade duration=live_end
 #[test]
 fn char_pl_sp_bp1_006_r_ab0() {
     let db = load_real_database();
@@ -8866,6 +9849,8 @@ fn char_pl_sp_bp1_006_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーが11枚以上ある場合、自分の控え室からライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
+/// expect:   ? condition: type=card_count_condition count=11 operator=>= location=energy_zone
 #[test]
 fn char_pl_sp_bp1_007_r_ab0() {
     let db = load_real_database();
@@ -8886,6 +9871,10 @@ fn char_pl_sp_bp1_007_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを1枚引く。自分のステージに「米女メイ」がいる場合、さらにカードを1枚引く。
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:     ? condition: type=location_condition location=stage
 #[test]
 fn char_pl_sp_bp1_008_p_ab0() {
     let db = load_real_database();
@@ -8906,6 +9895,9 @@ fn char_pl_sp_bp1_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}：カードを1枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_sp_bp1_009_p_ab0() {
     let db = load_real_database();
@@ -8926,6 +9918,7 @@ fn char_pl_sp_bp1_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く：自分のデッキの上からカードを5枚見る。その中から『Liella!』のカードを1枚公開して手札に加えてもよい。残り
+/// expect: - look_and_select
 #[test]
 fn char_pl_sp_bp1_010_r_ab0() {
     let db = load_real_database();
@@ -8946,6 +9939,7 @@ fn char_pl_sp_bp1_010_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_sp_bp1_011_r_ab0() {
     let db = load_real_database();
@@ -8966,6 +9960,8 @@ fn char_pl_sp_bp1_011_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   ? condition: type=comparison_condition operator=>
 #[test]
 fn char_pl_sp_bp1_023_srl_ab0() {
     let db = load_real_database();
@@ -8986,6 +9982,11 @@ fn char_pl_sp_bp1_023_srl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}
+/// expect: - sequential heart_colors=heart05/heart01 duration=live_end
+/// expect:   - gain_resource count=1 resource=blade card_type=member_card target=self duration=live_end
+/// expect:   - gain_resource count=1 resource=heart card_type=member_card target=self duration=live_end
+/// expect:   - gain_resource count=1 resource=blade card_type=member_card target=self duration=live_end
+/// expect:   - gain_resource count=1 resource=heart card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_sp_bp1_024_srl_ab0() {
     let db = load_real_database();
@@ -9006,6 +10007,8 @@ fn char_pl_sp_bp1_024_srl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=location_condition location=stage
 #[test]
 fn char_pl_sp_bp1_024_srl_ab1() {
     let db = load_real_database();
@@ -9026,6 +10029,8 @@ fn char_pl_sp_bp1_024_srl_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる場合、このカードを成功させるための必要ハートは{{heart_02.png|heart02}}{{heart_02.png|heart02}
+/// expect: - modify_required_hearts count=2 heart_colors=heart02/heart03/heart06 operation=set value=2
+/// expect:   ? condition: type=location_condition count=5 operator=>= group_names=['Liella!']
 #[test]
 fn char_pl_sp_bp1_026_secl_ab0() {
     let db = load_real_database();
@@ -9046,6 +10051,8 @@ fn char_pl_sp_bp1_026_secl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーが12枚以上ある場合、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1
+/// expect:   ? condition: type=card_count_condition count=12 operator=>= location=energy_zone
 #[test]
 fn char_pl_sp_bp1_027_srl_ab0() {
     let db = load_real_database();
@@ -9066,6 +10073,9 @@ fn char_pl_sp_bp1_027_srl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいる『Liella!』のメンバー1人のすべての{{live_start.png|ライブ開始時}}能力を、ライブ終了時まで、無効にしてもよい。これにより無効にした場合、自分の控え室から『Liella!』のカ
+/// expect: - conditional_on_result
+/// expect:   - invalidate_ability count=1 source=stage card_type=member_card target=self duration=live_end
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=card target=self
 #[test]
 fn char_pl_sp_bp2_001_r_ab0() {
     let db = load_real_database();
@@ -9086,6 +10096,8 @@ fn char_pl_sp_bp2_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーがエリアを移動したとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   ? condition: type=movement_condition
 #[test]
 fn char_pl_sp_bp2_003_p_ab0() {
     let db = load_real_database();
@@ -9106,6 +10118,8 @@ fn char_pl_sp_bp2_003_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバーのうち、センターエリアにいるメンバーが最も大きいコストを持つ場合、{{heart_03.png|heart03}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart03 target=self
+/// expect:   ? condition: type=highest_cost_on_stage_condition operator=> location=stage
 #[test]
 fn char_pl_sp_bp2_004_p_ab0() {
     let db = load_real_database();
@@ -9126,6 +10140,7 @@ fn char_pl_sp_bp2_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分のデッキの上からカードを7枚見る。その中から『Liella!』のカードを1枚公開して手札に加えてもよい。残りを控え室
+/// expect: - look_and_select
 #[test]
 fn char_pl_sp_bp2_005_r_ab0() {
     let db = load_real_database();
@@ -9146,6 +10161,8 @@ fn char_pl_sp_bp2_005_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: バトンタッチして登場した場合、このバトンタッチで控え室に置かれた『Liella!』のメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=recently_moved destination=hand card_type=member_card
+/// expect:   ? condition: type=movement_condition
 #[test]
 fn char_pl_sp_bp2_006_r_ab0() {
     let db = load_real_database();
@@ -9166,6 +10183,7 @@ fn char_pl_sp_bp2_006_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札のコスト4以下の『Liella!』のメンバーカードを1枚控え室に置く：これにより控え室に置いたメンバーカードの{{toujyou.png|登場}}能力1つを発動させる。 ({{toujyou.png|登場}}能力がコ
+/// expect: - activate_ability count=1 target=これにより控え室に置いたメンバーカードの{{toujyou.png|登場}}能力
 #[test]
 fn char_pl_sp_bp2_006_r_ab1() {
     let db = load_real_database();
@@ -9186,6 +10204,7 @@ fn char_pl_sp_bp2_006_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_sp_bp2_007_p_ab0() {
     let db = load_real_database();
@@ -9206,6 +10225,11 @@ fn char_pl_sp_bp2_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}：このメンバーがいるエリアとは別の自分のエリア1つを選ぶ。このメンバーをそのエリアに移動する。選んだエリアにメンバーがいる場合、そのメンバーは、このメンバーがいたエリアに移動させ
+/// expect: - sequential
+/// expect:   - select count=1 card_type=member_card target=self
+/// expect:   - position_change card_type=member_card
+/// expect:   - position_change destination=same_area card_type=member_card
+/// expect:     ? condition: type=card_count_condition count=1 operator=>=
 #[test]
 fn char_pl_sp_bp2_008_p_ab0() {
     let db = load_real_database();
@@ -9226,6 +10250,9 @@ fn char_pl_sp_bp2_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを2枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_sp_bp2_009_r_ab1() {
     let db = load_real_database();
@@ -9246,6 +10273,7 @@ fn char_pl_sp_bp2_009_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブ終了時まで、自分の手札2枚につき、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade target=self duration=live_end per_unit_type=枚
 #[test]
 fn char_pl_sp_bp2_009_r_ab0() {
     let db = load_real_database();
@@ -9266,6 +10294,7 @@ fn char_pl_sp_bp2_009_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手のライブカード置き場にあるすべてのライブカードは、成功させるための必要ハートが{{heart_00.png|heart0}}多くなる。
+/// expect: - modify_required_hearts_global heart_colors=heart00 target=opponent operation=increase value=1
 #[test]
 fn char_pl_sp_bp2_010_r_ab0() {
     let db = load_real_database();
@@ -9286,6 +10315,8 @@ fn char_pl_sp_bp2_010_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにこのメンバー以外のメンバーが1人以上いる場合、ライブ終了時まで、エールによって公開される自分のカードの枚数が8枚減る。
+/// expect: - modify_yell_count count=8 duration=live_end operation=subtract
+/// expect:   ? condition: type=card_count_condition count=1 operator=>= location=stage
 #[test]
 fn char_pl_sp_bp2_010_r_ab1() {
     let db = load_real_database();
@@ -9306,6 +10337,11 @@ fn char_pl_sp_bp2_010_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室にある、カード名の異なるライブカードを2枚選ぶ。そうした場合、相手はそれらのカードのうち1枚を選ぶ。これにより相手に選ばれたカードを自分の手札に加える。
+/// expect: - sequential
+/// expect:   - select count=2 source=discard card_type=live_card target=self
+/// expect:   - sequential
+/// expect:     - select count=1 source=selected_cards target=opponent
+/// expect:     - move_cards count=1 source=selected_cards destination=hand card_type=card target=self
 #[test]
 fn char_pl_sp_bp2_011_p_ab0() {
     let db = load_real_database();
@@ -9326,6 +10362,7 @@ fn char_pl_sp_bp2_011_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室からカードを1枚までデッキの一番上に置く。
+/// expect: - move_cards count=1 source=discard destination=deck_top card_type=card target=self
 #[test]
 fn char_pl_sp_bp2_014_n_ab0() {
     let db = load_real_database();
@@ -9346,6 +10383,8 @@ fn char_pl_sp_bp2_014_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の成功ライブカード置き場のカード枚数が相手より少ない場合、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1
+/// expect:   ? condition: type=comparison_condition operator=< location=success_live_card_zone
 #[test]
 fn char_pl_sp_bp2_023_srl_ab0() {
     let db = load_real_database();
@@ -9366,6 +10405,8 @@ fn char_pl_sp_bp2_023_srl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の手札の枚数が相手より多い場合、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1
+/// expect:   ? condition: type=comparison_condition operator=> location=hand
 #[test]
 fn char_pl_sp_bp2_024_secl_ab0() {
     let db = load_real_database();
@@ -9386,6 +10427,8 @@ fn char_pl_sp_bp2_024_secl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに「澁谷かのん」、「ウィーン・マルガレーテ」、「鬼塚冬毬」のうち、名前の異なるメンバーが2人以上いる場合、エールにより公開された自分のカードの中から、カードを1枚手札に加える。
+/// expect: - move_cards count=1 source=revealed_cards destination=hand card_type=card target=self
+/// expect:   ? condition: type=location_condition count=2 operator=>= location=stage
 #[test]
 fn char_pl_sp_bp2_025_l_ab0() {
     let db = load_real_database();
@@ -9406,6 +10449,8 @@ fn char_pl_sp_bp2_025_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバーが『Liella!』のみで、かつ自分のエネルギーが7枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   ? condition: type=compound operator=and location=stage group_names=['Liella!']
 #[test]
 fn char_pl_sp_bp4_001_p_ab0() {
     let db = load_real_database();
@@ -9426,6 +10471,7 @@ fn char_pl_sp_bp4_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにしてもよい：自分のデッキの上からカードを4枚見る。その中から必要ハートの合計が8以上の『Liella!』のライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_sp_bp4_002_p_ab0() {
     let db = load_real_database();
@@ -9446,6 +10492,9 @@ fn char_pl_sp_bp4_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{leftside.png|左サイド}}{{rightside.png|右サイド}}カードを2枚引き、手札を2枚控え室に置く。（この能力は左サイドエリアか右サイドエリアに登場した場合のみ発動する。）
+/// expect: - sequential
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=2 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_sp_bp4_003_p_ab0() {
     let db = load_real_database();
@@ -9466,6 +10515,7 @@ fn char_pl_sp_bp4_003_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=2 resource=blade
 #[test]
 fn char_pl_sp_bp4_003_p_ab1() {
     let db = load_real_database();
@@ -9486,6 +10536,7 @@ fn char_pl_sp_bp4_003_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このカードのプレイに際し、2人のメンバーとバトンタッチしてもよい。
+/// expect: - play_baton_touch count=2
 #[test]
 fn char_pl_sp_bp4_004_r_ab0() {
     let db = load_real_database();
@@ -9506,6 +10557,10 @@ fn char_pl_sp_bp4_004_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}『Liella!』のメンバー2人からバトンタッチして登場している場合、カードを2枚引き、自分の控え室にあるコスト4以下の『Liella!』のメンバーカード1枚を自分のステージのメンバ
+/// expect: - sequential
+/// expect:   ? condition: type=appearance_condition location=stage group_names=['Liella!']
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=1 source=discard destination=empty_area card_type=member_card target=self cost_limit=4 cost_limit_operator=<=
 #[test]
 fn char_pl_sp_bp4_004_r_ab1() {
     let db = load_real_database();
@@ -9526,6 +10581,8 @@ fn char_pl_sp_bp4_004_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 『Liella!』のメンバーからバトンタッチして登場しており、かつ自分のエネルギーが7枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを2枚ウェイト状態で置く。
+/// expect: - move_cards count=2 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   ? condition: type=compound operator=and group_names=['Liella!']
 #[test]
 fn char_pl_sp_bp4_005_r_ab0() {
     let db = load_real_database();
@@ -9546,6 +10603,8 @@ fn char_pl_sp_bp4_005_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーが10枚以上あるかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=3 resource=blade duration=as_long_as
+/// expect:   ? condition: type=card_count_condition count=10 operator=>= location=energy_zone
 #[test]
 fn char_pl_sp_bp4_005_r_ab1() {
     let db = load_real_database();
@@ -9566,6 +10625,8 @@ fn char_pl_sp_bp4_005_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中に、名前が異なる『Liella!』のメンバーカードが3枚以上ある場合、エールにより公開された自分のカードの中から『Liella!』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=revealed_cards destination=hand card_type=live_card target=self
+/// expect:   ? condition: type=location_condition count=3 operator=>= location=revealed_cards group_names=['Liella!']
 #[test]
 fn char_pl_sp_bp4_006_p_ab0() {
     let db = load_real_database();
@@ -9586,6 +10647,8 @@ fn char_pl_sp_bp4_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーがエリアを移動したとき、自分の控え室から、スコア3以下の『Liella!』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self cost_limit=3 cost_limit_operator=<=
+/// expect:   ? condition: type=movement_condition
 #[test]
 fn char_pl_sp_bp4_007_p_ab0() {
     let db = load_real_database();
@@ -9606,6 +10669,9 @@ fn char_pl_sp_bp4_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{leftside.png|左サイド}}カードを2枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_sp_bp4_008_r_ab0() {
     let db = load_real_database();
@@ -9626,6 +10692,7 @@ fn char_pl_sp_bp4_008_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{rightside.png|右サイド}}エネルギーを2枚アクティブにする。
+/// expect: - change_state count=2 state_change=active card_type=energy_card
 #[test]
 fn char_pl_sp_bp4_008_r_ab1() {
     let db = load_real_database();
@@ -9646,6 +10713,7 @@ fn char_pl_sp_bp4_008_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをポジションチェンジしてもよい。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。)
+/// expect: - position_change card_type=member_card
 #[test]
 fn char_pl_sp_bp4_008_r_ab2() {
     let db = load_real_database();
@@ -9666,6 +10734,8 @@ fn char_pl_sp_bp4_008_r_ab2() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバーのコストの合計が相手より低いかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=3 resource=blade duration=as_long_as
+/// expect:   ? condition: type=comparison_condition operator=< location=stage
 #[test]
 fn char_pl_sp_bp4_009_p_ab0() {
     let db = load_real_database();
@@ -9686,6 +10756,7 @@ fn char_pl_sp_bp4_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}このメンバーをウェイトにする：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
 #[test]
 fn char_pl_sp_bp4_010_r_ab0() {
     let db = load_real_database();
@@ -9706,6 +10777,8 @@ fn char_pl_sp_bp4_010_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーが登場か、エリアを移動したとき、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent
+/// expect:   ? condition: type=or_condition operator=or
 #[test]
 fn char_pl_sp_bp4_011_r_ab0() {
     let db = load_real_database();
@@ -9726,6 +10799,8 @@ fn char_pl_sp_bp4_011_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{leftside.png|左サイド}}このターン、このメンバーがエリアを移動している場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。（この能
+/// expect: - gain_resource count=2 resource=blade duration=live_end
+/// expect:   ? condition: type=temporal_condition
 #[test]
 fn char_pl_sp_bp4_017_n_ab0() {
     let db = load_real_database();
@@ -9746,6 +10821,8 @@ fn char_pl_sp_bp4_017_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{rightside.png|右サイド}}このターン、このメンバーがエリアを移動している場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。（この
+/// expect: - gain_resource count=2 resource=blade duration=live_end
+/// expect:   ? condition: type=temporal_condition
 #[test]
 fn char_pl_sp_bp4_020_n_ab0() {
     let db = load_real_database();
@@ -9766,6 +10843,10 @@ fn char_pl_sp_bp4_020_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブ終了時まで、自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレ
+/// expect: - sequential duration=live_end
+/// expect:   - select count=1 card_type=member_card duration=live_end
+/// expect:   - select count=1 card_type=member_card duration=live_end
+/// expect:   - gain_resource count=1 resource=blade duration=live_end
 #[test]
 fn char_pl_sp_bp4_023_srl_ab0() {
     let db = load_real_database();
@@ -9786,6 +10867,7 @@ fn char_pl_sp_bp4_023_srl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]にな
+/// expect: - set_blade_type duration=live_end
 #[test]
 fn char_pl_sp_bp4_023_srl_ab1() {
     let db = load_real_database();
@@ -9806,6 +10888,8 @@ fn char_pl_sp_bp4_023_srl_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1
+/// expect:   ? condition: type=comparison_condition operator=> group_names=['Liella!']
 #[test]
 fn char_pl_sp_bp4_024_secl_ab0() {
     let db = load_real_database();
@@ -9826,6 +10910,8 @@ fn char_pl_sp_bp4_024_secl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合、そのメンバーは、ライブ終了時まで、{{icon_blade.png|ブレード}}{{i
+/// expect: - gain_resource count=2 resource=blade card_type=member_card duration=live_end
+/// expect:   ? condition: type=comparison_condition count=3 operator=>= location=stage group_names=['Liella!']
 #[test]
 fn char_pl_sp_bp4_024_secl_ab1() {
     let db = load_real_database();
@@ -9846,6 +10932,7 @@ fn char_pl_sp_bp4_024_secl_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブ終了時まで、自分のステージのセンターエリアにいる『Liella!』のメンバーが元々持つ{{icon_blade.png|ブレード}}の数は3つになる。
+/// expect: - set_blade_count count=3 card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_sp_bp4_025_srl_ab0() {
     let db = load_real_database();
@@ -9866,6 +10953,8 @@ fn char_pl_sp_bp4_025_srl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1
+/// expect:   ? condition: type=temporal_condition group_names=['Liella!']
 #[test]
 fn char_pl_sp_bp4_025_srl_ab1() {
     let db = load_real_database();
@@ -9886,6 +10975,8 @@ fn char_pl_sp_bp4_025_srl_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中に名前が異なる『Liella!』のメンバーカードが5枚以上ある場合、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1
+/// expect:   ? condition: type=location_condition count=5 operator=>= location=revealed_cards group_names=['Liella!']
 #[test]
 fn char_pl_sp_bp4_026_srl_ab0() {
     let db = load_real_database();
@@ -9906,6 +10997,10 @@ fn char_pl_sp_bp4_026_srl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーが11枚以上ある場合、カードを2枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   ? condition: type=card_count_condition count=11 operator=>= location=energy_zone
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_sp_bp4_026_srl_ab1() {
     let db = load_real_database();
@@ -9926,6 +11021,8 @@ fn char_pl_sp_bp4_026_srl_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバーが『Liella!』のみの場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動
+/// expect: - position_change source=stage card_type=member_card target=self
+/// expect:   ? condition: type=group_condition location=stage group_names=['Liella!']
 #[test]
 fn char_pl_sp_bp4_027_srl_ab0() {
     let db = load_real_database();
@@ -9946,6 +11043,8 @@ fn char_pl_sp_bp4_027_srl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: アクティブ状態の自分のエネルギーがある場合、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1
+/// expect:   ? condition: type=energy_state_condition
 #[test]
 fn char_pl_sp_bp4_028_srl_ab0() {
     let db = load_real_database();
@@ -9966,6 +11065,9 @@ fn char_pl_sp_bp4_028_srl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：以下から1つを選ぶ。 ・相手のステージにいるコスト4以下のメンバー1人をウェイトにする。 ・カードを1枚引く。
+/// expect: - choice count=1
+/// expect:   - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent cost_limit=4 cost_limit_operator=<=
+/// expect:   - draw_card count=1 source=deck destination=hand
 #[test]
 fn char_pl_sp_bp5_001_r_ab0() {
     let db = load_real_database();
@@ -9986,6 +11088,7 @@ fn char_pl_sp_bp5_001_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにするか、手札を1枚控え室に置く：エネルギーを1枚アクティブにする。
+/// expect: - change_state count=1 state_change=active card_type=energy_card
 #[test]
 fn char_pl_sp_bp5_001_r_ab3() {
     let db = load_real_database();
@@ -10006,6 +11109,14 @@ fn char_pl_sp_bp5_001_r_ab3() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{leftside.png|左サイド}}このメンバーをウェイトにする：カードを3枚引き、手札を2枚控え室に置く。これにより控え室に置いたカードの中にブレードハートを持たないメンバーカードが1枚以上ある場合、このメンバー
+/// expect: - conditional_on_result
+/// expect:   - sequential
+/// expect:     - draw_card count=3 source=deck destination=hand
+/// expect:     - move_cards count=2 source=hand destination=discard card_type=card
+/// expect:   - sequential
+/// expect:     - change_state count=1 state_change=active card_type=member_card
+/// expect:     - gain_resource count=2 resource=blade duration=live_end
+/// expect:       ? condition: type=card_count_condition count=2 operator== negation=True
 #[test]
 fn char_pl_sp_bp5_002_r_ab0() {
     let db = load_real_database();
@@ -10026,6 +11137,7 @@ fn char_pl_sp_bp5_002_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: コスト10の『Liella!』のメンバーカードを自分の手札から登場させるためのコストは2減る。
+/// expect: - modify_cost count=2 source=hand destination=stage card_type=member_card target=self operation=subtract value=2 cost_limit=10 cost_limit_operator==
 #[test]
 fn char_pl_sp_bp5_003_r_ab0() {
     let db = load_real_database();
@@ -10046,6 +11158,9 @@ fn char_pl_sp_bp5_003_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}自分のステージにいるすべての『Liella!』のメンバーと、自分のすべてのエネルギーをアクティブにする。
+/// expect: - sequential
+/// expect:   - change_state count=0 state_change=active card_type=member_card target=self
+/// expect:   - change_state count=0 state_change=active card_type=energy_card target=self
 #[test]
 fn char_pl_sp_bp5_003_r_ab1() {
     let db = load_real_database();
@@ -10066,6 +11181,10 @@ fn char_pl_sp_bp5_003_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のカードの効果によって、このメンバーがエリアを移動するか自分のエネルギー置き場にエネルギーが置かれたとき、カードを1枚引き、ライブ終了時まで、{{heart_02.png|heart02}}を得る。
+/// expect: - sequential heart_colors=heart02
+/// expect:   ? condition: type=movement_condition location=energy_zone
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - gain_resource count=1 resource=heart heart_colors=heart02 duration=live_end
 #[test]
 fn char_pl_sp_bp5_004_r_ab0() {
     let db = load_real_database();
@@ -10086,6 +11205,7 @@ fn char_pl_sp_bp5_004_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: デッキの上からカードを3枚控え室に置く：ライブ終了時まで、これにより控え室に置いた『Liella!』のメンバーカード1枚につき、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade card_type=member_card duration=live_end per_unit_type=discard
 #[test]
 fn char_pl_sp_bp5_005_r_ab0() {
     let db = load_real_database();
@@ -10106,6 +11226,10 @@ fn char_pl_sp_bp5_005_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のメインフェイズの間、自分のカードが1枚以上いずれかの領域から控え室に置かれるたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、それらのカードの中から1枚手札に加える。
+/// expect: - conditional_on_optional
+/// expect:   ? condition: type=compound operator=and
+/// expect:   - pay_energy count=1
+/// expect:   - move_cards count=1 source=those_cards destination=hand card_type=card
 #[test]
 fn char_pl_sp_bp5_005_r_ab1() {
     let db = load_real_database();
@@ -10126,6 +11250,7 @@ fn char_pl_sp_bp5_005_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: デッキの上からカードを3枚控え室に置く：このメンバーはポジションチェンジする。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。)
+/// expect: - position_change card_type=member_card
 #[test]
 fn char_pl_sp_bp5_006_p_ab0() {
     let db = load_real_database();
@@ -10146,6 +11271,7 @@ fn char_pl_sp_bp5_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から各グループ名につき1枚ずつ公開し、3枚まで手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_sp_bp5_007_p_ab0() {
     let db = load_real_database();
@@ -10166,6 +11292,7 @@ fn char_pl_sp_bp5_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにし、手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からコスト9以上の『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_sp_bp5_008_p_ab0() {
     let db = load_real_database();
@@ -10186,6 +11313,13 @@ fn char_pl_sp_bp5_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のデッキの一番上のカードを控え室に置いてもよい。そうした場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。これにより控え室に置いたカードがライブカードの場合、このメンバーをウェイトにする。
+/// expect: - sequential
+/// expect:   - conditional_on_result
+/// expect:     - sequential
+/// expect:       - move_cards count=1 source=deck_top destination=discard card_type=card target=self
+/// expect:       - gain_resource count=1 resource=blade duration=live_end
+/// expect:     - change_state count=1 state_change=wait card_type=member_card
+/// expect:   - repeat_procedure
 #[test]
 fn char_pl_sp_bp5_009_p_ab0() {
     let db = load_real_database();
@@ -10206,6 +11340,7 @@ fn char_pl_sp_bp5_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分と相手は、自身のステージのセンターにいるメンバーをポジションチェンジする。(センターにいるメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはセンターエリアに移動させる。)
+/// expect: - position_change card_type=member_card target=both
 #[test]
 fn char_pl_sp_bp5_010_p_ab0() {
     let db = load_real_database();
@@ -10226,6 +11361,7 @@ fn char_pl_sp_bp5_010_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{leftside.png|左サイド}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。
+/// expect: - gain_resource count=3 resource=heart heart_colors=heart02/heart02/heart02
 #[test]
 fn char_pl_sp_bp5_011_p_ab0() {
     let db = load_real_database();
@@ -10246,6 +11382,7 @@ fn char_pl_sp_bp5_011_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}{{heart_03.png|heart03}}{{heart_03.png|heart03}}{{heart_03.png|heart03}}を得る。
+/// expect: - gain_resource count=3 resource=heart heart_colors=heart03/heart03/heart03
 #[test]
 fn char_pl_sp_bp5_011_p_ab1() {
     let db = load_real_database();
@@ -10266,6 +11403,7 @@ fn char_pl_sp_bp5_011_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{rightside.png|右サイド}}{{heart_05.png|heart05}}{{heart_05.png|heart05}}{{heart_05.png|heart05}}を得る。
+/// expect: - gain_resource count=3 resource=heart heart_colors=heart05/heart05/heart05
 #[test]
 fn char_pl_sp_bp5_011_p_ab2() {
     let db = load_real_database();
@@ -10286,6 +11424,8 @@ fn char_pl_sp_bp5_011_p_ab2() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいる『Liella!』のメンバーがこのターンにエリアを移動しているかぎり、手札にあるこのメンバーカードのコストは2減る。
+/// expect: - modify_cost count=2 source=hand card_type=member_card duration=as_long_as operation=subtract value=2
+/// expect:   ? condition: type=temporal_condition group_names=['Liella!']
 #[test]
 fn char_pl_sp_bp5_017_n_ab0() {
     let db = load_real_database();
@@ -10306,6 +11446,8 @@ fn char_pl_sp_bp5_017_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをステージから控え室に置く：自分のエネルギーが6枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   ? condition: type=card_count_condition count=6 operator=>= location=energy_zone
 #[test]
 fn char_pl_sp_bp5_021_n_ab0() {
     let db = load_real_database();
@@ -10326,6 +11468,8 @@ fn char_pl_sp_bp5_021_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつエールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードが1枚以上ある場合、このカードのスコアを＋２する。
+/// expect: - modify_score operation=add value=2
+/// expect:   ? condition: type=compound operator=and location=success_live_card_zone
 #[test]
 fn char_pl_sp_bp5_023_l_ab0() {
     let db = load_real_database();
@@ -10346,6 +11490,9 @@ fn char_pl_sp_bp5_023_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{heart_01.png|heart01}}か{{heart_02.png|heart02}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分のステージにいる、このターン中
+/// expect: - sequential heart_colors=heart01/heart02/heart06
+/// expect:   - select count=1 heart_colors=heart01/heart02/heart06
+/// expect:   - gain_resource count=1 resource=heart card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_sp_bp5_024_l_ab0() {
     let db = load_real_database();
@@ -10366,6 +11513,8 @@ fn char_pl_sp_bp5_024_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいる『Liella!』のメンバーが持つハートの総数が11以上の場合、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1
+/// expect:   ? condition: type=group_condition count=11 operator=>= location=stage group_names=['Liella!']
 #[test]
 fn char_pl_sp_bp5_026_l_ab0() {
     let db = load_real_database();
@@ -10386,6 +11535,9 @@ fn char_pl_sp_bp5_026_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置いてもよい。そうした場合、相手はカードを1枚引く。
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   - draw_card count=1 source=deck destination=hand target=opponent
 #[test]
 fn char_pl_sp_bp5_027_l_ab0() {
     let db = load_real_database();
@@ -10406,6 +11558,8 @@ fn char_pl_sp_bp5_027_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーがちょうど8枚あるかぎり、ライブの合計スコアを＋１する。
+/// expect: - modify_score target=live_total duration=as_long_as operation=add value=1
+/// expect:   ? condition: type=card_count_condition count=8 operator== location=energy_zone
 #[test]
 fn char_pl_sp_bp5_111_p_ab0() {
     let db = load_real_database();
@@ -10426,6 +11580,7 @@ fn char_pl_sp_bp5_111_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エネルギー2枚をエネルギーデッキに置く：自分の控え室にあるライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_sp_bp5_111_p_ab1() {
     let db = load_real_database();
@@ -10446,6 +11601,7 @@ fn char_pl_sp_bp5_111_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
 #[test]
 fn char_pl_sp_bp5_222_p_ab1() {
     let db = load_real_database();
@@ -10466,6 +11622,8 @@ fn char_pl_sp_bp5_222_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このカードが『Liella!』のメンバーの下に置かれているかぎり、そのメンバーは{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade card_type=member_card duration=as_long_as
+/// expect:   ? condition: type=group_condition location=under_member group_names=['Liella!']
 #[test]
 fn char_pl_sp_bp7_001_p_ab0() {
     let db = load_real_database();
@@ -10486,6 +11644,8 @@ fn char_pl_sp_bp7_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーがステージから控え室に置かれたとき、バトンタッチしていた場合、このカードをそのバトンタッチで登場したメンバーの下に置く。
+/// expect: - move_cards count=1 destination=under_member card_type=member_card
+/// expect:   ? condition: type=movement_condition
 #[test]
 fn char_pl_sp_bp7_001_p_ab1() {
     let db = load_real_database();
@@ -10506,6 +11666,8 @@ fn char_pl_sp_bp7_001_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーが7枚以上あり、かつ自分のエネルギーが相手より多いかぎり、ステージにいるこのメンバーのコストを＋２する。
+/// expect: - modify_cost count=2 source=stage card_type=member_card duration=as_long_as operation=add value=2
+/// expect:   ? condition: type=compound operator=and
 #[test]
 fn char_pl_sp_bp7_002_p_ab0() {
     let db = load_real_database();
@@ -10526,6 +11688,7 @@ fn char_pl_sp_bp7_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーの下に置かれているメンバーカード1枚につき、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade card_type=member_card per_unit_type=枚
 #[test]
 fn char_pl_sp_bp7_003_r_ab0() {
     let db = load_real_database();
@@ -10546,6 +11709,8 @@ fn char_pl_sp_bp7_003_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーの下にメンバーカードが3枚以上置かれているかぎり、ライブの合計スコアを＋１する。
+/// expect: - modify_score target=live_total duration=as_long_as operation=add value=1
+/// expect:   ? condition: type=card_count_condition count=3 operator=>= location=under_member
 #[test]
 fn char_pl_sp_bp7_003_r_ab1() {
     let db = load_real_database();
@@ -10566,6 +11731,9 @@ fn char_pl_sp_bp7_003_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札のコストが10か20のメンバーカードを1枚公開する：これにより公開したカードをこのメンバーの下に置く。その後、カードを2枚引く。
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=revealed_cards destination=under_member card_type=member_card
+/// expect:   - draw_card count=2 source=deck destination=hand
 #[test]
 fn char_pl_sp_bp7_003_r_ab2() {
     let db = load_real_database();
@@ -10586,6 +11754,9 @@ fn char_pl_sp_bp7_003_r_ab2() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の控え室から『Liella!』のメンバーカード3枚を好きな順番でデッキの一番下に置いてもよい。これによりデッキの下に置いたカードの中にブレードハートを持たないメンバーカードが1枚以上ある場合、ライブ終了時まで、{{i
+/// expect: - conditional_on_result
+/// expect:   - move_cards count=3 source=discard destination=deck_bottom card_type=member_card target=self
+/// expect:   - gain_resource count=2 resource=blade duration=live_end
 #[test]
 fn char_pl_sp_bp7_004_p_ab0() {
     let db = load_real_database();
@@ -10606,6 +11777,10 @@ fn char_pl_sp_bp7_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーが登場するか、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれたとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。そのエネルギーカードは、次のターンのアクティブフェイズ
+/// expect: - sequential
+/// expect:   ? condition: type=or_condition operator=or
+/// expect:   - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   - restriction count=1 card_type=energy_card
 #[test]
 fn char_pl_sp_bp7_005_r_ab0() {
     let db = load_real_database();
@@ -10626,6 +11801,8 @@ fn char_pl_sp_bp7_005_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のカードの効果によって、自分のエネルギー置き場にエネルギーが置かれたとき、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade duration=live_end
+/// expect:   ? condition: type=movement_condition location=energy_zone
 #[test]
 fn char_pl_sp_bp7_005_r_ab1() {
     let db = load_real_database();
@@ -10646,6 +11823,7 @@ fn char_pl_sp_bp7_005_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい：自分の控え室にある『Liella!』のメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=member_card target=self
 #[test]
 fn char_pl_sp_bp7_006_r_ab0() {
     let db = load_real_database();
@@ -10666,6 +11844,8 @@ fn char_pl_sp_bp7_006_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}このターン、自分のエネルギーがエネルギー置き場からエネルギーデッキに置かれていた場合、ライブの合計スコアを＋１する。
+/// expect: - modify_score target=live_total operation=add value=1
+/// expect:   ? condition: type=card_count_condition count=1 operator=>=
 #[test]
 fn char_pl_sp_bp7_006_r_ab1() {
     let db = load_real_database();
@@ -10686,6 +11866,7 @@ fn char_pl_sp_bp7_006_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エネルギー置き場にあるエネルギー2枚をエネルギーデッキに置いてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレー
+/// expect: - gain_resource count=3 resource=blade duration=live_end
 #[test]
 fn char_pl_sp_bp7_007_r_ab0() {
     let db = load_real_database();
@@ -10706,6 +11887,9 @@ fn char_pl_sp_bp7_007_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーデッキから、エネルギーカードを2枚ウェイト状態で置く。それらのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない。
+/// expect: - sequential
+/// expect:   - move_cards count=2 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   - restriction count=1 card_type=energy_card
 #[test]
 fn char_pl_sp_bp7_007_r_ab1() {
     let db = load_real_database();
@@ -10726,6 +11910,8 @@ fn char_pl_sp_bp7_007_r_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーが相手より多い場合、エネルギーを6枚アクティブにする。
+/// expect: - change_state count=6 state_change=active card_type=energy_card
+/// expect:   ? condition: type=comparison_condition operator=>
 #[test]
 fn char_pl_sp_bp7_007_r_ab2() {
     let db = load_real_database();
@@ -10746,6 +11932,7 @@ fn char_pl_sp_bp7_007_r_ab2() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをウェイトにする：カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
 #[test]
 fn char_pl_sp_bp7_008_p_ab0() {
     let db = load_real_database();
@@ -10766,6 +11953,8 @@ fn char_pl_sp_bp7_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ウェイト状態のこのメンバーがエリアを移動したとき、このメンバーをアクティブにする。
+/// expect: - change_state count=1 state_change=active card_type=member_card
+/// expect:   ? condition: type=movement_condition
 #[test]
 fn char_pl_sp_bp7_008_p_ab1() {
     let db = load_real_database();
@@ -10786,6 +11975,7 @@ fn char_pl_sp_bp7_008_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{leftside.png|左サイド}}{{rightside.png|右サイド}}{{heart_02.png|heart02}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart02
 #[test]
 fn char_pl_sp_bp7_009_p_ab0() {
     let db = load_real_database();
@@ -10806,6 +11996,7 @@ fn char_pl_sp_bp7_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent
 #[test]
 fn char_pl_sp_bp7_009_p_ab1() {
     let db = load_real_database();
@@ -10826,6 +12017,9 @@ fn char_pl_sp_bp7_009_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをステージから控え室に置く：自分のエネルギー置き場にあるエネルギー1枚をエネルギーデッキに置く。その後、自分の控え室からカードを1枚手札に加える。
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=energy_zone destination=energy_deck card_type=energy_card target=self
+/// expect:   - move_cards count=1 source=discard destination=hand card_type=card target=self
 #[test]
 fn char_pl_sp_bp7_010_p_ab0() {
     let db = load_real_database();
@@ -10846,6 +12040,7 @@ fn char_pl_sp_bp7_010_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札をすべて控え室に置いてもよい：カードを6枚引く。
+/// expect: - draw_card count=6 source=deck destination=hand
 #[test]
 fn char_pl_sp_bp7_011_p_ab0() {
     let db = load_real_database();
@@ -10866,6 +12061,10 @@ fn char_pl_sp_bp7_011_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに『KALEIDOSCORE』のメンバーが3人いるかぎり、{{heart_06.png|heart06}}{{icon_blade.png|ブレード}}を得る。
+/// expect: - sequential count=2 heart_colors=heart06 duration=as_long_as
+/// expect:   ? condition: type=group_condition count=3 location=stage group_names=['KALEIDOSCORE']
+/// expect:   - gain_resource count=1 resource=blade card_type=card duration=as_long_as
+/// expect:   - gain_resource count=1 resource=heart heart_colors=heart06 card_type=card duration=as_long_as
 #[test]
 fn char_pl_sp_bp7_013_n_ab0() {
     let db = load_real_database();
@@ -10886,6 +12085,8 @@ fn char_pl_sp_bp7_013_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：自分のステージに『CatChu!』のメンバーが3人いる場合、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=group_condition count=3 location=stage group_names=['CatChu!']
 #[test]
 fn char_pl_sp_bp7_015_n_ab0() {
     let db = load_real_database();
@@ -10906,6 +12107,7 @@ fn char_pl_sp_bp7_015_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札のライブカードを1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から1枚を手札に加え、残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_sp_bp7_018_n_ab0() {
     let db = load_real_database();
@@ -10926,6 +12128,8 @@ fn char_pl_sp_bp7_018_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに『5yncri5e!』のメンバーが3人以上いる場合、自分の控え室からライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
+/// expect:   ? condition: type=card_count_condition count=3 operator=>= location=stage group_names=['5yncri5e!']
 #[test]
 fn char_pl_sp_bp7_019_n_ab0() {
     let db = load_real_database();
@@ -10946,6 +12150,8 @@ fn char_pl_sp_bp7_019_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーが相手より多いかぎり、{{heart_06.png|heart06}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart06 target=self duration=as_long_as
+/// expect:   ? condition: type=comparison_condition operator=>
 #[test]
 fn char_pl_sp_bp7_021_n_ab0() {
     let db = load_real_database();
@@ -10966,6 +12172,7 @@ fn char_pl_sp_bp7_021_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置く：このメンバーはポジションチェンジする。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエ
+/// expect: - position_change card_type=member_card
 #[test]
 fn char_pl_sp_bp7_022_n_ab0() {
     let db = load_real_database();
@@ -10986,6 +12193,7 @@ fn char_pl_sp_bp7_022_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中から、『Liella!』のカードを1枚デッキの一番上に置いてもよい。
+/// expect: - move_cards count=1 source=revealed_cards destination=deck_top card_type=card target=self
 #[test]
 fn char_pl_sp_bp7_023_l_ab0() {
     let db = load_real_database();
@@ -11006,6 +12214,8 @@ fn char_pl_sp_bp7_023_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーが相手より2枚以上多い場合、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1
+/// expect:   ? condition: type=card_count_condition count=2 operator=>= location=energy_zone
 #[test]
 fn char_pl_sp_bp7_024_secl_ab0() {
     let db = load_real_database();
@@ -11026,6 +12236,7 @@ fn char_pl_sp_bp7_024_secl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブ終了時まで、自分のステージにいる「嵐千砂都」1人は{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade target=self duration=live_end
 #[test]
 fn char_pl_sp_bp7_025_l_ab0() {
     let db = load_real_database();
@@ -11046,6 +12257,10 @@ fn char_pl_sp_bp7_025_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい：自分のステージに「葉月恋」がいる場合、カードを2枚引き、手札を1枚控え室に置く。
+/// expect: - sequential
+/// expect:   ? condition: type=location_condition location=stage
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_sp_bp7_026_l_ab0() {
     let db = load_real_database();
@@ -11066,6 +12281,8 @@ fn char_pl_sp_bp7_026_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい：自分のエネルギーが相手より多い場合、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1
+/// expect:   ? condition: type=comparison_condition operator=>
 #[test]
 fn char_pl_sp_bp7_027_l_ab0() {
     let db = load_real_database();
@@ -11086,6 +12303,9 @@ fn char_pl_sp_bp7_027_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。そのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない。
+/// expect: - sequential
+/// expect:   - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   - restriction count=1 card_type=energy_card
 #[test]
 fn char_pl_sp_bp7_027_l_ab1() {
     let db = load_real_database();
@@ -11106,6 +12326,9 @@ fn char_pl_sp_bp7_027_l_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}支払わないかぎり、自分の手札を2枚控え室に置く。
+/// expect: - conditional_on_optional
+/// expect:   - pay_energy count=2 target=self
+/// expect:   - move_cards count=2 source=hand destination=discard card_type=card target=self
 #[test]
 fn char_pl_sp_pb1_001_p_ab0() {
     let db = load_real_database();
@@ -11126,6 +12349,7 @@ fn char_pl_sp_pb1_001_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{ico
+/// expect: - modify_score target=live_total operation=add value=1
 #[test]
 fn char_pl_sp_pb1_001_p_ab1() {
     let db = load_real_database();
@@ -11146,6 +12370,8 @@ fn char_pl_sp_pb1_001_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーが12枚以上ある場合、ライブの合計スコアを＋１する。
+/// expect: - modify_score target=live_total operation=add value=1
+/// expect:   ? condition: type=card_count_condition count=12 operator=>= location=energy_zone
 #[test]
 fn char_pl_sp_pb1_002_p_ab0() {
     let db = load_real_database();
@@ -11166,6 +12392,8 @@ fn char_pl_sp_pb1_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバーが『5yncri5e!』のみの場合、自分と対戦相手は、センターエリアのメンバーを左サイドエリアに、左サイドエリアのメンバーを右サイドエリアに、右サイドエリアのメンバーをセンターエリアに、それぞ
+/// expect: - position_change card_type=member_card target=both
+/// expect:   ? condition: type=group_condition location=stage group_names=['5yncri5e!']
 #[test]
 fn char_pl_sp_pb1_003_p_ab0() {
     let db = load_real_database();
@@ -11186,6 +12414,7 @@ fn char_pl_sp_pb1_003_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
 #[test]
 fn char_pl_sp_pb1_004_p_ab0() {
     let db = load_real_database();
@@ -11206,6 +12435,7 @@ fn char_pl_sp_pb1_004_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
 #[test]
 fn char_pl_sp_pb1_004_p_ab1() {
     let db = load_real_database();
@@ -11226,6 +12456,7 @@ fn char_pl_sp_pb1_004_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
 #[test]
 fn char_pl_sp_pb1_005_p_ab0() {
     let db = load_real_database();
@@ -11246,6 +12477,8 @@ fn char_pl_sp_pb1_005_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーが登場か、エリアを移動するたび、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。 (対戦相手のカードの効果でも発動する。)
+/// expect: - gain_resource count=2 resource=blade duration=live_end
+/// expect:   ? condition: type=or_condition operator=or
 #[test]
 fn char_pl_sp_pb1_006_p_ab0() {
     let db = load_real_database();
@@ -11266,6 +12499,7 @@ fn char_pl_sp_pb1_006_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エネルギーを2枚アクティブにする。
+/// expect: - change_state count=2 state_change=active card_type=energy_card
 #[test]
 fn char_pl_sp_pb1_007_p_ab0() {
     let db = load_real_database();
@@ -11286,6 +12520,13 @@ fn char_pl_sp_pb1_007_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを1枚引く。その後、登場したエリアとは別の自分のエリア1つを選ぶ。このメンバーをそのエリアに移動する。選んだエリアにメンバーがいる場合、そのメンバーは、このメンバーがいたエリアに移動させる。
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - sequential
+/// expect:     - select count=1 target=self
+/// expect:     - position_change card_type=member_card
+/// expect:     - position_change destination=same_area card_type=member_card
+/// expect:       ? condition: type=card_count_condition count=1 operator=>=
 #[test]
 fn char_pl_sp_pb1_008_p_ab0() {
     let db = load_real_database();
@@ -11306,6 +12547,8 @@ fn char_pl_sp_pb1_008_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにほかの『5yncri5e!』のメンバーがいる場合、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=group_condition location=stage group_names=['5yncri5e!']
 #[test]
 fn char_pl_sp_pb1_009_p_ab0() {
     let db = load_real_database();
@@ -11326,6 +12569,8 @@ fn char_pl_sp_pb1_009_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーが10枚以上ある場合、ステージにいるこのメンバーのコストを＋４する。
+/// expect: - modify_cost count=4 source=stage card_type=member_card operation=add value=4
+/// expect:   ? condition: type=card_count_condition count=10 operator=>= location=energy_zone
 #[test]
 fn char_pl_sp_pb1_010_p_ab0() {
     let db = load_real_database();
@@ -11346,6 +12591,7 @@ fn char_pl_sp_pb1_010_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 「鬼塚冬毬」以外の『Liella!』のメンバー1人をステージから控え室に置いてもよい：自分の控え室から、これにより控え室に置いたメンバーカードを1枚、そのメンバーがいたエリアに登場させる。
+/// expect: - move_cards count=1 source=discard destination=same_area card_type=member_card target=self
 #[test]
 fn char_pl_sp_pb1_011_p_ab0() {
     let db = load_real_database();
@@ -11366,6 +12612,7 @@ fn char_pl_sp_pb1_011_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『CatChu!』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_sp_pb1_015_n_ab0() {
     let db = load_real_database();
@@ -11386,6 +12633,7 @@ fn char_pl_sp_pb1_015_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『KALEIDOSCORE』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_sp_pb1_016_n_ab0() {
     let db = load_real_database();
@@ -11406,6 +12654,7 @@ fn char_pl_sp_pb1_016_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『5yncri5e!』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_sp_pb1_017_n_ab0() {
     let db = load_real_database();
@@ -11426,6 +12675,11 @@ fn char_pl_sp_pb1_017_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを＋１する。
+/// expect: - sequential
+/// expect:   - change_state count=6 state_change=active card_type=energy_card
+/// expect:     ? condition: type=location_condition count=2 operator=>= location=stage group_names=['CatChu!']
+/// expect:   - modify_score operation=add value=1
+/// expect:     ? condition: type=state_condition location=stage
 #[test]
 fn char_pl_sp_pb1_023_srl_ab0() {
     let db = load_real_database();
@@ -11446,6 +12700,8 @@ fn char_pl_sp_pb1_023_srl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに名前の異なる『KALEIDOSCORE』のメンバーが2人以上いる場合、このカードのスコアを＋１する。
+/// expect: - modify_score operation=add value=1
+/// expect:   ? condition: type=location_condition count=2 operator=>= location=stage group_names=['KALEIDOSCORE']
 #[test]
 fn char_pl_sp_pb1_024_srl_ab0() {
     let db = load_real_database();
@@ -11466,6 +12722,7 @@ fn char_pl_sp_pb1_024_srl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいる、このターン中に登場、またはエリアを移動した『5yncri5e!』のメンバー1人につき、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}減らす。
+/// expect: - modify_required_hearts heart_colors=heart00 target=self operation=decrease value=1 per_unit_type=人
 #[test]
 fn char_pl_sp_pb1_025_srl_ab0() {
     let db = load_real_database();
@@ -11486,6 +12743,12 @@ fn char_pl_sp_pb1_025_srl_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: バトンタッチして登場した場合、このバトンタッチによって控え室に置かれた『Liella!』のメンバーカード1枚につき、カードを1枚引く。ブレードハートを持たない『Liella!』のメンバーカード1枚につき、ライブ終了時まで
+/// expect: - sequential card_type=member_card per_unit_type=discard
+/// expect:   ? condition: type=movement_condition
+/// expect:   - draw_card count=1 source=deck destination=hand card_type=member_card per_unit_type=discard
+/// expect:     ? condition: type=movement_condition
+/// expect:   - gain_resource count=2 resource=blade card_type=member_card duration=live_end per_unit_type=discard
+/// expect:     ? condition: type=movement_condition
 #[test]
 fn char_pl_sp_pb2_000_duo_ab1() {
     let db = load_real_database();
@@ -11506,6 +12769,9 @@ fn char_pl_sp_pb2_000_duo_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からコスト4以下の『Liella!』のメンバーカードを1枚まで公開する。そのカードを自分のステージのメンバーのいないエリアに登場させるか、手札に
+/// expect: - look_and_select
+/// expect:   - choice
+/// expect:     - move_cards count=1 source=hand destination=stage card_type=member_card
 #[test]
 fn char_pl_sp_pb2_001_pp_ab0() {
     let db = load_real_database();
@@ -11526,6 +12792,9 @@ fn char_pl_sp_pb2_001_pp_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札の『Liella!』のカードを1枚控え室に置く：以下から1つを選ぶ。これにより控え室に置いたカードがブレードハートを持たないメンバーカードの場合、代わりに1つ以上を選ぶ。 ・自分のエネルギーデッキから、エネルギーカー
+/// expect: - choice count=1 heart_colors=heart06
+/// expect:   - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   - gain_resource count=2 resource=heart heart_colors=heart06/heart06 card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_sp_pb2_002_pp_ab0() {
     let db = load_real_database();
@@ -11546,6 +12815,8 @@ fn char_pl_sp_pb2_002_pp_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このターン、自分の『Liella!』のカードの効果によってこのメンバーがエリアを移動していた場合、ライブの合計スコアを＋１する。
+/// expect: - modify_score target=live_total operation=add value=1
+/// expect:   ? condition: type=group_condition group_names=['Liella!']
 #[test]
 fn char_pl_sp_pb2_003_pp_ab0() {
     let db = load_real_database();
@@ -11566,6 +12837,8 @@ fn char_pl_sp_pb2_003_pp_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブカード置き場の中に元々のスコアより高いスコアのライブカードがあるか、エールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードがある場合、カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
+/// expect:   ? condition: type=or_condition operator=or
 #[test]
 fn char_pl_sp_pb2_004_pp_ab0() {
     let db = load_real_database();
@@ -11586,6 +12859,10 @@ fn char_pl_sp_pb2_004_pp_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: バトンタッチして登場した場合、このバトンタッチで控え室に置かれた『Liella!』のメンバーカードを1枚、このメンバーの下に置く。
+/// expect: - sequential
+/// expect:   ? condition: type=movement_condition
+/// expect:   - play_baton_touch count=1 source=discard card_type=member_card
+/// expect:   - move_cards count=1 source=those_cards destination=under_member card_type=member_card
 #[test]
 fn char_pl_sp_pb2_005_pp_ab0() {
     let db = load_real_database();
@@ -11606,6 +12883,7 @@ fn char_pl_sp_pb2_005_pp_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーは、このメンバーの下に置かれている『Liella!』のメンバーカードが持つ{{kidou.png|起動}}能力をすべて得る。
+/// expect: - gain_ability_from_source card_type=member_card
 #[test]
 fn char_pl_sp_pb2_005_pp_ab1() {
     let db = load_real_database();
@@ -11626,6 +12904,7 @@ fn char_pl_sp_pb2_005_pp_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーの下にある『Liella!』のメンバーカード1枚につき、このメンバーのコストを＋１する。
+/// expect: - modify_cost count=1 card_type=member_card operation=add value=1 per_unit_type=枚
 #[test]
 fn char_pl_sp_pb2_006_pp_ab0() {
     let db = load_real_database();
@@ -11646,6 +12925,8 @@ fn char_pl_sp_pb2_006_pp_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のライブが成功するか、このメンバーがエリアを移動したとき、自分の控え室にある『Liella!』のメンバーカードを1枚、このメンバーの下に置く。
+/// expect: - move_cards count=1 source=discard destination=under_member card_type=member_card target=self
+/// expect:   ? condition: type=or_condition operator=or
 #[test]
 fn char_pl_sp_pb2_006_pp_ab1() {
     let db = load_real_database();
@@ -11666,6 +12947,7 @@ fn char_pl_sp_pb2_006_pp_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分の控え室から『Liella!』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_sp_pb2_007_r_ab0() {
     let db = load_real_database();
@@ -11686,6 +12968,7 @@ fn char_pl_sp_pb2_007_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: エールにより公開された自分のカードの中にあるブレードハートを持たない『Liella!』のメンバーカード2枚につき、ライブの合計スコアを＋１する。この能力では合計スコアは２までしか増えない。
+/// expect: - modify_score card_type=member_card target=live_total operation=add value=1 per_unit_type=枚
 #[test]
 fn char_pl_sp_pb2_008_pp_ab0() {
     let db = load_real_database();
@@ -11706,6 +12989,7 @@ fn char_pl_sp_pb2_008_pp_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 『Liella!』のメンバー1人をウェイトにしてもよい：相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数がこれによりウェイトにしたメンバーが元々持つ{{icon_blade.png|ブレード
+/// expect: - change_state count=1 state_change=wait card_type=member_card target=opponent
 #[test]
 fn char_pl_sp_pb2_009_r_ab0() {
     let db = load_real_database();
@@ -11726,6 +13010,9 @@ fn char_pl_sp_pb2_009_r_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置かないかぎり、自分のエネルギー1枚をエネルギーデッキに置く。
+/// expect: - conditional_on_optional
+/// expect:   - move_cards count=1 source=hand destination=discard target=self
+/// expect:   - move_cards count=1 source=energy_zone destination=energy_deck card_type=energy_card target=self
 #[test]
 fn char_pl_sp_pb2_010_pp_ab0() {
     let db = load_real_database();
@@ -11746,6 +13033,9 @@ fn char_pl_sp_pb2_010_pp_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 以下から1つを選ぶ。 ・カードを2枚引く。 ・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - choice count=1
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
 #[test]
 fn char_pl_sp_pb2_010_pp_ab1() {
     let db = load_real_database();
@@ -11766,6 +13056,11 @@ fn char_pl_sp_pb2_010_pp_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージのセンターエリアにいるメンバーがエリアを移動したとき、以下から1つを選ぶ。 ・ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。 ・相手の
+/// expect: - choice count=1
+/// expect:   ? condition: type=movement_condition location=stage
+/// expect:   - gain_resource count=2 resource=blade duration=live_end
+/// expect:   - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent
+/// expect:   - draw_card count=1 source=deck destination=hand
 #[test]
 fn char_pl_sp_pb2_011_pp_ab0() {
     let db = load_real_database();
@@ -11786,6 +13081,7 @@ fn char_pl_sp_pb2_011_pp_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをポジションチェンジしてもよい。
+/// expect: - position_change card_type=member_card
 #[test]
 fn char_pl_sp_pb2_011_pp_ab4() {
     let db = load_real_database();
@@ -11806,6 +13102,9 @@ fn char_pl_sp_pb2_011_pp_ab4() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札の『KALEIDOSCORE』のカードを1枚控え室に置いてもよい：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。これにより控え室に置いたカードがブレードハートを持たない場合、カードを1枚引く。
+/// expect: - conditional_on_result
+/// expect:   - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
+/// expect:   - draw_card count=1 source=deck destination=hand
 #[test]
 fn char_pl_sp_pb2_013_p_ab0() {
     let db = load_real_database();
@@ -11826,6 +13125,8 @@ fn char_pl_sp_pb2_013_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるメンバーが『5yncri5e!』のみの場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させてもよい。)
+/// expect: - position_change source=stage card_type=member_card target=self
+/// expect:   ? condition: type=group_condition location=stage group_names=['5yncri5e!']
 #[test]
 fn char_pl_sp_pb2_014_p_ab0() {
     let db = load_real_database();
@@ -11846,6 +13147,7 @@ fn char_pl_sp_pb2_014_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分の控え室から『CatChu!』のカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=card target=self
 #[test]
 fn char_pl_sp_pb2_015_p_ab0() {
     let db = load_real_database();
@@ -11866,6 +13168,7 @@ fn char_pl_sp_pb2_015_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいるこのメンバーと名前の異なる『CatChu!』のメンバー1人につき、エネルギーを1枚アクティブにする。
+/// expect: - change_state count=1 state_change=active card_type=energy_card target=self per_unit_type=人
 #[test]
 fn char_pl_sp_pb2_018_p_ab0() {
     let db = load_real_database();
@@ -11886,6 +13189,7 @@ fn char_pl_sp_pb2_018_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分の控え室から『5yncri5e!』のカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=card target=self
 #[test]
 fn char_pl_sp_pb2_019_p_ab0() {
     let db = load_real_database();
@@ -11906,6 +13210,10 @@ fn char_pl_sp_pb2_019_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分がエールしたとき、手札にある『Liella!』のライブカードを1枚控え室に置いてもよい。そうした場合、追加で2枚エールを行う。
+/// expect: - sequential
+/// expect:   ? condition: type=location_condition location=revealed_cards
+/// expect:   - move_cards count=1 source=hand destination=discard card_type=live_card
+/// expect:   - perform_yell count=2
 #[test]
 fn char_pl_sp_pb2_020_p_ab0() {
     let db = load_real_database();
@@ -11926,6 +13234,7 @@ fn char_pl_sp_pb2_020_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分の控え室から『KALEIDOSCORE』のカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=card target=self
 #[test]
 fn char_pl_sp_pb2_021_p_ab0() {
     let db = load_real_database();
@@ -11946,6 +13255,8 @@ fn char_pl_sp_pb2_021_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにいる『5yncri5e!』のメンバーがセンターエリアに移動したとき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.
+/// expect: - gain_resource count=4 resource=blade duration=live_end
+/// expect:   ? condition: type=movement_condition location=stage group_names=['5yncri5e!']
 #[test]
 fn char_pl_sp_pb2_022_p_ab0() {
     let db = load_real_database();
@@ -11966,6 +13277,7 @@ fn char_pl_sp_pb2_022_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 相手のステージにいるコスト2以下のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent cost_limit=2 cost_limit_operator=<=
 #[test]
 fn char_pl_sp_pb2_024_n_ab0() {
     let db = load_real_database();
@@ -11986,6 +13298,11 @@ fn char_pl_sp_pb2_024_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーが6枚以上あるかぎり、{{heart_03.png|heart03}}を得る。8枚以上あるかぎり、さらに{{heart_03.png|heart03}}を得る。
+/// expect: - sequential heart_colors=heart03
+/// expect:   - gain_resource count=1 resource=heart heart_colors=heart03 duration=as_long_as
+/// expect:     ? condition: type=card_count_condition count=6 operator=>= location=energy_zone
+/// expect:   - gain_resource count=1 resource=heart heart_colors=heart03 duration=as_long_as
+/// expect:     ? condition: type=card_count_condition count=8 operator=>= location=energy_zone
 #[test]
 fn char_pl_sp_pb2_027_n_ab0() {
     let db = load_real_database();
@@ -12006,6 +13323,9 @@ fn char_pl_sp_pb2_027_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{heart_02.png|heart02}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち1つを選ぶ。ライブ終了時まで、このメンバーが元々持つハートは選んだ
+/// expect: - sequential heart_colors=heart02/heart03/heart06
+/// expect:   - select count=1 heart_colors=heart02/heart03/heart06
+/// expect:   - set_heart_type heart_type=selected card_type=member_card duration=live_end
 #[test]
 fn char_pl_sp_pb2_030_n_ab0() {
     let db = load_real_database();
@@ -12026,6 +13346,9 @@ fn char_pl_sp_pb2_030_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{rightside.png|右サイド}}カードを2枚引き、手札を2枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=2 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_sp_pb2_036_n_ab0() {
     let db = load_real_database();
@@ -12046,6 +13369,9 @@ fn char_pl_sp_pb2_036_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{leftside.png|左サイド}}カードを2枚引き、手札を2枚控え室に置く。
+/// expect: - sequential
+/// expect:   - draw_card count=2 source=deck destination=hand
+/// expect:   - move_cards count=2 source=hand destination=discard card_type=card
 #[test]
 fn char_pl_sp_pb2_037_n_ab0() {
     let db = load_real_database();
@@ -12066,6 +13392,8 @@ fn char_pl_sp_pb2_037_n_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のステージにいるメンバーが『Liella!』のみの場合、相手のステージにいるコスト2以下のメンバー1人をウェイトにする。
+/// expect: - change_state count=1 source=stage state_change=wait card_type=member_card target=opponent cost_limit=2 cost_limit_operator=<=
+/// expect:   ? condition: type=group_condition location=stage group_names=['Liella!']
 #[test]
 fn char_pl_sp_pb2_047_l_ab0() {
     let db = load_real_database();
@@ -12086,6 +13414,8 @@ fn char_pl_sp_pb2_047_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージに『5yncri5e!』のメンバーが2人以上いる場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させてもよい。)
+/// expect: - position_change source=stage card_type=member_card target=self
+/// expect:   ? condition: type=card_count_condition count=2 operator=>= location=stage group_names=['5yncri5e!']
 #[test]
 fn char_pl_sp_pb2_050_l_ab0() {
     let db = load_real_database();
@@ -12106,6 +13436,7 @@ fn char_pl_sp_pb2_050_l_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を2枚控え室に置いてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png
+/// expect: - gain_resource count=5 resource=blade duration=live_end
 #[test]
 fn char_pl_sp_sd1_003_p_ab0() {
     let db = load_real_database();
@@ -12126,6 +13457,7 @@ fn char_pl_sp_sd1_003_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分の控え室から『Liella!』のメンバーカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=member_card target=self
 #[test]
 fn char_pl_sp_sd1_007_sd_ab0() {
     let db = load_real_database();
@@ -12146,6 +13478,7 @@ fn char_pl_sp_sd1_007_sd_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
 #[test]
 fn char_pl_sp_sd1_011_sd_ab0() {
     let db = load_real_database();
@@ -12166,6 +13499,7 @@ fn char_pl_sp_sd1_011_sd_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 手札を1枚控え室に置いてもよい：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+/// expect: - move_cards count=1 source=energy_deck destination=energy_zone state_change=wait card_type=energy_card target=self
 #[test]
 fn char_pl_sp_sd1_014_sd_ab0() {
     let db = load_real_database();
@@ -12186,6 +13520,7 @@ fn char_pl_sp_sd1_014_sd_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}支払ってもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。
+/// expect: - look_and_select
 #[test]
 fn char_pl_sp_sd1_017_sd_ab0() {
     let db = load_real_database();
@@ -12206,6 +13541,9 @@ fn char_pl_sp_sd1_017_sd_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを1枚引く。その後、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。)
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - position_change source=stage card_type=member_card target=self
 #[test]
 fn char_pl_sp_sd2_001_sd2_ab0() {
     let db = load_real_database();
@@ -12226,6 +13564,8 @@ fn char_pl_sp_sd2_001_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーがエリアを移動したとき、ライブ終了時まで、{{heart_06.png|heart06}}を得る。 (対戦相手のカードの効果でも発動する。)
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart06 duration=live_end
+/// expect:   ? condition: type=movement_condition
 #[test]
 fn char_pl_sp_sd2_002_p_ab1() {
     let db = load_real_database();
@@ -12246,6 +13586,7 @@ fn char_pl_sp_sd2_002_p_ab1() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}：このメンバーをポジションチェンジする。
+/// expect: - position_change card_type=member_card
 #[test]
 fn char_pl_sp_sd2_002_p_ab0() {
     let db = load_real_database();
@@ -12266,6 +13607,10 @@ fn char_pl_sp_sd2_002_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを1枚引く。このターン、このメンバーがエリアを移動している場合、さらにカードを1枚引く。
+/// expect: - sequential
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:   - draw_card count=1 source=deck destination=hand
+/// expect:     ? condition: type=temporal_condition
 #[test]
 fn char_pl_sp_sd2_003_sd2_ab0() {
     let db = load_real_database();
@@ -12286,6 +13631,7 @@ fn char_pl_sp_sd2_003_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{center.png|センター}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}
+/// expect: - gain_resource count=4 resource=blade
 #[test]
 fn char_pl_sp_sd2_004_sd2_ab0() {
     let db = load_real_database();
@@ -12306,6 +13652,7 @@ fn char_pl_sp_sd2_004_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーをポジションチェンジしてもよい。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。)
+/// expect: - position_change card_type=member_card
 #[test]
 fn char_pl_sp_sd2_005_sd2_ab0() {
     let db = load_real_database();
@@ -12326,6 +13673,7 @@ fn char_pl_sp_sd2_005_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く：自分の控え室から『Liella!』のライブカードを1枚手札に加える。
+/// expect: - move_cards count=1 source=discard destination=hand card_type=live_card target=self
 #[test]
 fn char_pl_sp_sd2_006_sd2_ab0() {
     let db = load_real_database();
@@ -12346,6 +13694,8 @@ fn char_pl_sp_sd2_006_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のステージにコスト13以上のメンバーがいるかぎり、{{heart_03.png|heart03}}を得る。
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart03 target=self duration=as_long_as
+/// expect:   ? condition: type=comparison_condition count=13 operator=>= location=stage
 #[test]
 fn char_pl_sp_sd2_008_sd2_ab0() {
     let db = load_real_database();
@@ -12366,6 +13716,7 @@ fn char_pl_sp_sd2_008_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: カードを1枚引く。
+/// expect: - draw_card count=1 source=deck destination=hand
 #[test]
 fn char_pl_sp_sd2_009_sd2_ab0() {
     let db = load_real_database();
@@ -12386,6 +13737,8 @@ fn char_pl_sp_sd2_009_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーがエリアを移動したとき、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。 (対戦相手のカードの効果でも発動する。)
+/// expect: - gain_resource count=1 resource=blade duration=live_end
+/// expect:   ? condition: type=movement_condition
 #[test]
 fn char_pl_sp_sd2_011_sd2_ab0() {
     let db = load_real_database();
@@ -12406,6 +13759,8 @@ fn char_pl_sp_sd2_011_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーがエリアを移動したとき、ライブ終了時まで、{{heart_02.png|heart02}}を得る。 (対戦相手のカードの効果でも発動する。)
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart02 duration=live_end
+/// expect:   ? condition: type=movement_condition
 #[test]
 fn char_pl_sp_sd2_012_sd2_ab0() {
     let db = load_real_database();
@@ -12426,6 +13781,10 @@ fn char_pl_sp_sd2_012_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分のエネルギーが7枚以上ある場合、ライブ終了時まで、このメンバーと自分のステージにいるほかの『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。
+/// expect: - sequential
+/// expect:   ? condition: type=card_count_condition count=7 operator=>= location=energy_zone
+/// expect:   - gain_resource count=1 resource=blade target=self duration=live_end
+/// expect:   - gain_resource count=1 resource=blade card_type=member_card duration=live_end
 #[test]
 fn char_pl_sp_sd2_020_sd2_ab0() {
     let db = load_real_database();
@@ -12446,6 +13805,8 @@ fn char_pl_sp_sd2_020_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: このメンバーがエリアを移動したとき、ライブ終了時まで、{{heart_03.png|heart03}}を得る。 (対戦相手のカードの効果でも発動する。)
+/// expect: - gain_resource count=1 resource=heart heart_colors=heart03 duration=live_end
+/// expect:   ? condition: type=movement_condition
 #[test]
 fn char_pl_sp_sd2_022_sd2_ab0() {
     let db = load_real_database();
@@ -12466,6 +13827,10 @@ fn char_pl_sp_sd2_022_sd2_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: 自分の成功ライブカード置き場にカードが2枚以上ある場合、このカードのスコアを＋５し、必要ハートは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png
+/// expect: - sequential heart_colors=heart02/heart03/heart06/heart00
+/// expect:   ? condition: type=card_count_condition count=2 operator=>= location=success_live_card_zone
+/// expect:   - modify_score operation=add value=5
+/// expect:   - modify_required_hearts count=3 heart_colors=heart00/heart02/heart03/heart06 operation=set value=3
 #[test]
 fn char_pl_sp_sd2_023_p_ab0() {
     let db = load_real_database();
@@ -12486,6 +13851,7 @@ fn char_pl_sp_sd2_023_p_ab0() {
 }
 /// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: ライブ終了時まで、自分のステージにいる、このターン中にエリアを移動したすべての『Liella!』のメンバーは、{{icon_blade.png|ブレード}}を得る。
+/// expect: - gain_resource count=1 resource=blade card_type=member_card target=self duration=live_end
 #[test]
 fn char_pl_sp_sd2_025_sd2_ab0() {
     let db = load_real_database();

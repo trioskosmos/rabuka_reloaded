@@ -50,11 +50,73 @@ def fn_name(card_no, idx):
     return f"char_{sanitize(card_no)}_ab{idx}"
 
 
-def build_test(card_no, idx, text):
+SALIENT = (
+    "action",
+    "type",
+    "count",
+    "resource",
+    "heart_colors",
+    "heart_type",
+    "source",
+    "destination",
+    "state_change",
+    "card_type",
+    "target",
+    "duration",
+    "operation",
+    "value",
+    "per_unit_type",
+    "cost_limit",
+    "cost_limit_operator",
+)
+CHILD_KEYS = ("actions", "options", "primary_effect", "followup_action",
+              "optional_action", "conditional_action", "alternative_effect")
+
+
+def describe(node, depth, out):
+    """One compact line per parsed node: the promotion checklist."""
+    if not isinstance(node, dict) or depth > 3:
+        return
+    bits = []
+    kind = node.get("action") or node.get("type") or "?"
+    for f in SALIENT:
+        if f in ("action", "type"):
+            continue
+        v = node.get(f)
+        if v is None or v is False:
+            continue
+        if isinstance(v, list):
+            v = "/".join(map(str, v))
+        bits.append(f"{f}={v}")
+    out.append("  " * depth + f"- {kind}" + (" " + " ".join(bits) if bits else ""))
+    cond = node.get("condition")
+    if isinstance(cond, dict):
+        cbits = [
+            f"{f}={cond[f]}"
+            for f in ("type", "count", "operator", "location", "group_names", "negation")
+            if cond.get(f) is not None
+        ]
+        out.append("  " * (depth + 1) + f"? condition: " + " ".join(cbits))
+    for k in CHILD_KEYS:
+        child = node.get(k)
+        if isinstance(child, dict):
+            describe(child, depth + 1, out)
+        elif isinstance(child, list):
+            for item in child:
+                describe(item, depth + 1, out)
+
+
+def build_test(card_no, idx, ab):
+    text = ab.get("triggerless_text") or ab["full_text"]
     oneline = " ".join(text.split())[:110].replace("\\", "")
+    hints = []
+    eff = ab.get("effect")
+    if isinstance(eff, dict):
+        describe(eff, 0, hints)
+    hint_lines = "".join(f"/// expect: {h}\n" for h in hints[:14])
     body = f'''/// UNTESTED-BACKLOG stub — upgrade in place with real assertions.
 /// text: {oneline}
-#[test]
+{hint_lines}#[test]
 fn {fn_name(card_no, idx)}() {{
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
@@ -78,8 +140,12 @@ fn {fn_name(card_no, idx)}() {{
 
 def main():
     check = "--check" in sys.argv
+    rebuild = "--rebuild" in sys.argv
     data = json.load(open(ABILITIES, encoding="utf-8"))
     covered = covered_ids()
+
+    if rebuild and os.path.exists(OUT_RS):
+        os.remove(OUT_RS)  # destructive for un-promoted in-place edits
 
     existing = ""
     if os.path.exists(OUT_RS):
@@ -115,7 +181,7 @@ def main():
         if name in seen:
             continue
         new_fns.append(
-            build_test(card_no, idx, ab.get("triggerless_text") or ab["full_text"])
+            build_test(card_no, idx, ab)
         )
 
     if check:
