@@ -4711,9 +4711,15 @@ def _try_ability_filter(text):
     # e.g., {{live_start.png|ライブ開始時}}能力も{{live_success.png|ライブ成功時}}能力も持たない
     if "能力も" in text:
         result["ability_filter"] = "no_ability_type"
-        triggers = re.findall(r"\{\{(\w+)\.png\|[^}]+\}\}能力も", text)
+        # Capture the JA alt-text (icon label), NOT the filename: the engine
+        # matches these against stored trigger strings ("ライブ開始時"...).
+        triggers = re.findall(r"\{\{\w+\.png\|([^}]+)\}\}能力も", text)
         if triggers:
             result["ability_filter_triggers"] = triggers
+    if "ライブ" in text:
+        # 「自分のライブ中のライブカードに…」 — the scanned zone is the
+        # live-card zone, not the stage default.
+        result["location"] = "live_card_zone"
     return result
 
 

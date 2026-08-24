@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-25T06:44:00.810391",
+  "generated_at": "2026-08-25T09:29:03.443915",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "6bc91a14",
+  "engine_commit": "130ac18c",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -3031,9 +3031,10 @@
           "text": "自分のライブ中のライブカードに、{{live_start.png|ライブ開始時}}能力も{{live_success.png|ライブ成功時}}能力も持たないカードがあるかぎり",
           "ability_filter": "no_ability_type",
           "ability_filter_triggers": [
-            "live_start",
-            "live_success"
-          ]
+            "ライブ開始時",
+            "ライブ成功時"
+          ],
+          "location": "live_card_zone"
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -27397,9 +27398,10 @@
           "text": "自分のライブ中のライブカードに、{{live_start.png|ライブ開始時}}能力も{{live_success.png|ライブ成功時}}能力も持たないカードがある場合",
           "ability_filter": "no_ability_type",
           "ability_filter_triggers": [
-            "live_start",
-            "live_success"
-          ]
+            "ライブ開始時",
+            "ライブ成功時"
+          ],
+          "location": "live_card_zone"
         },
         "count": 2,
         "card_type": "member_card",

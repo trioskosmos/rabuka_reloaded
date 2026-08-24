@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T23:10:33.366166+00:00",
+  "generated_at": "2026-08-24T23:35:02.241945+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 467,
-  "n_tests": 2799,
+  "n_files": 469,
+  "n_tests": 2806,
   "total_cards": 771,
-  "covered_cards": 690,
-  "abilities_on_covered": 855,
+  "covered_cards": 692,
+  "abilities_on_covered": 857,
   "trigger_counts": {
     "起動": [
       86,
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      232,
+      234,
       268
     ],
     "(none)": [
@@ -52,7 +52,7 @@
       71
     ],
     "gain_resource": [
-      147,
+      149,
       160
     ],
     "sequential": [
@@ -198,7 +198,7 @@
       88
     ],
     "location_condition": [
-      68,
+      69,
       73
     ],
     "movement:baton_touch": [
@@ -206,7 +206,7 @@
       18
     ],
     "ability_filter_condition": [
-      1,
+      2,
       2
     ],
     "group_condition": [
@@ -276,11 +276,11 @@
       68
     ],
     "bp4": [
-      80,
+      81,
       88
     ],
     "bp5": [
-      119,
+      120,
       134
     ],
     "bp6": [
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 624,
-    "L1+choice": 157,
-    "L2": 26,
-    "none": 81,
+    "L2+choice": 625,
+    "L1+choice": 156,
+    "L2": 28,
+    "none": 79,
     "L1": 48
   },
   "qa_rulings": {
@@ -889,6 +889,7 @@
         "engine/tests/test_modules/rurino_test.rs",
         "engine/tests/test_modules/score_condition_integration_test.rs",
         "engine/tests/test_modules/untested_abilities_batch16_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch41_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs"
       ],
       "covering_tests": [
@@ -923,7 +924,7 @@
         "himeno_bp6_cost_no_reduction_without_mirakura",
         "himeno_bp6_cost_reduced_by_mirakura_on_stage"
       ],
-      "covering_test_count": 94,
+      "covering_test_count": 100,
       "is_null": true
     },
     {
@@ -25200,24 +25201,31 @@
       ],
       "base": "PL!N-sd2-007",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/untested_abilities_batch32_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch32_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch41_test.rs"
       ],
       "covering_tests": [
         "bp6_016_look_three_reorder_back_on_top",
         "bp7_019_places_two_aqours_cards_under_deck",
         "hot_passion_accept_energy_opponent_draws",
         "hot_passion_decline_no_opponent_draw",
+        "mari_empty_live_zone_no_grant",
+        "mari_heart05_total_exactly_four_grants",
+        "mari_heart05_total_two_no_grant",
         "natsumi_rain_draws_and_discards_with_hasunosora_on_stage",
         "natsumi_rain_no_hasunosora_no_draw",
+        "rin_all_lives_have_triggers_no_blades",
+        "rin_empty_live_zone_no_blades",
+        "rin_live_without_triggers_grants_other_member_two_blades",
         "sd2_007_extra_draw_when_opponent_also_succeeded",
         "sd2_007_single_draw_without_opponent_success"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -30822,14 +30830,25 @@
         "PL!-bp4-014-N"
       ],
       "base": "PL!-bp4-014",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L2",
+      "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/probe_rin.rs",
+        "engine/tests/test_modules/untested_abilities_batch41_test.rs"
+      ],
+      "covering_tests": [
+        "mari_empty_live_zone_no_grant",
+        "mari_heart05_total_exactly_four_grants",
+        "mari_heart05_total_two_no_grant",
+        "probe_rin_condition",
+        "rin_all_lives_have_triggers_no_blades",
+        "rin_empty_live_zone_no_blades",
+        "rin_live_without_triggers_grants_other_member_two_blades"
+      ],
+      "covering_test_count": 7,
       "is_null": false
     },
     {
@@ -32562,14 +32581,23 @@
         "PL!S-bp5-017-N"
       ],
       "base": "PL!S-bp5-017",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L2",
+      "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch41_test.rs"
+      ],
+      "covering_tests": [
+        "mari_empty_live_zone_no_grant",
+        "mari_heart05_total_exactly_four_grants",
+        "mari_heart05_total_two_no_grant",
+        "rin_all_lives_have_triggers_no_blades",
+        "rin_empty_live_zone_no_blades",
+        "rin_live_without_triggers_grants_other_member_two_blades"
+      ],
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -34971,6 +34999,7 @@
         "engine/tests/test_modules/untested_abilities_batch36_test.rs",
         "engine/tests/test_modules/untested_abilities_batch37_test.rs",
         "engine/tests/test_modules/untested_abilities_batch40_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch41_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
@@ -35008,7 +35037,7 @@
         "c13_bp2_005_or_semantics_still_works",
         "c13_no_matching_card_optional_same_as_reject"
       ],
-      "covering_test_count": 293,
+      "covering_test_count": 299,
       "is_null": false
     },
     {

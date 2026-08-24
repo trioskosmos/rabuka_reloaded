@@ -3530,6 +3530,12 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(crate) fn evaluate_ability_filter_condition(&self, condition: &Condition) -> bool {
+        log::debug!(
+            "[ABILITY_FILTER_EVAL] filter={:?} triggers={:?} location={:?}",
+            condition.get_ability_filter(),
+            condition.get_ability_filter_triggers(),
+            condition.get_location()
+        );
         let target = condition.get_target().unwrap_or("self");
         let card_db = &self.game_state.card_database;
         let player = self.game_state.resolve_target_player(target);
@@ -3580,8 +3586,28 @@ impl<'a> ConditionContext<'a> {
         match filter {
             AbilityFilter::NoAbility => !has_ability,
             AbilityFilter::HasAbility => has_ability,
-            AbilityFilter::NoAbilityType if has_ability => {
-                !self.card_has_matching_ability_type(condition, filter)
+            AbilityFilter::NoAbilityType => {
+                // 「…能力も…能力も持たないカードがある場合」: SOME card in
+                // the scanned zone lacks every listed trigger type. Scans the
+                // LOCATION's cards (not just the activating card).
+                let excluded: &[String] = condition
+                    .get_ability_filter_triggers()
+                    .unwrap_or(&[]);
+                if excluded.is_empty() {
+                    return false;
+                }
+                if card_ids.is_empty() {
+                    return false;
+                }
+                card_ids.iter().any(|&id| {
+                    card_db.get_card(id).is_some_and(|c| {
+                        !c.abilities.iter().any(|ar| {
+                            ar.resolve().triggers.as_ref().is_some_and(|t| {
+                                excluded.iter().any(|et| t.starts_with(&et[..]))
+                            })
+                        })
+                    })
+                })
             }
             _ => true,
         }
