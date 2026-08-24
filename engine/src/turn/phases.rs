@@ -887,8 +887,10 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
     ) -> Result<(), String> {
         let use_baton_touch = use_baton_touch.unwrap_or(false);
 
-        // Clear stale baton touch state from any previous action this turn
-        game_state.clear_baton_touch_tracking();
+        // Clear stale PLAY-scoped baton touch state from any previous action
+        // this turn. Turn-scoped history (arriving ids, per-player counts)
+        // survives so same-turn baton plays accumulate.
+        game_state.clear_play_scoped_baton_touch();
 
         let card_db = game_state.card_database.clone();
 

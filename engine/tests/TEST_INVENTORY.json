@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T21:10:44.709692+00:00",
+  "generated_at": "2026-08-24T21:30:14.971587+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 462,
-  "n_tests": 2774,
+  "n_files": 463,
+  "n_tests": 2779,
   "total_cards": 771,
-  "covered_cards": 679,
-  "abilities_on_covered": 843,
+  "covered_cards": 681,
+  "abilities_on_covered": 845,
   "trigger_counts": {
     "起動": [
       85,
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      222,
+      224,
       268
     ],
     "(none)": [
@@ -132,7 +132,7 @@
       8
     ],
     "modify_required_hearts": [
-      13,
+      15,
       16
     ],
     "set_card_identity": [
@@ -194,7 +194,7 @@
       60
     ],
     "card_count_condition": [
-      79,
+      81,
       88
     ],
     "location_condition": [
@@ -272,7 +272,7 @@
       66
     ],
     "bp2": [
-      63,
+      65,
       68
     ],
     "bp4": [
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 613,
+    "L2+choice": 616,
     "L1+choice": 155,
-    "L2": 27,
-    "none": 93,
+    "L2": 26,
+    "none": 91,
     "L1": 48
   },
   "qa_rulings": {
@@ -6442,7 +6442,8 @@
         "engine/tests/test_modules/hinoshita_test.rs",
         "engine/tests/test_modules/untested_abilities_batch31_test.rs",
         "engine/tests/test_modules/untested_abilities_batch32_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch34_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch36_test.rs"
       ],
       "covering_tests": [
         "bp4_021_accept_puts_waitroom_card_on_deck_top",
@@ -6476,7 +6477,7 @@
         "hinoshita_use_limit_once_per_turn",
         "hot_passion_accept_energy_opponent_draws"
       ],
-      "covering_test_count": 48,
+      "covering_test_count": 53,
       "is_null": false
     },
     {
@@ -6506,7 +6507,8 @@
         "engine/tests/test_modules/hinoshita_test.rs",
         "engine/tests/test_modules/untested_abilities_batch31_test.rs",
         "engine/tests/test_modules/untested_abilities_batch32_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch34_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch36_test.rs"
       ],
       "covering_tests": [
         "bp4_021_accept_puts_waitroom_card_on_deck_top",
@@ -6540,7 +6542,7 @@
         "hinoshita_use_limit_once_per_turn",
         "hot_passion_accept_energy_opponent_draws"
       ],
-      "covering_test_count": 48,
+      "covering_test_count": 53,
       "is_null": false
     },
     {
@@ -12015,16 +12017,17 @@
       ],
       "base": "PL!HS-bp5-004",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/modifier_layer_characterization_test.rs",
         "engine/tests/test_modules/prohibition_layer_characterization_test.rs",
         "engine/tests/test_modules/untested_abilities_batch10_test.rs",
         "engine/tests/test_modules/untested_abilities_batch11_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch14_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch14_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch36_test.rs"
       ],
       "covering_tests": [
         "bp2024_cannot_place_blocks_both_live_zones",
@@ -12039,7 +12042,12 @@
         "go_master_start_fewer_success_cards_scores",
         "kanon_alone_on_stage_prohibits_live",
         "kanon_with_teammate_live_allowed_again",
+        "kokon_two_baton_arrivals_reduce_heart01",
         "manual_additive_survives_constant_recompute_and_tracks_condition",
+        "mirage_batons_of_wrong_group_no_reduction",
+        "mirage_one_baton_arrival_no_reduction",
+        "mirage_seated_without_baton_no_reduction",
+        "mirage_two_baton_arrivals_reduce_heart05",
         "note_mermaid_duplicate_kaleidoscope_names_no_score",
         "note_mermaid_two_distinct_kaleidoscope_members_score",
         "pb1013_higher_cost_member_on_stage_draws",
@@ -12051,7 +12059,7 @@
         "sd2_008_constant_heart_without_expensive_member",
         "temporary_live_end_effect_expires_when_live_phase_ends"
       ],
-      "covering_test_count": 23,
+      "covering_test_count": 28,
       "is_null": false
     },
     {
@@ -12103,7 +12111,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/himeno_bp5_live_start_test.rs",
-        "engine/tests/test_modules/rurino_bp5_test.rs"
+        "engine/tests/test_modules/rurino_bp5_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch36_test.rs"
       ],
       "covering_tests": [
         "himeno_bp5_ar_variant",
@@ -12126,10 +12135,15 @@
         "himeno_bp5_skip_cost_via_choice",
         "himeno_bp5_three_cards_two_share_group",
         "himeno_bp5_three_same_group_picks_two",
+        "kokon_two_baton_arrivals_reduce_heart01",
+        "mirage_batons_of_wrong_group_no_reduction",
+        "mirage_one_baton_arrival_no_reduction",
+        "mirage_seated_without_baton_no_reduction",
+        "mirage_two_baton_arrivals_reduce_heart05",
         "rurino_bp5_cross_unit_same_group_all_selectable",
         "rurino_bp5_discard_only_matching_unit_gets_heart"
       ],
-      "covering_test_count": 22,
+      "covering_test_count": 27,
       "is_null": false
     },
     {
@@ -25393,6 +25407,7 @@
         "engine/tests/test_modules/untested_abilities_batch28_test.rs",
         "engine/tests/test_modules/untested_abilities_batch29_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch36_test.rs",
         "engine/tests/test_modules/wao_wao_test.rs",
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/wonder_zone_max_repeats_test.rs",
@@ -25431,7 +25446,7 @@
         "c10_reveal_top_adds_to_hand",
         "c11_peek_per_niji_selects_keep1"
       ],
-      "covering_test_count": 383,
+      "covering_test_count": 388,
       "is_null": false
     },
     {
@@ -25509,6 +25524,7 @@
         "engine/tests/test_modules/untested_abilities_batch28_test.rs",
         "engine/tests/test_modules/untested_abilities_batch29_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch36_test.rs",
         "engine/tests/test_modules/wao_wao_test.rs",
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/wonder_zone_max_repeats_test.rs",
@@ -25547,7 +25563,7 @@
         "c10_reveal_top_adds_to_hand",
         "c11_peek_per_niji_selects_keep1"
       ],
-      "covering_test_count": 383,
+      "covering_test_count": 388,
       "is_null": false
     },
     {
@@ -25825,6 +25841,7 @@
         "engine/tests/test_modules/nagi_live_card_draw_test.rs",
         "engine/tests/test_modules/untested_abilities_batch29_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch36_test.rs",
         "engine/tests/test_modules/untested_abilities_playthrough_test.rs"
       ],
       "covering_tests": [
@@ -25841,6 +25858,11 @@
         "hs_bp5_021_score_bonus_with_three_mirakura_members",
         "hs_bp5_021_single_hasunosora_member_heart_conversion",
         "hs_bp5_021_three_members_pick_middle",
+        "kokon_two_baton_arrivals_reduce_heart01",
+        "mirage_batons_of_wrong_group_no_reduction",
+        "mirage_one_baton_arrival_no_reduction",
+        "mirage_seated_without_baton_no_reduction",
+        "mirage_two_baton_arrivals_reduce_heart05",
         "n_pb1_006_activates_wait_energy_to_active",
         "n_pb1_006_can_activate_multiple_times",
         "n_pb1_006_wait_self_activates_one_energy",
@@ -25852,14 +25874,9 @@
         "pr032_waitroom_at_threshold_mills_nothing",
         "pr032_waitroom_seven_mills_one_and_recovers_live",
         "sp_bp5_016_constant_evaluated_during_live_phase",
-        "sp_bp5_016_energy_ge_10_grants_heart06_x2",
-        "sp_bp5_016_energy_lt_10_grants_no_heart06",
-        "test_live_card_among_five_drawn_triggers_draw",
-        "test_live_card_in_existing_discard_but_not_in_five_drawn_no_draw",
-        "test_multiple_live_cards_among_five_drawn_still_only_draw_one",
-        "test_no_live_cards_among_five_drawn_no_draw"
+        "sp_bp5_016_energy_ge_10_grants_heart06_x2"
       ],
-      "covering_test_count": 30,
+      "covering_test_count": 35,
       "is_null": false
     },
     {
@@ -28765,14 +28782,35 @@
         "PL!HS-bp2-023-L"
       ],
       "base": "PL!HS-bp2-023",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/ability_trigger_fix_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch36_test.rs"
+      ],
+      "covering_tests": [
+        "baton_touch_cleared_between_actions",
+        "hanaho_baton_touch_low_cost_no_trigger",
+        "hanaho_baton_touch_triggers_activates_energy",
+        "hanaho_baton_touch_triggers_exactly_once",
+        "hanaho_baton_touch_wrong_group_no_trigger",
+        "hanaho_play_no_baton_touch_queue_stays_empty",
+        "hanaho_played_to_stage_no_baton_touch_does_not_trigger",
+        "kokon_two_baton_arrivals_reduce_heart01",
+        "mirage_batons_of_wrong_group_no_reduction",
+        "mirage_one_baton_arrival_no_reduction",
+        "mirage_seated_without_baton_no_reduction",
+        "mirage_two_baton_arrivals_reduce_heart05",
+        "serasu_double_trigger_regression",
+        "serasu_edelnote_appears_fires_once",
+        "serasu_edelnote_appears_with_non_edelnote_on_stage",
+        "serasu_on_stage_non_edelnote_appears_no_trigger",
+        "serasu_played_to_stage_triggers_self"
+      ],
+      "covering_test_count": 17,
       "is_null": false
     },
     {
@@ -28789,14 +28827,35 @@
         "PL!HS-bp2-025-L"
       ],
       "base": "PL!HS-bp2-025",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/ability_trigger_fix_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch36_test.rs"
+      ],
+      "covering_tests": [
+        "baton_touch_cleared_between_actions",
+        "hanaho_baton_touch_low_cost_no_trigger",
+        "hanaho_baton_touch_triggers_activates_energy",
+        "hanaho_baton_touch_triggers_exactly_once",
+        "hanaho_baton_touch_wrong_group_no_trigger",
+        "hanaho_play_no_baton_touch_queue_stays_empty",
+        "hanaho_played_to_stage_no_baton_touch_does_not_trigger",
+        "kokon_two_baton_arrivals_reduce_heart01",
+        "mirage_batons_of_wrong_group_no_reduction",
+        "mirage_one_baton_arrival_no_reduction",
+        "mirage_seated_without_baton_no_reduction",
+        "mirage_two_baton_arrivals_reduce_heart05",
+        "serasu_double_trigger_regression",
+        "serasu_edelnote_appears_fires_once",
+        "serasu_edelnote_appears_with_non_edelnote_on_stage",
+        "serasu_on_stage_non_edelnote_appears_no_trigger",
+        "serasu_played_to_stage_triggers_self"
+      ],
+      "covering_test_count": 17,
       "is_null": false
     },
     {
@@ -34838,6 +34897,7 @@
         "engine/tests/test_modules/untested_abilities_batch33_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch35_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch36_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
@@ -34875,7 +34935,7 @@
         "c13_bp2_005_or_semantics_still_works",
         "c13_no_matching_card_optional_same_as_reject"
       ],
-      "covering_test_count": 278,
+      "covering_test_count": 283,
       "is_null": false
     },
     {

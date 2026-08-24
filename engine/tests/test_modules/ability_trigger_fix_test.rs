@@ -435,7 +435,10 @@ fn hanaho_baton_touch_triggers_exactly_once() {
 // BATON TOUCH STATE CLEARANCE
 // ====================================================================
 
-/// Baton touch tracking fields are cleared between separate play actions.
+/// Baton touch PLAY-scoped state is cleared between separate play actions,
+/// while TURN-scoped history (arriving ids, per-player counts) persists:
+/// 「このターン中にバトンタッチして登場した」 spans the whole turn
+/// (PL!HS-bp2-023-L / PL!HS-bp2-025-L require two same-turn baton plays).
 #[test]
 fn baton_touch_cleared_between_actions() {
     let db = load_real_database();
@@ -481,8 +484,13 @@ fn baton_touch_cleared_between_actions() {
 
     // Verify tracking fields are clean after action 2
     assert_eq!(
-        game.state.baton_touch_count_p1, 0,
-        "baton_touch_count must be 0 after cleared second action"
+        game.state.baton_touch_count_p1, 1,
+        "turn-scoped baton count SURVIVES a later plain play (このターン中に)"
+    );
+    assert_eq!(
+        game.state.baton_touch_arriving_card_ids.len(),
+        1,
+        "arriving-id history survives for same-turn accumulation"
     );
     assert_eq!(
         game.state.baton_touch_replaced_member_id, None,

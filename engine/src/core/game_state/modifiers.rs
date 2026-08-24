@@ -1167,6 +1167,20 @@ impl GameState {
         self.baton_touch_arriving_card_id = None;
     }
 
+    /// Reset only the PLAY-scoped baton state (replaced-member identity/cost,
+    /// zero-cost flag, last arriving id). Turn-scoped history — arriving ids
+    /// and per-player counts — is intentionally preserved across plays within
+    /// the turn: 「このターン中にバトンタッチして登場したメンバーが2人以上」
+    /// requires two separate baton plays to ACCUMULATE
+    /// (PL!HS-bp2-023-L / PL!HS-bp2-025-L). Full clearing remains at the
+    /// Active-phase boundary via reset_keyword_tracking.
+    pub fn clear_play_scoped_baton_touch(&mut self) {
+        self.baton_touch_zero_cost = false;
+        self.baton_touch_replaced_member_cost = None;
+        self.baton_touch_replaced_member_id = None;
+        self.baton_touch_arriving_card_id = None;
+    }
+
     pub fn record_card_movement(&mut self, card_id: i16) {
         self.cards_moved_this_turn.push(card_id);
     }
