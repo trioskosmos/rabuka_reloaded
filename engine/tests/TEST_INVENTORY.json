@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T13:26:54.949549+00:00",
+  "generated_at": "2026-08-24T13:42:47.224887+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 455,
-  "n_tests": 2712,
+  "n_tests": 2711,
   "total_cards": 771,
   "covered_cards": 659,
   "abilities_on_covered": 823,

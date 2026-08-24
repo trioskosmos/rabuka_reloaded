@@ -35,13 +35,9 @@ fn live_fails_with_insufficient_hearts() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     advance_to_live_victory(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     // One more pass finalizes victory determination (winner placement).
     game.pass();
 
@@ -78,13 +74,9 @@ fn both_players_live_score_compared() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(p1_live);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
     advance_to_live_victory(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
     // One more pass to finalize LiveVictoryDetermination (move winner to success zone)
     game.pass();
     let p1_success = game.state.player1.success_live_card_zone.cards.len();
@@ -119,14 +111,10 @@ fn q147_empty_need_heart_live_succeeds() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     advance_to_live_victory(&mut game);
     // Drain the live's own ライブ成功時 ability chain (look_and_select etc.)
-    while game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
     // One more pass finalizes winner placement.
     game.pass();
     assert_eq!(
@@ -160,13 +148,9 @@ fn both_players_have_live_cards() {
     game.pass();
     game.set_live_card(p2_live);
     advance_to_live_victory(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
     advance_to_live_victory(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
     game.pass();
     // Rule 8.4.6.2: equal scores → BOTH win and BOTH place (neither has
     // ≥2 cards in their success zone yet). An OR here would mask one side
@@ -202,17 +186,13 @@ fn one_player_live_auto_higher_score() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     advance_to_live_victory(&mut game);
     assert!(
         game.has_pending_choice(),
         "Q47: P1 with live card succeeds even if P2 has none"
     );
-    while game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
     // One more pass finalizes winner placement.
     game.pass();
 
@@ -254,9 +234,7 @@ fn no_live_card_no_yell_no_success() {
     }
     advance_to_live_card_set_p1(&mut game);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     advance_to_live_victory(&mut game);
     assert!(
         game.state.player1.main_deck.cards.len() >= 45,
@@ -293,13 +271,9 @@ fn any_card_fails_hearts_all_fail() {
     // Second live card joins the zone (same as having set 2 cards).
     game.state.player1.live_card_zone.cards.push(live_b);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     advance_to_live_victory(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     game.pass();
 
     // 8.3.16: one failure fails ALL — nothing places, both cards to waitroom.
@@ -335,13 +309,9 @@ fn winner_takes_one_to_success_zone() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live_a);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
     advance_to_live_victory(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[0]);
     game.pass();
     // Q83: exactly ONE card places even though two succeeded; the other
     // must end in the waitroom.
@@ -397,9 +367,7 @@ fn two_live_cards_choose_second() {
     // Advance through live start
     game.pass();
     game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
 
     // Advance to live victory (3 passes)
     game.pass();
@@ -504,9 +472,7 @@ fn daydream_mermaid_no_niji_in_success_pick_one() {
     game.state.player1.live_card_zone.cards.push(live);
     game.pass();
     game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
 
     game.pass();
     game.pass();
@@ -581,9 +547,7 @@ fn daydream_mermaid_q191_niji_in_success_pick_both() {
     game.state.player1.live_card_zone.cards.push(live);
     game.pass();
     game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
 
     game.pass();
     game.pass();
@@ -683,9 +647,7 @@ fn shared_pool_depletion_all_fail() {
     );
 
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
 
     advance_to_live_victory(&mut game);
 
@@ -736,9 +698,7 @@ fn three_live_cards_any_fails_all_fail() {
     );
 
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    game.drain_choices_strict(&["SelectCard", "SelectAutoAbility"], &[]);
 
     advance_to_live_victory(&mut game);
 

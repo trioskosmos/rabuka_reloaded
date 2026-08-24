@@ -187,6 +187,33 @@ macro_rules! assert_ability {
 pub(crate) use assert_ability;
 
 // ====================================================================
+// Whole-board zone snapshots
+// ====================================================================
+
+/// Per-player zone contents as ordered card-ID lists. `stage` keeps the raw
+/// 3-slot layout (`-1` = empty area) so position swaps are visible.
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct PlayerZoneSnapshot {
+    pub hand: Vec<i16>,
+    pub stage: Vec<i16>,
+    pub live_card_zone: Vec<i16>,
+    pub success_live_card_zone: Vec<i16>,
+    pub energy_cards: Vec<i16>,
+    pub main_deck: Vec<i16>,
+    pub energy_deck: Vec<i16>,
+    pub waitroom: Vec<i16>,
+    pub exclusion: Vec<i16>,
+    pub active_energy: u8,
+}
+
+/// Full-board snapshot of both players — see [`TestGame::board_snapshot`].
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct BoardSnapshot {
+    pub p1: PlayerZoneSnapshot,
+    pub p2: PlayerZoneSnapshot,
+}
+
+// ====================================================================
 // TestGame — scenario-based game state wrapper
 // ====================================================================
 // Usage:
@@ -802,6 +829,134 @@ impl TestGame {
                 _ => break,
             }
         }
+    }
+
+    /// Strictly drain pending choice prompts.
+    ///
+    /// Unlike the blind `while game.has_pending_choice() { game.select_indices(&[0]); }`
+    /// pattern (which silently auto-answers ANY prompt, including ones that are
+    /// themselves bugs), every drained prompt must be one of the choice-type
+    /// names in `allowed` (e.g. `&["SelectCard", "SelectAutoAbility"]`) or the
+    /// test fails loudly with a dump of the offending prompt.
+    ///
+    /// Each prompt is answered via [`Self::select_indices`] with `answer`
+    /// (`&[]` = skip/select nothing, `&[0]` = pick the first card).
+    ///
+    /// A 1000-prompt guard catches non-terminating re-prompt loops.
+    pub fn drain_choices_strict(&mut self, allowed: &[&str], answer: &[usize]) {
+        let mut drained = 0usize;
+        while let Some(choice) = self.state.get_pending_choice() {
+            drained += 1;
+            assert!(
+                drained <= 1000,
+                "drain_choices_strict: exceeded 1000 prompts — non-terminating choice loop.\n{}",
+                self.pending_choice_summary()
+            );
+            let ty = self.pending_choice_type().unwrap_or_else(|| "Unknown".into());
+            assert!(
+                allowed.contains(&ty.as_str()),
+                "drain_choices_strict: unexpected pending choice {} (allowed: {:?})\n{}",
+                ty,
+                allowed,
+                self.dbg_choice_string()
+            );
+            match choice {
+                Choice::SelectCard { .. } | Choice::SelectAutoAbility { .. } => {
+                    self.select_indices(answer);
+                }
+                _ => panic!(
+                    "drain_choices_strict: no auto-answer for {}; answer this prompt explicitly in the test",
+                    ty
+                ),
+            }
+        }
+    }
+
+    /// Full pending-choice details as a String (dbg_choice prints instead).
+    fn dbg_choice_string(&self) -> String {
+        if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
+            format!("{:#?}", choice)
+        } else if let Some(ref pc) = self.state.get_pending_choice_json() {
+            format!("{}", pc)
+        } else {
+            "(none)".into()
+        }
+    }
+
+    /// Snapshot every zone of BOTH players as ordered card-ID lists.
+    /// Pair with [`Self::assert_board_matches`] to catch collateral damage a
+    /// per-zone assertion misses.
+    pub fn board_snapshot(&self) -> BoardSnapshot {
+        BoardSnapshot {
+            p1: Self::player_snapshot(&self.state.player1),
+            p2: Self::player_snapshot(&self.state.player2),
+        }
+    }
+
+    fn player_snapshot(p: &Player) -> PlayerZoneSnapshot {
+        PlayerZoneSnapshot {
+            hand: p.hand.cards.to_vec(),
+            stage: p.stage.stage.to_vec(),
+            live_card_zone: p.live_card_zone.cards.to_vec(),
+            success_live_card_zone: p.success_live_card_zone.cards.to_vec(),
+            energy_cards: p.energy_zone.cards.to_vec(),
+            active_energy: p.energy_zone.active_count(),
+            main_deck: p.main_deck.cards.to_vec(),
+            energy_deck: p.energy_deck.cards.to_vec(),
+            waitroom: p.waitroom.cards.to_vec(),
+            exclusion: p.exclusion_zone.cards.to_vec(),
+        }
+    }
+
+    /// Assert the current board equals `expected`, printing ONLY the zones
+    /// that differ (with resolved card names) on failure.
+    pub fn assert_board_matches(&self, expected: &BoardSnapshot, msg: &str) {
+        let actual = self.board_snapshot();
+        let mut diffs = Vec::new();
+        for (label, exp, act) in [
+            ("p1", &expected.p1, &actual.p1),
+            ("p2", &expected.p2, &actual.p2),
+        ] {
+            for (zone, ev, av) in [
+                ("hand", &exp.hand, &act.hand),
+                ("stage", &exp.stage, &act.stage),
+                ("live_card_zone", &exp.live_card_zone, &act.live_card_zone),
+                (
+                    "success_live_card_zone",
+                    &exp.success_live_card_zone,
+                    &act.success_live_card_zone,
+                ),
+                ("energy_cards", &exp.energy_cards, &act.energy_cards),
+                ("main_deck", &exp.main_deck, &act.main_deck),
+                ("energy_deck", &exp.energy_deck, &act.energy_deck),
+                ("waitroom", &exp.waitroom, &act.waitroom),
+                ("exclusion", &exp.exclusion, &act.exclusion),
+            ] {
+                if ev != av {
+                    diffs.push(format!(
+                        "{}.{}:\n  expected: [{}]\n  actual:   [{}]",
+                        label,
+                        zone,
+                        self.fmt_ids(ev),
+                        self.fmt_ids(av)
+                    ));
+                }
+            }
+            if exp.active_energy != act.active_energy {
+                diffs.push(format!(
+                    "{}.active_energy: expected {}, got {}",
+                    label, exp.active_energy, act.active_energy
+                ));
+            }
+        }
+        assert!(diffs.is_empty(), "{}\n{}", msg, diffs.join("\n"));
+    }
+
+    fn fmt_ids(&self, ids: &[i16]) -> String {
+        ids.iter()
+            .map(|&id| self.name(id))
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 
     /// Advance to the next phase (Pass action).
