@@ -222,6 +222,8 @@ hit instead of silently approximating.
 | R13 | **cost_limit+operator pair extraction**: `.cost_limit_operator_any()` appears at 22 sites across 10 files, half paired with `cost_limit_any()` into ChoiceBuilder::cost_limit(limit, String). Add `ChoiceBuilder::cost_limit_from(&AbilityEffect)` + swap ~11 builder-style sites; the as_deref comparison sites stay as-is | Mechanical |
 | R14 | **Bilingual zone-label pairs**: zone_label + zone_label_ja fetched together at ~32 sites (describe.rs ×26, look.rs ×4, move_cards.rs ×2); one `zone_labels(zone) -> (&str, &str)` helper halves the call sites | Low risk |
 | R15 | **filter_from_parts_full positional-None calls**: 6 callers pass up to 5 trailing Nones by position — builder pattern or struct-update would kill the silent-misordering class (CLEAN-G15/D20 already bit once) | R6 adjacent |
+| R16 | **Name-normalization sprawl (survey 08-24, partially done)**: `dedupe_by_normalized_name` helper now replaces 3 distinct-name blocks; `MoveSourceContext::player_mut` replaces the use_p2 pick at 4 clean sites (stage/selected_cards/revealed keep inline picks — interleaved gs-field borrows). REMAINING: two opposite-direction `normalize_card_no` impls (card.rs uppercase/fullwidth→half vs deck_parser.rs +/!→FULLWIDTH — document or unify); `normalize_member_name` (phases.rs) strips spaces; ~8 inline normalize_name-contains checks in condition.rs/state.rs/score.rs/card.rs should route through util's card_matches_name_fragments | Medium |
+| R17 | **sort+dedup pairs** at cost.rs:945, display.rs:1310, web_server.rs:1543, live.rs:2060/2219 → one `sort_dedup_ids(&mut Vec<i16>)` helper | Trivial |
 
 ### Test-side merges
 - Per-test depth attribution in `test_inventory.py` (attribute covering fns, ignore comments) before
