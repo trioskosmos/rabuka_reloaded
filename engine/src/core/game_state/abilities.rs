@@ -2494,7 +2494,14 @@ impl GameState {
                     }
                 }
                 _ => {
-                    log::debug!("Expired effect: {}", effect.description);
+                    // An effect kind with no revert arm means its modifiers
+                    // LEAK past expiry. Loud on purpose — extend this match.
+                    log::warn!(
+                        "expired temporary effect '{}' has no revert handler; \
+                         its modifiers were NOT reverted. description={}",
+                        effect.effect_type,
+                        effect.description
+                    );
                 }
             }
         }

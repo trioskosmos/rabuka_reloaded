@@ -2384,6 +2384,27 @@ pub fn parse_duration(s: &str) -> Duration {
     }
 }
 
+/// Effect kinds that GameState::check_expired_effects knows how to REVERT.
+/// Registering a temporary effect outside this set means its modifiers will
+/// silently leak past expiry — a new kind must extend BOTH this list and the
+/// expiry match. push_temporary_effect warns on violations.
+fn is_revertable_effect_type(effect_type: &str) -> bool {
+    matches!(
+        effect_type,
+        "activation_cost_increase"
+            | "activation_cost_decrease"
+            | "set_blade_count"
+            | "gain_surplus_heart"
+            | "heart_override"
+            | "modify_cost"
+            | "set_heart_type"
+    ) || effect_type.starts_with("gain_blade")
+        || effect_type.starts_with("gain_heart")
+        || effect_type.starts_with("gain_ability:")
+        || effect_type.starts_with("set_blade_type:")
+        || effect_type.starts_with("modify_score_")
+}
+
 pub fn push_temporary_effect(
     game_state: &mut crate::game_state::GameState,
     effect_type: &str,
@@ -2394,6 +2415,16 @@ pub fn push_temporary_effect(
 ) {
     if let Some(d) = duration {
         if d != "permanent" {
+            if !is_revertable_effect_type(effect_type) {
+                log::warn!(
+                    "temporary effect type '{}' has no expiry revert handler; \
+                     its modifiers will LEAK past expiry. Extend \
+                     GameState::check_expired_effects and is_revertable_effect_type. \
+                     description={}",
+                    effect_type,
+                    description
+                );
+            }
             game_state
                 .temporary_effects
                 .push(crate::game_state::TemporaryEffect {
