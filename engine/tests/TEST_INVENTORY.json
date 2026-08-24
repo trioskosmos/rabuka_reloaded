@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T05:45:30.532612+00:00",
+  "generated_at": "2026-08-24T06:00:41.044422+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 450,
-  "n_tests": 2702,
+  "n_files": 451,
+  "n_tests": 2704,
   "total_cards": 771,
-  "covered_cards": 652,
-  "abilities_on_covered": 816,
+  "covered_cards": 653,
+  "abilities_on_covered": 817,
   "trigger_counts": {
     "起動": [
       84,
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      220,
+      221,
       268
     ],
     "(none)": [
@@ -140,7 +140,7 @@
       1
     ],
     "set_heart_type": [
-      2,
+      3,
       3
     ],
     "choose_target_player": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      465,
+      466,
       545
     ],
     "temporal_condition": [
@@ -288,7 +288,7 @@
       82
     ],
     "bp7": [
-      96,
+      97,
       111
     ],
     "pb1": [
@@ -310,9 +310,9 @@
   },
   "depth_counts": {
     "L2+choice": 597,
-    "L1+choice": 146,
+    "L1+choice": 147,
     "L2": 25,
-    "none": 120,
+    "none": 119,
     "L1": 48
   },
   "qa_rulings": {
@@ -11030,9 +11030,12 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/untested_abilities_batch15_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch25_test.rs",
         "engine/tests/test_modules/untested_secondary_abilities_test.rs"
       ],
       "covering_tests": [
+        "bp7024_lone_aqours_member_hearts_become_heart04",
+        "bp7024_no_aqours_member_no_transform",
         "eli_bp5011_chosen_heart_scales_with_success_pile",
         "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
@@ -11045,7 +11048,7 @@
         "treco_please_aqours_h04_below_ten_no_score",
         "treco_please_aqours_h04_total_ten_scores_two"
       ],
-      "covering_test_count": 11,
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -38857,14 +38860,19 @@
         "PL!S-bp7-024-L"
       ],
       "base": "PL!S-bp7-024",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch25_test.rs"
+      ],
+      "covering_tests": [
+        "bp7024_lone_aqours_member_hearts_become_heart04",
+        "bp7024_no_aqours_member_no_transform"
+      ],
+      "covering_test_count": 2,
       "is_null": false
     },
     {
