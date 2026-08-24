@@ -1043,9 +1043,48 @@ impl AbilityResolver {
             Some(Zone::DeckBottom) => self.resolve_from_deck_bottom(gs, &c),
             Some(Zone::EnergyDeck) => self.resolve_from_energy_deck(gs, &c),
             Some(Zone::Stage) => self.resolve_from_stage(gs, &c),
+            Some(Zone::Energy) => {
+                // Optional energy-zone moves (「エネルギー置き場にあるエネルギーを
+                // エネルギーデッキに置いてもよい」 costs) must be declinable.
+                let optional = c.effect.optional.unwrap_or(false);
+                let decided = gs
+                    .ability_queue
+                    .current_entry()
+                    .and_then(|e| e.conditional_choice.as_ref())
+                    .is_some();
+                if optional && !decided {
+                    if self.ask_optional_move_gate(
+                        gs,
+                        c.effect,
+                        Zone::Energy,
+                        "Move an energy card from the energy zone to the energy deck?",
+                        "エネルギー置き場のエネルギーをエネルギーデッキに置きますか？",
+                    ) {
+                        return Ok(vec![]);
+                    }
+                }
+                if optional && decided {
+                    // Energy cards are fungible — after acceptance, take from
+                    // the end of the zone directly instead of prompting (the
+                    // prompt would be clobbered by the entry's own remaining
+                    // cost processing).
+                    let player = c.player_mut(gs);
+                    let mut taken = Vec::new();
+                    for _ in 0..c.count {
+                        if let Some(card) = player.energy_zone.cards.pop() {
+                            player.energy_zone.active_energy_count = player
+                                .energy_zone
+                                .active_energy_count
+                                .saturating_sub(1);
+                            taken.push(card);
+                        }
+                    }
+                    return Ok(taken);
+                }
+                self.resolve_from_standard_zone(gs, &c)
+            }
             Some(Zone::Hand)
             | Some(Zone::Discard)
-            | Some(Zone::Energy)
             | Some(Zone::LiveCardZone)
             | Some(Zone::SuccessLiveZone) => self.resolve_from_standard_zone(gs, &c),
             Some(Zone::LookedAt) => self.resolve_source_looked_at(gs, &c),
@@ -1063,7 +1102,7 @@ impl AbilityResolver {
     pub(crate) fn optional_gate_source(zone: Zone) -> bool {
         matches!(
             zone,
-            Zone::Deck | Zone::DeckTop | Zone::DeckBottom | Zone::EnergyDeck
+            Zone::Deck | Zone::DeckTop | Zone::DeckBottom | Zone::EnergyDeck | Zone::Energy
         )
     }
 
@@ -3494,6 +3533,13 @@ if util::distinct_should_dedupe(distinct) {
         destination: Option<String>,
         validate_card: &mut impl FnMut(i16) -> bool,
     ) -> Result<(), String> {
+        log::debug!(
+            "[ENERGY_SEL] indices={:?} count={} dst={:?} zone_now={:?}",
+            indices,
+            count,
+            destination,
+            gs.resolve_target_player("self").energy_zone.cards
+        );
         if let Some(ref dst) = destination {
             let cids: Vec<i16> = {
                 let player = gs.resolve_target_player_mut("self");

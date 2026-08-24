@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T21:53:55.500449+00:00",
+  "generated_at": "2026-08-24T22:36:07.693614+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 464,
-  "n_tests": 2787,
+  "n_files": 465,
+  "n_tests": 2793,
   "total_cards": 771,
-  "covered_cards": 684,
-  "abilities_on_covered": 848,
+  "covered_cards": 686,
+  "abilities_on_covered": 851,
   "trigger_counts": {
     "起動": [
       86,
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      226,
+      228,
       268
     ],
     "(none)": [
@@ -30,7 +30,7 @@
       2
     ],
     "ライブ成功時": [
-      112,
+      113,
       122
     ],
     "常時": [
@@ -52,11 +52,11 @@
       71
     ],
     "gain_resource": [
-      146,
+      147,
       160
     ],
     "sequential": [
-      193,
+      194,
       219
     ],
     "unknown": [
@@ -104,7 +104,7 @@
       2
     ],
     "modify_score": [
-      70,
+      71,
       73
     ],
     "conditional_alternative": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      489,
+      490,
       545
     ],
     "temporal_condition": [
@@ -190,7 +190,7 @@
       13
     ],
     "comparison_condition": [
-      53,
+      54,
       60
     ],
     "card_count_condition": [
@@ -198,7 +198,7 @@
       88
     ],
     "location_condition": [
-      67,
+      68,
       73
     ],
     "movement:baton_touch": [
@@ -280,7 +280,7 @@
       88
     ],
     "bp5": [
-      118,
+      119,
       134
     ],
     "bp6": [
@@ -288,7 +288,7 @@
       82
     ],
     "bp7": [
-      98,
+      100,
       111
     ],
     "pb1": [
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 619,
+    "L2+choice": 622,
     "L1+choice": 155,
     "L2": 26,
-    "none": 88,
+    "none": 85,
     "L1": 48
   },
   "qa_rulings": {
@@ -29865,7 +29865,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/daisuki_and_dia_test.rs",
-        "engine/tests/test_modules/daisuki_test.rs"
+        "engine/tests/test_modules/daisuki_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch38_test.rs"
       ],
       "covering_tests": [
         "blade_heart_0_triggers_discard",
@@ -29874,6 +29875,9 @@
         "condition_0_revealed_no_trigger",
         "condition_1_revealed_triggers",
         "condition_5_revealed_all_blade_heart_no_trigger",
+        "dia_empty_live_zone_no_grant",
+        "dia_heart04_total_exactly_four_grants_heart04",
+        "dia_heart04_total_three_no_grant",
         "discard_accept_then_re_yells",
         "discard_skip_no_re_yell",
         "filler_deck_select_dia_first",
@@ -29882,9 +29886,12 @@
         "mixed_deck_dia_first_then_daisuki",
         "once_per_turn_does_not_trigger_again_same_turn",
         "with_dia_mixed_deck_both_trigger",
-        "with_dia_only_dia_triggers"
+        "with_dia_only_dia_triggers",
+        "wwd_decline_no_score_change",
+        "wwd_energy_not_ahead_after_cost_no_bonus",
+        "wwd_live_success_places_waited_energy_with_delayed_lock"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 21,
       "is_null": false
     },
     {
@@ -32407,14 +32414,23 @@
         "PL!S-bp5-013-N"
       ],
       "base": "PL!S-bp5-013",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch38_test.rs"
+      ],
+      "covering_tests": [
+        "dia_empty_live_zone_no_grant",
+        "dia_heart04_total_exactly_four_grants_heart04",
+        "dia_heart04_total_three_no_grant",
+        "wwd_decline_no_score_change",
+        "wwd_energy_not_ahead_after_cost_no_bonus",
+        "wwd_live_success_places_waited_energy_with_delayed_lock"
+      ],
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -40448,14 +40464,23 @@
         "PL!SP-bp7-027-L"
       ],
       "base": "PL!SP-bp7-027",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch38_test.rs"
+      ],
+      "covering_tests": [
+        "dia_empty_live_zone_no_grant",
+        "dia_heart04_total_exactly_four_grants_heart04",
+        "dia_heart04_total_three_no_grant",
+        "wwd_decline_no_score_change",
+        "wwd_energy_not_ahead_after_cost_no_bonus",
+        "wwd_live_success_places_waited_energy_with_delayed_lock"
+      ],
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -40472,14 +40497,23 @@
         "PL!SP-bp7-027-L"
       ],
       "base": "PL!SP-bp7-027",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch38_test.rs"
+      ],
+      "covering_tests": [
+        "dia_empty_live_zone_no_grant",
+        "dia_heart04_total_exactly_four_grants_heart04",
+        "dia_heart04_total_three_no_grant",
+        "wwd_decline_no_score_change",
+        "wwd_energy_not_ahead_after_cost_no_bonus",
+        "wwd_live_success_places_waited_energy_with_delayed_lock"
+      ],
+      "covering_test_count": 6,
       "is_null": false
     },
     {

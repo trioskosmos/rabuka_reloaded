@@ -1194,6 +1194,22 @@ let source = cost.source_str().unwrap_or("");
                 }
                 return Ok(());
             }
+            // Optional energy-zone→energy-deck costs (「エネルギー置き場にある
+            // エネルギー1枚をエネルギーデッキに置いてもよい：…」): same pattern —
+            // execute the move now with optionality stripped.
+            if cost.action == ActionType::MoveCards
+                && Zone::from_str(cost.source_str().unwrap_or("")) == Some(Zone::Energy)
+                && cost.destination_any() == Some("energy_deck")
+            {
+                let mut c = cost.clone();
+                c.set_optional(Some(false));
+                self.pay_cost_move_cards(gs, &c)?;
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.cost_paid = true;
+                    entry.optional_cost_result = Some(true);
+                }
+                return Ok(());
+            }
             // Handle sequential_cost sub-costs — pay each after user confirmed
             if let Some(ref costs) = cost.compound.actions {
                 for sub_cost in costs {
