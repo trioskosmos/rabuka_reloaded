@@ -1091,50 +1091,28 @@ let source = cost.source_str().unwrap_or("");
         let has_cost = gs.entry_cost().is_some();
         // Sources whose optional gate re-enters the resolver with the effect
         // still pending: on "pay" we mark decided (conditional_choice) so the
-        // second pass executes instead of re-asking. Deck-top/deck-bottom
-        // moves and sequential steps with an energy-deck first move qualify;
+        // second pass executes instead of re-asking. Applies to shared-gate
+        // source zones (see move_cards::optional_gate_source) reached via a
+        // plain MoveCards effect or as the first step of a Sequential;
         // dedicated handlers like PlaceEnergyUnderMember manage their own
         // optionality and must NOT be marked (double-executes otherwise).
-        let source_matches = |s: Option<crate::ability::enums::Zone>| {
-            s == Some(Zone::DeckTop)
-                || s == Some(Zone::Deck)
-                || s == Some(Zone::DeckBottom)
+        let gated_move = |a: &AbilityEffect| {
+            a.source.is_some_and(|z| Self::optional_gate_source(z))
+                && matches!(
+                    a.action,
+                    ActionType::MoveCards | ActionType::Sequential
+                )
         };
-        let is_deck_top = gs
-            .entry_effect()
-            .and_then(|e| e.source)
-            .is_some_and(|s| source_matches(Some(s)))
+        let is_gated_effect_move = gs.entry_effect().is_some_and(|e| gated_move(e))
             || gs
                 .ability_queue
                 .current_entry()
-                .map(|e| &e.pending_actions)
-                .map(|pa| {
-                    pa.iter().any(|a| {
-                        a.source == Some(Zone::DeckTop)
-                            || a.source == Some(Zone::Deck)
-                            || a.source == Some(Zone::DeckBottom)
-                    })
-                })
-                .unwrap_or(false);
-        // Sequential whose FIRST pending action draws from the energy deck
-        // (resolve_from_energy_deck's optional gate).
-        let is_energy_deck_step = gs
-            .entry_effect()
-            .map(|e| e.action == ActionType::Sequential)
-            .unwrap_or(false)
-            && gs
-                .ability_queue
-                .current_entry()
-                .map(|e| {
-                    e.pending_actions
-                        .iter()
-                        .any(|a| a.source == Some(Zone::EnergyDeck))
-                })
+                .map(|e| e.pending_actions.iter().any(&gated_move))
                 .unwrap_or(false);
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.cost_paid = true;
             entry.optional_cost_result = Some(true);
-            if !has_cost && (is_deck_top || is_energy_deck_step) {
+            if !has_cost && is_gated_effect_move {
                 entry.effect_started = false;
                 entry.conditional_choice =
                     Some(ConditionalChoice::Str("pay_optional_cost".to_string()));

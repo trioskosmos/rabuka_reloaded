@@ -1,0 +1,123 @@
+﻿cargo : warning: rabuka_engine@0.1.0: bytecode size: 28530 bytes (compressed, from C:\Users\trios\OneDrive\Documents\ra
+buka_reloaded\engine\../cards/build/abilities.bin.z)
+発生場所 行:1 文字:1
++ cargo test --test run_all optional 2>&1 | Out-File -Encoding utf8 C:\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: rabuka...bilities.bin.z):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   Compiling rabuka_engine v0.1.0 (C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine)
+warning: associated function `new` is never used
+   --> src\ability\vm.rs:297:8
+    |
+296 | impl<'a> BcReader<'a> {
+    | --------------------- associated function in this implementation
+297 |     fn new(data: &'a [u8]) -> Self {
+    |        ^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rabuka_engine` (lib) generated 1 warning
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\test_modules\untested_abilities_batch28_test.rs:6:5
+  |
+6 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> tests\test_modules\prohibition_layer_characterization_test.rs:83:9
+   |
+83 |     let mut game = TestGame::new(db);
+   |         ----^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> tests\test_modules\prohibition_layer_characterization_test.rs:101:9
+    |
+101 |     let mut game = TestGame::new(db);
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: `rabuka_engine` (test "run_all") generated 3 warnings (run `cargo fix --test "run_all" -p rabuka_engine` to ap
+ply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 19.96s
+     Running tests\run_all.rs (C:/rust_targets\debug\build\rabuka_engine/6e1ae4530d532eee\out\run_all-6e1ae4530d532eee.
+exe)
+
+running 67 tests
+test test_modules::bp7_ai_energy_under_member_optional_test::ai_skip_places_nothing ... ok
+test test_modules::bp7_character_name_condition_test::mari_skip_optional_discard_moves_nothing ... ok
+test test_modules::bp7_ai_energy_under_member_optional_test::ai_no_nijigasaki_member_places_nothing ... ok
+test test_modules::bp7_ai_energy_under_member_optional_test::ai_accept_places_energy_under_nijigasaki ... ok
+test test_modules::bp7_kanata_look_select_test::kanata_skip_optional_cost_effect_does_not_fire ... ok
+test test_modules::bp7_cooking_with_love_test::cooking_both_in_discard_offers_optional ... ok
+test test_modules::bp7_like_a_treasure_optional_test::like_a_treasure_niji_member_not_added ... ok
+test test_modules::bp7_like_a_treasure_optional_test::like_a_treasure_accept_adds_niji_live_and_scores ... ok
+test test_modules::bp7_like_a_treasure_optional_test::like_a_treasure_multiple_niji_live_adds_one ... ok
+test test_modules::bp7_like_a_treasure_optional_test::like_a_treasure_duplicate_niji_copies_add_one ... ok
+test test_modules::bp6_004_002_audit_test::riko_bp6_auto_optional_skip_does_not_consume_turn_limit ... ok
+test test_modules::bp7_like_a_treasure_optional_test::like_a_treasure_no_movement_does_not_fire ... ok
+test test_modules::bp7_like_a_treasure_optional_test::like_a_treasure_opponent_live_success_does_not_fire ... ok
+test test_modules::awaken_the_power_test::optional_can_skip ... ok
+test test_modules::bp7_like_a_treasure_optional_test::like_a_treasure_no_niji_live_adds_nothing ... ok
+test test_modules::bp7_like_a_treasure_optional_test::like_a_treasure_preexisting_waitroom_niji_not_added ... ok
+test test_modules::bp7_like_a_treasure_optional_test::like_a_treasure_skip_adds_nothing ... ok
+test test_modules::bp7_mia_optional_recover_test::mia_does_not_fire_for_other_card ... ok
+test test_modules::bp7_mia_optional_recover_test::mia_does_not_fire_on_hand_to_discard ... ok
+test test_modules::bp7_like_a_treasure_optional_test::like_a_treasure_real_mill_decline_nothing ... ok
+test test_modules::bp7_like_a_treasure_optional_test::like_a_treasure_turn_limit_fires_once ... ok
+test test_modules::bp7_like_a_treasure_optional_test::like_a_treasure_real_mill_no_niji_does_not_fire ... ok
+test test_modules::bp7_like_a_treasure_optional_test::like_a_treasure_real_mill_accept_adds_niji_and_scores ... ok
+test test_modules::bp7_mia_optional_recover_test::mia_skip_no_discard_no_recover ... ok
+test test_modules::bp7_mia_optional_recover_test::mia_empty_hand_no_recover ... ok
+test test_modules::bp7_mia_optional_recover_test::mia_recovers_only_self ... ok
+test test_modules::bp7_mia_optional_recover_test::mia_accept_discards_one_and_recovers_self ... ok
+test test_modules::bp7_mirai_no_oto_optional_test::mirai_skip_leaves_discard_and_no_blade ... ok
+test test_modules::bp7_mirai_no_oto_optional_test::mirai_blade_applies_to_all_stage_members ... ok
+test test_modules::bp7_mirai_no_oto_optional_test::mirai_accept_moves_available_when_fewer_than_9 ... ok
+test test_modules::bp7_mirai_no_oto_optional_test::mirai_non_liella_in_discard_not_moved ... ok
+test test_modules::bp7_mirai_no_oto_optional_test::mirai_accept_moves_9_to_deck_bottom_and_grants_blade ... ok
+test test_modules::burn_energy_under_test::burn_skip_optional_no_score_even_with_10_total ... ok
+test test_modules::bp7_sd2_gap_test::kanata_skip_optional_wait_gains_nothing ... ok
+test test_modules::card_ability_tests::rurino_ozora_optional_cost_no_payment ... ok
+test test_modules::energy_and_member_under_test::kasumi_debut_skip_optional_no_energy_moved ... ok
+test test_modules::cards_6_thru_13_test::c13_no_matching_card_optional_same_as_reject ... ok
+test test_modules::fuyumari_test::fuyumari_q63_optional_cost_skipped ... ok
+test test_modules::card_ability_tests::hanayo_skip_optional_cost_no_effect ... ok
+test test_modules::card_ability_tests::hanayo_pay_optional_cost_waits_member_and_gains_hearts ... ok
+test test_modules::gameplay_test::dia_sd1_optional_draw_skip_skips_movement ... ok
+test test_modules::kanon_test::kanon_ab1_live_success_skip_optional_cost ... ok
+test test_modules::kanon_test::kanon_ab1_live_success_pay_optional_cost ... ok
+test test_modules::gameplay_test::dia_sd1_optional_draw_pay_then_deck_top ... ok
+test test_modules::gameplay_test::you_live_start_optional_cost_triggers ... ok
+test test_modules::position_change_non_optional_test::exclude_position_and_exclude_self_combine_correctly ... ok
+test test_modules::position_change_non_optional_test::exclude_position_center_not_offered ... ok
+test test_modules::pl_bp6_003_test::kotori_skip_optional_does_nothing ... ok
+test test_modules::position_change_multi_test::position_change_skip_optional ... ok
+test test_modules::position_change_non_optional_test::formation_change_still_offers_all_positions ... ok
+test test_modules::position_change_non_optional_test::non_optional_pc_excludes_self_from_left ... ok
+test test_modules::position_change_non_optional_test::non_optional_pc_excludes_self_from_center ... ok
+test test_modules::position_change_non_optional_test::non_optional_pc_with_all_positions_excluded_fizzles ... ok
+test test_modules::position_change_non_optional_test::non_optional_pc_executes_move_correctly ... ok
+test test_modules::position_change_non_optional_test::non_optional_pc_excludes_self_from_right ... ok
+test test_modules::position_change_non_optional_test::optional_pc_excludes_self_but_can_skip ... ok
+test test_modules::ll_bp1_001_test::joint_live_start_skip_optional_no_effect ... ok
+test test_modules::qa_new_tests238::q238_optional_skip ... ok
+test test_modules::qa_new_tests252::test_q252_skip_optional_move ... ok
+test test_modules::qa_new_tests252::test_q252_skip_optional_two_cards ... ok
+test test_modules::rurino_test::rurino_skip_optional_leaves_live_in_discard ... ok
+test test_modules::qa_new_tests251::q251_skip_optional ... ok
+test test_modules::untested_abilities_batch3_test::ruby_bp5009_decline_optional_payment_fetches_nothing ... ok
+test test_modules::shioriko_bp4_swap_test::shioriko_bp4_skip_optional_nothing_moves ... ok
+test test_modules::untested_abilities_batch3_test::ruby_bp5009_accept_optional_payment_fetches_and_grants_blades ... ok
+test test_modules::untested_abilities_batch3_test::yuna_sp222_live_start_optional_energy_places_wait_energy ... ok
+test test_modules::untested_abilities_batch8_test::mia_bp4023_optional_wait_cost_gates_draw_discard ... ok
+
+test result: ok. 67 passed; 0 failed; 0 ignored; 0 measured; 2652 filtered out; finished in 0.94s
+

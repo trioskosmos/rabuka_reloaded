@@ -1013,11 +1013,76 @@ impl AbilityResolver {
         }
     }
 
+    /// Source zones whose optional 「〜してもよい」 moves go through the shared
+    /// pay/skip gate ([Self::ask_optional_move_gate]).
+    /// `handle_optional_cost_payment` applies the same predicate when deciding
+    /// whether to mark the gate decided on acceptance.
+    pub(crate) fn optional_gate_source(zone: Zone) -> bool {
+        matches!(
+            zone,
+            Zone::Deck | Zone::DeckTop | Zone::DeckBottom | Zone::EnergyDeck
+        )
+    }
+
+    /// Ask the 「〜してもよい」 question once for an optional move from a gated
+    /// source zone.
+    ///
+    /// Emits the pay/skip prompt and returns **true** when the caller must
+    /// yield to the player. Returns **false** when execution should proceed
+    /// immediately: either the move isn't optional, the source isn't gated,
+    /// or the player already answered and acceptance was recorded (the queue
+    /// entry's `conditional_choice` acts as the decided marker; it is set by
+    /// `handle_optional_cost_payment` on "pay").
+    fn ask_optional_move_gate(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        source_zone: Zone,
+        description_en: &str,
+        description_ja: &str,
+    ) -> bool {
+        if !effect.optional.unwrap_or(false) || !Self::optional_gate_source(source_zone) {
+            return false;
+        }
+        let decided = gs
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.conditional_choice.as_ref())
+            .is_some();
+        if decided {
+            return false;
+        }
+        if let Some(entry_mut) = gs.ability_queue.current_entry_mut() {
+            entry_mut.choice_card_no =
+                Some(crate::ability::types::ChoiceRoute::Raw(
+                    "pay_optional_cost".to_string(),
+                ));
+        }
+        self.pending_choice = Some(Choice::SelectTarget {
+            target: "pay_optional_cost:skip_optional_cost".to_string(),
+            description: description_en.to_string(),
+            description_en: Some(description_en.to_string()),
+            description_ja: Some(description_ja.to_string()),
+            allow_skip: true,
+            options: Some(vec!["No".to_string(), "Yes".to_string()]),
+        });
+        true
+    }
+
     fn resolve_from_deck(
         &mut self,
         gs: &mut GameState,
         c: &MoveSourceContext,
     ) -> Result<Vec<i16>, String> {
+        if self.ask_optional_move_gate(
+            gs,
+            c.effect,
+            Zone::Deck,
+            "Place top card of deck to waiting room?",
+            "山札の上を控え室に置きますか？",
+        ) {
+            return Ok(vec![]);
+        }
         let player = if c.use_p2 {
             &mut gs.player2
         } else {
@@ -1025,30 +1090,6 @@ impl AbilityResolver {
         };
         let count = c.count;
         let card_db = c.card_db;
-        if c.effect.optional.unwrap_or(false) {
-            let entry = gs.ability_queue.current_entry();
-            let decided = entry
-                .as_ref()
-                .and_then(|e| e.conditional_choice.as_ref())
-                .is_some();
-            if !decided {
-                if let Some(entry_mut) = gs.ability_queue.current_entry_mut() {
-                    entry_mut.choice_card_no =
-                        Some(crate::ability::types::ChoiceRoute::Raw(
-                            "pay_optional_cost".to_string(),
-                        ));
-                }
-                self.pending_choice = Some(Choice::SelectTarget {
-                    target: "pay_optional_cost:skip_optional_cost".to_string(),
-                    description: "Place top card of deck to waiting room?".to_string(),
-                    description_en: Some("Place top card of deck to waiting room?".to_string()),
-                    description_ja: Some("山札の上を控え室に置きますか？".to_string()),
-                    allow_skip: true,
-                    options: Some(vec!["No".to_string(), "Yes".to_string()]),
-                });
-                return Ok(vec![]);
-            }
-        }
         let mut drawn = Vec::new();
         let mut attempts = 0u8;
         let mut remaining = count;
@@ -1091,36 +1132,21 @@ impl AbilityResolver {
         gs: &mut GameState,
         c: &MoveSourceContext,
     ) -> Result<Vec<i16>, String> {
+        if self.ask_optional_move_gate(
+            gs,
+            c.effect,
+            Zone::DeckBottom,
+            "Place bottom card of deck to waiting room?",
+            "山札の下を控え室に置きますか？",
+        ) {
+            return Ok(vec![]);
+        }
         let player = if c.use_p2 {
             &mut gs.player2
         } else {
             &mut gs.player1
         };
         let count = c.count;
-        if c.effect.optional.unwrap_or(false) {
-            let entry = gs.ability_queue.current_entry();
-            let decided = entry
-                .as_ref()
-                .and_then(|e| e.conditional_choice.as_ref())
-                .is_some();
-            if !decided {
-                if let Some(entry_mut) = gs.ability_queue.current_entry_mut() {
-                    entry_mut.choice_card_no =
-                        Some(crate::ability::types::ChoiceRoute::Raw(
-                            "pay_optional_cost".to_string(),
-                        ));
-                }
-                self.pending_choice = Some(Choice::SelectTarget {
-                    target: "pay_optional_cost:skip_optional_cost".to_string(),
-                    description: "Place bottom card of deck to waiting room?".to_string(),
-                    description_en: Some("Place bottom card of deck to waiting room?".to_string()),
-                    description_ja: Some("山札の下を控え室に置きますか？".to_string()),
-                    allow_skip: true,
-                    options: Some(vec!["No".to_string(), "Yes".to_string()]),
-                });
-                return Ok(vec![]);
-            }
-        }
         let mut drawn = Vec::new();
         for _i in 0..count {
             if let Some(card) = player.main_deck.draw_bottom() {
@@ -1137,46 +1163,27 @@ impl AbilityResolver {
         gs: &mut GameState,
         c: &MoveSourceContext,
     ) -> Result<Vec<i16>, String> {
+        // UnderMember destinations keep their own conditional_optional
+        // machinery (e.g. 宮下 愛's PlaceEnergyUnderMember); the shared gate
+        // covers plain energy-deck moves like HOT PASSION!!.
+        let under_member = Zone::from_str(&c.destination) == Some(Zone::UnderMember);
+        if !under_member
+            && self.ask_optional_move_gate(
+                gs,
+                c.effect,
+                Zone::EnergyDeck,
+                "Place energy card(s) from the energy deck?",
+                "エネルギーデッキからエネルギーを置きますか？",
+            )
+        {
+            return Ok(vec![]);
+        }
         let player = if c.use_p2 {
             &mut gs.player2
         } else {
             &mut gs.player1
         };
         let count = c.count;
-        // 「〜してもよい」 energy-deck placements (e.g. HOT PASSION!! gating
-        // the opponent's draw on acceptance) must be declinable. Mirror the
-        // deck_top optional gate: ask once, mark decided, execute on accept.
-        // EXCEPTION: destination=UnderMember shapes already route through the
-        // conditional_optional machinery, which owns their pay/skip decision.
-        let under_member = Zone::from_str(&c.destination) == Some(Zone::UnderMember);
-        if c.effect.optional.unwrap_or(false) && !under_member {
-            let entry = gs.ability_queue.current_entry();
-            let decided = entry
-                .as_ref()
-                .and_then(|e| e.conditional_choice.as_ref())
-                .is_some();
-            if !decided {
-                if let Some(entry_mut) = gs.ability_queue.current_entry_mut() {
-                    entry_mut.choice_card_no =
-                        Some(crate::ability::types::ChoiceRoute::Raw(
-                            "pay_optional_cost".to_string(),
-                        ));
-                }
-                self.pending_choice = Some(Choice::SelectTarget {
-                    target: "pay_optional_cost:skip_optional_cost".to_string(),
-                    description: "Place energy card(s) from the energy deck?".to_string(),
-                    description_en: Some(
-                        "Place energy card(s) from the energy deck?".to_string(),
-                    ),
-                    description_ja: Some(
-                        "エネルギーデッキからエネルギーを置きますか？".to_string(),
-                    ),
-                    allow_skip: true,
-                    options: Some(vec!["No".to_string(), "Yes".to_string()]),
-                });
-                return Ok(vec![]);
-            }
-        }
         let mut drawn = Vec::new();
         for _i in 0..count {
             if let Some(card) = player.energy_deck.draw() {

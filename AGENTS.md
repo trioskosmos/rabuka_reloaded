@@ -2,6 +2,7 @@
 
 ## Output / logs
 - **⛔ NEVER TRUNCATE OUTPUT — THIS MEANS YOU.** Do NOT filter live console output with Select-String / Select-Object -First/-Last chains instead of reading it. That hides exactly the lines needed and wastes turns guessing. THE ONLY ACCEPTABLE FLOW: run command → full output to file (`| Out-File -Encoding utf8 <file>`) → **Read tool** on that file (offset/limit for big files). Post-read grep on the FILE is fine; console-filtering INSTEAD of reading is a mistake. If you catch yourself writing `Select-String` on console output of a failing run, stop and redo it via file+Read.
+- **⛔ NEVER write throwaway Python/PowerShell scripts to patch files.** Use the Edit tool with exact strings read from the file. Script-generated edits are opaque, fail silently on mismatch, and leave litter behind. Read the region, then Edit it directly.
 - **Debug env (`$env:RUST_LOG="debug"`) is for FAILING tests only — it slows full runs down.** Green full-suite checks: plain `cargo test --test run_all`. When diagnosing/verifying: `$env:RUST_LOG="debug"; cargo test --test run_all <failing_substring> -- --nocapture --test-threads=1`. Cargo takes ONE positional filter — pick a substring covering the tests you need.
 - When ANY assertion fails, read the condition-verdict/trace lines from the debug file BEFORE changing code or tests. Never guess at engine internals.
 - Do not use `git` to revert or fall back on unless explicitly asked — fix the code properly.
