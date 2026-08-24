@@ -484,3 +484,4 @@ mod check_self_condition_test;
 
 pub mod corpus_smoke_test;
 pub mod characterization_test;
+pub mod characterization_promoted_test;
