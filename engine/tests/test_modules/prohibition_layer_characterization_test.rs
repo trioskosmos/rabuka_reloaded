@@ -18,7 +18,7 @@ use crate::helpers::*;
 #[test]
 fn kanon_alone_on_stage_prohibits_live() {
     let db = load_real_database();
-    let game = TestGame::new(db);
+    let mut game = TestGame::new(db);
     let me = game.id("PL!SP-bp1-001-R");
     game.state.player1.stage.stage[0] = me;
 
@@ -33,7 +33,7 @@ fn kanon_alone_on_stage_prohibits_live() {
 #[test]
 fn kanon_with_teammate_live_allowed_again() {
     let db = load_real_database();
-    let game = TestGame::new(db);
+    let mut game = TestGame::new(db);
     let me = game.id("PL!SP-bp1-001-R");
     let mate = game.new_id("PL!HS-bp5-004-R");
     game.state.player1.stage.stage = [me, mate, -1];
@@ -49,7 +49,7 @@ fn kanon_with_teammate_live_allowed_again() {
 #[test]
 fn removing_teammate_reprohibits_without_stale_state() {
     let db = load_real_database();
-    let game = TestGame::new(db);
+    let mut game = TestGame::new(db);
     let me = game.id("PL!SP-bp1-001-R");
     let mate = game.new_id("PL!HS-bp5-004-R");
     game.state.player1.stage.stage = [me, mate, -1];
@@ -80,7 +80,7 @@ fn removing_teammate_reprohibits_without_stale_state() {
 #[test]
 fn bp2024_cannot_place_blocks_both_live_zones() {
     let db = load_real_database();
-    let game = TestGame::new(db);
+    let mut game = TestGame::new(db);
     let live = game.id("PL!S-bp2-024-L");
 
     assert!(
@@ -98,7 +98,7 @@ fn bp2024_cannot_place_blocks_both_live_zones() {
 #[test]
 fn bp2024_positive_control_normal_live_card_is_placeable() {
     let db = load_real_database();
-    let game = TestGame::new(db);
+    let mut game = TestGame::new(db);
     let normal = game.id("PL!N-bp1-025-L"); // 虹ヶ咲 live card, no restriction
 
     assert!(
