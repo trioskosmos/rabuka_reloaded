@@ -4437,7 +4437,7 @@ def _try_appearance(text):
         result["cost_reference_operator"] = (
             ">" if "大きい" in cost_ref_m.group(2) else ">"
         )
-        result["cost_reference_type"] = "cost"
+        # (comparison dimension is always cost — no type field emitted)
     if subject:
         # Detect position-specific character assignments (e.g.
         # "右サイドエリアに「大沢瑠璃乃」が、左サイドエリアに「安養寺姫芽」が")
@@ -5126,14 +5126,33 @@ def _try_discard_live_and_member_optional(text):
         "target": "self",
         "text": "ライブ終了時まで、自分のステージにいるすべてのグループのメンバーはheart01を得る",
     }
-    return {
+    return make_conditional_on_optional(
+        text,
+        shuffle,
+        {"action": "sequential", "actions": [shuffle, heart]},
+        condition=condition,
+    )
+
+
+def make_conditional_on_optional(
+    text, optional_action, conditional_action, *, negation=False, **extra
+):
+    """Single constructor for every してもよい/そうしたとき-style container.
+
+    The optionality belongs to the CONTAINER (the player's may-I choice);
+    sub-actions keep their own fields untouched. Extra context (condition,
+    etc.) rides in via **extra so all builders share one shape contract.
+    """
+    node = {
         "text": text,
         "action": "conditional_on_optional",
-        "condition": condition,
-        "optional_action": shuffle,
-        "conditional_action": {"action": "sequential", "actions": [shuffle, heart]},
-        "conditional_negation": False,
+        "optional_action": optional_action,
+        "conditional_action": conditional_action,
     }
+    if negation:
+        node["conditional_negation"] = True
+    node.update(extra)
+    return node
 
 
 def _try_those_cards_add_hand_optional(text):
@@ -5166,13 +5185,11 @@ def _try_those_cards_add_hand_optional(text):
     move_done = dict(move_opt)
     move_done["optional"] = False
     cons = parse_effect(cons_text)
-    return {
-        "text": text,
-        "action": "conditional_on_optional",
-        "optional_action": move_opt,
-        "conditional_action": {"action": "sequential", "actions": [move_done, cons]},
-        "conditional_negation": False,
-    }
+    return make_conditional_on_optional(
+        text,
+        move_opt,
+        {"action": "sequential", "actions": [move_done, cons]},
+    )
 
 
 def _try_discard_shuffle_to_bottom_optional(text):
@@ -5244,26 +5261,19 @@ def _try_discard_shuffle_to_bottom_optional(text):
             if "シャッフル" in opt_text:
                 gm["shuffle"] = True
             seq_actions.append(gm)
-        return {
-            "text": text,
-            "action": "conditional_on_optional",
-            "optional_action": {"action": "sequential", "actions": seq_actions},
-            "conditional_action": {
-                "action": "sequential",
-                "actions": seq_actions + [cons],
-            },
-            "conditional_negation": False,
-        }
+        return make_conditional_on_optional(
+            text,
+            {"action": "sequential", "actions": seq_actions},
+            {"action": "sequential", "actions": seq_actions + [cons]},
+        )
 
     move_done = dict(move_opt)
     move_done["optional"] = False
-    return {
-        "text": text,
-        "action": "conditional_on_optional",
-        "optional_action": move_opt,
-        "conditional_action": {"action": "sequential", "actions": [move_done, cons]},
-        "conditional_negation": False,
-    }
+    return make_conditional_on_optional(
+        text,
+        move_opt,
+        {"action": "sequential", "actions": [move_done, cons]},
+    )
 
 
 def _try_discard_hand_recover_self_optional(text):
@@ -5314,13 +5324,11 @@ def _try_discard_hand_recover_self_optional(text):
             "self_target": True,
             "text": cons_text,
         }
-    return {
-        "text": text,
-        "action": "conditional_on_optional",
-        "optional_action": discard_opt,
-        "conditional_action": {"action": "sequential", "actions": [discard_done, cons]},
-        "conditional_negation": False,
-    }
+    return make_conditional_on_optional(
+        text,
+        discard_opt,
+        {"action": "sequential", "actions": [discard_done, cons]},
+    )
 
 
 def _extract_comparison_fields(condition, text):
@@ -7521,12 +7529,9 @@ def _try_each_time(text):
             for k, v in sub.items()
             if k not in ("text", "action", "actions")
         }
-        sub = {
-            "action": "conditional_on_optional",
-            **carried,
-            "optional_action": first,
-            "conditional_action": second,
-        }
+        sub = make_conditional_on_optional(
+            text, first, second, **carried
+        )
     return _finish_each_time(text, trigger_text, sub)
 
 
@@ -9308,14 +9313,7 @@ def _try_sou_shinakatta(text):
     aa_text = parts[1].strip().lstrip("、")
     # The alternative action text may include duration prefixes
     aa = parse_effect(aa_text)
-    result = {
-        "text": text,
-        "action": "conditional_on_optional",
-        "optional_action": fa,
-        "conditional_action": aa,
-        "conditional_negation": True,
-    }
-    return result
+    return make_conditional_on_optional(text, fa, aa, negation=True)
 
 
 def _try_unless_effect(text):
@@ -9344,13 +9342,9 @@ def _try_unless_effect(text):
         ec = unless_text.count("{{icon_energy.png|E}}")
         fa = {"action": "pay_energy", "energy": ec, "count": ec, "target": "self"}
         aa = parse_effect(eff_text)
-        return {
-            "text": text,
-            "action": "conditional_on_optional",
-            "optional_action": fa,
-            "conditional_action": aa,
-            "conditional_negation": True,
-        }
+        return make_conditional_on_optional(
+            text, fa, aa, negation=True
+        )
 
     # Non-energy unless: detect "手札をN枚控え室に置かないかぎり" pattern
     # (unless you discard N from hand to waitroom). The split leaves the
@@ -9373,13 +9367,9 @@ def _try_unless_effect(text):
             aa["source"] = "energy_zone"
             aa["destination"] = "energy_deck"
         if aa.get("action") != "custom":
-            return {
-                "text": text,
-                "action": "conditional_on_optional",
-                "optional_action": fa,
-                "conditional_action": aa,
-                "conditional_negation": True,
-            }
+            return make_conditional_on_optional(
+                text, fa, aa, negation=True
+            )
 
     return None
 

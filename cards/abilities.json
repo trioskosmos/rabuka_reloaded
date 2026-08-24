@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-24T13:42:07.691584",
+  "generated_at": "2026-08-24T13:56:29.494979",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "c61af22d",
+  "engine_commit": "d9b0ca26",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -5015,8 +5015,8 @@
       "is_null": false,
       "cost": null,
       "effect": {
+        "text": "自分のカードが1枚以上いずれかの領域から控え室に置かれるたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、それらのカードの中から1枚手札に加える",
         "action": "conditional_on_optional",
-        "conditional": true,
         "optional_action": {
           "text": "{{icon_energy.png|E}}支払ってもよい。",
           "action": "pay_energy",
@@ -5031,8 +5031,8 @@
           "action": "move_cards",
           "card_type": "card"
         },
+        "conditional": true,
         "trigger_type": "each_time",
-        "text": "自分のカードが1枚以上いずれかの領域から控え室に置かれるたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、それらのカードの中から1枚手札に加える",
         "condition": {
           "type": "compound",
           "operator": "and",
@@ -12905,7 +12905,6 @@
               "location": "stage",
               "cost_reference_character": "徒町小鈴",
               "cost_reference_operator": ">",
-              "cost_reference_type": "cost",
               "characters": [
                 "村野さやか"
               ]
@@ -18113,8 +18112,8 @@
       "is_null": false,
       "cost": null,
       "effect": {
+        "text": "自分のステージにほかの『スリーズブーケ』のメンバーが登場するたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、エネルギーを2枚アクティブにする",
         "action": "conditional_on_optional",
-        "conditional": true,
         "optional_action": {
           "text": "{{icon_energy.png|E}}支払ってもよい。",
           "action": "pay_energy",
@@ -18130,8 +18129,8 @@
           "card_type": "energy_card",
           "location": "stage"
         },
+        "conditional": true,
         "trigger_type": "each_time",
-        "text": "自分のステージにほかの『スリーズブーケ』のメンバーが登場するたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、エネルギーを2枚アクティブにする",
         "condition": {
           "type": "appearance_condition",
           "appearance": true,
@@ -37310,39 +37309,6 @@
       "effect": {
         "text": "自分の控え室に『虹ヶ咲』のライブカードと、ブレードハートを持たない『虹ヶ咲』のメンバーカードがある場合、自分の控え室にあるすべてのカードをシャッフルし、デッキの下に置いてもよい。そうしたとき、ライブ終了時まで、自分のステージにいるすべての『虹ヶ咲』のメンバーは{{heart_01.png|heart01}}を得る",
         "action": "conditional_on_optional",
-        "condition": {
-          "type": "compound",
-          "operator": "and",
-          "conditions": [
-            {
-              "type": "card_count_condition",
-              "card_type": "live_card",
-              "location": "discard",
-              "group_names": [
-                "虹ヶ咲"
-              ],
-              "count": 1,
-              "operator": ">=",
-              "target": "self",
-              "text": "控え室にグループのライブカードがある場合"
-            },
-            {
-              "type": "card_count_condition",
-              "card_type": "member_card",
-              "location": "discard",
-              "card_property": "has_blade_heart",
-              "negation": true,
-              "group_names": [
-                "虹ヶ咲"
-              ],
-              "count": 1,
-              "operator": ">=",
-              "target": "self",
-              "text": "ブレードハートを持たないグループのメンバーカードがある場合"
-            }
-          ],
-          "text": "控え室にグループのライブカードとブレードハートを持たないグループのメンバーカードがある場合"
-        },
         "optional_action": {
           "action": "move_cards",
           "source": "discard",
@@ -37387,6 +37353,39 @@
           ],
           "shuffle": true,
           "all": true
+        },
+        "condition": {
+          "type": "compound",
+          "operator": "and",
+          "conditions": [
+            {
+              "type": "card_count_condition",
+              "card_type": "live_card",
+              "location": "discard",
+              "group_names": [
+                "虹ヶ咲"
+              ],
+              "count": 1,
+              "operator": ">=",
+              "target": "self",
+              "text": "控え室にグループのライブカードがある場合"
+            },
+            {
+              "type": "card_count_condition",
+              "card_type": "member_card",
+              "location": "discard",
+              "card_property": "has_blade_heart",
+              "negation": true,
+              "group_names": [
+                "虹ヶ咲"
+              ],
+              "count": 1,
+              "operator": ">=",
+              "target": "self",
+              "text": "ブレードハートを持たないグループのメンバーカードがある場合"
+            }
+          ],
+          "text": "控え室にグループのライブカードとブレードハートを持たないグループのメンバーカードがある場合"
         },
         "group_names": [
           "虹ヶ咲"
