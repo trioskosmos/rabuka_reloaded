@@ -81,6 +81,7 @@ import json
 import re
 import copy
 import sys
+from functools import lru_cache
 from typing import Dict, Any, Optional, Tuple, List, Union
 
 
@@ -120,6 +121,30 @@ from parser_utils import (
     ActionRule,
     EffectPattern,
 )
+
+# ======================================================================
+# EXTRACTION MEMOIZATION (Phase 3: single-pass field extraction)
+# ======================================================================
+# Every extractor below is a pure function of its text and is re-invoked
+# many times per text across the pipeline (parse_action, _fill_defaults,
+# _walk, post-fixes). Memoizing at the name level means every call site —
+# existing or future — computes each field once per unique text, instead of
+# threading caches through signatures. Only scalar-returning extractors are
+# wrapped; list/dict-returning ones stay unmemoized so callers can mutate
+# results freely.
+extract_count = lru_cache(maxsize=16384)(extract_count)
+extract_source = lru_cache(maxsize=16384)(extract_source)
+extract_destination = lru_cache(maxsize=16384)(extract_destination)
+extract_target = lru_cache(maxsize=16384)(extract_target)
+extract_card_type = lru_cache(maxsize=16384)(extract_card_type)
+extract_operator = lru_cache(maxsize=16384)(extract_operator)
+extract_cost_limit = lru_cache(maxsize=16384)(extract_cost_limit)
+extract_cost_limit_with_operator = lru_cache(maxsize=16384)(
+    extract_cost_limit_with_operator
+)
+extract_picker = lru_cache(maxsize=16384)(extract_picker)
+detect_require_all_hearts = lru_cache(maxsize=16384)(detect_require_all_hearts)
+check_original_value = lru_cache(maxsize=16384)(check_original_value)
 
 # ============== CONFIGURATION CONSTANTS ==============
 MAX_CHARACTER_NAME_LENGTH = 10
@@ -1618,6 +1643,7 @@ def parse_effect(text: str) -> Dict[str, Any]:
                     ):
                         opt["duration"] = dur
                 _propagate_optional(result)
+                _strip_coo_child_optional(result)
                 return result
             if result.get("action") == "conditional_on_result":
                 for key in ("primary_effect", "followup_action"):
@@ -1625,6 +1651,7 @@ def parse_effect(text: str) -> Dict[str, Any]:
                     if sub and dur and "duration" not in sub:
                         sub["duration"] = dur
                 _propagate_optional(result)
+                _strip_coo_child_optional(result)
                 return result
             # For all other handlers, use the result as the effect directly
             effect = result
@@ -1634,6 +1661,7 @@ def parse_effect(text: str) -> Dict[str, Any]:
             if extra_activation_pos and "activation_position" not in effect:
                 effect["activation_position"] = extra_activation_pos
             _propagate_optional(effect)
+            _strip_coo_child_optional(effect)
             return effect
 
     # No handler matched: fallback to parse_action
@@ -1675,46 +1703,6 @@ def parse_effect(text: str) -> Dict[str, Any]:
                 else None
             ),
         ),
-        (
-            lambda: "何もしない" in pattern_text,
-            lambda: effect.update({"action": "choice", "choice_type": "emma_punch"}),
-        ),
-        (
-            lambda: "元々の" in pattern_text
-            and "ブレード" in pattern_text
-            and "同じ場合についても同じことを行う" in pattern_text,
-            lambda: effect.update(
-                {
-                    "action": "gain_resource",
-                    "resource": "blade",
-                    "count": effect.get("count", 1),
-                }
-            )
-            or (
-                effect.update({"duration": "live_end"})
-                if "duration" not in effect and "ライブ終了時まで" in pattern_text
-                else None
-            ),
-        ),
-        (
-            lambda: "カードを1枚引いてもよい" in pattern_text,
-            lambda: effect.update(
-                {"action": "draw_card", "count": 1, "optional": True}
-            ),
-        ),
-        (
-            lambda: effect.get("per_unit")
-            and "コスト" in pattern_text
-            and "少なくなる" in pattern_text
-            and effect.get("location") == "hand",
-            lambda: effect.update({"action": "modify_cost", "operation": "subtract"}),
-        ),
-        (
-            lambda: effect.get("character_effects")
-            and "ハート" in pattern_text
-            and "ブレード" in pattern_text,
-            lambda: effect.update({"action": "gain_resource"}),
-        ),
     ]
     for check, apply in extra_checks:
         if check():
@@ -1741,7 +1729,7 @@ def parse_effect(text: str) -> Dict[str, Any]:
         elif "引く" in fallback_text:
             effect["action"] = "draw_card"
 
-    return effect
+    return _strip_coo_child_optional(effect)
 
 
 def _enrich_condition_common(d: Dict[str, Any], text: str) -> None:
@@ -1836,6 +1824,26 @@ def _handle_dynamic_count(text, action):
     return action
 
 
+def _apply_no_ability_filter(d, text):
+    """Set ability_filter=no_ability/no_ability_type (+ trigger list) on `d`.
+
+    Shared by the parse-time derivations in `_handle_cost_modification`
+    (modify_cost) and `parse_action` (select/select_cards); mirrors the
+    「能力を持たない」 handling in `_enrich_from_text`.
+    """
+    trig_match = re.search(r"\{\{([^}]+?)\.png\|([^}]+?)\}\}能力", text)
+    if trig_match:
+        d["ability_filter"] = "no_ability_type"
+        d["ability_filter_triggers"] = [trig_match.group(2)]
+    elif "能力も" in text:
+        d["ability_filter"] = "no_ability_type"
+        triggers = re.findall(r"\{\{([^}]+?)\.png\|([^}]+?)\}\}能力も", text)
+        if triggers:
+            d["ability_filter_triggers"] = [t[1] for t in triggers]
+    else:
+        d["ability_filter"] = "no_ability"
+
+
 def _handle_cost_modification(text, action):
     """Handle cost modification patterns."""
     if "減る" in text or "減らす" in text or "マイナス" in text:
@@ -1899,6 +1907,13 @@ def _handle_cost_modification(text, action):
     # "このメンバーのコストを+Nする" → self_target (modifies only the activating card)
     if "このメンバー" in text:
         action["self_target"] = True
+    # 「（トリガー）能力を持たない」 restricts WHICH cards the cost change
+    # applies to. Derived at parse time rather than as a post-parse backfill
+    # (dissolved FIX 7, formerly in _process_pre_fix).
+    if "ability_filter" not in action and (
+        "能力を持たない" in text or "能力も持たない" in text
+    ):
+        _apply_no_ability_filter(action, text)
     return action
 
 
@@ -3171,6 +3186,28 @@ def parse_action(text: str) -> Dict[str, Any]:
         if entry.matches(text, action):
             entry.apply(text, action)
             break
+
+    # 「（トリガー）能力を持たない」 on selection actions filters WHAT may be
+    # selected. Derived at parse time rather than as a post-parse backfill
+    # (dissolved FIX 7b, formerly in _process_pre_fix).
+    if (
+        "ability_filter" not in action
+        and action.get("action") in ("select", "select_cards")
+        and ("能力を持たない" in text or "能力も持たない" in text)
+    ):
+        _apply_no_ability_filter(action, text)
+
+    # Rule 11.10.1: a position change MUST move to a different area — exclude
+    # the member's current position for single-target moves (not "メンバー1人を"
+    # player selection or "それぞれ" formation change). Derived at parse time
+    # rather than as a post-parse backfill (dissolved FIX 15).
+    if (
+        action.get("action") == "position_change"
+        and not action.get("exclude_self")
+        and "それぞれ" not in text
+        and not ("メンバー" in text and ("1人" in text or "N人" in text))
+    ):
+        action["exclude_self"] = True
 
     _fill_defaults(action, text, _cached_source=source, _cached_dest=destination)
     return action
@@ -7127,7 +7164,6 @@ def _try_conditional_alternative(text):
                 "type": "location_condition",
                 "location": "success_live_card_zone",
                 "card_type": "live_card",
-                "target_event": "placing_in_success_zone",
                 "text": ct,
             }
             # The alternative replaces the original placement, so it lands in
@@ -7401,16 +7437,8 @@ def _try_answer_choice(text):
     return None
 
 
-def _try_each_time(text):
-    """たび — each-time triggers."""
-    if EACH_TIME_MARKER not in text:
-        return None
-    tm = re.search(r"([^たび]+)たび", text)
-    if not tm:
-        return None
-    trigger_text = tm.group(1).strip()
-    rest = text[tm.end() :].strip().lstrip("、，")
-    sub = parse_effect(rest)
+def _finish_each_time(text, trigger_text, sub):
+    """Set each_time metadata and merge the 〜たび trigger condition into `sub`."""
     sub["trigger_type"] = "each_time"
     sub["text"] = text
     # Parse the trigger condition text
@@ -7443,6 +7471,46 @@ def _try_each_time(text):
         else:
             sub["condition"] = trigger_cond
     return sub
+
+
+def _try_each_time(text):
+    """たび — each-time triggers."""
+    if EACH_TIME_MARKER not in text:
+        return None
+    tm = re.search(r"([^たび]+)たび", text)
+    if not tm:
+        return None
+    trigger_text = tm.group(1).strip()
+    rest = text[tm.end() :].strip().lstrip("、，")
+    sub = parse_effect(rest)
+    # "〜たび" bodies shaped [optional pay_energy, effect] are
+    # conditional_on_optional: the player MAY pay, and paying gates the
+    # effect. Reshaped here at the producer rather than as a post-parse FIX
+    # block (dissolved FIX 2, formerly in _process_pre_fix).
+    acts = sub.get("actions") or []
+    if (
+        sub.get("action") == "sequential"
+        and len(acts) == 2
+        and isinstance(acts[0], dict)
+        and isinstance(acts[1], dict)
+        and acts[0].get("action") == "pay_energy"
+        and acts[0].get("optional") is True
+    ):
+        first, second = acts
+        for leak in ("exclude_self", "group_names", "optional"):
+            first.pop(leak, None)
+        carried = {
+            k: v
+            for k, v in sub.items()
+            if k not in ("text", "action", "actions")
+        }
+        sub = {
+            "action": "conditional_on_optional",
+            **carried,
+            "optional_action": first,
+            "conditional_action": second,
+        }
+    return _finish_each_time(text, trigger_text, sub)
 
 
 def _try_opponent_action(text):
@@ -8711,7 +8779,10 @@ def _try_choice(text):
 
     result = {"text": text, "action": "choice"}
     if cond_mod and cond_mod not in ("。", "."):
-        result["choice_modifier"] = cond_mod
+        # The raw modifier sentence is deliberately NOT emitted: the
+        # structured choice_condition / alternative_condition /
+        # alternative_count_type fields below carry everything the engine's
+        # tiered-choice evaluation reads.
         cond = parse_condition(cond_mod)
         cond = _resolve_preceding_moved_condition(cond, cond_mod)
         if cond.get("type") != "custom":
@@ -9155,6 +9226,18 @@ def _try_kore_niyori_result(text):
             }
         else:
             cond = None
+    # Result-condition property enrichment, done at the producer rather than
+    # as a post-parse backfill (dissolved FIX 9, formerly in _process_pre_fix).
+    if isinstance(cond, dict) and not cond.get("card_property"):
+        cond_text = cond.get("text", "")
+        if "ブレードハート" in cond_text:
+            cond["card_property"] = "has_blade_heart"
+            if "持たない" in cond_text or "ない" in cond_text:
+                cond["negation"] = True
+        if "{{icon_score.png|スコア}}を持つ" in cond_text:
+            cond["card_property"] = "has_score_icon"
+        _infer_heart_source(cond, cond_text)
+        _infer_baton_touch(cond, cond_text)
     primary_text = parts[0].strip()
     # Skip empty/trivial primary text (e.g. cost text already consumed, or just bracket fragments)
     if not primary_text or re.match(r"^[\s）」）』」、。]*$", primary_text):
@@ -9169,12 +9252,27 @@ def _try_kore_niyori_result(text):
         pe = parse_effect(primary_text)
         if isinstance(pe, dict):
             primary = pe
+    followup = parse_effect(fp.strip())
+    # "このメンバー" in a これにより followup acts on the activating card
+    # itself. Derived at the producer rather than as a post-parse backfill
+    # (dissolved FIX 9b, formerly in _process_pre_fix).
+    if isinstance(followup, dict) and "このメンバー" in followup.get("text", ""):
+        if not followup.get("target") and followup.get("self_target") is None:
+            followup["self_target"] = True
+        # For change_state, also set self_cost so the Rust handler restricts
+        # targets to the activating card and skips when the card is already in
+        # the target state (e.g. already wait).
+        if (
+            followup.get("action") == "change_state"
+            and followup.get("self_cost") is None
+        ):
+            followup["self_cost"] = True
     return {
         "text": text,
         "action": "conditional_on_result",
         "primary_effect": primary,
         "result_condition": cond,
-        "followup_action": parse_effect(fp.strip()),
+        "followup_action": followup,
     }
 
 
@@ -11308,51 +11406,6 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
     action = node.get("action")
     ct = node.get("condition_type") or node.get("type")
 
-    # Inherit location into conditions
-    if isinstance(node.get("condition"), dict):
-        nc = node["condition"]
-        if nc.get("type") in ("comparison_condition", "card_count_condition"):
-            if not nc.get("location") and ctx.get("location"):
-                nc["location"] = ctx["location"]
-            if not nc.get("target") and ctx.get("target"):
-                nc["target"] = ctx["target"]
-            if not nc.get("card_type") and ctx.get("card_type"):
-                nc["card_type"] = ctx["card_type"]
-
-    # Inherit duration and target into action-type dicts
-    if action in (
-        "gain_resource",
-        "change_state",
-        "move_cards",
-        "select",
-    ):
-        if not node.get("duration") and ctx.get("duration"):
-            node["duration"] = ctx["duration"]
-        if not node.get("target") and ctx.get("target"):
-            node["target"] = ctx["target"]
-    # draw_card: only inherit duration if context has it and action type
-    # is not a setup step (drawing itself is instantaneous)
-    if action == "draw_card" and not node.get("duration") and ctx.get("duration"):
-        act_text = node.get("text", "") or ""
-        if "得る" in act_text or "を得る" in act_text or "得られる" in act_text:
-            node["duration"] = ctx["duration"]
-        if not node.get("target") and ctx.get("target"):
-            node["target"] = ctx["target"]
-        if not node.get("all") and ctx.get("all"):
-            ap = node.get("activation_position") or ctx.get("activation_position")
-            if ap not in ("center", "left_side"):
-                if action == "move_cards" and ctx.get("source") == node.get("source"):
-                    pass
-                elif node.get("count"):
-                    pass
-                else:
-                    node["all"] = ctx.get("all")
-
-    # Inherit timing_condition into gain_resource actions
-    if action == "gain_resource":
-        if not node.get("timing_condition") and ctx.get("timing_condition"):
-            node["timing_condition"] = ctx["timing_condition"]
-
     # Build context for children
     new_ctx = dict(ctx)
     for f in (
@@ -11452,44 +11505,7 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
     node_text = node.get("text", "") or ""
     _infer_baton_touch(node, node_text)
 
-    # heart_type:all for gain_resource actions
-    if action == "gain_resource" and node.get("resource") == "heart":
-        if "{{icon_all.png|ハート}}" in (node.get("text", "") or t or ""):
-            if not node.get("heart_type") and not node.get("heart_colors"):
-                node["heart_type"] = "all"
-
-    # card_property enrichment and heart_colors cleanup for card_count_conditions
-    # Check node.get("condition") — works for effect/action nodes
     nc = node.get("condition")
-    if isinstance(nc, dict) and nc.get("type") == "card_count_condition":
-        nct = nc.get("text", "")
-        if "ブレードハートを持たない" in nct or "ブレードハートがない" in nct:
-            if not nc.get("card_property"):
-                nc["card_property"] = "has_blade_heart"
-        if "{{icon_score.png|スコア}}を持つ" in nct and not nc.get("card_property"):
-            nc["card_property"] = "has_score_icon"
-        _infer_heart_source(nc, nct)
-        _infer_baton_touch(nc, nct)
-        # Strip heart_colors from preceding_moved conditions that have a
-        # specific location — the move already filtered by heart color.
-        if (
-            nc.get("source") == "preceding_moved"
-            and nc.get("location")
-            and nc.get("heart_colors")
-        ):
-            nc.pop("heart_colors", None)
-    # Q148: Strip heart_colors from blade-aggregate location_conditions.
-    # "ブレードの合計がN以上" is a blade total check, not a heart filter.
-    # heart_colors in the effect text is the modification target, not a condition filter.
-    nc = node.get("condition")
-    if isinstance(nc, dict) and nc.get("type") == "location_condition":
-        nc_text = nc.get("text", "")
-        if (
-            "ブレード" in nc_text
-            and nc.get("aggregate") == "total"
-            and nc.get("heart_colors")
-        ):
-            nc.pop("heart_colors", None)
     # Also check if node itself IS a card_count_condition (sub-condition
     # of a compound — no "condition" child, it IS the condition).
     if node.get("type") == "card_count_condition" and node is not nc:
@@ -11788,98 +11804,31 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
     # --- 2. Targeted fixes logic ---
     t = ability.get("triggerless_text", "")
 
-    # FIX 2: each_time sequential → conditional_on_optional (LOAD-BEARING).
-    # Verified 2026-08: removal changes 2 corpus abilities (自動 per-discard
-    # optional-energy cards reshaped as conditional_on_optional).
-    if eff.get("trigger_type") == "each_time" and eff.get("action") == "sequential":
-        acts = eff.get("actions", [])
-        if len(acts) == 2:
-            first, second = acts[0], acts[1]
-            if isinstance(first, dict) and isinstance(second, dict):
-                if (
-                    first.get("action") == "pay_energy"
-                    and first.get("optional") is True
-                ):
-                    for leak in ("exclude_self", "group_names", "optional"):
-                        first.pop(leak, None)
-                    eff["action"] = "conditional_on_optional"
-                    eff["optional_action"] = first
-                    eff["conditional_action"] = second
-                    eff.pop("actions", None)
-                    fix_stats["each_time"] += 1
+    # FIX 2 dissolved 2026-08 into _try_each_time (the only producer of
+    # trigger_type="each_time"): the [optional pay_energy, effect] →
+    # conditional_on_optional reshape now happens at parse time.
 
-    # FIX 3: conditional_on_optional cleanup (LOAD-BEARING).
-    # The positive/negative renames have no current producer, but the
-    # sub-action "optional" strip is essential: handlers emit optional=True on
-    # the inner nodes (from 「〜してもよい」), yet within the
-    # conditional_on_optional container the optionality belongs to the
-    # container itself. Without this strip the engine would double-prompt.
-    # Verified 2026-08: removing changes 4 corpus abilities.
-    if eff.get("action") == "conditional_on_optional":
-        if "positive_action" in eff and "conditional_action" not in eff:
-            eff["conditional_action"] = eff.pop("positive_action")
-        eff.pop("negative_action", None)
-        for sub_key in ("optional_action", "conditional_action"):
-            sub = eff.get(sub_key)
-            if isinstance(sub, dict):
-                sub.pop("optional", None)
+    # FIX 3 dissolved 2026-08 into parse_effect's dispatcher: the
+    # conditional_on_optional sub-action "optional" strip now runs at parse
+    # time (the positive/negative_action renames had no producer — dead).
 
     # FIX 6 removed 2026-08 (byte-diff verified): no pipeline producer emits an
     # opponent_action wrapper anymore — _try_opponent_action flattens at
     # parse time. Kept as history note only.
 
-    # FIX 7/7b: Ability filter (LOAD-BEARING, verified 2026-08: removal changes
-    # 2 corpus abilities). 「能力を持たない」 on modify_cost and on select
-    # sub-actions must become ability_filter=no_ability; the generic handlers
-    # don't derive it from text.
-    if "能力を持たない" in t:
-        if eff.get("action") == "modify_cost" and not eff.get("ability_filter"):
-            eff["ability_filter"] = "no_ability"
-            fix_stats["ability_filter"] += 1
-
-    # FIX 7b: Ability filter for select actions within sequential compounds
-    # (e.g. 黒澤ダイヤ: "ライブ開始時能力を持たない" → select action filter)
-    if eff.get("action") == "sequential":
-        for sub in eff.get("actions", []):
-            if isinstance(sub, dict) and sub.get("action") in (
-                "select",
-                "select_cards",
-            ):
-                sub_text = sub.get("text", "")
-                if "能力を持たない" in sub_text or "能力も持たない" in sub_text:
-                    _enrich_from_text(sub, sub_text)
-                    fix_stats["ability_filter"] += 1
+    # FIX 7/7b dissolved 2026-08 into the producers: 「能力を持たない」 now
+    # derives ability_filter at parse time in _handle_cost_modification
+    # (modify_cost) and parse_action (select/select_cards) via
+    # _apply_no_ability_filter.
 
     _fix_condition_enrichment(eff, t, fix_stats)
 
-    # FIX 9: Result condition enrichment in conditional_on_result (LOAD-BEARING,
-    # verified 2026-08: removal changes 1 corpus ability — ブレードハート /
-    # スコア icon card_property derivation on result_condition).
-    rc = eff.get("result_condition")
-    if isinstance(rc, dict) and not rc.get("card_property"):
-        rct = rc.get("text", "")
-        if "ブレードハート" in rct:
-            rc["card_property"] = "has_blade_heart"
-            if "持たない" in rct or "ない" in rct:
-                rc["negation"] = True
-            fix_stats["result_cond"] += 1
-        if "{{icon_score.png|スコア}}を持つ" in rct:
-            rc["card_property"] = "has_score_icon"
-            fix_stats["result_cond"] += 1
-        _infer_heart_source(rc, rct)
-        _infer_baton_touch(rc, rct)
-
-    # FIX 9b: followup_action self_target/self_cost (LOAD-BEARING, verified
-    # 2026-08: removal changes 2 corpus abilities).
-    fa = eff.get("followup_action")
-    if isinstance(fa, dict) and "このメンバー" in fa.get("text", ""):
-        if not fa.get("target") and fa.get("self_target") is None:
-            fa["self_target"] = True
-        # For change_state, also set self_cost so the Rust handler
-        # restricts targets to the activating card and skips when
-        # the card is already in the target state (e.g. already wait).
-        if fa.get("action") == "change_state" and fa.get("self_cost") is None:
-            fa["self_cost"] = True
+    # FIX 9 dissolved 2026-08 into _try_kore_niyori_result (its only
+    # parse-time producer of text-derived result_conditions): ブレードハート /
+    # スコア icon card_property + heart_source/baton_touch enrichment now runs
+    # where the condition is built.
+    # FIX 9b dissolved 2026-08 into _try_kore_niyori_result: followup
+    # "このメンバー" → self_target/self_cost now derived at the producer.
 
     # FIX 10: Primary effect fixes — negation condition
     pe = eff.get("primary_effect")
@@ -11917,20 +11866,9 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
         if eff.get("all") and "all" not in pe and pe.get("count") == 1:
             pe["all"] = False
 
-    # FIX 11: Remove leaking fields from sub-actions in sequential
-    if eff.get("action") in ("sequential", "conditional_on_result"):
-        for sub in eff.get("actions", []):
-            if isinstance(sub, dict):
-                if sub.get("action") == "pay_energy":
-                    sub.pop("exclude_self", None)
-                    sub.pop("group_names", None)
-        fa = eff.get("followup_action")
-        if isinstance(fa, dict):
-            for sub in fa.get("actions", []):
-                if isinstance(sub, dict):
-                    sub.pop(
-                        "activation_position", None
-                    ) if "activation_position" in sub else None
+    # FIX 11 removed 2026-08 (removal-diff triage: 0 corpus abilities change):
+    # no current producer leaks exclude_self/group_names onto sequential
+    # pay_energy sub-actions, nor activation_position into followup actions.
 
     # FIX 12: compound condition → split gain_resource into sequential with two actions
     if isinstance(cond, dict) and cond.get("type") == "compound":
@@ -12023,51 +11961,11 @@ def _process_pre_fix(ability: Dict[str, Any], fix_stats: Dict[str, int]) -> None
                     fix_stats["auto_trigger"] += 1
                     break
 
-    # FIX 15: Backfill exclude_self for single-target position_change effects
-    # Rule 11.10.1: Position change MUST move to a different area.
-    if eff.get("action") == "position_change" and not eff.get("exclude_self"):
-        et = eff.get("text", "") or t
-        # Only for single-target moves (not "メンバー1人を" or "それぞれ" formation change)
-        if "それぞれ" not in et and not (
-            "メンバー" in et and ("1人" in et or "N人" in et)
-        ):
-            eff["exclude_self"] = True
-            fix_stats.setdefault("exclude_self", 0)
-            fix_stats["exclude_self"] += 1
-
-    # FIX N: All-revealed-match-heart-color condition for specify_heart_color+reveal+select_cards
-    if (
-        eff.get("action") == "sequential"
-        and "公開されたカードの中に" in t
-        and "合計" in t
-        and "枚含まれる場合" in t
-    ):
-        acts = eff.get("actions", [])
-        cond_m = re.search(r"合計(\d+)枚含まれる場合", t)
-        if cond_m:
-            cond_count = int(cond_m.group(1))
-            cond = {
-                "type": "all_revealed_match_heart_color",
-                "count": cond_count,
-                "operator": ">=",
-                "cache": True,
-                "text": f"公開されたカードの中に指定した色に合致するカードが合計{cond_count}枚含まれる場合",
-            }
-            for sub in acts:
-                if isinstance(sub, dict) and sub.get("action") in (
-                    "select_cards",
-                    "gain_resource",
-                ):
-                    if not sub.get("condition"):
-                        sub["condition"] = cond
-                    if sub.get("action") == "select_cards":
-                        sub.pop("discard_remaining", None)
-                # Remove leaked group_names from actions that don't need them
-                if isinstance(sub, dict) and sub.get("action") in (
-                    "specify_heart_color",
-                    "reveal",
-                ):
-                    sub.pop("group_names", None)
+    # FIX 15 dissolved 2026-08 into parse_action (single-target position_change
+    # → exclude_self, Rule 11.10.1) — derived where the action is built.
+    # FIX N removed 2026-08 (removal-diff triage: 0 corpus abilities change):
+    # _try_heart_select_reveal already attaches the all_revealed_match_heart_color
+    # condition at parse time, so this backfill never fires.
 
 
 def _fix_conditional_on_result(eff, t):
@@ -12495,6 +12393,20 @@ def _clean(obj):
         cleaned = [_clean(item) for item in obj]
         return [x for x in cleaned if x is not None and x != {}]
     return obj
+
+
+def _strip_coo_child_optional(effect):
+    """conditional_on_optional: the optionality belongs to the CONTAINER (the
+    player's may-I choice), not its sub-actions — handlers emit optional=True
+    on inner nodes from 「〜してもよい」, and leaving it there makes the engine
+    double-prompt. Runs after `_propagate_optional` at parse time, replacing
+    the post-parse FIX 3 sweep in _process_pre_fix."""
+    if isinstance(effect, dict) and effect.get("action") == "conditional_on_optional":
+        for sub_key in ("optional_action", "conditional_action"):
+            sub = effect.get(sub_key)
+            if isinstance(sub, dict):
+                sub.pop("optional", None)
+    return effect
 
 
 def _propagate_optional(d):

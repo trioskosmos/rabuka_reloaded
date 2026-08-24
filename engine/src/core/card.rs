@@ -2758,6 +2758,11 @@ pub blade_greater_than_all: Option<bool>,
     pub card_type: Option<ConditionCardType>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub characters: Option<Box<Vec<String>>>,
+    /// "このカードが控え室にある" style conditions: the check targets the
+    /// ACTIVATING card's presence in the location, not a count of matching
+    /// cards. See ConditionContext::evaluate_check_self_condition.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub check_self: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub comparison_target: Option<ComparisonTarget>,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -3611,6 +3616,10 @@ impl Condition {
 
     pub fn get_blade_greater_than_all(&self) -> Option<bool> {
         self.common().and_then(|c| c.blade_greater_than_all)
+    }
+
+    pub fn get_check_self(&self) -> Option<bool> {
+        self.common().and_then(|c| c.check_self)
     }
 
     pub fn get_area_direction(&self) -> Option<&str> {

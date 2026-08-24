@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-24T05:27:06.212145",
+  "generated_at": "2026-08-24T13:21:15.260332",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "124a06cf",
+  "engine_commit": "a21bd68f",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -5015,10 +5015,24 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のカードが1枚以上いずれかの領域から控え室に置かれるたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、それらのカードの中から1枚手札に加える",
         "action": "conditional_on_optional",
         "conditional": true,
+        "optional_action": {
+          "text": "{{icon_energy.png|E}}支払ってもよい。",
+          "action": "pay_energy",
+          "energy": 1,
+          "count": 1
+        },
+        "conditional_action": {
+          "text": "それらのカードの中から1枚手札に加える",
+          "source": "those_cards",
+          "destination": "hand",
+          "count": 1,
+          "action": "move_cards",
+          "card_type": "card"
+        },
         "trigger_type": "each_time",
+        "text": "自分のカードが1枚以上いずれかの領域から控え室に置かれるたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、それらのカードの中から1枚手札に加える",
         "condition": {
           "type": "compound",
           "operator": "and",
@@ -5045,20 +5059,6 @@
               "source": "preceding_moved"
             }
           ]
-        },
-        "optional_action": {
-          "text": "{{icon_energy.png|E}}支払ってもよい。",
-          "action": "pay_energy",
-          "energy": 1,
-          "count": 1
-        },
-        "conditional_action": {
-          "text": "それらのカードの中から1枚手札に加える",
-          "source": "those_cards",
-          "destination": "hand",
-          "count": 1,
-          "action": "move_cards",
-          "card_type": "card"
         }
       }
     },
@@ -5842,11 +5842,11 @@
             ],
             "optional": true,
             "action": "select",
-            "source": "live_card_zone",
             "ability_filter": "no_ability_type",
             "ability_filter_triggers": [
               "ライブ開始時"
-            ]
+            ],
+            "source": "live_card_zone"
           },
           {
             "action": "move_cards",
@@ -11737,7 +11737,8 @@
               {
                 "text": "このメンバーをそのエリアに移動する",
                 "card_type": "member_card",
-                "action": "position_change"
+                "action": "position_change",
+                "exclude_self": true
               },
               {
                 "text": "選んだエリアにメンバーがいる場合、そのメンバーは、このメンバーがいたエリアに移動させる",
@@ -11750,7 +11751,8 @@
                 },
                 "destination": "same_area",
                 "card_type": "member_card",
-                "action": "position_change"
+                "action": "position_change",
+                "exclude_self": true
               }
             ]
           }
@@ -12438,7 +12440,8 @@
           {
             "text": "このメンバーをそのエリアに移動する",
             "card_type": "member_card",
-            "action": "position_change"
+            "action": "position_change",
+            "exclude_self": true
           },
           {
             "text": "選んだエリアにメンバーがいる場合、そのメンバーは、このメンバーがいたエリアに移動させる",
@@ -12451,7 +12454,8 @@
             },
             "destination": "same_area",
             "card_type": "member_card",
-            "action": "position_change"
+            "action": "position_change",
+            "exclude_self": true
           }
         ]
       }
@@ -14934,14 +14938,14 @@
           "action": "gain_ability",
           "ability_gain_trigger": "常時",
           "ability_gain": "【常時】ライブの合計スコアを+1する。",
+          "self_target": true,
           "gained_effect": {
             "text": "ライブの合計スコアを+1する",
             "action": "modify_score",
             "value": 1,
             "operation": "add",
             "target": "live_total"
-          },
-          "self_target": true
+          }
         }
       }
     },
@@ -16399,10 +16403,10 @@
         "optional": true,
         "action": "position_change",
         "multiple_targets": true,
+        "exclude_self": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。"
-        ],
-        "exclude_self": true
+        ]
       }
     },
     {
@@ -18109,10 +18113,25 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のステージにほかの『スリーズブーケ』のメンバーが登場するたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、エネルギーを2枚アクティブにする",
         "action": "conditional_on_optional",
         "conditional": true,
+        "optional_action": {
+          "text": "{{icon_energy.png|E}}支払ってもよい。",
+          "action": "pay_energy",
+          "energy": 1,
+          "count": 1,
+          "location": "stage"
+        },
+        "conditional_action": {
+          "text": "エネルギーを2枚アクティブにする",
+          "state_change": "active",
+          "count": 2,
+          "action": "change_state",
+          "card_type": "energy_card",
+          "location": "stage"
+        },
         "trigger_type": "each_time",
+        "text": "自分のステージにほかの『スリーズブーケ』のメンバーが登場するたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、エネルギーを2枚アクティブにする",
         "condition": {
           "type": "appearance_condition",
           "appearance": true,
@@ -18132,23 +18151,7 @@
         "exclude_self": true,
         "group_names": [
           "スリーズブーケ"
-        ],
-        "optional_action": {
-          "text": "{{icon_energy.png|E}}支払ってもよい。",
-          "action": "pay_energy",
-          "energy": 1,
-          "count": 1,
-          "location": "stage"
-        },
-        "conditional_action": {
-          "text": "エネルギーを2枚アクティブにする",
-          "state_change": "active",
-          "count": 2,
-          "action": "change_state",
-          "card_type": "energy_card",
-          "exclude_self": true,
-          "location": "stage"
-        }
+        ]
       }
     },
     {
@@ -20319,7 +20322,6 @@
       "effect": {
         "text": "以下から1つを選ぶ。これにより控え室に置いたカードがブレードハートを持たないメンバーカードの場合、代わりに1つ以上を選ぶ。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n・ライブ終了時まで、自分のステージにいるこのメンバー以外の『Liella!』のメンバー1人は、{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る",
         "action": "choice",
-        "choice_modifier": "。これにより控え室に置いたカードがブレードハートを持たないメンバーカードの場合、代わりに1つ以上を選ぶ。",
         "choice_condition": {
           "type": "card_count_condition",
           "card_type": "member_card",
@@ -20974,10 +20976,10 @@
         "optional": true,
         "action": "position_change",
         "multiple_targets": true,
+        "exclude_self": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させてもよい。"
-        ],
-        "exclude_self": true
+        ]
       }
     },
     {
@@ -28185,7 +28187,6 @@
       "effect": {
         "text": "以下から1つを選ぶ。自分の成功ライブカード置き場に『虹ヶ咲』のカードがある場合、代わりに1つ以上を選ぶ。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n・自分の控え室からメンバーカードを1枚手札に加える",
         "action": "choice",
-        "choice_modifier": "。自分の成功ライブカード置き場に『虹ヶ咲』のカードがある場合、代わりに1つ以上を選ぶ。",
         "choice_condition": {
           "text": "。自分の成功ライブカード置き場に『虹ヶ咲』のカードがある場合、代わりに1つ以上を選ぶ。",
           "group_names": [
@@ -33287,7 +33288,6 @@
           "type": "location_condition",
           "location": "success_live_card_zone",
           "card_type": "live_card",
-          "target_event": "placing_in_success_zone",
           "text": "このカードを成功ライブカード置き場に置く場合",
           "target": "self"
         },
@@ -35050,7 +35050,8 @@
             "target": "self",
             "optional": true,
             "action": "position_change",
-            "multiple_targets": true
+            "multiple_targets": true,
+            "exclude_self": true
           }
         ],
         "parenthetical": [
@@ -36133,10 +36134,10 @@
         "optional": true,
         "action": "position_change",
         "multiple_targets": true,
+        "exclude_self": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させてもよい。"
-        ],
-        "exclude_self": true
+        ]
       }
     },
     {
@@ -36359,6 +36360,7 @@
           "optional": true,
           "action": "position_change",
           "multiple_targets": true,
+          "exclude_self": true,
           "location": "stage"
         },
         "result_condition": {
@@ -37360,8 +37362,7 @@
               "all": true,
               "shuffle": true,
               "target": "self",
-              "text": "自分の控え室にあるすべてのカードをシャッフルし、デッキの下に置いてもよい",
-              "optional": true
+              "text": "自分の控え室にあるすべてのカードをシャッフルし、デッキの下に置いてもよい"
             },
             {
               "action": "gain_resource",

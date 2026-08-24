@@ -480,3 +480,4 @@ pub mod l0_gap_subunit_success_test;
 pub mod l0_gap_livesuccess2_test;
 pub mod l0_gap_livestart2_test;
 pub mod l0_gap_livestart3_test;
+mod check_self_condition_test;

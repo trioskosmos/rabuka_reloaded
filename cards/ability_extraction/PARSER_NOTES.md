@@ -6,6 +6,22 @@ Consolidates the former `PARSER_REFACTOR.md`, `PARSER_DEEP_REFACTOR.md`, and
 
 ## Remaining debt (live)
 
+### Engine-side key audit (2026-08-24)
+Cross-referenced every JSON key emitted into `abilities.json` against
+`card.rs` structs + engine handlers. Findings:
+
+| Key (count) | Disposition |
+|---|---|
+| `check_self` (6 conditions) | **IMPLEMENTED in engine** — new `ConditionCommon.check_self`, decoded + evaluated in `evaluate_check_self_condition`; presence of the ACTIVATING card in the location instead of counting matching cards. Pinned by `check_self_condition_test.rs` (2 tests) |
+| `zone`/`energy`/`costs`/`max_repeats` | handled by vm.rs aliases / decoder (audit false positives) |
+| `source_location` (2 gain_ability_from_source) | engine already hardcodes under-member sourcing; documentary |
+| `action_reference` (1) | decodes as AlwaysTrue alias; acceptable degradation |
+| `action_reference` (1) | decodes as AlwaysTrue alias; acceptable degradation |
+| `choice_modifier` (2 choices) | **removed from emission** — structured choice_condition/alternative_condition/alternative_count_type were always present and are what the engine's tiered-choice evaluation reads (compound.rs) |
+| `target_event` (1) | **removed from emission** — engine keys replacement effects off destination=success_live_zone (pinned by replacement_destination validation rule) |
+| `per_character` (1, LL-bp7-001 play cost) | known limitation: engine selects count=len(characters) restricted to those names but cannot enforce exactly-one-per-name; single card, low impact |
+| `baton_touch`(on appearance), `energy_state`, `comparison_source`, `area_direction`, `positions_characters`, `turn_number`, `cost_reference_*` | decoded or harmless documentary |
+
 ### Phase 8 — Standardize `_ACTION_RULES` format — DONE (stale entry)
 All registrations already go through the ActionRule-normalizing
 `_register_action` (`__post_init__` arity normalization, E2a session); the
@@ -17,16 +33,16 @@ Empirically verified by removal + regen byte-diff, one block at a time:
 | Block | Verdict | Evidence |
 |---|---|---|
 | FIX 6 (opponent_action flatten) | **DEAD — removed** | 0 output change; no producer emits the wrapper |
-| FIX 2 (each_time → conditional_on_optional) | LOAD-BEARING | 2 abilities change without it |
-| FIX 3 (conditional_on_optional cleanup) | LOAD-BEARING | 4 abilities change; `optional` strip prevents engine double-prompting. positive/negative renames have no producer (dead but harmless) |
-| FIX 7/7b (ability_filter backfill) | LOAD-BEARING | 2 abilities |
-| FIX 9 (result_condition card_property) | LOAD-BEARING | 1 ability |
-| FIX 9b (followup self_target/self_cost) | LOAD-BEARING | 2 abilities |
-| FIX 10–15, N | presumed live (same pattern); untested | — |
+| FIX 2 (each_time → conditional_on_optional) | **DISSOLVED into producer** | `_try_each_time`/`_finish_each_time` reshapes at parse time; byte-identical |
+| FIX 3 (conditional_on_optional cleanup) | **DISSOLVED into parse_effect** | `_strip_coo_child_optional` after `_propagate_optional`; 1-ability delta (stale nested optional on shared children now stripped uniformly — the intended semantics). Dead positive/negative renames dropped |
+| FIX 7/7b (ability_filter backfill) | **DISSOLVED into producers** | `_apply_no_ability_filter` in `_handle_cost_modification` + `parse_action` select path; byte-identical |
+| FIX 9 (result_condition card_property) | **DISSOLVED into producer** | enrichment moved into `_try_kore_niyori_result`; byte-identical |
+| FIX 9b (followup self_target/self_cost) | **DISSOLVED into producer** | moved into `_try_kore_niyori_result` followup construction; byte-identical |
+| FIX 10–15, N | characterized 2026-08 by per-block removal-diff | FIX 11 & FIX N: **DEAD — deleted** (0 abilities each). FIX 15: **DISSOLVED into parse_action** (Rule 11.10.1 exclude_self now uniform; 4 nested nodes gained it, semantically correct). FIX 10/12/13a/13b: live pipeline steps (1/1/1/2 abilities), kept with characterization |
 
-Conclusion: these blocks are compensations for shapes that *handlers emit*.
-Dissolving them (Phase 5) means fixing each producing handler first — the
-blocks themselves are correct code.
+Conclusion: every verified-load-bearing compensation block has been
+dissolved into its producer or removed as dead. Remaining FIX blocks are
+genuine pipeline steps, each with a known ability-count blast radius.
 
 ## Fundamental structural issues (from the deep-refactor review)
 1. **`_fill_defaults` re-extracts fields `parse_action` already set**

@@ -73,6 +73,45 @@ impl<'a> ConditionContext<'a> {
         }
     }
 
+    /// `check_self` conditions (parser emits them for "このカードが控え室にある"
+    /// style gates) test whether the ACTIVATING card itself is present in the
+    /// location, instead of counting matching cards in that zone.
+    /// Returns None when the condition is not a check_self condition or lacks
+    /// a resolvable location, so callers fall through to normal evaluation.
+    /// Negation is NOT applied here — callers own negation semantics.
+    pub(crate) fn evaluate_check_self_condition(
+        &self,
+        condition: &Condition,
+    ) -> Option<bool> {
+        if !condition.get_check_self().unwrap_or(false) {
+            return None;
+        }
+        let cid = self.activating_card_id?;
+        let location = condition.get_location()?;
+        if location.is_empty() {
+            return None;
+        }
+        let present = match self.resolve_target_for_scope(condition) {
+            "both" => {
+                util::zone_cards(&self.game_state.player1, location).contains(&cid)
+                    || util::zone_cards(&self.game_state.player2, location).contains(&cid)
+            }
+            "opponent" => {
+                util::zone_cards(self.resolve_condition_player("opponent"), location)
+                    .contains(&cid)
+            }
+            _ => {
+                util::zone_cards(self.resolve_condition_player("self"), location)
+                    .contains(&cid)
+            }
+        };
+        Some(compare_counts(
+            condition.get_operator(),
+            if present { 1 } else { 0 },
+            condition.get_count().unwrap_or(1),
+        ))
+    }
+
     pub(crate) fn evaluate_both_condition(&self, condition: &Condition) -> bool {
         let values = match condition.get_values() {
             Some(v) if !v.is_empty() => v,
@@ -108,6 +147,9 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(crate) fn evaluate_comparison_condition(&self, condition: &Condition) -> bool {
+        if let Some(v) = self.evaluate_check_self_condition(condition) {
+            return v;
+        }
         // "元々のスコアより高いスコアのライブカードがある" — existence of a
         // live card in the zone whose CURRENT (modifier-adjusted) score is
         // higher than its ORIGINAL printed score. Not a count-vs-threshold
@@ -1179,6 +1221,9 @@ impl<'a> ConditionContext<'a> {
         // When the sequential pipeline needs to negate a location condition for
         // conditional_alternative collapse, it should use a non-location
         // condition type (e.g. a simple comparison on a step_result flag) instead.
+        if let Some(v) = self.evaluate_check_self_condition(condition) {
+            return v;
+        }
         if let Some(locs) = condition.get_locations() {
             if locs.len() >= 2 {
                 if condition.get_target() == Some("both")
@@ -2674,6 +2719,9 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(crate) fn evaluate_card_count_condition(&self, condition: &Condition) -> bool {
+        if let Some(v) = self.evaluate_check_self_condition(condition) {
+            return v;
+        }
         let card_type = condition
             .get_card_type()
             .map(|ct| ct.as_str())
