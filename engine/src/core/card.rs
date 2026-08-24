@@ -2754,6 +2754,18 @@ pub blade_greater_than_all: Option<bool>,
     pub cache: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub card_property: Option<CardProperty>,
+    /// Name-substring filter (e.g. name containing "DreamBelievers").
+    /// Candidates must contain ALL fragments (normalized) — see
+    /// CardFilter.name_fragments.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub card_names: Option<Box<Vec<String>>>,
+    /// Reference card for name-equality gates (e.g. 「それと同じカード名の
+    /// カードが…ある場合」). `"previous_selected"` compares against the card
+    /// chosen by the preceding sequential action. The parser emits this as a
+    /// bare condition key; historically it lived in LocationSubChecks —
+    /// `Condition::get_reference_card` reads common first, sub_checks second.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub reference_card: Option<ArcStr>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub card_type: Option<ConditionCardType>,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -3407,6 +3419,7 @@ impl Condition {
         let characters = c.and_then(|c| c.characters.as_ref());
         let exclude_characters = c.and_then(|c| c.exclude_characters.as_ref());
         let exclude_group_names = c.and_then(|c| c.exclude_group_names.as_ref());
+        let card_names = c.and_then(|c| c.card_names.as_ref()).map(|b| b.as_ref());
         crate::ability::util::CardFilter {
             card_type: card_type.map(|ct| ct.as_str()),
             group: group_names
@@ -3418,6 +3431,10 @@ impl Condition {
             exclude_characters: exclude_characters.map(|b| b.as_ref()),
             exclude_self: None,
             exclude_group_names: exclude_group_names.map(|b| b.as_slice()),
+            name_fragments: match card_names {
+                Some(names) if !names.is_empty() => Some(names),
+                _ => None,
+            },
             ..Default::default()
         }
     }
@@ -3727,6 +3744,11 @@ impl Condition {
     }
 
     pub fn get_reference_card(&self) -> Option<&str> {
+        // Common field first (bare key in generated JSON + bytecode);
+        // fall back to the legacy LocationSubChecks location.
+        if let Some(rc) = self.common().and_then(|c| c.reference_card.as_deref()) {
+            return Some(rc);
+        }
         match self {
             Condition::Location { sub_checks, .. } => sub_checks
                 .as_ref()

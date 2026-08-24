@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T13:42:47.224887+00:00",
+  "generated_at": "2026-08-24T14:37:24.903038+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 455,
-  "n_tests": 2711,
+  "n_files": 456,
+  "n_tests": 2722,
   "total_cards": 771,
   "covered_cards": 659,
   "abilities_on_covered": 823,
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 597,
-    "L1+choice": 153,
+    "L2+choice": 600,
+    "L1+choice": 150,
     "L2": 25,
     "none": 113,
     "L1": 48
@@ -2860,12 +2860,31 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/bytecode_validation_test.rs",
+        "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/kanon_invalidate_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test_part2.rs",
         "engine/tests/test_modules/zero_tested_action_types_test.rs"
       ],
       "covering_tests": [
+        "bytecode_ability_0",
+        "bytecode_cost_matches_json",
+        "bytecode_count_matches_json",
+        "bytecode_debug_ability_239",
+        "bytecode_debug_ability_399",
+        "bytecode_debug_ability_399_disabled",
+        "bytecode_empty_slices_match_known_is_null_baseline",
+        "bytecode_every_ability_decodes",
+        "bytecode_no_silent_decode_fallbacks",
+        "bytecode_nonempty_effects_match_action",
+        "dream_believers_empty_waitroom_no_bonus",
+        "dream_believers_members_and_name_match_score_plus_one",
+        "dream_believers_two_members_no_bonus",
+        "dream_believers_variant_name_still_matches",
+        "dream_believers_wrong_name_no_bonus",
+        "empty_slice_returns_default_ability",
+        "every_card_ability_index_is_valid",
         "issue10_dream_with_you_high_blade_plus_1_score",
         "issue10_dream_with_you_no_blade_no_score",
         "issue11_fanfare_15plus_cards_gives_blade",
@@ -2878,26 +2897,9 @@
         "issue16_hanamaru_all_cost_higher_than_opponent_gains_blade",
         "issue16_hanamaru_opponent_higher_cost_no_blade",
         "issue17_suzu_cost_bonus_condition_met",
-        "issue17_suzu_cost_bonus_condition_not_met",
-        "issue1_kanon_invalidate_and_recover",
-        "issue1_kanon_no_liella_on_stage_no_recovery",
-        "issue2_kanan_discard_1_gain_1",
-        "issue2_kanan_skip_cost_empty_live_gain",
-        "issue2_rina_cost_total_10_no_bonus",
-        "issue2_rina_cost_total_6_draws_card",
-        "issue3_ayumu_compound_both_conditions_met",
-        "issue3_ayumu_live_card_in_hand_blocks_effect",
-        "issue3_karin_live_start_draw_card",
-        "issue4_you_exclude_aqours_live_start",
-        "issue5_kanon_invalidate_other_liella",
-        "issue5_solitude_rain_heart_color_scoring",
-        "issue6_natsumi_blade_expires_after_live_victory_determination",
-        "issue6_natsumi_low_energy_no_blade",
-        "issue6_natsumi_self_and_other_blade",
-        "issue6_natsumi_self_only_blade",
-        "issue7_hajimari_no_success_live_no_effect"
+        "issue17_suzu_cost_bonus_condition_not_met"
       ],
-      "covering_test_count": 51,
+      "covering_test_count": 73,
       "is_null": false
     },
     {
@@ -4753,10 +4755,16 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test_part3.rs",
         "engine/tests/test_modules/shioriko_bp4_swap_test.rs"
       ],
       "covering_tests": [
+        "dream_believers_empty_waitroom_no_bonus",
+        "dream_believers_members_and_name_match_score_plus_one",
+        "dream_believers_two_members_no_bonus",
+        "dream_believers_variant_name_still_matches",
+        "dream_believers_wrong_name_no_bonus",
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
         "issue13_mia_three_conditional_blade_checks",
@@ -4765,6 +4773,7 @@
         "issue6_you_timed_heart_zero_for_setup_members",
         "issue7_mifune_live_start_select_and_check",
         "issue9_karin_select_from_discard_place_on_deck",
+        "kanon_alone_on_stage_no_recovery",
         "karin_edge_0_waited_members",
         "karin_edge_1_waited_1_niji_in_discard",
         "karin_edge_2_waited_2_niji_select_both",
@@ -4772,21 +4781,17 @@
         "karin_edge_hand_unchanged",
         "karin_edge_non_niji_not_selectable",
         "karin_edge_not_opponent_waitroom",
+        "mifune_different_name_in_success_zone_no_heart04",
+        "mifune_empty_success_zone_no_heart04",
+        "mifune_same_name_in_success_zone_gains_heart04",
         "saikou_edge_both_scores",
         "saikou_edge_no_cards",
         "saikou_edge_score1_only",
         "saikou_edge_score2_only",
         "saikou_edge_score5_only",
-        "shioriko_bp4_basic_swap_one_niji_one_niji",
-        "shioriko_bp4_both_zones_empty_skips",
-        "shioriko_bp4_no_niji_in_discard_after_move_swaps_same_card_back",
-        "shioriko_bp4_no_niji_in_success_skips_entirely",
-        "shioriko_bp4_non_niji_in_discard_not_offered",
-        "shioriko_bp4_non_niji_in_success_not_offered",
-        "shioriko_bp4_skip_optional_nothing_moves",
-        "shioriko_bp4_two_niji_in_success_choose_one"
+        "shioriko_bp4_basic_swap_one_niji_one_niji"
       ],
-      "covering_test_count": 28,
+      "covering_test_count": 37,
       "is_null": false
     },
     {
@@ -4812,10 +4817,16 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test_part3.rs",
         "engine/tests/test_modules/shioriko_bp4_swap_test.rs"
       ],
       "covering_tests": [
+        "dream_believers_empty_waitroom_no_bonus",
+        "dream_believers_members_and_name_match_score_plus_one",
+        "dream_believers_two_members_no_bonus",
+        "dream_believers_variant_name_still_matches",
+        "dream_believers_wrong_name_no_bonus",
         "issue11_shizuku_score_floor_at_zero",
         "issue12_compass_activate_dollchestra_live_start",
         "issue13_mia_three_conditional_blade_checks",
@@ -4824,6 +4835,7 @@
         "issue6_you_timed_heart_zero_for_setup_members",
         "issue7_mifune_live_start_select_and_check",
         "issue9_karin_select_from_discard_place_on_deck",
+        "kanon_alone_on_stage_no_recovery",
         "karin_edge_0_waited_members",
         "karin_edge_1_waited_1_niji_in_discard",
         "karin_edge_2_waited_2_niji_select_both",
@@ -4831,21 +4843,17 @@
         "karin_edge_hand_unchanged",
         "karin_edge_non_niji_not_selectable",
         "karin_edge_not_opponent_waitroom",
+        "mifune_different_name_in_success_zone_no_heart04",
+        "mifune_empty_success_zone_no_heart04",
+        "mifune_same_name_in_success_zone_gains_heart04",
         "saikou_edge_both_scores",
         "saikou_edge_no_cards",
         "saikou_edge_score1_only",
         "saikou_edge_score2_only",
         "saikou_edge_score5_only",
-        "shioriko_bp4_basic_swap_one_niji_one_niji",
-        "shioriko_bp4_both_zones_empty_skips",
-        "shioriko_bp4_no_niji_in_discard_after_move_swaps_same_card_back",
-        "shioriko_bp4_no_niji_in_success_skips_entirely",
-        "shioriko_bp4_non_niji_in_discard_not_offered",
-        "shioriko_bp4_non_niji_in_success_not_offered",
-        "shioriko_bp4_skip_optional_nothing_moves",
-        "shioriko_bp4_two_niji_in_success_choose_one"
+        "shioriko_bp4_basic_swap_one_niji_one_niji"
       ],
-      "covering_test_count": 28,
+      "covering_test_count": 37,
       "is_null": false
     },
     {
@@ -6423,11 +6431,12 @@
       ],
       "base": "PL!HS-bp5-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs"
       ],
       "covering_tests": [
@@ -6436,7 +6445,12 @@
         "dream_believers_104_to_105_no_match",
         "dream_believers_105_to_104_no_match",
         "dream_believers_105_to_base_no_match",
+        "dream_believers_empty_waitroom_no_bonus",
+        "dream_believers_members_and_name_match_score_plus_one",
         "dream_believers_to_105_matches",
+        "dream_believers_two_members_no_bonus",
+        "dream_believers_variant_name_still_matches",
+        "dream_believers_wrong_name_no_bonus",
         "hinoshita_multiple_waitroom_matches_prompts_choice",
         "hinoshita_no_live_card_in_hand_fails",
         "hinoshita_no_matching_live_in_discard_fails",
@@ -6444,10 +6458,14 @@
         "hinoshita_q237_name_contains_all_no_match",
         "hinoshita_reveal_choice_keeps_card_in_hand",
         "hinoshita_use_limit_once_per_turn",
+        "kanon_alone_on_stage_no_recovery",
         "link_to_the_future_104_to_base_no_match",
-        "link_to_the_future_to_104_matches"
+        "link_to_the_future_to_104_matches",
+        "mifune_different_name_in_success_zone_no_heart04",
+        "mifune_empty_success_zone_no_heart04",
+        "mifune_same_name_in_success_zone_gains_heart04"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 24,
       "is_null": false
     },
     {
@@ -6468,11 +6486,12 @@
       ],
       "base": "PL!HS-bp5-001",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs"
       ],
       "covering_tests": [
@@ -6481,7 +6500,12 @@
         "dream_believers_104_to_105_no_match",
         "dream_believers_105_to_104_no_match",
         "dream_believers_105_to_base_no_match",
+        "dream_believers_empty_waitroom_no_bonus",
+        "dream_believers_members_and_name_match_score_plus_one",
         "dream_believers_to_105_matches",
+        "dream_believers_two_members_no_bonus",
+        "dream_believers_variant_name_still_matches",
+        "dream_believers_wrong_name_no_bonus",
         "hinoshita_multiple_waitroom_matches_prompts_choice",
         "hinoshita_no_live_card_in_hand_fails",
         "hinoshita_no_matching_live_in_discard_fails",
@@ -6489,10 +6513,14 @@
         "hinoshita_q237_name_contains_all_no_match",
         "hinoshita_reveal_choice_keeps_card_in_hand",
         "hinoshita_use_limit_once_per_turn",
+        "kanon_alone_on_stage_no_recovery",
         "link_to_the_future_104_to_base_no_match",
-        "link_to_the_future_to_104_matches"
+        "link_to_the_future_to_104_matches",
+        "mifune_different_name_in_success_zone_no_heart04",
+        "mifune_empty_success_zone_no_heart04",
+        "mifune_same_name_in_success_zone_gains_heart04"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 24,
       "is_null": false
     },
     {
@@ -8487,9 +8515,23 @@
         "engine/tests/test_modules/bp7_mia_deck_to_discard_test.rs",
         "engine/tests/test_modules/bp7_mia_optional_recover_test.rs",
         "engine/tests/test_modules/bp7_mia_play_cost_reduction_test.rs",
-        "engine/tests/test_modules/bp7_q269_mia_yell_no_trigger_test.rs"
+        "engine/tests/test_modules/bp7_q269_mia_yell_no_trigger_test.rs",
+        "engine/tests/test_modules/bytecode_validation_test.rs"
       ],
       "covering_tests": [
+        "bytecode_ability_0",
+        "bytecode_cost_matches_json",
+        "bytecode_count_matches_json",
+        "bytecode_debug_ability_239",
+        "bytecode_debug_ability_399",
+        "bytecode_debug_ability_399_disabled",
+        "bytecode_empty_slices_match_known_is_null_baseline",
+        "bytecode_every_ability_decodes",
+        "bytecode_no_silent_decode_fallbacks",
+        "bytecode_nonempty_effects_match_action",
+        "empty_slice_returns_default_ability",
+        "every_card_ability_index_is_valid",
+        "malformed_bytecode_returns_error",
         "mia_ab1_accept_reduces_cost_by_2",
         "mia_ab1_decline_pays_full_cost",
         "mia_ab1_no_waitroom_members_still_offers_choice",
@@ -8506,10 +8548,9 @@
         "q269_yell_reveal_does_not_recover_existing_waitroom_copy",
         "q269_yell_reveal_does_not_trigger_mia_auto",
         "q269_yell_reveal_mid_pool_does_not_trigger",
-        "q277_control_no_refresh_recovers_mia",
-        "q277_refresh_before_auto_resolve_prevents_recover"
+        "q277_control_no_refresh_recovers_mia"
       ],
-      "covering_test_count": 18,
+      "covering_test_count": 31,
       "is_null": false
     },
     {
@@ -8538,9 +8579,23 @@
         "engine/tests/test_modules/bp7_mia_deck_to_discard_test.rs",
         "engine/tests/test_modules/bp7_mia_optional_recover_test.rs",
         "engine/tests/test_modules/bp7_mia_play_cost_reduction_test.rs",
-        "engine/tests/test_modules/bp7_q269_mia_yell_no_trigger_test.rs"
+        "engine/tests/test_modules/bp7_q269_mia_yell_no_trigger_test.rs",
+        "engine/tests/test_modules/bytecode_validation_test.rs"
       ],
       "covering_tests": [
+        "bytecode_ability_0",
+        "bytecode_cost_matches_json",
+        "bytecode_count_matches_json",
+        "bytecode_debug_ability_239",
+        "bytecode_debug_ability_399",
+        "bytecode_debug_ability_399_disabled",
+        "bytecode_empty_slices_match_known_is_null_baseline",
+        "bytecode_every_ability_decodes",
+        "bytecode_no_silent_decode_fallbacks",
+        "bytecode_nonempty_effects_match_action",
+        "empty_slice_returns_default_ability",
+        "every_card_ability_index_is_valid",
+        "malformed_bytecode_returns_error",
         "mia_ab1_accept_reduces_cost_by_2",
         "mia_ab1_decline_pays_full_cost",
         "mia_ab1_no_waitroom_members_still_offers_choice",
@@ -8557,10 +8612,9 @@
         "q269_yell_reveal_does_not_recover_existing_waitroom_copy",
         "q269_yell_reveal_does_not_trigger_mia_auto",
         "q269_yell_reveal_mid_pool_does_not_trigger",
-        "q277_control_no_refresh_recovers_mia",
-        "q277_refresh_before_auto_resolve_prevents_recover"
+        "q277_control_no_refresh_recovers_mia"
       ],
-      "covering_test_count": 18,
+      "covering_test_count": 31,
       "is_null": false
     },
     {
@@ -8589,9 +8643,23 @@
         "engine/tests/test_modules/bp7_mia_deck_to_discard_test.rs",
         "engine/tests/test_modules/bp7_mia_optional_recover_test.rs",
         "engine/tests/test_modules/bp7_mia_play_cost_reduction_test.rs",
-        "engine/tests/test_modules/bp7_q269_mia_yell_no_trigger_test.rs"
+        "engine/tests/test_modules/bp7_q269_mia_yell_no_trigger_test.rs",
+        "engine/tests/test_modules/bytecode_validation_test.rs"
       ],
       "covering_tests": [
+        "bytecode_ability_0",
+        "bytecode_cost_matches_json",
+        "bytecode_count_matches_json",
+        "bytecode_debug_ability_239",
+        "bytecode_debug_ability_399",
+        "bytecode_debug_ability_399_disabled",
+        "bytecode_empty_slices_match_known_is_null_baseline",
+        "bytecode_every_ability_decodes",
+        "bytecode_no_silent_decode_fallbacks",
+        "bytecode_nonempty_effects_match_action",
+        "empty_slice_returns_default_ability",
+        "every_card_ability_index_is_valid",
+        "malformed_bytecode_returns_error",
         "mia_ab1_accept_reduces_cost_by_2",
         "mia_ab1_decline_pays_full_cost",
         "mia_ab1_no_waitroom_members_still_offers_choice",
@@ -8608,10 +8676,9 @@
         "q269_yell_reveal_does_not_recover_existing_waitroom_copy",
         "q269_yell_reveal_does_not_trigger_mia_auto",
         "q269_yell_reveal_mid_pool_does_not_trigger",
-        "q277_control_no_refresh_recovers_mia",
-        "q277_refresh_before_auto_resolve_prevents_recover"
+        "q277_control_no_refresh_recovers_mia"
       ],
-      "covering_test_count": 18,
+      "covering_test_count": 31,
       "is_null": false
     },
     {
@@ -10002,6 +10069,7 @@
         "engine/tests/test_modules/attacker_order_performance_test.rs",
         "engine/tests/test_modules/aurora_flower_identity_test.rs",
         "engine/tests/test_modules/blade_heart_colorless_test.rs",
+        "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/fixed_customs_test.rs",
         "engine/tests/test_modules/ginko_baton_touch_hasu_search_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs",
@@ -10049,10 +10117,10 @@
         "dream_believers_104_to_105_no_match",
         "dream_believers_105_to_104_no_match",
         "dream_believers_105_to_base_no_match",
-        "dream_believers_to_105_matches",
-        "duplicate_names_fails_condition"
+        "dream_believers_empty_waitroom_no_bonus",
+        "dream_believers_members_and_name_match_score_plus_one"
       ],
-      "covering_test_count": 147,
+      "covering_test_count": 156,
       "is_null": true
     },
     {
@@ -20769,11 +20837,12 @@
       ],
       "base": "PL!HS-sd1-018",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs"
       ],
       "covering_tests": [
@@ -20782,7 +20851,12 @@
         "dream_believers_104_to_105_no_match",
         "dream_believers_105_to_104_no_match",
         "dream_believers_105_to_base_no_match",
+        "dream_believers_empty_waitroom_no_bonus",
+        "dream_believers_members_and_name_match_score_plus_one",
         "dream_believers_to_105_matches",
+        "dream_believers_two_members_no_bonus",
+        "dream_believers_variant_name_still_matches",
+        "dream_believers_wrong_name_no_bonus",
         "hinoshita_multiple_waitroom_matches_prompts_choice",
         "hinoshita_no_live_card_in_hand_fails",
         "hinoshita_no_matching_live_in_discard_fails",
@@ -20790,10 +20864,14 @@
         "hinoshita_q237_name_contains_all_no_match",
         "hinoshita_reveal_choice_keeps_card_in_hand",
         "hinoshita_use_limit_once_per_turn",
+        "kanon_alone_on_stage_no_recovery",
         "link_to_the_future_104_to_base_no_match",
-        "link_to_the_future_to_104_matches"
+        "link_to_the_future_to_104_matches",
+        "mifune_different_name_in_success_zone_no_heart04",
+        "mifune_empty_success_zone_no_heart04",
+        "mifune_same_name_in_success_zone_gains_heart04"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 24,
       "is_null": false
     },
     {
@@ -27550,6 +27628,7 @@
         "engine/tests/test_modules/bp7_watanabe_under_card_blade_test.rs",
         "engine/tests/test_modules/cards_6_thru_13_test.rs",
         "engine/tests/test_modules/catchu_energy_activation_test.rs",
+        "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/gameplay_test.rs",
         "engine/tests/test_modules/joint_card_live_start_test.rs",
         "engine/tests/test_modules/kanon_invalidate_test.rs",
@@ -27597,7 +27676,7 @@
         "c12_restriction_blocks_opponent_active",
         "c12_restriction_does_not_block_self_active"
       ],
-      "covering_test_count": 298,
+      "covering_test_count": 307,
       "is_null": false
     },
     {
@@ -33266,6 +33345,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/dream_believers_test.rs",
         "engine/tests/test_modules/hanamusubi_exclude_self_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs"
@@ -33276,9 +33356,14 @@
         "dream_believers_104_to_105_no_match",
         "dream_believers_105_to_104_no_match",
         "dream_believers_105_to_base_no_match",
+        "dream_believers_empty_waitroom_no_bonus",
+        "dream_believers_members_and_name_match_score_plus_one",
         "dream_believers_one_hasetsu_plus_other_pass",
         "dream_believers_q212_multiname_no_match",
         "dream_believers_to_105_matches",
+        "dream_believers_two_members_no_bonus",
+        "dream_believers_variant_name_still_matches",
+        "dream_believers_wrong_name_no_bonus",
         "hanamusubi_alone_no_reduction",
         "hanamusubi_reduces_only_heart04_not_heart0",
         "hanamusubi_with_non_renosora_no_reduction",
@@ -33291,15 +33376,13 @@
         "hinoshita_q237_name_contains_all_no_match",
         "hinoshita_reveal_choice_keeps_card_in_hand",
         "hinoshita_use_limit_once_per_turn",
+        "kanon_alone_on_stage_no_recovery",
         "link_to_the_future_104_to_base_no_match",
         "link_to_the_future_to_104_matches",
-        "one_hanamusubi_one_filler_no_reduction",
-        "one_hanamusubi_two_fillers_no_reduction",
-        "three_hanamusubi_each_reduces_4",
-        "two_hanamusubi_each_reduces_2",
-        "two_hanamusubi_one_filler_each_reduces_2"
+        "mifune_different_name_in_success_zone_no_heart04",
+        "mifune_empty_success_zone_no_heart04"
       ],
-      "covering_test_count": 27,
+      "covering_test_count": 36,
       "is_null": false
     },
     {

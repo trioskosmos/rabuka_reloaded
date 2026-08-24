@@ -68,6 +68,71 @@ pub fn ability_count() -> usize {
     NUM_ABILITIES
 }
 
+// ── Decode-fallback audit (audit item C1) ──
+// The bytecode decoder must never silently substitute a default for a value
+// it doesn't recognize: that turns an ability into a no-op (or a wrong-op)
+// with no signal. Every such site bumps this monotonic counter; the corpus
+// oracle test `bytecode_no_silent_decode_fallbacks` pins the total at 0 so a
+// new gap fails CI loudly. Repetition across repeated decodes is harmless:
+// expected is zero, and nonzero is nonzero.
+use core::sync::atomic::{AtomicUsize, Ordering};
+
+static DECODE_FALLBACKS: AtomicUsize = AtomicUsize::new(0);
+
+/// Per-ability fallback counters. The set of indices with nonzero counts is
+/// the interesting signal: unlike the running total it is stable under
+/// concurrent decoding by parallel tests.
+pub const DECODE_AUDIT_MAX: usize = 4096;
+
+#[allow(clippy::declare_interior_mutable_const)]
+const ATOMIC_ZERO: AtomicUsize = AtomicUsize::new(0);
+static DECODE_FALLBACK_ABILITIES: [AtomicUsize; DECODE_AUDIT_MAX] =
+    [ATOMIC_ZERO; DECODE_AUDIT_MAX];
+
+/// Record one silent default-substitution during bytecode decoding.
+/// `ability` is the ability index when known, `field` names the field being
+/// decoded, `value` the unrecognized raw value.
+pub fn note_decode_fallback(ability: Option<usize>, field: &str, value: &str) {
+    let n = DECODE_FALLBACKS.fetch_add(1, Ordering::Relaxed) + 1;
+    if let Some(i) = ability {
+        if i < DECODE_AUDIT_MAX {
+            DECODE_FALLBACK_ABILITIES[i].fetch_add(1, Ordering::Relaxed);
+        }
+    }
+    log::warn!(
+        "[decode_audit] fallback #{} (ability {:?}): {} = {:?}",
+        n, ability, field, value
+    );
+}
+
+/// Total silent-fallback substitutions recorded since process start.
+pub fn decode_fallback_count() -> usize {
+    DECODE_FALLBACKS.load(Ordering::Relaxed)
+}
+
+/// Sorted ability indices that recorded at least one silent fallback.
+pub fn decode_fallback_abilities() -> Vec<usize> {
+    let mut out: Vec<usize> = (0..NUM_ABILITIES.min(DECODE_AUDIT_MAX))
+        .filter(|&i| DECODE_FALLBACK_ABILITIES[i].load(Ordering::Relaxed) > 0)
+        .collect();
+    out.sort_unstable();
+    out
+}
+
+/// Number of abilities whose compiled slice is empty — these decode to
+/// `Ability::default()`. Baseline = the two known `is_null` abilities
+/// (PL!HS-PR-010-PR, PL!HS-bp1-019-L) that the parser cannot structure at
+/// all; any increase means a new ability lost its effects in compilation.
+#[cfg(not(feature = "snes"))]
+pub fn count_empty_bytecode_abilities() -> usize {
+    OFFSET_DELTAS.iter().filter(|&&d| d == 0).count()
+}
+
+#[cfg(feature = "snes")]
+pub fn count_empty_bytecode_abilities() -> usize {
+    ABILITY_LOCS.iter().filter(|&&(_, _, len)| len == 0).count()
+}
+
 /// Decode a single ability from the bytecode blob.
 ///
 /// Returns `Ok(Ability)` on success, or `Err(DecodeError)` with the ability
@@ -171,7 +236,7 @@ pub fn get_ability(idx: usize) -> Result<Ability, DecodeError> {
             (start + len) as usize,
         )
     };
-    let mut bc = BcReader::new(slice);
+    let mut bc = BcReader::with_idx(slice, idx);
     if let Some(ability) = decode_ability(&mut bc) {
         return Ok(ability);
     }
@@ -224,11 +289,17 @@ fn read_i64(c: &mut &[u8]) -> Option<i64> {
 
 struct BcReader<'a> {
     cursor: &'a [u8],
+    /// Ability index being decoded, for decode-audit diagnostics.
+    idx: Option<usize>,
 }
 
 impl<'a> BcReader<'a> {
     fn new(data: &'a [u8]) -> Self {
-        BcReader { cursor: data }
+        BcReader { cursor: data, idx: None }
+    }
+
+    fn with_idx(data: &'a [u8], idx: usize) -> Self {
+        BcReader { cursor: data, idx: Some(idx) }
     }
 
     fn read_u8(&mut self) -> Option<u8> {
@@ -321,7 +392,14 @@ impl<'a> BcReader<'a> {
             TAG_NULL => None,
             TAG_STR => {
                 let idx = self.read_idx()?;
-                Some(Zone::from_source_str(get_string(idx)?))
+                let s = get_string(idx)?;
+                match Zone::from_str(s) {
+                    Some(z) => Some(z),
+                    None => {
+                        note_decode_fallback(self.idx, "zone", s);
+                        Some(Zone::Unknown)
+                    }
+                }
             }
             _ => None,
         }
@@ -918,6 +996,11 @@ impl<'a> BcReader<'a> {
                     self.read_u8()?;
                 }
                 let count = self.read_len()?;
+                if count > 0 {
+                    // A non-empty object was discarded — its fields carried
+                    // state the default EffectState does not represent.
+                    note_decode_fallback(self.idx, "effect_state_nonempty_object", "");
+                }
                 for _ in 0..count {
                     self.skip_value()?;
                 }
@@ -941,7 +1024,10 @@ impl<'a> BcReader<'a> {
                 Some(Box::new(match get_string(idx).unwrap_or("") {
                     "card_name" => crate::card::DistinctType::CardName,
                     "true" | "distinct" => crate::card::DistinctType::True,
-                    _ => crate::card::DistinctType::CardName,
+                    other => {
+                        note_decode_fallback(self.idx, "distinct", other);
+                        crate::card::DistinctType::CardName
+                    }
                 }))
             }
             _ => None,
@@ -961,10 +1047,17 @@ impl<'a> BcReader<'a> {
                     "has_ability" => AbilityFilter::HasAbility,
                     "has_ability_type" => AbilityFilter::HasAbilityType,
                     "no_ability_type" => AbilityFilter::NoAbilityType,
-                    _ => AbilityFilter::NoAbility,
+                    "no_ability" => AbilityFilter::NoAbility,
+                    other => {
+                        note_decode_fallback(self.idx, "ability_filter", other);
+                        AbilityFilter::NoAbility
+                    }
                 })
             }
-            _ => Some(AbilityFilter::NoAbility),
+            _ => {
+                note_decode_fallback(self.idx, "ability_filter_tag", &format!("{tag:#04x}"));
+                Some(AbilityFilter::NoAbility)
+            }
         }
     }
 
@@ -1536,7 +1629,7 @@ fn decode_keywords(bc: &mut BcReader) -> Option<Option<Vec<crate::card::Keyword>
                 match keyword_from_str(&s) {
                     Some(k) => v.push(k),
                     None => {
-                        log::error!("decode_keywords: unknown keyword string {:?}; skipping entry", s);
+                        note_decode_fallback(bc.idx, "keyword", &s);
                     }
                 }
             }

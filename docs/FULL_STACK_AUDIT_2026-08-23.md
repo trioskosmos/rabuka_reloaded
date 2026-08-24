@@ -270,6 +270,33 @@ Part-0 holes; several silent-fallback paths can eat a regression unnoticed.
   add opponent-as-actor + simultaneous-trigger-ordering matrix tests; one replay/determinism test;
   one engine↔web_ui choice-contract pinning test.
 
+### Current work directive (user, 08-24)
+1. **Finish the missing tests, one by one, with care** — every new test covers positive AND
+   negative cases plus edge cases (empty zones, boundary counts, wrong-type/wrong-name
+   exclusions, sibling-ability interference). Take inspiration from the existing corpus of
+   ~450 test files; follow `engine/tests/WRITING_TESTS.md`.
+2. **Then write conjunction tests** — abilities working in combination (two constants stacking,
+   trigger ordering between two players, temporary expiry vs re-registration, cost reductions +
+   optional costs in one play chain).
+3. **Consult the rules corpus per card** — `cards/qa_data.json` rulings and `rules/rules.txt`
+   are part of the spec alongside the Japanese text; when they disagree with behavior, that is
+   a bug.
+4. **Never assume — observe.** Run the specific test with
+   `$env:RUST_LOG="debug"; cargo test --test run_all <name> -- --nocapture` and read the
+   condition-verdict/trace output before concluding anything about engine internals.
+5. **Feed findings back into refactoring** — tests that expose parser/decoder/handler weakness
+   become refactor tickets (P-items/R-items above); fix producers, not tests.
+
+Immediate targets (from the C1 decode-audit triage):
+- [ ] PL!N-bp4-010-R＋ ab#1 — 「それと同じカード名のカードが成功ライブカード置き場にある場合」
+      reference_card gate: pos/neg heart04 gain (`issue7_mifune_live_start_select_and_check`
+      currently asserts only that the member stays on stage — replace it).
+- [ ] PL!HS-sd1-018-SD ab#0 — waitroom live-card name-substring gate + 蓮ノ空≥3 member count:
+      pos/neg × both clauses.
+- [ ] PL!SP-bp2-001-R＋ ab#0 — negative case: no invalidatable Liella! → no recover
+      (positive covered by kanon_invalidate_test).
+- [x] PL!N-bp7-011-R＋ ab#1 — already pinned by bp7_mia_play_cost_reduction_test (3 tests).
+
 ---
 
 ## Part 4 — Ability text ↔ code expressiveness audit

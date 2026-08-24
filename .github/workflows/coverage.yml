@@ -9,6 +9,8 @@ on:
       - 'engine/tests/**'
       - 'engine/src/ability/**'
       - 'cards/ability_extraction/**'
+      - 'cards/generate_condition_decoder.py'
+      - 'engine/src/core/card.rs'
   pull_request:
     paths:
       - 'cards/abilities.json'
@@ -17,6 +19,8 @@ on:
       - 'engine/tests/**'
       - 'engine/src/ability/**'
       - 'cards/ability_extraction/**'
+      - 'cards/generate_condition_decoder.py'
+      - 'engine/src/core/card.rs'
   workflow_dispatch:
 
 jobs:
@@ -38,6 +42,17 @@ jobs:
       - name: Validate parser round-trip against baseline
         run: |
           python cards/ability_extraction/extract_card_abilities.py --validate-only --check
+
+      - name: Generated decoders are fresh
+        run: |
+          # The condition/effect decoders are AUTO-GENERATED from card.rs.
+          # Hand-editing them (or stale output after a card.rs change) must
+          # fail CI instead of being silently overwritten locally.
+          cp engine/src/ability/condition_decoder_gen.rs /tmp/cond_before.rs
+          (cd cards && python generate_condition_decoder.py)
+          diff -u /tmp/cond_before.rs engine/src/ability/condition_decoder_gen.rs \
+            || { echo "::error::condition_decoder_gen.rs is stale or hand-edited. Run: python cards/generate_condition_decoder.py"; exit 1; }
+          echo "Generated decoders are up-to-date."
 
       - name: Summary
         run: |

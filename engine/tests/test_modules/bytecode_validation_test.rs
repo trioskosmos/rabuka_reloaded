@@ -72,6 +72,79 @@ mod bytecode_validation {
         }
     }
 
+    /// Audit item C1: no ability may decode through an UNRECORDED silent
+    /// default-substitution. Every unknown zone/distinct/ability_filter/
+    /// keyword/condition field bumps `vm::note_decode_fallback`; this test
+    /// attributes each fallback to its ability and asserts the exact baseline
+    /// below. A new parser handler emitting an unmapped value fails here
+    /// instead of silently turning an ability into a no-op.
+    ///
+    /// Baseline — shadow-schema condition fields (audit §4.6): the JSON puts
+    /// `action_reference` / `reference_card` / `shuffle` / `card_names` on
+    /// condition objects, but the typed Condition struct has no such fields;
+    /// their effect-level twins ARE decoded via EffectFilter, so behavior
+    /// flows through that path until the P9 format-v2 cleanup gives them a
+    /// structural home. Do NOT add entries here for new values — fix the
+    /// mapping instead.
+    #[test]
+    fn bytecode_no_silent_decode_fallbacks() {
+        // (card_no, ab# slot) of the entries expected to carry shadow-schema
+        // condition fields (triaged 2026-08-24). The ab# discriminator is
+        // required: sibling abilities on the same card share the card_no.
+        const KNOWN_FALLBACKS: &[(&str, &str)] = &[
+            ("PL!SP-bp2-001-R＋", "(ab#0)"), // action_reference: "invalidate_ability"
+            ("PL!N-bp7-011-R＋", "(ab#1)"),  // shuffle: true
+        ];
+        let _ = env_logger::try_init(); // surface [decode_audit] warnings under RUST_LOG
+        let json_abilities = load_json_abilities();
+        for i in 0..json_abilities.len() {
+            let _ = get_ability(i);
+        }
+        // Expected set = indices of the JSON entries whose first card matches
+        // a known prefix (computed, so regeneration order shifts don't break
+        // the baseline).
+        let first_card = |i: usize| -> String {
+            json_abilities[i]
+                .get("cards")
+                .and_then(|c| c.as_array())
+                .and_then(|c| c.first())
+                .and_then(|s| s.as_str())
+                .unwrap_or("?")
+                .to_string()
+        };
+        let expected: Vec<usize> = (0..json_abilities.len())
+            .filter(|&i| {
+                let id = first_card(i);
+                KNOWN_FALLBACKS
+                    .iter()
+                    .any(|(no, ab)| id.starts_with(no) && id.ends_with(ab))
+            })
+            .collect();
+        assert_eq!(
+            expected.len(),
+            KNOWN_FALLBACKS.len(),
+            "baseline (card_no, ab#) pairs matched no JSON entries — cards renamed?"
+        );
+        let actual = rabuka_engine::ability::vm::decode_fallback_abilities();
+        assert_eq!(
+            actual, expected,
+            "silent decode fallback set changed — see [decode_audit] warnings under RUST_LOG=warn"
+        );
+    }
+
+    /// Empty bytecode slices decode to `Ability::default()` with no error.
+    /// Today NO corpus ability compiles to an empty slice (even the two
+    /// `is_null` abilities carry minimal bytecode). Any increase means a new
+    /// ability silently lost all of its effects during compilation.
+    #[test]
+    fn bytecode_empty_slices_match_known_is_null_baseline() {
+        assert_eq!(
+            rabuka_engine::ability::vm::count_empty_bytecode_abilities(),
+            0,
+            "empty-slice ability count changed — investigate which abilities lost their effects"
+        );
+    }
+
     #[test]
     fn bytecode_nonempty_effects_match_action() {
         let json_abilities = load_json_abilities();
