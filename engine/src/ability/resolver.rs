@@ -641,6 +641,23 @@ impl AbilityResolver {
     }
 
     /// Returns true if the ability has already been used `use_limit`+ times this turn.
+    ///
+    /// USE-LIMIT RECORDING MAP (resolver + choice.rs) — when the key gets
+    /// inserted depends on WHERE in the resolution lifecycle the attempt ends:
+    ///
+    /// | lifecycle moment                              | record? | why |
+    /// |-----------------------------------------------|---------|-----|
+    /// | trigger accepted, no cost/choice pending      | yes (guarded by can_activate) | premature auto triggers must not consume |
+    /// | effect condition fails, 起動 ability          | yes | player deliberately paid; attempt counts |
+    /// | effect condition fails, auto ability          | no  | preserve budget until state satisfies |
+    /// | pending choice = conditional_optional         | deferred to choice answer | player decides whether to pay |
+    /// | pending choice = position|destination (optional) | deferred | may-place: count only if placed |
+    /// | pending choice = other                        | yes | choice is part of the paid effect |
+    /// | normal completion                             | yes (guarded) | fallback for paths above |
+    ///
+    /// choice.rs adds two more variants for OPTIONAL effects whose recording
+    /// happens inside the choice resume handler (accepted → record, declined
+    /// → never). Any consolidation must keep these distinctions.
     fn check_use_limit_reached(
         &self,
         gs: &GameState,
