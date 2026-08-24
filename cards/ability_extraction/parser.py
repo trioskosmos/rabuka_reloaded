@@ -6629,33 +6629,9 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
 # and returns a complete effect dict or None.
 
 
-def _try_per_unit(text):
-    """Check for per-unit scaling (Xにつき) effects."""
-    excludes = (
-        "各グループ名につき",
-        "グループ名につき",
-        "グループ名",
-        "グループ名1種類につき",
-    )
-    if not ("につき" in text or "ごとに" in text):
-        return None
-    if any(e in text for e in excludes):
-        return None
-    if "この能力を起動するためのコストは" in text:
-        return None
-    if "コストは" in text and ("減る" in text or "少なくなる" in text):
-        return None
-
-    m = re.search(r"(.+?)(につき|ごとに)", text)
-    if not m:
-        return None
-    per_text = m.group(1).strip()
-    # If per_text contains a sentence boundary (。), the structure is likely
-    # "choice/action。per_unit_effect" — defer to sequential/choice handlers
-    if "。" in per_text:
-        return None
-    result = {"text": text, "per_unit": True}
-
+def _per_unit_gate(result, per_text):
+    """Strip a leading gate (場合 / とき、 / 時、) off the per-unit reference,
+    parse it onto result["condition"], and return the remaining per_text."""
     # Extract condition from per_text if present
     # Pattern: "条件場合、per_unit_reference" e.g.
     # "自分のセンターエリアに『μ's』のメンバーがいる場合、そのメンバーが持つheart03 2つ"
@@ -6692,17 +6668,11 @@ def _try_per_unit(text):
                     result["condition"] = cond
                 per_text = remaining
 
-    # Extract duration from per_text (e.g., "ライブ終了時まで、カード1枚につき")
-    for prefix, code in [
-        ("ライブ終了時まで", "live_end"),
-        ("このターンの間", "turn_end"),
-        ("ターン終了時まで", "turn_end"),
-    ]:
-        if per_text.startswith(prefix):
-            result["duration"] = code
-            per_text = per_text[len(prefix) :].lstrip("、").strip()
-            break
+    return per_text
 
+
+def _per_unit_count_type(result, text, per_text):
+    """Resolve per_unit_count / per_unit_type from reference + full text."""
     pm = re.search(r"(\d+)(人|枚|つ)(につき|ごとに)", text)
     if pm:
         result["per_unit_count"] = int(pm.group(1))
@@ -6738,6 +6708,12 @@ def _try_per_unit(text):
     if "これによって置いた" in per_text and "エネルギーカード" in per_text:
         result["per_unit_type"] = "energy_deck"
 
+
+def _per_unit_filters(result, text, per_text):
+    """Filter fields from the per-unit reference: excluded/included groups,
+    counted heart colors, distinct, card_property, exclude_self, cost_limit,
+    timing_condition, state, this-cost-waited source, target, card_type,
+    location."""
     # Check for excluded groups: 『group』以外
     exc_gns = re.findall(r"『([^』]+)』以外", per_text)
     if exc_gns:
@@ -6852,6 +6828,50 @@ def _try_per_unit(text):
         if kw in per_text:
             result["location"] = loc
             break
+
+
+def _try_per_unit(text):
+    """Check for per-unit scaling (Xにつき) effects."""
+    excludes = (
+        "各グループ名につき",
+        "グループ名につき",
+        "グループ名",
+        "グループ名1種類につき",
+    )
+    if not ("につき" in text or "ごとに" in text):
+        return None
+    if any(e in text for e in excludes):
+        return None
+    if "この能力を起動するためのコストは" in text:
+        return None
+    if "コストは" in text and ("減る" in text or "少なくなる" in text):
+        return None
+
+    m = re.search(r"(.+?)(につき|ごとに)", text)
+    if not m:
+        return None
+    per_text = m.group(1).strip()
+    # If per_text contains a sentence boundary (。), the structure is likely
+    # "choice/action。per_unit_effect" — defer to sequential/choice handlers
+    if "。" in per_text:
+        return None
+    result = {"text": text, "per_unit": True}
+
+    per_text = _per_unit_gate(result, per_text)
+
+    # Extract duration from per_text (e.g., "ライブ終了時まで、カード1枚につき")
+    for prefix, code in [
+        ("ライブ終了時まで", "live_end"),
+        ("このターンの間", "turn_end"),
+        ("ターン終了時まで", "turn_end"),
+    ]:
+        if per_text.startswith(prefix):
+            result["duration"] = code
+            per_text = per_text[len(prefix) :].lstrip("、").strip()
+            break
+
+    _per_unit_count_type(result, text, per_text)
+    _per_unit_filters(result, text, per_text)
 
     action_text = text.split("につき", 1)[1].strip().lstrip("、")
 
