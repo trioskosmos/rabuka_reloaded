@@ -860,13 +860,30 @@ impl AbilityResolver {
         // Handle "those_cards" alias: resolve to the cards that triggered the
         // each_time, captured as `trigger_moved_cards` on THIS queue entry at
         // enqueue time (the authoritative "cards that triggered me"). If no
-        // explicit snapshot was recorded (None), return None so the caller can
+        // explicit snapshot was recorded, fall back to the cards THIS ability
+        // moved earlier in its own sequential chain — exactly the
+        // 「これにより控え室に置いたカード」 / 「それらのカード」 semantics.
+        // Only when neither source exists return None so the caller can
         // fall through to the legacy discard-pile resolution.
         let trigger_cards = gs
             .ability_queue
             .current_entry()
             .and_then(|e| e.trigger_moved_cards.clone())
-            .filter(|c| !c.is_empty());
+            .filter(|c| !c.is_empty())
+            .or_else(|| {
+                let own_moves = self.moved_cards.clone();
+                (!own_moves.is_empty()).then_some(own_moves)
+            });
+        log::debug!(
+            "[THOSE_RESOLVE] entry: trigger_moved_cards(entry)={:?} pool={:?} count={} filter={:?} group={:?} dest={} optional={:?}",
+            gs.ability_queue.current_entry().and_then(|e| e.trigger_moved_cards.clone()),
+            trigger_cards,
+            count,
+            card_type_filter,
+            group_name,
+            destination,
+            effect.optional,
+        );
         if let Some(trigger_cards) = trigger_cards {
             if !trigger_cards.is_empty() {
                 if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
@@ -889,6 +906,7 @@ impl AbilityResolver {
                     }
                 }
                 if all_matching.is_empty() {
+                    log::debug!("[THOSE_RESOLVE] branch=no_match (pool {:?} matched nothing)", trigger_cards);
                     // The trigger moved cards, but none matched the filters
                     // (e.g. no 虹ヶ咲 live card among the milled batch). "Those
                     // cards" means ONLY the moved cards — nothing qualifies, so
@@ -897,8 +915,17 @@ impl AbilityResolver {
                     // NOT fall through to the discard pile.
                     self.last_move_moved_any = Some(false);
                     return Ok(Some(vec![]));
-                } else if all_matching.len() <= count as usize {
+                } else if all_matching.len() <= count as usize
+                    && (&*destination == "deck_top_or_bottom"
+                        || !effect.optional.unwrap_or(false))
+                {
+                    log::debug!("[THOSE_RESOLVE] branch=direct_take all_matching={:?}", all_matching);
                     // Exactly `count` or fewer match — take them directly.
+                    // Two guarded exceptions fall through to the choice flow:
+                    // - plain-destination OPTIONAL moves: 「〜してもよい」 must
+                    //   be declinable, never auto-execute;
+                    // - deck_top_or_bottom with MORE matches than count is the
+                    //   dedicated Q252 pick-one branch below.
                     let found = all_matching[..count.min(all_matching.len())].to_vec();
                     if !effect.optional.unwrap_or(false) {
                         let player = if use_p2 {
@@ -907,7 +934,8 @@ impl AbilityResolver {
                             &mut gs.player1
                         };
                         for &cid in &found {
-                            if let Some(pos) = player.waitroom.cards.iter().position(|&c| c == cid)
+                            if let Some(pos) =
+                                player.waitroom.cards.iter().position(|&c| c == cid)
                             {
                                 player.waitroom.cards.remove(pos);
                             }
@@ -916,6 +944,7 @@ impl AbilityResolver {
                     self.last_move_moved_any = Some(!found.is_empty());
                     return Ok(Some(found));
                 } else if &*destination == "deck_top_or_bottom" {
+                    log::debug!("[THOSE_RESOLVE] branch=choice_dtob all_matching={:?}", all_matching);
                     // Q252: more matching cards than count, player chooses which one.
                     // Directly create a SelectCard choice restricted to the
                     // trigger_moved_cards' positions in the waitroom.
@@ -954,6 +983,7 @@ impl AbilityResolver {
                     );
                     return Ok(Some(vec![]));
                 } else {
+                    log::debug!("[THOSE_RESOLVE] branch=choice_generic all_matching={:?} count={}", all_matching, count);
                     // More matching than count — player must choose which cards.
                     // Show a SelectCard choice restricted to the trigger_moved_cards'
                     // positions in the waitroom, regardless of destination.

@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-25T01:09:06.853224",
+  "generated_at": "2026-08-25T05:05:53.846077",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "7ca499f9",
+  "engine_commit": "11102386",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -10567,7 +10567,6 @@
               "type": "comparison_condition"
             },
             "source": "deck_top",
-            "count": 1,
             "destination": "discard",
             "dynamic_count": {
               "type": "dynamic_count",
@@ -10581,12 +10580,12 @@
           },
           {
             "text": "これにより控え室に置いたカードの中から、ライブカード1枚をデッキの一番上に置いてもよい",
+            "source": "those_cards",
             "destination": "deck_top",
             "count": 1,
             "card_type": "live_card",
             "optional": true,
-            "action": "move_cards",
-            "source": "hand"
+            "action": "move_cards"
           }
         ]
       }
@@ -23392,7 +23391,6 @@
               "type": "comparison_condition"
             },
             "source": "deck_top",
-            "count": 1,
             "destination": "discard",
             "dynamic_count": {
               "type": "dynamic_count",
@@ -23406,12 +23404,12 @@
           },
           {
             "text": "これにより控え室に置いたカードの中から、ライブカード1枚をデッキの一番上に置いてもよい",
+            "source": "those_cards",
             "destination": "deck_top",
             "count": 1,
             "card_type": "live_card",
             "optional": true,
-            "action": "move_cards",
-            "source": "hand"
+            "action": "move_cards"
           }
         ]
       }

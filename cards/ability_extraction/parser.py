@@ -11089,6 +11089,10 @@ def _canonicalize_dynamic_counts(node):
                         if dc["base_reference"]
                         else "8"
                     )
+                    # The shortfall IS the move count — drop any static
+                    # default so executors resolve the dynamic branch
+                    # instead of moving a fixed 1 card.
+                    node.pop("count", None)
             elif "これにより控え室に置いた" in ref:
                 dc["reference"] = "these_waitroom_placed_count"
             elif "ステージ" in ref and "メンバー" in ref:

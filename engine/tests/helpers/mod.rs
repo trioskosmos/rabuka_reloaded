@@ -37,9 +37,35 @@ fn init_test_logger() {
     let _ = env_logger::Builder::from_env(env_logger::Env::default()).try_init();
 }
 
+/// Global test-binary watchdog. libtest has no per-test timeout, so a single
+/// hanging test stalls the whole run (and CI) forever. Every test calls
+/// `load_real_database()`, which lazily spawns one watchdog thread: if the
+/// process is still alive after `RABUKA_TEST_TIMEOUT_SECS` (default 300 — the
+/// full suite normally finishes in ~5s), it names the currently-running test
+/// (libtest prints that line itself) and kills the process with a failure
+/// exit code.
+fn start_test_watchdog() {
+    static WATCHDOG: OnceLock<()> = OnceLock::new();
+    WATCHDOG.get_or_init(|| {
+        let secs: u64 = std::env::var("RABUKA_TEST_TIMEOUT_SECS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(300);
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(secs));
+            eprintln!(
+                "\n!!! TEST WATCHDOG: exceeded {secs}s (RABUKA_TEST_TIMEOUT_SECS) — \
+                 a test is hung; aborting the test binary !!!"
+            );
+            std::process::exit(101); // same code as a failing test binary
+        });
+    });
+}
+
 /// Load (once) and return a pre-seeded database.
 pub fn load_real_database() -> Arc<CardDatabase> {
     init_test_logger();
+    start_test_watchdog();
     PRELOADED.get_or_init(|| {
         let t0 = std::time::Instant::now();
         let cards =

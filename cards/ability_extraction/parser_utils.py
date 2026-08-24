@@ -398,6 +398,10 @@ SOURCE_PATTERNS: List[Tuple[str, str]] = [
     ("公開したカードをすべて", "revealed_cards"),
     ("公開したカードを", "revealed_cards"),
     ("それらのカードの中から", "those_cards"),
+    # Reference back to the cards THIS effect just placed in the waitroom
+    # (「その後、これにより控え室に置いたカードの中から…」) — same
+    # preceding-move pool as それらのカード.
+    ("これにより控え室に置いたカードの中から", "those_cards"),
     ("そのライブカードを", "those_cards"),
     ("このカードを手札に加えてもよい", "revealed_cards"),
     ("手札にある", "hand"),

@@ -1,24 +1,24 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T18:53:25.787084+00:00",
+  "generated_at": "2026-08-24T20:05:15.614081+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 460,
-  "n_tests": 2761,
+  "n_files": 461,
+  "n_tests": 2766,
   "total_cards": 771,
-  "covered_cards": 675,
-  "abilities_on_covered": 839,
+  "covered_cards": 677,
+  "abilities_on_covered": 841,
   "trigger_counts": {
     "起動": [
       85,
       96
     ],
     "登場": [
-      242,
+      244,
       269
     ],
     "ライブ開始時": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      190,
+      192,
       219
     ],
     "unknown": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      483,
+      485,
       545
     ],
     "temporal_condition": [
@@ -260,7 +260,7 @@
       58
     ],
     "PR": [
-      44,
+      46,
       52
     ],
     "bp1": [
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 611,
+    "L2+choice": 613,
     "L1+choice": 155,
     "L2": 25,
-    "none": 97,
+    "none": 95,
     "L1": 48
   },
   "qa_rulings": {
@@ -6440,7 +6440,8 @@
         "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs",
         "engine/tests/test_modules/untested_abilities_batch31_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch32_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch32_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs"
       ],
       "covering_tests": [
         "bp4_021_accept_puts_waitroom_card_on_deck_top",
@@ -6474,7 +6475,7 @@
         "hinoshita_use_limit_once_per_turn",
         "hot_passion_accept_energy_opponent_draws"
       ],
-      "covering_test_count": 43,
+      "covering_test_count": 48,
       "is_null": false
     },
     {
@@ -6503,7 +6504,8 @@
         "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs",
         "engine/tests/test_modules/untested_abilities_batch31_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch32_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch32_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs"
       ],
       "covering_tests": [
         "bp4_021_accept_puts_waitroom_card_on_deck_top",
@@ -6537,7 +6539,7 @@
         "hinoshita_use_limit_once_per_turn",
         "hot_passion_accept_energy_opponent_draws"
       ],
-      "covering_test_count": 43,
+      "covering_test_count": 48,
       "is_null": false
     },
     {
@@ -10112,6 +10114,7 @@
         "engine/tests/test_modules/untested_abilities_batch31_test.rs",
         "engine/tests/test_modules/untested_abilities_batch32_test.rs",
         "engine/tests/test_modules/untested_abilities_batch33_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs"
       ],
       "covering_tests": [
@@ -10146,7 +10149,7 @@
         "bp6_016n_deck_shorter_than_three_looks_whats_there",
         "bp6_016n_hand_debut_no_look"
       ],
-      "covering_test_count": 195,
+      "covering_test_count": 200,
       "is_null": true
     },
     {
@@ -11231,6 +11234,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/restriction_mechanics_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch3_test.rs",
         "engine/tests/test_modules/untested_abilities_batch4_test.rs",
         "engine/tests/test_modules/untested_abilities_batch5_test.rs",
@@ -11259,16 +11263,16 @@
         "niko_pr021_exact_energy_constant_refreshes_on_gain",
         "niko_pr021_exactly_seven_energy_grants_two_blades",
         "nozomi_bp3007_skipped_cost_means_no_look",
+        "pr032_declining_keeps_milled_cards_in_waitroom",
+        "pr032_mills_shortfall_and_recovers_live_to_deck_top",
+        "pr032_no_live_among_milled_no_prompt",
+        "pr032_waitroom_at_threshold_mills_nothing",
+        "pr032_waitroom_seven_mills_one_and_recovers_live",
         "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
         "ruby_bp5009_decline_optional_payment_fetches_nothing",
-        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
-        "sayaka_hsbp2002_blade_constant_tracks_higher_cost_member",
-        "sayaka_hsbp2002_fetch_is_cost_and_count_filtered",
-        "sayaka_hsbp2011_mills_top_five",
-        "sayaka_hspb1010_expensive_opponent_not_eligible",
-        "sayaka_hspb1010_no_big_member_no_effect"
+        "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost"
       ],
-      "covering_test_count": 39,
+      "covering_test_count": 44,
       "is_null": false
     },
     {
@@ -11697,7 +11701,8 @@
         "engine/tests/test_modules/position_change_triggers_jidou_move_test.rs",
         "engine/tests/test_modules/special_color_test.rs",
         "engine/tests/test_modules/sumire_bp5_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch30_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch30_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs"
       ],
       "covering_tests": [
         "all_three_liella_only_center_gets_modifier",
@@ -11731,7 +11736,7 @@
         "liella_blade_4_gets_set_to_3_not_plus_3",
         "liella_blade_4_with_existing_modifier"
       ],
-      "covering_test_count": 92,
+      "covering_test_count": 97,
       "is_null": false
     },
     {
@@ -12399,6 +12404,7 @@
         "engine/tests/test_modules/toubatsu_test.rs",
         "engine/tests/test_modules/turn_scope_regression_test.rs",
         "engine/tests/test_modules/untested_abilities_batch2_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch3_test.rs",
         "engine/tests/test_modules/untested_abilities_batch4_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
@@ -12440,7 +12446,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 774,
+      "covering_test_count": 779,
       "is_null": false
     },
     {
@@ -12892,14 +12898,22 @@
         "PL!HS-PR-036-PR"
       ],
       "base": "PL!N-PR-032",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs"
+      ],
+      "covering_tests": [
+        "pr032_declining_keeps_milled_cards_in_waitroom",
+        "pr032_mills_shortfall_and_recovers_live_to_deck_top",
+        "pr032_no_live_among_milled_no_prompt",
+        "pr032_waitroom_at_threshold_mills_nothing",
+        "pr032_waitroom_seven_mills_one_and_recovers_live"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -16703,6 +16717,7 @@
       "covering_files": [
         "engine/tests/test_modules/either_or_state_change_test.rs",
         "engine/tests/test_modules/remaining_quick_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch3_test.rs"
       ],
       "covering_tests": [
@@ -16728,16 +16743,16 @@
         "niko_bp3009_cost13_condition_draw",
         "niko_bp3009_no_cost13_no_draw",
         "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "pr032_declining_keeps_milled_cards_in_waitroom",
+        "pr032_mills_shortfall_and_recovers_live_to_deck_top",
+        "pr032_no_live_among_milled_no_prompt",
+        "pr032_waitroom_at_threshold_mills_nothing",
+        "pr032_waitroom_seven_mills_one_and_recovers_live",
         "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
         "ruby_bp5009_decline_optional_payment_fetches_nothing",
-        "suzuki_hsbp1008_mill_three_all_members_draws_one",
-        "suzuki_hsbp1008_mill_with_live_card_no_draw",
-        "wakashi_spbp1008_debut_draws_one_without_mei",
-        "wakashi_spbp1008_debut_draws_two_with_mei",
-        "yuna_sp222_exactly_eight_energy_scores_one",
-        "yuna_sp222_live_start_optional_energy_places_wait_energy"
+        "suzuki_hsbp1008_mill_three_all_members_draws_one"
       ],
-      "covering_test_count": 30,
+      "covering_test_count": 35,
       "is_null": false
     },
     {
@@ -25373,6 +25388,7 @@
         "engine/tests/test_modules/tokimeki_test.rs",
         "engine/tests/test_modules/untested_abilities_batch28_test.rs",
         "engine/tests/test_modules/untested_abilities_batch29_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/wao_wao_test.rs",
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/wonder_zone_max_repeats_test.rs",
@@ -25411,7 +25427,7 @@
         "c10_reveal_top_adds_to_hand",
         "c11_peek_per_niji_selects_keep1"
       ],
-      "covering_test_count": 378,
+      "covering_test_count": 383,
       "is_null": false
     },
     {
@@ -25488,6 +25504,7 @@
         "engine/tests/test_modules/tokimeki_test.rs",
         "engine/tests/test_modules/untested_abilities_batch28_test.rs",
         "engine/tests/test_modules/untested_abilities_batch29_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/wao_wao_test.rs",
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/wonder_zone_max_repeats_test.rs",
@@ -25526,7 +25543,7 @@
         "c10_reveal_top_adds_to_hand",
         "c11_peek_per_niji_selects_keep1"
       ],
-      "covering_test_count": 378,
+      "covering_test_count": 383,
       "is_null": false
     },
     {
@@ -25803,6 +25820,7 @@
       "covering_files": [
         "engine/tests/test_modules/nagi_live_card_draw_test.rs",
         "engine/tests/test_modules/untested_abilities_batch29_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_playthrough_test.rs"
       ],
       "covering_tests": [
@@ -25824,6 +25842,11 @@
         "n_pb1_006_wait_self_activates_one_energy",
         "pr0045_baton_over_cost4_no_draw",
         "pr0045_baton_over_cost7_draws",
+        "pr032_declining_keeps_milled_cards_in_waitroom",
+        "pr032_mills_shortfall_and_recovers_live_to_deck_top",
+        "pr032_no_live_among_milled_no_prompt",
+        "pr032_waitroom_at_threshold_mills_nothing",
+        "pr032_waitroom_seven_mills_one_and_recovers_live",
         "sp_bp5_016_constant_evaluated_during_live_phase",
         "sp_bp5_016_energy_ge_10_grants_heart06_x2",
         "sp_bp5_016_energy_lt_10_grants_no_heart06",
@@ -25832,7 +25855,7 @@
         "test_multiple_live_cards_among_five_drawn_still_only_draw_one",
         "test_no_live_cards_among_five_drawn_no_draw"
       ],
-      "covering_test_count": 25,
+      "covering_test_count": 30,
       "is_null": false
     },
     {
@@ -26252,14 +26275,22 @@
         "PL!S-PR-044-PR"
       ],
       "base": "PL!S-PR-044",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs"
+      ],
+      "covering_tests": [
+        "pr032_declining_keeps_milled_cards_in_waitroom",
+        "pr032_mills_shortfall_and_recovers_live_to_deck_top",
+        "pr032_no_live_among_milled_no_prompt",
+        "pr032_waitroom_at_threshold_mills_nothing",
+        "pr032_waitroom_seven_mills_one_and_recovers_live"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -31669,6 +31700,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch3_test.rs"
       ],
       "covering_tests": [
@@ -31677,6 +31709,11 @@
         "niko_bp3009_cost13_condition_draw",
         "niko_bp3009_no_cost13_no_draw",
         "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "pr032_declining_keeps_milled_cards_in_waitroom",
+        "pr032_mills_shortfall_and_recovers_live_to_deck_top",
+        "pr032_no_live_among_milled_no_prompt",
+        "pr032_waitroom_at_threshold_mills_nothing",
+        "pr032_waitroom_seven_mills_one_and_recovers_live",
         "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
         "ruby_bp5009_decline_optional_payment_fetches_nothing",
         "suzuki_hsbp1008_mill_three_all_members_draws_one",
@@ -31686,7 +31723,7 @@
         "yuna_sp222_exactly_eight_energy_scores_one",
         "yuna_sp222_live_start_optional_energy_places_wait_energy"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 18,
       "is_null": false
     },
     {
@@ -34784,6 +34821,7 @@
         "engine/tests/test_modules/untested_abilities_batch14_test.rs",
         "engine/tests/test_modules/untested_abilities_batch32_test.rs",
         "engine/tests/test_modules/untested_abilities_batch33_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
@@ -34821,7 +34859,7 @@
         "c13_bp2_005_or_semantics_still_works",
         "c13_no_matching_card_optional_same_as_reject"
       ],
-      "covering_test_count": 265,
+      "covering_test_count": 270,
       "is_null": false
     },
     {
@@ -34904,6 +34942,7 @@
         "engine/tests/test_modules/start_true_dreams_test.rs",
         "engine/tests/test_modules/sumire_auto_test.rs",
         "engine/tests/test_modules/untested_abilities_batch32_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_test.rs",
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/you_debut_test.rs"
@@ -34933,14 +34972,14 @@
         "natsumi_rain_no_hasunosora_no_draw",
         "no_live_card_no_yell_no_success",
         "one_player_live_auto_higher_score",
-        "q147_empty_need_heart_live_succeeds",
-        "sd2_007_extra_draw_when_opponent_also_succeeded",
-        "sd2_007_single_draw_without_opponent_success",
-        "shared_pool_depletion_all_fail",
-        "smile_q224_live_success_score_plus_1",
-        "start_true_dreams_q66_opponent_no_card_score_higher"
+        "pr032_declining_keeps_milled_cards_in_waitroom",
+        "pr032_mills_shortfall_and_recovers_live_to_deck_top",
+        "pr032_no_live_among_milled_no_prompt",
+        "pr032_waitroom_at_threshold_mills_nothing",
+        "pr032_waitroom_seven_mills_one_and_recovers_live",
+        "q147_empty_need_heart_live_succeeds"
       ],
-      "covering_test_count": 65,
+      "covering_test_count": 70,
       "is_null": false
     },
     {
