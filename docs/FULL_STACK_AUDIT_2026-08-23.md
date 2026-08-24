@@ -37,6 +37,7 @@
 | 08-24 | ce720802 | Test-gap burn-down: batch 19 covers draw-then-discard sequentials (bp1-009-R activation w/ energy cost, pb1-024-L live-success draw2/discard2 incl. keep-selection case). depth=none →133, suite **2634/0** |
 | 08-24 | 9df367fb | Test-gap burn-down: batch 20 covers 3 look_and_select debuts (bp3-012-R look4/reveal 虹ヶ咲, pb1-028-N look2/add1, bp1-011-PR look5/live-card reveal) via the full play pipeline — energy paid + optional cost + look choice answered. depth=none →130, suite **2637/0** |
 | 08-24 | 9e633e59 | Test-gap burn-down: batch 21 covers the pb2 debut-retrieval trio (CatChu!/5yncri5e!/KALEIDOSCORE waitroom retrieval behind optional discard cost). depth=none →127, suite **2640/0** |
+| 08-24 | ffd54eb8 | **R1+R3 characterization suites landed** (9 tests): pin the five-view movement-tracking sync, area-move flagging, turn-scope reset; pin constant grant/revert lifecycle, live_end temporary registration+expiry, and manual-additive-vs-constant stacking. **New finding pinned as known gap:** choice-path cost discards emit NO hand→waitroom events and never enter cards_moved_this_turn — only effect-side moves are tracked. Post-R1 flipped assertions are pre-written in the file. Suite **2649/0** |
 | — | — | R8 condition-cache keys assessed & deferred: `format!("{:?}")` is a complete content-addressing scheme over the struct; changing it risks subtle cache-hit changes for no correctness gain |
 
 Verification loop used per step: regen abilities.json → byte-diff vs pre-step copy
