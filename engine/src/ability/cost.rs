@@ -211,28 +211,14 @@ let source = cost.source_str().unwrap_or("");
                 }
                 return Ok(());
             }
-            self.pending_choice = Some(
-                Choice::SelectTarget {
-                    target: "pay_optional_cost:skip_optional_cost".to_string(),
-                    description: format!(
-                        "Put {} member(s) from stage to the waitroom (or skip)?",
-                        count
-                    ),
-                    description_en: Some(format!(
-                        "Put {} member(s) from stage to the waitroom (or skip)?",
-                        count
-                    )),
-                    description_ja: Some(format!(
-                        "ステージのメンバー{}人を控え室に置く（支払う/スキップ）？",
-                        count
-                    )),
-                    allow_skip: true,
-                    options: None,
-                },
+            self.emit_pay_skip_gate(
+                gs,
+                Some(ChoiceRoute::OptionalCost),
+                format!("Put {} member(s) from stage to the waitroom (or skip)?", count),
+                format!("ステージのメンバー{}人を控え室に置く（支払う/スキップ）？", count),
+                true,
+                None,
             );
-            if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
-            }
             return Ok(());
         }
 
@@ -588,31 +574,26 @@ let source = cost.source_str().unwrap_or("");
                     return Ok(());
                 }
             }
-            let cost_description = if state_change == "wait" {
-                "Put this member to wait state"
-            } else {
-                "Pay cost"
-            };
-            self.pending_choice = Some(Choice::SelectTarget {
-                target: "pay_optional_cost:skip_optional_cost".to_string(),
-                description: format!("Pay optional cost: {}? (pay or skip)", cost_description),
-                description_en: Some(format!(
-                    "Pay optional cost: {}? (pay or skip)",
-                    cost_description
-                )),
-                description_ja: Some(if state_change == "wait" {
-                    "このメンバーをレスト状態にする（支払う/スキップ）？".to_string()
-                } else {
-                    "コストを支払う（支払う/スキップ）？".to_string()
-                }),
-                allow_skip: true,
-                options: None,
-            });
-            if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
-            }
-            return Ok(());
-        }
+        let cost_description = if state_change == "wait" {
+            "Put this member to wait state"
+        } else {
+            "Pay cost"
+        };
+        let desc_ja = if state_change == "wait" {
+            "このメンバーをレスト状態にする（支払う/スキップ）？".to_string()
+        } else {
+            "コストを支払う（支払う/スキップ）？".to_string()
+        };
+        self.emit_pay_skip_gate(
+            gs,
+            Some(ChoiceRoute::OptionalCost),
+            format!("Pay optional cost: {}? (pay or skip)", cost_description),
+            desc_ja,
+            true,
+            None,
+        );
+        return Ok(());
+    }
 
         if state_change == "wait" {
             let count = cost.count.unwrap_or(1) as usize;
@@ -856,17 +837,14 @@ let source = cost.source_str().unwrap_or("");
                         ));
                         return Ok(());
                     }
-                    self.pending_choice = Some(Choice::SelectTarget {
-                        target: "pay_optional_cost:skip_optional_cost".to_string(),
-                        description: format!("Pay {} energy (or skip)?", energy),
-                        description_en: Some(format!("Pay {} energy (or skip)?", energy)),
-                        description_ja: Some(format!("{}エネルギー支払う（スキップ可）？", energy)),
-                        allow_skip: true,
-                        options: None,
-                    });
-                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
-                    }
+                    self.emit_pay_skip_gate(
+                        gs,
+                        Some(ChoiceRoute::OptionalCost),
+                        format!("Pay {} energy (or skip)?", energy),
+                        format!("{}エネルギー支払う（スキップ可）？", energy),
+                        true,
+                        None,
+                    );
                     return Ok(());
                 }
 

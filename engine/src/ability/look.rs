@@ -906,17 +906,14 @@ impl AbilityResolver {
         let target = effect.target_name();
         let source = effect.source_or(Zone::Deck.to_str());
         if effect.optional.unwrap_or(false) {
-            self.pending_choice = Some(Choice::SelectTarget {
-                target: "pay_optional_cost:skip_optional_cost".to_string(),
-                description: format!("Look at {} card(s) (optional cost)?", count),
-                description_en: Some(format!("Look at {} card(s) (optional cost)?", count)),
-                description_ja: Some(format!("{}枚確認（オプションコスト）？", count)),
-                allow_skip: true,
-                options: None,
-            });
-            if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
-            }
+            self.emit_pay_skip_gate(
+                gs,
+                Some(ChoiceRoute::OptionalCost),
+                format!("Look at {} card(s) (optional cost)?", count),
+                format!("{}枚確認（オプションコスト）？", count),
+                true,
+                None,
+            );
             return Ok(());
         }
         // Rule 10.2.2.2 / Q85: If deck has fewer cards than needed, take

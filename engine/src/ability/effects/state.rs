@@ -236,20 +236,14 @@ impl AbilityResolver {
                     );
                     return Ok(());
                 }
-                self.pending_choice = Some(Choice::SelectTarget {
-                    target: "pay_optional_cost:skip_optional_cost".to_string(),
-                    description: format!("Change state to {} (pay optional cost)?", state_change),
-                    description_en: Some(format!(
-                        "Change state to {} (pay optional cost)?",
-                        state_change
-                    )),
-                    description_ja: Some(format!(
-                        "状態を{}に変更（オプションコスト）？",
-                        state_change
-                    )),
-                    allow_skip: optional,
-                    options: None,
-                });
+                self.emit_pay_skip_gate(
+                    gs,
+                    Some(ChoiceRoute::ChangeState),
+                    format!("Change state to {} (pay optional cost)?", state_change),
+                    format!("状態を{}に変更（オプションコスト）？", state_change),
+                    optional,
+                    None,
+                );
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.choice_card_no = Some(ChoiceRoute::ChangeState);
                 }

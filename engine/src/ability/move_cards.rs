@@ -1065,20 +1065,16 @@ impl AbilityResolver {
         if decided {
             return false;
         }
-        if let Some(entry_mut) = gs.ability_queue.current_entry_mut() {
-            entry_mut.choice_card_no =
-                Some(crate::ability::types::ChoiceRoute::Raw(
-                    "pay_optional_cost".to_string(),
-                ));
-        }
-        self.pending_choice = Some(Choice::SelectTarget {
-            target: "pay_optional_cost:skip_optional_cost".to_string(),
-            description: description_en.to_string(),
-            description_en: Some(description_en.to_string()),
-            description_ja: Some(description_ja.to_string()),
-            allow_skip: true,
-            options: Some(vec!["No".to_string(), "Yes".to_string()]),
-        });
+        self.emit_pay_skip_gate(
+            gs,
+            Some(crate::ability::types::ChoiceRoute::Raw(
+                "pay_optional_cost".to_string(),
+            )),
+            description_en.to_string(),
+            description_ja.to_string(),
+            true,
+            Some(vec!["No".to_string(), "Yes".to_string()]),
+        );
         true
     }
 

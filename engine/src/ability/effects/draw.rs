@@ -96,14 +96,14 @@ impl AbilityResolver {
         // pending_choice is set, and skips them if the optional action is declined.
         if effect.optional.unwrap_or(false) {
             let count = effect.count_or(1);
-            self.pending_choice = Some(crate::ability::types::Choice::SelectTarget {
-                target: "pay_optional_cost:skip_optional_cost".to_string(),
-                description: format!("Draw {} card(s)?", count),
-                description_en: Some(format!("Draw {} card(s)?", count)),
-                description_ja: Some(format!("{}枚ドローする？", count)),
-                allow_skip: false,
-                options: None,
-            });
+            self.emit_pay_skip_gate(
+                gs,
+                None,
+                format!("Draw {} card(s)?", count),
+                format!("{}枚ドローする？", count),
+                false,
+                None,
+            );
             return Ok(());
         }
         let draw_count = if let Some(ref dc) = effect.dynamic_count_any() {

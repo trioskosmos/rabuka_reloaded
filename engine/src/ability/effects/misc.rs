@@ -56,17 +56,14 @@ impl AbilityResolver {
             && Zone::from_str(effect.source_any().unwrap_or("")) == Some(Zone::DeckTop)
         {
             if effect.optional.unwrap_or(false) {
-                self.pending_choice = Some(Choice::SelectTarget {
-                    target: "pay_optional_cost:skip_optional_cost".to_string(),
-                    description: "Reveal cards from deck (optional cost)?".to_string(),
-                    description_en: Some("Reveal cards from deck (optional cost)?".to_string()),
-                    description_ja: Some("山札からカードを公開（オプションコスト）？".to_string()),
-                    allow_skip: true,
-                    options: None,
-                });
-                if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
-                }
+                self.emit_pay_skip_gate(
+                    gs,
+                    Some(ChoiceRoute::OptionalCost),
+                    "Reveal cards from deck (optional cost)?".to_string(),
+                    "山札からカードを公開（オプションコスト）？".to_string(),
+                    true,
+                    None,
+                );
                 return Ok(());
             }
             let chosen = gs
@@ -2271,17 +2268,14 @@ impl AbilityResolver {
             // execute_place_energy_under_member_non_optional (optional=false), so
             // we gate only the initial prompt here.
             if optional && gs.entry_choice_card_no() != Some(ChoiceRoute::OptionalCost) {
-                self.pending_choice = Some(Choice::SelectTarget {
-                    target: "pay_optional_cost:skip_optional_cost".to_string(),
-                    description: "Place energy under a member (optional)?".to_string(),
-                    description_en: Some("Place energy under a member (optional)?".to_string()),
-                    description_ja: Some("メンバーの下にエネルギーを置きますか？（オプション）".to_string()),
-                    allow_skip: true,
-                    options: None,
-                });
-                if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
-                }
+                self.emit_pay_skip_gate(
+                    gs,
+                    Some(ChoiceRoute::OptionalCost),
+                    "Place energy under a member (optional)?".to_string(),
+                    "メンバーの下にエネルギーを置きますか？（オプション）".to_string(),
+                    true,
+                    None,
+                );
                 return;
             }
             // Move `count` energy cards from the ENERGY DECK under a member on
@@ -3726,14 +3720,14 @@ impl AbilityResolver {
                 return Ok(());
             }
             self.pending_energy_payment = Some(count);
-            self.pending_choice = Some(Choice::SelectTarget {
-                target: "pay_optional_cost:skip_optional_cost".to_string(),
-                description: format!("Pay {} energy?", count),
-                description_en: Some(format!("Pay {} energy?", count)),
-                description_ja: Some(format!("{}エネルギー支払う？", count)),
-                allow_skip: false,
-                options: None,
-            });
+            self.emit_pay_skip_gate(
+                gs,
+                None,
+                format!("Pay {} energy?", count),
+                format!("{}エネルギー支払う？", count),
+                false,
+                None,
+            );
             return Ok(());
         }
         if count > 0 {

@@ -153,6 +153,37 @@ impl AbilityResolver {
             .is_some_and(|t| &**t == crate::triggers::ACTIVATION)
     }
 
+    /// Emit the shared 「〜してもよい／支払う？」 SelectTarget gate
+    /// (target = pay_optional_cost:skip_optional_cost). ONE construction
+    /// point for every optional-action question across costs, effect moves,
+    /// look steps and energy placements; answers route through
+    /// handle_optional_cost_payment. `route` selects the resume handler;
+    /// None leaves any existing route untouched. The "Repeat effect?"
+    /// prompts intentionally do NOT use this (different resume semantics).
+    pub(crate) fn emit_pay_skip_gate(
+        &mut self,
+        gs: &mut GameState,
+        route: Option<crate::ability::types::ChoiceRoute>,
+        description_en: String,
+        description_ja: String,
+        allow_skip: bool,
+        options: Option<Vec<String>>,
+    ) {
+        self.pending_choice = Some(crate::ability::types::Choice::SelectTarget {
+            target: "pay_optional_cost:skip_optional_cost".to_string(),
+            description: description_en.clone(),
+            description_en: Some(description_en),
+            description_ja: Some(description_ja),
+            allow_skip,
+            options,
+        });
+        if let Some(route) = route {
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.choice_card_no = Some(route);
+            }
+        }
+    }
+
     pub fn new(card_database: Arc<CardDatabase>, activating_card_id: Option<i16>) -> Self {
         AbilityResolver {
             pending_choice: None,
