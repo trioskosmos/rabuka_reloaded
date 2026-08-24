@@ -2321,12 +2321,26 @@ impl GameState {
                 Duration::ThisLive => self.current_turn_phase != TurnPhase::Live,
                 Duration::Permanent => false,
                 Duration::AsLongAs => {
-                    // AsLongAs effects persist as long as their condition is true.
-                    // For now, treat as ThisLive (expire when live ends) since
-                    // condition re-evaluation is not yet implemented.
+                    // UNREACHABLE today: no caller passes "as_long_as" to
+                    // push_temporary_effect (the 62 「〜かぎり」 constants run
+                    // through recalculate_constants instead). If this arm ever
+                    // fires, real condition re-evaluation must be implemented —
+                    // expiring at live end is an approximation.
+                    log::warn!(
+                        "AsLongAs temporary effect expired via live-end approximation \
+                         (condition re-eval not implemented): {}",
+                        effect.description
+                    );
                     self.current_turn_phase != TurnPhase::Live
                 }
-                Duration::Unless => self.current_turn_phase != TurnPhase::Live,
+                Duration::Unless => {
+                    log::warn!(
+                        "Unless temporary effect expired via live-end approximation \
+                         (negated condition re-eval not implemented): {}",
+                        effect.description
+                    );
+                    self.current_turn_phase != TurnPhase::Live
+                }
             };
 
             if is_expired {

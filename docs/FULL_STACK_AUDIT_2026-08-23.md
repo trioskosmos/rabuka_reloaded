@@ -43,6 +43,7 @@
 | 08-24 | a0ee2157 | R3 slice 2 prerequisite: prohibition-layer characterization (conditional cannot_live register/clear/re-register trio via recalc). Lesson: cannot_place on live cards is enforced at PLACEMENT time via `can_place_card_in_zone` checking the card's own printed ability — NOT via recalculate registration — and was already covered by kagayaiteru_q125. Redundant recalc-based assertion removed. Suite **2652/0** |
 | 08-24 | 7ff9fe7d | Re-registered the three characterization modules lost in the parallel-session mod.rs rewrite (movement 6 / modifier 3 / prohibition 5 — cannot_place now pinned at the `can_place_card_in_zone` primitive incl. LiveCardZone↔SuccessLiveZone interchangeability + positive control). Also noted: parser untangle Phases 1–5 + corpus smoke-test infra landed from the parallel session. Suite **2658/0** |
 | 08-24 | 8c8264e0 | Test-gap burn-down: batch 23 covers the baton-touch-debut gate family — source_character name match (中須かすみ replaces her own name → draw2+hand-discard, pos+neg) and replaced-member cost comparison (北条そふぃ over cheaper DOLLCHESTRA → +2 blades, pos+neg). Plus defensive `extract_source` regex for 「デッキをN枚上から/下から」 (corpus-neutral today). depth=none →122, suite **2658/0** |
+| 08-24 | 7b01d3f8 | Test-gap burn-down: batch 24 covers named-baton-source debut draws (東條希 replacing 優木せつ菜, エマ・ヴェルデ replacing herself; draw 2 + hand-discard 2, pos+neg). Finding: this ability shape resolves fully inside the play action — no pending choice reaches the caller. depth=none →120, suite **2665/0** |
 | — | — | R8 condition-cache keys assessed & deferred: `format!("{:?}")` is a complete content-addressing scheme over the struct; changing it risks subtle cache-hit changes for no correctness gain |
 
 Verification loop used per step: regen abilities.json → byte-diff vs pre-step copy
@@ -143,12 +144,21 @@ ingest). This is prerequisite for real AsLongAs semantics.
   fragile vs double-count/leak.
 
 ### C5. Known-unimplemented / under-implemented rules areas
-- Phase-begin/end-of-turn triggers documented absent (`triggers.rs:70-76`) — none required by pool yet,
-  but blocks future sets.
-- Deck legality warn-only; no max-4-copies check (deck_builder.rs:84-119).
-- Q118 placement-incomplete guard skips draws globally (`effects/mod.rs:54-69`).
-- Double victory check in `check_timing` (actions.rs:1308 & 1340); refresh logic duplicated inline
-  instead of calling `Player::refresh` (actions.rs:1276-1303 vs player.rs:545).
+~~Phase-begin/end-of-turn triggers absent (triggers.rs:70-76)~~ — still true but none required by pool.
+Deck legality warn-only — user verdict: fine as-is.
+~~Q118 placement-incomplete guard skips draws globally~~ — **CORRECTED 2026-08-24**: the gate
+(`optional_moves_all_moved`) lives on the ability-queue ENTRY, not globally; it cannot leak across
+abilities, and the all-or-nothing semantics are pinned by five existing tests
+(bp7_parser_gap_cards_test: kanon_missing_group_places_present_but_no_draw et al). No fix needed.
+~~heart_color_multiplier bulk wipe on expiry~~ — **VERIFIED SAFE 2026-08-24**: every multiplier
+entry is created by execute_set_heart_type which simultaneously registers a live-scoped temporary
+effect, so the bulk clear can never outlive an active owner. Deliberate belt-and-braces.
+~~AsLongAs/Unless expiry stub~~ — **RESOLVED 2026-08-24**: confirmed unreachable (no caller passes
+those durations; parse_duration's only producer feeds nothing), arms now log::warn loudly if ever
+hit instead of silently approximating.
+~~Choice-path cost discards invisible to movement tracking~~ — **FIXED** (ab7fca67, R1 slice 1).
+~~Aggregate-total target=both hijack~~ — **FIXED** (b09ab1b5).
+~~blade_limit undecoded / cross-position condition unimplemented~~ — **FIXED** (b7f1952d).
 
 ### C6. Untested correctness classes (from test audit)
 - Simultaneous-trigger ordering between players / stack order — spot cases only.
