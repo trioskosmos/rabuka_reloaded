@@ -333,6 +333,8 @@ pub mod untested_abilities_batch18_test;
 pub mod untested_abilities_batch19_test;
 pub mod untested_abilities_batch20_test;
 pub mod untested_abilities_batch21_test;
+pub mod movement_tracking_characterization_test;
+pub mod modifier_layer_characterization_test;
 pub mod untested_secondary_abilities_test;
 pub mod restriction_mechanics_test;
 pub mod untested_abilities_batch3_test;

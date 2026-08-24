@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T00:02:59.824169+00:00",
+  "generated_at": "2026-08-24T00:30:15.534623+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 441,
-  "n_tests": 2674,
+  "n_files": 443,
+  "n_tests": 2683,
   "total_cards": 771,
   "covered_cards": 645,
   "abilities_on_covered": 809,
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 595,
-    "L1+choice": 143,
+    "L2+choice": 597,
+    "L1+choice": 141,
     "L2": 24,
     "none": 127,
     "L1": 47
@@ -11868,6 +11868,7 @@
       "has_choice": false,
       "has_negative": false,
       "covering_files": [
+        "engine/tests/test_modules/modifier_layer_characterization_test.rs",
         "engine/tests/test_modules/untested_abilities_batch10_test.rs",
         "engine/tests/test_modules/untested_abilities_batch11_test.rs",
         "engine/tests/test_modules/untested_abilities_batch14_test.rs"
@@ -11878,8 +11879,10 @@
         "bp7020_constant_blades_off_when_behind",
         "bp7020_constant_blades_while_energy_ahead",
         "cl1_006_debut_gains_three_blades",
+        "constant_blade_recompute_updates_when_condition_source_changes",
         "go_master_start_equal_success_cards_no_score",
         "go_master_start_fewer_success_cards_scores",
+        "manual_additive_survives_constant_recompute_and_tracks_condition",
         "note_mermaid_duplicate_kaleidoscope_names_no_score",
         "note_mermaid_two_distinct_kaleidoscope_members_score",
         "pb1013_higher_cost_member_on_stage_draws",
@@ -11887,9 +11890,10 @@
         "pb2_029_debut_rests_low_cost_member",
         "sd1022_live_start_grants_blade_to_all_aqours_members",
         "sd2_008_constant_heart_while_cost13_member_on_stage",
-        "sd2_008_constant_heart_without_expensive_member"
+        "sd2_008_constant_heart_without_expensive_member",
+        "temporary_live_end_effect_expires_when_live_phase_ends"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 18,
       "is_null": false
     },
     {
@@ -12764,19 +12768,26 @@
       ],
       "base": "PL!N-sd1-005",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/movement_tracking_characterization_test.rs",
         "engine/tests/test_modules/untested_abilities_batch16_test.rs"
       ],
       "covering_tests": [
+        "activation_discard_cost_feeds_movement_views",
         "bp3004_rest_self_and_discard_retrieves_niji_live",
         "bp4018_rests_self_to_waitroom_retrieves_liella",
-        "proteinbar_discard2_retrieves_niji_member"
+        "clear_card_movement_tracking_resets_turn_scope",
+        "non_area_moves_do_not_record_area_movement",
+        "proteinbar_discard2_retrieves_niji_member",
+        "push_movement_event_syncs_all_views",
+        "second_move_appends_and_updates_recent_zone_only",
+        "stage_to_stage_move_also_records_area_movement"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 9,
       "is_null": false
     },
     {
@@ -16469,23 +16480,30 @@
       ],
       "base": "PL!N-bp3-004",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/movement_tracking_characterization_test.rs",
         "engine/tests/test_modules/untested_abilities_batch16_test.rs",
         "engine/tests/test_modules/untested_abilities_batch20_test.rs"
       ],
       "covering_tests": [
+        "activation_discard_cost_feeds_movement_views",
         "bp1011_look5_reveals_live_card_to_hand",
         "bp3004_rest_self_and_discard_retrieves_niji_live",
         "bp3012_look4_reveals_niji_card_to_hand",
         "bp4018_rests_self_to_waitroom_retrieves_liella",
+        "clear_card_movement_tracking_resets_turn_scope",
+        "non_area_moves_do_not_record_area_movement",
         "pb1028_look2_adds_one_to_hand",
-        "proteinbar_discard2_retrieves_niji_member"
+        "proteinbar_discard2_retrieves_niji_member",
+        "push_movement_event_syncs_all_views",
+        "second_move_appends_and_updates_recent_zone_only",
+        "stage_to_stage_move_also_records_area_movement"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 12,
       "is_null": false
     },
     {
@@ -37079,15 +37097,19 @@
       "has_choice": false,
       "has_negative": false,
       "covering_files": [
+        "engine/tests/test_modules/modifier_layer_characterization_test.rs",
         "engine/tests/test_modules/untested_abilities_batch11_test.rs"
       ],
       "covering_tests": [
         "cl1_006_debut_gains_three_blades",
+        "constant_blade_recompute_updates_when_condition_source_changes",
+        "manual_additive_survives_constant_recompute_and_tracks_condition",
         "pb2_029_debut_rests_low_cost_member",
         "sd2_008_constant_heart_while_cost13_member_on_stage",
-        "sd2_008_constant_heart_without_expensive_member"
+        "sd2_008_constant_heart_without_expensive_member",
+        "temporary_live_end_effect_expires_when_live_phase_ends"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 7,
       "is_null": false
     },
     {
@@ -37332,15 +37354,19 @@
       "has_choice": false,
       "has_negative": false,
       "covering_files": [
+        "engine/tests/test_modules/modifier_layer_characterization_test.rs",
         "engine/tests/test_modules/untested_abilities_batch11_test.rs"
       ],
       "covering_tests": [
         "cl1_006_debut_gains_three_blades",
+        "constant_blade_recompute_updates_when_condition_source_changes",
+        "manual_additive_survives_constant_recompute_and_tracks_condition",
         "pb2_029_debut_rests_low_cost_member",
         "sd2_008_constant_heart_while_cost13_member_on_stage",
-        "sd2_008_constant_heart_without_expensive_member"
+        "sd2_008_constant_heart_without_expensive_member",
+        "temporary_live_end_effect_expires_when_live_phase_ends"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 7,
       "is_null": false
     },
     {
