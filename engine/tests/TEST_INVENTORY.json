@@ -1,24 +1,24 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-23T23:44:00.927540+00:00",
+  "generated_at": "2026-08-24T00:02:59.824169+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 440,
-  "n_tests": 2671,
+  "n_files": 441,
+  "n_tests": 2674,
   "total_cards": 771,
-  "covered_cards": 642,
-  "abilities_on_covered": 806,
+  "covered_cards": 645,
+  "abilities_on_covered": 809,
   "trigger_counts": {
     "起動": [
       84,
       96
     ],
     "登場": [
-      223,
+      226,
       269
     ],
     "ライブ開始時": [
@@ -44,7 +44,7 @@
   },
   "action_counts": {
     "move_cards": [
-      122,
+      125,
       146
     ],
     "look_and_select": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      459,
+      462,
       545
     ],
     "temporal_condition": [
@@ -300,7 +300,7 @@
       31
     ],
     "pb2": [
-      33,
+      36,
       43
     ],
     "cl1": [
@@ -310,9 +310,9 @@
   },
   "depth_counts": {
     "L2+choice": 595,
-    "L1+choice": 140,
+    "L1+choice": 143,
     "L2": 24,
-    "none": 130,
+    "none": 127,
     "L1": 47
   },
   "qa_rulings": {
@@ -9444,7 +9444,8 @@
         "engine/tests/test_modules/hazuki_test.rs",
         "engine/tests/test_modules/l0_gap_constant_test.rs",
         "engine/tests/test_modules/sumire_bp4_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch18_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch18_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch21_test.rs"
       ],
       "covering_tests": [
         "ayumu_empty_energy_deck_no_effect",
@@ -9470,15 +9471,15 @@
         "kanon_one_per_group_not_multiple_from_same_group",
         "kanon_selects_each_group_to_deck_bottom_and_draws",
         "kanon_skip_placement_no_draw",
+        "pb2015_catchu_debut_retrieves_catchu_card",
+        "pb2019_5yncri5e_debut_retrieves_5yncri5e_card",
+        "pb2021_kaleidoscope_debut_retrieves_kaleido_card",
         "q266_cost_b0_waits_nothing_incl_blade0",
         "q266_cost_b1_waits_nothing",
         "q266_cost_b2_waits_blade0_not_blade1",
-        "q266_cost_b4_waits_blade2_not_blade3",
-        "q266_skip_cost_waits_nothing",
-        "sumire_action_type_string_parsing_play_member_to_stage",
-        "sumire_double_baton_integration_via_string_path"
+        "q266_cost_b4_waits_blade2_not_blade3"
       ],
-      "covering_test_count": 45,
+      "covering_test_count": 48,
       "is_null": false
     },
     {
@@ -23241,14 +23242,20 @@
         "PL!SP-pb2-015-P＋"
       ],
       "base": "PL!SP-pb2-015",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch21_test.rs"
+      ],
+      "covering_tests": [
+        "pb2015_catchu_debut_retrieves_catchu_card",
+        "pb2019_5yncri5e_debut_retrieves_5yncri5e_card",
+        "pb2021_kaleidoscope_debut_retrieves_kaleido_card"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -23302,14 +23309,20 @@
         "PL!SP-pb2-019-P＋"
       ],
       "base": "PL!SP-pb2-019",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch21_test.rs"
+      ],
+      "covering_tests": [
+        "pb2015_catchu_debut_retrieves_catchu_card",
+        "pb2019_5yncri5e_debut_retrieves_5yncri5e_card",
+        "pb2021_kaleidoscope_debut_retrieves_kaleido_card"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -23369,14 +23382,20 @@
         "PL!SP-pb2-021-P＋"
       ],
       "base": "PL!SP-pb2-021",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch21_test.rs"
+      ],
+      "covering_tests": [
+        "pb2015_catchu_debut_retrieves_catchu_card",
+        "pb2019_5yncri5e_debut_retrieves_5yncri5e_card",
+        "pb2021_kaleidoscope_debut_retrieves_kaleido_card"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
