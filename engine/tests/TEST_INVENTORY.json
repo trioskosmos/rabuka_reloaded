@@ -1,24 +1,24 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T06:07:01.128062+00:00",
+  "generated_at": "2026-08-24T06:20:45.437960+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 452,
-  "n_tests": 2707,
+  "n_files": 453,
+  "n_tests": 2708,
   "total_cards": 771,
-  "covered_cards": 656,
-  "abilities_on_covered": 820,
+  "covered_cards": 657,
+  "abilities_on_covered": 821,
   "trigger_counts": {
     "起動": [
       84,
       96
     ],
     "登場": [
-      236,
+      237,
       269
     ],
     "ライブ開始時": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      178,
+      179,
       219
     ],
     "unknown": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      469,
+      470,
       545
     ],
     "temporal_condition": [
@@ -264,7 +264,7 @@
       52
     ],
     "bp1": [
-      54,
+      55,
       56
     ],
     "bp3": [
@@ -310,9 +310,9 @@
   },
   "depth_counts": {
     "L2+choice": 597,
-    "L1+choice": 150,
+    "L1+choice": 151,
     "L2": 25,
-    "none": 116,
+    "none": 115,
     "L1": 48
   },
   "qa_rulings": {
@@ -13203,14 +13203,18 @@
         "PL!N-bp1-009-P"
       ],
       "base": "PL!N-bp1-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch27_test.rs"
+      ],
+      "covering_tests": [
+        "bp1009_debut_mill2_then_retrieve_member_from_waitroom"
+      ],
+      "covering_test_count": 1,
       "is_null": false
     },
     {
@@ -16544,10 +16548,12 @@
         "engine/tests/test_modules/movement_tracking_characterization_test.rs",
         "engine/tests/test_modules/untested_abilities_batch16_test.rs",
         "engine/tests/test_modules/untested_abilities_batch20_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch26_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch26_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch27_test.rs"
       ],
       "covering_tests": [
         "activation_discard_cost_feeds_movement_views",
+        "bp1009_debut_mill2_then_retrieve_member_from_waitroom",
         "bp1011_look5_reveals_live_card_to_hand",
         "bp3004_rest_self_and_discard_retrieves_niji_live",
         "bp3012_look4_reveals_niji_card_to_hand",
@@ -16563,7 +16569,7 @@
         "second_move_appends_and_updates_recent_zone_only",
         "stage_to_stage_move_also_records_area_movement"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 16,
       "is_null": false
     },
     {
