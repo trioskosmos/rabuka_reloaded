@@ -176,11 +176,7 @@ let source = cost.source_str().unwrap_or("");
         let count = cost.count.unwrap_or(1) as usize;
         let card_type = cost.card_type_any().map(|s| s.to_string());
         let optional = cost.optional.unwrap_or(false);
-        let is_activation = self
-            .current_ability
-            .as_ref()
-            .and_then(|a| a.triggers.as_ref())
-            .is_some_and(|t| &**t == crate::triggers::ACTIVATION);
+        let is_activation = self.current_ability_is_activation();
 
         let same_unit = cost.same_unit_name_any().unwrap_or(false);
         let is_from_hand = Zone::from_str(source) == Some(Zone::Hand) && !same_unit;
@@ -568,11 +564,7 @@ let source = cost.source_str().unwrap_or("");
         let state_change = state_change_binding.unwrap_or("");
         let target = cost.target.as_deref().unwrap_or("self");
         let optional = cost.optional.unwrap_or(false);
-        let is_activation = self
-            .current_ability
-            .as_ref()
-            .and_then(|a| a.triggers.as_ref())
-            .is_some_and(|t| &**t == crate::triggers::ACTIVATION);
+        let is_activation = self.current_ability_is_activation();
 
         if optional && !is_activation {
             // Q137: 「ウェイトにする」とは、アクティブ状態のメンバーをウェイト
@@ -802,13 +794,10 @@ let source = cost.source_str().unwrap_or("");
             ActionType::PayEnergy => {
                 let energy = cost.energy_count_any().unwrap_or(0);
                 let target = cost.target.as_deref().unwrap_or("self");
-                let optional = cost.optional.unwrap_or(false);
-                let any_number = cost.any_number_any().unwrap_or(false);
-                let is_activation = self
-                    .current_ability
-                    .as_ref()
-                    .and_then(|a| a.triggers.as_ref())
-                    .is_some_and(|t| &**t == crate::triggers::ACTIVATION);
+        let optional = cost.optional.unwrap_or(false);
+        let any_number = cost.any_number_any().unwrap_or(false);
+        let is_activation = self.current_ability_is_activation();
+
 
                 if any_number && (optional || !is_activation) {
                     let player = gs.resolve_target_player_mut(target);

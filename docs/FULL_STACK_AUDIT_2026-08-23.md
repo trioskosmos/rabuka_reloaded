@@ -217,6 +217,11 @@ hit instead of silently approximating.
 | R8 | Proper condition-cache key (variant tag + normalized fields) replacing `format!("{:?}")` | After R7 touches compound.rs anyway |
 | R9 | Dedup util-level helpers: two `fn norm`s (util.rs:510/559), zone-label fns ×3 (condition.rs:246, describe.rs:26/628), count_matching family (util.rs:1652-2290) | Low risk |
 | R10 | Consolidate use_limit recording into one phased function | Gate on Q58-Q61 tests |
+| R11 | **Optionality unification (partially done 08-24)**: shared `ask_optional_move_gate` + `optional_gate_source` now cover deck/deck_bottom/energy_deck; remaining scattered shapes — resolve_from_stage/revealed/standard `can_skip = is_max \|\| optional` params, cost.rs Stage gate (ChoiceRoute::OptionalCost flow), PlaceEnergyUnderMember internal gate, conditional_optional machinery. End state: ONE gate decision enum consulted by all move executors | Medium; keep per-shape tests green |
+| R12 | **is_activation idiom** (done for cost.rs 08-24): `current_ability_is_activation()` added to AbilityResolver; resolver.rs:728/944 compare passed-in abilities (different shape) and could share a static helper | Trivial remainder |
+| R13 | **cost_limit+operator pair extraction**: `.cost_limit_operator_any()` appears at 22 sites across 10 files, half paired with `cost_limit_any()` into ChoiceBuilder::cost_limit(limit, String). Add `ChoiceBuilder::cost_limit_from(&AbilityEffect)` + swap ~11 builder-style sites; the as_deref comparison sites stay as-is | Mechanical |
+| R14 | **Bilingual zone-label pairs**: zone_label + zone_label_ja fetched together at ~32 sites (describe.rs ×26, look.rs ×4, move_cards.rs ×2); one `zone_labels(zone) -> (&str, &str)` helper halves the call sites | Low risk |
+| R15 | **filter_from_parts_full positional-None calls**: 6 callers pass up to 5 trailing Nones by position — builder pattern or struct-update would kill the silent-misordering class (CLEAN-G15/D20 already bit once) | R6 adjacent |
 
 ### Test-side merges
 - Per-test depth attribution in `test_inventory.py` (attribute covering fns, ignore comments) before

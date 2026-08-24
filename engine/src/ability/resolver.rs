@@ -143,6 +143,16 @@ pub struct AbilityResolver {
 }
 
 impl AbilityResolver {
+    /// Whether the ability currently being resolved is a 起動 (activation).
+    /// Single source of truth for the trigger check previously copy-pasted at
+    /// every optional-cost site.
+    pub(crate) fn current_ability_is_activation(&self) -> bool {
+        self.current_ability
+            .as_ref()
+            .and_then(|a| a.triggers.as_ref())
+            .is_some_and(|t| &**t == crate::triggers::ACTIVATION)
+    }
+
     pub fn new(card_database: Arc<CardDatabase>, activating_card_id: Option<i16>) -> Self {
         AbilityResolver {
             pending_choice: None,
