@@ -1,14 +1,14 @@
 # AGENTS.md
 
 ## Output / logs
-- **Debug env is for FAILING tests only — it slows runs down.** Full-suite / green-run checks: plain `cargo test --test run_all`. When a failure appears OR you're verifying a fix: re-run ONLY the failing tests with `$env:RUST_LOG="debug"; cargo test --test run_all <failing_substring> -- --nocapture --test-threads=1`. Note cargo accepts ONE positional filter — pick a substring matching the tests you need.
-- Redirect output to a file (`| Out-File -Encoding utf8 <file>`) and inspect it with the Read tool. No Select-String surgery on live console output; don't truncate.
-- When ANY assertion fails, read the condition-verdict/trace lines from that debug output BEFORE changing code or tests. Never guess at engine internals.
+- **⛔ NEVER TRUNCATE OUTPUT — THIS MEANS YOU.** Do NOT filter live console output with Select-String / Select-Object -First/-Last chains instead of reading it. That hides exactly the lines needed and wastes turns guessing. THE ONLY ACCEPTABLE FLOW: run command → full output to file (`| Out-File -Encoding utf8 <file>`) → **Read tool** on that file (offset/limit for big files). Post-read grep on the FILE is fine; console-filtering INSTEAD of reading is a mistake. If you catch yourself writing `Select-String` on console output of a failing run, stop and redo it via file+Read.
+- **Debug env (`$env:RUST_LOG="debug"`) is for FAILING tests only — it slows full runs down.** Green full-suite checks: plain `cargo test --test run_all`. When diagnosing/verifying: `$env:RUST_LOG="debug"; cargo test --test run_all <failing_substring> -- --nocapture --test-threads=1`. Cargo takes ONE positional filter — pick a substring covering the tests you need.
+- When ANY assertion fails, read the condition-verdict/trace lines from the debug file BEFORE changing code or tests. Never guess at engine internals.
 - Do not use `git` to revert or fall back on unless explicitly asked — fix the code properly.
 
 ## Tests
 - The engine test suite is run from the `engine` directory: `cargo test --test run_all`.
-- To run a single module: `cargo test --test run_all <module_name>` (still with `$env:RUST_LOG="debug";`).
+- To run a single module: `cargo test --test run_all <module_name>` (debug env only when diagnosing).
 - Tests load the real card database from `cards/cards.json` via the baked bytecode; regenerate card abilities with `python ability_extraction/extract_card_abilities.py` from the `cards` directory when the parser changes, then run the engine suite. Note: `condition_decoder_gen.rs` / `effect_decoder_gen.rs` are AUTO-GENERATED (see their headers) — edit `cards/generate_condition_decoder.py` / the generator, never the generated file.
 - Coverage inventory is automated: `python cards/test_inventory.py` regenerates `engine/tests/TEST_COVERAGE.md`, `docs/ABILITY_MATRIX.md`, `engine/tests/TEST_INVENTORY.{json,md}` from `cards/abilities.json` + `engine/tests`. CI checks it via `python cards/test_inventory.py --check`. Do not hand-edit the generated markdown.
 

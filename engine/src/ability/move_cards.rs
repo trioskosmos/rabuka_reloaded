@@ -1143,6 +1143,40 @@ impl AbilityResolver {
             &mut gs.player1
         };
         let count = c.count;
+        // 「〜してもよい」 energy-deck placements (e.g. HOT PASSION!! gating
+        // the opponent's draw on acceptance) must be declinable. Mirror the
+        // deck_top optional gate: ask once, mark decided, execute on accept.
+        // EXCEPTION: destination=UnderMember shapes already route through the
+        // conditional_optional machinery, which owns their pay/skip decision.
+        let under_member = Zone::from_str(&c.destination) == Some(Zone::UnderMember);
+        if c.effect.optional.unwrap_or(false) && !under_member {
+            let entry = gs.ability_queue.current_entry();
+            let decided = entry
+                .as_ref()
+                .and_then(|e| e.conditional_choice.as_ref())
+                .is_some();
+            if !decided {
+                if let Some(entry_mut) = gs.ability_queue.current_entry_mut() {
+                    entry_mut.choice_card_no =
+                        Some(crate::ability::types::ChoiceRoute::Raw(
+                            "pay_optional_cost".to_string(),
+                        ));
+                }
+                self.pending_choice = Some(Choice::SelectTarget {
+                    target: "pay_optional_cost:skip_optional_cost".to_string(),
+                    description: "Place energy card(s) from the energy deck?".to_string(),
+                    description_en: Some(
+                        "Place energy card(s) from the energy deck?".to_string(),
+                    ),
+                    description_ja: Some(
+                        "エネルギーデッキからエネルギーを置きますか？".to_string(),
+                    ),
+                    allow_skip: true,
+                    options: Some(vec!["No".to_string(), "Yes".to_string()]),
+                });
+                return Ok(vec![]);
+            }
+        }
         let mut drawn = Vec::new();
         for _i in 0..count {
             if let Some(card) = player.energy_deck.draw() {

@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T16:42:19.559364+00:00",
+  "generated_at": "2026-08-24T17:19:44.906998+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 458,
-  "n_tests": 2745,
+  "n_files": 459,
+  "n_tests": 2753,
   "total_cards": 771,
-  "covered_cards": 668,
-  "abilities_on_covered": 832,
+  "covered_cards": 673,
+  "abilities_on_covered": 837,
   "trigger_counts": {
     "起動": [
       85,
@@ -30,7 +30,7 @@
       2
     ],
     "ライブ成功時": [
-      106,
+      111,
       122
     ],
     "常時": [
@@ -44,7 +44,7 @@
   },
   "action_counts": {
     "move_cards": [
-      129,
+      130,
       146
     ],
     "look_and_select": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      185,
+      189,
       219
     ],
     "unknown": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      479,
+      483,
       545
     ],
     "temporal_condition": [
@@ -210,7 +210,7 @@
       2
     ],
     "group_condition": [
-      38,
+      39,
       44
     ],
     "or_condition": [
@@ -256,7 +256,7 @@
   },
   "set_counts": {
     "sd1": [
-      55,
+      56,
       58
     ],
     "PR": [
@@ -280,15 +280,15 @@
       88
     ],
     "bp5": [
-      117,
+      118,
       134
     ],
     "bp6": [
-      70,
+      71,
       82
     ],
     "bp7": [
-      97,
+      98,
       111
     ],
     "pb1": [
@@ -296,7 +296,7 @@
       137
     ],
     "sd2": [
-      26,
+      27,
       31
     ],
     "pb2": [
@@ -310,9 +310,9 @@
   },
   "depth_counts": {
     "L2+choice": 609,
-    "L1+choice": 150,
+    "L1+choice": 155,
     "L2": 25,
-    "none": 104,
+    "none": 99,
     "L1": 48
   },
   "qa_rulings": {
@@ -6439,14 +6439,17 @@
       "covering_files": [
         "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch31_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch32_test.rs"
       ],
       "covering_tests": [
         "bp4_021_accept_puts_waitroom_card_on_deck_top",
         "bp4_021_skip_leaves_waitroom_intact",
         "bp5_015_debut_mills_exactly_ten",
+        "bp6_016_look_three_reorder_back_on_top",
         "bp6_021_accept_cost_scores_and_retrieves",
         "bp6_021_skip_cost_no_score_no_retrieval",
+        "bp7_019_places_two_aqours_cards_under_deck",
         "butterfly_to_butterfly_wing_matches",
         "butterfly_wing_to_butterfly_no_match",
         "cl1_009_cost_ten_outside_range_not_selectable",
@@ -6469,11 +6472,9 @@
         "hinoshita_q237_name_contains_all_no_match",
         "hinoshita_reveal_choice_keeps_card_in_hand",
         "hinoshita_use_limit_once_per_turn",
-        "hs_bp6_032_expensive_members_not_selectable",
-        "hs_bp6_032_retrieves_low_cost_member",
-        "kanon_alone_on_stage_no_recovery"
+        "hot_passion_accept_energy_opponent_draws"
       ],
-      "covering_test_count": 35,
+      "covering_test_count": 43,
       "is_null": false
     },
     {
@@ -6501,14 +6502,17 @@
       "covering_files": [
         "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch31_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch32_test.rs"
       ],
       "covering_tests": [
         "bp4_021_accept_puts_waitroom_card_on_deck_top",
         "bp4_021_skip_leaves_waitroom_intact",
         "bp5_015_debut_mills_exactly_ten",
+        "bp6_016_look_three_reorder_back_on_top",
         "bp6_021_accept_cost_scores_and_retrieves",
         "bp6_021_skip_cost_no_score_no_retrieval",
+        "bp7_019_places_two_aqours_cards_under_deck",
         "butterfly_to_butterfly_wing_matches",
         "butterfly_wing_to_butterfly_no_match",
         "cl1_009_cost_ten_outside_range_not_selectable",
@@ -6531,11 +6535,9 @@
         "hinoshita_q237_name_contains_all_no_match",
         "hinoshita_reveal_choice_keeps_card_in_hand",
         "hinoshita_use_limit_once_per_turn",
-        "hs_bp6_032_expensive_members_not_selectable",
-        "hs_bp6_032_retrieves_low_cost_member",
-        "kanon_alone_on_stage_no_recovery"
+        "hot_passion_accept_energy_opponent_draws"
       ],
-      "covering_test_count": 35,
+      "covering_test_count": 43,
       "is_null": false
     },
     {
@@ -10108,6 +10110,7 @@
         "engine/tests/test_modules/special_blade_heart_rules_test.rs",
         "engine/tests/test_modules/untested_abilities_batch30_test.rs",
         "engine/tests/test_modules/untested_abilities_batch31_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch32_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs"
       ],
       "covering_tests": [
@@ -10134,15 +10137,15 @@
         "bp4_021_accept_puts_waitroom_card_on_deck_top",
         "bp4_021_skip_leaves_waitroom_intact",
         "bp5_015_debut_mills_exactly_ten",
+        "bp6_016_look_three_reorder_back_on_top",
         "bp6_021_accept_cost_scores_and_retrieves",
         "bp6_021_skip_cost_no_score_no_retrieval",
         "bp6_023_draws_extra_with_mus_live_in_success_zone",
         "bp6_023_non_mus_live_in_success_zone_single_draw",
         "bp6_023_single_draw_without_success_zone_card",
-        "butterfly_to_butterfly_wing_matches",
-        "butterfly_wing_to_butterfly_no_match"
+        "bp7_019_places_two_aqours_cards_under_deck"
       ],
-      "covering_test_count": 179,
+      "covering_test_count": 187,
       "is_null": true
     },
     {
@@ -11289,12 +11292,21 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/draw_one_put_bottom_debut_test.rs"
+        "engine/tests/test_modules/draw_one_put_bottom_debut_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch32_test.rs"
       ],
       "covering_tests": [
         "all_three_cards_parse_to_identical_sequential",
+        "bp6_016_look_three_reorder_back_on_top",
+        "bp7_019_places_two_aqours_cards_under_deck",
+        "hot_passion_accept_energy_opponent_draws",
+        "hot_passion_decline_no_opponent_draw",
         "mari_draw_one_put_one_bottom",
+        "natsumi_rain_draws_and_discards_with_hasunosora_on_stage",
+        "natsumi_rain_no_hasunosora_no_draw",
         "ruby_draw_one_put_one_bottom",
+        "sd2_007_extra_draw_when_opponent_also_succeeded",
+        "sd2_007_single_draw_without_opponent_success",
         "you_draw_last_deck_card_then_place_on_empty_deck",
         "you_draw_one_put_one_on_bottom_basic",
         "you_drawn_card_can_be_placed_on_bottom",
@@ -11307,7 +11319,7 @@
         "you_selection_includes_all_card_types",
         "you_single_card_hand_auto_resolves_no_prompt"
       ],
-      "covering_test_count": 14,
+      "covering_test_count": 22,
       "is_null": false
     },
     {
@@ -25118,14 +25130,25 @@
         "PL!N-sd2-007-SD2"
       ],
       "base": "PL!N-sd2-007",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch32_test.rs"
+      ],
+      "covering_tests": [
+        "bp6_016_look_three_reorder_back_on_top",
+        "bp7_019_places_two_aqours_cards_under_deck",
+        "hot_passion_accept_energy_opponent_draws",
+        "hot_passion_decline_no_opponent_draw",
+        "natsumi_rain_draws_and_discards_with_hasunosora_on_stage",
+        "natsumi_rain_no_hasunosora_no_draw",
+        "sd2_007_extra_draw_when_opponent_also_succeeded",
+        "sd2_007_single_draw_without_opponent_success"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -34006,14 +34029,25 @@
         "PL!SP-bp5-027-L"
       ],
       "base": "PL!SP-bp5-027",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch32_test.rs"
+      ],
+      "covering_tests": [
+        "bp6_016_look_three_reorder_back_on_top",
+        "bp7_019_places_two_aqours_cards_under_deck",
+        "hot_passion_accept_energy_opponent_draws",
+        "hot_passion_decline_no_opponent_draw",
+        "natsumi_rain_draws_and_discards_with_hasunosora_on_stage",
+        "natsumi_rain_no_hasunosora_no_draw",
+        "sd2_007_extra_draw_when_opponent_also_succeeded",
+        "sd2_007_single_draw_without_opponent_success"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -34635,14 +34669,25 @@
         "PL!HS-sd1-017-SD"
       ],
       "base": "PL!HS-sd1-017",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch32_test.rs"
+      ],
+      "covering_tests": [
+        "bp6_016_look_three_reorder_back_on_top",
+        "bp7_019_places_two_aqours_cards_under_deck",
+        "hot_passion_accept_energy_opponent_draws",
+        "hot_passion_decline_no_opponent_draw",
+        "natsumi_rain_draws_and_discards_with_hasunosora_on_stage",
+        "natsumi_rain_no_hasunosora_no_draw",
+        "sd2_007_extra_draw_when_opponent_also_succeeded",
+        "sd2_007_single_draw_without_opponent_success"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -34736,6 +34781,7 @@
         "engine/tests/test_modules/strawberry_test.rs",
         "engine/tests/test_modules/tokimeki_test.rs",
         "engine/tests/test_modules/untested_abilities_batch14_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch32_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
@@ -34749,10 +34795,12 @@
         "aquarium_yell_from_bottom_short_deck",
         "aquarium_yell_from_bottom_two_yells",
         "baton_touch_cleared_between_actions",
+        "bp6_016_look_three_reorder_back_on_top",
         "bp7014_constant_heart_lost_when_tied",
         "bp7014_constant_heart_while_opp_energy_ahead",
         "bp7020_constant_blades_off_when_behind",
         "bp7020_constant_blades_while_energy_ahead",
+        "bp7_019_places_two_aqours_cards_under_deck",
         "buffers_are_bounded",
         "c10_reveal_top_adds_to_hand",
         "c11_peek_per_niji_selects_keep1",
@@ -34769,11 +34817,9 @@
         "c6_niji_cost_lt20_noop",
         "c7_waitroom_to_deck_bottom",
         "c8_both_shuffle_under_deck",
-        "c8_q242_19_below_threshold",
-        "c8_q242_both_shuffle_and_retrieve_and_blade",
-        "c8_q242_exactly_20_threshold_met"
+        "c8_q242_19_below_threshold"
       ],
-      "covering_test_count": 249,
+      "covering_test_count": 257,
       "is_null": false
     },
     {
@@ -34855,6 +34901,7 @@
         "engine/tests/test_modules/smile_test.rs",
         "engine/tests/test_modules/start_true_dreams_test.rs",
         "engine/tests/test_modules/sumire_auto_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch32_test.rs",
         "engine/tests/test_modules/untested_abilities_test.rs",
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/you_debut_test.rs"
@@ -34863,12 +34910,16 @@
         "any_card_fails_hearts_all_fail",
         "both_players_have_live_cards",
         "both_players_live_score_compared",
+        "bp6_016_look_three_reorder_back_on_top",
+        "bp7_019_places_two_aqours_cards_under_deck",
         "cutie_panther_live_start_reduce_hearts",
         "daydream_mermaid_choice_appears_and_selects_energy",
         "daydream_mermaid_choice_selects_recover",
         "daydream_mermaid_no_niji_in_success_pick_one",
         "daydream_mermaid_q191_niji_in_success_pick_both",
         "honoka_cost_limit_wait_blocked_by_wait_immunity",
+        "hot_passion_accept_energy_opponent_draws",
+        "hot_passion_decline_no_opponent_draw",
         "kaguya_live_success_cheer_recover",
         "kaguya_live_success_recover",
         "kanan_live_success_timing",
@@ -34876,22 +34927,18 @@
         "love_u_q192_live_success_all_blade_score_up",
         "mijuku_dreamer_no_refresh_no_bonus",
         "mijuku_dreamer_refresh_via_mill_gets_bonus",
+        "natsumi_rain_draws_and_discards_with_hasunosora_on_stage",
+        "natsumi_rain_no_hasunosora_no_draw",
         "no_live_card_no_yell_no_success",
         "one_player_live_auto_higher_score",
         "q147_empty_need_heart_live_succeeds",
+        "sd2_007_extra_draw_when_opponent_also_succeeded",
+        "sd2_007_single_draw_without_opponent_success",
         "shared_pool_depletion_all_fail",
         "smile_q224_live_success_score_plus_1",
-        "start_true_dreams_q66_opponent_no_card_score_higher",
-        "sumire_q112_cheer_with_blade_heart_no_gain",
-        "sumire_q112_positive_no_blade_heart_triggers_heart06",
-        "sumire_q113_no_cheer_no_trigger",
-        "test_change_state_choice_bug",
-        "test_dia_gain_resource_choice",
-        "test_dia_gain_resource_no_targets",
-        "test_hand_size_cost_reduction_kotori",
-        "test_honoka_change_state_with_valid_targets"
+        "start_true_dreams_q66_opponent_no_card_score_higher"
       ],
-      "covering_test_count": 57,
+      "covering_test_count": 65,
       "is_null": false
     },
     {
@@ -35813,14 +35860,25 @@
         "PL!-bp6-016-N"
       ],
       "base": "PL!-bp6-016",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch32_test.rs"
+      ],
+      "covering_tests": [
+        "bp6_016_look_three_reorder_back_on_top",
+        "bp7_019_places_two_aqours_cards_under_deck",
+        "hot_passion_accept_energy_opponent_draws",
+        "hot_passion_decline_no_opponent_draw",
+        "natsumi_rain_draws_and_discards_with_hasunosora_on_stage",
+        "natsumi_rain_no_hasunosora_no_draw",
+        "sd2_007_extra_draw_when_opponent_also_succeeded",
+        "sd2_007_single_draw_without_opponent_success"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -39055,14 +39113,25 @@
         "PL!S-bp7-019-L"
       ],
       "base": "PL!S-bp7-019",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch32_test.rs"
+      ],
+      "covering_tests": [
+        "bp6_016_look_three_reorder_back_on_top",
+        "bp7_019_places_two_aqours_cards_under_deck",
+        "hot_passion_accept_energy_opponent_draws",
+        "hot_passion_decline_no_opponent_draw",
+        "natsumi_rain_draws_and_discards_with_hasunosora_on_stage",
+        "natsumi_rain_no_hasunosora_no_draw",
+        "sd2_007_extra_draw_when_opponent_also_succeeded",
+        "sd2_007_single_draw_without_opponent_success"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {

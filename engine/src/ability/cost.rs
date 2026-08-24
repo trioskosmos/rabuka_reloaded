@@ -1089,12 +1089,21 @@ let source = cost.source_str().unwrap_or("");
         }
         let has_pending = gs.ability_queue.has_pending_actions();
         let has_cost = gs.entry_cost().is_some();
+        // Sources whose optional gate re-enters the resolver with the effect
+        // still pending: on "pay" we mark decided (conditional_choice) so the
+        // second pass executes instead of re-asking. Deck-top/deck-bottom
+        // moves and sequential steps with an energy-deck first move qualify;
+        // dedicated handlers like PlaceEnergyUnderMember manage their own
+        // optionality and must NOT be marked (double-executes otherwise).
+        let source_matches = |s: Option<crate::ability::enums::Zone>| {
+            s == Some(Zone::DeckTop)
+                || s == Some(Zone::Deck)
+                || s == Some(Zone::DeckBottom)
+        };
         let is_deck_top = gs
             .entry_effect()
             .and_then(|e| e.source)
-            .is_some_and(|s| {
-                s == Zone::DeckTop || s == Zone::Deck || s == Zone::DeckBottom
-            })
+            .is_some_and(|s| source_matches(Some(s)))
             || gs
                 .ability_queue
                 .current_entry()
@@ -1107,10 +1116,25 @@ let source = cost.source_str().unwrap_or("");
                     })
                 })
                 .unwrap_or(false);
+        // Sequential whose FIRST pending action draws from the energy deck
+        // (resolve_from_energy_deck's optional gate).
+        let is_energy_deck_step = gs
+            .entry_effect()
+            .map(|e| e.action == ActionType::Sequential)
+            .unwrap_or(false)
+            && gs
+                .ability_queue
+                .current_entry()
+                .map(|e| {
+                    e.pending_actions
+                        .iter()
+                        .any(|a| a.source == Some(Zone::EnergyDeck))
+                })
+                .unwrap_or(false);
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.cost_paid = true;
             entry.optional_cost_result = Some(true);
-            if !has_cost && is_deck_top {
+            if !has_cost && (is_deck_top || is_energy_deck_step) {
                 entry.effect_started = false;
                 entry.conditional_choice =
                     Some(ConditionalChoice::Str("pay_optional_cost".to_string()));

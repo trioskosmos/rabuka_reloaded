@@ -83,6 +83,7 @@ pub mod bytecode_validation_test;
 pub mod decode_audit_behavior_pins_test;
 pub mod untested_abilities_batch30_test;
 pub mod untested_abilities_batch31_test;
+pub mod untested_abilities_batch32_test;
 pub mod describe_parity_test;
 pub mod cannot_baton_touch_test;
 pub mod card_ability_tests;
