@@ -1,24 +1,24 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T17:19:44.906998+00:00",
+  "generated_at": "2026-08-24T18:53:25.787084+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 459,
-  "n_tests": 2753,
+  "n_files": 460,
+  "n_tests": 2761,
   "total_cards": 771,
-  "covered_cards": 673,
-  "abilities_on_covered": 837,
+  "covered_cards": 675,
+  "abilities_on_covered": 839,
   "trigger_counts": {
     "起動": [
       85,
       96
     ],
     "登場": [
-      240,
+      242,
       269
     ],
     "ライブ開始時": [
@@ -48,7 +48,7 @@
       146
     ],
     "look_and_select": [
-      53,
+      54,
       71
     ],
     "gain_resource": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      189,
+      190,
       219
     ],
     "unknown": [
@@ -186,7 +186,7 @@
       34
     ],
     "appearance_condition": [
-      10,
+      12,
       13
     ],
     "comparison_condition": [
@@ -284,7 +284,7 @@
       134
     ],
     "bp6": [
-      71,
+      73,
       82
     ],
     "bp7": [
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 609,
+    "L2+choice": 611,
     "L1+choice": 155,
     "L2": 25,
-    "none": 99,
+    "none": 97,
     "L1": 48
   },
   "qa_rulings": {
@@ -10111,6 +10111,7 @@
         "engine/tests/test_modules/untested_abilities_batch30_test.rs",
         "engine/tests/test_modules/untested_abilities_batch31_test.rs",
         "engine/tests/test_modules/untested_abilities_batch32_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch33_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs"
       ],
       "covering_tests": [
@@ -10137,15 +10138,15 @@
         "bp4_021_accept_puts_waitroom_card_on_deck_top",
         "bp4_021_skip_leaves_waitroom_intact",
         "bp5_015_debut_mills_exactly_ten",
+        "bp6_011n_deck_with_one_card_still_discards",
+        "bp6_011n_empty_deck_and_empty_hand_is_a_clean_noop",
+        "bp6_011n_hand_debut_no_draw",
+        "bp6_011n_waitroom_debut_draws_two_discards_one",
         "bp6_016_look_three_reorder_back_on_top",
-        "bp6_021_accept_cost_scores_and_retrieves",
-        "bp6_021_skip_cost_no_score_no_retrieval",
-        "bp6_023_draws_extra_with_mus_live_in_success_zone",
-        "bp6_023_non_mus_live_in_success_zone_single_draw",
-        "bp6_023_single_draw_without_success_zone_card",
-        "bp7_019_places_two_aqours_cards_under_deck"
+        "bp6_016n_deck_shorter_than_three_looks_whats_there",
+        "bp6_016n_hand_debut_no_look"
       ],
-      "covering_test_count": 187,
+      "covering_test_count": 195,
       "is_null": true
     },
     {
@@ -34782,6 +34783,7 @@
         "engine/tests/test_modules/tokimeki_test.rs",
         "engine/tests/test_modules/untested_abilities_batch14_test.rs",
         "engine/tests/test_modules/untested_abilities_batch32_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch33_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
@@ -34795,7 +34797,15 @@
         "aquarium_yell_from_bottom_short_deck",
         "aquarium_yell_from_bottom_two_yells",
         "baton_touch_cleared_between_actions",
+        "bp6_011n_deck_with_one_card_still_discards",
+        "bp6_011n_empty_deck_and_empty_hand_is_a_clean_noop",
+        "bp6_011n_hand_debut_no_draw",
+        "bp6_011n_waitroom_debut_draws_two_discards_one",
         "bp6_016_look_three_reorder_back_on_top",
+        "bp6_016n_deck_shorter_than_three_looks_whats_there",
+        "bp6_016n_hand_debut_no_look",
+        "bp6_016n_no_appearance_record_no_look",
+        "bp6_016n_waitroom_debut_looks_three_takes_one",
         "bp7014_constant_heart_lost_when_tied",
         "bp7014_constant_heart_while_opp_energy_ahead",
         "bp7020_constant_blades_off_when_behind",
@@ -34809,17 +34819,9 @@
         "c12_restriction_p2_owned_blocks_p1_active",
         "c13_all_three_hearts_present_select_one",
         "c13_bp2_005_or_semantics_still_works",
-        "c13_no_matching_card_optional_same_as_reject",
-        "c13_one_of_three_hearts_rejected",
-        "c13_qualifying_goes_to_hand_nonqualifying_discarded",
-        "c13_two_of_three_hearts_rejected",
-        "c6_niji_cost_ge20_draw3_put3",
-        "c6_niji_cost_lt20_noop",
-        "c7_waitroom_to_deck_bottom",
-        "c8_both_shuffle_under_deck",
-        "c8_q242_19_below_threshold"
+        "c13_no_matching_card_optional_same_as_reject"
       ],
-      "covering_test_count": 257,
+      "covering_test_count": 265,
       "is_null": false
     },
     {
@@ -36181,14 +36183,25 @@
         "PL!S-bp6-011-N"
       ],
       "base": "PL!S-bp6-011",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch33_test.rs"
+      ],
+      "covering_tests": [
+        "bp6_011n_deck_with_one_card_still_discards",
+        "bp6_011n_empty_deck_and_empty_hand_is_a_clean_noop",
+        "bp6_011n_hand_debut_no_draw",
+        "bp6_011n_waitroom_debut_draws_two_discards_one",
+        "bp6_016n_deck_shorter_than_three_looks_whats_there",
+        "bp6_016n_hand_debut_no_look",
+        "bp6_016n_no_appearance_record_no_look",
+        "bp6_016n_waitroom_debut_looks_three_takes_one"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -36243,14 +36256,25 @@
         "PL!S-bp6-016-N"
       ],
       "base": "PL!S-bp6-016",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch33_test.rs"
+      ],
+      "covering_tests": [
+        "bp6_011n_deck_with_one_card_still_discards",
+        "bp6_011n_empty_deck_and_empty_hand_is_a_clean_noop",
+        "bp6_011n_hand_debut_no_draw",
+        "bp6_011n_waitroom_debut_draws_two_discards_one",
+        "bp6_016n_deck_shorter_than_three_looks_whats_there",
+        "bp6_016n_hand_debut_no_look",
+        "bp6_016n_no_appearance_record_no_look",
+        "bp6_016n_waitroom_debut_looks_three_takes_one"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
