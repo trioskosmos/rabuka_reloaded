@@ -36,6 +36,7 @@
 | 08-24 | c7823995 | Test-gap burn-down: batch 18 establishes the `revealed_cards` setup pattern (エール公開 conditions) — Wish Song distinct-Liella-5 score gate pos+neg, bp4-006-R retrieve-from-revealed. depth=none →135, suite **2631/0** |
 | 08-24 | ce720802 | Test-gap burn-down: batch 19 covers draw-then-discard sequentials (bp1-009-R activation w/ energy cost, pb1-024-L live-success draw2/discard2 incl. keep-selection case). depth=none →133, suite **2634/0** |
 | 08-24 | 9df367fb | Test-gap burn-down: batch 20 covers 3 look_and_select debuts (bp3-012-R look4/reveal 虹ヶ咲, pb1-028-N look2/add1, bp1-011-PR look5/live-card reveal) via the full play pipeline — energy paid + optional cost + look choice answered. depth=none →130, suite **2637/0** |
+| 08-24 | 9e633e59 | Test-gap burn-down: batch 21 covers the pb2 debut-retrieval trio (CatChu!/5yncri5e!/KALEIDOSCORE waitroom retrieval behind optional discard cost). depth=none →127, suite **2640/0** |
 | — | — | R8 condition-cache keys assessed & deferred: `format!("{:?}")` is a complete content-addressing scheme over the struct; changing it risks subtle cache-hit changes for no correctness gain |
 
 Verification loop used per step: regen abilities.json → byte-diff vs pre-step copy
