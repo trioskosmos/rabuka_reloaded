@@ -1763,26 +1763,40 @@ pub fn card_at_position(player: &crate::player::Player, pos: &str) -> Option<i16
     }
 }
 
-/// Deduplicate by card name when `filter.distinct` is set.
-/// Returns indices into `cards`, deduplicated by card name.
-pub fn filter_distinct(
-    cards: &[i16],
+/// Deduplicate `items` by each card's normalized name, keeping first
+/// occurrences. Cards missing from the database are kept. Single shared
+/// implementation of the distinct-by-card-name pattern previously copied at
+/// filter_distinct / apply_distinct_filter / the move_cards take path.
+pub fn dedupe_by_normalized_name<T: Copy>(
+    items: &[T],
+    card_id: impl Fn(&T) -> i16,
     db: &CardDatabase,
-    filter: &CardFilter,
-    skip_empty: bool,
-) -> Vec<usize> {
-    let ids: Vec<usize> = matching_indices(cards, db, filter, skip_empty);
-    if !distinct_should_dedupe(filter.distinct) {
-        return ids;
-    }
-    let mut seen: HashSet<String> = HashSet::default();
-    ids.into_iter()
-        .filter(|&i| {
-            db.get_card(cards[i])
+) -> Vec<T> {
+    let mut seen = HashSet::<String>::default();
+    items
+        .iter()
+        .filter(|item| {
+            db.get_card(card_id(item))
                 .map(|c| seen.insert(CardDatabase::normalize_name(&c.name)))
                 .unwrap_or(true)
         })
+        .copied()
         .collect()
+}
+
+/// Deduplicate by card name when `filter.distinct` is set.
+/// Returns indices into `cards`, deduplicated by card name.
+pub fn filter_distinct(
+cards: &[i16],
+db: &CardDatabase,
+filter: &CardFilter,
+skip_empty: bool,
+) -> Vec<usize> {
+let ids: Vec<usize> = matching_indices(cards, db, filter, skip_empty);
+if !distinct_should_dedupe(filter.distinct) {
+return ids;
+}
+dedupe_by_normalized_name(&ids, |&i| cards[i], db)
 }
 
 // ============== ZONE HELPERS ==============
@@ -2306,7 +2320,7 @@ pub fn resolve_per_unit_count(
 // ============== DISTINCT FILTERING ==============
 
 #[inline]
-fn distinct_should_dedupe(distinct: Option<DistinctType>) -> bool {
+pub(crate) fn distinct_should_dedupe(distinct: Option<DistinctType>) -> bool {
     matches!(
         distinct,
         Some(DistinctType::CardName) | Some(DistinctType::True) | Some(DistinctType::Distinct)
@@ -2321,17 +2335,7 @@ pub fn apply_distinct_filter(
     if !distinct_should_dedupe(distinct) {
         return cards.to_vec();
     }
-    let mut seen = HashSet::<String>::default();
-    cards
-        .iter()
-        .filter(|&&id| {
-            card_db
-                .get_card(id)
-                .map(|c| seen.insert(CardDatabase::normalize_name(&c.name)))
-                .unwrap_or(true)
-        })
-        .copied()
-        .collect()
+    dedupe_by_normalized_name(cards, |&id| id, card_db)
 }
 
 /// Count of distinct names among member cards for a "名前の異なるメンバーカード1枚につき"

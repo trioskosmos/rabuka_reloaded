@@ -89,6 +89,19 @@ struct MoveSourceContext<'a> {
     card_db: &'a crate::card::CardDatabase,
 }
 
+impl<'a> MoveSourceContext<'a> {
+    /// The player whose zones this move operates on. Replaces the
+    /// `let player = if c.use_p2 {...}` pick previously copy-pasted at every
+    /// resolve_from_* function.
+    fn player_mut<'gs>(&self, gs: &'gs mut GameState) -> &'gs mut Player {
+        if self.use_p2 {
+            &mut gs.player2
+        } else {
+            &mut gs.player1
+        }
+    }
+}
+
 fn remove_card_from_any_zone(
     player: &mut crate::player::Player,
     last_vacated_stage_area: &mut Option<u8>,
@@ -1083,11 +1096,7 @@ impl AbilityResolver {
         ) {
             return Ok(vec![]);
         }
-        let player = if c.use_p2 {
-            &mut gs.player2
-        } else {
-            &mut gs.player1
-        };
+        let player = c.player_mut(gs);
         let count = c.count;
         let card_db = c.card_db;
         let mut drawn = Vec::new();
@@ -1141,11 +1150,7 @@ impl AbilityResolver {
         ) {
             return Ok(vec![]);
         }
-        let player = if c.use_p2 {
-            &mut gs.player2
-        } else {
-            &mut gs.player1
-        };
+        let player = c.player_mut(gs);
         let count = c.count;
         let mut drawn = Vec::new();
         for _i in 0..count {
@@ -1178,11 +1183,7 @@ impl AbilityResolver {
         {
             return Ok(vec![]);
         }
-        let player = if c.use_p2 {
-            &mut gs.player2
-        } else {
-            &mut gs.player1
-        };
+        let player = c.player_mut(gs);
         let count = c.count;
         let mut drawn = Vec::new();
         for _i in 0..count {
@@ -1200,6 +1201,8 @@ impl AbilityResolver {
         gs: &mut GameState,
         c: &MoveSourceContext,
     ) -> Result<Vec<i16>, String> {
+        // Inline pick: this fn interleaves gs.last_vacated_stage_area writes
+        // with player use, so a whole-gs borrow via player_mut conflicts.
         let player = if c.use_p2 {
             &mut gs.player2
         } else {
@@ -1317,11 +1320,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         c: &MoveSourceContext,
     ) -> Result<Vec<i16>, String> {
-        let player = if c.use_p2 {
-            &mut gs.player2
-        } else {
-            &mut gs.player1
-        };
+        let player = c.player_mut(gs);
         let card_db = c.card_db;
         let effect = c.effect;
         let src_zone = Zone::from_str(c.effective_source);
@@ -1600,6 +1599,8 @@ impl AbilityResolver {
         gs: &mut GameState,
         c: &MoveSourceContext,
     ) -> Result<Vec<i16>, String> {
+        // Inline pick: writes gs.last_vacated_stage_area below conflict with
+        // a whole-gs borrow.
         let player = if c.use_p2 {
             &mut gs.player2
         } else {
@@ -1656,6 +1657,8 @@ impl AbilityResolver {
         c: &MoveSourceContext,
     ) -> Result<Vec<i16>, String> {
         let count = c.count;
+        // Inline pick: interleaves cheer_buf / revealed_cards / resolution_zone
+        // access with player use, so a whole-gs borrow conflicts.
         let player = if c.use_p2 {
             &mut gs.player2
         } else {
@@ -2066,23 +2069,15 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
             return Ok(());
         }
 
-        // Apply distinct card name filter if specified
-        let distinct = effect.distinct_any();
-        if distinct == Some(DistinctType::CardName)
-            || distinct == Some(DistinctType::True)
-            || distinct == Some(DistinctType::Distinct)
-        {
-            let mut seen: HashSet<String> = HashSet::default();
-            taken.retain(|&id| {
-                card_db
-                    .get_card(id)
-                    .map(|c| seen.insert(CardDatabase::normalize_name(&c.name)))
-                    .unwrap_or(true)
-            });
-            if taken.len() < count {
-                taken.clear(); // Not enough distinct cards — skip
-            }
-        }
+// Apply distinct card name filter if specified
+let distinct = effect.distinct_any();
+if util::distinct_should_dedupe(distinct) {
+    let deduped = util::dedupe_by_normalized_name(&taken, |&id| id, &card_db);
+    taken = deduped;
+    if taken.len() < count {
+        taken.clear(); // Not enough distinct cards ? skip
+    }
+}
 
         // --- STEP 3: Place cards in destination ---
         let deck_pos = effect
