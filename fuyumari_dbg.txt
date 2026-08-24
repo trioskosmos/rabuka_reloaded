@@ -1,0 +1,253 @@
+﻿cargo : warning: rabuka_engine@0.1.0: bytecode size: 28530 bytes (compressed, from C:\Users\trios\OneDrive\Documents\ra
+buka_reloaded\engine\../cards/build/abilities.bin.z)
+発生場所 行:1 文字:24
++ ... OG="debug"; cargo test --test run_all fuyumari_test::fuyumari_ -- --n ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: rabuka...bilities.bin.z):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+warning: associated function `new` is never used
+   --> src\ability\vm.rs:297:8
+    |
+296 | impl<'a> BcReader<'a> {
+    | --------------------- associated function in this implementation
+297 |     fn new(data: &'a [u8]) -> Self {
+    |        ^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rabuka_engine` (lib) generated 1 warning
+   Compiling rabuka_engine v0.1.0 (C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine)
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\test_modules\untested_abilities_batch28_test.rs:6:5
+  |
+6 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> tests\test_modules\prohibition_layer_characterization_test.rs:83:9
+   |
+83 |     let mut game = TestGame::new(db);
+   |         ----^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> tests\test_modules\prohibition_layer_characterization_test.rs:101:9
+    |
+101 |     let mut game = TestGame::new(db);
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: `rabuka_engine` (test "run_all") generated 3 warnings (run `cargo fix --test "run_all" -p rabuka_engine` to ap
+ply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.68s
+     Running tests\run_all.rs (C:/rust_targets\debug\build\rabuka_engine/6e1ae4530d532eee\out\run_all-6e1ae4530d532eee.
+exe)
+
+running 5 tests
+[timing] db load: 930ms
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::phases] [TRACK_MOVE] card_id=26627 player_id=p1
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [DEBUT_TRIG_DBG] stage card_id=26627 card_no=PL!SP-pb1-011-R
+ card_no_clone=PL!SP-pb1-011-R
+test test_modules::fuyumari_test::fuyumari_edge_exclude_self_from_cost ... ok
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [DEBUT_TRIG_DBG]   ability={{toujyou.png|逋ｻ蝣ｴ}}縲碁ｬｼ蝪壼・豈ｬ縲堺ｻ･
+螟悶・縲鮫iella!縲上・繝｡繝ｳ繝舌・1莠ｺ繧偵せ繝・・繧ｸ縺九ｉ謗ｧ縺亥ｮ､縺ｫ鄂ｮ縺・※繧ゅｈ縺・ｼ夊・蛻・・謗ｧ縺亥ｮ､縺九ｉ縲√％繧後↓繧医ｊ謗ｧ縺亥ｮ､縺ｫ鄂ｮ縺・◆繝｡繝ｳ繝舌・繧ｫ繝ｼ繝峨ｒ1譫壹√◎縺ｮ繝｡繝ｳ繝舌・
+縺後＞縺溘お繝ｪ繧｢縺ｫ逋ｻ蝣ｴ縺輔○繧九・triggers=Some(ArcStr("逋ｻ蝣ｴ")) match=true
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [AUTO_TRIGGER] checking stage for player p1
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [AUTO_TRIGGER] checking stage for player p2
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [BCR] SelectTarget target=pay_optional_cost:skip_optional_cos
+t card_id=Some(1) card_indices=None options=None
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] took resolver: moved_cards=[] selected=[]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::choice] [HST] target=pay_optional_cost:skip_optional_cost selected=
+pay_optional_cost choice_card_no=Some(OptionalCost) activating=Some(26627)
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::util] [GET_SEL] cards.len=3 filter.nh_color=None filter.nh_total=No
+ne
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [STAGE_EXACT] moved cards=[8730] vacated=Some(2) last_v
+acated=Some(2)
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [TRACE_PLACE] dest=discard card=8730 pos_to_use=None va
+cated_area=None stage_before=[-1, 26627, -1]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [TRACE_PLACE] stage_after=[-1, 26627, -1]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [FINALIZE_MOVE] dest=discard cards=[8730] -> self.moved
+_cards=[8730]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] after provide: pending_choice=false moved_cards=[8730] 
+selected=[]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] cost_was_paid=true, effect_started=false, had_pending_s
+equential=false
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC_BRANCH] cost_was_paid=true effect_started=false had_pend
+ing=false optional_skipped=false pending_cleared=false effect_ready=true
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] needs_reprocess=true: storing resolver and calling PCA
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::core::game_state::abilities] [PCA] Reusing existing resolver for effect exec
+ution
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::resolver] [KANAN_DEBUG] cost_was_skipped=false optional_cost_result
+=Some(true)
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::effects] [DEBUG_EXEC] execute_effect: action=move_cards effect_ptr=
+0x2534a5bf720
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::effects] DEBUG: execute_effect - action: move_cards, source: discar
+d, destination: same_area
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [NEED_HEART] filter: color=None total=None op=None src=
+"discard" card_type=Some("member_card")
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [TAKE] zone=discard excl_chars=None chars=None group=No
+ne cards=[8730]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::util] [GET_SEL] cards.len=1 filter.nh_color=None filter.nh_total=No
+ne
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [TRACE_PLACE] dest=same_area card=8730 pos_to_use=Some(
+2) vacated_area=Some(2) stage_before=[-1, 26627, -1]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::util] [TRACE_SAME_AREA] card=8730 vacated=Some(2) stage_before=[-1,
+ 26627, -1]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::util] [TRACE_SAME_AREA] stage_after=[-1, 26627, 8730]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [TRACE_PLACE] stage_after=[-1, 26627, 8730]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [FINALIZE_MOVE] dest=same_area cards=[8730] -> self.mov
+ed_cards=[8730, 8730]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::resolver] [AFTER_EXEC] pending=false action=MoveCards
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::phases] [TRACK_MOVE] card_id=26627 player_id=p1
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [DEBUT_TRIG_DBG] stage card_id=28882 card_no=PL!-sd1-010-SD 
+card_no_clone=PL!SP-pb1-011-R
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [DEBUT_TRIG_DBG] stage card_id=26627 card_no=PL!SP-pb1-011-R
+ card_no_clone=PL!SP-pb1-011-R
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [DEBUT_TRIG_DBG]   ability={{toujyou.png|逋ｻ蝣ｴ}}縲碁ｬｼ蝪壼・豈ｬ縲堺ｻ･
+螟悶・縲鮫iella!縲上・繝｡繝ｳ繝舌・1莠ｺ繧偵せ繝・・繧ｸ縺九ｉ謗ｧ縺亥ｮ､縺ｫ鄂ｮ縺・※繧ゅｈ縺・ｼ夊・蛻・・謗ｧ縺亥ｮ､縺九ｉ縲√％繧後↓繧医ｊ謗ｧ縺亥ｮ､縺ｫ鄂ｮ縺・◆繝｡繝ｳ繝舌・繧ｫ繝ｼ繝峨ｒ1譫壹√◎縺ｮ繝｡繝ｳ繝舌・
+縺後＞縺溘お繝ｪ繧｢縺ｫ逋ｻ蝣ｴ縺輔○繧九・triggers=Some(ArcStr("逋ｻ蝣ｴ")) match=true
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [AUTO_TRIGGER] checking stage for player p1
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [AUTO_TRIGGER] checking stage for player p2
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::resolver] [KANAN_DEBUG] cost_was_skipped=true optional_cost_result=
+Some(false)
+test test_modules::fuyumari_test::fuyumari_edge_no_valid_cost_target ... ok
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::phases] [TRACK_MOVE] card_id=26627 player_id=p1
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [DEBUT_TRIG_DBG] stage card_id=8730 card_no=PL!SP-sd1-006-SD
+ card_no_clone=PL!SP-pb1-011-R
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [DEBUT_TRIG_DBG] stage card_id=26627 card_no=PL!SP-pb1-011-R
+ card_no_clone=PL!SP-pb1-011-R
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [DEBUT_TRIG_DBG]   ability={{toujyou.png|逋ｻ蝣ｴ}}縲碁ｬｼ蝪壼・豈ｬ縲堺ｻ･
+螟悶・縲鮫iella!縲上・繝｡繝ｳ繝舌・1莠ｺ繧偵せ繝・・繧ｸ縺九ｉ謗ｧ縺亥ｮ､縺ｫ鄂ｮ縺・※繧ゅｈ縺・ｼ夊・蛻・・謗ｧ縺亥ｮ､縺九ｉ縲√％繧後↓繧医ｊ謗ｧ縺亥ｮ､縺ｫ鄂ｮ縺・◆繝｡繝ｳ繝舌・繧ｫ繝ｼ繝峨ｒ1譫壹√◎縺ｮ繝｡繝ｳ繝舌・
+縺後＞縺溘お繝ｪ繧｢縺ｫ逋ｻ蝣ｴ縺輔○繧九・triggers=Some(ArcStr("逋ｻ蝣ｴ")) match=true
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [AUTO_TRIGGER] checking stage for player p1
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [AUTO_TRIGGER] checking stage for player p2
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [BCR] SelectTarget target=pay_optional_cost:skip_optional_cos
+t card_id=None card_indices=Some([0]) options=None
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] took resolver: moved_cards=[] selected=[]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::choice] [HST] target=pay_optional_cost:skip_optional_cost selected=
+skip_optional_cost choice_card_no=Some(OptionalCost) activating=Some(26627)
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::choice] [RPA_REPEAT] pending_repeat=0 pending_choice=false
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] after provide: pending_choice=false moved_cards=[] sele
+cted=[]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] cost_was_paid=true, effect_started=true, had_pending_se
+quential=false
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC_BRANCH] cost_was_paid=true effect_started=true had_pendi
+ng=false optional_skipped=true pending_cleared=false effect_ready=false
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] optional_skipped=true pending_cleared=false completing 
+ability
+test test_modules::fuyumari_test::fuyumari_q63_effect_debut_no_cost_payment ... ok
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::phases] [TRACK_MOVE] card_id=26627 player_id=p1
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [DEBUT_TRIG_DBG] stage card_id=8730 card_no=PL!SP-sd1-006-SD
+ card_no_clone=PL!SP-pb1-011-R
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [DEBUT_TRIG_DBG] stage card_id=26627 card_no=PL!SP-pb1-011-R
+ card_no_clone=PL!SP-pb1-011-R
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [DEBUT_TRIG_DBG]   ability={{toujyou.png|逋ｻ蝣ｴ}}縲碁ｬｼ蝪壼・豈ｬ縲堺ｻ･
+螟悶・縲鮫iella!縲上・繝｡繝ｳ繝舌・1莠ｺ繧偵せ繝・・繧ｸ縺九ｉ謗ｧ縺亥ｮ､縺ｫ鄂ｮ縺・※繧ゅｈ縺・ｼ夊・蛻・・謗ｧ縺亥ｮ､縺九ｉ縲√％繧後↓繧医ｊ謗ｧ縺亥ｮ､縺ｫ鄂ｮ縺・◆繝｡繝ｳ繝舌・繧ｫ繝ｼ繝峨ｒ1譫壹√◎縺ｮ繝｡繝ｳ繝舌・
+縺後＞縺溘お繝ｪ繧｢縺ｫ逋ｻ蝣ｴ縺輔○繧九・triggers=Some(ArcStr("逋ｻ蝣ｴ")) match=true
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [AUTO_TRIGGER] checking stage for player p1
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [AUTO_TRIGGER] checking stage for player p2
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [BCR] SelectTarget target=pay_optional_cost:skip_optional_cos
+t card_id=None card_indices=Some([]) options=None
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] took resolver: moved_cards=[] selected=[]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::choice] [HST] target=pay_optional_cost:skip_optional_cost selected=
+skip_optional_cost choice_card_no=Some(OptionalCost) activating=Some(26627)
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::choice] [RPA_REPEAT] pending_repeat=0 pending_choice=false
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] after provide: pending_choice=false moved_cards=[] sele
+cted=[]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] cost_was_paid=true, effect_started=true, had_pending_se
+quential=false
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC_BRANCH] cost_was_paid=true effect_started=true had_pendi
+ng=false optional_skipped=true pending_cleared=false effect_ready=false
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] optional_skipped=true pending_cleared=false completing 
+ability
+test test_modules::fuyumari_test::fuyumari_q63_optional_cost_skipped ... ok
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::phases] [TRACK_MOVE] card_id=26627 player_id=p1
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [DEBUT_TRIG_DBG] stage card_id=8730 card_no=PL!SP-sd1-006-SD
+ card_no_clone=PL!SP-pb1-011-R
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [DEBUT_TRIG_DBG] stage card_id=26627 card_no=PL!SP-pb1-011-R
+ card_no_clone=PL!SP-pb1-011-R
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [DEBUT_TRIG_DBG]   ability={{toujyou.png|逋ｻ蝣ｴ}}縲碁ｬｼ蝪壼・豈ｬ縲堺ｻ･
+螟悶・縲鮫iella!縲上・繝｡繝ｳ繝舌・1莠ｺ繧偵せ繝・・繧ｸ縺九ｉ謗ｧ縺亥ｮ､縺ｫ鄂ｮ縺・※繧ゅｈ縺・ｼ夊・蛻・・謗ｧ縺亥ｮ､縺九ｉ縲√％繧後↓繧医ｊ謗ｧ縺亥ｮ､縺ｫ鄂ｮ縺・◆繝｡繝ｳ繝舌・繧ｫ繝ｼ繝峨ｒ1譫壹√◎縺ｮ繝｡繝ｳ繝舌・
+縺後＞縺溘お繝ｪ繧｢縺ｫ逋ｻ蝣ｴ縺輔○繧九・triggers=Some(ArcStr("逋ｻ蝣ｴ")) match=true
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [AUTO_TRIGGER] checking stage for player p1
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::triggers] [AUTO_TRIGGER] checking stage for player p2
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [BCR] SelectTarget target=pay_optional_cost:skip_optional_cos
+t card_id=Some(1) card_indices=None options=None
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] took resolver: moved_cards=[] selected=[]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::choice] [HST] target=pay_optional_cost:skip_optional_cost selected=
+pay_optional_cost choice_card_no=Some(OptionalCost) activating=Some(26627)
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::util] [GET_SEL] cards.len=3 filter.nh_color=None filter.nh_total=No
+ne
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [STAGE_EXACT] moved cards=[8730] vacated=Some(0) last_v
+acated=Some(0)
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [TRACE_PLACE] dest=discard card=8730 pos_to_use=None va
+cated_area=None stage_before=[-1, 26627, -1]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [TRACE_PLACE] stage_after=[-1, 26627, -1]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [FINALIZE_MOVE] dest=discard cards=[8730] -> self.moved
+_cards=[8730]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] after provide: pending_choice=false moved_cards=[8730] 
+selected=[]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] cost_was_paid=true, effect_started=false, had_pending_s
+equential=false
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC_BRANCH] cost_was_paid=true effect_started=false had_pend
+ing=false optional_skipped=false pending_cleared=false effect_ready=true
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] needs_reprocess=true: storing resolver and calling PCA
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::core::game_state::abilities] [PCA] Reusing existing resolver for effect exec
+ution
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::resolver] [KANAN_DEBUG] cost_was_skipped=false optional_cost_result
+=Some(true)
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::effects] [DEBUG_EXEC] execute_effect: action=move_cards effect_ptr=
+0x2534a5bf720
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::effects] DEBUG: execute_effect - action: move_cards, source: discar
+d, destination: same_area
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [NEED_HEART] filter: color=None total=None op=None src=
+"discard" card_type=Some("member_card")
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [TAKE] zone=discard excl_chars=None chars=None group=No
+ne cards=[28739, 8730, 8730]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::util] [GET_SEL] cards.len=3 filter.nh_color=None filter.nh_total=No
+ne
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [PROMPT_SEL@191] zone=discard count=1 can_skip=false pr
+op=None neg=false filtered=Some([0, 1, 2]) excl_chars=None
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [FINALIZE_MOVE] dest=same_area cards=[] -> self.moved_c
+ards=[8730]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::resolver] [AFTER_EXEC] pending=true action=MoveCards
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] took resolver: moved_cards=[8730] selected=[]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::choice] [KANAN_DEBUG] check hand-cost block: zone=discard is_hand=f
+alse has_cost=true effect_started=true
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [EXEC_SEL] zone=discard indices=[0] dest=Some("same_are
+a") target=self
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [EXEC_SEL_FILTER] zone=discard cards.len=3 indices=[0]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [EXEC_SEL_PASS] idx=0 cid=28739 pass=true
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [EXEC_SEL_FILTER_RESULT] filtered_indices=[0]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [TRACE_PLACE] dest=same_area card=28739 pos_to_use=None
+ vacated_area=None stage_before=[-1, 26627, -1]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::util] [TRACE_SAME_AREA] card=28739 vacated=None stage_before=[-1, 2
+6627, -1]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::util] [TRACE_SAME_AREA] stage_after=[28739, 26627, -1]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [TRACE_PLACE] stage_after=[28739, 26627, -1]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::move_cards] [DEBUT_CHAIN] enqueueing debut of PL!SP-sd1-008-SD (id=
+28739, controller=p1): PL!SP-sd1-008-SD_{{toujyou.png|逋ｻ蝣ｴ}}{{icon_energy.png|E}}謾ｯ謇輔▲縺ｦ繧ゅｈ縺・ｼ夊・蛻・・繝・ャ繧ｭ縺ｮ荳翫°繧峨き繝ｼ繝峨ｒ3譫
+夊ｦ九ｋ縲ゅ◎縺ｮ荳ｭ縺九ｉ1譫壹ｒ謇区惆縺ｫ蜉縺医∵ｮ九ｊ繧呈而縺亥ｮ､縺ｫ鄂ｮ縺上・[FIN_DBG] looked=false sub_choice=false has_pending=false was_select_car
+d=false cont=Immediate
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::choice] [RPA_REPEAT] pending_repeat=0 pending_choice=false
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::choice] [FINALIZE_CHOICE] pending=false selected=[28739] context=Si
+ngleEffect { effect_index: 0 }
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] after provide: pending_choice=false moved_cards=[8730, 
+28739] selected=[28739]
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC] cost_was_paid=true, effect_started=true, had_pending_se
+quential=false
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::turn::actions] [RWC_BRANCH] cost_was_paid=true effect_started=true had_pendi
+ng=false optional_skipped=false pending_cleared=false effect_ready=false
+[2026-08-24T16:40:32Z DEBUG rabuka_engine::ability::resolver] [KANAN_DEBUG] cost_was_skipped=true optional_cost_result=
+Some(false)
+test test_modules::fuyumari_test::fuyumari_q95_player_chooses_card_from_discard ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 2706 filtered out; finished in 1.03s
+

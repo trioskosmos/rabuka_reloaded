@@ -185,6 +185,61 @@ let source = cost.source_str().unwrap_or("");
         let same_unit = cost.same_unit_name_any().unwrap_or(false);
         let is_from_hand = Zone::from_str(source) == Some(Zone::Hand) && !same_unit;
         let is_all = cost.all_any().unwrap_or(false);
+
+        // 「〜してもよい」 stage-move costs (e.g. 『μ's』のメンバー1人をステージから
+        // 控え室に置いてもよい：…): ask pay/skip FIRST, mirroring the optional
+        // energy gate. Without this the player was forced to sacrifice a member
+        // even though the cost is optional. On "pay", handle_optional_cost_payment
+        // re-enters here with optional stripped.
+        if optional
+            && !is_activation
+            && !is_from_hand
+            && Zone::from_str(source) == Some(Zone::Stage)
+        {
+            let target = cost.target.as_deref().unwrap_or("self");
+            let card_db = &gs.card_database;
+            let player = gs.resolve_target_player(target);
+            let filter = cost.filter_subset();
+            let matching = player
+                .stage
+                .stage
+                .iter()
+                .filter(|&&id| id != -1 && filter.matches(card_db, id, true))
+                .count();
+            if matching < count {
+                // Nothing eligible to sacrifice — treat as declined.
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.cost_paid = true;
+                    entry.optional_cost_result = Some(false);
+                    entry.pending_actions.clear();
+                }
+                return Ok(());
+            }
+            self.pending_choice = Some(
+                Choice::SelectTarget {
+                    target: "pay_optional_cost:skip_optional_cost".to_string(),
+                    description: format!(
+                        "Put {} member(s) from stage to the waitroom (or skip)?",
+                        count
+                    ),
+                    description_en: Some(format!(
+                        "Put {} member(s) from stage to the waitroom (or skip)?",
+                        count
+                    )),
+                    description_ja: Some(format!(
+                        "ステージのメンバー{}人を控え室に置く（支払う/スキップ）？",
+                        count
+                    )),
+                    allow_skip: true,
+                    options: None,
+                },
+            );
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
+            }
+            return Ok(());
+        }
+
         if is_from_hand && is_all {
             // "手札をすべて控え室に置く" — discard the ENTIRE hand as an optional
             // cost. Only offer the yes/no (discard all or skip) choice when there
@@ -1154,6 +1209,21 @@ let source = cost.source_str().unwrap_or("");
                         return Ok(());
                     }
                 }
+            }
+            // Optional stage-move costs (「メンバーを控え室に置いてもよい：…」):
+            // the player accepted — actually execute the move now, with
+            // optionality stripped so it doesn't loop back to the gate.
+            if cost.action == ActionType::MoveCards
+                && Zone::from_str(cost.source_str().unwrap_or("")) == Some(Zone::Stage)
+            {
+                let mut c = cost.clone();
+                c.set_optional(Some(false));
+                self.pay_cost_move_cards(gs, &c)?;
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.cost_paid = true;
+                    entry.optional_cost_result = Some(true);
+                }
+                return Ok(());
             }
             // Handle sequential_cost sub-costs — pay each after user confirmed
             if let Some(ref costs) = cost.compound.actions {

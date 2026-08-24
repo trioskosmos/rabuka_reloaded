@@ -1,24 +1,24 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T15:12:39.234431+00:00",
+  "generated_at": "2026-08-24T16:42:19.559364+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 457,
-  "n_tests": 2734,
+  "n_files": 458,
+  "n_tests": 2745,
   "total_cards": 771,
-  "covered_cards": 663,
-  "abilities_on_covered": 827,
+  "covered_cards": 668,
+  "abilities_on_covered": 832,
   "trigger_counts": {
     "起動": [
       85,
       96
     ],
     "登場": [
-      238,
+      240,
       269
     ],
     "ライブ開始時": [
@@ -30,7 +30,7 @@
       2
     ],
     "ライブ成功時": [
-      103,
+      106,
       122
     ],
     "常時": [
@@ -44,7 +44,7 @@
   },
   "action_counts": {
     "move_cards": [
-      125,
+      129,
       146
     ],
     "look_and_select": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      184,
+      185,
       219
     ],
     "unknown": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      474,
+      479,
       545
     ],
     "temporal_condition": [
@@ -276,15 +276,15 @@
       68
     ],
     "bp4": [
-      78,
+      79,
       88
     ],
     "bp5": [
-      116,
+      117,
       134
     ],
     "bp6": [
-      68,
+      70,
       82
     ],
     "bp7": [
@@ -304,15 +304,15 @@
       43
     ],
     "cl1": [
-      3,
+      4,
       10
     ]
   },
   "depth_counts": {
-    "L2+choice": 604,
+    "L2+choice": 609,
     "L1+choice": 150,
     "L2": 25,
-    "none": 109,
+    "none": 104,
     "L1": 48
   },
   "qa_rulings": {
@@ -648,6 +648,7 @@
         "engine/tests/test_modules/qa_new_tests202.rs",
         "engine/tests/test_modules/ren_test.rs",
         "engine/tests/test_modules/sumire_bp2_center_cost_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs",
         "engine/tests/test_modules/untested_abilities_test.rs",
         "engine/tests/test_modules/upper_batch_on_yell_test.rs",
         "engine/tests/test_modules/yoshiko_center_ability_test.rs",
@@ -668,6 +669,11 @@
         "bella_q174_no_member_on_stage_ability_does_not_fire",
         "bp3_031_fires_from_real_live_victory_flow",
         "bp3_031_per_waited_member_score_plus1",
+        "bp4_021_accept_puts_waitroom_card_on_deck_top",
+        "bp4_021_skip_leaves_waitroom_intact",
+        "bp5_015_debut_mills_exactly_ten",
+        "bp6_021_accept_cost_scores_and_retrieves",
+        "bp6_021_skip_cost_no_score_no_retrieval",
         "burn_multiple_under_all_moved_and_scores",
         "burn_no_under_no_move_no_score",
         "burn_one_under_but_total_9_no_score",
@@ -678,14 +684,9 @@
         "center_highest_among_three_different_costs",
         "center_highest_cost_gains_heart",
         "center_highest_two_members_only",
-        "center_lower_cost_no_heart",
-        "center_not_highest_right_is",
-        "center_tied_with_right_no_heart",
-        "chika_adds_non_matching_member_gets_no_blades",
-        "chika_adds_riko_gets_2_blades",
-        "chika_adds_yo_gets_2_blades"
+        "center_lower_cost_no_heart"
       ],
-      "covering_test_count": 212,
+      "covering_test_count": 223,
       "is_null": false
     },
     {
@@ -6437,11 +6438,21 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
-        "engine/tests/test_modules/hinoshita_test.rs"
+        "engine/tests/test_modules/hinoshita_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs"
       ],
       "covering_tests": [
+        "bp4_021_accept_puts_waitroom_card_on_deck_top",
+        "bp4_021_skip_leaves_waitroom_intact",
+        "bp5_015_debut_mills_exactly_ten",
+        "bp6_021_accept_cost_scores_and_retrieves",
+        "bp6_021_skip_cost_no_score_no_retrieval",
         "butterfly_to_butterfly_wing_matches",
         "butterfly_wing_to_butterfly_no_match",
+        "cl1_009_cost_ten_outside_range_not_selectable",
+        "cl1_009_retrieves_cost_four_boundary",
+        "cl1_009_retrieves_cost_nine_boundary",
+        "cl1_009_wrong_group_excluded_even_in_range",
         "dream_believers_104_to_105_no_match",
         "dream_believers_105_to_104_no_match",
         "dream_believers_105_to_base_no_match",
@@ -6458,14 +6469,11 @@
         "hinoshita_q237_name_contains_all_no_match",
         "hinoshita_reveal_choice_keeps_card_in_hand",
         "hinoshita_use_limit_once_per_turn",
-        "kanon_alone_on_stage_no_recovery",
-        "link_to_the_future_104_to_base_no_match",
-        "link_to_the_future_to_104_matches",
-        "mifune_different_name_in_success_zone_no_heart04",
-        "mifune_empty_success_zone_no_heart04",
-        "mifune_same_name_in_success_zone_gains_heart04"
+        "hs_bp6_032_expensive_members_not_selectable",
+        "hs_bp6_032_retrieves_low_cost_member",
+        "kanon_alone_on_stage_no_recovery"
       ],
-      "covering_test_count": 24,
+      "covering_test_count": 35,
       "is_null": false
     },
     {
@@ -6492,11 +6500,21 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/decode_audit_behavior_pins_test.rs",
-        "engine/tests/test_modules/hinoshita_test.rs"
+        "engine/tests/test_modules/hinoshita_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs"
       ],
       "covering_tests": [
+        "bp4_021_accept_puts_waitroom_card_on_deck_top",
+        "bp4_021_skip_leaves_waitroom_intact",
+        "bp5_015_debut_mills_exactly_ten",
+        "bp6_021_accept_cost_scores_and_retrieves",
+        "bp6_021_skip_cost_no_score_no_retrieval",
         "butterfly_to_butterfly_wing_matches",
         "butterfly_wing_to_butterfly_no_match",
+        "cl1_009_cost_ten_outside_range_not_selectable",
+        "cl1_009_retrieves_cost_four_boundary",
+        "cl1_009_retrieves_cost_nine_boundary",
+        "cl1_009_wrong_group_excluded_even_in_range",
         "dream_believers_104_to_105_no_match",
         "dream_believers_105_to_104_no_match",
         "dream_believers_105_to_base_no_match",
@@ -6513,14 +6531,11 @@
         "hinoshita_q237_name_contains_all_no_match",
         "hinoshita_reveal_choice_keeps_card_in_hand",
         "hinoshita_use_limit_once_per_turn",
-        "kanon_alone_on_stage_no_recovery",
-        "link_to_the_future_104_to_base_no_match",
-        "link_to_the_future_to_104_matches",
-        "mifune_different_name_in_success_zone_no_heart04",
-        "mifune_empty_success_zone_no_heart04",
-        "mifune_same_name_in_success_zone_gains_heart04"
+        "hs_bp6_032_expensive_members_not_selectable",
+        "hs_bp6_032_retrieves_low_cost_member",
+        "kanon_alone_on_stage_no_recovery"
       ],
-      "covering_test_count": 24,
+      "covering_test_count": 35,
       "is_null": false
     },
     {
@@ -9905,11 +9920,17 @@
         "engine/tests/test_modules/baton_touch_order_test.rs",
         "engine/tests/test_modules/hasunosora_pb1_test.rs",
         "engine/tests/test_modules/himeno_test.rs",
-        "engine/tests/test_modules/sumire_bp2_center_cost_test.rs"
+        "engine/tests/test_modules/sumire_bp2_center_cost_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs"
       ],
       "covering_tests": [
         "all_equal_cost_no_heart",
         "baton_touch_activates_energy",
+        "bp4_021_accept_puts_waitroom_card_on_deck_top",
+        "bp4_021_skip_leaves_waitroom_intact",
+        "bp5_015_debut_mills_exactly_ten",
+        "bp6_021_accept_cost_scores_and_retrieves",
+        "bp6_021_skip_cost_no_score_no_retrieval",
         "center_equal_cost_no_heart",
         "center_highest_among_three_different_costs",
         "center_highest_cost_gains_heart",
@@ -9917,6 +9938,10 @@
         "center_lower_cost_no_heart",
         "center_not_highest_right_is",
         "center_tied_with_right_no_heart",
+        "cl1_009_cost_ten_outside_range_not_selectable",
+        "cl1_009_retrieves_cost_four_boundary",
+        "cl1_009_retrieves_cost_nine_boundary",
+        "cl1_009_wrong_group_excluded_even_in_range",
         "edelnote_appearance_waits_opponent",
         "hasunosora_pb1_condition_met_gains_heart04",
         "hasunosora_pb1_condition_not_met_no_effect",
@@ -9928,14 +9953,9 @@
         "himeno_bp6_delayed_cannot_active_blocks_activation",
         "himeno_bp6_delayed_cannot_active_stack_resets_on_second_set",
         "himeno_bp6_q249_cost_reduced_by_three_mirakura",
-        "himeno_edge_no_mirakura_skips",
-        "himeno_q82_dodo_live_card_selectable",
-        "himeno_q82_identity_live_card_selectable",
-        "q84_both_triggers_in_baton_touch_resolve_ordered",
-        "sumire_at_center_highest_gains_heart",
-        "three_distinct_costs_center_highest"
+        "himeno_edge_no_mirakura_skips"
       ],
-      "covering_test_count": 26,
+      "covering_test_count": 37,
       "is_null": false
     },
     {
@@ -10087,6 +10107,7 @@
         "engine/tests/test_modules/shioriko_bp4_swap_test.rs",
         "engine/tests/test_modules/special_blade_heart_rules_test.rs",
         "engine/tests/test_modules/untested_abilities_batch30_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs"
       ],
       "covering_tests": [
@@ -10110,18 +10131,18 @@
         "b_heart07_parses_to_colorless_heart00",
         "b_heart07_yell_contributes_two_colorless_hearts_each",
         "baton_touch_search_adds_hasu_live_to_hand",
+        "bp4_021_accept_puts_waitroom_card_on_deck_top",
+        "bp4_021_skip_leaves_waitroom_intact",
+        "bp5_015_debut_mills_exactly_ten",
+        "bp6_021_accept_cost_scores_and_retrieves",
+        "bp6_021_skip_cost_no_score_no_retrieval",
         "bp6_023_draws_extra_with_mus_live_in_success_zone",
         "bp6_023_non_mus_live_in_success_zone_single_draw",
         "bp6_023_single_draw_without_success_zone_card",
         "butterfly_to_butterfly_wing_matches",
-        "butterfly_wing_to_butterfly_no_match",
-        "colorless_hearts_cannot_fill_colored_requirement",
-        "colorless_hearts_fill_heart0_when_colored_hearts_present",
-        "discarded_first_yell_hearts_are_lost",
-        "dream_believers_104_to_105_no_match",
-        "dream_believers_105_to_104_no_match"
+        "butterfly_wing_to_butterfly_no_match"
       ],
-      "covering_test_count": 168,
+      "covering_test_count": 179,
       "is_null": true
     },
     {
@@ -13707,9 +13728,19 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/himeno_test.rs",
-        "engine/tests/test_modules/parser_issues_e2e_test.rs"
+        "engine/tests/test_modules/parser_issues_e2e_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs"
       ],
       "covering_tests": [
+        "bp4_021_accept_puts_waitroom_card_on_deck_top",
+        "bp4_021_skip_leaves_waitroom_intact",
+        "bp5_015_debut_mills_exactly_ten",
+        "bp6_021_accept_cost_scores_and_retrieves",
+        "bp6_021_skip_cost_no_score_no_retrieval",
+        "cl1_009_cost_ten_outside_range_not_selectable",
+        "cl1_009_retrieves_cost_four_boundary",
+        "cl1_009_retrieves_cost_nine_boundary",
+        "cl1_009_wrong_group_excluded_even_in_range",
         "himeno_bp6_cost_no_reduction_without_mirakura",
         "himeno_bp6_cost_reduced_by_mirakura_on_stage",
         "himeno_bp6_cost_reduced_by_two_mirakura",
@@ -13719,6 +13750,8 @@
         "himeno_edge_no_mirakura_skips",
         "himeno_q82_dodo_live_card_selectable",
         "himeno_q82_identity_live_card_selectable",
+        "hs_bp6_032_expensive_members_not_selectable",
+        "hs_bp6_032_retrieves_low_cost_member",
         "issue10_dream_with_you_high_blade_plus_1_score",
         "issue10_dream_with_you_no_blade_no_score",
         "issue11_fanfare_15plus_cards_gives_blade",
@@ -13728,20 +13761,9 @@
         "issue13_kurage_card_exists",
         "issue14_koware_yasuki_card_exists",
         "issue15_mirai_ticket_card_exists",
-        "issue16_hanamaru_all_cost_higher_than_opponent_gains_blade",
-        "issue16_hanamaru_opponent_higher_cost_no_blade",
-        "issue17_suzu_cost_bonus_condition_met",
-        "issue17_suzu_cost_bonus_condition_not_met",
-        "issue1_kanon_invalidate_and_recover",
-        "issue1_kanon_no_liella_on_stage_no_recovery",
-        "issue2_rina_cost_total_10_no_bonus",
-        "issue2_rina_cost_total_6_draws_card",
-        "issue3_karin_live_start_draw_card",
-        "issue4_you_exclude_aqours_live_start",
-        "issue5_solitude_rain_heart_color_scoring",
-        "issue6_natsumi_blade_expires_after_live_victory_determination"
+        "issue16_hanamaru_all_cost_higher_than_opponent_gains_blade"
       ],
-      "covering_test_count": 40,
+      "covering_test_count": 51,
       "is_null": false
     },
     {
@@ -21864,14 +21886,26 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs"
       ],
       "covering_tests": [
+        "bp4_021_accept_puts_waitroom_card_on_deck_top",
+        "bp4_021_skip_leaves_waitroom_intact",
+        "bp5_015_debut_mills_exactly_ten",
+        "bp6_021_accept_cost_scores_and_retrieves",
+        "bp6_021_skip_cost_no_score_no_retrieval",
+        "cl1_009_cost_ten_outside_range_not_selectable",
+        "cl1_009_retrieves_cost_four_boundary",
+        "cl1_009_retrieves_cost_nine_boundary",
+        "cl1_009_wrong_group_excluded_even_in_range",
         "happy_party_train_all_active_reduces_need_heart",
         "happy_party_train_mill_aqours_member_reduces_need_heart",
         "happy_party_train_mill_non_aqours_no_reduction",
         "happy_party_train_waited_or_empty_stage_no_reduction",
         "heartbeat_bp4021_escalating_thresholds",
+        "hs_bp6_032_expensive_members_not_selectable",
+        "hs_bp6_032_retrieves_low_cost_member",
         "kanon_spbp2023_stacked_energy_threshold_hearts",
         "keke_spbp1002_twelve_energy_live_total_bonus",
         "ketsumi_no_hikari_per_waited_member_score",
@@ -21887,7 +21921,7 @@
         "umi_bp4004_below_threshold_activates_nothing",
         "umi_bp4004_success_score_six_activates_two"
       ],
-      "covering_test_count": 19,
+      "covering_test_count": 30,
       "is_null": false
     },
     {
@@ -30959,14 +30993,28 @@
         "PL!N-bp4-021-N"
       ],
       "base": "PL!N-bp4-021",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs"
+      ],
+      "covering_tests": [
+        "bp4_021_accept_puts_waitroom_card_on_deck_top",
+        "bp4_021_skip_leaves_waitroom_intact",
+        "bp5_015_debut_mills_exactly_ten",
+        "bp6_021_accept_cost_scores_and_retrieves",
+        "bp6_021_skip_cost_no_score_no_retrieval",
+        "cl1_009_cost_ten_outside_range_not_selectable",
+        "cl1_009_retrieves_cost_four_boundary",
+        "cl1_009_retrieves_cost_nine_boundary",
+        "cl1_009_wrong_group_excluded_even_in_range",
+        "hs_bp6_032_expensive_members_not_selectable",
+        "hs_bp6_032_retrieves_low_cost_member"
+      ],
+      "covering_test_count": 11,
       "is_null": false
     },
     {
@@ -32213,14 +32261,28 @@
         "PL!S-bp5-015-N"
       ],
       "base": "PL!S-bp5-015",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs"
+      ],
+      "covering_tests": [
+        "bp4_021_accept_puts_waitroom_card_on_deck_top",
+        "bp4_021_skip_leaves_waitroom_intact",
+        "bp5_015_debut_mills_exactly_ten",
+        "bp6_021_accept_cost_scores_and_retrieves",
+        "bp6_021_skip_cost_no_score_no_retrieval",
+        "cl1_009_cost_ten_outside_range_not_selectable",
+        "cl1_009_retrieves_cost_four_boundary",
+        "cl1_009_retrieves_cost_nine_boundary",
+        "cl1_009_wrong_group_excluded_even_in_range",
+        "hs_bp6_032_expensive_members_not_selectable",
+        "hs_bp6_032_retrieves_low_cost_member"
+      ],
+      "covering_test_count": 11,
       "is_null": false
     },
     {
@@ -35877,14 +35939,28 @@
         "PL!-bp6-021-L"
       ],
       "base": "PL!-bp6-021",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs"
+      ],
+      "covering_tests": [
+        "bp4_021_accept_puts_waitroom_card_on_deck_top",
+        "bp4_021_skip_leaves_waitroom_intact",
+        "bp5_015_debut_mills_exactly_ten",
+        "bp6_021_accept_cost_scores_and_retrieves",
+        "bp6_021_skip_cost_no_score_no_retrieval",
+        "cl1_009_cost_ten_outside_range_not_selectable",
+        "cl1_009_retrieves_cost_four_boundary",
+        "cl1_009_retrieves_cost_nine_boundary",
+        "cl1_009_wrong_group_excluded_even_in_range",
+        "hs_bp6_032_expensive_members_not_selectable",
+        "hs_bp6_032_retrieves_low_cost_member"
+      ],
+      "covering_test_count": 11,
       "is_null": false
     },
     {
@@ -37090,14 +37166,28 @@
         "PL!HS-bp6-032-L"
       ],
       "base": "PL!HS-bp6-032",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs"
+      ],
+      "covering_tests": [
+        "bp4_021_accept_puts_waitroom_card_on_deck_top",
+        "bp4_021_skip_leaves_waitroom_intact",
+        "bp5_015_debut_mills_exactly_ten",
+        "bp6_021_accept_cost_scores_and_retrieves",
+        "bp6_021_skip_cost_no_score_no_retrieval",
+        "cl1_009_cost_ten_outside_range_not_selectable",
+        "cl1_009_retrieves_cost_four_boundary",
+        "cl1_009_retrieves_cost_nine_boundary",
+        "cl1_009_wrong_group_excluded_even_in_range",
+        "hs_bp6_032_expensive_members_not_selectable",
+        "hs_bp6_032_retrieves_low_cost_member"
+      ],
+      "covering_test_count": 11,
       "is_null": false
     },
     {
@@ -37374,14 +37464,28 @@
         "PL!HS-cl1-009-CL"
       ],
       "base": "PL!HS-cl1-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs"
+      ],
+      "covering_tests": [
+        "bp4_021_accept_puts_waitroom_card_on_deck_top",
+        "bp4_021_skip_leaves_waitroom_intact",
+        "bp5_015_debut_mills_exactly_ten",
+        "bp6_021_accept_cost_scores_and_retrieves",
+        "bp6_021_skip_cost_no_score_no_retrieval",
+        "cl1_009_cost_ten_outside_range_not_selectable",
+        "cl1_009_retrieves_cost_four_boundary",
+        "cl1_009_retrieves_cost_nine_boundary",
+        "cl1_009_wrong_group_excluded_even_in_range",
+        "hs_bp6_032_expensive_members_not_selectable",
+        "hs_bp6_032_retrieves_low_cost_member"
+      ],
+      "covering_test_count": 11,
       "is_null": false
     },
     {

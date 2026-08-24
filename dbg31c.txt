@@ -1,0 +1,76 @@
+﻿cargo : warning: rabuka_engine@0.1.0: bytecode size: 28530 bytes (compressed, from C:\Users\trios\OneDrive\Documents\ra
+buka_reloaded\engine\../cards/build/abilities.bin.z)
+発生場所 行:1 文字:24
++ ... OG="debug"; cargo test --test run_all bp6_021_skip -- --nocapture --t ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: rabuka...bilities.bin.z):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+warning: associated function `new` is never used
+   --> src\ability\vm.rs:297:8
+    |
+296 | impl<'a> BcReader<'a> {
+    | --------------------- associated function in this implementation
+297 |     fn new(data: &'a [u8]) -> Self {
+    |        ^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rabuka_engine` (lib) generated 1 warning
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\test_modules\untested_abilities_batch28_test.rs:6:5
+  |
+6 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> tests\test_modules\prohibition_layer_characterization_test.rs:83:9
+   |
+83 |     let mut game = TestGame::new(db);
+   |         ----^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> tests\test_modules\prohibition_layer_characterization_test.rs:101:9
+    |
+101 |     let mut game = TestGame::new(db);
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: `rabuka_engine` (test "run_all") generated 3 warnings (run `cargo fix --test "run_all" -p rabuka_engine` to ap
+ply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running tests\run_all.rs (C:/rust_targets\debug\build\rabuka_engine/6e1ae4530d532eee\out\run_all-6e1ae4530d532eee.
+exe)
+
+running 1 test
+[timing] db load: 809ms
+[2026-08-24T15:55:07Z DEBUG rabuka_engine::ability::util] [GET_SEL] cards.len=3 filter.nh_color=None filter.nh_total=No
+ne
+[2026-08-24T15:55:07Z DEBUG rabuka_engine::ability::move_cards] [PROMPT_SEL@191] zone=stage count=1 can_skip=false prop
+=None neg=false filtered=Some([0, 2]) excl_chars=None
+[2026-08-24T15:55:07Z DEBUG rabuka_engine::ability::move_cards] [FINALIZE_MOVE] dest=discard cards=[] -> self.moved_car
+ds=[]
+[answer_optional] unmatched prompt: SelectCard zone=stage count=1 allow_skip=false card_type=Some("member_card") group=
+Some("ﾎｼ's") options=Some(2)
+
+thread 'test_modules::untested_abilities_batch31_test::bp6_021_skip_cost_no_score_no_retrieval' (13664) panicked at tes
+ts\test_modules\untested_abilities_batch31_test.rs:127:5:
+expected an optional-gate prompt
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test test_modules::untested_abilities_batch31_test::bp6_021_skip_cost_no_score_no_retrieval ... FAILED
+
+failures:
+
+failures:
+    test_modules::untested_abilities_batch31_test::bp6_021_skip_cost_no_score_no_retrieval
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2710 filtered out; finished in 0.87s
+
+error: test failed, to rerun pass `--test run_all`

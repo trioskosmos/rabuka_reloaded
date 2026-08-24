@@ -959,6 +959,8 @@ pub struct CardFilter<'a> {
     pub cost_values: Option<&'a Vec<u8>>,
     /// Minimum cost bound for range filters (e.g. cost >= 4)
     pub cost_limit_min: Option<u8>,
+    /// Maximum cost bound for range filters (e.g. 「コスト4以上9以下」 -> 9)
+    pub cost_limit_max: Option<u8>,
     /// Sum-total cost constraint — checked post-selection, not in per-card matches()
     pub cost_total: Option<u8>,
     pub cost_total_operator: Option<&'a str>,
@@ -1050,6 +1052,7 @@ impl<'a> CardFilter<'a> {
             || self.groups.is_some()
             || self.cost_limit.is_some()
             || self.cost_limit_min.is_some()
+            || self.cost_limit_max.is_some()
             || self.characters.is_some()
             || self.exclude_characters.is_some()
             || !self.heart_colors.is_empty()
@@ -1376,6 +1379,11 @@ impl<'a> CardFilter<'a> {
                 return false;
             }
         }
+        if let Some(max) = self.cost_limit_max {
+            if !card_matches_cost_limit_op(db, id, Some(max), Some("<=")) {
+                return false;
+            }
+        }
         if let Some(ch) = self.characters {
             if !card_matches_characters(db, id, Some(ch)) {
                 return false;
@@ -1471,6 +1479,7 @@ impl<'a> CardFilter<'a> {
             cost_operator,
             cost_values: None,
             cost_limit_min: effect.cost_limit_min_any(),
+            cost_limit_max: effect.cost_limit_max_any(),
             cost_total: effect.cost_total_any(),
             cost_total_operator,
             characters: effect.characters_any(),

@@ -740,7 +740,7 @@ impl AbilityResolver {
             count.min(gs.revealed_cards.len())
         };
         let can_skip = is_max || effect.optional.unwrap_or(false);
-        let filter = util::filter_from_parts_full(
+        let mut filter = util::filter_from_parts_full(
             card_type_filter,
             group_name,
             cost_limit,
@@ -753,6 +753,9 @@ impl AbilityResolver {
             cost_total_operator,
             effect.exclude_characters_any(),
         );
+        // Range filters (「コスト4以上9以下」) ride the min/max fields.
+        filter.cost_limit_min = effect.cost_limit_min_any();
+        filter.cost_limit_max = effect.cost_limit_max_any();
         let neg = effect.negation_any().unwrap_or(false);
         let matching: Vec<usize> = (0..gs.revealed_cards.len())
             .filter(|&i| {
@@ -1254,7 +1257,9 @@ impl AbilityResolver {
                     self.prompt_card_selection(
                         Zone::Stage.to_str(),
                         c.count,
-                        false,
+                        // 「〜してもよい」 optional stage moves MUST be declinable;
+                        // a hardcoded false forced players to pay.
+                        effect.optional.unwrap_or(false),
                         effect,
                         &filter,
                         Some(stage_indices),

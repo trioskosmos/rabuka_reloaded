@@ -1,0 +1,68 @@
+﻿cargo : warning: rabuka_engine@0.1.0: bytecode size: 28530 bytes (compressed, from C:\Users\trios\OneDrive\Documents\ra
+buka_reloaded\engine\../cards/build/abilities.bin.z)
+発生場所 行:1 文字:24
++ ... OG="debug"; cargo test --test run_all bp4_021_skip -- --nocapture --t ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: rabuka...bilities.bin.z):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+warning: associated function `new` is never used
+   --> src\ability\vm.rs:297:8
+    |
+296 | impl<'a> BcReader<'a> {
+    | --------------------- associated function in this implementation
+297 |     fn new(data: &'a [u8]) -> Self {
+    |        ^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rabuka_engine` (lib) generated 1 warning
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\test_modules\untested_abilities_batch28_test.rs:6:5
+  |
+6 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> tests\test_modules\prohibition_layer_characterization_test.rs:83:9
+   |
+83 |     let mut game = TestGame::new(db);
+   |         ----^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> tests\test_modules\prohibition_layer_characterization_test.rs:101:9
+    |
+101 |     let mut game = TestGame::new(db);
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: `rabuka_engine` (test "run_all") generated 3 warnings (run `cargo fix --test "run_all" -p rabuka_engine` to ap
+ply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running tests\run_all.rs (C:/rust_targets\debug\build\rabuka_engine/6e1ae4530d532eee\out\run_all-6e1ae4530d532eee.
+exe)
+
+running 1 test
+[timing] db load: 859ms
+
+thread 'test_modules::untested_abilities_batch31_test::bp4_021_skip_leaves_waitroom_intact' (1484) panicked at tests\he
+lpers\mod.rs:462:14:
+play_to_stage failed: "Could not pay 9 energy (only 8 active energy available, 8 total energy cards)"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test test_modules::untested_abilities_batch31_test::bp4_021_skip_leaves_waitroom_intact ... FAILED
+
+failures:
+
+failures:
+    test_modules::untested_abilities_batch31_test::bp4_021_skip_leaves_waitroom_intact
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2710 filtered out; finished in 0.92s
+
+error: test failed, to rerun pass `--test run_all`

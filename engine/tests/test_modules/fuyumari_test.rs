@@ -21,6 +21,19 @@ fn drain_auto_prompts_fuyumari(game: &mut TestGame) {
     }
 }
 
+/// Answer the optional-stage-cost pay/skip gate introduced for
+/// 「〜してもよい」 member-sacrifice costs. Returns true when a gate was
+/// present and answered (accept=true pays, false skips).
+fn answer_stage_cost_gate(game: &mut TestGame, accept: bool) -> bool {
+    match game.get_pending_choice() {
+        Choice::SelectTarget { target, .. } if target.starts_with("pay_optional_cost") => {
+            game.select_option(if accept { 1 } else { 0 });
+            true
+        }
+        _ => false,
+    }
+}
+
 /// Q63: Effect-debut doesn't pay member cost separately.
 #[test]
 fn fuyumari_q63_effect_debut_no_cost_payment() {
@@ -112,9 +125,16 @@ fn fuyumari_q95_player_chooses_card_from_discard() {
     game.state.player1.stage.stage[1] = -1;
     game.play_to_stage(fuyumari, MemberArea::Center);
 
+    // 1. Optional-cost gate: pay or skip (「〜してもよい」).
+    assert!(
+        answer_stage_cost_gate(&mut game, true),
+        "optional stage cost must present a pay/skip gate"
+    );
+    // 2. Cost target selection: pick the Liella! member from stage[0].
     if game.has_pending_choice() {
         game.select_indices(&[0]);
     }
+    // 3. Effect: choose the card to re-deploy from the waitroom.
     if game.has_pending_choice() {
         game.select_indices(&[0]);
     }
@@ -196,23 +216,19 @@ fn fuyumari_edge_exclude_self_from_cost() {
 
     game.play_to_stage(fuyumari, MemberArea::Center);
 
-    // EXCLUSION PROOF: candidates are {liella_member, herself}. With
-    // exclude_self honored, exactly ONE candidate remains → the optional
-    // cost auto-resolves with NO prompt. If the filter were broken she'd
-    // be offered too (2 candidates) and a SelectCard would hang here.
-    let mut saw_prompt = false;
-    let mut guard = 0;
-    while game.has_pending_choice() && guard < 10 {
-        guard += 1;
-        saw_prompt = true;
-        match game.get_pending_choice() {
-            Choice::SelectCard { .. } => game.select_indices(&[0]),
-            _ => break,
-        }
-    }
+    // The optional stage cost now ALWAYS opens with a pay/skip gate — that
+    // gate itself is not an exclusion failure. Exclusion is proven by what
+    // follows: with exclude_self honored, exactly ONE candidate remains
+    // (liella_member), so after accepting there is NO SelectCard prompt
+    // (single candidate auto-resolves). If the filter were broken, ふるまり
+    // would be offered too and a SelectCard would appear here.
     assert!(
-        !saw_prompt,
-        "single valid candidate must auto-resolve; a prompt means \
+        answer_stage_cost_gate(&mut game, true),
+        "optional stage cost must present a pay/skip gate"
+    );
+    assert!(
+        !game.has_pending_choice(),
+        "single valid candidate must auto-resolve; a SelectCard here means \
          exclude_self failed to drop herself"
     );
 

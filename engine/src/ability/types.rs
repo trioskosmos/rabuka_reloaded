@@ -538,6 +538,7 @@ impl Choice {
                 cost_operator: cost_limit_operator.as_deref(),
                 cost_values: None,
                 cost_limit_min: None,
+                cost_limit_max: None,
                 cost_total: None,
                 cost_total_operator: None,
                 need_heart_total: None,
