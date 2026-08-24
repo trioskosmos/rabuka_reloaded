@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T22:36:07.693614+00:00",
+  "generated_at": "2026-08-24T22:50:24.786463+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 465,
-  "n_tests": 2793,
+  "n_files": 466,
+  "n_tests": 2797,
   "total_cards": 771,
-  "covered_cards": 686,
-  "abilities_on_covered": 851,
+  "covered_cards": 688,
+  "abilities_on_covered": 853,
   "trigger_counts": {
     "起動": [
       86,
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      228,
+      230,
       268
     ],
     "(none)": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      194,
+      196,
       219
     ],
     "unknown": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      490,
+      492,
       545
     ],
     "temporal_condition": [
@@ -292,7 +292,7 @@
       111
     ],
     "pb1": [
-      123,
+      125,
       137
     ],
     "sd2": [
@@ -310,9 +310,9 @@
   },
   "depth_counts": {
     "L2+choice": 622,
-    "L1+choice": 155,
+    "L1+choice": 157,
     "L2": 26,
-    "none": 85,
+    "none": 83,
     "L1": 48
   },
   "qa_rulings": {
@@ -31900,14 +31900,21 @@
         "PL!N-pb1-034-N"
       ],
       "base": "PL!N-pb1-034",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch39_test.rs"
+      ],
+      "covering_tests": [
+        "pb1034_choose_first_color_heart03",
+        "pb1034_choose_last_color_heart05",
+        "pb1034_choose_mid_color_heart04",
+        "pb1036_twin_chooses_heart06"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -31924,14 +31931,21 @@
         "PL!N-pb1-036-N"
       ],
       "base": "PL!N-pb1-036",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch39_test.rs"
+      ],
+      "covering_tests": [
+        "pb1034_choose_first_color_heart03",
+        "pb1034_choose_last_color_heart05",
+        "pb1034_choose_mid_color_heart04",
+        "pb1036_twin_chooses_heart06"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
