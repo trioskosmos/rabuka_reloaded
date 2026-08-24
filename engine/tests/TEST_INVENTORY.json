@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T23:35:02.241945+00:00",
+  "generated_at": "2026-08-24T23:51:07.465350+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,21 +8,21 @@
     "unique_abilities": 936
   },
   "n_files": 469,
-  "n_tests": 2806,
+  "n_tests": 2811,
   "total_cards": 771,
-  "covered_cards": 692,
-  "abilities_on_covered": 857,
+  "covered_cards": 695,
+  "abilities_on_covered": 860,
   "trigger_counts": {
     "起動": [
       86,
       96
     ],
     "登場": [
-      244,
+      245,
       269
     ],
     "ライブ開始時": [
-      234,
+      236,
       268
     ],
     "(none)": [
@@ -48,11 +48,11 @@
       146
     ],
     "look_and_select": [
-      54,
+      55,
       71
     ],
     "gain_resource": [
-      149,
+      150,
       160
     ],
     "sequential": [
@@ -64,7 +64,7 @@
       2
     ],
     "draw_card": [
-      43,
+      44,
       44
     ],
     "change_state": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      494,
+      495,
       545
     ],
     "temporal_condition": [
@@ -198,7 +198,7 @@
       88
     ],
     "location_condition": [
-      69,
+      70,
       73
     ],
     "movement:baton_touch": [
@@ -210,7 +210,7 @@
       2
     ],
     "group_condition": [
-      39,
+      40,
       44
     ],
     "or_condition": [
@@ -280,7 +280,7 @@
       88
     ],
     "bp5": [
-      120,
+      121,
       134
     ],
     "bp6": [
@@ -288,7 +288,7 @@
       82
     ],
     "bp7": [
-      100,
+      102,
       111
     ],
     "pb1": [
@@ -310,9 +310,9 @@
   },
   "depth_counts": {
     "L2+choice": 625,
-    "L1+choice": 156,
+    "L1+choice": 159,
     "L2": 28,
-    "none": 79,
+    "none": 76,
     "L1": 48
   },
   "qa_rulings": {
@@ -1234,9 +1234,12 @@
         "engine/tests/test_modules/kanon_pb2_test.rs",
         "engine/tests/test_modules/keke_pb2_013_debut_test.rs",
         "engine/tests/test_modules/pr_energy_place_cost_test.rs",
-        "engine/tests/test_modules/tang_keke_test.rs"
+        "engine/tests/test_modules/tang_keke_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch42_test.rs"
       ],
       "covering_tests": [
+        "bp5015_all_six_colors_present_two_blades",
+        "bp5015_missing_colors_no_blades",
         "chisato_area_move_gains_blade",
         "fuyumari_area_move_gains_heart03",
         "kanon_area_move_gains_heart02",
@@ -1253,6 +1256,8 @@
         "keke_discard_blade_heart_no_draw",
         "keke_discard_no_blade_heart_draw",
         "may_area_move_adds_liella_live",
+        "mei_accept_live_cost_look_five_take_one",
+        "mei_decline_cost_no_look",
         "natsumi_yell_no_blade_heart_gains_heart02",
         "natsumi_yell_with_blade_heart_does_not_gain",
         "pr_energy_place_decline_cost_no_discard",
@@ -1262,13 +1267,9 @@
         "sayaka_stage_to_discard_buffs_member",
         "setsuna_baton_touch_debut_draws",
         "setsuna_bp7_baton_touch_places_energy_under_arriver",
-        "shiki_wait_then_area_move_reactivates",
-        "shioriko_live_phase_wait_discard_activates",
-        "tang_keke_discard_member_with_blade_heart_choose_one",
-        "tang_keke_discard_member_without_blade_heart_choose_any_number",
-        "tang_keke_discard_non_member_liella_card_choose_one"
+        "shiki_wait_then_area_move_reactivates"
       ],
-      "covering_test_count": 34,
+      "covering_test_count": 40,
       "is_null": false
     },
     {
@@ -9755,9 +9756,12 @@
         "engine/tests/test_modules/kanon_pb2_test.rs",
         "engine/tests/test_modules/tang_keke_test.rs",
         "engine/tests/test_modules/untested_abilities_batch10_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch11_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch11_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch42_test.rs"
       ],
       "covering_tests": [
+        "bp5015_all_six_colors_present_two_blades",
+        "bp5015_missing_colors_no_blades",
         "chika_bp5_baton_touch_draw_triggers_refresh",
         "chika_bp5_baton_touch_from_ability_member_no_draw",
         "chika_bp5_baton_touch_from_no_ability_draw",
@@ -9785,11 +9789,9 @@
         "jellyfish_q98_member_appeared_then_left_not_counted",
         "jellyfish_q98_one_left_one_stays",
         "jellyfish_q99_one_member_both_flags_counts_once",
-        "jellyfish_three_members_all_qualify_reduce_by_3",
-        "jellyfish_two_members_appeared_reduce_by_2",
-        "kanon_cost_above_4_rejected"
+        "jellyfish_three_members_all_qualify_reduce_by_3"
       ],
-      "covering_test_count": 54,
+      "covering_test_count": 60,
       "is_null": false
     },
     {
@@ -12426,6 +12428,7 @@
         "engine/tests/test_modules/untested_abilities_batch35_test.rs",
         "engine/tests/test_modules/untested_abilities_batch37_test.rs",
         "engine/tests/test_modules/untested_abilities_batch3_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch42_test.rs",
         "engine/tests/test_modules/untested_abilities_batch4_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
@@ -12466,7 +12469,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 795,
+      "covering_test_count": 801,
       "is_null": false
     },
     {
@@ -25451,6 +25454,7 @@
         "engine/tests/test_modules/untested_abilities_batch29_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch36_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch42_test.rs",
         "engine/tests/test_modules/wao_wao_test.rs",
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/wonder_zone_max_repeats_test.rs",
@@ -25484,12 +25488,12 @@
         "both_players_have_live_cards",
         "both_players_live_score_compared",
         "bp3_002_per_opponent_waited_member_blade",
+        "bp5015_all_six_colors_present_two_blades",
+        "bp5015_missing_colors_no_blades",
         "bp5_020_pay_1e_draw_1",
-        "bp5_111_per_other_arise_member_heart05",
-        "c10_reveal_top_adds_to_hand",
-        "c11_peek_per_niji_selects_keep1"
+        "bp5_111_per_other_arise_member_heart05"
       ],
-      "covering_test_count": 388,
+      "covering_test_count": 394,
       "is_null": false
     },
     {
@@ -25568,6 +25572,7 @@
         "engine/tests/test_modules/untested_abilities_batch29_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch36_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch42_test.rs",
         "engine/tests/test_modules/wao_wao_test.rs",
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/wonder_zone_max_repeats_test.rs",
@@ -25601,12 +25606,12 @@
         "both_players_have_live_cards",
         "both_players_live_score_compared",
         "bp3_002_per_opponent_waited_member_blade",
+        "bp5015_all_six_colors_present_two_blades",
+        "bp5015_missing_colors_no_blades",
         "bp5_020_pay_1e_draw_1",
-        "bp5_111_per_other_arise_member_heart05",
-        "c10_reveal_top_adds_to_hand",
-        "c11_peek_per_niji_selects_keep1"
+        "bp5_111_per_other_arise_member_heart05"
       ],
-      "covering_test_count": 388,
+      "covering_test_count": 394,
       "is_null": false
     },
     {
@@ -30836,19 +30841,17 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/probe_rin.rs",
         "engine/tests/test_modules/untested_abilities_batch41_test.rs"
       ],
       "covering_tests": [
         "mari_empty_live_zone_no_grant",
         "mari_heart05_total_exactly_four_grants",
         "mari_heart05_total_two_no_grant",
-        "probe_rin_condition",
         "rin_all_lives_have_triggers_no_blades",
         "rin_empty_live_zone_no_blades",
         "rin_live_without_triggers_grants_other_member_two_blades"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -32726,14 +32729,23 @@
         "PL!N-bp5-015-N"
       ],
       "base": "PL!N-bp5-015",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch42_test.rs"
+      ],
+      "covering_tests": [
+        "bp5015_all_six_colors_present_two_blades",
+        "bp5015_missing_colors_no_blades",
+        "mei_accept_live_cost_look_five_take_one",
+        "mei_decline_cost_no_look",
+        "sumire_only_two_catchu_no_draw",
+        "sumire_three_catchu_draws"
+      ],
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -35000,6 +35012,7 @@
         "engine/tests/test_modules/untested_abilities_batch37_test.rs",
         "engine/tests/test_modules/untested_abilities_batch40_test.rs",
         "engine/tests/test_modules/untested_abilities_batch41_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch42_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
@@ -35013,6 +35026,8 @@
         "aquarium_yell_from_bottom_short_deck",
         "aquarium_yell_from_bottom_two_yells",
         "baton_touch_cleared_between_actions",
+        "bp5015_all_six_colors_present_two_blades",
+        "bp5015_missing_colors_no_blades",
         "bp6_011n_deck_with_one_card_still_discards",
         "bp6_011n_empty_deck_and_empty_hand_is_a_clean_noop",
         "bp6_011n_hand_debut_no_draw",
@@ -35033,11 +35048,9 @@
         "c12_restriction_blocks_opponent_active",
         "c12_restriction_does_not_block_self_active",
         "c12_restriction_p2_owned_blocks_p1_active",
-        "c13_all_three_hearts_present_select_one",
-        "c13_bp2_005_or_semantics_still_works",
-        "c13_no_matching_card_optional_same_as_reject"
+        "c13_all_three_hearts_present_select_one"
       ],
-      "covering_test_count": 299,
+      "covering_test_count": 305,
       "is_null": false
     },
     {
@@ -35122,6 +35135,7 @@
         "engine/tests/test_modules/untested_abilities_batch32_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch40_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch42_test.rs",
         "engine/tests/test_modules/untested_abilities_test.rs",
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/you_debut_test.rs"
@@ -35130,6 +35144,8 @@
         "any_card_fails_hearts_all_fail",
         "both_players_have_live_cards",
         "both_players_live_score_compared",
+        "bp5015_all_six_colors_present_two_blades",
+        "bp5015_missing_colors_no_blades",
         "bp6_016_look_three_reorder_back_on_top",
         "bp7_019_places_two_aqours_cards_under_deck",
         "cutie_panther_live_start_reduce_hearts",
@@ -35145,6 +35161,8 @@
         "kanan_live_success_timing",
         "live_fails_with_insufficient_hearts",
         "love_u_q192_live_success_all_blade_score_up",
+        "mei_accept_live_cost_look_five_take_one",
+        "mei_decline_cost_no_look",
         "mijuku_dreamer_no_refresh_no_bonus",
         "mijuku_dreamer_refresh_via_mill_gets_bonus",
         "natsumi_rain_draws_and_discards_with_hasunosora_on_stage",
@@ -35152,13 +35170,9 @@
         "no_live_card_no_yell_no_success",
         "omoi_empty_waitroom_no_prompt",
         "one_player_live_auto_higher_score",
-        "pr032_declining_keeps_milled_cards_in_waitroom",
-        "pr032_mills_shortfall_and_recovers_live_to_deck_top",
-        "pr032_no_live_among_milled_no_prompt",
-        "pr032_waitroom_at_threshold_mills_nothing",
-        "pr032_waitroom_seven_mills_one_and_recovers_live"
+        "pr032_declining_keeps_milled_cards_in_waitroom"
       ],
-      "covering_test_count": 72,
+      "covering_test_count": 78,
       "is_null": false
     },
     {
@@ -40272,14 +40286,23 @@
         "PL!SP-bp7-015-N"
       ],
       "base": "PL!SP-bp7-015",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch42_test.rs"
+      ],
+      "covering_tests": [
+        "bp5015_all_six_colors_present_two_blades",
+        "bp5015_missing_colors_no_blades",
+        "mei_accept_live_cost_look_five_take_one",
+        "mei_decline_cost_no_look",
+        "sumire_only_two_catchu_no_draw",
+        "sumire_three_catchu_draws"
+      ],
+      "covering_test_count": 6,
       "is_null": false
     },
     {
@@ -40368,14 +40391,23 @@
         "PL!SP-bp7-018-N"
       ],
       "base": "PL!SP-bp7-018",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch42_test.rs"
+      ],
+      "covering_tests": [
+        "bp5015_all_six_colors_present_two_blades",
+        "bp5015_missing_colors_no_blades",
+        "mei_accept_live_cost_look_five_take_one",
+        "mei_decline_cost_no_look",
+        "sumire_only_two_catchu_no_draw",
+        "sumire_three_catchu_draws"
+      ],
+      "covering_test_count": 6,
       "is_null": false
     },
     {
