@@ -11,6 +11,47 @@ use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
+/// After execution, the game must remain structurally sane: a card instance
+/// lives in exactly one zone, no zone lists an id twice, and stage/energy
+/// areas hold no garbage.
+fn assert_state_invariants(game: &TestGame) {
+    let p1 = &game.state.player1;
+    let p2 = &game.state.player2;
+
+    fn zone_vecs<'a>(p: &'a rabuka_engine::player::Player) -> Vec<(&'static str, &'a [i16])> {
+        vec![
+            ("stage", &p.stage.stage[..]),
+            ("hand", &p.hand.cards),
+            ("waitroom", &p.waitroom.cards),
+            ("main_deck", &p.main_deck.cards),
+            ("live_card_zone", &p.live_card_zone.cards),
+            ("success_live_zone", &p.success_live_card_zone.cards),
+            ("energy_zone", &p.energy_zone.cards),
+        ]
+    }
+
+    for (pname, p) in [("p1", p1), ("p2", p2)] {
+        let mut seen: std::collections::HashMap<i16, &'static str> =
+            std::collections::HashMap::new();
+        for (zone, cards) in zone_vecs(p) {
+            let mut in_zone: std::collections::HashSet<i16> = std::collections::HashSet::new();
+            for &id in cards {
+                if id < 0 {
+                    continue; // empty stage slots / placeholders
+                }
+                if !in_zone.insert(id) {
+                    panic!("{pname}: card {id} listed twice in {zone}");
+                }
+                if let Some(prev) = seen.insert(id, zone) {
+                    panic!("{pname}: card {id} simultaneously in '{prev}' and '{zone}'");
+                }
+            }
+        }
+        // Stage is exactly 3 area slots; anything else corrupts formation.
+        assert_eq!(p.stage.stage.len(), 3, "{pname}: stage slot count drifted");
+    }
+}
+
 fn smoke_one_card(db: &std::sync::Arc<rabuka_engine::card::CardDatabase>, card_no: &str) {
     let mut game = TestGame::new(db.clone());
     let cid = game.id(card_no);
@@ -36,6 +77,8 @@ fn smoke_one_card(db: &std::sync::Arc<rabuka_engine::card::CardDatabase>, card_n
     let pid = game.state.player1.id.clone();
     game.state.process_pending_auto_abilities(&pid);
     game.drain_auto_ability_choices();
+
+    assert_state_invariants(&game);
 }
 
 #[test]
