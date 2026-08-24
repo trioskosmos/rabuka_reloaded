@@ -587,7 +587,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             options,
             ..
         } => {
-            if target == "pay_optional_cost:skip_optional_cost" {
+            if target == crate::ability::types::PAY_SKIP_TARGET {
                 return vec![
                     make_action_params(
                         ActionType::ChoiceDecision,

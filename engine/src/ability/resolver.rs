@@ -170,7 +170,7 @@ impl AbilityResolver {
         options: Option<Vec<String>>,
     ) {
         self.pending_choice = Some(crate::ability::types::Choice::SelectTarget {
-            target: "pay_optional_cost:skip_optional_cost".to_string(),
+            target: crate::ability::types::PAY_SKIP_TARGET.to_string(),
             description: description_en.clone(),
             description_en: Some(description_en),
             description_ja: Some(description_ja),

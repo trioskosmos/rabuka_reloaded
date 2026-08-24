@@ -616,7 +616,7 @@ impl AbilityResolver {
                                     .extend(repeat_actions.iter().cloned());
                             }
                             self.pending_choice = Some(Choice::SelectTarget {
-                                target: "pay_optional_cost:skip_optional_cost".to_string(),
+                                target: crate::ability::types::PAY_SKIP_TARGET.to_string(),
                                 description: "Repeat effect?".to_string(),
                                 description_en: Some("Repeat effect?".to_string()),
                                 description_ja: Some("効果を繰り返しますか？".to_string()),

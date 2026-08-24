@@ -1,4 +1,4 @@
-﻿use super::condition::ConditionContext;
+use super::condition::ConditionContext;
 use super::enums::{ActionType, Zone};
 use super::types::{
     Choice, ChoiceBuilder, ChoiceResult, ChoiceRoute, ExecutionContext, LookAndSelectStep,
@@ -134,7 +134,7 @@ impl super::resolver::AbilityResolver {
             let next = self.pending_repeat_actions.remove(0);
             gs.ability_queue.set_pending_actions(vec![*next]);
             self.pending_choice = Some(Choice::SelectTarget {
-                target: "pay_optional_cost:skip_optional_cost".to_string(),
+                target: crate::ability::types::PAY_SKIP_TARGET.to_string(),
                 description: "Repeat effect?".to_string(),
                 description_en: Some("Repeat effect?".to_string()),
                 description_ja: Some("効果を繰り返しますか？".to_string()),

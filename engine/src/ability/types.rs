@@ -25,6 +25,12 @@ pub struct TriggerEvent {
     pub energy_placed_by_player: Option<String>,
 }
 
+/// The shared 「〜してもよい／支払う？」 gate target. ONE definition: emitted by
+/// `AbilityResolver::emit_pay_skip_gate`, parsed by
+/// `SelectTargetKind::PayOptionalCostSkipOptionalCost`, answered by
+/// `handle_optional_cost_payment`, and matched by frontend action generation.
+pub const PAY_SKIP_TARGET: &str = "pay_optional_cost:skip_optional_cost";
+
 /// Discriminator for routing choice results to the correct handler.
 /// Statically known routes are enum variants; dynamic routes (e.g. position_change
 /// with card_no) use `Raw`.

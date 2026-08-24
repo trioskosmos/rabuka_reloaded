@@ -733,7 +733,7 @@ impl SelectTargetKind {
         match s {
             "choice" => Some(Self::Choice),
             "choice_string" => Some(Self::ChoiceString),
-            "pay_optional_cost:skip_optional_cost" => Some(Self::PayOptionalCostSkipOptionalCost),
+            crate::ability::types::PAY_SKIP_TARGET => Some(Self::PayOptionalCostSkipOptionalCost),
             "double_baton_touch" => Some(Self::DoubleBatonTouch),
             "primary|alternative" => Some(Self::PrimaryAlternative),
             "apply_replacement" => Some(Self::ApplyReplacement),
@@ -755,7 +755,7 @@ impl SelectTargetKind {
         match self {
             Self::Choice => "choice",
             Self::ChoiceString => "choice_string",
-            Self::PayOptionalCostSkipOptionalCost => "pay_optional_cost:skip_optional_cost",
+            Self::PayOptionalCostSkipOptionalCost => crate::ability::types::PAY_SKIP_TARGET,
             Self::DoubleBatonTouch => "double_baton_touch",
             Self::PrimaryAlternative => "primary|alternative",
             Self::ApplyReplacement => "apply_replacement",
