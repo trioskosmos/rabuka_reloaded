@@ -1,24 +1,24 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T06:00:41.044422+00:00",
+  "generated_at": "2026-08-24T06:07:01.128062+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 451,
-  "n_tests": 2704,
+  "n_files": 452,
+  "n_tests": 2707,
   "total_cards": 771,
-  "covered_cards": 653,
-  "abilities_on_covered": 817,
+  "covered_cards": 656,
+  "abilities_on_covered": 820,
   "trigger_counts": {
     "起動": [
       84,
       96
     ],
     "登場": [
-      233,
+      236,
       269
     ],
     "ライブ開始時": [
@@ -48,7 +48,7 @@
       146
     ],
     "look_and_select": [
-      50,
+      53,
       71
     ],
     "gain_resource": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      466,
+      469,
       545
     ],
     "temporal_condition": [
@@ -292,11 +292,11 @@
       111
     ],
     "pb1": [
-      118,
+      120,
       137
     ],
     "sd2": [
-      23,
+      24,
       31
     ],
     "pb2": [
@@ -310,9 +310,9 @@
   },
   "depth_counts": {
     "L2+choice": 597,
-    "L1+choice": 147,
+    "L1+choice": 150,
     "L2": 25,
-    "none": 119,
+    "none": 116,
     "L1": 48
   },
   "qa_rulings": {
@@ -9460,7 +9460,8 @@
         "engine/tests/test_modules/l0_gap_constant_test.rs",
         "engine/tests/test_modules/sumire_bp4_test.rs",
         "engine/tests/test_modules/untested_abilities_batch18_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch21_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch21_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch26_test.rs"
       ],
       "covering_tests": [
         "ayumu_empty_energy_deck_no_effect",
@@ -9486,15 +9487,15 @@
         "kanon_one_per_group_not_multiple_from_same_group",
         "kanon_selects_each_group_to_deck_bottom_and_draws",
         "kanon_skip_placement_no_draw",
+        "pb1015_look5_catchu_card_to_hand",
+        "pb1016_look5_kaleidoscore_card_to_hand",
         "pb2015_catchu_debut_retrieves_catchu_card",
         "pb2019_5yncri5e_debut_retrieves_5yncri5e_card",
         "pb2021_kaleidoscope_debut_retrieves_kaleido_card",
         "q266_cost_b0_waits_nothing_incl_blade0",
-        "q266_cost_b1_waits_nothing",
-        "q266_cost_b2_waits_blade0_not_blade1",
-        "q266_cost_b4_waits_blade2_not_blade3"
+        "q266_cost_b1_waits_nothing"
       ],
-      "covering_test_count": 48,
+      "covering_test_count": 51,
       "is_null": false
     },
     {
@@ -16542,7 +16543,8 @@
       "covering_files": [
         "engine/tests/test_modules/movement_tracking_characterization_test.rs",
         "engine/tests/test_modules/untested_abilities_batch16_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch20_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch20_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch26_test.rs"
       ],
       "covering_tests": [
         "activation_discard_cost_feeds_movement_views",
@@ -16552,13 +16554,16 @@
         "bp4018_rests_self_to_waitroom_retrieves_liella",
         "clear_card_movement_tracking_resets_turn_scope",
         "non_area_moves_do_not_record_area_movement",
+        "pb1015_look5_catchu_card_to_hand",
+        "pb1016_look5_kaleidoscore_card_to_hand",
         "pb1028_look2_adds_one_to_hand",
         "proteinbar_discard2_retrieves_niji_member",
         "push_movement_event_syncs_all_views",
+        "sd2012_look3_nijigasaki_card_to_hand",
         "second_move_appends_and_updates_recent_zone_only",
         "stage_to_stage_move_also_records_area_movement"
       ],
-      "covering_test_count": 12,
+      "covering_test_count": 15,
       "is_null": false
     },
     {
@@ -25010,14 +25015,20 @@
         "PL!N-sd2-014-SD2"
       ],
       "base": "PL!N-sd2-012",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch26_test.rs"
+      ],
+      "covering_tests": [
+        "pb1015_look5_catchu_card_to_hand",
+        "pb1016_look5_kaleidoscore_card_to_hand",
+        "sd2012_look3_nijigasaki_card_to_hand"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -27808,14 +27819,20 @@
         "PL!SP-pb1-015-N"
       ],
       "base": "PL!SP-pb1-015",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch26_test.rs"
+      ],
+      "covering_tests": [
+        "pb1015_look5_catchu_card_to_hand",
+        "pb1016_look5_kaleidoscore_card_to_hand",
+        "sd2012_look3_nijigasaki_card_to_hand"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -27832,14 +27849,20 @@
         "PL!SP-pb1-016-N"
       ],
       "base": "PL!SP-pb1-016",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch26_test.rs"
+      ],
+      "covering_tests": [
+        "pb1015_look5_catchu_card_to_hand",
+        "pb1016_look5_kaleidoscore_card_to_hand",
+        "sd2012_look3_nijigasaki_card_to_hand"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
