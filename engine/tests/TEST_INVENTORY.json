@@ -1,24 +1,24 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T03:21:08.337127+00:00",
+  "generated_at": "2026-08-24T05:21:05.084553+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 446,
-  "n_tests": 2691,
+  "n_files": 449,
+  "n_tests": 2699,
   "total_cards": 771,
-  "covered_cards": 648,
-  "abilities_on_covered": 812,
+  "covered_cards": 650,
+  "abilities_on_covered": 814,
   "trigger_counts": {
     "起動": [
       84,
       96
     ],
     "登場": [
-      229,
+      231,
       269
     ],
     "ライブ開始時": [
@@ -52,11 +52,11 @@
       71
     ],
     "gain_resource": [
-      143,
+      144,
       160
     ],
     "sequential": [
-      175,
+      176,
       219
     ],
     "unknown": [
@@ -202,7 +202,7 @@
       73
     ],
     "movement:baton_touch": [
-      13,
+      15,
       18
     ],
     "ability_filter_condition": [
@@ -272,7 +272,7 @@
       66
     ],
     "bp2": [
-      62,
+      63,
       68
     ],
     "bp4": [
@@ -292,7 +292,7 @@
       111
     ],
     "pb1": [
-      115,
+      116,
       137
     ],
     "sd2": [
@@ -310,10 +310,10 @@
   },
   "depth_counts": {
     "L2+choice": 597,
-    "L1+choice": 144,
-    "L2": 24,
-    "L1": 47,
-    "none": 124
+    "L1+choice": 146,
+    "L2": 25,
+    "none": 122,
+    "L1": 46
   },
   "qa_rulings": {
     "covered": 272,
@@ -413,6 +413,7 @@
         "engine/tests/test_modules/setsuna_test.rs",
         "engine/tests/test_modules/sunny_test.rs",
         "engine/tests/test_modules/untested_abilities_batch17_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch23_test.rs",
         "engine/tests/test_modules/untested_abilities_batch4_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
@@ -442,16 +443,16 @@
         "bouken_gain_ability_draws_on_live_success",
         "bouken_gain_ability_no_draw_on_failed_live",
         "bouken_three_options",
+        "bp2008_baton_over_cheaper_dollchestra_gains_two_blades",
+        "bp2008_baton_over_expensive_dollchestra_no_blades",
         "bp6009_center_side_blade2_members_live_total_plus1",
         "bp7024_debut_heart01_with_three_r3birth",
         "bp7024_debut_no_heart01_with_two_r3birth",
         "center_mus_with_2_heart03_reduces_1",
         "center_mus_zero_heart03_no_reduction",
-        "center_non_mus_no_reduction",
-        "choice_condition_shows_proper_labels_in_actions",
-        "cutie_panther_live_start_reduce_hearts"
+        "center_non_mus_no_reduction"
       ],
-      "covering_test_count": 397,
+      "covering_test_count": 401,
       "is_null": false
     },
     {
@@ -881,6 +882,7 @@
         "engine/tests/test_modules/energy_and_member_under_test.rs",
         "engine/tests/test_modules/himeno_test.rs",
         "engine/tests/test_modules/live_success_rules_test.rs",
+        "engine/tests/test_modules/prohibition_layer_characterization_test.rs",
         "engine/tests/test_modules/rurino_test.rs",
         "engine/tests/test_modules/score_condition_integration_test.rs",
         "engine/tests/test_modules/untested_abilities_batch16_test.rs",
@@ -898,6 +900,8 @@
         "ayumu_bp5n_heart01_condition_passes_but_modifier_not_found",
         "both_players_have_live_cards",
         "both_players_live_score_compared",
+        "bp2024_cannot_place_blocks_both_live_zones",
+        "bp2024_positive_control_normal_live_card_is_placeable",
         "bp3004_rest_self_and_discard_retrieves_niji_live",
         "bp4018_rests_self_to_waitroom_retrieves_liella",
         "compound_dododo_hasunosora_on_stage_passes",
@@ -914,11 +918,9 @@
         "hasunosora_group_no_member_fails",
         "heartbeat_bp4021_escalating_thresholds",
         "himeno_bp6_cost_no_reduction_without_mirakura",
-        "himeno_bp6_cost_reduced_by_mirakura_on_stage",
-        "himeno_bp6_cost_reduced_by_two_mirakura",
-        "himeno_bp6_delayed_cannot_active_blocks_activation"
+        "himeno_bp6_cost_reduced_by_mirakura_on_stage"
       ],
-      "covering_test_count": 89,
+      "covering_test_count": 94,
       "is_null": true
     },
     {
@@ -1109,6 +1111,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization_promoted_test.rs",
         "engine/tests/test_modules/kanata_bp1_test.rs",
         "engine/tests/test_modules/kanata_restrict_test.rs",
         "engine/tests/test_modules/konata_bp1_test.rs",
@@ -1137,6 +1140,7 @@
         "ll_bp2001_cannot_be_baton_touched_out",
         "mijuku_dreamer_refresh_condition_scores",
         "natsumi_bp4009_blade_constant_tracks_cost_total_race",
+        "nijigasaki_bp1_006r_pay_two_draw_one",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "no_appearance_condition_fails",
         "non_niji_member_does_not_activate",
@@ -1148,7 +1152,7 @@
         "use_limit_blocks_both_abilities",
         "wondermates_activates_waited_nijigasaki_enabling_activation"
       ],
-      "covering_test_count": 29,
+      "covering_test_count": 30,
       "is_null": false
     },
     {
@@ -1447,6 +1451,8 @@
         "bella_positive_surplus_heart04_ability_fires",
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "bella_q174_no_member_on_stage_ability_does_not_fire",
+        "bp2024_cannot_place_blocks_both_live_zones",
+        "bp2024_positive_control_normal_live_card_is_placeable",
         "choice_condition_shows_proper_labels_in_actions",
         "dia_sd1_optional_draw_pay_then_deck_top",
         "dia_sd1_optional_draw_skip_skips_movement",
@@ -1457,11 +1463,9 @@
         "distortion_q103_two_triggers_only_one_plus_1",
         "distortion_q96_score_permanent_after_energy_used",
         "distortion_q97_all_active_no_catchu_score_plus_1",
-        "distortion_same_name_catchu_all_active_score_plus_1",
-        "distortion_same_name_catchu_condition_not_met",
-        "distortion_two_same_one_diff_catchu_condition_met"
+        "distortion_same_name_catchu_all_active_score_plus_1"
       ],
-      "covering_test_count": 91,
+      "covering_test_count": 93,
       "is_null": false
     },
     {
@@ -1910,14 +1914,19 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/untested_abilities_batch20_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch20_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch23_test.rs"
       ],
       "covering_tests": [
         "bp1011_look5_reveals_live_card_to_hand",
+        "bp2008_baton_over_cheaper_dollchestra_gains_two_blades",
+        "bp2008_baton_over_expensive_dollchestra_no_blades",
         "bp3012_look4_reveals_niji_card_to_hand",
+        "pb1014_baton_over_other_name_no_draw",
+        "pb1014_baton_over_own_name_draws_two_discards_one",
         "pb1028_look2_adds_one_to_hand"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 7,
       "is_null": false
     },
     {
@@ -1999,6 +2008,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization_promoted_test.rs",
         "engine/tests/test_modules/kanata_bp1_test.rs",
         "engine/tests/test_modules/kanata_restrict_test.rs",
         "engine/tests/test_modules/konata_bp1_test.rs",
@@ -2025,6 +2035,7 @@
         "ll_bp2001_cannot_be_baton_touched_out",
         "mijuku_dreamer_refresh_condition_scores",
         "natsumi_bp4009_blade_constant_tracks_cost_total_race",
+        "nijigasaki_bp1_006r_pay_two_draw_one",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "no_appearance_condition_fails",
         "non_niji_member_does_not_activate",
@@ -2035,7 +2046,7 @@
         "use_limit_blocks_both_abilities",
         "wondermates_activates_waited_nijigasaki_enabling_activation"
       ],
-      "covering_test_count": 27,
+      "covering_test_count": 28,
       "is_null": false
     },
     {
@@ -11884,10 +11895,10 @@
       ],
       "base": "PL!HS-bp5-004",
       "covered": true,
-      "depth": "L1",
+      "depth": "L2",
       "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/modifier_layer_characterization_test.rs",
         "engine/tests/test_modules/prohibition_layer_characterization_test.rs",
@@ -11896,6 +11907,8 @@
         "engine/tests/test_modules/untested_abilities_batch14_test.rs"
       ],
       "covering_tests": [
+        "bp2024_cannot_place_blocks_both_live_zones",
+        "bp2024_positive_control_normal_live_card_is_placeable",
         "bp7014_constant_heart_lost_when_tied",
         "bp7014_constant_heart_while_opp_energy_ahead",
         "bp7020_constant_blades_off_when_behind",
@@ -11918,7 +11931,7 @@
         "sd2_008_constant_heart_without_expensive_member",
         "temporary_live_end_effect_expires_when_live_phase_ends"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 23,
       "is_null": false
     },
     {
@@ -13255,6 +13268,8 @@
       ],
       "covering_tests": [
         "all_three_liella_only_center_gets_modifier",
+        "bp2024_cannot_place_blocks_both_live_zones",
+        "bp2024_positive_control_normal_live_card_is_placeable",
         "center_empty_no_one_gets_modifier",
         "chisato_natsumi_baton_replacing_non_liella_counts_only_liella",
         "chisato_natsumi_blade_bonus_expires_at_live_end",
@@ -13281,11 +13296,9 @@
         "kanon_alone_cannot_live",
         "kanon_alone_on_stage_prohibits_live",
         "kanon_with_other_member_no_restriction",
-        "kanon_with_teammate_live_allowed_again",
-        "liella_at_left_side_excluded_by_position",
-        "liella_at_right_side_excluded_by_position"
+        "kanon_with_teammate_live_allowed_again"
       ],
-      "covering_test_count": 59,
+      "covering_test_count": 61,
       "is_null": false
     },
     {
@@ -14624,6 +14637,8 @@
         "bella_positive_surplus_heart04_ability_fires",
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "bella_q174_no_member_on_stage_ability_does_not_fire",
+        "bp2024_cannot_place_blocks_both_live_zones",
+        "bp2024_positive_control_normal_live_card_is_placeable",
         "choice_condition_shows_proper_labels_in_actions",
         "dia_sd1_optional_draw_pay_then_deck_top",
         "dia_sd1_optional_draw_skip_skips_movement",
@@ -14634,11 +14649,9 @@
         "distortion_q103_two_triggers_only_one_plus_1",
         "distortion_q96_score_permanent_after_energy_used",
         "distortion_q97_all_active_no_catchu_score_plus_1",
-        "distortion_same_name_catchu_all_active_score_plus_1",
-        "distortion_same_name_catchu_condition_not_met",
-        "distortion_two_same_one_diff_catchu_condition_met"
+        "distortion_same_name_catchu_all_active_score_plus_1"
       ],
-      "covering_test_count": 86,
+      "covering_test_count": 88,
       "is_null": false
     },
     {
@@ -15191,14 +15204,21 @@
         "PL!HS-bp2-008-P"
       ],
       "base": "PL!HS-bp2-008",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch23_test.rs"
+      ],
+      "covering_tests": [
+        "bp2008_baton_over_cheaper_dollchestra_gains_two_blades",
+        "bp2008_baton_over_expensive_dollchestra_no_blades",
+        "pb1014_baton_over_other_name_no_draw",
+        "pb1014_baton_over_own_name_draws_two_discards_one"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -19863,14 +19883,21 @@
         "PL!N-pb1-014-P＋"
       ],
       "base": "PL!N-pb1-014",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch23_test.rs"
+      ],
+      "covering_tests": [
+        "bp2008_baton_over_cheaper_dollchestra_gains_two_blades",
+        "bp2008_baton_over_expensive_dollchestra_no_blades",
+        "pb1014_baton_over_other_name_no_draw",
+        "pb1014_baton_over_own_name_draws_two_discards_one"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {

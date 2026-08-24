@@ -685,6 +685,13 @@ def extract_source(text: str) -> Optional[str]:
             best_pos = pos
     if best_value is not None:
         return best_value
+    # を-construction the literal list misses: 「デッキを(1枚)上から/下から…」
+    # (e.g. pb1-014-R's mill clause). Only fires when 上から/下から directly
+    # follows a デッキを phrase, so draws (デッキを1枚引く) are unaffected.
+    if re.search(r"デッキを.{0,6}?上から", text):
+        return "deck_top"
+    if re.search(r"デッキを.{0,6}?下から", text):
+        return "deck_bottom"
     return extract_by_pattern(text, SOURCE_PATTERNS)
 
 
