@@ -91,6 +91,7 @@ pub mod untested_abilities_batch36_test;
 pub mod untested_abilities_batch37_test;
 pub mod untested_abilities_batch38_test;
 pub mod untested_abilities_batch39_test;
+pub mod untested_abilities_batch40_test;
 pub mod describe_parity_test;
 pub mod cannot_baton_touch_test;
 pub mod card_ability_tests;

@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T22:50:24.786463+00:00",
+  "generated_at": "2026-08-24T23:10:33.366166+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 466,
-  "n_tests": 2797,
+  "n_files": 467,
+  "n_tests": 2799,
   "total_cards": 771,
-  "covered_cards": 688,
-  "abilities_on_covered": 853,
+  "covered_cards": 690,
+  "abilities_on_covered": 855,
   "trigger_counts": {
     "起動": [
       86,
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      230,
+      232,
       268
     ],
     "(none)": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      196,
+      198,
       219
     ],
     "unknown": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      492,
+      494,
       545
     ],
     "temporal_condition": [
@@ -256,7 +256,7 @@
   },
   "set_counts": {
     "sd1": [
-      56,
+      57,
       58
     ],
     "PR": [
@@ -268,7 +268,7 @@
       56
     ],
     "bp3": [
-      65,
+      66,
       66
     ],
     "bp2": [
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 622,
+    "L2+choice": 624,
     "L1+choice": 157,
     "L2": 26,
-    "none": 83,
+    "none": 81,
     "L1": 48
   },
   "qa_rulings": {
@@ -16748,7 +16748,8 @@
         "engine/tests/test_modules/either_or_state_change_test.rs",
         "engine/tests/test_modules/remaining_quick_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch3_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch3_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch40_test.rs"
       ],
       "covering_tests": [
         "cara_q203_energy_and_member_gives_plus2",
@@ -16773,16 +16774,16 @@
         "niko_bp3009_cost13_condition_draw",
         "niko_bp3009_no_cost13_no_draw",
         "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "omoi_empty_waitroom_no_prompt",
         "pr032_declining_keeps_milled_cards_in_waitroom",
         "pr032_mills_shortfall_and_recovers_live_to_deck_top",
         "pr032_no_live_among_milled_no_prompt",
         "pr032_waitroom_at_threshold_mills_nothing",
         "pr032_waitroom_seven_mills_one_and_recovers_live",
         "ruby_bp5009_accept_optional_payment_fetches_and_grants_blades",
-        "ruby_bp5009_decline_optional_payment_fetches_nothing",
-        "suzuki_hsbp1008_mill_three_all_members_draws_one"
+        "ruby_bp5009_decline_optional_payment_fetches_nothing"
       ],
-      "covering_test_count": 35,
+      "covering_test_count": 37,
       "is_null": false
     },
     {
@@ -29908,14 +29909,19 @@
         "PL!S-bp3-021-L"
       ],
       "base": "PL!S-bp3-021",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch40_test.rs"
+      ],
+      "covering_tests": [
+        "omoi_empty_waitroom_no_prompt",
+        "ruby_no_aqours_in_hand_blade_still_optional"
+      ],
+      "covering_test_count": 2,
       "is_null": false
     },
     {
@@ -34964,6 +34970,7 @@
         "engine/tests/test_modules/untested_abilities_batch35_test.rs",
         "engine/tests/test_modules/untested_abilities_batch36_test.rs",
         "engine/tests/test_modules/untested_abilities_batch37_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch40_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
@@ -35001,7 +35008,7 @@
         "c13_bp2_005_or_semantics_still_works",
         "c13_no_matching_card_optional_same_as_reject"
       ],
-      "covering_test_count": 291,
+      "covering_test_count": 293,
       "is_null": false
     },
     {
@@ -35085,6 +35092,7 @@
         "engine/tests/test_modules/sumire_auto_test.rs",
         "engine/tests/test_modules/untested_abilities_batch32_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch40_test.rs",
         "engine/tests/test_modules/untested_abilities_test.rs",
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/you_debut_test.rs"
@@ -35113,15 +35121,15 @@
         "natsumi_rain_draws_and_discards_with_hasunosora_on_stage",
         "natsumi_rain_no_hasunosora_no_draw",
         "no_live_card_no_yell_no_success",
+        "omoi_empty_waitroom_no_prompt",
         "one_player_live_auto_higher_score",
         "pr032_declining_keeps_milled_cards_in_waitroom",
         "pr032_mills_shortfall_and_recovers_live_to_deck_top",
         "pr032_no_live_among_milled_no_prompt",
         "pr032_waitroom_at_threshold_mills_nothing",
-        "pr032_waitroom_seven_mills_one_and_recovers_live",
-        "q147_empty_need_heart_live_succeeds"
+        "pr032_waitroom_seven_mills_one_and_recovers_live"
       ],
-      "covering_test_count": 70,
+      "covering_test_count": 72,
       "is_null": false
     },
     {
@@ -35340,14 +35348,19 @@
         "PL!S-sd1-009-SD"
       ],
       "base": "PL!S-sd1-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch40_test.rs"
+      ],
+      "covering_tests": [
+        "omoi_empty_waitroom_no_prompt",
+        "ruby_no_aqours_in_hand_blade_still_optional"
+      ],
+      "covering_test_count": 2,
       "is_null": false
     },
     {
