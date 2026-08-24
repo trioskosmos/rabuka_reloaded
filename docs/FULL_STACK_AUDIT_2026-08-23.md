@@ -275,27 +275,37 @@ Part-0 holes; several silent-fallback paths can eat a regression unnoticed.
    negative cases plus edge cases (empty zones, boundary counts, wrong-type/wrong-name
    exclusions, sibling-ability interference). Take inspiration from the existing corpus of
    ~450 test files; follow `engine/tests/WRITING_TESTS.md`.
-2. **Then write conjunction tests** — abilities working in combination (two constants stacking,
+2. **Text-similarity search FIRST.** Before writing a new test, grep `cards/abilities.json`
+   and the existing suite for abilities with similar Japanese text (same clause shapes:
+   「〜かぎり」, 「そうした場合」, 「エールにより公開された…」, per-unit counts, name-substring
+   gates). A sibling ability with an existing test gives the setup idiom, the choice-drain
+   pattern AND a known-good engine path; adapt it instead of deriving from scratch. If the
+   sibling exists but is untested too, they share a batch.
+3. **Then write conjunction tests** — abilities working in combination (two constants stacking,
    trigger ordering between two players, temporary expiry vs re-registration, cost reductions +
    optional costs in one play chain).
-3. **Consult the rules corpus per card** — `cards/qa_data.json` rulings and `rules/rules.txt`
+4. **Consult the rules corpus per card** — `cards/qa_data.json` rulings and `rules/rules.txt`
    are part of the spec alongside the Japanese text; when they disagree with behavior, that is
    a bug.
-4. **Never assume — observe.** Run the specific test with
+5. **Never assume — observe.** Run the specific test with
    `$env:RUST_LOG="debug"; cargo test --test run_all <name> -- --nocapture` and read the
    condition-verdict/trace output before concluding anything about engine internals.
-5. **Feed findings back into refactoring** — tests that expose parser/decoder/handler weakness
+6. **Feed findings back into refactoring** — tests that expose parser/decoder/handler weakness
    become refactor tickets (P-items/R-items above); fix producers, not tests.
 
 Immediate targets (from the C1 decode-audit triage):
-- [ ] PL!N-bp4-010-R＋ ab#1 — 「それと同じカード名のカードが成功ライブカード置き場にある場合」
-      reference_card gate: pos/neg heart04 gain (`issue7_mifune_live_start_select_and_check`
-      currently asserts only that the member stays on stage — replace it).
-- [ ] PL!HS-sd1-018-SD ab#0 — waitroom live-card name-substring gate + 蓮ノ空≥3 member count:
-      pos/neg × both clauses.
-- [ ] PL!SP-bp2-001-R＋ ab#0 — negative case: no invalidatable Liella! → no recover
-      (positive covered by kanon_invalidate_test).
+- [x] PL!N-bp4-010-R＋ ab#1 — 「それと同じカード名のカードが成功ライブカード置き場にある場合」
+      reference_card gate: **real over-trigger bug found + fixed** (heart04 granted on
+      different-name success-zone card); pos/neg/empty pins in decode_audit_behavior_pins_test.
+      Replaces the assertion-free issue7_mifune_live_start_select_and_check.
+- [x] PL!HS-sd1-018-SD ab#0 — **real over-trigger bug found + fixed** (score+1 fired on ANY
+      waitroom live card; condition-side card_names was dropped at decode). Pins: pos,
+      wrong-name neg, 2-member neg, empty-waitroom neg, 104期Ver substring edge.
+- [x] PL!SP-bp2-001-R＋ ab#0 — negative case pinned: no invalidatable Liella! → no recovery.
 - [x] PL!N-bp7-011-R＋ ab#1 — already pinned by bp7_mia_play_cost_reduction_test (3 tests).
+
+| 08-24 | 7ca499f9 | Decode-audit follow-through: **two real over-trigger bugs fixed** (bp4-010-R+ ab#1 heart04 name gate; sd1-018 waitroom card_names gate) via ConditionCommon.card_names/reference_card + regenerated decoder; decode_audit instrumentation made generator-emitted + CI freshness check; 9 gameplay behavior pins (mifune ×3, dream believers ×5, kanon neg ×1). Suite **2688/0**, depth=none →113 |
+| 08-24 | — | Batch 30 (13 tests) + **third real bug fixed — has_moved/not_moved inversion**: the compiler stripped `"type":"has_moved"` as a tag without preserving it, so `Condition::Movement{movement:None}` classified EVERY moved-gate as NotMoved (gate inverted: fired when standing still, blocked after moving). Fix at all three layers: compile_abilities.py injects `movement` field from type tag (mirrors or_condition→operator precedent); enums classification maps `Some("not_moved")`→NotMoved; deep-compare oracle normalizes moved types before serde. Found via batch-30 千砂都 test drawing 2-without-move / 1-after-move — exactly inverted. Tests: 葉月恋 dual energy thresholds 5/6/7/8 boundary ×4, 桜坂しずく hand-cost−2 success-zone gate pos/neg/wrong-group, sweet&sweet holiday μ's-success-zone draw pos/neg/wrong-group, 千砂都 area-move draw pos/neg. Suite **2700/0**, covered cards 659→663, depth=none →109 |
 
 ---
 

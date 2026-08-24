@@ -14,8 +14,35 @@ mod bytecode_deep_compare {
         data["unique_abilities"].as_array().unwrap().clone()
     }
 
+    /// Mirror compile_abilities.py's condition normalization: `has_moved` /
+    /// `not_moved` type tags become `movement` field values so the serde path
+    /// classifies them identically to the bytecode path.
+    fn normalize_moved_types(v: &mut serde_json::Value) {
+        match v {
+            serde_json::Value::Object(map) => {
+                if map.get("type").and_then(|t| t.as_str()) == Some("has_moved")
+                    || map.get("type").and_then(|t| t.as_str()) == Some("not_moved")
+                {
+                    if let Some(t) = map.get("type").and_then(|t| t.as_str()).map(String::from) {
+                        map.insert("movement".into(), serde_json::Value::String(t));
+                    }
+                }
+                for (_, child) in map.iter_mut() {
+                    normalize_moved_types(child);
+                }
+            }
+            serde_json::Value::Array(arr) => {
+                for child in arr.iter_mut() {
+                    normalize_moved_types(child);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn json_path_decode(entry: &serde_json::Value) -> Option<Ability> {
         let mut normalized = entry.clone();
+        normalize_moved_types(&mut normalized);
         if let Some(cost_val) = normalized.get_mut("cost") {
             if let Some(obj) = cost_val.as_object_mut() {
                 rabuka_engine::ability::vm::normalize_cost_keys(obj);

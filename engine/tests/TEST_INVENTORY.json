@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T14:37:24.903038+00:00",
+  "generated_at": "2026-08-24T15:12:39.234431+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 456,
-  "n_tests": 2722,
+  "n_files": 457,
+  "n_tests": 2734,
   "total_cards": 771,
-  "covered_cards": 659,
-  "abilities_on_covered": 823,
+  "covered_cards": 663,
+  "abilities_on_covered": 827,
   "trigger_counts": {
     "起動": [
       85,
@@ -30,11 +30,11 @@
       2
     ],
     "ライブ成功時": [
-      101,
+      103,
       122
     ],
     "常時": [
-      113,
+      115,
       117
     ],
     "自動": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      181,
+      184,
       219
     ],
     "unknown": [
@@ -112,7 +112,7 @@
       7
     ],
     "modify_cost": [
-      14,
+      15,
       16
     ],
     "place_energy_under_member": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      471,
+      474,
       545
     ],
     "temporal_condition": [
@@ -210,7 +210,7 @@
       2
     ],
     "group_condition": [
-      37,
+      38,
       44
     ],
     "or_condition": [
@@ -284,7 +284,7 @@
       134
     ],
     "bp6": [
-      67,
+      68,
       82
     ],
     "bp7": [
@@ -296,11 +296,11 @@
       137
     ],
     "sd2": [
-      24,
+      26,
       31
     ],
     "pb2": [
-      36,
+      37,
       43
     ],
     "cl1": [
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 600,
+    "L2+choice": 604,
     "L1+choice": 150,
     "L2": 25,
-    "none": 113,
+    "none": 109,
     "L1": 48
   },
   "qa_rulings": {
@@ -10086,6 +10086,7 @@
         "engine/tests/test_modules/qa_new_tests257.rs",
         "engine/tests/test_modules/shioriko_bp4_swap_test.rs",
         "engine/tests/test_modules/special_blade_heart_rules_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch30_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs"
       ],
       "covering_tests": [
@@ -10109,18 +10110,18 @@
         "b_heart07_parses_to_colorless_heart00",
         "b_heart07_yell_contributes_two_colorless_hearts_each",
         "baton_touch_search_adds_hasu_live_to_hand",
+        "bp6_023_draws_extra_with_mus_live_in_success_zone",
+        "bp6_023_non_mus_live_in_success_zone_single_draw",
+        "bp6_023_single_draw_without_success_zone_card",
         "butterfly_to_butterfly_wing_matches",
         "butterfly_wing_to_butterfly_no_match",
         "colorless_hearts_cannot_fill_colored_requirement",
         "colorless_hearts_fill_heart0_when_colored_hearts_present",
         "discarded_first_yell_hearts_are_lost",
         "dream_believers_104_to_105_no_match",
-        "dream_believers_105_to_104_no_match",
-        "dream_believers_105_to_base_no_match",
-        "dream_believers_empty_waitroom_no_bonus",
-        "dream_believers_members_and_name_match_score_plus_one"
+        "dream_believers_105_to_104_no_match"
       ],
-      "covering_test_count": 156,
+      "covering_test_count": 168,
       "is_null": true
     },
     {
@@ -11661,10 +11662,14 @@
         "engine/tests/test_modules/position_change_non_optional_test.rs",
         "engine/tests/test_modules/position_change_triggers_jidou_move_test.rs",
         "engine/tests/test_modules/special_color_test.rs",
-        "engine/tests/test_modules/sumire_bp5_test.rs"
+        "engine/tests/test_modules/sumire_bp5_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch30_test.rs"
       ],
       "covering_tests": [
         "all_three_liella_only_center_gets_modifier",
+        "bp6_023_draws_extra_with_mus_live_in_success_zone",
+        "bp6_023_non_mus_live_in_success_zone_single_draw",
+        "bp6_023_single_draw_without_success_zone_card",
         "center_empty_no_one_gets_modifier",
         "chisato_area_move_gains_blade",
         "chisato_auto_first_no_energy",
@@ -11690,12 +11695,9 @@
         "liella_blade_1_gets_correct_modifier",
         "liella_blade_2_gets_correct_modifier",
         "liella_blade_4_gets_set_to_3_not_plus_3",
-        "liella_blade_4_with_existing_modifier",
-        "may_area_move_adds_liella_live",
-        "multiple_liella_only_center_gets_modifier",
-        "natsumi_yell_no_blade_heart_gains_heart02"
+        "liella_blade_4_with_existing_modifier"
       ],
-      "covering_test_count": 80,
+      "covering_test_count": 92,
       "is_null": false
     },
     {
@@ -35946,14 +35948,29 @@
         "PL!-bp6-023-L"
       ],
       "base": "PL!-bp6-023",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch30_test.rs"
+      ],
+      "covering_tests": [
+        "bp6_023_draws_extra_with_mus_live_in_success_zone",
+        "bp6_023_non_mus_live_in_success_zone_single_draw",
+        "bp6_023_single_draw_without_success_zone_card",
+        "pb2_027_eight_energy_two_hearts",
+        "pb2_027_five_energy_no_heart",
+        "pb2_027_seven_energy_still_one_heart",
+        "pb2_027_six_energy_one_heart",
+        "sd2_003_draws_extra_after_area_move",
+        "sd2_003_hand_cost_full_without_success_zone_card",
+        "sd2_003_hand_cost_reduced_with_nijigasaki_live_in_success_zone",
+        "sd2_003_non_nijigasaki_live_does_not_reduce_cost",
+        "sd2_003_single_draw_without_area_move"
+      ],
+      "covering_test_count": 12,
       "is_null": false
     },
     {
@@ -37477,14 +37494,29 @@
         "PL!SP-sd2-003-SD2"
       ],
       "base": "PL!SP-sd2-003",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch30_test.rs"
+      ],
+      "covering_tests": [
+        "bp6_023_draws_extra_with_mus_live_in_success_zone",
+        "bp6_023_non_mus_live_in_success_zone_single_draw",
+        "bp6_023_single_draw_without_success_zone_card",
+        "pb2_027_eight_energy_two_hearts",
+        "pb2_027_five_energy_no_heart",
+        "pb2_027_seven_energy_still_one_heart",
+        "pb2_027_six_energy_one_heart",
+        "sd2_003_draws_extra_after_area_move",
+        "sd2_003_hand_cost_full_without_success_zone_card",
+        "sd2_003_hand_cost_reduced_with_nijigasaki_live_in_success_zone",
+        "sd2_003_non_nijigasaki_live_does_not_reduce_cost",
+        "sd2_003_single_draw_without_area_move"
+      ],
+      "covering_test_count": 12,
       "is_null": false
     },
     {
@@ -38014,14 +38046,29 @@
         "PL!SP-pb2-027-N"
       ],
       "base": "PL!SP-pb2-027",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch30_test.rs"
+      ],
+      "covering_tests": [
+        "bp6_023_draws_extra_with_mus_live_in_success_zone",
+        "bp6_023_non_mus_live_in_success_zone_single_draw",
+        "bp6_023_single_draw_without_success_zone_card",
+        "pb2_027_eight_energy_two_hearts",
+        "pb2_027_five_energy_no_heart",
+        "pb2_027_seven_energy_still_one_heart",
+        "pb2_027_six_energy_one_heart",
+        "sd2_003_draws_extra_after_area_move",
+        "sd2_003_hand_cost_full_without_success_zone_card",
+        "sd2_003_hand_cost_reduced_with_nijigasaki_live_in_success_zone",
+        "sd2_003_non_nijigasaki_live_does_not_reduce_cost",
+        "sd2_003_single_draw_without_area_move"
+      ],
+      "covering_test_count": 12,
       "is_null": false
     },
     {
@@ -40336,14 +40383,29 @@
         "PL!N-sd2-003-SD2"
       ],
       "base": "PL!N-sd2-003",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch30_test.rs"
+      ],
+      "covering_tests": [
+        "bp6_023_draws_extra_with_mus_live_in_success_zone",
+        "bp6_023_non_mus_live_in_success_zone_single_draw",
+        "bp6_023_single_draw_without_success_zone_card",
+        "pb2_027_eight_energy_two_hearts",
+        "pb2_027_five_energy_no_heart",
+        "pb2_027_seven_energy_still_one_heart",
+        "pb2_027_six_energy_one_heart",
+        "sd2_003_draws_extra_after_area_move",
+        "sd2_003_hand_cost_full_without_success_zone_card",
+        "sd2_003_hand_cost_reduced_with_nijigasaki_live_in_success_zone",
+        "sd2_003_non_nijigasaki_live_does_not_reduce_cost",
+        "sd2_003_single_draw_without_area_move"
+      ],
+      "covering_test_count": 12,
       "is_null": false
     },
     {

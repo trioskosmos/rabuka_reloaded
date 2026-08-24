@@ -3448,6 +3448,9 @@ impl Condition {
             Condition::Movement {
                 movement: Some(m), ..
             } if m.as_ref() == "has_moved" => Some(ConditionType::HasMoved),
+            Condition::Movement {
+                movement: Some(m), ..
+            } if m.as_ref() == "not_moved" => Some(ConditionType::NotMoved),
             Condition::Movement { .. } => Some(ConditionType::MovementCondition),
             Condition::Group { .. } => Some(ConditionType::GroupCondition),
             Condition::Appearance { .. } => Some(ConditionType::AppearanceCondition),

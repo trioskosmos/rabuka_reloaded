@@ -293,6 +293,12 @@ def compile_all(abilities):
                 # the decoded bytecode matches the oracle.
                 if t == "or_condition" and "operator" not in v:
                     v["operator"] = "or"
+                # has_moved / not_moved: the type string IS the discriminator,
+                # but it is stripped below. Preserve it in the `movement` field
+                # so condition_type() classifies the decoded Movement variant
+                # as HasMoved / NotMoved instead of defaulting to NotMoved.
+                if t in ("has_moved", "not_moved") and "movement" not in v:
+                    v["movement"] = t
                 if vtag is not None:
                     v.pop("type", None)
                     out.append(0x09)  # TAG_OBJECT_VARIANT
