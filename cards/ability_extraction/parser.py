@@ -77,18 +77,16 @@ Condition types produced (type field in condition dict):
 
 """
 
-import json
 import re
 import copy
 import sys
 from functools import lru_cache
-from typing import Dict, Any, Optional, Tuple, List, Union
+from typing import Dict, Any, Optional, Tuple, List
 
 
 from parser_utils import (
     extract_count,
     extract_dynamic_count,
-    extract_group_name,
     COUNT_PATTERN,
     normalize_fullwidth_digits,
     strip_suffix_period,
@@ -107,12 +105,8 @@ from parser_utils import (
     detect_card_property,
     detect_require_all_hearts,
     check_original_value,
-    SOURCE_PATTERNS,
-    DESTINATION_PATTERNS,
     STATE_CHANGE_PATTERNS,
     LOCATION_PATTERNS,
-    CARD_TYPE_PATTERNS,
-    OPERATOR_PATTERNS,
     POSITION_KEYWORDS,
     _ALL_KW_RE,
     _OPTIONAL_RE,
@@ -147,7 +141,6 @@ detect_require_all_hearts = lru_cache(maxsize=16384)(detect_require_all_hearts)
 check_original_value = lru_cache(maxsize=16384)(check_original_value)
 
 # ============== CONFIGURATION CONSTANTS ==============
-MAX_CHARACTER_NAME_LENGTH = 10
 SPLIT_LIMIT = 1
 
 
@@ -296,7 +289,6 @@ DURATION_MARKER = "かぎり"
 COMPOUND_OPERATOR = "かつ"
 PER_UNIT_MARKER = "につき"
 EACH_TIME_MARKER = "たび"
-EITHER_CASE_MARKER = "いずれかの場合"
 ALTERNATIVE_MARKER = "代わりに"
 
 # ============== DURATION PREFIXES ==============
@@ -515,6 +507,11 @@ def categorize_quoted_text(quoted_text: List[str]) -> Dict[str, List[str]]:
         else:
             result["characters"].append(q)
     return result
+
+
+def deduped_groups(text):
+    """Group names from 『』, deduplicated preserving first-seen order."""
+    return list(dict.fromkeys(extract_all_groups(text)))
 
 
 def _quoted_names(text: str) -> List[str]:
@@ -1335,7 +1332,7 @@ def _cost_energy(text, cost):
                 "type": "sequential_cost",
                 "costs": [parse_cost(energy_text), other_cost],
             }
-            if "もよい" in text or "てもよい" in text:
+            if extract_optional(text):
                 result["optional"] = True
                 for cp in result["costs"]:
                     cp["optional"] = True
@@ -1345,7 +1342,7 @@ def _cost_energy(text, cost):
     cost["energy"] = energy_count
     cost["zone"] = "energy_zone"
     cost["count"] = energy_count
-    if "もよい" in text or "てもよい" in text:
+    if extract_optional(text):
         cost["optional"] = True
     if "好きな数" in text or "任意の数" in text:
         cost["any_number"] = True
@@ -1455,7 +1452,7 @@ def _classify_cost(cost, text):
         return "change_state"
     if "{{icon_energy.png|E}}" in text and ("支払う" in text or "支払って" in text):
         cost["energy"] = text.count("{{icon_energy.png|E}}")
-        if "もよい" in text or "てもよい" in text:
+        if extract_optional(text):
             cost["optional"] = True
         return "pay_energy"
     if cost.get("source"):
@@ -1510,7 +1507,7 @@ def parse_cost(text: str) -> Dict[str, Any]:
         cost["characters"] = include_chars
     if exclude_chars:
         cost["exclude_characters"] = exclude_chars
-    if "もよい" in text or "てもよい" in text:
+    if extract_optional(text):
         cost["optional"] = True
     gns = extract_all_groups(text)
     if gns:
@@ -5021,7 +5018,7 @@ def _try_placed_discard_live_or_member(text):
     if not ("控え室に置いた" in text or "置いたカード" in text):
         return None
     # Group name(s) from 『』 (e.g. 『虹ヶ咲』).
-    groups = list(dict.fromkeys(extract_all_groups(text)))
+    groups = deduped_groups(text)
     if not groups:
         return None
     # Only fire when the live-card alternative and the blade-heartless member
@@ -5076,7 +5073,7 @@ def _try_discard_live_and_member_optional(text):
         return None
     if "そうしたとき" not in text:
         return None
-    groups = list(dict.fromkeys(extract_all_groups(text)))
+    groups = deduped_groups(text)
     if not groups:
         return None
 
@@ -5150,7 +5147,7 @@ def _try_those_cards_add_hand_optional(text):
     opt_text, _, cons_text = text.partition("そうしたとき")
     opt_text = opt_text.strip()
     cons_text = cons_text.strip().lstrip("、")
-    groups = list(dict.fromkeys(extract_all_groups(opt_text)))
+    groups = deduped_groups(opt_text)
     m = re.search(r"(\d+)枚", opt_text)
     count = int(m.group(1)) if m else 1
     card_type = "live_card" if "ライブカード" in opt_text else "card"
@@ -5194,7 +5191,7 @@ def _try_discard_shuffle_to_bottom_optional(text):
     opt_text, _, cons_text = text.partition("そうしたとき")
     opt_text = opt_text.strip()
     cons_text = cons_text.strip().lstrip("、")
-    groups = list(dict.fromkeys(extract_all_groups(opt_text)))
+    groups = deduped_groups(opt_text)
     m = re.search(r"(\d+)枚", opt_text)
     # "それぞれ1枚ずつ" = 1 from EACH group → the total count equals the number of groups.
     per_each = "それぞれ" in opt_text or "ずつ" in opt_text
@@ -10127,7 +10124,7 @@ def _try_play_time_cost_set(text):
     # 控え室に置く / 置いて / 置き — any placement form
     if not characters or "控え室に置" not in move_text:
         return None
-    optional = "てもよい" in move_text or "てもよい" in text
+    optional = extract_optional(move_text)
     effect = {
         "text": text,
         "action": "modify_cost",

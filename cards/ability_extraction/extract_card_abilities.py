@@ -384,14 +384,13 @@ def extract_all_abilities(cards_file: Path) -> dict:
             ):
                 print(f"Warning: Effect parsed with empty actions: {sample['triggerless_text'][:100]}")
                 print(f"Effect dict: {effect}")
-        except Exception as e:
-            print(f"Error parsing effect: {sample['triggerless_text']}")
-            print(f"Exception: {e}")
-            import traceback
-
-            traceback.print_exc()
-            cost = None
-            effect = {"text": sample["triggerless_text"], "actions": []}
+        except Exception:
+            # A parse crash means the ability would silently do nothing in
+            # game. Surface it loudly and fail the run so it can never be
+            # baked into bytecode unnoticed.
+            print("ERROR: parse_ability crashed — ability would be a no-op!")
+            print(f"  text: {sample['triggerless_text'][:120]}")
+            raise
 
         _enrich_effect_type(effect, triggerless=sample["triggerless_text"])
 
