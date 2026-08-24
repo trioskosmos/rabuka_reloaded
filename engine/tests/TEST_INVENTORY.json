@@ -1,24 +1,24 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T13:13:56.044207+00:00",
+  "generated_at": "2026-08-24T13:26:54.949549+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 454,
-  "n_tests": 2710,
+  "n_files": 455,
+  "n_tests": 2712,
   "total_cards": 771,
-  "covered_cards": 658,
-  "abilities_on_covered": 822,
+  "covered_cards": 659,
+  "abilities_on_covered": 823,
   "trigger_counts": {
     "起動": [
       85,
       96
     ],
     "登場": [
-      237,
+      238,
       269
     ],
     "ライブ開始時": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      180,
+      181,
       219
     ],
     "unknown": [
@@ -202,7 +202,7 @@
       73
     ],
     "movement:baton_touch": [
-      17,
+      18,
       18
     ],
     "ability_filter_condition": [
@@ -260,7 +260,7 @@
       58
     ],
     "PR": [
-      43,
+      44,
       52
     ],
     "bp1": [
@@ -310,9 +310,9 @@
   },
   "depth_counts": {
     "L2+choice": 597,
-    "L1+choice": 152,
+    "L1+choice": 153,
     "L2": 25,
-    "none": 114,
+    "none": 113,
     "L1": 48
   },
   "qa_rulings": {
@@ -25234,6 +25234,7 @@
         "engine/tests/test_modules/takaramono_test.rs",
         "engine/tests/test_modules/tokimeki_test.rs",
         "engine/tests/test_modules/untested_abilities_batch28_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch29_test.rs",
         "engine/tests/test_modules/wao_wao_test.rs",
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/wonder_zone_max_repeats_test.rs",
@@ -25272,7 +25273,7 @@
         "c10_reveal_top_adds_to_hand",
         "c11_peek_per_niji_selects_keep1"
       ],
-      "covering_test_count": 376,
+      "covering_test_count": 378,
       "is_null": false
     },
     {
@@ -25348,6 +25349,7 @@
         "engine/tests/test_modules/takaramono_test.rs",
         "engine/tests/test_modules/tokimeki_test.rs",
         "engine/tests/test_modules/untested_abilities_batch28_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch29_test.rs",
         "engine/tests/test_modules/wao_wao_test.rs",
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/wonder_zone_max_repeats_test.rs",
@@ -25386,7 +25388,7 @@
         "c10_reveal_top_adds_to_hand",
         "c11_peek_per_niji_selects_keep1"
       ],
-      "covering_test_count": 376,
+      "covering_test_count": 378,
       "is_null": false
     },
     {
@@ -25662,6 +25664,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/nagi_live_card_draw_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch29_test.rs",
         "engine/tests/test_modules/untested_abilities_playthrough_test.rs"
       ],
       "covering_tests": [
@@ -25681,6 +25684,8 @@
         "n_pb1_006_activates_wait_energy_to_active",
         "n_pb1_006_can_activate_multiple_times",
         "n_pb1_006_wait_self_activates_one_energy",
+        "pr0045_baton_over_cost4_no_draw",
+        "pr0045_baton_over_cost7_draws",
         "sp_bp5_016_constant_evaluated_during_live_phase",
         "sp_bp5_016_energy_ge_10_grants_heart06_x2",
         "sp_bp5_016_energy_lt_10_grants_no_heart06",
@@ -25689,7 +25694,7 @@
         "test_multiple_live_cards_among_five_drawn_still_only_draw_one",
         "test_no_live_cards_among_five_drawn_no_draw"
       ],
-      "covering_test_count": 23,
+      "covering_test_count": 25,
       "is_null": false
     },
     {
@@ -26133,14 +26138,19 @@
         "PL!S-PR-045-PR"
       ],
       "base": "PL!S-PR-045",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch29_test.rs"
+      ],
+      "covering_tests": [
+        "pr0045_baton_over_cost4_no_draw",
+        "pr0045_baton_over_cost7_draws"
+      ],
+      "covering_test_count": 2,
       "is_null": false
     },
     {

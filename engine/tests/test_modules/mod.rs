@@ -340,6 +340,7 @@ pub mod untested_abilities_batch25_test;
 pub mod untested_abilities_batch26_test;
 pub mod untested_abilities_batch27_test;
 pub mod untested_abilities_batch28_test;
+pub mod untested_abilities_batch29_test;
 pub mod untested_abilities_batch23_test;
 pub mod untested_secondary_abilities_test;
 pub mod restriction_mechanics_test;
