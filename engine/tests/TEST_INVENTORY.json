@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T20:05:15.614081+00:00",
+  "generated_at": "2026-08-24T21:10:44.709692+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 461,
-  "n_tests": 2766,
+  "n_files": 462,
+  "n_tests": 2774,
   "total_cards": 771,
-  "covered_cards": 677,
-  "abilities_on_covered": 841,
+  "covered_cards": 679,
+  "abilities_on_covered": 843,
   "trigger_counts": {
     "起動": [
       85,
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      221,
+      222,
       268
     ],
     "(none)": [
@@ -30,7 +30,7 @@
       2
     ],
     "ライブ成功時": [
-      111,
+      112,
       122
     ],
     "常時": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      192,
+      193,
       219
     ],
     "unknown": [
@@ -64,7 +64,7 @@
       2
     ],
     "draw_card": [
-      42,
+      43,
       44
     ],
     "change_state": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      485,
+      486,
       545
     ],
     "temporal_condition": [
@@ -198,7 +198,7 @@
       88
     ],
     "location_condition": [
-      66,
+      67,
       73
     ],
     "movement:baton_touch": [
@@ -260,7 +260,7 @@
       58
     ],
     "PR": [
-      46,
+      47,
       52
     ],
     "bp1": [
@@ -292,7 +292,7 @@
       111
     ],
     "pb1": [
-      121,
+      122,
       137
     ],
     "sd2": [
@@ -311,8 +311,8 @@
   "depth_counts": {
     "L2+choice": 613,
     "L1+choice": 155,
-    "L2": 25,
-    "none": 95,
+    "L2": 27,
+    "none": 93,
     "L1": 48
   },
   "qa_rulings": {
@@ -649,6 +649,7 @@
         "engine/tests/test_modules/ren_test.rs",
         "engine/tests/test_modules/sumire_bp2_center_cost_test.rs",
         "engine/tests/test_modules/untested_abilities_batch31_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch35_test.rs",
         "engine/tests/test_modules/untested_abilities_test.rs",
         "engine/tests/test_modules/upper_batch_on_yell_test.rs",
         "engine/tests/test_modules/yoshiko_center_ability_test.rs",
@@ -686,7 +687,7 @@
         "center_highest_two_members_only",
         "center_lower_cost_no_heart"
       ],
-      "covering_test_count": 223,
+      "covering_test_count": 231,
       "is_null": false
     },
     {
@@ -9862,6 +9863,7 @@
         "engine/tests/test_modules/ll_bp7_001_triple_member_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/sayaka_loop_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch35_test.rs",
         "engine/tests/test_modules/victory_road_test.rs"
       ],
       "covering_tests": [
@@ -9896,7 +9898,7 @@
         "himeno_bp6_cost_no_reduction_without_mirakura",
         "himeno_bp6_cost_reduced_by_mirakura_on_stage"
       ],
-      "covering_test_count": 156,
+      "covering_test_count": 164,
       "is_null": false
     },
     {
@@ -9925,7 +9927,8 @@
         "engine/tests/test_modules/hasunosora_pb1_test.rs",
         "engine/tests/test_modules/himeno_test.rs",
         "engine/tests/test_modules/sumire_bp2_center_cost_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch31_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch31_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch35_test.rs"
       ],
       "covering_tests": [
         "all_equal_cost_no_heart",
@@ -9959,7 +9962,7 @@
         "himeno_bp6_q249_cost_reduced_by_three_mirakura",
         "himeno_edge_no_mirakura_skips"
       ],
-      "covering_test_count": 37,
+      "covering_test_count": 45,
       "is_null": false
     },
     {
@@ -12405,6 +12408,7 @@
         "engine/tests/test_modules/turn_scope_regression_test.rs",
         "engine/tests/test_modules/untested_abilities_batch2_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch35_test.rs",
         "engine/tests/test_modules/untested_abilities_batch3_test.rs",
         "engine/tests/test_modules/untested_abilities_batch4_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
@@ -12446,7 +12450,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 779,
+      "covering_test_count": 787,
       "is_null": false
     },
     {
@@ -26745,14 +26749,25 @@
         "PL!HS-PR-028-PR"
       ],
       "base": "PL!HS-PR-028",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L2",
+      "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch35_test.rs"
+      ],
+      "covering_tests": [
+        "pb1029_boosted_non_miraku_nothing",
+        "pb1029_one_boosted_miraku_draws_only",
+        "pb1029_two_boosted_miraku_draw_and_reduce_hearts",
+        "pb1029_unboosted_miraku_nothing",
+        "pr028_boost_on_non_member_does_not_count",
+        "pr028_boosted_member_draws",
+        "pr028_empty_stage_no_draw",
+        "pr028_unboosted_member_no_draw"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -34822,6 +34837,7 @@
         "engine/tests/test_modules/untested_abilities_batch32_test.rs",
         "engine/tests/test_modules/untested_abilities_batch33_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch35_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
@@ -34859,7 +34875,7 @@
         "c13_bp2_005_or_semantics_still_works",
         "c13_no_matching_card_optional_same_as_reject"
       ],
-      "covering_test_count": 270,
+      "covering_test_count": 278,
       "is_null": false
     },
     {
@@ -35675,14 +35691,25 @@
         "PL!HS-pb1-029-L"
       ],
       "base": "PL!HS-pb1-029",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L2",
+      "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch35_test.rs"
+      ],
+      "covering_tests": [
+        "pb1029_boosted_non_miraku_nothing",
+        "pb1029_one_boosted_miraku_draws_only",
+        "pb1029_two_boosted_miraku_draw_and_reduce_hearts",
+        "pb1029_unboosted_miraku_nothing",
+        "pr028_boost_on_non_member_does_not_count",
+        "pr028_boosted_member_draws",
+        "pr028_empty_stage_no_draw",
+        "pr028_unboosted_member_no_draw"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {

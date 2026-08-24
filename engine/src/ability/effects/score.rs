@@ -493,6 +493,15 @@ impl AbilityResolver {
                 true
             })
             .collect();
+        log::debug!(
+            "[MOD_REQ_HEARTS] op={} value={} colors={:?} self_target={:?} activating={:?} candidates={:?}",
+            operation,
+            value,
+            heart_colors,
+            effect.is_self_target(),
+            gs.activating_card,
+            card_ids
+        );
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card

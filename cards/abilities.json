@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-25T05:05:53.846077",
+  "generated_at": "2026-08-25T06:44:00.810391",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "11102386",
+  "engine_commit": "6bc91a14",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -32678,7 +32678,7 @@
             "condition": {
               "type": "card_count_condition",
               "count": 1,
-              "operator": ">=",
+              "operator": ">",
               "text": "自分のステージに、元々持つハートの数より多い数のハートを持つ『みらくらぱーく！』のメンバーが1人以上いる場合",
               "unit": "人",
               "card_type": "member_card",

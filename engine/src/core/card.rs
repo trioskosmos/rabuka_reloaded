@@ -3736,13 +3736,16 @@ impl Condition {
 
     pub fn get_original_value(&self) -> Option<bool> {
         match self {
-            Condition::Location { sub_checks, .. } => {
-                sub_checks.as_ref().and_then(|sc| sc.original_value)
-            }
+            // Bare-key original_value lands in ConditionCommon; the legacy
+            // LocationSubChecks nesting wins when both are present.
+            Condition::Location { common, sub_checks, .. } => sub_checks
+                .as_ref()
+                .and_then(|sc| sc.original_value)
+                .or(common.original_value),
             Condition::Compound { common, .. } | Condition::Comparison { common, .. } => {
                 common.original_value
             }
-            _ => None,
+            _ => self.common().and_then(|c| c.original_value),
         }
     }
 

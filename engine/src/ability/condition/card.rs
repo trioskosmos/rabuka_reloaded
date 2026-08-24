@@ -1265,27 +1265,35 @@ impl<'a> ConditionContext<'a> {
         }
 
         if !self.check_heart_type_all(condition, player, location) {
+            log::debug!("[LOC_COND] failed at check_heart_type_all");
             return false;
         }
         if !self.check_heart_colors(condition, player, location) {
+            log::debug!("[LOC_COND] failed at check_heart_colors");
             return false;
         }
         if !self.check_card_property(condition, player, location) {
+            log::debug!("[LOC_COND] failed at check_card_property");
             return false;
         }
         if !self.check_baton_touch(condition) {
+            log::debug!("[LOC_COND] failed at check_baton_touch");
             return false;
         }
         if let Some(res) = self.check_aggregate_total(condition, player, location) {
+            log::debug!("[LOC_COND] aggregate_total decided: {}", res);
             return res;
         }
         if !self.check_ability_filter(condition, player, location) {
+            log::debug!("[LOC_COND] failed at check_ability_filter");
             return false;
         }
         if !self.check_distinct_names(condition, player, location) {
+            log::debug!("[LOC_COND] failed at check_distinct_names");
             return false;
         }
         if !self.check_no_excess_heart(condition, player, target) {
+            log::debug!("[LOC_COND] failed at check_no_excess_heart");
             return false;
         }
 
@@ -1482,7 +1490,20 @@ impl<'a> ConditionContext<'a> {
             }
         }
         let thresh = condition.get_count().unwrap_or(1);
-        let effective_op = op.or_else(|| if thresh == 0 { Some("==") } else { Some(">=") });
+        // Operator ownership: when original_value=true WITHOUT a blade_limit,
+        // the condition operator belongs to the PER-CARD heart comparison
+        // consumed by check_original_heart_filter above
+        // (「元々持つハートの数より多い数のハートを持つメンバー」). Reusing it
+        // for the outer member-count would demand N+1 boosted members
+        // instead of N. The outer clause (「メンバーがいる/N人以上」) is a
+        // plain existence/count threshold -> >=.
+        let effective_op = if condition.get_original_value().unwrap_or(false)
+            && condition.get_blade_limit().is_none()
+        {
+            Some(">=")
+        } else {
+            op.or_else(|| if thresh == 0 { Some("==") } else { Some(">=") })
+        };
         compare_counts(effective_op, count, thresh)
     }
 
@@ -1731,7 +1752,16 @@ impl<'a> ConditionContext<'a> {
                 current_hearts += modifier as u8;
             }
         }
-        compare_counts(Some(op), current_hearts, base_hearts)
+        let verdict = compare_counts(Some(op), current_hearts, base_hearts);
+        log::debug!(
+            "[ORIG_HEART] card={} base={} current={} op={:?} -> {}",
+            card_id,
+            base_hearts,
+            current_hearts,
+            op,
+            verdict
+        );
+        verdict
     }
 
     pub(crate) fn evaluate_multi_location_condition(&self, condition: &Condition) -> bool {
@@ -2438,7 +2468,10 @@ impl<'a> ConditionContext<'a> {
                     condition.get_cost_limit(),
                     condition.get_cost_limit_operator().map(|o| o.as_str()),
                     None,
-                    false,
+                    // true: honor original_value so per-card current-vs-
+                    // original heart/blade comparisons gate each counted
+                    // card (「元々持つハートの数より多い…メンバー」).
+                    true,
                     condition,
                 ) as usize
             }
@@ -2820,10 +2853,22 @@ impl<'a> ConditionContext<'a> {
             );
             return compare_counts(Some(op), actual, threshold);
         }
-        let count_op =
+        // Operator ownership: when original_value=true WITHOUT a blade_limit,
+        // the condition operator belongs to the PER-CARD heart comparison
+        // applied inside resolve_zone_card_count's filter chain
+        // (「元々持つハートの数より多い数のハートを持つメンバー」). Reusing it
+        // for the outer member-count would demand N+1 boosted members instead
+        // of N. The outer clause (「メンバーがいる/N人以上」) is a plain
+        // existence/count threshold -> >=.
+        let count_op = if condition.get_original_value().unwrap_or(false)
+            && condition.get_blade_limit().is_none()
+        {
+            Some(">=")
+        } else {
             condition
                 .get_operator()
-                .or_else(|| if count == 0 { Some("==") } else { Some(">=") });
+                .or_else(|| if count == 0 { Some("==") } else { Some(">=") })
+        };
         let mut passed = compare_counts(count_op, actual, count);
         // Same-name constraint: if set, ensure at least 2 counted cards share a name
         if passed && condition.get_same_name().unwrap_or(false) {

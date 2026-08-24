@@ -10718,6 +10718,19 @@ def _walk_propagate_position(d, d_ctx, d_text):
     if "original_value" not in d and d_text and check_original_value(d_text):
         d["original_value"] = True
 
+    # Operator ownership for original-value conditions: the operator is
+    # consumed per-card (current vs original hearts/blade). 「元々…より多い」
+    # is a STRICT comparison; ">=" here would make every unboosted member
+    # qualify. The outer member-count threshold stays >= engine-side.
+    if (
+        d.get("original_value")
+        and "blade_limit" not in d
+        and d.get("operator") == ">="
+        and d_text
+        and ("より多い" in d_text or "より多く" in d_text)
+    ):
+        d["operator"] = ">"
+
 
 def _walk_propagate_flags(d, d_ctx):
     # Mark group_reference for non-bracket group name patterns (safe string field)
