@@ -1,20 +1,20 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-24T21:30:14.971587+00:00",
+  "generated_at": "2026-08-24T21:53:55.500449+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 463,
-  "n_tests": 2779,
+  "n_files": 464,
+  "n_tests": 2787,
   "total_cards": 771,
-  "covered_cards": 681,
-  "abilities_on_covered": 845,
+  "covered_cards": 684,
+  "abilities_on_covered": 848,
   "trigger_counts": {
     "起動": [
-      85,
+      86,
       96
     ],
     "登場": [
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      224,
+      226,
       268
     ],
     "(none)": [
@@ -44,7 +44,7 @@
   },
   "action_counts": {
     "move_cards": [
-      130,
+      131,
       146
     ],
     "look_and_select": [
@@ -52,7 +52,7 @@
       71
     ],
     "gain_resource": [
-      144,
+      146,
       160
     ],
     "sequential": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      486,
+      489,
       545
     ],
     "temporal_condition": [
@@ -268,7 +268,7 @@
       56
     ],
     "bp3": [
-      64,
+      65,
       66
     ],
     "bp2": [
@@ -276,7 +276,7 @@
       68
     ],
     "bp4": [
-      79,
+      80,
       88
     ],
     "bp5": [
@@ -292,7 +292,7 @@
       111
     ],
     "pb1": [
-      122,
+      123,
       137
     ],
     "sd2": [
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 616,
+    "L2+choice": 619,
     "L1+choice": 155,
     "L2": 26,
-    "none": 91,
+    "none": 88,
     "L1": 48
   },
   "qa_rulings": {
@@ -12423,6 +12423,7 @@
         "engine/tests/test_modules/untested_abilities_batch2_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch35_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch37_test.rs",
         "engine/tests/test_modules/untested_abilities_batch3_test.rs",
         "engine/tests/test_modules/untested_abilities_batch4_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
@@ -12464,7 +12465,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 787,
+      "covering_test_count": 795,
       "is_null": false
     },
     {
@@ -16268,14 +16269,25 @@
         "PL!-bp3-006-P"
       ],
       "base": "PL!-bp3-006",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch37_test.rs"
+      ],
+      "covering_tests": [
+        "honoka_accept_other_members_gain_one_blade_each",
+        "honoka_decline_no_blades_anywhere",
+        "honoka_lone_member_nothing_to_boost",
+        "maki_accept_cost_three_success_cards_six_blades",
+        "maki_decline_no_blades",
+        "maki_empty_success_zone_zero_blades",
+        "margarete_activation_waits_self_and_places_waited_energy",
+        "margarete_empty_energy_deck_clean_noop"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -17377,14 +17389,25 @@
         "PL!-pb1-010-P＋"
       ],
       "base": "PL!-pb1-010",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch37_test.rs"
+      ],
+      "covering_tests": [
+        "honoka_accept_other_members_gain_one_blade_each",
+        "honoka_decline_no_blades_anywhere",
+        "honoka_lone_member_nothing_to_boost",
+        "maki_accept_cost_three_success_cards_six_blades",
+        "maki_decline_no_blades",
+        "maki_empty_success_zone_zero_blades",
+        "margarete_activation_waits_self_and_places_waited_energy",
+        "margarete_empty_energy_deck_clean_noop"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -18675,14 +18698,25 @@
         "PL!SP-bp4-010-P"
       ],
       "base": "PL!SP-bp4-010",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch37_test.rs"
+      ],
+      "covering_tests": [
+        "honoka_accept_other_members_gain_one_blade_each",
+        "honoka_decline_no_blades_anywhere",
+        "honoka_lone_member_nothing_to_boost",
+        "maki_accept_cost_three_success_cards_six_blades",
+        "maki_decline_no_blades",
+        "maki_empty_success_zone_zero_blades",
+        "margarete_activation_waits_self_and_places_waited_energy",
+        "margarete_empty_energy_deck_clean_noop"
+      ],
+      "covering_test_count": 8,
       "is_null": false
     },
     {
@@ -25842,12 +25876,16 @@
         "engine/tests/test_modules/untested_abilities_batch29_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch36_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch37_test.rs",
         "engine/tests/test_modules/untested_abilities_playthrough_test.rs"
       ],
       "covering_tests": [
         "bp4_018_blade_updates_when_score_changes",
         "bp4_018_opponent_score_higher_grants_zero_blade",
         "bp4_018_own_success_score_greater_grants_blade_x2",
+        "honoka_accept_other_members_gain_one_blade_each",
+        "honoka_decline_no_blades_anywhere",
+        "honoka_lone_member_nothing_to_boost",
         "hs_bp5_016_no_heart06_without_opponent_wait",
         "hs_bp5_016_wait_opponent_members_triggers_constant_heart06",
         "hs_bp5_021_multiple_hasunosora_members_choice_one_converted",
@@ -25859,6 +25897,11 @@
         "hs_bp5_021_single_hasunosora_member_heart_conversion",
         "hs_bp5_021_three_members_pick_middle",
         "kokon_two_baton_arrivals_reduce_heart01",
+        "maki_accept_cost_three_success_cards_six_blades",
+        "maki_decline_no_blades",
+        "maki_empty_success_zone_zero_blades",
+        "margarete_activation_waits_self_and_places_waited_energy",
+        "margarete_empty_energy_deck_clean_noop",
         "mirage_batons_of_wrong_group_no_reduction",
         "mirage_one_baton_arrival_no_reduction",
         "mirage_seated_without_baton_no_reduction",
@@ -25866,17 +25909,9 @@
         "n_pb1_006_activates_wait_energy_to_active",
         "n_pb1_006_can_activate_multiple_times",
         "n_pb1_006_wait_self_activates_one_energy",
-        "pr0045_baton_over_cost4_no_draw",
-        "pr0045_baton_over_cost7_draws",
-        "pr032_declining_keeps_milled_cards_in_waitroom",
-        "pr032_mills_shortfall_and_recovers_live_to_deck_top",
-        "pr032_no_live_among_milled_no_prompt",
-        "pr032_waitroom_at_threshold_mills_nothing",
-        "pr032_waitroom_seven_mills_one_and_recovers_live",
-        "sp_bp5_016_constant_evaluated_during_live_phase",
-        "sp_bp5_016_energy_ge_10_grants_heart06_x2"
+        "pr0045_baton_over_cost4_no_draw"
       ],
-      "covering_test_count": 35,
+      "covering_test_count": 43,
       "is_null": false
     },
     {
@@ -34898,6 +34933,7 @@
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch35_test.rs",
         "engine/tests/test_modules/untested_abilities_batch36_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch37_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
@@ -34935,7 +34971,7 @@
         "c13_bp2_005_or_semantics_still_works",
         "c13_no_matching_card_optional_same_as_reject"
       ],
-      "covering_test_count": 283,
+      "covering_test_count": 291,
       "is_null": false
     },
     {

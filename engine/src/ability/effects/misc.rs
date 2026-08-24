@@ -1672,8 +1672,10 @@ impl AbilityResolver {
                     }
                 }
             } else if effect.target_count_any().is_none()
-                && (effect.exclude_self_any().is_none()
-                    || effect.target_player() == Some(TargetPlayer::Self_))
+                // Fallback-to-self is for plain "this member gains N" shapes.
+                // exclude_self effects (「ほかのメンバーは…」) must NEVER land
+                // on the activating card when no other member qualifies.
+                && !effect.exclude_self_any().unwrap_or(false)
             {
                 if let Some(card_id) = activating_card_id {
                     gs.mods.add_blade_modifier_with_trace(
