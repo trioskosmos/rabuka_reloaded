@@ -67,10 +67,43 @@ fn removing_teammate_reprohibits_without_stale_state() {
 }
 
 // ====================================================================
-// NOTE on cannot_place (PL!S-bp2-024-L): that restriction does NOT register
-// through recalculate_constants (live-card-zone constants are not scanned).
-// It is enforced at placement time via GameState::can_place_card_in_zone
-// checking the card's own printed Restriction ability — already covered end-
-// to-end by kagayaiteru_q125_cannot_place_in_success_zone. Do NOT add a
-// recalc-based characterization for it here.
+// PL!S-bp2-024-L (常時): 「このカードは成功ライブカード置き場に置くことができない。」
+//
+// Enforced at PLACEMENT TIME via GameState::can_place_card_in_zone scanning
+// the card's own printed Restriction ability — NOT via prohibition_effects
+// registration (live-card-zone constants are not scanned by recalc).
+// End-to-end flow covered by kagayaiteru_q125_cannot_place_in_success_zone.
+// Here we pin the validation PRIMITIVE itself, incl. the
+// LiveCardZone <-> SuccessLiveZone interchangeability rule.
 // ====================================================================
+
+#[test]
+fn bp2024_cannot_place_blocks_both_live_zones() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live = game.id("PL!S-bp2-024-L");
+
+    assert!(
+        !game
+            .state
+            .can_place_card_in_zone(live, "success_live_card_zone", "p1"),
+        "printed cannot_place must block success-zone placement"
+    );
+    assert!(
+        !game.state.can_place_card_in_zone(live, "live_card_zone", "p1"),
+        "LiveCardZone <-> SuccessLiveZone are interchangeable for cannot_place"
+    );
+}
+
+#[test]
+fn bp2024_positive_control_normal_live_card_is_placeable() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let normal = game.id("PL!N-bp1-025-L"); // 虹ヶ咲 live card, no restriction
+
+    assert!(
+        game.state
+            .can_place_card_in_zone(normal, "success_live_card_zone", "p1"),
+        "a live card without the restriction must be placeable"
+    );
+}

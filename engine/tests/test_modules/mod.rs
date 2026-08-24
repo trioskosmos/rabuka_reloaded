@@ -202,6 +202,7 @@ pub mod miyashita_ai_pr_test;
 pub mod miyashita_ai_test;
 pub mod modify_required_hearts_global_test;
 pub mod movement_condition_test;
+pub mod movement_tracking_characterization_test;
 pub mod multiname_card_test;
 pub mod mute_kibiriver_test;
 pub mod mymai_tonight_test;
@@ -228,6 +229,7 @@ pub mod position_change_condition_test;
 pub mod position_change_multi_test;
 pub mod position_change_non_optional_test;
 pub mod position_change_triggers_jidou_move_test;
+pub mod prohibition_layer_characterization_test;
 pub mod q127_heart_set_plus_global_test;
 pub mod q137_already_waited_cost_test;
 pub mod q146_per_member_draw_test;
@@ -400,6 +402,7 @@ pub mod multi_color_heart_test;
 
 // modify_required_hearts + exclude_heart_colors (PL!-bp5-023-L)
 pub mod modify_required_hearts_exclude_heart_test;
+pub mod modifier_layer_characterization_test;
 
 // modify_score + per_unit + need_heart_total filtering (PL!SP-pb2-045-L)
 pub mod wakana_shiki_test;
