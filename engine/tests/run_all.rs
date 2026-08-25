@@ -1,6 +1,4 @@
 mod helpers;
-#[path = "probe_rin.rs"]
-mod probe_rin;
 mod test_modules;
 
 #[test]
