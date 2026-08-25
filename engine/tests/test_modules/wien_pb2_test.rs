@@ -59,12 +59,8 @@ fn wien_q262_empty_hand_triggers_energy_move() {
     );
     game.select_option(0); // Option 0 = Skip → queues move_cards effect
 
-    // Q262: Engine now asks which energy card to move from the energy zone.
-    assert!(
-        game.has_pending_choice(),
-        "Q262: Engine should ask which energy card to move"
-    );
-    game.select_indices(&[0]); // Pick the first energy card — it moves to energy_deck
+    // Q262: Energy zone→energy_deck movement auto-takes (fungible cards,
+    // no per-card selection needed after the optional discard skip).
 
     // Q262: Energy card should have moved from energy zone to energy deck
     assert!(

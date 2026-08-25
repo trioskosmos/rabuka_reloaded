@@ -41,10 +41,6 @@ fn fire_live_start(game: &mut TestGame, cid: i16) {
 // ====================================================================
 
 #[test]
-#[ignore = "KNOWN GAP (bug 13 family): the 「エネルギー置き場にあるエネルギー\
-1枚をエネルギーデッキに置く」 cost of this activation is silently dropped \
-during cost-resume (same root as wwd_accept_cost ignore) — the member \
-still position-changes. Blocked on the R10/R11 cost-funnel restructure."]
 fn bp7022_activation_moves_member_to_another_area() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

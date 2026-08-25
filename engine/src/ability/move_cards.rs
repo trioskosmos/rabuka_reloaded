@@ -1046,14 +1046,20 @@ impl AbilityResolver {
             Some(Zone::EnergyDeck) => self.resolve_from_energy_deck(gs, &c),
             Some(Zone::Stage) => self.resolve_from_stage(gs, &c),
             Some(Zone::Energy) => {
-                // Optional energy-zone moves (「エネルギー置き場にあるエネルギーを
-                // エネルギーデッキに置いてもよい」 costs) must be declinable.
                 let optional = c.effect.optional.unwrap_or(false);
                 let decided = gs
                     .ability_queue
                     .current_entry()
                     .and_then(|e| e.conditional_choice.as_ref())
                     .is_some();
+                log::debug!(
+                    "[ENERGY_ARM] optional={} decided={} count={} src={:?} dst={:?}",
+                    optional,
+                    decided,
+                    c.count,
+                    c.effective_source,
+                    c.destination,
+                );
                 if optional && !decided {
                     if self.ask_optional_move_gate(
                         gs,
@@ -1065,11 +1071,10 @@ impl AbilityResolver {
                         return Ok(vec![]);
                     }
                 }
-                if optional && decided {
-                    // Energy cards are fungible — after acceptance, take from
-                    // the end of the zone directly instead of prompting (the
-                    // prompt would be clobbered by the entry's own remaining
-                    // cost processing).
+                if c.destination == "energy_deck" || c.destination == Zone::EnergyDeck.as_str() {
+                    // Energy zone→energy_deck movement: take from the end of
+                    // the zone directly. Energy cards are fungible; prompting
+                    // would be clobbered by interleaved cost processing.
                     let player = c.player_mut(gs);
                     let mut taken = Vec::new();
                     for _ in 0..c.count {

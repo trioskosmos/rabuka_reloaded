@@ -116,12 +116,6 @@ fn wwd_setup(game: &mut TestGame) -> i16 {
 }
 
 #[test]
-#[ignore = "KNOWN GAP (bug 13): accepting the 「エネルギーをエネルギーデッキに\
-置いてもよい」 cost still does not move the energy — after the pay/skip \
-gate, the entry's own {E} activation-cost processing clobbers the \
-pending which-energy selection (cost-resume interleaving, R10/R11 \
-territory). The DECLINE half of this rules pair IS fixed and pinned by \
-wwd_decline_no_score_change."]
 fn wwd_accept_cost_energy_ahead_scores_plus_one() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
