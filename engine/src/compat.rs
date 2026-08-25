@@ -86,6 +86,12 @@ pub(crate) mod atomic {
             self.0.set(cur.wrapping_add(v));
             cur
         }
+        pub fn load(&self, _order: core::sync::atomic::Ordering) -> u32 {
+            self.0.get()
+        }
+        pub fn store(&self, v: u32, _order: core::sync::atomic::Ordering) {
+            self.0.set(v);
+        }
     }
 
     // Console ports are single-threaded; the counter is only ever touched from

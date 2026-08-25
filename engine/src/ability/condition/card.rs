@@ -3726,37 +3726,6 @@ impl<'a> ConditionContext<'a> {
         }
     }
 
-    pub(crate) fn card_has_matching_ability_type(
-        &self,
-        condition: &Condition,
-        _filter: &AbilityFilter,
-    ) -> bool {
-        let excluded_triggers: Vec<&str> = condition
-            .get_ability_filter_triggers()
-            .as_ref()
-            .map(|t| t.iter().map(|s| s.as_str()).collect())
-            .unwrap_or_default();
-        if excluded_triggers.is_empty() {
-            return false;
-        }
-        if let Some(card_id) = self.game_state.activating_card {
-            let card_db = &self.game_state.card_database;
-            if let Some(card) = card_db.get_card(card_id) {
-                card.abilities.iter().any(|ar| {
-                    ar.resolve()
-                        .triggers
-                        .as_ref()
-                        .map(|t| excluded_triggers.iter().any(|et| t.starts_with(et)))
-                        .unwrap_or(false)
-                })
-            } else {
-                false
-            }
-        } else {
-            false
-        }
-    }
-
     pub(crate) fn evaluate_ability_filter_condition_with_card_check(
         &self,
         condition: &Condition,

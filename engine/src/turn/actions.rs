@@ -751,7 +751,12 @@ impl super::TurnEngine {
                         // options array by index.  The options array contains the actual
                         // position names (e.g. "left", "center", "right") that the handler
                         // expects, not raw numeric indices.
-                        if target == "position|destination" || target == "area_select" {
+                        // double_baton_touch likewise: its handler parses the option
+                        // text as an "area1,area2" pair and cannot read numeric ids.
+                        if target == "position|destination"
+                            || target == "area_select"
+                            || target == "double_baton_touch"
+                        {
                             if let Some(ref opts) = options {
                                 if let Some(id) = card_id {
                                     if id >= 0 && (id as usize) < opts.len() {

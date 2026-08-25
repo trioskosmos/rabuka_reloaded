@@ -31,6 +31,22 @@ pub struct TriggerEvent {
 /// `handle_optional_cost_payment`, and matched by frontend action generation.
 pub const PAY_SKIP_TARGET: &str = "pay_optional_cost:skip_optional_cost";
 
+/// The shared 「効果を繰り返しますか？」 Stop/Continue prompt. ONE construction
+/// point for both ask sites: the end-of-loop ask in
+/// `execute_sequential_effect` (compound.rs) and the one-at-a-time repeat
+/// feeder in `resume_pending_actions` (choice.rs).
+#[allow(dead_code)]
+pub fn repeat_prompt_choice() -> Choice {
+    Choice::SelectTarget {
+        target: PAY_SKIP_TARGET.to_string(),
+        description: "Repeat effect?".to_string(),
+        description_en: Some("Repeat effect?".to_string()),
+        description_ja: Some("効果を繰り返しますか？".to_string()),
+        allow_skip: true,
+        options: Some(vec!["Stop".to_string(), "Continue".to_string()]),
+    }
+}
+
 /// Discriminator for routing choice results to the correct handler.
 /// Statically known routes are enum variants; dynamic routes (e.g. position_change
 /// with card_no) use `Raw`.

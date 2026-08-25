@@ -759,3 +759,72 @@ fn sumire_explicit_double_baton_to_left_no_debut() {
         "Only Sumire deployed this turn"
     );
 }
+
+/// Pins the STANDALONE double-baton choice path: `execute_play_baton_touch`
+/// with count>1 emits a `double_baton_touch` SelectTarget whose answer is the
+/// option text ("left,center" etc.), handled by
+/// `handle_double_baton_touch`. Asserts:
+/// - both chosen members go to the waitroom,
+/// - exactly 2 baton touches are recorded (matching phases.rs's canonical
+///   double-baton path),
+/// - the un-chosen member stays on stage,
+/// - the choice round-trip works through resume_with_choice (the option-text
+///   encoding in build_choice_result).
+#[test]
+fn sumire_double_baton_choice_path_records_two_touches() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let sumire = game.id("PL!SP-bp4-004-R\u{ff0b}");
+    let bystander = game.id("PL!-sd1-010-SD");
+    let liella1 = game.id("PL!SP-bp1-004-R");
+    let liella2 = game.id("PL!SP-bp1-005-R");
+
+    // Stage [bystander, liella1, liella2]; choosing "left,center" (option 0)
+    // must remove the first two and leave the bystander... rather, leave
+    // RIGHT (liella2) untouched.
+    game.state.player1.stage.stage = [bystander, liella1, liella2];
+
+    // Trigger Sumire ab#0 (常時: play_baton_touch count=2) through the ability
+    // queue, mirroring helpers::fire_trigger but for the 常時 label.
+    let ability_id = {
+        let card = db.get_card(sumire).unwrap();
+        let ab = card.resolved_abilities().next().unwrap();
+        format!("{}_{}", card.card_no, ab.full_text)
+    };
+    let card_no = db.get_card(sumire).unwrap().card_no.to_string();
+    let pid = game.state.player1.id.clone();
+    game.state.trigger_auto_ability(
+        ability_id,
+        rabuka_engine::core::types::AbilityTrigger::Constant,
+        pid.clone(),
+        Some(card_no),
+        Some(sumire),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(sumire);
+    game.state.process_pending_auto_abilities(&pid);
+
+    assert!(
+        game.has_pending_choice(),
+        "double_baton_touch choice should be pending, got: {:?}",
+        game.pending_choice_summary()
+    );
+
+    // Answer with option 0 = "left,center".
+    game.select_option(0);
+
+    assert_eq!(
+        game.state.baton_touch_count_p1, 2,
+        "double baton via choice path records 2 baton touches"
+    );
+    let stage = game.state.player1.stage.stage;
+    assert_eq!(stage[2], liella2, "unchosen Right member stays on stage");
+    let waitroom = &game.state.player1.waitroom.cards;
+    assert!(
+        waitroom.contains(&bystander) && waitroom.contains(&liella1),
+        "both chosen members moved to waitroom; waitroom={:?}",
+        waitroom
+    );
+}

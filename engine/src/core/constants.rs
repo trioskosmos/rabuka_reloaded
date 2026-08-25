@@ -38,7 +38,6 @@ pub fn saturate_i16(v: i32) -> i16 {
 /// small in practice, but waitrooms/decks CAN exceed 255 in long games and a
 /// raw `as u8` silently wraps such counts to garbage (casting cut-downs).
 pub trait U8Count {
-    #[inline]
     fn u8_count(self) -> u8;
 }
 

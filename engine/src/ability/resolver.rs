@@ -236,6 +236,40 @@ impl AbilityResolver {
         self.pending_choice.as_ref()
     }
 
+    /// Cached verdict for a condition marked `cache: true` on the current
+    /// queue entry, if one was stored earlier in this ability's resolution.
+    /// ONE definition of the cache lookup — used by the main condition gate
+    /// (can_activate_effect) and the sequential step loop (compound.rs).
+    pub fn cached_condition_verdict(
+        &self,
+        gs: &GameState,
+        condition: &Condition,
+    ) -> Option<bool> {
+        if !condition.get_cache().unwrap_or(false) {
+            return None;
+        }
+        let entry = gs.ability_queue.current_entry()?;
+        let key = format!("{:?}", condition);
+        entry
+            .condition_cache
+            .iter()
+            .find(|(k, _)| k == &key)
+            .map(|(_, v)| *v)
+    }
+
+    /// Store a verdict for a condition marked `cache: true` on the current
+    /// queue entry. Replaces any previously stored verdict for the same key.
+    pub fn store_condition_verdict(&self, gs: &mut GameState, condition: &Condition, passed: bool) {
+        if !condition.get_cache().unwrap_or(false) {
+            return;
+        }
+        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+            let key = format!("{:?}", condition);
+            entry.condition_cache.retain(|(k, _)| k != &key);
+            entry.condition_cache.push((key, passed));
+        }
+    }
+
     pub fn can_activate_effect(&self, gs: &mut GameState, effect: &AbilityEffect) -> bool {
         log::debug!(
             "[CAN_ACT_ENTER] action={:?} has_cond={}",
@@ -299,21 +333,8 @@ impl AbilityResolver {
             } else {
                 // Check cache first — avoids re-evaluation against stale state
                 // (e.g. revealed_cards modified by a prior select_cards filter).
-                if condition.get_cache().unwrap_or(false) {
-                    if let Some(entry) = gs.ability_queue.current_entry() {
-                        let key = format!("{:?}", condition);
-                        if let Some(cached) = entry
-                            .condition_cache
-                            .iter()
-                            .find(|(k, _)| k == &key)
-                            .map(|(_, v)| *v)
-                        {
-                            if cached {
-                                return true;
-                            }
-                            return false;
-                        }
-                    }
+                if let Some(cached) = self.cached_condition_verdict(gs, condition) {
+                    return cached;
                 }
                 let mut cond = condition.clone();
                 if cond.get_position().is_none() && cond.get_positions_characters().is_none() {
@@ -362,13 +383,7 @@ impl AbilityResolver {
                     }
                 }
                 // Cache the result if the condition asks for it
-                if condition.get_cache().unwrap_or(false) {
-                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        let key = format!("{:?}", condition);
-                        entry.condition_cache.retain(|(k, _)| k != &key);
-                        entry.condition_cache.push((key, passed));
-                    }
-                }
+                self.store_condition_verdict(gs, condition, passed);
                 if !passed {
                     gs.push_debug_note(format!(
                         "gate BLOCK card={:?} action={} cond_type={:?} location={:?}",

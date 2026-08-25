@@ -14,6 +14,28 @@ use alloc::{
 };
 use core::sync::atomic::Ordering;
 
+/// Routes a settled conditional_on_optional answer to the branch that fires.
+/// ONE definition of the (chose_yes × negation) matrix, used by
+/// `execute_conditional_on_optional` (compound.rs) and
+/// `handle_conditional_optional` (choice.rs):
+///
+///   yes + negation    → optional_action     ("unless you pay → do A" honored)
+///   yes + no negation → conditional_action  (the follow-up)
+///   no  + negation    → conditional_action  (the penalty)
+///   no  + no negation → nothing fires
+pub(crate) fn route_conditional_branch(
+    effect: &AbilityEffect,
+    chose_yes: bool,
+    is_negation: bool,
+) -> Option<Box<AbilityEffect>> {
+    match (chose_yes, is_negation) {
+        (true, true) => effect.compound.optional_action.clone(),
+        (true, false) => effect.compound.conditional_action.clone(),
+        (false, true) => effect.compound.conditional_action.clone(),
+        (false, false) => None,
+    }
+}
+
 impl AbilityResolver {
     // Rule 9.2.1.1 / Q94 / Q107 / Q217: Sequential effect execution
     //
@@ -213,39 +235,14 @@ impl AbilityResolver {
                             let cond = action.condition.as_ref().unwrap();
                             // Check cache first — avoids re-evaluation against stale
                             // game state after a choice round-trip.
-                            let passed = if cond.get_cache().unwrap_or(false) {
-                                if let Some(entry) = gs.ability_queue.current_entry() {
-                                    if let Some(&(_, cached)) = entry
-                                        .condition_cache
-                                        .iter()
-                                        .find(|(k, _)| {
-                                            let cur_key = format!("{:?}", cond);
-                                            k == &cur_key
-                                        })
-                                    {
-                                        cached
-                                    } else {
-                                        false // not cached yet — evaluate below
-                                    }
-                                } else {
-                                    false
-                                }
-                            } else {
-                                false
-                            };
-                            let passed = if passed {
+                            let cached = self.cached_condition_verdict(gs, cond);
+                            let passed = if cached == Some(true) {
                                 true
                             } else {
                                 let ctx = ConditionContext::with_moved_cards(gs, &self.moved_cards);
                                 let p = ctx.evaluate_condition(cond);
                                 // Cache the result if condition asks for it
-                                if cond.get_cache().unwrap_or(false) {
-                                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                                        let key = format!("{:?}", cond);
-                                        entry.condition_cache.retain(|(k, _)| k != &key);
-                                        entry.condition_cache.push((key, p));
-                                    }
-                                }
+                                self.store_condition_verdict(gs, cond, p);
                                 p
                             };
                             if !action.optional.unwrap_or(false) {
@@ -631,14 +628,8 @@ impl AbilityResolver {
                                 self.pending_repeat_actions
                                     .extend(repeat_actions.iter().cloned());
                             }
-                            self.pending_choice = Some(Choice::SelectTarget {
-                                target: crate::ability::types::PAY_SKIP_TARGET.to_string(),
-                                description: "Repeat effect?".to_string(),
-                                description_en: Some("Repeat effect?".to_string()),
-                                description_ja: Some("効果を繰り返しますか？".to_string()),
-                                allow_skip: true,
-                                options: Some(vec!["Stop".to_string(), "Continue".to_string()]),
-                            });
+                            self.pending_choice =
+                                Some(crate::ability::types::repeat_prompt_choice());
                             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                                 entry.choice_card_no =
                                     Some(crate::ability::types::ChoiceRoute::Raw(
@@ -811,22 +802,6 @@ impl AbilityResolver {
         }
     }
 
-    pub fn execute_repeat_procedure(
-        &mut self,
-        gs: &mut GameState,
-        effect: &AbilityEffect,
-    ) -> Result<(), String> {
-        let repeat_limit = effect.repeat_limit_any().unwrap_or(1) as usize;
-        if let Some(ref actions) = effect.compound.actions {
-            for _ in 0..repeat_limit {
-                for action in actions {
-                    self.execute_effect(gs, action)?;
-                }
-            }
-        }
-        Ok(())
-    }
-
     pub fn execute_conditional_on_result(
         &mut self,
         gs: &mut GameState,
@@ -952,15 +927,9 @@ impl AbilityResolver {
                 .and_then(|e| e.optional_cost_result);
             if let Some(cost_was_paid) = result {
                 let chose_yes = cost_was_paid;
-                let effect = effect.clone();
-                let cmd = match (chose_yes, is_negation) {
-                    (true, true) => effect.compound.optional_action.map(|a| *a),
-                    (true, false) => effect.compound.conditional_action.map(|a| *a),
-                    (false, true) => effect.compound.conditional_action.map(|a| *a),
-                    (false, false) => None,
-                };
+                let cmd = route_conditional_branch(effect, chose_yes, is_negation);
                 if let Some(cmd) = cmd {
-                    gs.ability_queue.set_pending_actions(vec![cmd]);
+                    gs.ability_queue.set_pending_actions(vec![*cmd]);
                 }
                 return self.resume_pending_actions(gs);
             }

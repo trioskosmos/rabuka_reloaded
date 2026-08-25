@@ -338,7 +338,6 @@ impl AbilityResolver {
             ActionType::Choice => self.execute_choice(gs, effect),
             ActionType::PayEnergy => self.execute_pay_energy(gs, effect),
             ActionType::SetCardIdentity => self.execute_set_card_identity_effect(gs, effect),
-            ActionType::RepeatProcedure => self.execute_repeat_procedure(gs, effect),
             ActionType::DiscardUntilCount => self.execute_discard_until_count(gs, effect),
             // Q57: A "cannot do X" effect takes priority over an effect that would do X.
             ActionType::Restriction => self.execute_restriction(gs, effect),
@@ -406,6 +405,12 @@ impl AbilityResolver {
             | ActionType::ActionBy
             | ActionType::SequentialCost
             | ActionType::ChoiceCondition
+            // RepeatProcedure never dispatches through here: the parser emits it
+            // only as the LAST step of a sequential, which
+            // execute_sequential_effect intercepts via actions.last() and drives
+            // interactively (compound.rs). Verified: abilities.json contains
+            // exactly one repeat_procedure node, in that last-step position.
+            | ActionType::RepeatProcedure
             | ActionType::EnergyCondition => {
                 log::warn!(
                     "Unexpected internal action type in execute_effect: {:?}",

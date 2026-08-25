@@ -663,6 +663,12 @@ pub fn has_cannot_baton_touch_protection(
     })
 }
 
+/// Canonical group list — exactly the groups recognized by
+/// `card_series_matches_group`. ONE definition: probing loops (e.g. the
+/// different_group_names filter in move_cards.rs) iterate this instead of
+/// re-hardcoding the names.
+pub const KNOWN_GROUPS: [&str; 5] = ["μ's", "Aqours", "虹ヶ咲", "Liella!", "蓮ノ空"];
+
 fn card_series_matches_group(series: &str, group: &str) -> bool {
     if group == "μ's" {
         // For μ's, check each series line individually to handle multi-series

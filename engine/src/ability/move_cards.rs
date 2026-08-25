@@ -4,10 +4,10 @@ use super::resolver::AbilityResolver;
 use super::types::{Choice, ExecutionContext, LookAndSelectStep};
 use super::util;
 use crate::ability_queue::ConditionalChoice;
-use crate::card::{AbilityEffect, CardDatabase, DistinctType, Operator, PlacementOrder};
+use crate::card::{AbilityEffect, CardDatabase, Operator, PlacementOrder};
 use crate::game_state::GameState;
 use crate::player::Player;
-use crate::{HashMap, HashSet};
+use crate::HashMap;
 #[cfg(feature = "no_std")]
 use alloc::{
     boxed::Box,
@@ -1535,7 +1535,7 @@ impl AbilityResolver {
                             stage_groups.push(card.group.to_string());
                         }
                     } else {
-                        for known_group in ["μ's", "Aqours", "虹ヶ咲", "Liella!", "蓮ノ空"] {
+                        for known_group in util::KNOWN_GROUPS {
                             if util::card_matches_group_str(card_db, cid, Some(known_group)) {
                                 let s = known_group.to_string();
                                 if !stage_groups.contains(&s) {
@@ -1922,6 +1922,94 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         Ok(vec![])
     }
 
+    /// Success-zone replacement check (e.g. 錯覚CROSSROADS): when `card_id`
+    /// would be placed into the success zone and a replacement effect binds
+    /// it, offer the "pick a live card from the waitroom instead" choice.
+    /// ONE construction point — used by `execute_move_cards` and
+    /// `execute_selected_cards_from_zone`. Returns true when a pending choice
+    /// was created and the caller must stop.
+    fn maybe_prompt_success_replacement(
+        &mut self,
+        gs: &mut GameState,
+        card_id: i16,
+        dest: &str,
+        target: &str,
+    ) -> bool {
+        if Zone::from_str(dest) != Some(Zone::SuccessLiveZone) {
+            return false;
+        }
+        if let Some(group_names) = crate::turn::TurnEngine::get_success_replacement_info(gs, card_id)
+        {
+            let player = gs.resolve_target_player(target);
+            let player_id = player.id.clone();
+            let has_valid_targets = player.waitroom.cards.iter().any(|&cid| {
+                gs.card_database.get_card(cid).is_some_and(|c| {
+                    c.is_live()
+                        && group_names.iter().any(|gn| {
+                            crate::ability::util::card_matches_group_str(
+                                &gs.card_database,
+                                cid,
+                                Some(gn),
+                            )
+                        })
+                })
+            });
+            if has_valid_targets {
+                gs.pending_success_replacement_card_id = Some(card_id);
+                gs.pending_success_replacement_player_id = Some(player_id);
+                let group_name = group_names.into_iter().next().unwrap_or_default();
+                let choice = Choice::select_cards(
+                    Zone::Discard.to_str(),
+                    1,
+                    "Choose a live card from discard to place in your success zone (or skip to place the original card)"
+                        .to_string(),
+                    true,
+                )
+                .description_ja(Some("控え室から成功ゾーンに置くライブカードを選んでください（スキップで元のカードを置きます）".to_string()))
+                .card_type(Some("live_card".to_string()))
+                .group(Some(group_name))
+                .target_player_id(Some("self".to_string()))
+                .build();
+                self.pending_choice = Some(choice);
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Shared 「山札の上または下？」 prompt: parks `card_id`'s deck placement
+    /// behind a top/bottom SelectTarget. ONE construction point — used by
+    /// `execute_move_cards` and `execute_selected_cards_from_zone`.
+    /// Note: when `allow_skip` is set (optional deck placement), the card was
+    /// left in the waitroom by resolve_cards_from_source, so a skipped answer
+    /// simply leaves it there.
+    fn prompt_deck_top_or_bottom(
+        &mut self,
+        card_id: i16,
+        state_change: Option<String>,
+        target: String,
+        source_zone: String,
+        allow_skip: bool,
+    ) {
+        self.pending_choice = Some(Choice::SelectTarget {
+            target: "position|destination".to_string(),
+            description: "Choose deck top or bottom".to_string(),
+            description_en: Some("Choose deck top or bottom".to_string()),
+            description_ja: Some("山札の上または下を選択".to_string()),
+            allow_skip,
+            options: Some(vec![
+                Zone::DeckTop.to_str().to_string(),
+                Zone::DeckBottom.to_str().to_string(),
+            ]),
+        });
+        self.execution_context = ExecutionContext::MoveCardsPosition {
+            card_id,
+            state_change,
+            target,
+            source_zone,
+        };
+    }
+
     pub fn execute_move_cards(
         &mut self,
         gs: &mut GameState,
@@ -2192,44 +2280,13 @@ if util::distinct_should_dedupe(distinct) {
         } else {
             for &card_id in &taken {
                 // Check for success zone replacement (e.g. 錯覚CROSSROADS)
-                if Zone::from_str(&destination) == Some(Zone::SuccessLiveZone) {
-                    if let Some(group_names) =
-                        crate::turn::TurnEngine::get_success_replacement_info(gs, card_id)
-                    {
-                        let player = gs.resolve_target_player(tgt.as_deref().unwrap_or("self"));
-                        let player_id = player.id.clone();
-                        let has_valid_targets = player.waitroom.cards.iter().any(|&cid| {
-                            gs.card_database.get_card(cid).is_some_and(|c| {
-                                c.is_live()
-                                    && group_names.iter().any(|gn| {
-                                        crate::ability::util::card_matches_group_str(
-                                            &gs.card_database,
-                                            cid,
-                                            Some(gn),
-                                        )
-                                    })
-                            })
-                        });
-                        if has_valid_targets {
-                            gs.pending_success_replacement_card_id = Some(card_id);
-                            gs.pending_success_replacement_player_id = Some(player_id);
-                            let group_name = group_names.into_iter().next().unwrap_or_default();
-                            let choice = Choice::select_cards(
-                                Zone::Discard.to_str(),
-                                1,
-                                "Choose a live card from discard to place in your success zone (or skip to place the original card)"
-                                    .to_string(),
-                                true,
-                            )
-                            .description_ja(Some("控え室から成功ゾーンに置くライブカードを選んでください（スキップで元のカードを置きます）".to_string()))
-                            .card_type(Some("live_card".to_string()))
-                            .group(Some(group_name))
-                            .target_player_id(Some("self".to_string()))
-                            .build();
-                            self.pending_choice = Some(choice);
-                            return Ok(());
-                        }
-                    }
+                if self.maybe_prompt_success_replacement(
+                    gs,
+                    card_id,
+                    &destination,
+                    tgt.as_deref().unwrap_or("self"),
+                ) {
+                    return Ok(());
                 }
                 if Zone::from_str(&destination) == Some(Zone::Deck) && deck_pos.is_some() && !is_max
                 {
@@ -2242,29 +2299,13 @@ if util::distinct_should_dedupe(distinct) {
                     let clamped = pos.min(player.main_deck.cards.len());
                     player.main_deck.cards.insert(clamped, card_id);
                 } else if &*destination == "deck_top_or_bottom" {
-                    let can_skip = effect.optional.unwrap_or(false);
-                    if can_skip && !taken.is_empty() {
-                        // For optional deck placement, the card was left in
-                        // waitroom by resolve_cards_from_source. If the player
-                        // skips, it stays there.
-                    }
-                    self.pending_choice = Some(Choice::SelectTarget {
-                        target: "position|destination".to_string(),
-                        description: "Choose deck top or bottom".to_string(),
-                        description_en: Some("Choose deck top or bottom".to_string()),
-                        description_ja: Some("山札の上または下を選択".to_string()),
-                        allow_skip: can_skip,
-                        options: Some(vec![
-                            Zone::DeckTop.to_str().to_string(),
-                            Zone::DeckBottom.to_str().to_string(),
-                        ]),
-                    });
-                    self.execution_context = ExecutionContext::MoveCardsPosition {
+                    self.prompt_deck_top_or_bottom(
                         card_id,
-                        state_change: effect.state_change_any().map(|s| s.to_string()),
-                        target: tgt.as_deref().unwrap_or("self").to_string(),
-                        source_zone: source.to_string(),
-                    };
+                        effect.state_change_any().map(|s| s.to_string()),
+                        tgt.as_deref().unwrap_or("self").to_string(),
+                        source.to_string(),
+                        effect.optional.unwrap_or(false),
+                    );
                     return Ok(());
                 } else {
                     match self.place_card_with_stage_choice(
@@ -2672,7 +2713,8 @@ if util::distinct_should_dedupe(distinct) {
                 }
             }
         }
-        drop(player);
+        // `player`'s borrow of `gs` ends here (last use above); the mods
+        // update below re-borrows gs directly.
         for host in host_ids {
             if !gs.mods.last_under_move_host_ids.contains(&host) {
                 gs.mods.last_under_move_host_ids.push(host);
@@ -3028,24 +3070,14 @@ if util::distinct_should_dedupe(distinct) {
                     }
                     _ if dest == "deck_top_or_bottom" => {
                         if let Some(&cid) = card_ids.first() {
-                            self.pending_choice = Some(Choice::SelectTarget {
-                                target: "position|destination".to_string(),
-                                description: "Choose deck top or bottom".to_string(),
-                                description_en: Some("Choose deck top or bottom".to_string()),
-                                description_ja: Some("山札の上または下を選択".to_string()),
-                                allow_skip: false,
-                                options: Some(vec![
-                                    Zone::DeckTop.to_str().to_string(),
-                                    Zone::DeckBottom.to_str().to_string(),
-                                ]),
-                            });
+                            self.prompt_deck_top_or_bottom(
+                                cid,
+                                None,
+                                target.clone(),
+                                zone.to_string(),
+                                false,
+                            );
                             self.sub_choice_created = true;
-                            self.execution_context = ExecutionContext::MoveCardsPosition {
-                                card_id: cid,
-                                state_change: None,
-                                target: target.clone(),
-                                source_zone: zone.to_string(),
-                            };
                             return Ok(());
                         }
                     }
@@ -3059,50 +3091,14 @@ if util::distinct_should_dedupe(distinct) {
                             target
                         );
                         // Check for success zone replacement (e.g. 錯覚CROSSROADS)
-                        if Zone::from_str(dest) == Some(Zone::SuccessLiveZone) {
-                            if let Some(&replaced_card_id) = card_ids.first() {
-                                if let Some(group_names) =
-                                    crate::turn::TurnEngine::get_success_replacement_info(
-                                        gs,
-                                        replaced_card_id,
-                                    )
-                                {
-                                    let player = gs.resolve_target_player(&target);
-                                    let player_id = player.id.clone();
-                                    let has_valid_targets =
-                                        player.waitroom.cards.iter().any(|&cid| {
-                                            gs.card_database.get_card(cid).is_some_and(|c| {
-                                                c.is_live() && group_names.iter().any(|gn| {
-                                                    crate::ability::util::card_matches_group_str(
-                                                        &gs.card_database,
-                                                        cid,
-                                                        Some(gn),
-                                                    )
-                                                })
-                                            })
-                                        });
-                                    if has_valid_targets {
-                                        gs.pending_success_replacement_card_id =
-                                            Some(replaced_card_id);
-                                        gs.pending_success_replacement_player_id = Some(player_id);
-                                        let group_name =
-                                            group_names.into_iter().next().unwrap_or_default();
-                                        let choice = Choice::select_cards(
-                                            Zone::Discard.to_str(),
-                                            1,
-                                            "Choose a live card from discard to place in your success zone (or skip to place the original card)"
-                                                .to_string(),
-                                            true,
-                                        )
-                                        .description_ja(Some("控え室から成功ゾーンに置くライブカードを選んでください（スキップで元のカードを置きます）".to_string()))
-                                        .card_type(Some("live_card".to_string()))
-                                        .group(Some(group_name))
-                                        .target_player_id(Some("self".to_string()))
-                                        .build();
-                                        self.pending_choice = Some(choice);
-                                        return Ok(());
-                                    }
-                                }
+                        if let Some(&replaced_card_id) = card_ids.first() {
+                            if self.maybe_prompt_success_replacement(
+                                gs,
+                                replaced_card_id,
+                                dest,
+                                &target,
+                            ) {
+                                return Ok(());
                             }
                         }
                         let player = gs.resolve_target_player_mut(&target);

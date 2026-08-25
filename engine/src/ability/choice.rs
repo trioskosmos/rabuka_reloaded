@@ -134,14 +134,7 @@ impl super::resolver::AbilityResolver {
         if !self.pending_repeat_actions.is_empty() && self.pending_choice.is_none() {
             let next = self.pending_repeat_actions.remove(0);
             gs.ability_queue.set_pending_actions(vec![*next]);
-            self.pending_choice = Some(Choice::SelectTarget {
-                target: crate::ability::types::PAY_SKIP_TARGET.to_string(),
-                description: "Repeat effect?".to_string(),
-                description_en: Some("Repeat effect?".to_string()),
-                description_ja: Some("効果を繰り返しますか？".to_string()),
-                allow_skip: true,
-                options: Some(vec!["Stop".to_string(), "Continue".to_string()]),
-            });
+            self.pending_choice = Some(crate::ability::types::repeat_prompt_choice());
         }
         // Set re-prompt choice if one is pending and no other choice was created.
         if let Some(reprompt) = self.pending_reprompt_choice.take() {
@@ -451,7 +444,6 @@ impl super::resolver::AbilityResolver {
         let cost_total_operator: &Option<String> = &ctx.cost_total_operator;
         let group: &Option<String> = &ctx.group;
         let characters: &Option<Vec<String>> = &ctx.characters;
-        let filtered_indices: &Option<Vec<usize>> = &ctx.filtered_indices;
         let is_select_action: bool = ctx.is_select_action;
         let target_player_id: &Option<String> = &ctx.target_player_id;
 
@@ -459,13 +451,6 @@ impl super::resolver::AbilityResolver {
         let validate_filter = choice.as_filter();
         let mut validate_card =
             |cid: i16| -> bool { validate_filter.matches(&card_db, cid, false) };
-
-        let mfi = |indices: &[usize]| -> Vec<usize> {
-            match &filtered_indices {
-                Some(fi) => indices.iter().filter_map(|&i| fi.get(i).copied()).collect(),
-                None => indices.to_vec(),
-            }
-        };
 
         // Consume the deferred そうした場合 gate (parent-conditional
         // sequential whose gating move deferred to THIS selection): an
@@ -523,7 +508,7 @@ impl super::resolver::AbilityResolver {
                 let p = gs.resolve_target_player_mut(&target);
                 p.hand.cards.to_vec()
             };
-            let cost_hand_indices = mfi(indices);
+            let cost_hand_indices = ctx.mfi(indices);
             let new_card_ids: Vec<i16> = cost_hand_indices
                 .iter()
                 .filter_map(|&i| {
@@ -960,7 +945,7 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                         .clone()
                         .unwrap_or_else(|| "self".to_string().into());
                     let player = gs.resolve_target_player_mut(&target);
-                    let mapped_indices = mfi(indices);
+                    let mapped_indices = ctx.mfi(indices);
                     let mut cards: Vec<i16> = Vec::new();
                     for &i in mapped_indices.iter() {
                         if i < player.live_card_zone.cards.len() {
@@ -987,7 +972,7 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                         .clone()
                         .unwrap_or_else(|| "self".to_string().into());
                     let player = gs.resolve_target_player_mut(&tgt);
-                    let card_ids: Vec<i16> = mfi(indices)
+                    let card_ids: Vec<i16> = ctx.mfi(indices)
                         .iter()
                         .filter_map(|&i| player.live_card_zone.cards.get(i).copied())
                         .filter(|&cid| validate_card(cid))
@@ -3210,6 +3195,15 @@ modified.destination = Some(Zone::from_source_str(dest));
         let p1_id = gs.player1.id.clone();
         // For double baton via choice, the arriving card has already been placed on stage
         // before this handler runs. Get it from the stage placement.
+        // NOTE: record_baton_touch is called TWICE deliberately — this matches the
+        // canonical double-baton path in phases.rs ("Record 2 baton touches"), which
+        // also records 2. Do NOT "fix" this into a single call.
+        // Known limitations of this standalone path (execute_play_baton_touch
+        // count>1): it mutates player1 unconditionally, and `arriving` is derived
+        // as the first non-empty stage slot, which misidentifies the arriving card
+        // when an untouched member occupies slot 0. The web UI uses the canonical
+        // play_member_to_stage path instead; pinned by
+        // sumire_double_baton_choice_path_records_two_touches.
         let arriving = gs
             .player1
             .stage
@@ -3236,12 +3230,28 @@ modified.destination = Some(Zone::from_source_str(dest));
     ) -> Result<(), String> {
         // Safety timeout: a runaway optional-cost re-trigger loop (see the
         // each_time watcher fix) must abort rather than hang forever.
+        // Counted PER QUEUE ENTRY (card + ability index): the counter resets
+        // whenever resolution moves to a different ability, so long batch or
+        // arena runs can no longer accumulate toward the cap across games and
+        // silently clear an unrelated game's queue.
         use crate::compat::atomic::AtomicU32;
         use core::sync::atomic::Ordering;
         static CHOICE_CALLS: AtomicU32 = AtomicU32::new(0);
+        static LAST_CARD: AtomicU32 = AtomicU32::new(u32::MAX);
+        static LAST_ABILITY: AtomicU32 = AtomicU32::new(u32::MAX);
+        let entry = gs.ability_queue.current_entry();
+        let key_card = entry.and_then(|e| e.card_id).unwrap_or(-1) as i32 as u32;
+        let key_ability = entry.map(|e| e.ability_index as u32).unwrap_or(u32::MAX);
+        if LAST_CARD.load(Ordering::Relaxed) != key_card
+            || LAST_ABILITY.load(Ordering::Relaxed) != key_ability
+        {
+            CHOICE_CALLS.store(0, Ordering::Relaxed);
+            LAST_CARD.store(key_card, Ordering::Relaxed);
+            LAST_ABILITY.store(key_ability, Ordering::Relaxed);
+        }
         if CHOICE_CALLS.fetch_add(1, Ordering::Relaxed) > 200_000 {
             log::error!(
-                "[CHOICE_TIMEOUT] exceeded 200k conditional-optional resolutions; aborting"
+                "[CHOICE_TIMEOUT] exceeded 200k conditional-optional resolutions for one ability; aborting"
             );
             gs.ability_queue.clear();
             return Ok(());
@@ -3269,7 +3279,6 @@ modified.destination = Some(Zone::from_source_str(dest));
             .or_else(|| entry_eff);
         if let Some(effect) = effect {
             let is_negation = effect.compound.conditional_negation.unwrap_or(false);
-            let chose_yes = selected == "1" || selected == "yes";
             // Record use_limit when the player chose to pay (but NOT when declined)
             if chose_yes {
                 if let Some(entry) = gs.ability_queue.current_entry() {
@@ -3285,16 +3294,8 @@ modified.destination = Some(Zone::from_source_str(dest));
                     }
                 }
             }
-            let cmd = match (chose_yes, is_negation) {
-                // yes + negation → optional_action fires, conditional skipped
-                (true, true) => effect.compound.optional_action.map(|a| *a),
-                // yes + no negation → conditional_action fires (the follow-up)
-                (true, false) => effect.compound.conditional_action.map(|a| *a),
-                // no + negation → conditional_action fires (the penalty)
-                (false, true) => effect.compound.conditional_action.map(|a| *a),
-                // no + no negation → nothing fires
-                (false, false) => None,
-            };
+            let cmd =
+                super::compound::route_conditional_branch(&effect, chose_yes, is_negation);
             // The player accepted the optional placement. Arm the gate so the
             // trailing "そうしたとき" consequence only fires if the placement
             // actually moved a card. Any optional move that auto-skips (e.g. a
@@ -3306,7 +3307,7 @@ modified.destination = Some(Zone::from_source_str(dest));
                 }
             }
             if let Some(cmd) = cmd {
-                gs.ability_queue.set_pending_actions(vec![cmd]);
+                gs.ability_queue.set_pending_actions(vec![*cmd]);
             }
         }
         self.resume_pending_actions(gs)?;

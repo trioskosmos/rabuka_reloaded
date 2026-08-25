@@ -1189,7 +1189,6 @@ let source = cost.source_str().unwrap_or("");
                             .target_player_id(Some(
                                 cost.target.as_deref().unwrap_or("self").to_string(),
                             ))
-                            .is_reveal(true)
                             .is_select_action(true)
                             .build(),
                         );

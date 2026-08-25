@@ -294,10 +294,6 @@ struct BcReader<'a> {
 }
 
 impl<'a> BcReader<'a> {
-    fn new(data: &'a [u8]) -> Self {
-        BcReader { cursor: data, idx: None }
-    }
-
     fn with_idx(data: &'a [u8], idx: usize) -> Self {
         BcReader { cursor: data, idx: Some(idx) }
     }
