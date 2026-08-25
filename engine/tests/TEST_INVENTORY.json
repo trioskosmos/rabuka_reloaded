@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T02:44:06.204089+00:00",
+  "generated_at": "2026-08-25T02:54:30.986262+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,17 +8,17 @@
     "unique_abilities": 936
   },
   "n_files": 478,
-  "n_tests": 2848,
+  "n_tests": 2850,
   "total_cards": 771,
-  "covered_cards": 721,
-  "abilities_on_covered": 886,
+  "covered_cards": 723,
+  "abilities_on_covered": 888,
   "trigger_counts": {
     "起動": [
       89,
       96
     ],
     "登場": [
-      252,
+      254,
       269
     ],
     "ライブ開始時": [
@@ -48,7 +48,7 @@
       146
     ],
     "look_and_select": [
-      56,
+      58,
       71
     ],
     "gain_resource": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      515,
+      516,
       545
     ],
     "temporal_condition": [
@@ -190,7 +190,7 @@
       13
     ],
     "comparison_condition": [
-      56,
+      57,
       60
     ],
     "card_count_condition": [
@@ -276,7 +276,7 @@
       68
     ],
     "bp4": [
-      84,
+      85,
       88
     ],
     "bp5": [
@@ -292,7 +292,7 @@
       111
     ],
     "pb1": [
-      125,
+      126,
       137
     ],
     "sd2": [
@@ -310,9 +310,9 @@
   },
   "depth_counts": {
     "L2+choice": 633,
-    "L1+choice": 177,
+    "L1+choice": 179,
     "L2": 28,
-    "none": 50,
+    "none": 48,
     "L1": 48
   },
   "qa_rulings": {
@@ -10595,7 +10595,8 @@
         "engine/tests/test_modules/hinoshita_test.rs",
         "engine/tests/test_modules/link_to_future_test.rs",
         "engine/tests/test_modules/untested_abilities_batch12_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch20_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch20_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch51_test.rs"
       ],
       "covering_tests": [
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
@@ -10609,6 +10610,8 @@
         "aurora_flower_two_members_no_score",
         "bp1011_look5_reveals_live_card_to_hand",
         "bp3012_look4_reveals_niji_card_to_hand",
+        "bp4006_low_score_no_fetch",
+        "bp4006_score_three_or_more_looks_five_mus_fetch",
         "bp6012_debut_activates_energy_with_sbuuke_teammate",
         "bp6022_equal_or_fewer_opp_energy_no_score",
         "bp6022_more_opp_energy_scores",
@@ -10625,11 +10628,9 @@
         "hanamusubi_with_two_other_renosora_reduces_4",
         "hinoshita_multiple_waitroom_matches_prompts_choice",
         "hinoshita_no_live_card_in_hand_fails",
-        "hinoshita_no_matching_live_in_discard_fails",
-        "hinoshita_q236_name_contains_all_matches",
-        "hinoshita_q237_name_contains_all_no_match"
+        "hinoshita_no_matching_live_in_discard_fails"
       ],
-      "covering_test_count": 45,
+      "covering_test_count": 48,
       "is_null": false
     },
     {
@@ -13250,18 +13251,22 @@
       "covering_files": [
         "engine/tests/test_modules/bp7_ai_energy_under_member_optional_test.rs",
         "engine/tests/test_modules/konata_bp4_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch51_test.rs",
         "engine/tests/test_modules/zero_tested_action_types_test.rs"
       ],
       "covering_tests": [
         "ai_accept_places_energy_under_nijigasaki",
         "ai_no_nijigasaki_member_places_nothing",
         "ai_skip_places_nothing",
+        "bp4006_low_score_no_fetch",
+        "bp4006_score_three_or_more_looks_five_mus_fetch",
         "kanon_invalidate_liella_live_start",
         "konata_bp4_deploy_blade_heart_member_waits",
         "konata_bp4_deploy_non_blade_heart_member_stays_active",
         "konata_bp4_q188_placed_in_wait_no_trigger",
         "konata_bp4_skip_cost_no_effect",
         "natsumi_sunshine_pay_any_energy_for_score",
+        "pb1016_look_two_reveals_karin_to_hand",
         "step_zero_to_one_live_start_full_ability",
         "vitamin_summer_live_success_hand_condition",
         "vivid_world_all_heart_colors_present",
@@ -13269,7 +13274,7 @@
         "vivid_world_live_phase_blade_and_success",
         "vivid_world_missing_heart_color"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 18,
       "is_null": false
     },
     {
@@ -17909,14 +17914,20 @@
         "PL!-bp4-006-P"
       ],
       "base": "PL!-bp4-006",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch51_test.rs"
+      ],
+      "covering_tests": [
+        "bp4006_low_score_no_fetch",
+        "bp4006_score_three_or_more_looks_five_mus_fetch",
+        "pb1016_look_two_reveals_karin_to_hand"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -20164,14 +20175,20 @@
         "PL!N-pb1-016-P＋"
       ],
       "base": "PL!N-pb1-016",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch51_test.rs"
+      ],
+      "covering_tests": [
+        "bp4006_low_score_no_fetch",
+        "bp4006_score_three_or_more_looks_five_mus_fetch",
+        "pb1016_look_two_reveals_karin_to_hand"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -25924,9 +25941,12 @@
         "engine/tests/test_modules/untested_abilities_batch37_test.rs",
         "engine/tests/test_modules/untested_abilities_batch43_test.rs",
         "engine/tests/test_modules/untested_abilities_batch44_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch51_test.rs",
         "engine/tests/test_modules/untested_abilities_playthrough_test.rs"
       ],
       "covering_tests": [
+        "bp4006_low_score_no_fetch",
+        "bp4006_score_three_or_more_looks_five_mus_fetch",
         "bp4011_wait_self_center_mus_member_two_blades",
         "bp4017_twin_center_mus_member_one_blade",
         "bp4_018_blade_updates_when_score_changes",
@@ -25954,11 +25974,9 @@
         "maki_accept_cost_three_success_cards_six_blades",
         "maki_decline_no_blades",
         "maki_empty_success_zone_zero_blades",
-        "margarete_activation_waits_self_and_places_waited_energy",
-        "margarete_empty_energy_deck_clean_noop",
-        "mia_activation_self_wait_draws_two_discards_two"
+        "margarete_activation_waits_self_and_places_waited_energy"
       ],
-      "covering_test_count": 52,
+      "covering_test_count": 55,
       "is_null": false
     },
     {
@@ -28792,7 +28810,8 @@
         "engine/tests/test_modules/aurora_flower_identity_test.rs",
         "engine/tests/test_modules/hinoshita_test.rs",
         "engine/tests/test_modules/link_to_future_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch12_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch12_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch51_test.rs"
       ],
       "covering_tests": [
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
@@ -28800,6 +28819,8 @@
         "aoku_haruka_live_start_scores_with_aurora_in_discard",
         "aurora_flower_does_not_match_unrelated_groups",
         "aurora_flower_treated_as_three_groups_in_stage",
+        "bp4006_low_score_no_fetch",
+        "bp4006_score_three_or_more_looks_five_mus_fetch",
         "bp6012_debut_activates_energy_with_sbuuke_teammate",
         "bp6022_equal_or_fewer_opp_energy_no_score",
         "bp6022_more_opp_energy_scores",
@@ -28821,10 +28842,10 @@
         "link_to_future_zero_members_score_0",
         "link_to_the_future_104_to_base_no_match",
         "link_to_the_future_to_104_matches",
-        "pb1021_dollchestra_in_live_zone_draws",
-        "pb1021_no_dollchestra_no_draw"
+        "pb1016_look_two_reveals_karin_to_hand",
+        "pb1021_dollchestra_in_live_zone_draws"
       ],
-      "covering_test_count": 28,
+      "covering_test_count": 31,
       "is_null": false
     },
     {
@@ -35125,6 +35146,7 @@
         "engine/tests/test_modules/untested_abilities_batch47_test.rs",
         "engine/tests/test_modules/untested_abilities_batch49_test.rs",
         "engine/tests/test_modules/untested_abilities_batch50_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch51_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
@@ -35138,6 +35160,8 @@
         "aquarium_yell_from_bottom_short_deck",
         "aquarium_yell_from_bottom_two_yells",
         "baton_touch_cleared_between_actions",
+        "bp4006_low_score_no_fetch",
+        "bp4006_score_three_or_more_looks_five_mus_fetch",
         "bp4024_mus_member_gains_blade",
         "bp4024_no_mus_member_on_stage_no_blades",
         "bp5010_mill_happens_even_without_arise",
@@ -35158,11 +35182,9 @@
         "bp6_016n_waitroom_debut_looks_three_takes_one",
         "bp7014_constant_heart_lost_when_tied",
         "bp7014_constant_heart_while_opp_energy_ahead",
-        "bp7020_constant_blades_off_when_behind",
-        "bp7020_constant_blades_while_energy_ahead",
-        "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly"
+        "bp7020_constant_blades_off_when_behind"
       ],
-      "covering_test_count": 330,
+      "covering_test_count": 333,
       "is_null": false
     },
     {
@@ -41192,7 +41214,6 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/probe_rin.rs",
         "engine/tests/test_modules/untested_abilities_batch45_test.rs",
         "engine/tests/test_modules/untested_abilities_batch50_test.rs"
       ],
@@ -41203,10 +41224,9 @@
         "cl1012_tie_score_retrieves_cost_nine_member",
         "pb2030_choose_first_option_transforms",
         "pb2030_choose_third_option_transforms",
-        "probe_sd2005_choice",
         "sd2005_specify_color_grants_exactly_two_of_one_color"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 7,
       "is_null": false
     },
     {
