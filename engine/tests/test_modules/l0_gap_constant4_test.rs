@@ -15,13 +15,6 @@ fn drain_skips(game: &mut TestGame) {
     }
 }
 
-fn advance_live(game: &mut TestGame) {
-    for _ in 0..7 {
-        game.pass();
-        drain_skips(game);
-    }
-}
-
 /// PL!SP-bp5-011-R: 常時 left→heart02×3, center→heart03×3, right→heart05×3.
 /// Tests all three position variants.
 #[test]

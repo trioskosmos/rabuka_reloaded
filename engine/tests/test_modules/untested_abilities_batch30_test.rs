@@ -17,28 +17,11 @@ use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
 
+/// Thin wrapper: helpers::fire_trigger plus the choice drain this batch's
+/// constant-threshold assertions rely on (the one behavioral difference from
+/// the shared helper — kept local and explicit).
 fn fire_trigger(game: &mut TestGame, cid: i16, trigger: AbilityTrigger, trig: &str) {
-    let ability_id = {
-        let card = game.db.get_card(cid).unwrap();
-        let ab = card
-            .resolved_abilities()
-            .find(|a| a.triggers.as_deref() == Some(trig))
-            .unwrap_or_else(|| panic!("card {} lacks a '{trig}' ability", card.card_no));
-        format!("{}_{}", card.card_no, ab.full_text)
-    };
-    let card_no = game.db.get_card(cid).unwrap().card_no.to_string();
-    let pid = game.state.player1.id.clone();
-    game.state.trigger_auto_ability(
-        ability_id,
-        trigger,
-        pid.clone(),
-        Some(card_no),
-        Some(cid),
-        None,
-        None,
-    );
-    game.state.activating_card = Some(cid);
-    game.state.process_pending_auto_abilities(&pid);
+    crate::helpers::fire_trigger(game, cid, trigger, trig);
     game.drain_auto_ability_choices();
 }
 

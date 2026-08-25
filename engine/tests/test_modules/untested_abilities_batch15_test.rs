@@ -5,30 +5,6 @@
 use crate::helpers::*;
 use rabuka_engine::core::types::AbilityTrigger;
 
-fn fire_trigger(game: &mut TestGame, cid: i16, trigger: AbilityTrigger, trig: &str) {
-    let ability_id = {
-        let card = game.db.get_card(cid).unwrap();
-        let ab = card
-            .resolved_abilities()
-            .find(|a| a.triggers.as_deref() == Some(trig))
-            .unwrap_or_else(|| panic!("card {} lacks a '{trig}' ability", card.card_no));
-        format!("{}_{}", card.card_no, ab.full_text)
-    };
-    let card_no = game.db.get_card(cid).unwrap().card_no.to_string();
-    let pid = game.state.player1.id.clone();
-    game.state.trigger_auto_ability(
-        ability_id,
-        trigger,
-        pid.clone(),
-        Some(card_no),
-        Some(cid),
-        None,
-        None,
-    );
-    game.state.activating_card = Some(cid);
-    game.state.process_pending_auto_abilities(&pid);
-}
-
 // ====================================================================
 // PL!SP-sd1-026-SD / -SRL (ライブ開始時):
 // 「自分のエネルギーが9枚以上の場合、このカードのスコアを＋１する。」

@@ -25,30 +25,6 @@ use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
 
-fn fire_trigger(game: &mut TestGame, cid: i16, trigger: AbilityTrigger, trig: &str) {
-    let ability_id = {
-        let card = game.db.get_card(cid).unwrap();
-        let ab = card
-            .resolved_abilities()
-            .find(|a| a.triggers.as_deref() == Some(trig))
-            .unwrap_or_else(|| panic!("card {} lacks a '{trig}' ability", card.card_no));
-        format!("{}_{}", card.card_no, ab.full_text)
-    };
-    let card_no = game.db.get_card(cid).unwrap().card_no.to_string();
-    let pid = game.state.player1.id.clone();
-    game.state.trigger_auto_ability(
-        ability_id,
-        trigger,
-        pid.clone(),
-        Some(card_no),
-        Some(cid),
-        None,
-        None,
-    );
-    game.state.activating_card = Some(cid);
-    game.state.process_pending_auto_abilities(&pid);
-}
-
 const FILLER: &str = "PL!N-sd1-010-SD";
 const KANON_SD: &str = "PL!SP-sd1-002-SD"; // 澁谷かのん (Liella!)
 const WIEN_SD: &str = "PL!SP-sd2-010-SD2"; // ウィーン・マルガレーテ

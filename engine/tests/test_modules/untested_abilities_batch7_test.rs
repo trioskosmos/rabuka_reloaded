@@ -8,32 +8,6 @@ use rabuka_engine::zones::MemberArea;
 
 const FILLER: &str = "PL!-sd1-010-SD"; // ﾎｼ's member, cost 4, no abilities
 
-/// Fire a specific trigger ability of a stage card by trigger text, using the
-/// real `{card_no}_{full_text}` ability id that `trigger_auto_ability` matches.
-fn fire_trigger(game: &mut TestGame, cid: i16, trigger: AbilityTrigger, trig: &str) {
-    let ability_id = {
-        let card = game.db.get_card(cid).unwrap();
-        let ab = card
-            .resolved_abilities()
-            .find(|a| a.triggers.as_deref() == Some(trig))
-            .unwrap_or_else(|| panic!("card {} lacks a '{trig}' ability", card.card_no));
-        format!("{}_{}", card.card_no, ab.full_text)
-    };
-    let card_no = game.db.get_card(cid).unwrap().card_no.to_string();
-    let pid = game.state.player1.id.clone();
-    game.state.trigger_auto_ability(
-        ability_id,
-        trigger,
-        pid.clone(),
-        Some(card_no),
-        Some(cid),
-        None,
-        None,
-    );
-    game.state.activating_card = Some(cid);
-    game.state.process_pending_auto_abilities(&pid);
-}
-
 // ====================================================================
 // A1 PL!-bp5-008-R 蟆乗ｳ芽干髯ｽ 窶・蟶ｸ譎・
 // 閾ｪ蛻・・謌仙粥繝ｩ繧､繝悶き繝ｼ繝臥ｽｮ縺榊ｴ縺ｫ縺ゅｋ繧ｫ繝ｼ繝峨・繧ｹ繧ｳ繧｢縺ｮ蜷郁ｨ医′・紋ｻ･荳翫〒縺ゅｋ縺九℃繧翫・// {{heart_03}} 繧抵ｼ偵▽蠕励ｋ縲・// BATCH7_PLAN.md ﾂｧA1, edges 1窶・.

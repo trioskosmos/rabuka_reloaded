@@ -11,30 +11,6 @@ use rabuka_engine::zones::MemberArea;
 
 const FILLER: &str = "PL!-sd1-010-SD"; // μ's member, cost 4
 
-fn fire_trigger(game: &mut TestGame, cid: i16, trigger: AbilityTrigger, trig: &str) {
-    let ability_id = {
-        let card = game.db.get_card(cid).unwrap();
-        let ab = card
-            .resolved_abilities()
-            .find(|a| a.triggers.as_deref() == Some(trig))
-            .unwrap_or_else(|| panic!("card {} lacks a '{trig}' ability", card.card_no));
-        format!("{}_{}", card.card_no, ab.full_text)
-    };
-    let card_no = game.db.get_card(cid).unwrap().card_no.to_string();
-    let pid = game.state.player1.id.clone();
-    game.state.trigger_auto_ability(
-        ability_id,
-        trigger,
-        pid.clone(),
-        Some(card_no),
-        Some(cid),
-        None,
-        None,
-    );
-    game.state.activating_card = Some(cid);
-    game.state.process_pending_auto_abilities(&pid);
-}
-
 // ====================================================================
 // B9-1 PL!S-bp7-021-L 僕らの旅は終わらない — ライブ開始時:
 // 自分のステージにメンバーが3人以上いる場合、デッキの下から5枚控え室に置く。
