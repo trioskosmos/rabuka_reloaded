@@ -152,6 +152,31 @@ pub fn scan_autos_both(game: &mut TestGame) {
     game.drain_auto_ability_choices();
 }
 
+/// Answer ANY pending choice by option index, dispatching on the choice
+/// variant so tests never need to know which channel a prompt requires:
+/// - SelectCard                -> select_indices(&[idx])
+/// - SelectPosition / position-or-area SelectTarget -> select_generated(idx)
+/// - SelectHeartColor & other indexed options       -> select_option(idx)
+///
+/// Kills the recurring bug class where a valid index sent through the wrong
+/// channel silently no-ops ("Unknown source position") or picks garbage.
+pub fn answer_choice(game: &mut TestGame, idx: usize) {
+    use rabuka_engine::ability::types::Choice;
+    match game.get_pending_choice() {
+        Choice::SelectCard { .. } => game.select_indices(&[idx]),
+        Choice::SelectAutoAbility { .. } => game.select_indices(&[idx]),
+        Choice::SelectLiveSuccess { .. } => game.select_indices(&[idx]),
+        Choice::SelectTarget { target, .. }
+            if target == "position|destination" || target == "area_select" =>
+        {
+            game.select_generated(idx);
+        }
+        Choice::SelectPosition { .. } => game.select_generated(idx),
+        Choice::SelectHeartColor { .. } => game.select_option(idx as i16),
+        _ => game.select_indices(&[idx]),
+    }
+}
+
 /// Enable the engine's condition-verdict logger, run a TAS scan, and return a
 /// human-readable tree of every condition verdict. Useful for debugging why an
 /// ability did (or didn't) fire without editing engine source.
@@ -375,10 +400,14 @@ impl TestGame {
         state.current_phase = Phase::Main;
         state.current_turn_phase = TurnPhase::FirstAttackerNormal;
         state.turn_number = 1;
-        // cargo test: all gates ON (loud). cargo t: detects --test-threads → all OFF.
-        let quiet = std::env::args().any(|a| a.starts_with("--test-threads"));
+        // Diagnostics ON by default for every test: ABILITY_DEBUG gates the
+        // engine-internal traces ([TAS]/[PCA_TRIGGER]/…), while actual log
+        // emission is controlled independently by RUST_LOG. This replaces the
+        // old `--test-threads` argv sniff, which silently disabled half the
+        // diagnostics depending on how cargo invoked the binary.
+        // Override with RABUKA_QUIET=1 for fully silent runs.
+        let quiet = std::env::var("RABUKA_QUIET").as_deref() == Ok("1");
         if !quiet {
-            let _ = env_logger::try_init();
             rabuka_engine::ability::debug::set_debug(true);
         }
         let debug_enabled = !quiet || std::env::var("RABUKA_DEBUG").is_ok();

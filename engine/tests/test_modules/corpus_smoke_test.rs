@@ -100,9 +100,23 @@ fn every_card_executes_without_panicking() {
         card_nos.len()
     );
 
-    // Silence per-panic hook spam; we aggregate failures ourselves.
-    let prev_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(|_| {}));
+    // Silence per-panic hook spam ONLY while smoke workers are active: the
+    // hook is process-global, so an unconditional swap would also swallow
+    // panic output from unrelated tests running concurrently in libtest's
+    // pool. Workers increment SMOKE_ACTIVE; the installed hook defers to the
+    // previous hook whenever the count is zero.
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static SMOKE_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+    type PanicHook = dyn Fn(&std::panic::PanicHookInfo) + Sync + Send;
+    let prev_hook: std::sync::Arc<PanicHook> = std::sync::Arc::from(std::panic::take_hook());
+    std::panic::set_hook(Box::new({
+        let prev_hook = prev_hook.clone();
+        move |info| {
+            if SMOKE_ACTIVE.load(Ordering::Relaxed) == 0 {
+                prev_hook(info);
+            }
+        }
+    }));
 
     // Cards are independent (each gets its own GameState over the shared
     // read-only Arc<CardDatabase>), so smoke them across a thread pool.
@@ -120,6 +134,7 @@ fn every_card_executes_without_panicking() {
             .map(|chunk| {
                 let db = db.clone();
                 scope.spawn(move || {
+                    SMOKE_ACTIVE.fetch_add(1, Ordering::Relaxed);
                     let mut fails: Vec<String> = Vec::new();
                     for no in chunk {
                         let ok = catch_unwind(AssertUnwindSafe(|| smoke_one_card(&db, no)));
@@ -134,6 +149,7 @@ fn every_card_executes_without_panicking() {
                             fails.push(format!("{no}: {msg}"));
                         }
                     }
+                    SMOKE_ACTIVE.fetch_sub(1, Ordering::Relaxed);
                     fails
                 })
             })
@@ -148,7 +164,8 @@ fn every_card_executes_without_panicking() {
         all
     });
 
-    std::panic::set_hook(prev_hook);
+    // Restore the previous hook now that no smoke workers remain.
+    std::panic::set_hook(Box::new(move |info| prev_hook(info)));
 
     assert!(
         failures.is_empty(),

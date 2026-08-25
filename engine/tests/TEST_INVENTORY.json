@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T11:52:19.631065+00:00",
+  "generated_at": "2026-08-25T12:08:57.062586+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 485,
-  "n_tests": 2943,
+  "n_files": 486,
+  "n_tests": 2946,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -315,13 +315,10 @@
     "L1": 48
   },
   "qa_rulings": {
-    "covered": 272,
+    "covered": 275,
     "total": 280,
     "uncovered_ids": [
-      "Q139",
-      "Q138",
       "Q39",
-      "Q37",
       "Q34",
       "Q33",
       "Q31",
@@ -1394,6 +1391,7 @@
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test_part3.rs",
         "engine/tests/test_modules/pl_hs_sd1_008_test.rs",
+        "engine/tests/test_modules/qa_rulings_pins_test.rs",
         "engine/tests/test_modules/sayaka_loop_test.rs",
         "engine/tests/test_modules/untested_abilities_batch53_test.rs",
         "engine/tests/test_modules/untested_abilities_batch54_test.rs",
@@ -1432,7 +1430,7 @@
         "emma_q163_self_excluded_no_other_niko_cost_fails",
         "hanabiko_baton_touch_replaced_triggers"
       ],
-      "covering_test_count": 144,
+      "covering_test_count": 147,
       "is_null": false
     },
     {
@@ -4101,7 +4099,8 @@
         "engine/tests/test_modules/ability_combination_test.rs",
         "engine/tests/test_modules/miyashita_ai_bp3_test.rs",
         "engine/tests/test_modules/miyashita_ai_test.rs",
-        "engine/tests/test_modules/miyata_draw_until_test.rs"
+        "engine/tests/test_modules/miyata_draw_until_test.rs",
+        "engine/tests/test_modules/qa_rulings_pins_test.rs"
       ],
       "covering_tests": [
         "ai_bp3_draw_from_empty_hand",
@@ -4118,12 +4117,15 @@
         "miyashita_ai_q162_q161_three_debuts_triggers_draw",
         "n_bp3_005_constant_grant_and_counting_auto_combo",
         "n_bp3_005_two_debuts_auto_silent_but_constant_grants",
+        "q138_under_energy_cannot_pay_costs",
+        "q139_under_energy_moves_with_member",
+        "q37_live_start_grant_does_not_stack_on_refire",
         "small_deck_draws_out_and_resolves",
         "sp_bp7_005_double_auto_cascade",
         "third_appearance_draws_to_five",
         "two_appearances_no_draw"
       ],
-      "covering_test_count": 18,
+      "covering_test_count": 21,
       "is_null": false
     },
     {
@@ -4152,7 +4154,8 @@
         "engine/tests/test_modules/ability_combination_test.rs",
         "engine/tests/test_modules/miyashita_ai_bp3_test.rs",
         "engine/tests/test_modules/miyashita_ai_test.rs",
-        "engine/tests/test_modules/miyata_draw_until_test.rs"
+        "engine/tests/test_modules/miyata_draw_until_test.rs",
+        "engine/tests/test_modules/qa_rulings_pins_test.rs"
       ],
       "covering_tests": [
         "ai_bp3_draw_from_empty_hand",
@@ -4169,12 +4172,15 @@
         "miyashita_ai_q162_q161_three_debuts_triggers_draw",
         "n_bp3_005_constant_grant_and_counting_auto_combo",
         "n_bp3_005_two_debuts_auto_silent_but_constant_grants",
+        "q138_under_energy_cannot_pay_costs",
+        "q139_under_energy_moves_with_member",
+        "q37_live_start_grant_does_not_stack_on_refire",
         "small_deck_draws_out_and_resolves",
         "sp_bp7_005_double_auto_cascade",
         "third_appearance_draws_to_five",
         "two_appearances_no_draw"
       ],
-      "covering_test_count": 18,
+      "covering_test_count": 21,
       "is_null": false
     },
     {
@@ -6875,6 +6881,7 @@
         "engine/tests/test_modules/bp7_kanan_formation_change_test.rs",
         "engine/tests/test_modules/choice_bullet_test.rs",
         "engine/tests/test_modules/logging_test.rs",
+        "engine/tests/test_modules/qa_rulings_pins_test.rs",
         "engine/tests/test_modules/self_control_position_change_test.rs",
         "engine/tests/test_modules/trigger_scope_test.rs"
       ],
@@ -6910,7 +6917,7 @@
         "no_saint_snow_does_not_fire",
         "only_selects_matching_live_cards"
       ],
-      "covering_test_count": 43,
+      "covering_test_count": 46,
       "is_null": false
     },
     {
@@ -21106,6 +21113,7 @@
         "engine/tests/test_modules/ability_combination_test.rs",
         "engine/tests/test_modules/awaken_the_power_test.rs",
         "engine/tests/test_modules/bp7_kanan_formation_change_test.rs",
+        "engine/tests/test_modules/qa_rulings_pins_test.rs",
         "engine/tests/test_modules/self_control_position_change_test.rs",
         "engine/tests/test_modules/trigger_scope_test.rs"
       ],
@@ -21130,16 +21138,18 @@
         "only_selects_matching_live_cards",
         "optional_can_skip",
         "position_change_triggered_grant_blade_to_moved_members",
+        "q138_under_energy_cannot_pay_costs",
+        "q139_under_energy_moves_with_member",
+        "q37_live_start_grant_does_not_stack_on_refire",
         "s1_bp7_005_opponent_caused_placement_does_not_fire",
         "s2_bp4_016_energy_placed_by_opponent_fires",
         "s2_pb1_006_opponent_caused_move_fires",
         "s2_pb1_006_own_debut_fires",
         "s3_bp5_111_opponent_caused_move_does_not_fire",
         "s3_bp5_111_own_move_fires",
-        "seira_area_move_wait_blocked_by_immunity",
-        "sp_bp7_005_double_auto_cascade"
+        "seira_area_move_wait_blocked_by_immunity"
       ],
-      "covering_test_count": 28,
+      "covering_test_count": 31,
       "is_null": false
     },
     {
@@ -28286,6 +28296,7 @@
         "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test_part3.rs",
+        "engine/tests/test_modules/qa_rulings_pins_test.rs",
         "engine/tests/test_modules/untested_abilities_batch53_test.rs",
         "engine/tests/test_modules/untested_abilities_batch54_test.rs",
         "engine/tests/test_modules/untested_abilities_batch55_test.rs",
@@ -28323,7 +28334,7 @@
         "hanabiko_static_stage_no_trigger",
         "hanabiko_two_copies_one_moved_one_static"
       ],
-      "covering_test_count": 131,
+      "covering_test_count": 134,
       "is_null": false
     },
     {

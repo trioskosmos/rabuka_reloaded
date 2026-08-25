@@ -1,5 +1,6 @@
 pub mod ability_combination_test;
 pub mod ability_engine_fixes_test;
+pub mod qa_rulings_pins_test;
 pub mod trigger_scope_test;
 pub mod ability_from_source_test;
 pub mod abundant_test;

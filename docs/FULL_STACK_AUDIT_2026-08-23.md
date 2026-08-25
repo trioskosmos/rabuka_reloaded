@@ -313,8 +313,19 @@ Additional finds from the same trench work (not R1-gated):
 | A6 | Corpus smoke parallelization swaps the process-global panic hook for its duration; panics in OTHER tests running concurrently in that window print nothing | Narrow race, cosmetic — note for whoever touches the smoke harness |
 
 Also open, cheap: corpus sweep for additional 「自分のカードの効果によって」/
-「〜でも発動する。」 shapes beyond the 4+7 pinned abilities (appearance-based
-variants may exist without their scope flags decoded).
+「〜でも発動する。」 shapes — **swept 08-25, none found** beyond the pinned
+S1×4 / S2×7 sets; remaining 効果によって hits are condition/restriction-side
+clauses already listed above.
+
+| # | Finding | Why it matters |
+|---|---|---|
+| A7 | `gained_card_abilities` registration **stacks duplicates** — refiring the same LiveStart/LiveSuccess grant re-pushes an identical gained ability and re-applies its immediate score | Unreachable through phase-driven dispatch today (just_completed/this_batch guards), but one guard regression away from score inflation. Hardening: make registration idempotent per (card_id, full_text) or per (source_card, full_text) when distinct sources must stack |
+
+QA-ruling coverage updated: Q37/Q138/Q139 pinned in
+`qa_rulings_pins_test.rs` (Q139 under-energy follows area moves; Q138
+under-energy unpayable; Q37 single-resolution per timing). Remaining
+uncovered rulings are procedural definitions (Q31/Q33/Q34/Q39) with no
+engine decision to assert.
 
 ### Continuous (parallel track)
 - ~~Test-gap burn-down: prioritize the 176 unreferenced abilities~~ **DONE at L0** —
