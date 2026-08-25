@@ -23,67 +23,149 @@ fn maybe_plural(count: Option<u8>, word: &str) -> String {
     }
 }
 
+fn zone_label_inner(zone: Option<&str>, ja: bool) -> &str {
+    if ja {
+        match zone {
+            Some("hand") => "手札",
+            Some("discard") | Some("waitroom") => "控え室",
+            Some("deck") => "デッキ",
+            Some("deck_top") => "デッキの上",
+            Some("deck_bottom") => "デッキの下",
+            Some("stage") => "ステージ",
+            Some("energy") => "エネルギー",
+            Some("energy_deck") => "エネルギーデッキ",
+            Some("energy_zone") => "エネルギーゾーン",
+            Some("success_zone") => "成功ライブカード置き場",
+            Some("live_card_zone") => "ライブカードゾーン",
+            Some("under_member") => "このメンバーの下",
+            Some("revealed_cards") => "公開されたカード",
+            Some("those_cards") => "それらのカード",
+            Some("all_selected") => "選択したカード",
+            Some(s) => s,
+            None => "不明",
+        }
+    } else {
+        match zone {
+            Some("hand") => "hand",
+            Some("discard") => "the waiting room",
+            Some("deck") => "deck",
+            Some("deck_top") => "top of deck",
+            Some("deck_bottom") => "bottom of deck",
+            Some("stage") => "stage",
+            Some("energy") => "energy",
+            Some("energy_deck") => "energy deck",
+            Some("energy_zone") => "energy zone",
+            Some("waitroom") => "wait room",
+            Some("success_zone") => "success zone",
+            Some("live_card_zone") => "live card zone",
+            Some("under_member") => "under this member",
+            Some("revealed_cards") => "revealed cards",
+            Some("those_cards") => "those cards",
+            Some("all_selected") => "selected cards",
+            Some(s) => s,
+            None => "unknown",
+        }
+    }
+}
+
 pub fn zone_label(zone: Option<&str>) -> &str {
-    match zone {
-        Some("hand") => "hand",
-        Some("discard") => "the waiting room",
-        Some("deck") => "deck",
-        Some("deck_top") => "top of deck",
-        Some("deck_bottom") => "bottom of deck",
-        Some("stage") => "stage",
-        Some("energy") => "energy",
-        Some("energy_deck") => "energy deck",
-        Some("energy_zone") => "energy zone",
-        Some("waitroom") => "wait room",
-        Some("success_zone") => "success zone",
-        Some("live_card_zone") => "live card zone",
-        Some("under_member") => "under this member",
-        Some("revealed_cards") => "revealed cards",
-        Some("those_cards") => "those cards",
-        Some("all_selected") => "selected cards",
-        Some(s) => s,
-        None => "unknown",
+    zone_label_inner(zone, false)
+}
+
+fn card_type_label_inner(ct: Option<&str>, ja: bool) -> &str {
+    if ja {
+        match ct {
+            Some("member_card") => "メンバー",
+            Some("live_card") => "ライブカード",
+            Some("energy_card") => "エネルギー",
+            Some("card") => "カード",
+            Some(s) => s,
+            None => "カード",
+        }
+    } else {
+        match ct {
+            Some("member_card") => "member",
+            Some("live_card") => "live card",
+            Some("energy_card") => "energy",
+            Some("card") => "card",
+            Some(s) => s,
+            None => "card",
+        }
     }
 }
 
 pub fn card_type_label(ct: Option<&str>) -> &str {
-    match ct {
-        Some("member_card") => "member",
-        Some("live_card") => "live card",
-        Some("energy_card") => "energy",
-        Some("card") => "card",
-        Some(s) => s,
-        None => "card",
+    card_type_label_inner(ct, false)
+}
+
+fn state_verb_inner(state: Option<&str>, ja: bool) -> &str {
+    if ja {
+        match state {
+            Some("wait") => "ウェイト",
+            Some("active") => "アクティブ",
+            Some(s) => s,
+            None => "状態変更",
+        }
+    } else {
+        match state {
+            Some("wait") => "Rest",
+            Some("active") => "Activate",
+            Some(s) => s,
+            None => "Change state of",
+        }
     }
 }
 
 fn state_verb(state: Option<&str>) -> &str {
-    match state {
-        Some("wait") => "Rest",
-        Some("active") => "Activate",
-        Some(s) => s,
-        None => "Change state of",
+    state_verb_inner(state, false)
+}
+
+fn resource_label_inner(r: Option<&str>, ja: bool) -> &str {
+    if ja {
+        match r {
+            Some("blade") => "ブレード",
+            Some("heart") => "ハート",
+            Some(s) => s,
+            None => "リソース",
+        }
+    } else {
+        match r {
+            Some("blade") => "blade",
+            Some("heart") => "heart",
+            Some(s) => s,
+            None => "resource",
+        }
     }
 }
 
 fn resource_label(r: Option<&str>) -> &str {
-    match r {
-        Some("blade") => "blade",
-        Some("heart") => "heart",
-        Some(s) => s,
-        None => "resource",
+    resource_label_inner(r, false)
+}
+
+fn duration_label_inner(d: Option<&str>, ja: bool) -> &str {
+    if ja {
+        match d {
+            Some("live_end") => "ライブ終了時まで",
+            Some("live_start") => "このライブの間",
+            Some("live_success") => "ライブ成功時",
+            Some("turn_end") | Some("turn") => "ターン終了時まで",
+            Some(s) => s,
+            None => "",
+        }
+    } else {
+        match d {
+            Some("live_end") => "until end of live",
+            Some("live_start") => "for this live",
+            Some("live_success") => "on live success",
+            Some("turn_end") | Some("turn") => "until end of turn",
+            Some(s) => s,
+            None => "",
+        }
     }
 }
 
 fn duration_label(d: Option<&str>) -> &str {
-    match d {
-        Some("live_end") => "until end of live",
-        Some("live_start") => "for this live",
-        Some("live_success") => "on live success",
-        Some("turn_end") | Some("turn") => "until end of turn",
-        Some(s) => s,
-        None => "",
-    }
+    duration_label_inner(d, false)
 }
 
 fn group_label(gn: Option<&Vec<String>>) -> String {
@@ -666,66 +748,26 @@ pub fn describe_sequential_cost_ja(costs: &[Box<AbilityEffect>], choice_index: u
 
 // ── Japanese description ──────────────────────────────────────────────
 
+// ── Japanese description helpers (delegates to locale-parameterized inner) ──
+
 pub fn zone_label_ja(zone: Option<&str>) -> &str {
-    match zone {
-        Some("hand") => "手札",
-        Some("discard") | Some("waitroom") => "控え室",
-        Some("deck") => "デッキ",
-        Some("deck_top") => "デッキの上",
-        Some("deck_bottom") => "デッキの下",
-        Some("stage") => "ステージ",
-        Some("energy") => "エネルギー",
-        Some("energy_deck") => "エネルギーデッキ",
-        Some("energy_zone") => "エネルギーゾーン",
-        Some("success_zone") => "成功ライブカード置き場",
-        Some("live_card_zone") => "ライブカードゾーン",
-        Some("under_member") => "このメンバーの下",
-        Some("revealed_cards") => "公開されたカード",
-        Some("those_cards") => "それらのカード",
-        Some("all_selected") => "選択したカード",
-        Some(s) => s,
-        None => "不明",
-    }
+    zone_label_inner(zone, true)
 }
 
 fn card_type_label_ja(ct: Option<&str>) -> &str {
-    match ct {
-        Some("member_card") => "メンバー",
-        Some("live_card") => "ライブカード",
-        Some("energy_card") => "エネルギー",
-        Some("card") => "カード",
-        Some(s) => s,
-        None => "カード",
-    }
+    card_type_label_inner(ct, true)
 }
 
 pub fn state_verb_ja(state: Option<&str>) -> &str {
-    match state {
-        Some("wait") => "ウェイト",
-        Some("active") => "アクティブ",
-        Some(s) => s,
-        None => "状態変更",
-    }
+    state_verb_inner(state, true)
 }
 
 pub fn resource_label_ja(r: Option<&str>) -> &str {
-    match r {
-        Some("blade") => "ブレード",
-        Some("heart") => "ハート",
-        Some(s) => s,
-        None => "リソース",
-    }
+    resource_label_inner(r, true)
 }
 
 fn duration_label_ja(d: Option<&str>) -> &str {
-    match d {
-        Some("live_end") => "ライブ終了時まで",
-        Some("live_start") => "このライブの間",
-        Some("live_success") => "ライブ成功時",
-        Some("turn_end") | Some("turn") => "ターン終了時まで",
-        Some(s) => s,
-        None => "",
-    }
+    duration_label_inner(d, true)
 }
 
 /// Canonical English choice-prompt templates. Used by the startup self-check
