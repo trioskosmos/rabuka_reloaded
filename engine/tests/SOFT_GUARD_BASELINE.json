@@ -61,7 +61,6 @@
   "engine/tests/test_modules/position_change_multi_test.rs": 1,
   "engine/tests/test_modules/qa_new_tests198.rs": 3,
   "engine/tests/test_modules/qa_new_tests202.rs": 3,
-  "engine/tests/test_modules/qa_new_tests209.rs": 11,
   "engine/tests/test_modules/qa_new_tests255.rs": 4,
   "engine/tests/test_modules/qa_new_tests256.rs": 3,
   "engine/tests/test_modules/qa_rulings_pins_test.rs": 1,

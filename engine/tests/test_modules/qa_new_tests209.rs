@@ -49,11 +49,8 @@ fn q209_ceras_discard_edelnote_live_recover_same() {
     assert!(game.has_pending_choice(), "Q209 discard-2 cost must be offered");
     game.select_indices(&[0, 1]);
 
-    // Effect: select 1 EdelNote live from waitroom to retrieve
-    if game.has_pending_choice() {
-        // The retrieved card is the edel_live we just discarded
-        game.select_indices(&[0]);
-    }
+    // Effect: single candidate (the just-discarded edel_live) AUTO-RESOLVES
+    // — no retrieval prompt; outcome pinned by the hand assertion below.
 
     while game.has_pending_choice() {
         game.select_indices(&[]);
@@ -91,10 +88,7 @@ fn q209_ceras_discard_filler_retrieve_preexisting_edelnote() {
     // Discard 2 fillers from hand — any_number re-prompt: select both, then skip
     assert!(game.has_pending_choice(), "Q209 discard-2 cost must be offered");
     game.select_indices(&[0, 1]);
-    // any_number finalize skip (count=0, allow_skip)
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // any_number cost: selecting exactly the cap (2) finalises — no extra ask.
 
     // Effect: move_cards with count=1 from a waitroom with exactly 1 EdelNote live
     // → engine auto-resolves (single candidate), no prompt. Verify outcome strictly.
@@ -124,9 +118,11 @@ fn q209_ceras_no_edelnote_in_discard_skips() {
 
     game.play_to_stage(ceras, MemberArea::Center);
 
-    if game.has_pending_choice() {
-        game.select_option(0);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "Q209 debut SelectAutoAbility must be offered even with nothing to retrieve"
+    );
+    game.select_option(0);
 
     // Pay cost: discard 2 fillers
     assert!(game.has_pending_choice(), "Q209 discard-2 cost must be offered");
@@ -334,13 +330,13 @@ fn q209_kasumi_no_niji_in_discard_skips() {
     )
     .expect("activate");
 
-    if game.has_pending_choice() {
-        game.select_generated(0); // pay 2 energy
-    }
-
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // discard filler
-    }
+    // {E}{E} auto-pays (sufficient active energy); the hand discard is the
+    // only prompt. No 虹ヶ咲 live in waitroom → effect skips afterwards.
+    assert!(
+        game.has_pending_choice(),
+        "hand-discard cost prompt expected"
+    );
+    game.select_indices(&[0]); // discard filler
 
     // No 虹ヶ咲 live in waitroom → no retrieval choice
     while game.has_pending_choice() {
@@ -384,15 +380,10 @@ fn q209_kasumi_use_limit_blocks_second() {
     )
     .expect("first activate");
 
-    if game.has_pending_choice() {
-        game.select_generated(0); // pay energy
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // discard
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // retrieve
-    }
+    // {E}{E} auto-pays; hand discard prompted; single-candidate retrieval
+    // (the just-discarded niji_live) auto-resolves.
+    assert!(game.has_pending_choice(), "hand-discard cost prompt expected");
+    game.select_indices(&[0]); // discard
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
@@ -444,18 +435,17 @@ fn q209_kasumi_retrieve_different_niji_live() {
     )
     .expect("activate");
 
-    if game.has_pending_choice() {
-        game.select_generated(0); // pay energy
-    }
+    // {E}{E} auto-pays; hand discard prompted.
+    assert!(game.has_pending_choice(), "hand-discard cost prompt expected");
+    game.select_indices(&[0]); // discard niji_b
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // discard niji_b
-    }
-
-    // Now waitroom has [niji_a, niji_b]. Choose niji_a (index 0).
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // retrieve niji_a
-    }
+    // Waitroom now holds [niji_a, niji_b] → retrieval IS prompted (two
+    // candidates); pick niji_a (index 0).
+    assert!(
+        game.has_pending_choice(),
+        "retrieve prompt expected with two candidates"
+    );
+    game.select_indices(&[0]); // retrieve niji_a
 
     while game.has_pending_choice() {
         game.select_indices(&[]);
