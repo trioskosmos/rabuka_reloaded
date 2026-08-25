@@ -305,7 +305,7 @@ Additional finds from the same trench work (not R1-gated):
 
 | # | Finding | Why it matters |
 |---|---|---|
-| A1 | `condition_is_event_based` does not understand **composite conditions** — OR(appearance ∪ area_move) watchers are treated as non-event-based and enqueued on *every* TAS pass, relying entirely on downstream guards | Any future guard regression silently multi-fires these; classification should recurse into `trigger_event.events` |
+| A1 | ~~`condition_is_event_based` does not recurse into composites~~ **CORRECTED 08-25**: recursion into `Condition::Compound` exists (abilities.rs ~306); the multi-fire observed during S2 debugging traced to **guard lifetimes (P2)**, not classification | No code gap — kept as a pin: `trigger_scope` + combination tests now cover composite watchers' enqueue counts |
 | A2 | Debug output has **two independent switches**: gated logs check the `ABILITY_DEBUG` atomic (set by `TestGame::new` unless `--test-threads` appears in argv), plain `log::debug!` needs `RUST_LOG`. Running with `--test-threads=1` silently disables half the diagnostics | Debugging sessions lose the most valuable traces for no reason; derive one switch from `RUST_LOG` |
 | A3 | The `--test-threads` argv sniff itself is brittle (`-j`, env vars, CI runners all bypass it) | Same fix as A2 |
 | A4 | `effect_only` flag on MovementEvents is set inconsistently by callers (cost discards false, hook placements true, some executors unclear) | 「カードの効果によって」 scoping depends on this bit; worth a per-caller audit when R1 lands |
