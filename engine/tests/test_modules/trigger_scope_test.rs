@@ -61,7 +61,7 @@ fn s2_pb1_006_own_debut_fires() {
 /// (HS-pb1-014-R's debut position-changes an opponent member to the facing
 /// area), and the S2 auto MUST fire even though a p2 card caused it.
 #[test]
-fn s2_pb1_006_opponent_caused_move_fires() {
+fn s2_pb1_006_opponent_drag_arms_per_move() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -72,46 +72,43 @@ fn s2_pb1_006_opponent_caused_move_fires() {
     game.state.player1.stage.stage = [-1, -1, member];
     game.play_to_stage(member, MemberArea::RightSide);
     scan_autos_both(&mut game);
-    let blade_after_debut = game.state.mods.get_blade_modifier(member);
-    assert_eq!(blade_after_debut, 2, "own debut fired once");
+    assert_eq!(
+        game.state.mods.get_blade_modifier(member),
+        2,
+        "own debut armed the auto (+2)"
+    );
 
-    // P2 board: all-みらくらぱーく！ requirement for the mover's gate.
+    // P2 board: all-みらくらぱーく！ gate for the mover.
     let mirakura_a = game.new_id("PL!HS-bp1-005-PR");
-    let mirakura_b = game.new_id("PL!HS-PR-005-PR");
-    let mover = game.new_id("PL!HS-pb1-014-R"); // cost 9, unit みらくらぱーく!
-    game.state.player2.stage.stage = [mirakura_a, -1, mirakura_b];
-    game.add_to_hand_for(Side::P2, mover);
+    let mover1 = game.new_id("PL!HS-pb1-014-R"); // cost 9
+    game.state.player2.stage.stage = [mirakura_a, -1, -1];
+    game.add_to_hand_for(Side::P2, mover1);
     game.give_energy_for(Side::P2, 9);
 
-    // P2 debuts the mover at ITS center; the facing area is P1's center, so
-    // the watcher (P1 right) is dragged right -> center: a real area change
-    // caused entirely by p2's card effect.
-    game.try_play_to_stage_for(Side::P2, mover, MemberArea::Center)
-        .expect("p2 debut of the mover");
-    // Target/position prompts are answered via generated ChoicePosition
-    // actions (the same buttons the frontend renders).
+    // DRAG #1: mover1 debuts at P2 center (faces P1 center) — the watcher is
+    // pulled right -> center. Distinct movement_event_counter => arms again.
+    game.try_play_to_stage_for(Side::P2, mover1, MemberArea::Center)
+        .expect("p2 debut of mover1");
     while game.has_pending_choice() {
-        game.select_generated(0);
+        answer_choice(&mut game, 0);
     }
     scan_autos_both(&mut game);
 
-    eprintln!(
-        "[PROBE] p1_stage={:?} p2_stage={:?} blade={}",
-        game.state.player1.stage.stage,
-        game.state.player2.stage.stage,
-        game.state.mods.get_blade_modifier(member)
-    );
-
-    // The watcher moved area (right -> center).
-    assert!(
-        game.state.player1.stage.stage[2] != member && game.state.player1.stage.stage[1] == member,
-        "opponent's debut moved the watcher out of its area"
+    assert_eq!(
+        game.state.player1.stage.stage[1], member,
+        "drag #1 moved the watcher into P1 center"
     );
     assert_eq!(
         game.state.mods.get_blade_modifier(member),
         4,
-        "parenthetical: opponent-caused area move ALSO fires the auto (+2 more)"
+        "per-move dedupe: drag #1 is a DISTINCT move -> +2 more"
     );
+
+    // NOTE: multi-drag sequences within one turn are deliberately NOT pinned
+    // here — blind index answers to the facing-area prompt can select
+    // degenerate destinations (EPCWD source==target NOOP). Per-move arming is
+    // covered by opp_cause_fired_keys unit semantics; extend with a scripted
+    // two-mover scenario only alongside real UI-flow captures.
 }
 
 // ====================================================================

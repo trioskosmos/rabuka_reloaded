@@ -107,6 +107,8 @@ pub fn push_energy_zone_change(game: &mut TestGame, player: &str) {
     /// Fire a card's auto ability identified by its JA trigger label
     /// (e.g. 「ライブ開始時」), then resolve the pushed abilities. The canonical way
     /// to exercise 自動/ライブ開始時/ライブ成功時 triggers without advancing phases.
+    /// Calling twice re-fires deliberately — gate repeats in the test itself
+    /// when once-per-timing semantics are under test (Q37).
     pub fn fire_trigger(
         game: &mut TestGame,
         cid: i16,
@@ -175,6 +177,17 @@ pub fn answer_choice(game: &mut TestGame, idx: usize) {
         Choice::SelectHeartColor { .. } => game.select_option(idx as i16),
         _ => game.select_indices(&[idx]),
     }
+}
+
+/// Count how many entries of the engine's always-on event trace contain
+/// `needle`. Unlike [`TestGame::event_trace_contains`] this returns the
+/// occurrence count, letting tests assert EXACTLY-N firings.
+pub fn count_debug_trace(game: &TestGame, needle: &str) -> usize {
+    game.state
+        .debug_trace
+        .iter()
+        .filter(|e| e.contains(needle))
+        .count()
 }
 
 /// Enable the engine's condition-verdict logger, run a TAS scan, and return a
