@@ -376,6 +376,10 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
     }
 
     super::card::CardDatabase {
+        normalized_no_to_id: card_no_to_id
+            .keys()
+            .map(|k| (super::card::CardDatabase::normalize_card_no(k), card_no_to_id[k]))
+            .collect(),
         cards,
         card_no_to_id,
         next_id,

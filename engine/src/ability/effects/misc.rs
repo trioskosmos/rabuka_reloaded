@@ -3162,28 +3162,6 @@ impl AbilityResolver {
         destination: &str,
     ) -> Result<(), String> {
         let raw_target = effect.target_any().unwrap_or("self");
-        let target = if raw_target == "both" {
-            "self"
-        } else {
-            raw_target
-        };
-        let target_member_binding = effect.target_member_any();
-        let target_member = target_member_binding.unwrap_or("this_member");
-        let sp_binding = effect.source_position_any();
-        let source_position = sp_binding.as_deref().or_else(|| {
-            effect
-                .position_any()
-                .as_ref()
-                .and_then(|p| p.get_position())
-        });
-        log::debug!(
-            "[EPCWD] entry: target={} target_member={} source_pos={:?} dest={} activating={:?}",
-            target,
-            target_member,
-            source_position,
-            destination,
-            self.activating_card_id
-        );
         // "both" at resolution time means "self" (the ability controller resolves choices)
         let target = if raw_target == "both" {
             "self"
@@ -3200,6 +3178,14 @@ impl AbilityResolver {
                 .as_ref()
                 .and_then(|p| p.get_position())
         });
+        log::debug!(
+            "[EPCWD] entry: target={} target_member={} source_pos={:?} dest={} activating={:?}",
+            target,
+            target_member,
+            source_position,
+            destination,
+            self.activating_card_id
+        );
 
         // destination "same_area" means the area that was just vacated by the
         // previous position_change (the source area of the first move). Since

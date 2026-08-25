@@ -395,6 +395,10 @@ impl From<CardId> for usize {
 pub struct CardDatabase {
     pub cards: HashMap<i16, Card>,
     pub card_no_to_id: HashMap<String, i16>,
+    /// Normalized (uppercase, fullwidth→halfwidth) card_no → id. Built once at
+    /// load so `get_card_id` fallback lookups are O(1) instead of an
+    /// O(n)-allocation scan over every key.
+    pub normalized_no_to_id: HashMap<String, i16>,
     pub next_id: i16,
 }
 
@@ -438,6 +442,7 @@ impl CardDatabase {
         Self {
             cards: HashMap::default(),
             card_no_to_id: HashMap::default(),
+            normalized_no_to_id: HashMap::default(),
             next_id: 0,
         }
     }
@@ -472,6 +477,15 @@ impl CardDatabase {
             db.cards.insert(card_id, card);
         }
 
+        // R1-adjacent perf fix: pre-build the normalized lookup index once so
+        // get_card_id's fallback is O(1) instead of an allocating scan over
+        // every key on each miss.
+        db.normalized_no_to_id = db
+            .card_no_to_id
+            .keys()
+            .map(|k| (Self::normalize_card_no(k), *db.card_no_to_id.get(k).unwrap()))
+            .collect();
+
         db
     }
 
@@ -492,20 +506,16 @@ impl CardDatabase {
         if let Some(&id) = self.card_no_to_id.get(card_no) {
             return Some(id);
         }
-        // Normalize: uppercase + convert fullwidth characters to halfwidth
+        // Fallback: uppercase + fullwidth→halfwidth normalization, resolved
+        // through the prebuilt index (no per-miss scan).
         let normalized = Self::normalize_card_no(card_no);
-        for (key, &id) in &self.card_no_to_id {
-            if Self::normalize_card_no(key) == normalized {
-                return Some(id);
-            }
-        }
-        None
+        self.normalized_no_to_id.get(&normalized).copied()
     }
 
     /// Normalize card_no for lookup: uppercase, fullwidth → halfwidth.
     /// Avoids allocation when input is already ASCII uppercase with no
     /// fullwidth characters (the common case after initial load).
-    fn normalize_card_no(card_no: &str) -> String {
+    pub(crate) fn normalize_card_no(card_no: &str) -> String {
         let mut result = String::with_capacity(card_no.len());
         let mut changed = false;
         for ch in card_no.chars() {
