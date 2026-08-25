@@ -272,6 +272,35 @@ Part-0 holes; several silent-fallback paths can eat a regression unnoticed.
 18. R4 single zone enum
 19. P9 abilities.json format v2 (structured cards[], triggers[], discriminator unification)
 
+### Post-R1 agenda (from 08-25 trigger-scoping work)
+
+R1 (movement-tracking unification) stopped being theoretical this session:
+the S2/S3 scoping implementation had to be threaded through five overlapping
+channels and three guard lifetimes, and every misstep traced back to the same
+root. What R1 must absorb, concretely:
+
+| # | Pain (observed 08-25) | Consequence today | Post-R1 shape |
+|---|---|---|---|
+| P1 | Movement recorded in **5 places** (`recently_moved_cards`, `batch_movements`, `turn_area_movements`, `position_change_events`, entry `trigger_moved_cards`/`snapshot_movements`) with different lifetimes | Every consumer picks the wrong one eventually; TAS windows gated on `recently_moved.is_some()` silently skip pure-position-change batches | One append-only event log; all queries derived |
+| P2 | Dedupe guards (`this_batch_triggered_ability_ids`, `just_completed_ability_key`) cleared at **inconsistent sites** (process-loop end vs RWC windows vs never) | Stale key **permanently suppressed** an each_time watcher's future triggers (found via S2 pin); clearing too eagerly double-fires | Guard = (ability key, event id) pairs; expires by construction when its event ages out of the log |
+| P3 | Cause-player attribution exists **only on MovementEvent** | Opponent-effect scoping (S1/S2) implementable for stage moves + energy placements only; appearance/state-change families stay blind | Add causer to every emitted event kind at emit time |
+| P4 | Energy placement tracked as a **bool flag** (`last_energy_placed_by_effect`) + player string | No per-card/per-count info; snapshots must be plumbed manually through entries | Query the log like any other zone change |
+| P5 | `entry_snapshot_*` getter proliferation (~6 ad-hoc filters over `snapshot_movements`) | Each new feature adds another bespoke getter; filters drift | Typed query API over entry snapshot (by zone pair, by card, latest-n) |
+| P6 | Position-change executors bypass `push_movement_event` in some paths (opponent-facing drags recorded nothing until hooked) | Cross-side forced moves invisible to ALL trigger classes, not just S2 | Single emission point enforced; executor cannot forget |
+
+Sequencing note: `fire_opponent_cause_watchers_for_move` /
+`_energy_watchers` and their turn-scoped dedupe
+(`opp_cause_fired_keys`) were deliberately written against
+`push_movement_event` only, so they survive the unification untouched —
+afterwards they reduce to "query log for events caused by opponent matching
+marker", and P2/P3 dissolve entirely.
+
+Also blocked-on-R1 (smaller):
+- Per-move identity for each_time dedupe (today: turn-scoped set ⇒ marked
+  watchers arm at most once/turn even across distinct moves)
+- Simultaneous two-player trigger ordering pins need stable event ids to be
+  assertable deterministically
+
 ### Continuous (parallel track)
 - ~~Test-gap burn-down: prioritize the 176 unreferenced abilities~~ **DONE at L0** —
   936/936 abilities on 771/771 cards referenced (batch 55 closed the list). Remaining
