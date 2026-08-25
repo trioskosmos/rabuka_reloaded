@@ -1,28 +1,28 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T00:21:01.850628+00:00",
+  "generated_at": "2026-08-25T00:31:50.145207+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 471,
-  "n_tests": 2820,
+  "n_files": 472,
+  "n_tests": 2823,
   "total_cards": 771,
-  "covered_cards": 702,
-  "abilities_on_covered": 867,
+  "covered_cards": 706,
+  "abilities_on_covered": 871,
   "trigger_counts": {
     "起動": [
       87,
       96
     ],
     "登場": [
-      248,
+      250,
       269
     ],
     "ライブ開始時": [
-      238,
+      240,
       268
     ],
     "(none)": [
@@ -44,19 +44,19 @@
   },
   "action_counts": {
     "move_cards": [
-      132,
+      133,
       146
     ],
     "look_and_select": [
-      55,
+      56,
       71
     ],
     "gain_resource": [
-      152,
+      153,
       160
     ],
     "sequential": [
-      202,
+      203,
       219
     ],
     "unknown": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      500,
+      503,
       545
     ],
     "temporal_condition": [
@@ -194,7 +194,7 @@
       60
     ],
     "card_count_condition": [
-      81,
+      82,
       88
     ],
     "location_condition": [
@@ -288,7 +288,7 @@
       82
     ],
     "bp7": [
-      104,
+      106,
       111
     ],
     "pb1": [
@@ -296,7 +296,7 @@
       137
     ],
     "sd2": [
-      27,
+      29,
       31
     ],
     "pb2": [
@@ -310,9 +310,9 @@
   },
   "depth_counts": {
     "L2+choice": 628,
-    "L1+choice": 163,
+    "L1+choice": 167,
     "L2": 28,
-    "none": 69,
+    "none": 65,
     "L1": 48
   },
   "qa_rulings": {
@@ -40497,14 +40497,20 @@
         "PL!SP-bp7-019-N"
       ],
       "base": "PL!SP-bp7-019",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch45_test.rs"
+      ],
+      "covering_tests": [
+        "bp7019_only_two_5ync_no_retrieval",
+        "bp7019_three_5ync_retrieves_live_from_waitroom",
+        "bp7025_staged_chisato_gains_blade"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -40577,14 +40583,20 @@
         "PL!SP-bp7-025-L"
       ],
       "base": "PL!SP-bp7-025",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch45_test.rs"
+      ],
+      "covering_tests": [
+        "bp7019_only_two_5ync_no_retrieval",
+        "bp7019_three_5ync_retrieves_live_from_waitroom",
+        "bp7025_staged_chisato_gains_blade"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -40976,14 +40988,20 @@
         "PL!N-sd2-005-SD2"
       ],
       "base": "PL!N-sd2-005",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch45_test.rs"
+      ],
+      "covering_tests": [
+        "bp7019_only_two_5ync_no_retrieval",
+        "bp7019_three_5ync_retrieves_live_from_waitroom",
+        "bp7025_staged_chisato_gains_blade"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
@@ -41039,14 +41057,20 @@
         "PL!N-sd2-009-SD2"
       ],
       "base": "PL!N-sd2-009",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch45_test.rs"
+      ],
+      "covering_tests": [
+        "bp7019_only_two_5ync_no_retrieval",
+        "bp7019_three_5ync_retrieves_live_from_waitroom",
+        "bp7025_staged_chisato_gains_blade"
+      ],
+      "covering_test_count": 3,
       "is_null": false
     },
     {
