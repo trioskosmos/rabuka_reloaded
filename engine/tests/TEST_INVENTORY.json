@@ -1,28 +1,28 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T01:09:57.738931+00:00",
+  "generated_at": "2026-08-25T01:25:17.217380+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 474,
-  "n_tests": 2834,
+  "n_files": 475,
+  "n_tests": 2838,
   "total_cards": 771,
-  "covered_cards": 713,
-  "abilities_on_covered": 878,
+  "covered_cards": 716,
+  "abilities_on_covered": 881,
   "trigger_counts": {
     "起動": [
-      88,
+      89,
       96
     ],
     "登場": [
-      250,
+      251,
       269
     ],
     "ライブ開始時": [
-      246,
+      247,
       268
     ],
     "(none)": [
@@ -44,7 +44,7 @@
   },
   "action_counts": {
     "move_cards": [
-      133,
+      135,
       146
     ],
     "look_and_select": [
@@ -104,7 +104,7 @@
       2
     ],
     "modify_score": [
-      71,
+      72,
       73
     ],
     "conditional_alternative": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      509,
+      511,
       545
     ],
     "temporal_condition": [
@@ -210,7 +210,7 @@
       2
     ],
     "group_condition": [
-      42,
+      43,
       44
     ],
     "or_condition": [
@@ -280,7 +280,7 @@
       88
     ],
     "bp5": [
-      123,
+      124,
       134
     ],
     "bp6": [
@@ -304,15 +304,15 @@
       43
     ],
     "cl1": [
-      4,
+      6,
       10
     ]
   },
   "depth_counts": {
     "L2+choice": 633,
-    "L1+choice": 169,
+    "L1+choice": 172,
     "L2": 28,
-    "none": 58,
+    "none": 55,
     "L1": 48
   },
   "qa_rulings": {
@@ -6445,11 +6445,13 @@
         "engine/tests/test_modules/untested_abilities_batch31_test.rs",
         "engine/tests/test_modules/untested_abilities_batch32_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch36_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch36_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch48_test.rs"
       ],
       "covering_tests": [
         "bp4_021_accept_puts_waitroom_card_on_deck_top",
         "bp4_021_skip_leaves_waitroom_intact",
+        "bp5026_total_ten_no_bonus",
         "bp5_015_debut_mills_exactly_ten",
         "bp6_016_look_three_reorder_back_on_top",
         "bp6_021_accept_cost_scores_and_retrieves",
@@ -6457,6 +6459,9 @@
         "bp7_019_places_two_aqours_cards_under_deck",
         "butterfly_to_butterfly_wing_matches",
         "butterfly_wing_to_butterfly_no_match",
+        "cl1002_accept_energy_retrieves_dollchestra",
+        "cl1002_decline_stays_in_waitroom",
+        "cl1008_self_to_waitroom_retrieves_hasunosora",
         "cl1_009_cost_ten_outside_range_not_selectable",
         "cl1_009_retrieves_cost_four_boundary",
         "cl1_009_retrieves_cost_nine_boundary",
@@ -6473,13 +6478,9 @@
         "hinoshita_multiple_waitroom_matches_prompts_choice",
         "hinoshita_no_live_card_in_hand_fails",
         "hinoshita_no_matching_live_in_discard_fails",
-        "hinoshita_q236_name_contains_all_matches",
-        "hinoshita_q237_name_contains_all_no_match",
-        "hinoshita_reveal_choice_keeps_card_in_hand",
-        "hinoshita_use_limit_once_per_turn",
-        "hot_passion_accept_energy_opponent_draws"
+        "hinoshita_q236_name_contains_all_matches"
       ],
-      "covering_test_count": 53,
+      "covering_test_count": 57,
       "is_null": false
     },
     {
@@ -6510,11 +6511,13 @@
         "engine/tests/test_modules/untested_abilities_batch31_test.rs",
         "engine/tests/test_modules/untested_abilities_batch32_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch36_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch36_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch48_test.rs"
       ],
       "covering_tests": [
         "bp4_021_accept_puts_waitroom_card_on_deck_top",
         "bp4_021_skip_leaves_waitroom_intact",
+        "bp5026_total_ten_no_bonus",
         "bp5_015_debut_mills_exactly_ten",
         "bp6_016_look_three_reorder_back_on_top",
         "bp6_021_accept_cost_scores_and_retrieves",
@@ -6522,6 +6525,9 @@
         "bp7_019_places_two_aqours_cards_under_deck",
         "butterfly_to_butterfly_wing_matches",
         "butterfly_wing_to_butterfly_no_match",
+        "cl1002_accept_energy_retrieves_dollchestra",
+        "cl1002_decline_stays_in_waitroom",
+        "cl1008_self_to_waitroom_retrieves_hasunosora",
         "cl1_009_cost_ten_outside_range_not_selectable",
         "cl1_009_retrieves_cost_four_boundary",
         "cl1_009_retrieves_cost_nine_boundary",
@@ -6538,13 +6544,9 @@
         "hinoshita_multiple_waitroom_matches_prompts_choice",
         "hinoshita_no_live_card_in_hand_fails",
         "hinoshita_no_matching_live_in_discard_fails",
-        "hinoshita_q236_name_contains_all_matches",
-        "hinoshita_q237_name_contains_all_no_match",
-        "hinoshita_reveal_choice_keeps_card_in_hand",
-        "hinoshita_use_limit_once_per_turn",
-        "hot_passion_accept_energy_opponent_draws"
+        "hinoshita_q236_name_contains_all_matches"
       ],
-      "covering_test_count": 53,
+      "covering_test_count": 57,
       "is_null": false
     },
     {
@@ -28872,10 +28874,15 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/ability_trigger_fix_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch36_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch36_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch48_test.rs"
       ],
       "covering_tests": [
         "baton_touch_cleared_between_actions",
+        "bp5026_total_ten_no_bonus",
+        "cl1002_accept_energy_retrieves_dollchestra",
+        "cl1002_decline_stays_in_waitroom",
+        "cl1008_self_to_waitroom_retrieves_hasunosora",
         "hanaho_baton_touch_low_cost_no_trigger",
         "hanaho_baton_touch_triggers_activates_energy",
         "hanaho_baton_touch_triggers_exactly_once",
@@ -28893,7 +28900,7 @@
         "serasu_on_stage_non_edelnote_appears_no_trigger",
         "serasu_played_to_stage_triggers_self"
       ],
-      "covering_test_count": 17,
+      "covering_test_count": 21,
       "is_null": false
     },
     {
@@ -33507,14 +33514,21 @@
         "PL!SP-bp5-026-L"
       ],
       "base": "PL!SP-bp5-026",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch48_test.rs"
+      ],
+      "covering_tests": [
+        "bp5026_total_ten_no_bonus",
+        "cl1002_accept_energy_retrieves_dollchestra",
+        "cl1002_decline_stays_in_waitroom",
+        "cl1008_self_to_waitroom_retrieves_hasunosora"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -37764,14 +37778,21 @@
         "PL!HS-cl1-002-CL"
       ],
       "base": "PL!HS-cl1-002",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch48_test.rs"
+      ],
+      "covering_tests": [
+        "bp5026_total_ten_no_bonus",
+        "cl1002_accept_energy_retrieves_dollchestra",
+        "cl1002_decline_stays_in_waitroom",
+        "cl1008_self_to_waitroom_retrieves_hasunosora"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -37876,14 +37897,21 @@
         "PL!HS-cl1-008-CL"
       ],
       "base": "PL!HS-cl1-008",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch48_test.rs"
+      ],
+      "covering_tests": [
+        "bp5026_total_ten_no_bonus",
+        "cl1002_accept_energy_retrieves_dollchestra",
+        "cl1002_decline_stays_in_waitroom",
+        "cl1008_self_to_waitroom_retrieves_hasunosora"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -38796,13 +38824,18 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/untested_abilities_batch44_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch47_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch47_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch48_test.rs"
       ],
       "covering_tests": [
         "bp5010_mill_happens_even_without_arise",
         "bp5010_mills_three_retrieves_arise_member",
+        "bp5026_total_ten_no_bonus",
         "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
         "chisato_right_side_debut_draws_two_discards_two",
+        "cl1002_accept_energy_retrieves_dollchestra",
+        "cl1002_decline_stays_in_waitroom",
+        "cl1008_self_to_waitroom_retrieves_hasunosora",
         "koko_only_two_kaleidoscope_no_bonus",
         "koko_three_kaleidoscore_grants_heart06_and_blade",
         "mia_activation_self_wait_draws_two_discards_two",
@@ -38810,7 +38843,7 @@
         "pb2047_non_liella_on_stage_no_enemy_wait",
         "sumire_left_side_debut_draws_two_discards_two"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -38834,13 +38867,18 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/untested_abilities_batch44_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch47_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch47_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch48_test.rs"
       ],
       "covering_tests": [
         "bp5010_mill_happens_even_without_arise",
         "bp5010_mills_three_retrieves_arise_member",
+        "bp5026_total_ten_no_bonus",
         "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
         "chisato_right_side_debut_draws_two_discards_two",
+        "cl1002_accept_energy_retrieves_dollchestra",
+        "cl1002_decline_stays_in_waitroom",
+        "cl1008_self_to_waitroom_retrieves_hasunosora",
         "koko_only_two_kaleidoscope_no_bonus",
         "koko_three_kaleidoscore_grants_heart06_and_blade",
         "mia_activation_self_wait_draws_two_discards_two",
@@ -38848,7 +38886,7 @@
         "pb2047_non_liella_on_stage_no_enemy_wait",
         "sumire_left_side_debut_draws_two_discards_two"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -40360,16 +40398,21 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/untested_abilities_batch44_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch44_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch48_test.rs"
       ],
       "covering_tests": [
+        "bp5026_total_ten_no_bonus",
         "chisato_right_side_debut_draws_two_discards_two",
+        "cl1002_accept_energy_retrieves_dollchestra",
+        "cl1002_decline_stays_in_waitroom",
+        "cl1008_self_to_waitroom_retrieves_hasunosora",
         "koko_only_two_kaleidoscope_no_bonus",
         "koko_three_kaleidoscore_grants_heart06_and_blade",
         "mia_activation_self_wait_draws_two_discards_two",
         "sumire_left_side_debut_draws_two_discards_two"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 9,
       "is_null": false
     },
     {
