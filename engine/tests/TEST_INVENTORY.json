@@ -1,28 +1,28 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T06:28:01.170836+00:00",
+  "generated_at": "2026-08-25T06:37:46.644682+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 480,
-  "n_tests": 2889,
+  "n_files": 481,
+  "n_tests": 2903,
   "total_cards": 771,
-  "covered_cards": 736,
-  "abilities_on_covered": 901,
+  "covered_cards": 746,
+  "abilities_on_covered": 911,
   "trigger_counts": {
     "起動": [
-      92,
+      93,
       96
     ],
     "登場": [
-      256,
+      263,
       269
     ],
     "ライブ開始時": [
-      256,
+      257,
       268
     ],
     "(none)": [
@@ -30,7 +30,7 @@
       2
     ],
     "ライブ成功時": [
-      115,
+      116,
       122
     ],
     "常時": [
@@ -44,11 +44,11 @@
   },
   "action_counts": {
     "move_cards": [
-      139,
+      140,
       146
     ],
     "look_and_select": [
-      59,
+      66,
       71
     ],
     "gain_resource": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      211,
+      213,
       220
     ],
     "unknown": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      525,
+      535,
       545
     ],
     "temporal_condition": [
@@ -264,7 +264,7 @@
       52
     ],
     "bp1": [
-      55,
+      56,
       56
     ],
     "bp3": [
@@ -272,7 +272,7 @@
       66
     ],
     "bp2": [
-      65,
+      66,
       68
     ],
     "bp4": [
@@ -288,11 +288,11 @@
       82
     ],
     "bp7": [
-      108,
+      109,
       111
     ],
     "pb1": [
-      127,
+      133,
       137
     ],
     "sd2": [
@@ -300,7 +300,7 @@
       31
     ],
     "pb2": [
-      41,
+      42,
       43
     ],
     "cl1": [
@@ -310,10 +310,10 @@
   },
   "depth_counts": {
     "L2+choice": 647,
-    "L1+choice": 178,
+    "L1+choice": 188,
     "L2": 28,
     "L1": 48,
-    "none": 35
+    "none": 25
   },
   "qa_rulings": {
     "covered": 272,
@@ -892,6 +892,7 @@
         "engine/tests/test_modules/score_condition_integration_test.rs",
         "engine/tests/test_modules/untested_abilities_batch16_test.rs",
         "engine/tests/test_modules/untested_abilities_batch41_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs"
       ],
       "covering_tests": [
@@ -910,6 +911,9 @@
         "bp2024_positive_control_normal_live_card_is_placeable",
         "bp3004_rest_self_and_discard_retrieves_niji_live",
         "bp4018_rests_self_to_waitroom_retrieves_liella",
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
         "compound_dododo_hasunosora_on_stage_passes",
         "compound_dododo_no_hasunosora_fails",
         "compound_dododo_tied_score_with_hasunosora_fails",
@@ -921,12 +925,9 @@
         "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
         "happy_party_train_all_active_reduces_need_heart",
         "happy_party_train_mill_aqours_member_reduces_need_heart",
-        "happy_party_train_mill_non_aqours_no_reduction",
-        "happy_party_train_waited_or_empty_stage_no_reduction",
-        "hasunosora_group_member_present_passes",
-        "hasunosora_group_mixed_stage_passes"
+        "happy_party_train_mill_non_aqours_no_reduction"
       ],
-      "covering_test_count": 115,
+      "covering_test_count": 129,
       "is_null": true
     },
     {
@@ -1190,10 +1191,25 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs",
         "engine/tests/test_modules/untested_abilities_test.rs"
       ],
       "covering_tests": [
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
         "honoka_cost_limit_wait_blocked_by_wait_immunity",
+        "hspb1004_decline_hand_cost_no_mill_no_recover",
+        "hspb1004_discard_mills_three_recovers_slieszbuque_live",
+        "hspb1018_looks_five_fetches_dollchestra",
+        "pb1016_m_decline_leaves_deck_intact",
+        "pb1016_m_looks_four_fetches_lilywhite",
+        "pb1021_looks_two_reveals_rinana_to_hand",
+        "pb1021_wrong_character_stays_out_of_hand",
+        "pb1024_looks_two_reveals_tomari_to_hand",
+        "pbs2007_decline_keeps_waitroom_untouched",
+        "pbs2007_pay_three_retrieves_liella_live_from_waitroom",
+        "spb1017_looks_five_fetches_5yncri5e",
         "test_change_state_choice_bug",
         "test_dia_gain_resource_choice",
         "test_dia_gain_resource_no_targets",
@@ -1204,7 +1220,7 @@
         "test_opponent_choice_emma_punch",
         "test_success_live_zone_per_unit_heart"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 24,
       "is_null": false
     },
     {
@@ -1375,6 +1391,7 @@
         "engine/tests/test_modules/parser_issues_e2e_test_part3.rs",
         "engine/tests/test_modules/pl_hs_sd1_008_test.rs",
         "engine/tests/test_modules/sayaka_loop_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs",
         "engine/tests/test_modules/untested_abilities_test.rs"
       ],
       "covering_tests": [
@@ -1383,6 +1400,9 @@
         "baton_touch_does_not_lock_all_full_lanes",
         "baton_touch_hanaho_auto_ability_triggers",
         "baton_touch_moves_replaced_member_to_waitroom",
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
         "card_count_condition_baton_touch_filter",
         "check_self_comparison_container_hand_presence",
         "check_self_location_follows_the_card",
@@ -1404,12 +1424,9 @@
         "hanabiko_stage_to_deck_no_trigger",
         "hanabiko_stage_to_discard_triggers_ability",
         "hanabiko_static_discard_no_trigger",
-        "hanabiko_static_stage_no_trigger",
-        "hanabiko_two_copies_one_moved_one_static",
-        "honoka_cost_limit_wait_blocked_by_wait_immunity",
-        "issue10_dream_with_you_high_blade_plus_1_score"
+        "hanabiko_static_stage_no_trigger"
       ],
-      "covering_test_count": 105,
+      "covering_test_count": 119,
       "is_null": false
     },
     {
@@ -10074,7 +10091,8 @@
         "engine/tests/test_modules/gameplay_test.rs",
         "engine/tests/test_modules/q127_heart_set_plus_global_test.rs",
         "engine/tests/test_modules/target_selection_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch52_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch52_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs"
       ],
       "covering_tests": [
         "ai_screeam_answer_both_discard",
@@ -10097,18 +10115,18 @@
         "bp7023_opponent_one_energy_ahead_scores_plus_one",
         "bp7023_opponent_two_energy_ahead_scores_plus_two",
         "bp7023_tied_after_return_no_score",
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
         "choice_condition_shows_proper_labels_in_actions",
         "dia_sd1_optional_draw_pay_then_deck_top",
         "dia_sd1_optional_draw_skip_skips_movement",
         "distinct_card_name_prevents_same_card_twice",
         "distortion_basic_energy_refresh_with_catchu",
         "distortion_exact_max_boundary_6_wait_all_refreshed",
-        "distortion_max_cap_8_wait_refresh_6_only",
-        "distortion_no_refresh_when_no_wait_energy",
-        "distortion_q103_two_triggers_only_one_plus_1",
-        "distortion_q96_score_permanent_after_energy_used"
+        "distortion_max_cap_8_wait_refresh_6_only"
       ],
-      "covering_test_count": 90,
+      "covering_test_count": 104,
       "is_null": false
     },
     {
@@ -13655,14 +13673,31 @@
         "PL!SP-bp1-010-P"
       ],
       "base": "PL!SP-bp1-010",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs"
+      ],
+      "covering_tests": [
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
+        "hspb1004_decline_hand_cost_no_mill_no_recover",
+        "hspb1004_discard_mills_three_recovers_slieszbuque_live",
+        "hspb1018_looks_five_fetches_dollchestra",
+        "pb1016_m_decline_leaves_deck_intact",
+        "pb1016_m_looks_four_fetches_lilywhite",
+        "pb1021_looks_two_reveals_rinana_to_hand",
+        "pb1021_wrong_character_stays_out_of_hand",
+        "pb1024_looks_two_reveals_tomari_to_hand",
+        "pbs2007_decline_keeps_waitroom_untouched",
+        "pbs2007_pay_three_retrieves_liella_live_from_waitroom",
+        "spb1017_looks_five_fetches_5yncri5e"
+      ],
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -15051,14 +15086,31 @@
         "PL!SP-bp2-005-P"
       ],
       "base": "PL!SP-bp2-005",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs"
+      ],
+      "covering_tests": [
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
+        "hspb1004_decline_hand_cost_no_mill_no_recover",
+        "hspb1004_discard_mills_three_recovers_slieszbuque_live",
+        "hspb1018_looks_five_fetches_dollchestra",
+        "pb1016_m_decline_leaves_deck_intact",
+        "pb1016_m_looks_four_fetches_lilywhite",
+        "pb1021_looks_two_reveals_rinana_to_hand",
+        "pb1021_wrong_character_stays_out_of_hand",
+        "pb1024_looks_two_reveals_tomari_to_hand",
+        "pbs2007_decline_keeps_waitroom_untouched",
+        "pbs2007_pay_three_retrieves_liella_live_from_waitroom",
+        "spb1017_looks_five_fetches_5yncri5e"
+      ],
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -15433,15 +15485,22 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/hard_abilities_tier_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch23_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch23_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs"
       ],
       "covering_tests": [
         "bp2008_baton_over_cheaper_dollchestra_gains_two_blades",
         "bp2008_baton_over_expensive_dollchestra_no_blades",
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
         "ddd_decline_pay_does_nothing",
         "ddd_option_a_retrieves_any_member_from_waitroom",
         "ddd_option_b_requires_two_cards_in_live_zone",
         "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
+        "hspb1004_decline_hand_cost_no_mill_no_recover",
+        "hspb1004_discard_mills_three_recovers_slieszbuque_live",
+        "hspb1018_looks_five_fetches_dollchestra",
         "kanan_cannot_mill_itself",
         "kanan_mill_then_debut_exact_cost_plus_two_same_area",
         "kanan_no_matching_cost_only_the_mill_happens",
@@ -15454,9 +15513,14 @@
         "kokoro_high_member_sets_cost_and_grants_heart05",
         "kokoro_no_dollchestra_in_hand_no_gate",
         "pb1014_baton_over_other_name_no_draw",
-        "pb1014_baton_over_own_name_draws_two_discards_one"
+        "pb1014_baton_over_own_name_draws_two_discards_one",
+        "pb1016_m_decline_leaves_deck_intact",
+        "pb1016_m_looks_four_fetches_lilywhite",
+        "pb1021_looks_two_reveals_rinana_to_hand",
+        "pb1021_wrong_character_stays_out_of_hand",
+        "pb1024_looks_two_reveals_tomari_to_hand"
       ],
-      "covering_test_count": 19,
+      "covering_test_count": 33,
       "is_null": false
     },
     {
@@ -17777,14 +17841,31 @@
         "PL!-pb1-016-P＋"
       ],
       "base": "PL!-pb1-016",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs"
+      ],
+      "covering_tests": [
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
+        "hspb1004_decline_hand_cost_no_mill_no_recover",
+        "hspb1004_discard_mills_three_recovers_slieszbuque_live",
+        "hspb1018_looks_five_fetches_dollchestra",
+        "pb1016_m_decline_leaves_deck_intact",
+        "pb1016_m_looks_four_fetches_lilywhite",
+        "pb1021_looks_two_reveals_rinana_to_hand",
+        "pb1021_wrong_character_stays_out_of_hand",
+        "pb1024_looks_two_reveals_tomari_to_hand",
+        "pbs2007_decline_keeps_waitroom_untouched",
+        "pbs2007_pay_three_retrieves_liella_live_from_waitroom",
+        "spb1017_looks_five_fetches_5yncri5e"
+      ],
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -20408,14 +20489,31 @@
         "PL!N-pb1-021-P＋"
       ],
       "base": "PL!N-pb1-021",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs"
+      ],
+      "covering_tests": [
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
+        "hspb1004_decline_hand_cost_no_mill_no_recover",
+        "hspb1004_discard_mills_three_recovers_slieszbuque_live",
+        "hspb1018_looks_five_fetches_dollchestra",
+        "pb1016_m_decline_leaves_deck_intact",
+        "pb1016_m_looks_four_fetches_lilywhite",
+        "pb1021_looks_two_reveals_rinana_to_hand",
+        "pb1021_wrong_character_stays_out_of_hand",
+        "pb1024_looks_two_reveals_tomari_to_hand",
+        "pbs2007_decline_keeps_waitroom_untouched",
+        "pbs2007_pay_three_retrieves_liella_live_from_waitroom",
+        "spb1017_looks_five_fetches_5yncri5e"
+      ],
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -20503,14 +20601,31 @@
         "PL!N-pb1-024-P＋"
       ],
       "base": "PL!N-pb1-024",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs"
+      ],
+      "covering_tests": [
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
+        "hspb1004_decline_hand_cost_no_mill_no_recover",
+        "hspb1004_discard_mills_three_recovers_slieszbuque_live",
+        "hspb1018_looks_five_fetches_dollchestra",
+        "pb1016_m_decline_leaves_deck_intact",
+        "pb1016_m_looks_four_fetches_lilywhite",
+        "pb1021_looks_two_reveals_rinana_to_hand",
+        "pb1021_wrong_character_stays_out_of_hand",
+        "pb1024_looks_two_reveals_tomari_to_hand",
+        "pbs2007_decline_keeps_waitroom_untouched",
+        "pbs2007_pay_three_retrieves_liella_live_from_waitroom",
+        "spb1017_looks_five_fetches_5yncri5e"
+      ],
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -21465,14 +21580,31 @@
         "PL!HS-pb1-004-P＋"
       ],
       "base": "PL!HS-pb1-004",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs"
+      ],
+      "covering_tests": [
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
+        "hspb1004_decline_hand_cost_no_mill_no_recover",
+        "hspb1004_discard_mills_three_recovers_slieszbuque_live",
+        "hspb1018_looks_five_fetches_dollchestra",
+        "pb1016_m_decline_leaves_deck_intact",
+        "pb1016_m_looks_four_fetches_lilywhite",
+        "pb1021_looks_two_reveals_rinana_to_hand",
+        "pb1021_wrong_character_stays_out_of_hand",
+        "pb1024_looks_two_reveals_tomari_to_hand",
+        "pbs2007_decline_keeps_waitroom_untouched",
+        "pbs2007_pay_three_retrieves_liella_live_from_waitroom",
+        "spb1017_looks_five_fetches_5yncri5e"
+      ],
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -23409,14 +23541,31 @@
         "PL!SP-pb2-007-PP"
       ],
       "base": "PL!SP-pb2-007",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs"
+      ],
+      "covering_tests": [
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
+        "hspb1004_decline_hand_cost_no_mill_no_recover",
+        "hspb1004_discard_mills_three_recovers_slieszbuque_live",
+        "hspb1018_looks_five_fetches_dollchestra",
+        "pb1016_m_decline_leaves_deck_intact",
+        "pb1016_m_looks_four_fetches_lilywhite",
+        "pb1021_looks_two_reveals_rinana_to_hand",
+        "pb1021_wrong_character_stays_out_of_hand",
+        "pb1024_looks_two_reveals_tomari_to_hand",
+        "pbs2007_decline_keeps_waitroom_untouched",
+        "pbs2007_pay_three_retrieves_liella_live_from_waitroom",
+        "spb1017_looks_five_fetches_5yncri5e"
+      ],
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -24720,14 +24869,31 @@
         "PL!N-bp7-012-P"
       ],
       "base": "PL!N-bp7-012",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs"
+      ],
+      "covering_tests": [
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
+        "hspb1004_decline_hand_cost_no_mill_no_recover",
+        "hspb1004_discard_mills_three_recovers_slieszbuque_live",
+        "hspb1018_looks_five_fetches_dollchestra",
+        "pb1016_m_decline_leaves_deck_intact",
+        "pb1016_m_looks_four_fetches_lilywhite",
+        "pb1021_looks_two_reveals_rinana_to_hand",
+        "pb1021_wrong_character_stays_out_of_hand",
+        "pb1024_looks_two_reveals_tomari_to_hand",
+        "pbs2007_decline_keeps_waitroom_untouched",
+        "pbs2007_pay_three_retrieves_liella_live_from_waitroom",
+        "spb1017_looks_five_fetches_5yncri5e"
+      ],
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -27901,9 +28067,13 @@
         "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test_part3.rs",
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs",
         "engine/tests/test_modules/untested_abilities_test.rs"
       ],
       "covering_tests": [
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
         "ddd_decline_pay_does_nothing",
         "ddd_option_a_retrieves_any_member_from_waitroom",
         "ddd_option_b_requires_two_cards_in_live_zone",
@@ -27925,17 +28095,14 @@
         "hanabiko_static_stage_no_trigger",
         "hanabiko_two_copies_one_moved_one_static",
         "honoka_cost_limit_wait_blocked_by_wait_immunity",
+        "hspb1004_decline_hand_cost_no_mill_no_recover",
+        "hspb1004_discard_mills_three_recovers_slieszbuque_live",
+        "hspb1018_looks_five_fetches_dollchestra",
         "issue10_dream_with_you_high_blade_plus_1_score",
         "issue10_dream_with_you_no_blade_no_score",
-        "issue11_fanfare_15plus_cards_gives_blade",
-        "issue11_fanfare_few_cards_no_blade",
-        "issue11_shizuku_score_floor_at_zero",
-        "issue12_compass_activate_dollchestra_live_start",
-        "issue12_proof_look_and_select_cost_20plus",
-        "issue12_proof_look_and_select_cost_30plus",
-        "issue13_kurage_card_exists"
+        "issue11_fanfare_15plus_cards_gives_blade"
       ],
-      "covering_test_count": 92,
+      "covering_test_count": 106,
       "is_null": false
     },
     {
@@ -28108,6 +28275,7 @@
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/pl_sp_sd1_002_test.rs",
         "engine/tests/test_modules/untested_abilities_batch52_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs",
         "engine/tests/test_modules/wakana_shiki_test.rs",
         "engine/tests/test_modules/zettai_lover_test.rs"
       ],
@@ -28128,6 +28296,9 @@
         "bp7023_opponent_one_energy_ahead_scores_plus_one",
         "bp7023_opponent_two_energy_ahead_scores_plus_two",
         "bp7023_tied_after_return_no_score",
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
         "chisato_movement_triggers_with_both_flags",
         "chisato_no_trigger_without_position_change_flag",
         "cutie_panther_live_start_reduce_hearts",
@@ -28138,12 +28309,9 @@
         "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
         "fuyumari_already_wait_excluded_from_candidates",
         "fuyumari_appear_triggers_opponent_wait",
-        "fuyumari_area_move_triggers_opponent_wait",
-        "fuyumari_baton_touch_left_to_center_triggers",
-        "fuyumari_baton_touch_triggers_area_move",
-        "fuyumari_blade_limit_excludes_high_blade"
+        "fuyumari_area_move_triggers_opponent_wait"
       ],
-      "covering_test_count": 106,
+      "covering_test_count": 120,
       "is_null": false
     },
     {
@@ -28407,14 +28575,31 @@
         "PL!SP-pb1-017-N"
       ],
       "base": "PL!SP-pb1-017",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs"
+      ],
+      "covering_tests": [
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
+        "hspb1004_decline_hand_cost_no_mill_no_recover",
+        "hspb1004_discard_mills_three_recovers_slieszbuque_live",
+        "hspb1018_looks_five_fetches_dollchestra",
+        "pb1016_m_decline_leaves_deck_intact",
+        "pb1016_m_looks_four_fetches_lilywhite",
+        "pb1021_looks_two_reveals_rinana_to_hand",
+        "pb1021_wrong_character_stays_out_of_hand",
+        "pb1024_looks_two_reveals_tomari_to_hand",
+        "pbs2007_decline_keeps_waitroom_untouched",
+        "pbs2007_pay_three_retrieves_liella_live_from_waitroom",
+        "spb1017_looks_five_fetches_5yncri5e"
+      ],
+      "covering_test_count": 14,
       "is_null": false
     },
     {
@@ -35949,14 +36134,31 @@
         "PL!HS-pb1-018-N"
       ],
       "base": "PL!HS-pb1-018",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch53_test.rs"
+      ],
+      "covering_tests": [
+        "bpsp1010_activation_cost_then_liella_look_five",
+        "bpsp2005_accept_pay_looks_seven_fetches_liella",
+        "bpsp2005_decline_pay_skips_the_look",
+        "hspb1004_decline_hand_cost_no_mill_no_recover",
+        "hspb1004_discard_mills_three_recovers_slieszbuque_live",
+        "hspb1018_looks_five_fetches_dollchestra",
+        "pb1016_m_decline_leaves_deck_intact",
+        "pb1016_m_looks_four_fetches_lilywhite",
+        "pb1021_looks_two_reveals_rinana_to_hand",
+        "pb1021_wrong_character_stays_out_of_hand",
+        "pb1024_looks_two_reveals_tomari_to_hand",
+        "pbs2007_decline_keeps_waitroom_untouched",
+        "pbs2007_pay_three_retrieves_liella_live_from_waitroom",
+        "spb1017_looks_five_fetches_5yncri5e"
+      ],
+      "covering_test_count": 14,
       "is_null": false
     },
     {

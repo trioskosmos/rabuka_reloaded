@@ -105,6 +105,7 @@ pub mod untested_abilities_batch50_test;
 pub mod untested_abilities_batch51_test;
 pub mod untested_abilities_batch52_test;
 pub mod hard_abilities_tier_test;
+pub mod untested_abilities_batch53_test;
 pub mod describe_parity_test;
 pub mod cannot_baton_touch_test;
 pub mod card_ability_tests;
