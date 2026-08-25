@@ -1,5 +1,23 @@
 # Test Hardening & Parser/Engine Fix Plan — 2026-08-26
 
+## Mission (standing directive)
+
+**Engine and parser rewrites while adding more tests for possible in-game
+scenarios that have not yet been considered.** Keep examining the existing test
+corpus to find what still needs writing. Tests where **both players use
+abilities against each other** are required — one-sided scenarios are not
+enough for a two-player simulator.
+
+Method, in order:
+1. Read `engine/rules/rules.txt` and `cards/qa_data.json` for the EXACT rules
+   process before writing any scenario — no guessed semantics.
+2. Mine abilities.json for interaction shapes (whose-effect gates, cross-player
+   triggers, opponent choices) and check them against existing tests.
+3. Write real-game flows, not synthetic state injection.
+4. When a test fails: run it under `$env:RUST_LOG="debug"` and READ THE FULL
+   FLOW before touching code or expectations; classify test bug vs engine bug
+   vs parser gap, then fix end-to-end (AGENTS.md).
+
 ## Status (updated as work lands)
 
 | Item | State |
@@ -31,6 +49,30 @@ Baton-touch semantics pinned from rules.txt + qa_data.json: the 「バトンタ�
 event belongs to the ARRIVING member's play (9.6.2.3.2.1); the departed ability's
 conditions describe the NEWCOMER; net payment = newcomer cost − occupant cost.
 Energy assertions require wait-state cards in the pool (activation flips wait→active).
+
+## §3 Round 3 — both-player interaction (mission directive)
+
+Mined abilities.json for the 「対戦相手のカードの効果でも発動する」 marker
+class (6 cards) and for effects that move OPPONENT members (exactly one:
+PL!HS-pb1-014-R 安養寺姫芽 debut, position_change dest=front target=opponent).
+
+New `cross_player_interaction_test.rs`: 姫芽's MiraKura-gated debut force-
+repositions P2's 可可 → 可可's own area-move watcher must fire from the
+opponent-caused move (heart06 until live end); plus a gate-blocked negative.
+
+**Engine bug #4 found and fixed:**
+`fire_opponent_cause_watchers_for_move` enqueues the watcher with a
+trigger_moved_cards SNAPSHOT, but resolution-time evaluation of
+`position_change` conditions only consulted live scratch state
+(`position_change_events`, `recently_moved_cards`) — which the enqueuing
+player's batch loop legitimately clears (abilities.rs:1433-1445) before the
+other seat's queue resolves. The watcher armed, then silently did nothing.
+Fix: the position_change arm of evaluate_movement_condition now falls back to
+the entry snapshot via entry_trigger_moved_cards(), with a [POS_CHANGE_EVAL]
+diagnostic line. Also noted: answering a non-skippable SelectTarget with empty
+indices silently no-ops ("Unknown source position") — queued as P0.3/P3 work.
+
+Suite state after round 3: **2944 passed / 0 failed / 0 ignored.**
 
 **Engine bugs found and fixed by this round:**
 

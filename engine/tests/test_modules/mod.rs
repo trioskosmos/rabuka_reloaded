@@ -537,3 +537,4 @@ pub mod shizuku_bp4_aggregate_test;
 // and a current API). See docs/TEST_HARDENING_PLAN_2026-08-26.md P0.1.
 pub mod dive_false_trigger_test;
 pub mod zone_change_gate_test;
+pub mod cross_player_interaction_test;

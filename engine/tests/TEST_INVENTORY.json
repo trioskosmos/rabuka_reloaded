@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T17:34:24.550011+00:00",
+  "generated_at": "2026-08-25T17:53:57.883145+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 487,
-  "n_tests": 2956,
+  "n_files": 488,
+  "n_tests": 2958,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,8 +309,8 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 677,
-    "L1+choice": 185,
+    "L2+choice": 680,
+    "L1+choice": 182,
     "L2": 26,
     "L1": 48
   },
@@ -12515,18 +12515,21 @@
       ],
       "base": "PL!SP-sd2-002",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/cross_player_interaction_test.rs",
         "engine/tests/test_modules/sd2_002_basic_test.rs"
       ],
       "covering_tests": [
+        "himeko_debut_repositions_opponent_member_and_koko_responds",
+        "himeko_gate_blocked_no_reposition_no_koko_response",
         "sd2_002_kidou_position_change_grants_heart_bonus",
         "sd2_002_opponent_effect_area_move_triggers_heart"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -22348,11 +22351,14 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/cross_player_interaction_test.rs",
         "engine/tests/test_modules/himeno_front_test.rs",
         "engine/tests/test_modules/restriction_mechanics_test.rs",
         "engine/tests/test_modules/trigger_scope_test.rs"
       ],
       "covering_tests": [
+        "himeko_debut_repositions_opponent_member_and_koko_responds",
+        "himeko_gate_blocked_no_reposition_no_koko_response",
         "himena_bp6006_baton_only_with_murasakipark",
         "himena_bp6006_murasakipark_partner_baton_succeeds",
         "himeno_front_1_opponent_at_left_moves_to_center",
@@ -22375,7 +22381,7 @@
         "s3_bp5_111_own_move_fires",
         "sumire_bpb4004_double_baton_removes_both_and_clamps_cost"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 23,
       "is_null": false
     },
     {
@@ -22399,11 +22405,14 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/cross_player_interaction_test.rs",
         "engine/tests/test_modules/himeno_front_test.rs",
         "engine/tests/test_modules/restriction_mechanics_test.rs",
         "engine/tests/test_modules/trigger_scope_test.rs"
       ],
       "covering_tests": [
+        "himeko_debut_repositions_opponent_member_and_koko_responds",
+        "himeko_gate_blocked_no_reposition_no_koko_response",
         "himena_bp6006_baton_only_with_murasakipark",
         "himena_bp6006_murasakipark_partner_baton_succeeds",
         "himeno_front_1_opponent_at_left_moves_to_center",
@@ -22426,7 +22435,7 @@
         "s3_bp5_111_own_move_fires",
         "sumire_bpb4004_double_baton_removes_both_and_clamps_cost"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 23,
       "is_null": false
     },
     {
@@ -23301,18 +23310,21 @@
       ],
       "base": "PL!SP-sd2-002",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/cross_player_interaction_test.rs",
         "engine/tests/test_modules/sd2_002_basic_test.rs"
       ],
       "covering_tests": [
+        "himeko_debut_repositions_opponent_member_and_koko_responds",
+        "himeko_gate_blocked_no_reposition_no_koko_response",
         "sd2_002_kidou_position_change_grants_heart_bonus",
         "sd2_002_opponent_effect_area_move_triggers_heart"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -27507,11 +27519,12 @@
       ],
       "base": "PL!HS-PR-029",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/cross_player_interaction_test.rs",
         "engine/tests/test_modules/untested_abilities_batch46_test.rs"
       ],
       "covering_tests": [
@@ -27519,10 +27532,12 @@
         "bp4024_no_mus_member_on_stage_no_blades",
         "bp5013_live_card_among_milled_no_blades",
         "bp5013_mill_three_all_members_two_blades",
+        "himeko_debut_repositions_opponent_member_and_koko_responds",
+        "himeko_gate_blocked_no_reposition_no_koko_response",
         "pr0029_decline_no_heart",
         "pr0029_pay_energy_grants_heart01"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 8,
       "is_null": false
     },
     {

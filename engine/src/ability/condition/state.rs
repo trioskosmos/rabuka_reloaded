@@ -550,13 +550,31 @@ impl<'a> ConditionContext<'a> {
                     condition,
                 );
                 let tm_match = if !pce_match && self.activating_card_id.is_some() {
-                    let in_current_batch = |cid| {
-                        self.moved_cards.contains(&cid)
-                            || self
-                                .game_state
-                                .recently_moved_cards
-                                .as_ref()
-                                .map_or(false, |v| v.contains(&cid))
+                    // Cross-player watcher entries (「対戦相手のカードの効果でも
+                    // 発動する。」) are enqueued by fire_opponent_cause_watchers
+                    // with a trigger_moved_cards SNAPSHOT, but the enqueuing
+                    // player's batch loop clears recently_moved /
+                    // position_change_events before the other seat's queue
+                    // resolves. The entry snapshot is the surviving evidence.
+                    let entry_snapshot = self.game_state.entry_trigger_moved_cards();
+                    log::debug!(
+                        "[POS_CHANGE_EVAL] activating={:?} pce_match={} entry_snapshot={:?} recently={:?}",
+                        self.activating_card_id,
+                        pce_match,
+                        entry_snapshot.as_ref().map(|v| v.to_vec()),
+                        self.game_state.recently_moved_cards.as_ref().map(|v| v.to_vec()),
+                    );
+                    let in_current_batch = |cid: i16| {
+                        cid == self.activating_card_id.unwrap_or(-1)
+                            && (self.moved_cards.contains(&cid)
+                                || entry_snapshot
+                                    .as_ref()
+                                    .map_or(false, |v| v.contains(&cid))
+                                || self
+                                    .game_state
+                                    .recently_moved_cards
+                                    .as_ref()
+                                    .map_or(false, |v| v.contains(&cid)))
                     };
                     self.game_state.turn_area_movements.iter().any(|m| {
                         self.activating_card_id == Some(m.moved_card_id)
