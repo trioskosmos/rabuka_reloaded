@@ -1,3 +1,4 @@
+use crate::core::constants::U8Count;
 use super::comparison_default_count;
 use super::ConditionContext;
 use crate::ability::debug::AbDebug;
@@ -1447,7 +1448,7 @@ impl<'a> ConditionContext<'a> {
                                         == selected_name
                                 })
                             })
-                            .count() as u8;
+                            .count().u8_count();
                         let required = condition.get_count().unwrap_or(1);
                         return matching >= required;
                     }
@@ -1508,7 +1509,7 @@ impl<'a> ConditionContext<'a> {
                         && self.check_original_heart_filter(condition, id)
                         && self.check_heart_type_all_per_card(condition, card_db, id)
                 })
-                .count() as u8
+                .count().u8_count()
         };
         // For revealed_cards: check that filtered cards collectively have all required
         // heart colors in their base_heart (printed hearts).
@@ -1907,7 +1908,7 @@ impl<'a> ConditionContext<'a> {
                             distinct_costs.insert(modified_cost);
                         }
                     }
-                    let count = distinct_costs.len() as u8;
+                    let count = distinct_costs.len().u8_count();
                     compare_counts(operator, count, count_threshold)
                 }
                 "group_name" => {
@@ -1922,7 +1923,7 @@ impl<'a> ConditionContext<'a> {
                             }
                         }
                     }
-                    let count = distinct_groups.len() as u8;
+                    let count = distinct_groups.len().u8_count();
                     compare_counts(operator, count, count_threshold)
                 }
                 _ => {
@@ -2399,9 +2400,9 @@ impl<'a> ConditionContext<'a> {
                     }
                 }
             }
-            colors.len() as u8
+            colors.len().u8_count()
         } else {
-            moved_ids.len() as u8
+            moved_ids.len().u8_count()
         };
         // negation for the count comparison only applies when card_property is not
         // driving the per-card filter (handled above). For pure count negation
@@ -3787,7 +3788,7 @@ impl<'a> ConditionContext<'a> {
                     })
                     .unwrap_or(false)
             })
-            .count() as u8;
+            .count().u8_count();
 
         match operator {
             "=" => match_count == count_needed,
@@ -3807,13 +3808,13 @@ impl<'a> ConditionContext<'a> {
                 &self.game_state.mods.orientation_modifiers,
                 true,
             ),
-            Some(Zone::Hand) => player.hand.len() as u8,
-            Some(Zone::Deck) => player.main_deck.len() as u8,
-            Some(Zone::Discard) => player.waitroom.len() as u8,
-            Some(Zone::Energy) => player.energy_zone.cards.len() as u8,
-            Some(Zone::LiveCardZone) => player.live_card_zone.len() as u8,
-            Some(Zone::SuccessLiveZone) => player.success_live_card_zone.len() as u8,
-            Some(Zone::RevealedCards) => self.game_state.revealed_cards.len() as u8,
+            Some(Zone::Hand) => player.hand.len().u8_count(),
+            Some(Zone::Deck) => player.main_deck.len().u8_count(),
+            Some(Zone::Discard) => player.waitroom.len().u8_count(),
+            Some(Zone::Energy) => player.energy_zone.cards.len().u8_count(),
+            Some(Zone::LiveCardZone) => player.live_card_zone.len().u8_count(),
+            Some(Zone::SuccessLiveZone) => player.success_live_card_zone.len().u8_count(),
+            Some(Zone::RevealedCards) => self.game_state.revealed_cards.len().u8_count(),
             _ => 0,
         }
     }
@@ -3957,7 +3958,7 @@ impl<'a> ConditionContext<'a> {
                         seen.insert(card.group.to_string());
                     }
                 }
-                seen.len() as u8
+                seen.len().u8_count()
             }
             _ => {
                 let name_sets: Vec<Vec<String>> = matching
@@ -4058,7 +4059,7 @@ impl<'a> ConditionContext<'a> {
                 }
                 true
             })
-            .count() as u8;
+            .count().u8_count();
         log::debug!(
             "[COUNT_GROUP] zone_count={} group={:?} ct={:?} exc={:?} total={}",
             cards.len(),
@@ -4175,7 +4176,7 @@ impl<'a> ConditionContext<'a> {
                 }
                 crate::constants::saturate_u8(total_cost)
             }
-            Some("energy") => player.energy_zone.cards.len() as u8,
+            Some("energy") => player.energy_zone.cards.len().u8_count(),
             _ => self.zone_len(player, location),
         }
     }
@@ -4339,7 +4340,7 @@ impl<'a> ConditionContext<'a> {
         }
         if resource_type == Some("hand_count") {
             let player = self.resolve_condition_player(target);
-            return player.hand.len() as u8;
+            return player.hand.len().u8_count();
         }
         if let Some(rt) = resource_type {
             if rt.starts_with("heart") {
@@ -4392,7 +4393,7 @@ impl<'a> ConditionContext<'a> {
         }
         if resource_type == Some("energy") {
             let player = self.resolve_condition_player(target);
-            let count = player.energy_zone.cards.len() as u8;
+            let count = player.energy_zone.cards.len().u8_count();
             log::debug!(
                 "[GET_COUNT] resource_type=energy target={} → {}",
                 target,
@@ -4430,7 +4431,7 @@ impl<'a> ConditionContext<'a> {
                     }
                     true
                 })
-                .count() as u8;
+                .count().u8_count();
             return count;
         }
 
@@ -4496,7 +4497,7 @@ impl<'a> ConditionContext<'a> {
                 let matching: u8 = source_cards
                     .iter()
                     .filter(|&&cid| util::card_matches_characters(card_db, cid, Some(chars)))
-                    .count() as u8;
+                    .count().u8_count();
                 return matching;
             }
         }
@@ -4614,7 +4615,7 @@ impl<'a> ConditionContext<'a> {
         let comparison_type = condition.get_comparison_type();
         if resource_type == Some("energy") {
             let player = self.resolve_condition_player(target);
-            return player.energy_zone.cards.len() as u8;
+            return player.energy_zone.cards.len().u8_count();
         }
         let player = self.resolve_condition_player(target);
         let mut count = self.count_for_player_target(player, location, comparison_type);

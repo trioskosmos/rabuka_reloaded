@@ -1,3 +1,4 @@
+use crate::core::constants::U8Count;
 use super::ConditionContext;
 use crate::ability::enums::{ConditionType, Zone};
 use crate::ability::util;
@@ -354,7 +355,7 @@ impl<'a> ConditionContext<'a> {
                     if all_cards {
                         player.energy_zone.active_count() == 0
                     } else {
-                        player.energy_zone.active_count() < player.energy_zone.cards.len() as u8
+                        player.energy_zone.active_count() < player.energy_zone.cards.len().u8_count()
                     }
                 }
                 _ => true,
@@ -1183,7 +1184,7 @@ impl<'a> ConditionContext<'a> {
                                     }
                                 })
                         })
-                        .count() as u8;
+                        .count().u8_count();
                     // Negation: passes only when NO matching cards exist
                     if count > 0 {
                         return false;

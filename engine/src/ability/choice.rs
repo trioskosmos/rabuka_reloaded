@@ -1,3 +1,4 @@
+use crate::core::constants::U8Count;
 use super::condition::ConditionContext;
 use super::enums::{ActionType, Zone};
 use super::types::{
@@ -564,7 +565,7 @@ impl super::resolver::AbilityResolver {
                         false,
                     );
                 }
-                gs.mods.last_cost_discard_count += new_card_ids.len() as u8;
+                gs.mods.last_cost_discard_count += new_card_ids.len().u8_count();
                 gs.mods
                     .last_cost_moved_card_ids
                     .extend(new_card_ids.iter().copied());
@@ -583,7 +584,7 @@ impl super::resolver::AbilityResolver {
             if new_card_ids.is_empty() {
                 if !self.moved_cards.is_empty() {
                     log::debug!("[KANAN_DEBUG] cost finalize: moved_cards={:?}, setting optional_cost_result=true", self.moved_cards);
-                    gs.mods.last_cost_discard_count = self.moved_cards.len() as u8;
+                    gs.mods.last_cost_discard_count = self.moved_cards.len().u8_count();
                     gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
 gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
@@ -764,7 +765,7 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                 self.moved_cards.len()
             );
             self.pay_deferred_costs(gs)?;
-            let final_count = self.moved_cards.len() as u8;
+            let final_count = self.moved_cards.len().u8_count();
             gs.mods.last_cost_discard_count = final_count;
             gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
 gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));

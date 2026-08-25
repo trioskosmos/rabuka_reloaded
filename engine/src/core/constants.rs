@@ -32,3 +32,19 @@ pub fn saturate_u8(v: i32) -> u8 {
 pub fn saturate_i16(v: i32) -> i16 {
     v.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16
 }
+
+/// Saturating usize → u8 for card counts, as an extension method so call
+/// sites read `.len().u8_count()` instead of `.len() as u8`. Zone sizes are
+/// small in practice, but waitrooms/decks CAN exceed 255 in long games and a
+/// raw `as u8` silently wraps such counts to garbage (casting cut-downs).
+pub trait U8Count {
+    #[inline]
+    fn u8_count(self) -> u8;
+}
+
+impl U8Count for usize {
+    #[inline]
+    fn u8_count(self) -> u8 {
+        self.min(usize::from(u8::MAX)) as u8
+    }
+}

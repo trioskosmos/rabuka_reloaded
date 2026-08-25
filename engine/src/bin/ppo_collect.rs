@@ -1,3 +1,4 @@
+use rabuka_engine::core::constants::U8Count;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
@@ -200,7 +201,7 @@ fn main() {
         }
 
         // Write trajectory: [n_steps:u8] [step_1] [step_2] ...
-        let n_steps = trajectory.len() as u8;
+        let n_steps = trajectory.len().u8_count();
         let _ = out.write_all(&n_steps.to_le_bytes());
         for step in &trajectory {
             let n_actions = step.actions.len() as u16;

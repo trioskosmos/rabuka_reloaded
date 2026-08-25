@@ -1,3 +1,4 @@
+use crate::core::constants::U8Count;
 use super::enums::Zone;
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ChoiceRoute, ExecutionContext, LookAndSelectStep};
@@ -291,7 +292,7 @@ impl AbilityResolver {
             match Zone::from_str(source) {
                 Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
                 Some(Zone::Deck) | Some(Zone::DeckTop) => {
-                    let take_count = count.min(player.main_deck.cards.len() as u8) as usize;
+                    let take_count = count.min(player.main_deck.cards.len().u8_count()) as usize;
                     // Peek only — don't drain from deck here. The card stays
                     // in the deck until the conditional move_cards consumes it.
                     // If the condition fails, the card remains on top of the
@@ -532,7 +533,7 @@ impl AbilityResolver {
         if effect.distinct_any().is_some() && gs.looked_at_cards.len() < count as usize {
             return Ok(());
         }
-        let count = count.min(gs.looked_at_cards.len() as u8);
+        let count = count.min(gs.looked_at_cards.len().u8_count());
 
         let filtered_indices: Option<Vec<usize>> = if Zone::from_str(source) == Some(Zone::Stage) {
             let looked = gs.looked_at_cards.clone();

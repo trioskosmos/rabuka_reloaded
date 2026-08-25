@@ -1,3 +1,4 @@
+use crate::core::constants::U8Count;
 use crate::{HashMap, HashSet};
 use actix_cors::Cors;
 use actix_files as fs;
@@ -1245,7 +1246,7 @@ async fn exec_code(
             if let Some(cid) = p.energy_zone.cards.pop() {
                 p.energy_deck.cards.push(cid);
                 p.energy_zone.set_active_count(
-                    p.energy_zone.active_count().min(p.energy_zone.cards.len() as u8),
+                    p.energy_zone.active_count().min(p.energy_zone.cards.len().u8_count()),
                 );
             }
         });
@@ -2689,7 +2690,7 @@ async fn launch_ngrok(port: u16, auth_token: Option<String>) {
 fn serialize_p1_state(gs: &GameState) -> Vec<u8> {
     let mut buf = Vec::new();
     let hand = &gs.player1.hand.cards;
-    buf.push(hand.len() as u8);
+    buf.push(hand.len().u8_count());
     for &c in hand.iter() {
         buf.extend_from_slice(&c.to_le_bytes());
     }

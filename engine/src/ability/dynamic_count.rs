@@ -3,6 +3,7 @@
 //! Both the constant-path (`recalculate_constants`) and the ability-execution
 //! path (`AbilityResolver`) call this one method, so dynamic_count semantics live
 //! in exactly one place instead of being duplicated per caller.
+use crate::core::constants::U8Count;
 use crate::card::DynamicCount;
 use crate::game_state::GameState;
 
@@ -37,9 +38,9 @@ impl GameState {
             }
             Some("previous_moved_cards") | Some("previous_move") => {
                 if !moved_cards.is_empty() {
-                    moved_cards.len() as u8
+                    moved_cards.len().u8_count()
                 } else if let Some(ref recently_moved) = self.recently_moved_cards {
-                    recently_moved.len() as u8
+                    recently_moved.len().u8_count()
                 } else {
                     self.mods.last_cost_discard_count
                 }
@@ -48,7 +49,7 @@ impl GameState {
                 if last_draw_count > 0 {
                     last_draw_count
                 } else if let Some(ref recently_moved) = self.recently_moved_cards {
-                    recently_moved.len() as u8
+                    recently_moved.len().u8_count()
                 } else {
                     0
                 }
@@ -56,7 +57,7 @@ impl GameState {
             Some("revealed_cards") | Some("previous_reveal") => self.revealed_count(),
             Some("unit_count") => {
                 let player = self.resolve_target_player("self");
-                player.stage.stage.iter().filter(|&&c| c != -1).count() as u8
+                player.stage.stage.iter().filter(|&&c| c != -1).count().u8_count()
             }
             Some("energy_difference") => {
                 let threshold = dc
@@ -65,7 +66,7 @@ impl GameState {
                     .and_then(|s| s.parse::<u8>().ok())
                     .unwrap_or(0);
                 let player = self.resolve_target_player("self");
-                (player.energy_zone.cards.len() as u8).saturating_sub(threshold)
+                (player.energy_zone.cards.len().u8_count()).saturating_sub(threshold)
             }
             Some("success_pile_count_difference") => {
                 // 「相手の成功ライブカード置き場にあるカードの枚数が自分より多い
@@ -81,14 +82,14 @@ impl GameState {
                 } else {
                     (&self.player2, &self.player1)
                 };
-                (other.success_live_card_zone.cards.len() as u8)
-                    .saturating_sub(own.success_live_card_zone.cards.len() as u8)
+                (other.success_live_card_zone.cards.len().u8_count())
+                    .saturating_sub(own.success_live_card_zone.cards.len().u8_count())
             }
             Some("these_waitroom_placed_count") => {
                 if let Some(ref recently_moved) = self.recently_moved_cards {
-                    recently_moved.len() as u8
+                    recently_moved.len().u8_count()
                 } else {
-                    moved_cards.len() as u8
+                    moved_cards.len().u8_count()
                 }
             }
             Some("total_live_score") => {
@@ -102,11 +103,11 @@ impl GameState {
             }
             Some("stage_member_count") => {
                 let player = self.resolve_target_player("self");
-                player.stage.stage.iter().filter(|&&c| c != -1).count() as u8
+                player.stage.stage.iter().filter(|&&c| c != -1).count().u8_count()
             }
             Some("opponent_stage_member_count") => {
                 let player = self.resolve_target_player("opponent");
-                player.stage.stage.iter().filter(|&&c| c != -1).count() as u8
+                player.stage.stage.iter().filter(|&&c| c != -1).count().u8_count()
             }
             // 「相手のステージにいるウェイト状態のメンバーの数まで」 — only
             // WAITED opponents count; the old fuzzy arm counted everyone.
@@ -119,7 +120,7 @@ impl GameState {
                     .filter(|&&c| {
                         c != -1 && self.mods.get_orientation_modifier(c) == Some("wait")
                     })
-                    .count() as u8
+                    .count().u8_count()
             }
             // 「控え室にあるカードの枚数がN枚未満の場合、その差に等しい枚数…」
             // mills exactly the shortfall (base_reference holds N).
@@ -130,7 +131,7 @@ impl GameState {
                     .and_then(|s| s.parse::<u8>().ok())
                     .unwrap_or(0);
                 let player = self.resolve_target_player("self");
-                threshold.saturating_sub(player.waitroom.cards.len() as u8)
+                threshold.saturating_sub(player.waitroom.cards.len().u8_count())
             }
             Some("energy_cards_under_this_member") => {
                 let player = self.resolve_target_player("self");
@@ -143,7 +144,7 @@ impl GameState {
                     1 => crate::zones::MemberArea::Center,
                     _ => crate::zones::MemberArea::RightSide,
                 };
-                player.stage.get_under_cards(area).len() as u8
+                player.stage.get_under_cards(area).len().u8_count()
             }
             _ => match dc.count_type.as_str() {
                 "revealed_cards" => self.revealed_count(),
@@ -162,7 +163,7 @@ impl GameState {
     fn revealed_count(&self) -> u8 {
         let cheer = self.cheer_revealed_cards();
         if !cheer.is_empty() {
-            return cheer.len() as u8;
+            return cheer.len().u8_count();
         }
         let player = self.resolve_target_player("self");
         self.revealed_cards
@@ -179,6 +180,6 @@ impl GameState {
                     || player.success_live_card_zone.cards.contains(&cid)
                     || self.resolution_zone.cards.contains(&cid)
             })
-            .count() as u8
+            .count().u8_count()
     }
 }

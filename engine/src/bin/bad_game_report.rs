@@ -4,6 +4,7 @@
 //!
 //! Usage: cargo run --release --bin bad_game_report -- [games] [worst_k]
 
+use rabuka_engine::core::constants::U8Count;
 use rabuka_engine::bot::{strategy_v2, strategy_v4, strategy_v5};
 use rabuka_engine::card::{CardDatabase, CardType};
 use rabuka_engine::card_loader;
@@ -67,7 +68,7 @@ fn lives_in_hand(p: &rabuka_engine::player::Player, db: &CardDatabase) -> u8 {
         .cards
         .iter()
         .filter(|&&c| db.get_card(c).map_or(false, |x| x.card_type == CardType::Live))
-        .count() as u8
+        .count().u8_count()
 }
 
 fn main() {
@@ -121,8 +122,8 @@ fn main() {
             } else {
                 stuck = 0;
                 last_turn = gs.turn_number;
-                let s1 = gs.player1.success_live_card_zone.cards.len() as u8;
-                let s2 = gs.player2.success_live_card_zone.cards.len() as u8;
+                let s1 = gs.player1.success_live_card_zone.cards.len().u8_count();
+                let s2 = gs.player2.success_live_card_zone.cards.len().u8_count();
                 rec.timeline.push((
                     s1,
                     s2,

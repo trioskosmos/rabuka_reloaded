@@ -1,3 +1,4 @@
+use crate::core::constants::U8Count;
 use super::super::enums::{TargetPlayer, Zone};
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
@@ -587,7 +588,7 @@ impl AbilityResolver {
             // Only count recently_moved (from the current effect),
             // NOT entry_snapshot (which may contain trigger-setup cards).
             if let Some(moved) = recently_moved.as_ref() {
-                matching_count = moved.len() as u8;
+                matching_count = moved.len().u8_count();
             } else {
                 matching_count = 0;
             }
@@ -1561,7 +1562,7 @@ impl AbilityResolver {
             .collect();
         let mut saved = effect.clone();
         saved.set_target_count(None);
-        self.selected_count_at_save = Some(self.selected_cards.len() as u8);
+        self.selected_count_at_save = Some(self.selected_cards.len().u8_count());
         let mut pending = gs.ability_queue.take_pending_actions();
         pending.insert(0, saved);
         gs.ability_queue.set_pending_actions(pending);

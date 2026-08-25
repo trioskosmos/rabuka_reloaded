@@ -1,3 +1,4 @@
+use rabuka_engine::core::constants::U8Count;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
@@ -178,14 +179,14 @@ impl Example {
             state: State::capture(gs),
             action_card_id,
             action_type_idx: at,
-            success_before: gs.player1.success_live_card_zone.cards.len() as u8,
+            success_before: gs.player1.success_live_card_zone.cards.len().u8_count(),
         }
     }
 }
 
 fn write_example(f: &mut File, ex: &Example, reward: f32, next_state: Option<&State>) {
     let s = &ex.state;
-    let _ = f.write_all(&[s.hand.len() as u8]);
+    let _ = f.write_all(&[s.hand.len().u8_count()]);
     for &c in &s.hand {
         let _ = f.write_all(&c.to_le_bytes());
     }
@@ -199,7 +200,7 @@ fn write_example(f: &mut File, ex: &Example, reward: f32, next_state: Option<&St
     let _ = f.write_all(&[ex.action_type_idx]);
     let _ = f.write_all(&reward.to_le_bytes());
     let ns = next_state.unwrap_or(s);
-    let _ = f.write_all(&[ns.hand.len() as u8]);
+    let _ = f.write_all(&[ns.hand.len().u8_count()]);
     for &c in &ns.hand {
         let _ = f.write_all(&c.to_le_bytes());
     }

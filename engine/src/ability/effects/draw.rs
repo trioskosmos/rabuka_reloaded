@@ -1,3 +1,4 @@
+use crate::core::constants::U8Count;
 use super::super::enums::Zone;
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ExecutionContext};
@@ -119,9 +120,9 @@ impl AbilityResolver {
                 gs.mods.last_cost_discard_count
             );
             if !self.moved_cards.is_empty() {
-                self.moved_cards.len() as u8
+                self.moved_cards.len().u8_count()
             } else if let Some(ref moved_cards) = gs.recently_moved_cards {
-                moved_cards.len() as u8
+                moved_cards.len().u8_count()
             } else {
                 gs.mods.last_cost_discard_count
             }
@@ -394,7 +395,7 @@ impl AbilityResolver {
                 // counting all currently-waited members.
                 let multiplier =
                     if effect.per_unit_source_any().as_deref() == Some("this_cost_waited") {
-                        cost_waited_members.len() as u8
+                        cost_waited_members.len().u8_count()
                     } else {
                         util::calculate_per_unit_multiplier(
                             per_unit,

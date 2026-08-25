@@ -1,3 +1,4 @@
+use crate::core::constants::U8Count;
 use super::enums::{ActionType, Zone};
 use crate::card::{parse_heart_color, AbilityFilter, CardDatabase, DistinctType, Operator};
 use crate::game_state::Duration;
@@ -1445,7 +1446,7 @@ impl<'a> CardFilter<'a> {
         cards
             .iter()
             .filter(|&&id| self.matches(db, id, false))
-            .count() as u8
+            .count().u8_count()
     }
 
     /// Build a full CardFilter from all AbilityEffect fields.
@@ -1711,7 +1712,7 @@ pub fn count_matching(
     cards
         .iter()
         .filter(|&&id| filter.matches(db, id, skip_empty))
-        .count() as u8
+        .count().u8_count()
 }
 
 /// Count cards matching a filter, deduplicating by card name when
@@ -1738,7 +1739,7 @@ pub fn count_matching_distinct(
     if matches!(filter.distinct, Some(DistinctType::CardName)) {
         count_distinct_member_name_units(&matching, db) as u8
     } else {
-        apply_distinct_filter(&matching, filter.distinct, db).len() as u8
+        apply_distinct_filter(&matching, filter.distinct, db).len().u8_count()
     }
 }
 
@@ -2170,14 +2171,14 @@ pub fn calculate_per_unit_multiplier(
                     .map_or(s == "active", |o| o.as_str() == s),
                 None => true,
             })
-            .count() as u8
+            .count().u8_count()
     };
     match per_unit_type {
         Some("member") | Some("人") | Some("members") => stage_count(state_filter),
-        Some("hand") | Some("card") | Some("枚") => player.hand.cards.len() as u8,
-        Some("energy") => player.energy_zone.cards.len() as u8,
-        Some("live_card_zone") => player.live_card_zone.cards.len() as u8,
-        Some("discard") => player.waitroom.cards.len() as u8,
+        Some("hand") | Some("card") | Some("枚") => player.hand.cards.len().u8_count(),
+        Some("energy") => player.energy_zone.cards.len().u8_count(),
+        Some("live_card_zone") => player.live_card_zone.cards.len().u8_count(),
+        Some("discard") => player.waitroom.cards.len().u8_count(),
         Some("under_member") | Some("下") => player
             .stage
             .under_cards
@@ -2228,7 +2229,7 @@ pub fn resolve_per_unit_count(
                 }
             }
         }
-        return colors_found.len() as u8;
+        return colors_found.len().u8_count();
     }
 
     let zone = match per_unit_type {
@@ -2284,7 +2285,7 @@ pub fn resolve_per_unit_count(
                 .copied()
                 .collect();
             matching = apply_distinct_filter(&matching, filter.distinct, card_db);
-            matching.len() as u8
+            matching.len().u8_count()
         }
     } else {
         let mut cards: Vec<i16> = zone_cards(player, zone).to_vec();
@@ -2312,7 +2313,7 @@ pub fn resolve_per_unit_count(
                 .copied()
                 .collect();
             matching = apply_distinct_filter(&matching, filter.distinct, card_db);
-            matching.len() as u8
+            matching.len().u8_count()
         }
     }
 }

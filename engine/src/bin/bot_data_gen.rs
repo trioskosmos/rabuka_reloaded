@@ -1,3 +1,4 @@
+use rabuka_engine::core::constants::U8Count;
 use rand::Rng;
 use std::fs::File;
 use std::io::Write;
@@ -125,7 +126,7 @@ fn main() {
 
         for (i, ex) in examples.iter().enumerate() {
             let steps_rem = (step_count - i as u32) as u16;
-            let hand_len = ex.my_hand.len() as u8;
+            let hand_len = ex.my_hand.len().u8_count();
             let _ = out.write_all(&[hand_len]);
             for &c in &ex.my_hand {
                 let _ = out.write_all(&c.to_le_bytes());

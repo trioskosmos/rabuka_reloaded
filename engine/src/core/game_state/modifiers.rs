@@ -1,3 +1,4 @@
+use crate::core::constants::U8Count;
 use super::GameState;
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -1001,7 +1002,7 @@ impl GameState {
                         } else {
                             let cards: Vec<i16> =
                                 crate::ability::util::zone_cards(player, count_zone).to_vec();
-                            cards.len() as u8
+                            cards.len().u8_count()
                         };
                         log::debug!(
                             "[COST_MOD_PER_UNIT] cid={} count_zone={} count={}",

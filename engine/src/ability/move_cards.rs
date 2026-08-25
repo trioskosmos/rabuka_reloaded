@@ -1,3 +1,4 @@
+use crate::core::constants::U8Count;
 use super::enums::Zone;
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ExecutionContext, LookAndSelectStep};
@@ -1175,7 +1176,7 @@ impl AbilityResolver {
         let mut attempts = 0u8;
         let mut remaining = count;
         while remaining > 0
-            && attempts < (count as u8 + player.main_deck.cards.len() as u8 + 10)
+            && attempts < (count as u8 + player.main_deck.cards.len().u8_count() + 10)
         {
             // Q104 / Rule 10.2.1: deck empty mid-draw → refresh from waitroom
             // and continue. This handles deck-to-discard costs/effects when the
@@ -2511,7 +2512,7 @@ if util::distinct_should_dedupe(distinct) {
                         "opponent" => &mut gs.player2,
                         _ => &mut gs.player1,
                     };
-                    p.energy_zone.active_energy_count += moved_cards.len() as u8;
+                    p.energy_zone.active_energy_count += moved_cards.len().u8_count();
                 }
             }
         }
@@ -3095,7 +3096,7 @@ if util::distinct_should_dedupe(distinct) {
                     && (Zone::from_str(dest) == Some(Zone::Discard)
                         || Zone::from_str(dest) == Some(Zone::Waitroom))
                 {
-                    gs.mods.last_cost_discard_count = moved.len() as u8;
+                    gs.mods.last_cost_discard_count = moved.len().u8_count();
                     gs.mods.last_cost_moved_card_ids = moved.clone().into();
                 }
             }
@@ -3564,7 +3565,7 @@ if util::distinct_should_dedupe(distinct) {
                 player.energy_zone.active_energy_count = player
                     .energy_zone
                     .active_energy_count
-                    .saturating_sub(removed.len() as u8);
+                    .saturating_sub(removed.len().u8_count());
                 removed
             };
             if dst == Zone::UnderMember.to_str() {
@@ -3699,7 +3700,7 @@ if util::distinct_should_dedupe(distinct) {
         player.energy_zone.active_energy_count = player
             .energy_zone
             .active_energy_count
-            .saturating_sub(to_mark.len() as u8);
+            .saturating_sub(to_mark.len().u8_count());
         for cid in to_mark {
             gs.mods.clear_all_for_card(cid);
             gs.mods.add_orientation_modifier(cid, "wait");

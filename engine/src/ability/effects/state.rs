@@ -1,3 +1,4 @@
+use crate::core::constants::U8Count;
 use super::super::enums::{TargetPlayer, Zone};
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
@@ -44,7 +45,7 @@ impl AbilityResolver {
                 .is_some_and(|s| s.contains("previous_moved"))
             {
                 let per_unit_cnt = effect.per_unit_count_any().unwrap_or(1) as u8;
-                count = (self.moved_cards.len() as u8 / per_unit_cnt) * count.max(1);
+                count = (self.moved_cards.len().u8_count() / per_unit_cnt) * count.max(1);
             } else {
                 let player = gs.resolve_target_player(&target);
                 let loc_binding = effect.location_any();
@@ -68,7 +69,7 @@ impl AbilityResolver {
                     util::count_distinct_member_name_units(&matching, &gs.card_database) as u8
                 } else {
                     util::apply_distinct_filter(&matching, effect.distinct_any(), &gs.card_database)
-                        .len() as u8
+                        .len().u8_count()
                 };
                 let per_unit_cnt = effect.per_unit_count_any().unwrap_or(1) as u8;
                 count = (matched_count / per_unit_cnt) * count.max(1);
@@ -494,7 +495,7 @@ impl AbilityResolver {
             let change_count = if is_change_all {
                 candidates.len()
             } else {
-                count.min(candidates.len() as u8) as usize
+                count.min(candidates.len().u8_count()) as usize
             };
 
             let actual_targets: Vec<_> = if is_self_target {
@@ -782,7 +783,7 @@ impl AbilityResolver {
             // many as possible instead of aborting the whole effect. Legacy
             // behavior (candidates ≥ requested) is untouched.
             let effective_count = if valid_indices.len() < effective_count as usize {
-                let capped = valid_indices.len() as u8;
+                let capped = valid_indices.len().u8_count();
                 log::debug!(
                     "[ENERGY] partial: requested={} candidates={} effective={}",
                     effective_count,
@@ -895,7 +896,7 @@ impl AbilityResolver {
                     ));
                 }
                 let player = gs.resolve_target_player_mut(target);
-                player.energy_zone.add_active(active_cards.len() as u8);
+                player.energy_zone.add_active(active_cards.len().u8_count());
             }
             _ => {}
         }

@@ -511,11 +511,13 @@ impl CardDatabase {
         for ch in card_no.chars() {
             match ch {
                 'a'..='z' => {
-                    result.push((ch as u8 - b'a' + b'A') as char);
+                    result.push(ch.to_ascii_uppercase());
                     changed = true;
                 }
                 'ａ'..='ｚ' => {
-                    result.push((ch as u32 - 'ａ' as u32 + 'A' as u32) as u8 as char);
+                    // Fullwidth lowercase → ASCII uppercase: the offset from
+                    // 'ａ' maps 1:1 onto 'A'..'Z'.
+                    result.push((u32::from(ch) - u32::from('ａ') + u32::from('A')) as u8 as char);
                     changed = true;
                 }
                 '＋' => {

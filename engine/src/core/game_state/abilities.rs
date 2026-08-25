@@ -1,3 +1,4 @@
+use crate::core::constants::U8Count;
 use super::GameState;
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -756,7 +757,7 @@ impl GameState {
                 true
             })
             .collect();
-        let match_count = matching.len() as u8;
+        let match_count = matching.len().u8_count();
         if match_count <= 1 {
             return match_count;
         }

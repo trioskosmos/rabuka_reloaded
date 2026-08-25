@@ -1,3 +1,4 @@
+use crate::core::constants::U8Count;
 use crate::card::{BaseHeart, CardDatabase, HeartColor, HeartMap};
 use crate::core::game_modifiers::ModifierEntry;
 use crate::{HashMap, HashSet};
@@ -694,7 +695,7 @@ impl EnergyZone {
 
     pub fn activate_all(&mut self) {
         // Set all energy cards to active state
-        self.active_energy_count = self.cards.len() as u8;
+        self.active_energy_count = self.cards.len().u8_count();
         // log::debug!("Activated {} energy cards (active_energy_count={})", self.cards.len(), self.active_energy_count);
     }
 }
