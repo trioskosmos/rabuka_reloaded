@@ -21,7 +21,7 @@ fn push_movement_event_syncs_all_views() {
     let mut game = TestGame::new(db);
     let card = game.new_id(FILLER);
 
-    assert!(game.state.recently_moved_cards.is_none());
+    assert!(game.state.recently_moved_cards().is_none());
     game.state.push_movement_event(card, "hand", "waitroom", None, "p1", false);
 
     // Batch view
@@ -36,7 +36,7 @@ fn push_movement_event_syncs_all_views() {
     // Turn view
     assert_eq!(game.state.turn_movements.len(), 1);
     // Recently-batch scratch channel
-    let recent = game.state.recently_moved_cards.as_ref().expect("Some after move");
+    let recent = game.state.recently_moved_cards().expect("Some after move");
     assert_eq!(recent.as_slice(), &[card]);
     assert_eq!(
         game.state.recently_moved_from_zone.as_deref(),
@@ -83,7 +83,7 @@ fn second_move_appends_and_updates_recent_zone_only() {
     game.state.push_movement_event(b, "hand", "waitroom", None, "p1", false);
 
     // recently_* reflects the LATEST batch write: both cards, latest zone wins.
-    let recent = game.state.recently_moved_cards.as_ref().expect("Some");
+    let recent = game.state.recently_moved_cards().expect("Some");
     assert_eq!(recent.as_slice(), &[a, b]);
     assert_eq!(game.state.recently_moved_from_zone.as_deref(), Some("hand"));
     // Turn scope accumulates both.

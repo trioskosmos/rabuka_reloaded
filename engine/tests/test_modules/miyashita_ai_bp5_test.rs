@@ -31,7 +31,7 @@ fn setup_baton_touch_scenario(
     let initial_energy_active = game.state.player1.energy_zone.active_count();
 
     game.state.player1.waitroom.cards.push(niji_card);
-    game.state.recently_moved_cards = Some(vec![niji_card].into());
+    game.state.set_recently_moved_cards(vec![niji_card]);
     game.state.recently_moved_from_zone = Some("stage".to_string());
     game.state.baton_touch_count_p1 = 1;
     game.state.baton_touch_replaced_member_id = Some(niji_card);

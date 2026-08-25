@@ -435,7 +435,7 @@ fn ren_ab1_card_type_catch_all_matches_any_card() {
     game.state.player1.waitroom.cards.push(energy);
     game.state.player1.waitroom.cards.push(energy);
     game.state.player1.waitroom.cards.push(energy);
-    game.state.recently_moved_cards = Some(vec![energy, energy, energy].into());
+    game.state.set_recently_moved_cards(vec![energy, energy, energy]);
     game.state.trigger_auto_abilities_for_player("p1");
     game.state.process_pending_auto_abilities("p1");
 
@@ -650,7 +650,7 @@ fn ren_ab1_decline_retrigger_same_turn() {
     game.state.player1.waitroom.cards.push(filler);
     game.state.player1.waitroom.cards.push(filler);
     game.state.player1.waitroom.cards.push(filler);
-    game.state.recently_moved_cards = Some(vec![filler, filler, filler].into());
+    game.state.set_recently_moved_cards(vec![filler, filler, filler]);
     game.state.trigger_auto_abilities_for_player("p1");
     game.state.process_pending_auto_abilities("p1");
 
@@ -673,7 +673,7 @@ fn ren_ab1_decline_retrigger_same_turn() {
     game.state.player1.waitroom.cards.push(filler);
     game.state.player1.waitroom.cards.push(filler);
     game.state.player1.waitroom.cards.push(filler);
-    game.state.recently_moved_cards = Some(vec![filler, filler, filler].into());
+    game.state.set_recently_moved_cards(vec![filler, filler, filler]);
     game.state.trigger_auto_abilities_for_player("p1");
     game.state.process_pending_auto_abilities("p1");
 

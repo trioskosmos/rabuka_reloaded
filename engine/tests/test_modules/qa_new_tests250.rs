@@ -20,7 +20,7 @@ fn trigger_ceras_auto(game: &mut TestGame) {
 fn setup_ceras_appearance(game: &mut TestGame, p2_active_count: usize) -> (i16, Vec<i16>) {
     let ceras = game.new_id("PL!HS-bp6-007-R");
     game.state.player1.stage.stage[0] = ceras;
-    game.state.recently_moved_cards = Some(vec![ceras].into());
+    game.state.set_recently_moved_cards(vec![ceras]);
 
     let mut p2_members = Vec::new();
     for i in 0..p2_active_count {
@@ -109,7 +109,7 @@ fn q250_use_limit() {
     assert!(!game.has_pending_choice());
 
     // Re-trigger with SAME copy ID — use_limit (1/turn) blocks it
-    game.state.recently_moved_cards = Some(vec![ceras].into());
+    game.state.set_recently_moved_cards(vec![ceras]);
     trigger_ceras_auto(&mut game);
     assert!(
         !game.has_pending_choice(),

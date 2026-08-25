@@ -102,7 +102,7 @@ fn kohaku_stage_to_discard_triggers_ability() {
     // Manually trigger stage→discard for Kohaku
     g.state.player1.stage.stage[1] = -1;
     g.state.player1.waitroom.cards.push(kohaku);
-    g.state.recently_moved_cards = Some(vec![kohaku].into());
+    g.state.set_recently_moved_cards(vec![kohaku]);
     g.state.recently_moved_from_zone = Some("stage".to_string());
 
     let pid = g.state.player1.id.clone();

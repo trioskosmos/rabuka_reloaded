@@ -83,7 +83,7 @@ fn ab0_triggers_for_p2_during_p2_main_phase() {
     g.state.player2.hand.cards.push(filler);
     g.state.player2.waitroom.cards.retain(|c| *c != dive);
     g.state.player2.hand.cards.push(dive);
-    g.state.recently_moved_cards = Some(vec![dive].into()); // simulate movement tracking
+    g.state.set_recently_moved_cards(vec![dive]); // simulate movement tracking
 
     // P2 has a Nijigasaki member on stage
     g.state.player2.stage.stage = [-1, niji, -1];
@@ -120,7 +120,7 @@ fn ab0_no_trigger_for_p2_during_p1_main_phase() {
     g.state.player2.hand.cards.push(filler);
     g.state.player2.waitroom.cards.retain(|c| *c != dive);
     g.state.player2.hand.cards.push(dive);
-    g.state.recently_moved_cards = Some(vec![dive].into()); // simulate movement tracking
+    g.state.set_recently_moved_cards(vec![dive]); // simulate movement tracking
 
     // P2 has a Nijigasaki member on stage
     g.state.player2.stage.stage = [-1, niji, -1];
@@ -207,7 +207,7 @@ fn ab1_two_niji_members_only_one_gets_blade() {
     let filler = g.id("PL!-sd1-010-SD");
 
     g.state.player1.live_card_zone.cards.push(dive);
-    g.state.recently_moved_cards = Some(vec![dive].into());
+    g.state.set_recently_moved_cards(vec![dive]);
     g.state.player1.hand.cards.push(filler);
     g.state.player1.stage.stage = [-1, niji_a, niji_b];
     for _ in 0..10 {
@@ -250,7 +250,7 @@ fn ab1_fires_on_direct_placement() {
     let filler = g.id("PL!-sd1-010-SD");
 
     g.state.player1.live_card_zone.cards.push(dive);
-    g.state.recently_moved_cards = Some(vec![dive].into());
+    g.state.set_recently_moved_cards(vec![dive]);
     g.state.player1.stage.stage = [-1, niji, -1];
     g.state.player1.hand.cards.push(filler);
     for _ in 0..10 {

@@ -13,7 +13,7 @@ const OSAWA_RINO: &str = "PL!HS-bp5-003-AR";
 
 /// Manually trigger Rino's auto ability (stage → discard zone change).
 fn trigger_rino_auto(game: &mut TestGame, rino: i16) {
-    game.state.recently_moved_cards = Some(vec![rino].into());
+    game.state.set_recently_moved_cards(vec![rino]);
     game.state.recently_moved_from_zone = Some("stage".to_string());
     let pid = game.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);

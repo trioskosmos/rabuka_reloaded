@@ -32,7 +32,7 @@ fn hanabiko_stage_to_discard_triggers_ability() {
     // Move hanabiko from stage to discard
     g.state.player1.stage.stage[1] = -1;
     g.state.player1.waitroom.cards.push(hanabiko);
-    g.state.recently_moved_cards = Some(vec![hanabiko].into());
+    g.state.set_recently_moved_cards(vec![hanabiko]);
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
@@ -90,7 +90,7 @@ fn hanabiko_static_discard_no_trigger() {
     // Simulate a different movement (filler goes to discard)
     g.state.player1.hand.cards.retain(|c| *c != filler);
     g.state.player1.waitroom.cards.push(filler);
-    g.state.recently_moved_cards = Some(vec![filler].into());
+    g.state.set_recently_moved_cards(vec![filler]);
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
@@ -124,7 +124,7 @@ fn hanabiko_static_stage_no_trigger() {
     // A different card moves to trigger TAS
     g.state.player1.hand.cards.retain(|c| *c != filler);
     g.state.player1.waitroom.cards.push(filler);
-    g.state.recently_moved_cards = Some(vec![filler].into());
+    g.state.set_recently_moved_cards(vec![filler]);
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
@@ -159,7 +159,7 @@ fn hanabiko_hand_to_discard_no_trigger() {
     // Move hanabiko from hand to discard (wrong zone! should be stage→discard)
     g.state.player1.hand.cards.retain(|c| *c != hanabiko);
     g.state.player1.waitroom.cards.push(hanabiko);
-    g.state.recently_moved_cards = Some(vec![hanabiko].into());
+    g.state.set_recently_moved_cards(vec![hanabiko]);
     // Record the real zone transition so the source filter can verify it.
     use rabuka_engine::core::types::ZoneId;
     g.state.turn_movements.push(rabuka_engine::types::MovementEvent {
@@ -200,7 +200,7 @@ fn hanabiko_stage_to_deck_no_trigger() {
     // Move hanabiko from stage to top of deck (wrong destination!)
     g.state.player1.stage.stage[1] = -1;
     g.state.player1.main_deck.cards.push(hanabiko);
-    g.state.recently_moved_cards = Some(vec![hanabiko].into());
+    g.state.set_recently_moved_cards(vec![hanabiko]);
     use rabuka_engine::core::types::ZoneId;
     g.state.turn_movements.push(rabuka_engine::types::MovementEvent {
         moved_card_id: hanabiko,
@@ -252,7 +252,7 @@ fn hanabiko_two_copies_one_moved_one_static() {
     // Move the stage copy to discard
     g.state.player1.stage.stage[1] = -1;
     g.state.player1.waitroom.cards.push(hanabiko_moved);
-    g.state.recently_moved_cards = Some(vec![hanabiko_moved].into());
+    g.state.set_recently_moved_cards(vec![hanabiko_moved]);
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
@@ -289,7 +289,7 @@ fn hanabiko_decline_discard_no_retrieval() {
     // Move hanabiko from stage to discard
     g.state.player1.stage.stage[1] = -1;
     g.state.player1.waitroom.cards.push(hanabiko);
-    g.state.recently_moved_cards = Some(vec![hanabiko].into());
+    g.state.set_recently_moved_cards(vec![hanabiko]);
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);

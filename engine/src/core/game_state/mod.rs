@@ -164,7 +164,10 @@ pub struct GameState {
     pub looked_at_cards: SmallVec<[i16; 8]>,
     pub ability_applications: SmallVec<[crate::types::AbilityApplication; 4]>,
     /// Synced from batch_movements by push_movement_event().
-    pub recently_moved_cards: Option<SmallVec<[i16; 4]>>,
+    /// R1 slice 1b: writes route through `set_recently_moved_cards` /
+    /// `accumulate_recently_moved` / `clear_recently_moved_batch`; external
+    /// (test-crate) readers use `recently_moved_cards()`.
+    pub(crate) recently_moved_cards: Option<SmallVec<[i16; 4]>>,
     pub recently_appeared_cards: SmallVec<[i16; 4]>,
     pub recently_moved_from_zone: Option<String>,
     /// Explicit per-batch event log of stage-area-to-stage-area position changes.
@@ -698,6 +701,18 @@ impl GameState {
             .map(|m| m.cause_player_id.as_str())
     }
     /// Backward-compat: whether energy was placed by a card effect this batch.
+    /// R1 slice 1b test-facing view of the recently-moved batch. Writes go
+    /// through [`Self::set_recently_moved_cards`] /
+    /// `accumulate_recently_moved` / `clear_recently_moved_batch`.
+    pub fn recently_moved_cards(&self) -> Option<&SmallVec<[i16; 4]>> {
+        self.recently_moved_cards.as_ref()
+    }
+
+    /// R1-gated write view for the recently-moved batch (tests + internal).
+    pub fn set_recently_moved_cards(&mut self, cards: Vec<i16>) {
+        self.recently_moved_cards = Some(cards.into());
+    }
+
     pub fn last_energy_placed_by_effect(&self) -> bool {
         self.batch_movements
             .iter()
