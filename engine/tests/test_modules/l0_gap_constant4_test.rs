@@ -64,15 +64,14 @@ fn sp_bp5_011_position_hearts() {
     );
 }
 
-/// PL!N-bp7-007-R: 常時 このメンバーの下にあるエネルギーカード1枚につき、
+/// PL!N-bp7-007-R+ 優木せつ菜: 常時 このメンバーの下にあるエネルギーカード1枚につき、
 /// heart02を得る。
 #[test]
-#[ignore = "card PL!N-bp7-007-R not found in DB"]
 fn nico_bp7_007_per_under_energy_heart02() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let member = game.id("PL!N-bp7-007-R");
+    let member = game.id("PL!N-bp7-007-R\u{ff0b}");
     game.state.player1.stage.stage = [-1, member, -1];
     // Place 2 energy cards under the member
     let e1 = game.id("LL-E-001-SD");
@@ -87,22 +86,21 @@ fn nico_bp7_007_per_under_energy_heart02() {
         .state
         .mods
         .get_heart_modifier(member, HeartColor::Heart02);
-    assert!(
-        h02 >= 2,
-        "2 under-member energies should grant >= +2 heart02"
+    assert_eq!(
+        h02, 2,
+        "2 under-member energies should grant exactly +2 heart02"
     );
 }
 
-/// PL!S-bp7-005-R: 常時 メンバーカードが下に置かれている『Aqours』メンバーは、
+/// PL!S-bp7-005-R+ 渡辺 曜: 常時 メンバーカードが下に置かれている『Aqours』メンバーは、
 /// ブレード+1。
-/// TODO: needs investigation — under-card setup may not trigger correctly.
+/// (Deeper coverage incl. negatives lives in bp7_watanabe_under_card_blade_test.rs.)
 #[test]
-#[ignore = "under-card blade needs investigation"]
 fn sb7_005_aqours_under_card_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let member = game.id("PL!S-bp7-005-R");
+    let member = game.id("PL!S-bp7-005-R\u{ff0b}");
     game.state.player1.stage.stage = [-1, member, -1];
     // Place an Aqours member card under this member
     let under_card = game.id("PL!S-bp2-001-R");
@@ -112,8 +110,8 @@ fn sb7_005_aqours_under_card_blade() {
     game.state.recalculate_constants();
 
     let blade = game.state.mods.get_blade_modifier(member);
-    assert!(
-        blade >= 1,
-        "under-card Aqours member should grant >= +1 blade"
+    assert_eq!(
+        blade, 1,
+        "under-card Aqours member should gain exactly +1 blade"
     );
 }

@@ -2859,6 +2859,14 @@ pub blade_greater_than_all: Option<bool>,
     pub locations: Option<Box<Vec<String>>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub min_baton_touch_count: Option<u8>,
+    /// Movement gate on ANY condition variant (「…されたとき」 placement/
+    /// movement qualifiers the parser emits on location_condition etc., e.g.
+    /// DIVE! PL!N-bp4-026-L ab#1). The TAS movement gates read this via
+    /// [`Condition::get_movement`]; before it lived here, Location conditions
+    /// silently lost the key in BOTH the serde and bytecode paths, so static
+    /// presence re-triggered "when placed" abilities.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub movement: Option<ArcStr>,
     pub negation: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub no_excess_heart: Option<bool>,
@@ -3291,7 +3299,9 @@ impl Condition {
     pub fn get_movement(&self) -> Option<&str> {
         match self {
             Condition::Movement { movement, .. } => movement.as_deref(),
-            _ => None,
+            // Non-Movement variants carry the gate in their common fields
+            // (e.g. location_condition with "movement": "moved").
+            _ => self.common().and_then(|c| c.movement.as_deref()),
         }
     }
 

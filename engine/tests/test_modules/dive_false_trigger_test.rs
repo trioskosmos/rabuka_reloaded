@@ -22,6 +22,14 @@ const SETSUNA_SINGLE: &str = "PL!N-bp5-019-N";
 /// Another Nijigasaki live card (distinct name from DIVE!) for wrong-target picks.
 const OTHER_NIJI_LIVE: &str = "PL!N-bp4-025-L";
 
+fn blade_mod(g: &TestGame, cid: i16) -> i32 {
+    g.state
+        .mods
+        .blade_modifiers
+        .get(&cid)
+        .map_or(0, |e| e.total())
+}
+
 /// Game 1: P1 plays bp4-007 Setsuna during P1's main phase. Her ab#0 makes EACH
 /// player retrieve 1 live card from their OWN waitroom. Both waitrooms hold only
 /// DIVE! copies, so both retrievals are forced onto DIVE!.
@@ -127,5 +135,176 @@ fn wrong_target_retrieval_does_not_arm_dive() {
     assert!(
         g.state.player1.waitroom.cards.contains(&dive),
         "DIVE! must still be in the waitroom"
+    );
+}
+
+/// Game 3 (F2): DIVE! drawn from the MAIN DECK during the natural draw phase
+/// must NOT arm ab#0. The printed trigger is 「控え室から手札に加えられたとき」
+/// — deck→hand is a different zone change even though it IS P2's own main
+/// phase when the draw completes.
+#[test]
+fn natural_draw_from_deck_does_not_arm_dive() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let dive_p2 = g.new_id(DIVE);
+    let filler = g.id("PL!-sd1-010-SD");
+
+    fill_decks(&mut g, filler);
+    put_on_deck_top(&mut g, 2, dive_p2);
+
+    // Advance P1(Main) -> P2 Active -> Energy -> Draw -> Main.
+    // The Draw->Main transition performs the real deck draw.
+    for _ in 0..4 {
+        g.pass();
+        // Any prompt appearing right after a pass means an ability armed.
+        assert!(
+            !g.has_pending_choice(),
+            "a prompt appeared during phase progression — DIVE! must not arm \
+             off a deck draw:\n{}",
+            g.pending_choice_summary()
+        );
+    }
+
+    assert!(
+        g.state.player2.hand.cards.contains(&dive_p2),
+        "P2 should have drawn DIVE! from the deck"
+    );
+    assert!(
+        !g.state.player2.live_card_zone.cards.contains(&dive_p2),
+        "deck-drawn DIVE! must NOT auto-place"
+    );
+}
+
+/// Game 4 (F6): DIVE! statically in the live zone with NOTHING moved this turn
+/// → ab#1 must not grant blade. The location condition carries
+/// movement:"moved"; a static presence is not a placement event.
+#[test]
+fn ab1_no_blade_when_statically_in_live_zone() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let dive = g.id(DIVE);
+    let niji = g.id("PL!N-PR-003-PR");
+    let filler = g.id("PL!-sd1-010-SD");
+
+    g.state.player1.live_card_zone.cards.push(dive);
+    g.state.player1.stage.stage = [-1, niji, -1];
+    g.state.player1.hand.cards.push(filler);
+    fill_decks(&mut g, filler);
+    g.state.clear_recently_moved_batch();
+
+    let pid = g.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
+    g.state.process_pending_auto_abilities(&pid);
+    while g.has_pending_choice() {
+        g.select_indices(&[]);
+    }
+
+    assert_eq!(
+        blade_mod(&g, niji),
+        0,
+        "static live-zone presence without movement must not grant blade"
+    );
+}
+
+/// Game 5 (F7): ab#1 grants exactly +2 once per placement — clearing the
+/// movement flags and rescanning must not stack a second +2.
+#[test]
+fn ab1_rescan_after_flags_cleared_does_not_double_grant() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let dive = g.id(DIVE);
+    let niji = g.new_id("PL!N-PR-003-PR");
+    let filler = g.id("PL!-sd1-010-SD");
+
+    g.state.player1.live_card_zone.cards.push(dive);
+    g.state.set_recently_moved_cards(vec![dive]);
+    g.state.recently_moved_from_zone = Some("hand".to_string());
+    g.state.player1.stage.stage = [-1, niji, -1];
+    g.state.player1.hand.cards.push(filler);
+    fill_decks(&mut g, filler);
+
+    let pid = g.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
+    g.state.process_pending_auto_abilities(&pid);
+    while g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+    assert_eq!(blade_mod(&g, niji), 2, "first grant gives exactly blade+2");
+
+    // Movement flags consumed/cleared — rescan must be silent.
+    g.state.clear_recently_moved_batch();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
+    g.state.process_pending_auto_abilities(&pid);
+    while g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+    assert_eq!(
+        blade_mod(&g, niji),
+        2,
+        "rescan after flags cleared must NOT double the blade grant"
+    );
+}
+
+/// Game 6 (F8): two DIVE! copies in hand, only ONE moved discard→hand.
+/// Exactly one placement flow may occur; the untouched copy stays in hand.
+#[test]
+fn two_dive_copies_only_the_moved_one_places() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let dive_moved = g.id(DIVE);
+    let dive_static = g.new_id(DIVE);
+    let filler = g.id("PL!-sd1-010-SD");
+
+    g.state.player1.hand.cards.push(dive_moved);
+    g.state.player1.hand.cards.push(dive_static);
+    g.state.player1.waitroom.cards.push(filler);
+    fill_decks(&mut g, filler);
+
+    // Real movement event: ONLY dive_moved comes discard→hand this batch.
+    g.state
+        .push_movement_event(dive_moved, "discard", "hand", None, "p1", true);
+
+    let pid = g.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
+    g.state.process_pending_auto_abilities(&pid);
+
+    // Accept the (single) placement offer.
+    let mut placements = 0;
+    let mut guard = 0;
+    while g.has_pending_choice() {
+        guard += 1;
+        assert!(guard <= 10, "runaway prompts:\n{}", g.pending_choice_summary());
+        let ty = g.pending_choice_type().unwrap_or_default();
+        if ty == "SelectCard" {
+            placements += 1;
+            g.select_indices(&[0]);
+        } else if ty == "SelectTarget" {
+            g.select_indices(&[0]);
+        } else {
+            panic!("unexpected prompt {}:\n{}", ty, g.pending_choice_summary());
+        }
+    }
+
+    assert_eq!(
+        placements, 1,
+        "exactly one placement selection expected (the moved copy)"
+    );
+
+    let placed = g.state.player1.live_card_zone.cards.contains(&dive_moved);
+    let static_placed = g
+        .state
+        .player1
+        .live_card_zone
+        .cards
+        .contains(&dive_static);
+    assert!(
+        placed ^ static_placed,
+        "exactly one copy may end up in the live zone: moved_placed={} static_placed={}",
+        placed,
+        static_placed
+    );
+    assert!(
+        !static_placed,
+        "the copy that never moved must stay in hand"
     );
 }

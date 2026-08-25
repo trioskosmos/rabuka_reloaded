@@ -1,5 +1,24 @@
 # Test Hardening & Parser/Engine Fix Plan — 2026-08-26
 
+## Status (updated as work lands)
+
+| Item | State |
+|---|---|
+| P0.1 orphaned mod.rs registration | DONE — 6 files recovered, `sumire_bp5_test_debug.rs` deleted as stale duplicate; konata/location/shizuku fixed to current APIs |
+| P0.2 DIVE! false-trigger audit | DONE — 6 real-game tests in `dive_false_trigger_test.rs`; found + fixed **engine gap**: `movement` key on non-Movement condition variants was dropped by both serde and bytecode decode paths, so static presence re-triggered "when placed" abilities. Fixed via `ConditionCommon.movement` + regenerated decoder |
+| P0.3 `has_pending_choice` soft-guard migration | OPEN (~250 sites) |
+| P1.1 per-test inventory | OPEN |
+| P1.2 or-assertions sweep | OPEN |
+| P1.3 helper dedup (`fire_trigger` x40) | OPEN |
+| P2.* parser/pipeline hardening | OPEN |
+| P3.* engine quality debt | PARTIAL — either-target location_condition fixed ([LOC_COND_EITHER]); mojibake/queue-u8/runaway counters still open |
+
+Suite state after this round: **2934 passed / 0 failed / 0 ignored** (was 2927 passing
+with 7 failing orphans + 2 ignores before recovery). The two former `#[ignore]`s were
+full-width-plus card-ID typos, not engine gaps.
+
+---
+
 Working plan derived from the full-repo audit (engine src, cards/ parser ecosystem,
 abilities.json, engine/tests). Guiding directive: **work on tests and fixes together** —
 every parser gap gets an end-to-end test, every engine fix pins behavior, no documenting
