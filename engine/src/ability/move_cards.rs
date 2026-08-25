@@ -459,11 +459,13 @@ impl AbilityResolver {
     ) -> Result<Option<Vec<i16>>, String> {
         let cards = util::zone_card_ids(player, zone_name);
         log::debug!(
-            "[TAKE] zone={zone_name} excl_chars={:?} chars={:?} group={:?} cards={:?}",
+            "[TAKE] zone={zone_name} excl_chars={:?} chars={:?} group={:?} cards={:?} ct={:?} count={count} self_only={} all={is_all} can_skip={can_skip}",
             filter.exclude_characters,
             filter.characters,
             filter.group,
-            cards
+            cards,
+            filter.card_type,
+            effect.is_self_target(),
         );
         let filtered_indices = util::matching_indices(&cards, card_db, filter, false);
 

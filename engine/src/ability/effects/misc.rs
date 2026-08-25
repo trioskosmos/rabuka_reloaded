@@ -3612,9 +3612,18 @@ impl AbilityResolver {
         // used as a condition (e.g. "if X group is present, pick any number"), not
         // as a filter on the options themselves.  Fixes Kanon pb2-001-R's followup
         // choice where group_names=["Liella!"] was lost after option selection.
+        //
+        // BUT: if ANY option defines its own group_names, the parent's copy is
+        // contextual (per-option scoping), not a shared filter — propagating it
+        // would wrongly restrict sibling options (ド！ド！ド！ cl1-011-CL: option A
+        // retrieves ANY member while option B is 『蓮ノ空』-only).
+        let options_have_own_groups = options
+            .map(|opts| opts.iter().any(|o| o.group_names_any().is_some()))
+            .unwrap_or(false);
         let should_propagate_group = effect.group_names_any().is_some()
             && effect.alternative_count_type_any().is_none()
-            && effect.compound.alternative_condition.is_none();
+            && effect.compound.alternative_condition.is_none()
+            && !options_have_own_groups;
         let propagated_options: Option<Vec<Box<AbilityEffect>>> = if should_propagate_group {
             options.map(|opts| {
                 opts.iter()

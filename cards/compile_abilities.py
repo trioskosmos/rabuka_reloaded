@@ -258,7 +258,13 @@ def compile_all(abilities):
         elif isinstance(v, int):
             out.append(0x03)
             if v < 0:
-                out.extend(struct.pack("<q", v))
+                # Negative: width byte 0xFF + SIGNED 32-bit two's complement.
+                # The Rust reader (vm.rs read_int) interprets a 0xFF width byte
+                # as a 4-byte payload; writing a raw <q with no width byte
+                # desynced the whole tree walk (the first payload byte was
+                # consumed as the width).
+                out.append(0xFF)
+                out.extend(struct.pack("<I", v & 0xFFFFFFFF))
             elif v <= 0xFD:
                 out.append(v & 0xFF)
             elif v <= 0xFFFF:

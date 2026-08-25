@@ -1604,6 +1604,92 @@ impl AbilityResolver {
                 card_ids.retain(|id| *id == cid);
             }
         }
+        log::debug!(
+            "[MOD_COST_ENTRY] op={:?} offset={:?} reference={:?} value={:?} ids={:?}",
+            op_binding,
+            effect.cost_offset_any(),
+            effect.cost_reference_any(),
+            effect.value_any(),
+            card_ids
+        );
+        // 「このメンバーのコストは、選んだメンバーが元々持つコストよりN低い/高い
+        // 値に等しくなる」 (bp5-005-R family): resolve the previously selected/
+        // moved card, take its ORIGINAL printed cost ± offset, and apply that as
+        // an additive modifier relative to each target's own printed cost.
+        //
+        // NOTE: must run BEFORE the plain add/subtract/set delta match — that
+        // match's wildcard arm treats any other operation string as unknown.
+        if operation == "set_from_reference" {
+            // 「選んだメンバー」 resolves from selection results FIRST — a
+            // preceding select action stores its target in selected_cards.
+            // moved_cards only holds cards physically MOVED (e.g. a discarded
+            // cost payment), which would pick the wrong card here.
+            let selected = self.selected_cards.last().copied();
+            let moved = self.moved_cards.last().copied();
+            let recently = gs
+                .recently_moved_cards
+                .as_ref()
+                .and_then(|cards| cards.last().copied());
+            let Some(ref_id) = selected.or(moved).or(recently) else {
+                log::debug!("[MOD_COST_REF] no selected/moved card to reference");
+                return;
+            };
+            let ref_cost = gs
+                .card_database
+                .get_card(ref_id)
+                .and_then(|c| c.cost)
+                .unwrap_or_else(|| {
+                    log::debug!("[MOD_COST_REF] ref card {} has no printed cost", ref_id);
+                    0
+                }) as i32;
+            let offset = effect.cost_offset_any().unwrap_or(0) as i32;
+            let resolved = crate::constants::saturate_u8(ref_cost.saturating_add(offset)) as i32;
+            log::debug!(
+                "[MOD_COST_REF] ref={} ref_cost={} offset={} resolved={}",
+                ref_id,
+                ref_cost,
+                offset,
+                resolved
+            );
+            let deltas: SmallVec<[i16; 8]> = card_ids
+                .iter()
+                .map(|&cid| {
+                    let printed =
+                        gs.card_database.get_card(cid).and_then(|c| c.cost).unwrap_or(0)
+                            as i32;
+                    (resolved - printed).clamp(i16::MIN as i32, i16::MAX as i32) as i16
+                })
+                .collect();
+            for (card_id, d) in card_ids.iter().zip(deltas.iter()) {
+                // Additive (not the `set` field) so live_end revert via
+                // remove_cost_modifier restores exactly what was applied.
+                gs.mods.add_cost_modifier(*card_id, *d);
+                log::debug!("[MOD_COST_REF] card={} applied delta={}", card_id, d);
+            }
+            if let Some(dur) = duration {
+                if dur != "permanent" {
+                    let target_str = target.to_string();
+                    let items: Vec<crate::core::types::CardEffectItem> = card_ids
+                        .iter()
+                        .zip(deltas.iter())
+                        .map(|(&cid, &d)| crate::core::types::CardEffectItem {
+                            card_id: cid,
+                            amount: d.abs(),
+                            color: None,
+                        })
+                        .collect();
+                    util::push_temporary_effect(
+                        gs,
+                        "modify_cost",
+                        Some(dur),
+                        &target_str,
+                        &format!("Cost set_from_reference ({})", dur),
+                        Some(crate::core::types::EffectData::MultiCard { items }),
+                    );
+                }
+            }
+            return;
+        }
         let delta = match operation {
             "add" => value as i16,
             "subtract" => -(value as i16),

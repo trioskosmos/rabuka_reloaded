@@ -2525,6 +2525,11 @@ pub enum Operation {
     Set,
     #[cfg_attr(feature = "serde_support", serde(rename = "subtract"))]
     Subtract,
+    /// 「このメンバーのコストは、選んだメンバーが元々持つコストよりN低い/高い
+    /// 値に等しくなる」 (bp5-005-R family): cost becomes referenced card's
+    /// ORIGINAL cost ± offset.
+    #[cfg_attr(feature = "serde_support", serde(rename = "set_from_reference"))]
+    SetFromReference,
 }
 
 impl Operation {
@@ -2536,6 +2541,7 @@ impl Operation {
             Operation::Remove => "remove",
             Operation::Set => "set",
             Operation::Subtract => "subtract",
+            Operation::SetFromReference => "set_from_reference",
         }
     }
 }
@@ -2548,6 +2554,7 @@ pub(crate) fn parse_operation(s: &str) -> Option<Operation> {
         "remove" => Operation::Remove,
         "set" => Operation::Set,
         "subtract" => Operation::Subtract,
+        "set_from_reference" => Operation::SetFromReference,
         _ => return None,
     })
 }

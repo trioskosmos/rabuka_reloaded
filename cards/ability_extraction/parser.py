@@ -7224,6 +7224,69 @@ def _try_energy_ahead_alternative(text):
     return result
 
 
+def _try_cost_set_from_reference(text):
+    """「…を選ぶ。ライブ終了時まで、このメンバーのコストは、選んだメンバーが
+    元々持つコストよりN低い/高い値に等しくなる。これによりこのカードのコストが
+    M以上になった場合、…を得る。」 — cost mirror from a selected member plus an
+    optional threshold followup (bp5-005-R 徒町小鈴 family)."""
+    key = "のコストは、選んだメンバーが元々持つコストより"
+    if key not in text:
+        return None
+    head, sep, tail = text.partition("これにより")
+    m = re.search(
+        r"^(?P<sel>[^。]*を選ぶ)。"
+        r"(?P<dur>ライブ終了時まで|このターン中)?、?"
+        r"この(?:メンバー|カード)のコストは、"
+        r"選んだメンバーが元々持つコストより(?P<n>\d+)(?P<dir>低い|高い)値に等しくなる",
+        head.strip(),
+    )
+    if not m:
+        return None
+    select_part = parse_action(m.group("sel"))
+    if not isinstance(select_part, dict):
+        return None
+    n = int(m.group("n"))
+    offset = -n if m.group("dir") == "低い" else n
+    dur_txt = m.group("dur") or "ライブ終了時まで"
+    duration = "live_end" if "ライブ" in dur_txt else "turn_end"
+    modify = {
+        "action": "modify_cost",
+        "operation": "set_from_reference",
+        "cost_reference": "previous_moved_card",
+        "cost_offset": offset,
+        "duration": duration,
+        "card_type": "member_card",
+        "target": "self",
+        "text": m.group(0)[len(m.group("sel")) + 1 :],
+    }
+    result = {
+        "action": "conditional_on_result",
+        "primary_effect": {
+            "action": "sequential",
+            "actions": [select_part, modify],
+        },
+    }
+    if sep:
+        mt = re.match(r"このカードのコストが(\d+)以上になった場合、(.*)", tail.strip().rstrip("。"))
+        if mt:
+            result["result_condition"] = {
+                "type": "comparison_condition",
+                "comparison_type": "cost",
+                # Explicit subject marker: compare THE ACTIVATING CARD's current
+                # effective cost. Distinguishes from Rina-style 「合計コストがN」
+                # conditions (no location), which sum moved-card costs.
+                "location": "activating_card",
+                "count": int(mt.group(1)),
+                "operator": ">=",
+                "target": "self",
+                "text": f"これによりこのカードのコストが{mt.group(1)}以上になった場合",
+            }
+            followup = parse_action(mt.group(2))
+            if isinstance(followup, dict):
+                result["followup_action"] = followup
+    return result
+
+
 def _try_conditional_alternative(text):
     """代わりに — conditional alternative effects."""
     if ALTERNATIVE_MARKER not in text:
@@ -9986,6 +10049,7 @@ _EFFECT_HANDLERS = [
     _try_per_unit,  # XにつきY (per-unit gain — restructures text)
     _try_yell_source_modifier,  # エールはデッキの下から行う (yell-source modifier)
     _try_activation_history_tiers,  # このターン…アクティブにしていた場合 tiers (Q203)
+    _try_cost_set_from_reference,  # コストは選んだメンバーが元々持つコストよりN低い/高い (bp5-005-R)
     _try_energy_ahead_alternative,  # 相手のエネルギーが自分よりN枚多い場合 tiers (bp7-023-L)
     _try_conditional_alternative,  # X場合Y、そうでない場合Z (if/else)
     _try_character_specific,  # 「X」のキャラ specific effect

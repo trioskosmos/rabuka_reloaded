@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-25T15:22:02.504446",
+  "generated_at": "2026-08-25T16:27:20.759238",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "dcb04c2b",
+  "engine_commit": "f57ef451",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -9871,15 +9871,9 @@
         "type": "move_cards"
       },
       "effect": {
-        "text": "自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ。ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる。これによりこのカードのコストが10以上になった場合、ライブ終了時まで、{{heart_05.png|heart05}}を得る",
         "action": "conditional_on_result",
         "primary_effect": {
-          "text": "自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ。ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる",
-          "group_names": [
-            "DOLLCHESTRA"
-          ],
           "action": "sequential",
-          "original_value": true,
           "actions": [
             {
               "text": "自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ",
@@ -9893,27 +9887,34 @@
               "action": "select"
             },
             {
-              "text": "ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる",
+              "action": "modify_cost",
+              "operation": "set_from_reference",
+              "cost_reference": "previous_moved_card",
+              "cost_offset": -1,
               "duration": "live_end",
               "card_type": "member_card",
-              "action": "modify_cost",
-              "group_names": [
-                "DOLLCHESTRA"
-              ],
+              "target": "self",
+              "text": "ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる",
               "original_value": true
             }
+          ],
+          "text": "手札の『DOLLCHESTRA』のカードを1枚控え室に置いてもよい：自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ。ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる。これによりこのカードのコストが10以上になった場合、ライブ終了時まで、{{heart_05.png|heart05}}を得る",
+          "original_value": true,
+          "group_names": [
+            "DOLLCHESTRA"
           ]
         },
         "result_condition": {
-          "text": "これによりこのカードのコストが10以上になった場合",
+          "type": "comparison_condition",
+          "comparison_type": "cost",
+          "location": "activating_card",
           "count": 10,
           "operator": ">=",
-          "comparison_type": "cost",
-          "cost_limit": 10,
-          "type": "comparison_condition"
+          "target": "self",
+          "text": "これによりこのカードのコストが10以上になった場合"
         },
         "followup_action": {
-          "text": "ライブ終了時まで、{{heart_05.png|heart05}}を得る",
+          "text": "{{heart_05.png|heart05}}を得る",
           "duration": "live_end",
           "action": "gain_resource",
           "resource": "heart",
@@ -9922,6 +9923,7 @@
           ],
           "count": 1
         },
+        "text": "手札の『DOLLCHESTRA』のカードを1枚控え室に置いてもよい：自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ。ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる。これによりこのカードのコストが10以上になった場合、ライブ終了時まで、{{heart_05.png|heart05}}を得る。",
         "original_value": true,
         "group_names": [
           "DOLLCHESTRA"

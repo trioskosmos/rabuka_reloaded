@@ -2510,10 +2510,27 @@ pub fn get_selection_indices(
     skip_empty: bool,
 ) -> Vec<usize> {
     log::debug!(
-        "[GET_SEL] cards.len={} filter.nh_color={:?} filter.nh_total={:?}",
+        "[GET_SEL] cards.len={} filter.nh_color={:?} filter.nh_total={:?} ct={:?} group={:?} groups={:?} chars={:?} excl_chars={:?} cost_lim={:?} cost_op={:?} cost_vals={:?} cost_min={:?} cost_max={:?} excl_self={:?} names={:?} hearts={:?} nhc_count={:?} distinct={:?} excl_groups={:?} excl_cards={:?}",
         cards.len(),
         filter.need_heart_color,
-        filter.need_heart_total
+        filter.need_heart_total,
+        filter.card_type,
+        filter.group,
+        filter.groups,
+        filter.characters,
+        filter.exclude_characters,
+        filter.cost_limit,
+        filter.cost_operator,
+        filter.cost_values,
+        filter.cost_limit_min,
+        filter.cost_limit_max,
+        filter.exclude_self,
+        filter.name_fragments,
+        filter.heart_colors,
+        filter.heart_color_count,
+        filter.distinct,
+        filter.exclude_group_names,
+        filter.exclude_cards,
     );
     let mut idxs = matching_indices(cards, card_db, filter, skip_empty);
     if self_target_only {

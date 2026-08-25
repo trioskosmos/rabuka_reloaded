@@ -329,7 +329,8 @@ impl<'a> BcReader<'a> {
     }
 
     /// Read a TAG_I64 value with variable-width payload:
-    /// value ≤ 0xFD → 1 byte; 0xFE → +u16; 0xFF → +u32; negative → full i64.
+    /// value ≤ 0xFD → 1 byte; 0xFE → +u16; 0xFF → +i32 (two's complement,
+    /// signed so the compiler can encode negative ints such as cost_offset).
     fn read_int(&mut self) -> Option<i64> {
         let b = self.read_u8()?;
         if b <= 0xFD {
@@ -337,7 +338,7 @@ impl<'a> BcReader<'a> {
         } else if b == 0xFE {
             self.u16().map(|v| v as i64)
         } else if b == 0xFF {
-            self.read_u32().map(|v| v as i64)
+            self.read_u32().map(|v| v as i32 as i64)
         } else {
             self.i64()
         }

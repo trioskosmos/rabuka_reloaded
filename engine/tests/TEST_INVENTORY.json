@@ -1,20 +1,20 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T05:25:55.435990+00:00",
+  "generated_at": "2026-08-25T06:28:01.170836+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 479,
-  "n_tests": 2874,
+  "n_files": 480,
+  "n_tests": 2889,
   "total_cards": 771,
-  "covered_cards": 731,
-  "abilities_on_covered": 896,
+  "covered_cards": 736,
+  "abilities_on_covered": 901,
   "trigger_counts": {
     "起動": [
-      91,
+      92,
       96
     ],
     "登場": [
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      254,
+      256,
       268
     ],
     "(none)": [
@@ -30,11 +30,11 @@
       2
     ],
     "ライブ成功時": [
-      114,
+      115,
       122
     ],
     "常時": [
-      116,
+      117,
       117
     ],
     "自動": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      209,
+      211,
       220
     ],
     "unknown": [
@@ -84,7 +84,7 @@
       11
     ],
     "conditional_on_result": [
-      18,
+      19,
       19
     ],
     "activate_ability": [
@@ -112,7 +112,7 @@
       6
     ],
     "modify_cost": [
-      15,
+      16,
       16
     ],
     "place_energy_under_member": [
@@ -120,7 +120,7 @@
       6
     ],
     "choice": [
-      21,
+      22,
       24
     ],
     "conditional_on_optional": [
@@ -174,11 +174,11 @@
   },
   "cond_counts": {
     "none": [
-      521,
+      525,
       545
     ],
     "temporal_condition": [
-      18,
+      19,
       20
     ],
     "compound": [
@@ -260,7 +260,7 @@
       58
     ],
     "PR": [
-      49,
+      50,
       52
     ],
     "bp1": [
@@ -280,11 +280,11 @@
       88
     ],
     "bp5": [
-      124,
+      126,
       134
     ],
     "bp6": [
-      77,
+      78,
       82
     ],
     "bp7": [
@@ -304,16 +304,16 @@
       43
     ],
     "cl1": [
-      9,
+      10,
       10
     ]
   },
   "depth_counts": {
-    "L2+choice": 641,
-    "L1+choice": 179,
+    "L2+choice": 647,
+    "L1+choice": 178,
     "L2": 28,
-    "none": 40,
-    "L1": 48
+    "L1": 48,
+    "none": 35
   },
   "qa_rulings": {
     "covered": 272,
@@ -394,6 +394,7 @@
         "engine/tests/test_modules/energy_and_member_under_test.rs",
         "engine/tests/test_modules/fuyumari_test.rs",
         "engine/tests/test_modules/gameplay_test.rs",
+        "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/kanata_bp1_test.rs",
         "engine/tests/test_modules/kidou_softlock_test.rs",
         "engine/tests/test_modules/konata_test.rs",
@@ -453,7 +454,7 @@
         "center_mus_zero_heart03_no_reduction",
         "center_non_mus_no_reduction"
       ],
-      "covering_test_count": 404,
+      "covering_test_count": 419,
       "is_null": false
     },
     {
@@ -883,6 +884,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/energy_and_member_under_test.rs",
+        "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/himeno_test.rs",
         "engine/tests/test_modules/live_success_rules_test.rs",
         "engine/tests/test_modules/prohibition_layer_characterization_test.rs",
@@ -913,18 +915,18 @@
         "compound_dododo_tied_score_with_hasunosora_fails",
         "daydream_mermaid_no_niji_in_success_pick_one",
         "daydream_mermaid_q191_niji_in_success_pick_both",
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
         "happy_party_train_all_active_reduces_need_heart",
         "happy_party_train_mill_aqours_member_reduces_need_heart",
         "happy_party_train_mill_non_aqours_no_reduction",
         "happy_party_train_waited_or_empty_stage_no_reduction",
         "hasunosora_group_member_present_passes",
-        "hasunosora_group_mixed_stage_passes",
-        "hasunosora_group_no_member_fails",
-        "heartbeat_bp4021_escalating_thresholds",
-        "himeno_bp6_cost_no_reduction_without_mirakura",
-        "himeno_bp6_cost_reduced_by_mirakura_on_stage"
+        "hasunosora_group_mixed_stage_passes"
       ],
-      "covering_test_count": 100,
+      "covering_test_count": 115,
       "is_null": true
     },
     {
@@ -1368,6 +1370,7 @@
         "engine/tests/test_modules/check_self_condition_test.rs",
         "engine/tests/test_modules/emma_test.rs",
         "engine/tests/test_modules/hanabiko_discard_test.rs",
+        "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test_part3.rs",
         "engine/tests/test_modules/pl_hs_sd1_008_test.rs",
@@ -1383,6 +1386,10 @@
         "card_count_condition_baton_touch_filter",
         "check_self_comparison_container_hand_presence",
         "check_self_location_follows_the_card",
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
         "emma_live_start_activates_wait_both_gain_heart04",
         "emma_live_start_active_member_not_affected",
         "emma_live_start_alone_no_other_members_no_heart",
@@ -1400,13 +1407,9 @@
         "hanabiko_static_stage_no_trigger",
         "hanabiko_two_copies_one_moved_one_static",
         "honoka_cost_limit_wait_blocked_by_wait_immunity",
-        "issue10_dream_with_you_high_blade_plus_1_score",
-        "issue10_dream_with_you_no_blade_no_score",
-        "issue11_fanfare_15plus_cards_gives_blade",
-        "issue11_fanfare_few_cards_no_blade",
-        "issue11_shizuku_score_floor_at_zero"
+        "issue10_dream_with_you_high_blade_plus_1_score"
       ],
-      "covering_test_count": 90,
+      "covering_test_count": 105,
       "is_null": false
     },
     {
@@ -7569,10 +7572,15 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/hasunosora_bp6_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs"
       ],
       "covering_tests": [
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
         "issue10_dream_with_you_high_blade_plus_1_score",
         "issue10_dream_with_you_no_blade_no_score",
         "issue11_fanfare_15plus_cards_gives_blade",
@@ -7598,13 +7606,9 @@
         "issue6_natsumi_self_and_other_blade",
         "issue6_natsumi_self_only_blade",
         "issue7_hajimari_no_success_live_no_effect",
-        "issue7_hajimari_set_modifier_replaces_not_adds",
-        "issue7_hajimari_set_required_hearts",
-        "issue9_izumi_debut_draw_2_discard_1",
-        "issue9_izumi_debut_empty_hand",
-        "kosuzu_bp6_condition_met_gains_heart05_and_blade"
+        "issue7_hajimari_set_modifier_replaces_not_adds"
       ],
-      "covering_test_count": 33,
+      "covering_test_count": 48,
       "is_null": false
     },
     {
@@ -7630,10 +7634,15 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/hasunosora_bp6_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs"
       ],
       "covering_tests": [
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
         "issue10_dream_with_you_high_blade_plus_1_score",
         "issue10_dream_with_you_no_blade_no_score",
         "issue11_fanfare_15plus_cards_gives_blade",
@@ -7659,13 +7668,9 @@
         "issue6_natsumi_self_and_other_blade",
         "issue6_natsumi_self_only_blade",
         "issue7_hajimari_no_success_live_no_effect",
-        "issue7_hajimari_set_modifier_replaces_not_adds",
-        "issue7_hajimari_set_required_hearts",
-        "issue9_izumi_debut_draw_2_discard_1",
-        "issue9_izumi_debut_empty_hand",
-        "kosuzu_bp6_condition_met_gains_heart05_and_blade"
+        "issue7_hajimari_set_modifier_replaces_not_adds"
       ],
-      "covering_test_count": 33,
+      "covering_test_count": 48,
       "is_null": false
     },
     {
@@ -9342,22 +9347,38 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/multi_color_heart_test.rs",
         "engine/tests/test_modules/untested_secondary_abilities_test.rs"
       ],
       "covering_tests": [
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
         "eli_bp5011_chosen_heart_scales_with_success_pile",
         "fuyuko_bpb5011_position_constants_are_mutually_exclusive",
         "hanamaru_bpb5007_fetches_double_heart04_member_only",
         "hanamaru_bpb5007_no_eligible_member_fetches_nothing",
+        "kanan_cannot_mill_itself",
+        "kanan_mill_then_debut_exact_cost_plus_two_same_area",
+        "kanan_no_matching_cost_only_the_mill_happens",
         "karin_bpb4004_cap_counts_waited_opponents_only",
+        "kinako_hand_cost_minus_two_while_liella_moved",
+        "kinako_hand_cost_normal_when_liella_did_not_move",
+        "kinako_non_liella_movement_gives_no_discount",
+        "kokoro_below_threshold_sets_cost_without_heart",
+        "kokoro_boundary_eleven_exactly_reaches_ten",
+        "kokoro_decline_leaves_everything_untouched",
+        "kokoro_high_member_sets_cost_and_grants_heart05",
+        "kokoro_no_dollchestra_in_hand_no_gate",
         "multi_color_heart_condition_met_grants_both_colors",
         "multi_color_heart_condition_not_met_does_not_queue",
         "multi_color_heart_wrong_group_does_not_trigger",
         "nozomi_bp3007_paid_look_splits_three_ways",
         "ruby_bp6009_blades_equal_success_pile_difference"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 25,
       "is_null": false
     },
     {
@@ -12101,14 +12122,32 @@
         "PL!HS-bp5-005-AR"
       ],
       "base": "PL!HS-bp5-005",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/hard_abilities_tier_test.rs"
+      ],
+      "covering_tests": [
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
+        "kanan_cannot_mill_itself",
+        "kanan_mill_then_debut_exact_cost_plus_two_same_area",
+        "kanan_no_matching_cost_only_the_mill_happens",
+        "kinako_hand_cost_minus_two_while_liella_moved",
+        "kinako_hand_cost_normal_when_liella_did_not_move",
+        "kinako_non_liella_movement_gives_no_discount",
+        "kokoro_below_threshold_sets_cost_without_heart",
+        "kokoro_boundary_eleven_exactly_reaches_ten",
+        "kokoro_decline_leaves_everything_untouched",
+        "kokoro_high_member_sets_cost_and_grants_heart05",
+        "kokoro_no_dollchestra_in_hand_no_gate"
+      ],
+      "covering_test_count": 15,
       "is_null": false
     },
     {
@@ -13699,6 +13738,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/bloom_hs_test.rs",
+        "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/pl_hs_bp1_003_test.rs",
         "engine/tests/test_modules/q127_heart_set_plus_global_test.rs",
         "engine/tests/test_modules/sayaka_loop_test.rs",
@@ -13718,26 +13758,26 @@
         "bloom_live_start_choice_third_option_heart05",
         "bloom_live_start_heart_choice_changes_requirements",
         "bloom_no_hasunosuka_member_no_choice",
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
         "duplicate_names_fails_distinct_condition",
         "empty_area_fails_all_areas_condition",
-        "live_card_own_live_success_no_trigger",
-        "live_score_includes_global_bonus",
-        "live_score_no_bonus_when_condition_fails",
-        "live_start_another_member",
-        "live_start_cost_free_still_triggers",
-        "live_start_grants_all_heart",
-        "live_success_each_time_draws_card",
-        "live_victory_p1_wins_with_global_bonus_p2_without",
-        "member_without_live_start_no_trigger",
-        "missing_hasunosora_member_fails_condition",
-        "multiname_card_matches_hasunosora_group",
-        "no_live_success_no_trigger",
-        "non_member_on_stage_no_trigger",
-        "q127_build_card_needs_set_plus_additive",
-        "q127_no_wien_bloom_set_standalone",
-        "q127_two_wien_stack_plus2_heart00"
+        "kanan_cannot_mill_itself",
+        "kanan_mill_then_debut_exact_cost_plus_two_same_area",
+        "kanan_no_matching_cost_only_the_mill_happens",
+        "kinako_hand_cost_minus_two_while_liella_moved",
+        "kinako_hand_cost_normal_when_liella_did_not_move",
+        "kinako_non_liella_movement_gives_no_discount",
+        "kokoro_below_threshold_sets_cost_without_heart",
+        "kokoro_boundary_eleven_exactly_reaches_ten",
+        "kokoro_decline_leaves_everything_untouched",
+        "kokoro_high_member_sets_cost_and_grants_heart05",
+        "kokoro_no_dollchestra_in_hand_no_gate",
+        "live_card_own_live_success_no_trigger"
       ],
-      "covering_test_count": 47,
+      "covering_test_count": 62,
       "is_null": false
     },
     {
@@ -14488,6 +14528,7 @@
         "engine/tests/test_modules/choice_bullet_test.rs",
         "engine/tests/test_modules/constant_edge_case_test.rs",
         "engine/tests/test_modules/deep_resonance_bp3_test.rs",
+        "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/l0_gap_constant4_test.rs",
         "engine/tests/test_modules/l0_gap_livestart2_test.rs",
         "engine/tests/test_modules/qa_new_tests202.rs",
@@ -14524,11 +14565,11 @@
         "chika_wait_can_select_any_member",
         "chika_wait_target_stays_on_stage",
         "chika_waited_member_gets_score_boost",
-        "deep_resonance_aqours_center_cost9_fires",
-        "deep_resonance_aqours_center_cost9_ignores_left",
-        "deep_resonance_aqours_cost13_at_left_no_fire"
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone"
       ],
-      "covering_test_count": 96,
+      "covering_test_count": 111,
       "is_null": false
     },
     {
@@ -14659,6 +14700,7 @@
       "covering_files": [
         "engine/tests/test_modules/daisuki_and_dia_test.rs",
         "engine/tests/test_modules/daisuki_test.rs",
+        "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/kurosawa_dia_re_yell_test.rs",
         "engine/tests/test_modules/qa_new_tests202.rs",
         "engine/tests/test_modules/special_blade_heart_rules_test.rs",
@@ -14672,32 +14714,32 @@
         "condition_0_revealed_no_trigger",
         "condition_1_revealed_triggers",
         "condition_5_revealed_all_blade_heart_no_trigger",
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
         "discard_accept_then_re_yells",
         "discard_skip_no_re_yell",
         "discarded_first_yell_hearts_are_lost",
         "failed_live_still_resolves_yell_draw_icons",
         "filler_deck_select_dia_first",
         "full_flow_accept_discard_and_re_yell",
+        "kanan_cannot_mill_itself",
+        "kanan_mill_then_debut_exact_cost_plus_two_same_area",
+        "kanan_no_matching_cost_only_the_mill_happens",
+        "kinako_hand_cost_minus_two_while_liella_moved",
+        "kinako_hand_cost_normal_when_liella_did_not_move",
+        "kinako_non_liella_movement_gives_no_discount",
+        "kokoro_below_threshold_sets_cost_without_heart",
+        "kokoro_boundary_eleven_exactly_reaches_ten",
+        "kokoro_decline_leaves_everything_untouched",
+        "kokoro_high_member_sets_cost_and_grants_heart05",
+        "kokoro_no_dollchestra_in_hand_no_gate",
         "live_zone_special_icons_do_not_apply",
         "mixed_deck_daisuki_first_then_dia",
-        "mixed_deck_dia_first_then_daisuki",
-        "once_per_turn_does_not_trigger_again_same_turn",
-        "q107_dia_re_yell_works",
-        "q107_dia_skip_discard_no_followup",
-        "q200_uehara_deploy_triggers_mandatory_draw_discard",
-        "q201_miyashita_decline_leaves_opponents_active",
-        "q201_miyashita_deploy_triggers_opponent_wait",
-        "q202_mia_deploy_look_top3_adds_one_rest_to_waitroom",
-        "re_yell_revealed_draw_icon_draws",
-        "re_yelled_ball_counts_as_wildcard_not_colorless",
-        "score_icon_revealed_by_yell_adds_to_cheer_and_score",
-        "solitude_rain_revealed_by_yell_draws_one_card",
-        "test_yoshiko_center_ability_basic_success",
-        "test_yoshiko_center_ability_cost_calculation",
-        "test_yoshiko_center_ability_exclude_self",
-        "test_yoshiko_center_ability_fails_no_hand_cards"
+        "mixed_deck_dia_first_then_daisuki"
       ],
-      "covering_test_count": 48,
+      "covering_test_count": 63,
       "is_null": false
     },
     {
@@ -15385,20 +15427,36 @@
       ],
       "base": "PL!HS-bp2-008",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/untested_abilities_batch23_test.rs"
       ],
       "covering_tests": [
         "bp2008_baton_over_cheaper_dollchestra_gains_two_blades",
         "bp2008_baton_over_expensive_dollchestra_no_blades",
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
+        "kanan_cannot_mill_itself",
+        "kanan_mill_then_debut_exact_cost_plus_two_same_area",
+        "kanan_no_matching_cost_only_the_mill_happens",
+        "kinako_hand_cost_minus_two_while_liella_moved",
+        "kinako_hand_cost_normal_when_liella_did_not_move",
+        "kinako_non_liella_movement_gives_no_discount",
+        "kokoro_below_threshold_sets_cost_without_heart",
+        "kokoro_boundary_eleven_exactly_reaches_ten",
+        "kokoro_decline_leaves_everything_untouched",
+        "kokoro_high_member_sets_cost_and_grants_heart05",
+        "kokoro_no_dollchestra_in_hand_no_gate",
         "pb1014_baton_over_other_name_no_draw",
         "pb1014_baton_over_own_name_draws_two_discards_one"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 19,
       "is_null": false
     },
     {
@@ -22354,14 +22412,32 @@
         "PL!S-bp6-003-P"
       ],
       "base": "PL!S-bp6-003",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/hard_abilities_tier_test.rs"
+      ],
+      "covering_tests": [
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
+        "kanan_cannot_mill_itself",
+        "kanan_mill_then_debut_exact_cost_plus_two_same_area",
+        "kanan_no_matching_cost_only_the_mill_happens",
+        "kinako_hand_cost_minus_two_while_liella_moved",
+        "kinako_hand_cost_normal_when_liella_did_not_move",
+        "kinako_non_liella_movement_gives_no_discount",
+        "kokoro_below_threshold_sets_cost_without_heart",
+        "kokoro_boundary_eleven_exactly_reaches_ten",
+        "kokoro_decline_leaves_everything_untouched",
+        "kokoro_high_member_sets_cost_and_grants_heart05",
+        "kokoro_no_dollchestra_in_hand_no_gate"
+      ],
+      "covering_test_count": 15,
       "is_null": false
     },
     {
@@ -26899,14 +26975,32 @@
         "PL!HS-PR-017-PR"
       ],
       "base": "PL!HS-PR-017",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/hard_abilities_tier_test.rs"
+      ],
+      "covering_tests": [
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
+        "kanan_cannot_mill_itself",
+        "kanan_mill_then_debut_exact_cost_plus_two_same_area",
+        "kanan_no_matching_cost_only_the_mill_happens",
+        "kinako_hand_cost_minus_two_while_liella_moved",
+        "kinako_hand_cost_normal_when_liella_did_not_move",
+        "kinako_non_liella_movement_gives_no_discount",
+        "kokoro_below_threshold_sets_cost_without_heart",
+        "kokoro_boundary_eleven_exactly_reaches_ten",
+        "kokoro_decline_leaves_everything_untouched",
+        "kokoro_high_member_sets_cost_and_grants_heart05",
+        "kokoro_no_dollchestra_in_hand_no_gate"
+      ],
+      "covering_test_count": 15,
       "is_null": false
     },
     {
@@ -27624,16 +27718,32 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/aurora_flower_identity_test.rs"
+        "engine/tests/test_modules/aurora_flower_identity_test.rs",
+        "engine/tests/test_modules/hard_abilities_tier_test.rs"
       ],
       "covering_tests": [
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
         "aoku_haruka_live_start_no_score_when_aurora_missing",
         "aoku_haruka_live_start_scores_with_aurora_in_discard",
         "aurora_flower_does_not_match_unrelated_groups",
-        "aurora_flower_treated_as_three_groups_in_stage"
+        "aurora_flower_treated_as_three_groups_in_stage",
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
+        "kanan_cannot_mill_itself",
+        "kanan_mill_then_debut_exact_cost_plus_two_same_area",
+        "kanan_no_matching_cost_only_the_mill_happens",
+        "kinako_hand_cost_minus_two_while_liella_moved",
+        "kinako_hand_cost_normal_when_liella_did_not_move",
+        "kinako_non_liella_movement_gives_no_discount",
+        "kokoro_below_threshold_sets_cost_without_heart",
+        "kokoro_boundary_eleven_exactly_reaches_ten",
+        "kokoro_decline_leaves_everything_untouched",
+        "kokoro_high_member_sets_cost_and_grants_heart05",
+        "kokoro_no_dollchestra_in_hand_no_gate"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 20,
       "is_null": false
     },
     {
@@ -27788,11 +27898,16 @@
       "covering_files": [
         "engine/tests/test_modules/emma_test.rs",
         "engine/tests/test_modules/hanabiko_discard_test.rs",
+        "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test_part3.rs",
         "engine/tests/test_modules/untested_abilities_test.rs"
       ],
       "covering_tests": [
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
         "emma_live_start_activates_wait_both_gain_heart04",
         "emma_live_start_active_member_not_affected",
         "emma_live_start_alone_no_other_members_no_heart",
@@ -27818,13 +27933,9 @@
         "issue12_compass_activate_dollchestra_live_start",
         "issue12_proof_look_and_select_cost_20plus",
         "issue12_proof_look_and_select_cost_30plus",
-        "issue13_kurage_card_exists",
-        "issue13_mia_three_conditional_blade_checks",
-        "issue14_koware_yasuki_card_exists",
-        "issue15_mirai_ticket_card_exists",
-        "issue16_hanamaru_all_cost_higher_than_opponent_gains_blade"
+        "issue13_kurage_card_exists"
       ],
-      "covering_test_count": 77,
+      "covering_test_count": 92,
       "is_null": false
     },
     {
@@ -27991,6 +28102,7 @@
       "covering_files": [
         "engine/tests/test_modules/b9_more_test.rs",
         "engine/tests/test_modules/dazzling_test.rs",
+        "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/kanon_invalidate_test.rs",
         "engine/tests/test_modules/movement_condition_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
@@ -28020,18 +28132,18 @@
         "chisato_no_trigger_without_position_change_flag",
         "cutie_panther_live_start_reduce_hearts",
         "dazzling_q187_exclude_selected_liella_other_pickable",
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
         "fuyumari_already_wait_excluded_from_candidates",
         "fuyumari_appear_triggers_opponent_wait",
         "fuyumari_area_move_triggers_opponent_wait",
         "fuyumari_baton_touch_left_to_center_triggers",
         "fuyumari_baton_touch_triggers_area_move",
-        "fuyumari_blade_limit_excludes_high_blade",
-        "fuyumari_p2_play_to_stage_triggers_appearance",
-        "fuyumari_real_play_to_stage_triggers_appearance",
-        "fuyumari_waits_only_one_member",
-        "issue10_dream_with_you_high_blade_plus_1_score"
+        "fuyumari_blade_limit_excludes_high_blade"
       ],
-      "covering_test_count": 91,
+      "covering_test_count": 106,
       "is_null": false
     },
     {
@@ -33509,14 +33621,32 @@
         "PL!SP-bp5-017-N"
       ],
       "base": "PL!SP-bp5-017",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/hard_abilities_tier_test.rs"
+      ],
+      "covering_tests": [
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
+        "kanan_cannot_mill_itself",
+        "kanan_mill_then_debut_exact_cost_plus_two_same_area",
+        "kanan_no_matching_cost_only_the_mill_happens",
+        "kinako_hand_cost_minus_two_while_liella_moved",
+        "kinako_hand_cost_normal_when_liella_did_not_move",
+        "kinako_non_liella_movement_gives_no_discount",
+        "kokoro_below_threshold_sets_cost_without_heart",
+        "kokoro_boundary_eleven_exactly_reaches_ten",
+        "kokoro_decline_leaves_everything_untouched",
+        "kokoro_high_member_sets_cost_and_grants_heart05",
+        "kokoro_no_dollchestra_in_hand_no_gate"
+      ],
+      "covering_test_count": 15,
       "is_null": false
     },
     {
@@ -33708,6 +33838,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/bloom_hs_test.rs",
+        "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/pl_hs_bp1_003_test.rs",
         "engine/tests/test_modules/q127_heart_set_plus_global_test.rs",
         "engine/tests/test_modules/sayaka_loop_test.rs",
@@ -33727,26 +33858,26 @@
         "bloom_live_start_choice_third_option_heart05",
         "bloom_live_start_heart_choice_changes_requirements",
         "bloom_no_hasunosuka_member_no_choice",
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
         "duplicate_names_fails_distinct_condition",
         "empty_area_fails_all_areas_condition",
-        "live_card_own_live_success_no_trigger",
-        "live_score_includes_global_bonus",
-        "live_score_no_bonus_when_condition_fails",
-        "live_start_another_member",
-        "live_start_cost_free_still_triggers",
-        "live_start_grants_all_heart",
-        "live_success_each_time_draws_card",
-        "live_victory_p1_wins_with_global_bonus_p2_without",
-        "member_without_live_start_no_trigger",
-        "missing_hasunosora_member_fails_condition",
-        "multiname_card_matches_hasunosora_group",
-        "no_live_success_no_trigger",
-        "non_member_on_stage_no_trigger",
-        "q127_build_card_needs_set_plus_additive",
-        "q127_no_wien_bloom_set_standalone",
-        "q127_two_wien_stack_plus2_heart00"
+        "kanan_cannot_mill_itself",
+        "kanan_mill_then_debut_exact_cost_plus_two_same_area",
+        "kanan_no_matching_cost_only_the_mill_happens",
+        "kinako_hand_cost_minus_two_while_liella_moved",
+        "kinako_hand_cost_normal_when_liella_did_not_move",
+        "kinako_non_liella_movement_gives_no_discount",
+        "kokoro_below_threshold_sets_cost_without_heart",
+        "kokoro_boundary_eleven_exactly_reaches_ten",
+        "kokoro_decline_leaves_everything_untouched",
+        "kokoro_high_member_sets_cost_and_grants_heart05",
+        "kokoro_no_dollchestra_in_hand_no_gate",
+        "live_card_own_live_success_no_trigger"
       ],
-      "covering_test_count": 47,
+      "covering_test_count": 62,
       "is_null": false
     },
     {
@@ -38206,14 +38337,32 @@
         "PL!HS-cl1-011-CL"
       ],
       "base": "PL!HS-cl1-011",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/hard_abilities_tier_test.rs"
+      ],
+      "covering_tests": [
+        "ddd_decline_pay_does_nothing",
+        "ddd_option_a_retrieves_any_member_from_waitroom",
+        "ddd_option_b_requires_two_cards_in_live_zone",
+        "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
+        "kanan_cannot_mill_itself",
+        "kanan_mill_then_debut_exact_cost_plus_two_same_area",
+        "kanan_no_matching_cost_only_the_mill_happens",
+        "kinako_hand_cost_minus_two_while_liella_moved",
+        "kinako_hand_cost_normal_when_liella_did_not_move",
+        "kinako_non_liella_movement_gives_no_discount",
+        "kokoro_below_threshold_sets_cost_without_heart",
+        "kokoro_boundary_eleven_exactly_reaches_ten",
+        "kokoro_decline_leaves_everything_untouched",
+        "kokoro_high_member_sets_cost_and_grants_heart05",
+        "kokoro_no_dollchestra_in_hand_no_gate"
+      ],
+      "covering_test_count": 15,
       "is_null": false
     },
     {

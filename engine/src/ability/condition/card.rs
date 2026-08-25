@@ -172,6 +172,40 @@ impl<'a> ConditionContext<'a> {
             );
             return util::compare_counts(Some(op), u8::try_from(ahead).unwrap_or(u8::MAX), n);
         }
+        // 「これによりこのカードのコストがN以上になった場合」 — compares the
+        // ACTIVATING card's current effective cost (printed + modifiers) against
+        // the threshold. The parser tags these with location="activating_card"
+        // so they never shadow the moved-cards-sum cost_total conditions
+        // (Rina bp3-009: 「その合計コストがNの場合」) that also lack position.
+        if condition.get_comparison_type() == Some("cost")
+            && condition.get_location() == Some("activating_card")
+        {
+            if let Some(act) = self.game_state.activating_card {
+                let printed = self
+                    .game_state
+                    .card_database
+                    .get_card(act)
+                    .and_then(|c| c.cost)
+                    .unwrap_or(0) as i32;
+                let effective =
+                    (printed + self.game_state.mods.get_cost_modifier(act)).clamp(0, u8::MAX as i32);
+                let threshold = condition.get_count().unwrap_or(0);
+                let op = condition.get_operator().unwrap_or(">=");
+                log::debug!(
+                    "[COST_SELF] card={} printed={} effective={} threshold={} op={}",
+                    act,
+                    printed,
+                    effective,
+                    threshold,
+                    op
+                );
+                return util::compare_counts(
+                    Some(op),
+                    u8::try_from(effective).unwrap_or(u8::MAX),
+                    threshold,
+                );
+            }
+        }
         // "元々のスコアより高いスコアのライブカードがある" — existence of a
         // live card in the zone whose CURRENT (modifier-adjusted) score is
         // higher than its ORIGINAL printed score. Not a count-vs-threshold

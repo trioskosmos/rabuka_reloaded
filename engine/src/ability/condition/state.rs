@@ -102,8 +102,24 @@ impl<'a> ConditionContext<'a> {
                                 } else if self.game_state.position_change_occurred_this_turn {
                                     let target = condition.get_target().unwrap_or("self");
                                     let player = self.resolve_condition_player(target);
+                                    // Group restriction (「『Liella!』のメンバーが…移動し
+                                    // ているかぎり」): only members matching the nested/
+                                    // outer group filter count as satisfying the gate.
+                                    let groups = nested_condition
+                                        .get_group_names()
+                                        .map(|g| g.to_vec())
+                                        .or_else(|| condition.get_group_names().map(|g| g.to_vec()));
+                                    let card_db = &self.game_state.card_database;
                                     player.stage.stage.iter().any(|&cid| {
-                                        cid != -1 && self.game_state.has_card_moved_this_turn(cid)
+                                        cid != -1
+                                            && self.game_state.has_card_moved_this_turn(cid)
+                                            && groups.as_ref().map_or(true, |g| {
+                                                g.iter().any(|name| {
+                                                    crate::ability::util::card_matches_group_str(
+                                                        card_db, cid, Some(name),
+                                                    )
+                                                })
+                                            })
                                     })
                                 } else if let Some(activating_card_id) = self.activating_card_id {
                                     self.game_state.has_card_moved_this_turn(activating_card_id)
