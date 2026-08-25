@@ -106,7 +106,6 @@ fn sumire_three_catchu_draws() {
     let deck_before = game.state.player1.main_deck.cards.len();
     game.give_energy(5);
     fire_live_start(&mut game, sumire);
-
     assert!(game.has_pending_choice(), "optional energy cost prompted");
     game.select_option(1); // pay the energy
 
