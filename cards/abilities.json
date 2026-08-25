@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-25T09:29:03.443915",
+  "generated_at": "2026-08-25T14:08:40.017369",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "130ac18c",
+  "engine_commit": "4dbba632",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -30436,7 +30436,8 @@
           "card_type": "member_card",
           "count": 11,
           "operator": ">=",
-          "type": "group_condition"
+          "type": "group_condition",
+          "aggregate": "total"
         },
         "action": "modify_score",
         "value": 1,

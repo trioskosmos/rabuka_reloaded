@@ -122,6 +122,11 @@ fn cl1008_self_to_waitroom_retrieves_hasunosora() {
 
 // ====================================================================
 // PL!SP-bp5-026-L — Liella heart-total constant gates live score +1
+//
+// aggregate=total on group_condition + Stage dispatches to
+// sum_group_hearts_in_stage (base heart sums of matching members).
+// The group filter 「Liella!」 matches via series containing
+// スーパースター (card_series_matches_group in util.rs).
 // ====================================================================
 
 fn bp5026_setup(game: &mut TestGame) -> i16 {
@@ -129,50 +134,51 @@ fn bp5026_setup(game: &mut TestGame) -> i16 {
     fill_decks(game, filler);
     let live = game.id("PL!SP-bp5-026-L");
     game.state.player1.live_card_zone.cards.push(live);
-    // Three Liella members totalling 10 base hearts (< 11).
-    let l1 = game.id("PL!SP-pb2-036-N"); // 2
-    let l2 = game.id("PL!SP-pb2-037-N"); // 2
-    let l3 = game.id("PL!SP-bp7-013-N"); // 6
-    game.state.player1.stage.stage[0] = l1;
-    game.state.player1.stage.stage[1] = l2;
-    game.state.player1.stage.stage[2] = l3;
     live
 }
 
 #[test]
-#[ignore = "KNOWN GAP (bug 17): 「メンバーが持つハートの総数が11以上」 has \
-no structural home — the parse emits a plain group_condition(count=11), \
-which the engine evaluates as a MEMBER-COUNT (3 staged Liella < 11, \
-always false). Stage-scoped current-heart-total aggregation over a \
-group is unimplemented (Part 4.1 typed-PerUnit / F4 territory)."]
 fn bp5026_total_eleven_scores_plus_one() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = bp5026_setup(&mut game);
-    // Push the total from 10 to exactly 11 via an ability-style modifier.
-    let l3 = game.id("PL!SP-bp7-013-N");
-    game.state.mods.add_heart_modifier(l3, HeartColor::Heart01, 1);
+    // Three Superstar-series members: 9 + 8 + any third member >= 0.
+    // The two big ones alone give 17 >= 11.
+    let big1 = game.id("PL!SP-pb2-005-R"); // hearts {02:3, 03:3, 06:3} = 9
+    let big2 = game.id("PL!SP-bp4-004-P"); // hearts {02:3, 03:3, 06:2} = 8
+    let small = game.new_id("PL!-sd1-010-SD"); // μ's — not Liella!, excluded
+    game.state.player1.stage.stage[0] = big1;
+    game.state.player1.stage.stage[1] = big2;
+    game.state.player1.stage.stage[2] = small;
 
-    game.state.recalculate_constants();
+    fire_live_start(&mut game, live);
 
     assert_eq!(
         game.state.mods.get_score_modifier(live),
         1,
-        "heart total reached 11 -> score +1"
+        "two Liella! members' base hearts total 17 >= 11 -> score +1"
     );
 }
 
 #[test]
-fn bp5026_total_ten_no_bonus() {
+fn bp5026_total_below_threshold_no_bonus() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = bp5026_setup(&mut game);
+    // Two low-heart Liella members + one non-Liella outsider.
+    // Liella total: 2 + 2 = 4 < 11.
+    let l1 = game.id("PL!SP-pb2-036-N");
+    let l2 = game.id("PL!SP-pb2-037-N");
+    let outsider = game.new_id("PL!-sd1-010-SD"); // μ's — not counted
+    game.state.player1.stage.stage[0] = l1;
+    game.state.player1.stage.stage[1] = l2;
+    game.state.player1.stage.stage[2] = outsider;
 
-    game.state.recalculate_constants();
+    fire_live_start(&mut game, live);
 
     assert_eq!(
         game.state.mods.get_score_modifier(live),
         0,
-        "total 10 < 11 -> no bonus"
+        "total 4 < 11 -> no bonus"
     );
 }

@@ -1070,6 +1070,47 @@ impl<'a> ConditionContext<'a> {
                 _ => None,
             }
         } else if Zone::from_str(location) == Some(Zone::Stage)
+            && condition.get_group_names().is_some()
+            && condition.get_card_type() == Some(crate::card::ConditionCardType::MemberCard)
+        {
+            // 「メンバーが持つハートの総数がN以上」 — aggregate=total with
+            // group_names but NO specific heart_colors on Stage: sum ALL
+            // base_heart values of matching members and compare.
+            let card_db = &self.game_state.card_database;
+            let group = condition
+                .get_group_names()
+                .and_then(|gn| gn.first().map(|s| s.as_str()));
+            let total: u8 = player
+                .stage
+                .stage
+                .iter()
+                .filter(|&&id| id != -1)
+                .filter(|&&id| {
+                    group.map_or(true, |g| {
+                        util::card_matches_group_str(card_db, id, Some(g))
+                    })
+                })
+                .filter_map(|&id| card_db.get_card(id))
+                .map(|card| {
+                    card.base_heart
+                        .as_ref()
+                        .map(|bh| bh.hearts.values_sum())
+                        .unwrap_or(0)
+                })
+                .sum();
+            log::debug!(
+                "[HEART_TOTAL_STAGE] group={:?} total={} threshold={:?} op={:?}",
+                group,
+                total,
+                condition.get_count(),
+                condition.get_operator()
+            );
+            Some(compare_counts(
+                condition.get_operator(),
+                total,
+                condition.get_count().unwrap_or(0),
+            ))
+        } else if Zone::from_str(location) == Some(Zone::Stage)
             // The Stage branch sums BLADE totals for 「自分のステージ…ブレードの
             // 合計」 conditions (target=self). Cross-player member counts
             // (「自分と相手のステージにメンバーが合計6人」, target=both) must

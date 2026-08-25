@@ -5741,6 +5741,11 @@ def _infer_condition_type(condition, text):
             condition["type"] = "comparison_condition"
     elif group_names:
         condition["type"] = "group_condition"
+        # 「ハートの総数がN以上」 — aggregate over group members' heart totals,
+        # not a member-count. Engine dispatches via get_group_card_count's
+        # aggregate branch (sum_group_hearts_in_stage).
+        if "ハートの総数" in text or ("ハート" in text and "総数" in text):
+            condition["aggregate"] = "total"
         if "コスト" in text and ("低い" in text or "高い" in text):
             condition["comparison_type"] = "cost"
             condition["operator"] = "<" if "低い" in text else ">"
