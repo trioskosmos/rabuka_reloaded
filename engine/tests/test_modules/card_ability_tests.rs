@@ -504,17 +504,16 @@ fn rurino_bp1_discard_2_draw_2() {
     let mut game = TestGame::new(db);
     let (deck_before, hand_before) = setup_rurino_bp1(&mut game);
 
-    if game.has_pending_choice() {
-        // Sequential: pick 2 cards, then skip the remaining 1
-        game.select_indices(&[0]);
-        if game.has_pending_choice() {
-            game.select_indices(&[0]);
-        }
-        if game.has_pending_choice() {
-            // Skip the third — we want to discard exactly 2
-            game.select_indices(&[]);
-        }
-    }
+    // Sequential optional cost: pick 2 cards, then decline the third.
+    assert!(game.has_pending_choice(), "discard prompt 1 expected");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "discard prompt 2 expected");
+    game.select_indices(&[0]);
+    assert!(
+        game.has_pending_choice(),
+        "re-prompt 3 expected (up-to-3 lets us stop)"
+    );
+    game.select_indices(&[]);
 
     // count=0 → draw = last_cost_discard_count = 2
     assert_eq!(game.state.player1.waitroom.cards.len(), 2);
@@ -533,9 +532,9 @@ fn rurino_bp1_discard_0_draw_0() {
     let mut game = TestGame::new(db);
     let (deck_before, hand_before) = setup_rurino_bp1(&mut game);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Decline the up-to-3 cost entirely: exactly one prompt, answered empty.
+    assert!(game.has_pending_choice(), "optional discard prompt expected");
+    game.select_indices(&[]);
 
     // skipped cost → 0 discarded → draw 0
     assert_eq!(game.state.player1.hand.cards.len(), hand_before);
@@ -549,16 +548,13 @@ fn rurino_bp1_discard_3_draw_3() {
     let mut game = TestGame::new(db);
     let (deck_before, hand_before) = setup_rurino_bp1(&mut game);
 
-    if game.has_pending_choice() {
-        // Sequential: pick 3 cards, count=3 met, finalize
-        game.select_indices(&[0]);
-        if game.has_pending_choice() {
-            game.select_indices(&[0]);
-        }
-        if game.has_pending_choice() {
-            game.select_indices(&[0]);
-        }
-    }
+    // Sequential: pick all 3 — count met, cost finalises without a 4th ask.
+    assert!(game.has_pending_choice(), "discard prompt 1 expected");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "discard prompt 2 expected");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "discard prompt 3 expected");
+    game.select_indices(&[0]);
 
     // count=3 → draw = last_cost_discard_count = 3
     assert_eq!(game.state.player1.waitroom.cards.len(), 3);
@@ -591,16 +587,14 @@ fn rurino_bp1_limited_to_3_with_more_in_hand() {
     let hand_before = game.state.player1.hand.cards.len();
     game.play_to_stage(rurino, rabuka_engine::zones::MemberArea::Center);
 
-    // Try to discard 5 cards — the cap should stop at 3
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Try to discard 5 — the cap stops the sequence after exactly 3 asks,
+    // each deterministically present.
+    assert!(game.has_pending_choice(), "discard prompt 1 expected");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "discard prompt 2 expected");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "discard prompt 3 expected");
+    game.select_indices(&[0]);
     // After 3 selections, should NOT have another re-prompt (cap met)
     assert!(
         !game.has_pending_choice(),

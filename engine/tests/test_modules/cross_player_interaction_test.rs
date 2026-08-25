@@ -95,7 +95,6 @@ fn himeko_debut_repositions_opponent_member_and_koko_responds() {
 fn himeko_gate_blocked_no_reposition_no_koko_response() {
     let db = load_real_database();
     let mut g = TestGame::new(db);
-    let rurino = g.id(MIRAKURA_RURINO);
     let himeko = g.id(HIMEKO);
     let koko = g.id(KOKO);
     let outsider = g.id(NON_MIRAKURA_MEMBER);

@@ -6,7 +6,7 @@
   "engine/tests/test_modules/bp6_004_002_audit_test.rs": 1,
   "engine/tests/test_modules/bp7_ai_choice_under_member_test.rs": 1,
   "engine/tests/test_modules/burn_energy_under_test.rs": 1,
-  "engine/tests/test_modules/card_ability_tests.rs": 12,
+  "engine/tests/test_modules/card_ability_tests.rs": 2,
   "engine/tests/test_modules/cheer_pipeline_test.rs": 1,
   "engine/tests/test_modules/chisato_jidou_move_analysis_test.rs": 1,
   "engine/tests/test_modules/choice_bullet_test.rs": 1,
