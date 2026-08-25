@@ -182,6 +182,7 @@ pub fn answer_choice(game: &mut TestGame, idx: usize) {
 /// Count how many entries of the engine's always-on event trace contain
 /// `needle`. Unlike [`TestGame::event_trace_contains`] this returns the
 /// occurrence count, letting tests assert EXACTLY-N firings.
+#[allow(dead_code)] // utility reserved for per-move/per-timing count pins
 pub fn count_debug_trace(game: &TestGame, needle: &str) -> usize {
     game.state
         .debug_trace

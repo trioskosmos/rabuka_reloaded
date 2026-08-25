@@ -7,7 +7,6 @@
 /// - PL!SP-bp7-018-N 米女メイ (登場, opt. discard 1 live from hand): look at
 ///   top 5, add 1 to hand, rest to waitroom.
 use crate::helpers::*;
-use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
 

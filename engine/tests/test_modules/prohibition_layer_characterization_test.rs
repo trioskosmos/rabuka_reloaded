@@ -80,7 +80,7 @@ fn removing_teammate_reprohibits_without_stale_state() {
 #[test]
 fn bp2024_cannot_place_blocks_both_live_zones() {
     let db = load_real_database();
-    let mut game = TestGame::new(db);
+    let game = TestGame::new(db);
     let live = game.id("PL!S-bp2-024-L");
 
     assert!(
@@ -98,7 +98,7 @@ fn bp2024_cannot_place_blocks_both_live_zones() {
 #[test]
 fn bp2024_positive_control_normal_live_card_is_placeable() {
     let db = load_real_database();
-    let mut game = TestGame::new(db);
+    let game = TestGame::new(db);
     let normal = game.id("PL!N-bp1-025-L"); // 虹ヶ咲 live card, no restriction
 
     assert!(

@@ -9,32 +9,7 @@
 ///   staged -> heart06 + blade.
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
-use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
-
-fn fire_live_start(game: &mut TestGame, cid: i16) {
-    let ability_id = {
-        let card = game.db.get_card(cid).unwrap();
-        let ab = card
-            .resolved_abilities()
-            .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-            .unwrap_or_else(|| panic!("card {} lacks a ライブ開始時 ability", card.card_no));
-        format!("{}_{}", card.card_no, ab.full_text)
-    };
-    let card_no = game.db.get_card(cid).unwrap().card_no.to_string();
-    let pid = game.state.player1.id.clone();
-    game.state.trigger_auto_ability(
-        ability_id,
-        AbilityTrigger::LiveStart,
-        pid.clone(),
-        Some(card_no),
-        Some(cid),
-        None,
-        None,
-    );
-    game.state.activating_card = Some(cid);
-    game.state.process_pending_auto_abilities(&pid);
-}
 
 // ====================================================================
 // PL!SP-pb2-036-N / pb2-037-N — right/left-side debut draw2+discard2

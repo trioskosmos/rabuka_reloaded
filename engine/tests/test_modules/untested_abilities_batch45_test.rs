@@ -10,7 +10,6 @@
 /// - PL!N-sd2-009-SD2 (登場): look at top 3; optionally reveal a 『虹ヶ咲』
 ///   card to hand, rest to waitroom.
 use crate::helpers::*;
-use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
 

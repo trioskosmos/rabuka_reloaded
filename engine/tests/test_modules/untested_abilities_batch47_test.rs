@@ -10,7 +10,6 @@
 ///   『A-RISE』 member from the waitroom if present.
 use crate::helpers::*;
 use rabuka_engine::core::types::AbilityTrigger;
-use rabuka_engine::zones::MemberArea;
 
 fn fire_live_start(game: &mut TestGame, cid: i16) {
     let ability_id = {

@@ -7,7 +7,6 @@
 /// - PL!SP-bp5-026-L (常時): staged Liella! members' heart total >= 11 ->
 ///   this live card's score +1.
 use crate::helpers::*;
-use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
 

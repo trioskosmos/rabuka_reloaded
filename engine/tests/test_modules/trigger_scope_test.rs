@@ -67,6 +67,7 @@ fn s2_pb1_006_opponent_drag_arms_per_move() {
 
     // P1: the S2 watcher staged at RIGHT.
     let member = game.new_id("PL!SP-pb1-006-R");
+    game.set_active_side(Side::P1); // pin the acting seat explicitly
     game.give_energy(9);
     game.add_to_hand(member);
     game.state.player1.stage.stage = [-1, -1, member];

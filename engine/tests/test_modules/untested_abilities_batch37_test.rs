@@ -7,7 +7,6 @@
 /// - PL!SP-bp4-010-R ウィーン・マルガレーテ (起動 ターン1回, E): waits itself,
 ///   places 1 WAITED energy card from the energy deck.
 use crate::helpers::*;
-use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::types::AbilityTrigger;
 
 fn fire_live_start(game: &mut TestGame, live: i16) {

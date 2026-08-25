@@ -6,9 +6,7 @@
 /// - PL!-bp6-013-N (登場): own success-zone score total ≥6 -> retrieve one
 ///   『μ's』 live card from the waitroom.
 use crate::helpers::*;
-use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::types::AbilityTrigger;
-use rabuka_engine::zones::MemberArea;
 
 fn fire_live_start(game: &mut TestGame, cid: i16) {
     let ability_id = {
