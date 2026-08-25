@@ -1,20 +1,20 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T00:39:02.706618+00:00",
+  "generated_at": "2026-08-25T01:09:57.738931+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 473,
-  "n_tests": 2829,
+  "n_files": 474,
+  "n_tests": 2834,
   "total_cards": 771,
-  "covered_cards": 710,
-  "abilities_on_covered": 875,
+  "covered_cards": 713,
+  "abilities_on_covered": 878,
   "trigger_counts": {
     "起動": [
-      87,
+      88,
       96
     ],
     "登場": [
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      244,
+      246,
       268
     ],
     "(none)": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      205,
+      206,
       219
     ],
     "unknown": [
@@ -68,7 +68,7 @@
       44
     ],
     "change_state": [
-      58,
+      59,
       60
     ],
     "play_baton_touch": [
@@ -76,7 +76,7 @@
       1
     ],
     "position_change": [
-      17,
+      18,
       19
     ],
     "gain_ability": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      507,
+      509,
       545
     ],
     "temporal_condition": [
@@ -210,7 +210,7 @@
       2
     ],
     "group_condition": [
-      41,
+      42,
       44
     ],
     "or_condition": [
@@ -280,7 +280,7 @@
       88
     ],
     "bp5": [
-      122,
+      123,
       134
     ],
     "bp6": [
@@ -288,7 +288,7 @@
       82
     ],
     "bp7": [
-      106,
+      107,
       111
     ],
     "pb1": [
@@ -300,7 +300,7 @@
       31
     ],
     "pb2": [
-      39,
+      40,
       43
     ],
     "cl1": [
@@ -309,10 +309,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 628,
-    "L1+choice": 171,
+    "L2+choice": 633,
+    "L1+choice": 169,
     "L2": 28,
-    "none": 61,
+    "none": 58,
     "L1": 48
   },
   "qa_rulings": {
@@ -9757,11 +9757,15 @@
         "engine/tests/test_modules/tang_keke_test.rs",
         "engine/tests/test_modules/untested_abilities_batch10_test.rs",
         "engine/tests/test_modules/untested_abilities_batch11_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch42_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch42_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch47_test.rs"
       ],
       "covering_tests": [
+        "bp5010_mill_happens_even_without_arise",
+        "bp5010_mills_three_retrieves_arise_member",
         "bp5015_all_six_colors_present_two_blades",
         "bp5015_missing_colors_no_blades",
+        "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
         "chika_bp5_baton_touch_draw_triggers_refresh",
         "chika_bp5_baton_touch_from_ability_member_no_draw",
         "chika_bp5_baton_touch_from_no_ability_draw",
@@ -9786,12 +9790,9 @@
         "jellyfish_mixed_qualifying_and_non_qualifying",
         "jellyfish_no_qualifying_members_no_reduction",
         "jellyfish_position_change_swap_creates_countable_movement",
-        "jellyfish_q98_member_appeared_then_left_not_counted",
-        "jellyfish_q98_one_left_one_stays",
-        "jellyfish_q99_one_member_both_flags_counts_once",
-        "jellyfish_three_members_all_qualify_reduce_by_3"
+        "jellyfish_q98_member_appeared_then_left_not_counted"
       ],
-      "covering_test_count": 60,
+      "covering_test_count": 65,
       "is_null": false
     },
     {
@@ -16762,13 +16763,17 @@
         "engine/tests/test_modules/untested_abilities_batch3_test.rs",
         "engine/tests/test_modules/untested_abilities_batch40_test.rs",
         "engine/tests/test_modules/untested_abilities_batch44_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch46_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch46_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch47_test.rs"
       ],
       "covering_tests": [
         "bp4024_mus_member_gains_blade",
         "bp4024_no_mus_member_on_stage_no_blades",
+        "bp5010_mill_happens_even_without_arise",
+        "bp5010_mills_three_retrieves_arise_member",
         "bp5013_live_card_among_milled_no_blades",
         "bp5013_mill_three_all_members_two_blades",
+        "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
         "cara_q203_energy_and_member_gives_plus2",
         "cara_q203_member_only_activation_gives_nothing",
         "cara_q203_nijigasaki_energy_activation_gives_plus1",
@@ -16791,12 +16796,9 @@
         "koko_only_two_kaleidoscope_no_bonus",
         "koko_three_kaleidoscore_grants_heart06_and_blade",
         "mia_activation_self_wait_draws_two_discards_two",
-        "niko_bp3009_activation_self_wait_and_heart_choice",
-        "niko_bp3009_cost13_condition_draw",
-        "niko_bp3009_no_cost13_no_draw",
-        "niko_pr021_exactly_seven_energy_grants_two_blades"
+        "niko_bp3009_activation_self_wait_and_heart_choice"
       ],
-      "covering_test_count": 48,
+      "covering_test_count": 53,
       "is_null": false
     },
     {
@@ -20505,10 +20507,14 @@
         "engine/tests/test_modules/cards_6_thru_13_test.rs",
         "engine/tests/test_modules/himeno_bp5_live_start_test.rs",
         "engine/tests/test_modules/l0_gap_constant5_test.rs",
-        "engine/tests/test_modules/rurino_bp5_test.rs"
+        "engine/tests/test_modules/rurino_bp5_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch47_test.rs"
       ],
       "covering_tests": [
+        "bp5010_mill_happens_even_without_arise",
+        "bp5010_mills_three_retrieves_arise_member",
         "bp5_111_per_other_arise_member_heart05",
+        "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
         "c10_reveal_top_adds_to_hand",
         "c11_peek_per_niji_selects_keep1",
         "c12_restriction_blocks_opponent_active",
@@ -20534,12 +20540,9 @@
         "himeno_bp5_ar_variant",
         "himeno_bp5_cross_unit_same_group",
         "himeno_bp5_different_group_pair_still_works",
-        "himeno_bp5_discarded_go_to_waitroom",
-        "himeno_bp5_empty_hand_skips",
-        "himeno_bp5_left_position",
-        "himeno_bp5_mixed_groups_auto_skips"
+        "himeno_bp5_discarded_go_to_waitroom"
       ],
-      "covering_test_count": 48,
+      "covering_test_count": 53,
       "is_null": false
     },
     {
@@ -20566,10 +20569,14 @@
         "engine/tests/test_modules/cards_6_thru_13_test.rs",
         "engine/tests/test_modules/himeno_bp5_live_start_test.rs",
         "engine/tests/test_modules/l0_gap_constant5_test.rs",
-        "engine/tests/test_modules/rurino_bp5_test.rs"
+        "engine/tests/test_modules/rurino_bp5_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch47_test.rs"
       ],
       "covering_tests": [
+        "bp5010_mill_happens_even_without_arise",
+        "bp5010_mills_three_retrieves_arise_member",
         "bp5_111_per_other_arise_member_heart05",
+        "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
         "c10_reveal_top_adds_to_hand",
         "c11_peek_per_niji_selects_keep1",
         "c12_restriction_blocks_opponent_active",
@@ -20595,12 +20602,9 @@
         "himeno_bp5_ar_variant",
         "himeno_bp5_cross_unit_same_group",
         "himeno_bp5_different_group_pair_still_works",
-        "himeno_bp5_discarded_go_to_waitroom",
-        "himeno_bp5_empty_hand_skips",
-        "himeno_bp5_left_position",
-        "himeno_bp5_mixed_groups_auto_skips"
+        "himeno_bp5_discarded_go_to_waitroom"
       ],
-      "covering_test_count": 48,
+      "covering_test_count": 53,
       "is_null": false
     },
     {
@@ -31899,18 +31903,24 @@
       "covering_files": [
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch3_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch46_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch46_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch47_test.rs"
       ],
       "covering_tests": [
         "bp4024_mus_member_gains_blade",
         "bp4024_no_mus_member_on_stage_no_blades",
+        "bp5010_mill_happens_even_without_arise",
+        "bp5010_mills_three_retrieves_arise_member",
         "bp5013_live_card_among_milled_no_blades",
         "bp5013_mill_three_all_members_two_blades",
+        "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
         "kanata_bp3006_debut_enters_wait_state",
         "niko_bp3009_activation_self_wait_and_heart_choice",
         "niko_bp3009_cost13_condition_draw",
         "niko_bp3009_no_cost13_no_draw",
         "niko_pr021_exactly_seven_energy_grants_two_blades",
+        "pb2047_all_liella_stage_waits_enemy_cost_two_member",
+        "pb2047_non_liella_on_stage_no_enemy_wait",
         "pr0029_decline_no_heart",
         "pr0029_pay_energy_grants_heart01",
         "pr032_declining_keeps_milled_cards_in_waitroom",
@@ -31927,7 +31937,7 @@
         "yuna_sp222_exactly_eight_energy_scores_one",
         "yuna_sp222_live_start_optional_energy_places_wait_energy"
       ],
-      "covering_test_count": 24,
+      "covering_test_count": 29,
       "is_null": false
     },
     {
@@ -32209,14 +32219,22 @@
         "PL!-bp5-010-N"
       ],
       "base": "PL!-bp5-010",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch47_test.rs"
+      ],
+      "covering_tests": [
+        "bp5010_mill_happens_even_without_arise",
+        "bp5010_mills_three_retrieves_arise_member",
+        "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
+        "pb2047_all_liella_stage_waits_enemy_cost_two_member",
+        "pb2047_non_liella_on_stage_no_enemy_wait"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -35084,6 +35102,7 @@
         "engine/tests/test_modules/untested_abilities_batch42_test.rs",
         "engine/tests/test_modules/untested_abilities_batch44_test.rs",
         "engine/tests/test_modules/untested_abilities_batch46_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch47_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
@@ -35099,6 +35118,8 @@
         "baton_touch_cleared_between_actions",
         "bp4024_mus_member_gains_blade",
         "bp4024_no_mus_member_on_stage_no_blades",
+        "bp5010_mill_happens_even_without_arise",
+        "bp5010_mills_three_retrieves_arise_member",
         "bp5013_live_card_among_milled_no_blades",
         "bp5013_mill_three_all_members_two_blades",
         "bp5015_all_six_colors_present_two_blades",
@@ -35116,12 +35137,10 @@
         "bp7014_constant_heart_while_opp_energy_ahead",
         "bp7020_constant_blades_off_when_behind",
         "bp7020_constant_blades_while_energy_ahead",
-        "bp7_019_places_two_aqours_cards_under_deck",
-        "buffers_are_bounded",
-        "c10_reveal_top_adds_to_hand",
-        "c11_peek_per_niji_selects_keep1"
+        "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
+        "bp7_019_places_two_aqours_cards_under_deck"
       ],
-      "covering_test_count": 316,
+      "covering_test_count": 321,
       "is_null": false
     },
     {
@@ -38771,21 +38790,27 @@
       ],
       "base": "PL!SP-pb2-036",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/untested_abilities_batch44_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch44_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch47_test.rs"
       ],
       "covering_tests": [
+        "bp5010_mill_happens_even_without_arise",
+        "bp5010_mills_three_retrieves_arise_member",
+        "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
         "chisato_right_side_debut_draws_two_discards_two",
         "koko_only_two_kaleidoscope_no_bonus",
         "koko_three_kaleidoscore_grants_heart06_and_blade",
         "mia_activation_self_wait_draws_two_discards_two",
+        "pb2047_all_liella_stage_waits_enemy_cost_two_member",
+        "pb2047_non_liella_on_stage_no_enemy_wait",
         "sumire_left_side_debut_draws_two_discards_two"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 10,
       "is_null": false
     },
     {
@@ -38803,21 +38828,27 @@
       ],
       "base": "PL!SP-pb2-037",
       "covered": true,
-      "depth": "L1+choice",
+      "depth": "L2+choice",
       "has_assert": true,
       "has_choice": true,
-      "has_negative": false,
+      "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/untested_abilities_batch44_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch44_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch47_test.rs"
       ],
       "covering_tests": [
+        "bp5010_mill_happens_even_without_arise",
+        "bp5010_mills_three_retrieves_arise_member",
+        "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
         "chisato_right_side_debut_draws_two_discards_two",
         "koko_only_two_kaleidoscope_no_bonus",
         "koko_three_kaleidoscore_grants_heart06_and_blade",
         "mia_activation_self_wait_draws_two_discards_two",
+        "pb2047_all_liella_stage_waits_enemy_cost_two_member",
+        "pb2047_non_liella_on_stage_no_enemy_wait",
         "sumire_left_side_debut_draws_two_discards_two"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 10,
       "is_null": false
     },
     {
@@ -38895,14 +38926,22 @@
         "PL!SP-pb2-047-L"
       ],
       "base": "PL!SP-pb2-047",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch47_test.rs"
+      ],
+      "covering_tests": [
+        "bp5010_mill_happens_even_without_arise",
+        "bp5010_mills_three_retrieves_arise_member",
+        "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
+        "pb2047_all_liella_stage_waits_enemy_cost_two_member",
+        "pb2047_non_liella_on_stage_no_enemy_wait"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -40605,14 +40644,22 @@
         "PL!SP-bp7-022-N"
       ],
       "base": "PL!SP-bp7-022",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch47_test.rs"
+      ],
+      "covering_tests": [
+        "bp5010_mill_happens_even_without_arise",
+        "bp5010_mills_three_retrieves_arise_member",
+        "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
+        "pb2047_all_liella_stage_waits_enemy_cost_two_member",
+        "pb2047_non_liella_on_stage_no_enemy_wait"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
