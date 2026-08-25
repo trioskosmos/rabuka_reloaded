@@ -77,6 +77,71 @@ CHOICE_RE = re.compile(r"(has_pending_choice|pending_choice_type|select_indices|
 FN_TEST_RE = re.compile(r"^\s*#\[test\]\s*\n\s*(?:pub\s+)?fn\s+(\w+)", re.MULTILINE)
 COVERS_RE = re.compile(r"@covers\s+([A-Z0-9!+\-]+\S*)", re.IGNORECASE)
 
+# ---------------------------------------------------------------------------
+# P0.3 ratchet (docs/TEST_HARDENING_PLAN_2026-08-26.md): the soft-guard
+# pattern `if x.has_pending_choice() { ... }` silently absorbs a missing
+# prompt, so a broken ability can pass its test. WRITING_TESTS.md mandates
+# strict draining (drain_choices_strict / dispatch-on-choice). Existing sites
+# are grandfathered in SOFT_GUARD_BASELINE.json; the count may only go DOWN.
+# ---------------------------------------------------------------------------
+SOFT_GUARD_RE = re.compile(
+    r"\bif\s+[A-Za-z_][\w\.]*\.has_pending_choice\(\)\s*\{"
+)
+SOFT_GUARD_BASELINE = ROOT / "engine" / "tests" / "SOFT_GUARD_BASELINE.json"
+
+
+def count_soft_guards():
+    """Per-file counts of soft-guard `if` sites across the test corpus."""
+    counts = {}
+    for path in sorted((ROOT / "engine" / "tests").rglob("*.rs")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        n = len(SOFT_GUARD_RE.findall(text))
+        if n:
+            counts[str(path.relative_to(ROOT)).replace("\\", "/")] = n
+    return counts
+
+
+def load_soft_guard_baseline():
+    if not SOFT_GUARD_BASELINE.exists():
+        return {}
+    return json.loads(SOFT_GUARD_BASELINE.read_text(encoding="utf-8"))
+
+
+def check_soft_guard_ratchet():
+    """Returns a list of human-readable violations (empty == OK)."""
+    current = count_soft_guards()
+    baseline = load_soft_guard_baseline()
+    violations = []
+    for path, n in sorted(current.items()):
+        allowed = baseline.get(path, 0)
+        if n > allowed:
+            violations.append(
+                f"{path}: {n} soft guards (baseline allows {allowed}). "
+                "Use drain_choices_strict / dispatch-on-choice instead "
+                "(WRITING_TESTS.md §H); update "
+                "engine/tests/SOFT_GUARD_BASELINE.json ONLY when a guarded "
+                "site is genuinely legitimate."
+            )
+    for path in sorted(baseline):
+        if path not in current and baseline[path] > 0:
+            print(
+                f"SOFT GUARD ratchet: {path} dropped to 0 — remove it from "
+                "the baseline (python cards/test_inventory.py --update-softguard-baseline)"
+            )
+    return violations
+
+
+def write_soft_guard_baseline():
+    counts = count_soft_guards()
+    SOFT_GUARD_BASELINE.write_text(
+        json.dumps(counts, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    total = sum(counts.values())
+    print(
+        f"Wrote {SOFT_GUARD_BASELINE.relative_to(ROOT)} "
+        f"({len(counts)} files, {total} soft-guard sites baselined)"
+    )
+
 
 def load_abilities():
     with open(CARDS_JSON, encoding="utf-8") as f:
@@ -602,7 +667,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="fail if generated files are stale")
     ap.add_argument("--json-only", action="store_true", help="only write JSON")
+    ap.add_argument(
+        "--update-softguard-baseline",
+        action="store_true",
+        help="re-record the soft-guard ratchet baseline (P0.3)",
+    )
     args = ap.parse_args()
+
+    if args.update_softguard_baseline:
+        write_soft_guard_baseline()
+        return 0
 
     inv = build_inventory()
 
@@ -680,6 +754,9 @@ def main():
                     print(f"  --- {len(diff)} diff lines total ---", file=sys.stderr)
                     print(f"  Run `python cards/test_inventory.py` and inspect `git diff {path.relative_to(ROOT)}` for full context.", file=sys.stderr)
                 ok = False
+        for violation in check_soft_guard_ratchet():
+            print(f"SOFT GUARD RATCHET FAIL: {violation}", file=sys.stderr)
+            ok = False
         sys.exit(0 if ok else 1)
 
     if not args.json_only:
