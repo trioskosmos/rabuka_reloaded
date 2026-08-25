@@ -9,9 +9,40 @@
 | P0.3 `has_pending_choice` soft-guard migration | OPEN (~250 sites) |
 | P1.1 per-test inventory | OPEN |
 | P1.2 or-assertions sweep | OPEN |
-| P1.3 helper dedup (`fire_trigger` x40) | OPEN |
+| P1.3 helper dedup (`fire_trigger` x40) | DONE — 21 byte-identical clones deleted onto `helpers::fire_trigger`; batch30 keeps a 3-line drain wrapper; batch8's `fire_trigger_nth` kept as genuine extension |
 | P2.* parser/pipeline hardening | OPEN |
 | P3.* engine quality debt | PARTIAL — either-target location_condition fixed ([LOC_COND_EITHER]); mojibake/queue-u8/runaway counters still open |
+
+## §2 Zone-change / source-gate audit (round 2)
+
+Systematic scan of every trigger-gate key in abilities.json (zone_change
+source/destination, movement on non-Movement variants, self_effect_only,
+check_self, temporal phase_target) cross-referenced against the test corpus.
+Result: 16 gate shapes, all covered except three families — now tested in
+`engine/tests/test_modules/zone_change_gate_test.rs`:
+
+| Card | Gate | Tests |
+|---|---|---|
+| PL!S-bp6-002-R+ 桜内梨子 ab#0 | live_card_zone→discard, Aqours live, target=self | positive deck-top/bottom placement; μ's-live negative; own-side-only negative |
+| PL!N-pb1-009-R 天王寺璃奈 ab#0 | live_card_zone→discard + negated has_blade_heart, this_turn | positive draw+hearts; blade-heart-departure negative |
+
+**Engine bugs found and fixed by this round:**
+
+1. **Indices-channel answers to `position|destination` choices dropped cards**
+   (actions.rs BCR dispatch): only the `card_id` channel was mapped through
+   the options array; an answer arriving via `card_indices` (the normal
+   `select_indices`/web-UI channel) fell through and the raw index became the
+   destination string `"0"`, matching no zone — the chosen card silently
+   vanished. Fixed by mapping `card_indices.first()` through `options` first.
+   Found by `riko_responds_only_to_own_side_live_zone`.
+
+2. *(Prior round)* `movement` on non-Movement condition variants was dropped by
+   both decode paths — see commit history.
+
+Note: `blade_heart` is its OWN printed field (`cards.json .blade_heart`,
+b_heart icons) distinct from the `blade` stat — picked test members accordingly.
+
+Suite state after round 2: **2939 passed / 0 failed / 0 ignored.**
 
 Suite state after this round: **2934 passed / 0 failed / 0 ignored** (was 2927 passing
 with 7 failing orphans + 2 ignores before recovery). The two former `#[ignore]`s were

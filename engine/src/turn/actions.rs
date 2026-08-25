@@ -758,6 +758,22 @@ impl super::TurnEngine {
                             || target == "double_baton_touch"
                         {
                             if let Some(ref opts) = options {
+                                // Indices channel (select_indices / web UI): map the
+                                // first index through the option list. Before this arm
+                                // existed, an indices-channel answer fell through and
+                                // the raw number became the destination string ("0"),
+                                // which matches no zone — the card was silently dropped
+                                // (found by zone_change_gate_test riko_responds_only_to_own_side).
+                                if let Some(&idx) =
+                                    card_indices.as_deref().and_then(|v| v.first())
+                                {
+                                    if idx < opts.len() {
+                                        return Ok(crate::ability::types::ChoiceResult::
+                                            TargetSelected {
+                                                target: opts[idx].clone(),
+                                            });
+                                    }
+                                }
                                 if let Some(id) = card_id {
                                     if id >= 0 && (id as usize) < opts.len() {
                                         return Ok(

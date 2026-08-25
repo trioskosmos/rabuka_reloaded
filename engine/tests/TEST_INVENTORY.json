@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T16:43:52.498822+00:00",
+  "generated_at": "2026-08-25T17:08:10.345109+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 486,
-  "n_tests": 2948,
+  "n_files": 487,
+  "n_tests": 2953,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,9 +309,9 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 675,
+    "L2+choice": 676,
     "L1+choice": 185,
-    "L2": 28,
+    "L2": 27,
     "L1": 48
   },
   "qa_rulings": {
@@ -7288,7 +7288,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/bp6_004_002_audit_test.rs",
-        "engine/tests/test_modules/qa_new_tests252.rs"
+        "engine/tests/test_modules/qa_new_tests252.rs",
+        "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
         "dia_bp6_conditional_heart_gain_works",
@@ -7296,6 +7297,9 @@
         "dia_bp6_live_start_triggers_with_2plus_cards",
         "dia_bp6_lt2_cards_no_trigger",
         "dia_bp6_zero_cards_no_trigger",
+        "reina_fires_after_non_blade_member_left_live_zone",
+        "reina_silent_when_blade_heart_member_left_live_zone",
+        "riko_aqours_live_leaving_live_zone_offers_deck_placement",
         "riko_bp6_auto_batch_of_3_first_only_taken_others_untouched",
         "riko_bp6_auto_does_not_fire_without_live_card_zone_movement",
         "riko_bp6_auto_e2e_cannot_live_triggers",
@@ -7317,12 +7321,9 @@
         "riko_bp6_live_start_aggregate_below_threshold_no_hearts",
         "riko_bp6_live_start_empty_zone_no_hearts",
         "riko_bp6_live_start_mix_fills_3_slots_passes",
-        "riko_bp6_live_start_non_aq_present_all_members_fails",
-        "riko_bp6_live_start_single_miracle_wave_exact_modifier",
-        "riko_bp6_live_start_three_slots_all_aqours_passes",
-        "riko_bp6_live_start_two_miracle_waves_exact_modifier"
+        "riko_bp6_live_start_non_aq_present_all_members_fails"
       ],
-      "covering_test_count": 44,
+      "covering_test_count": 49,
       "is_null": false
     },
     {
@@ -7349,7 +7350,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/bp6_004_002_audit_test.rs",
-        "engine/tests/test_modules/qa_new_tests252.rs"
+        "engine/tests/test_modules/qa_new_tests252.rs",
+        "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
         "dia_bp6_conditional_heart_gain_works",
@@ -7357,6 +7359,9 @@
         "dia_bp6_live_start_triggers_with_2plus_cards",
         "dia_bp6_lt2_cards_no_trigger",
         "dia_bp6_zero_cards_no_trigger",
+        "reina_fires_after_non_blade_member_left_live_zone",
+        "reina_silent_when_blade_heart_member_left_live_zone",
+        "riko_aqours_live_leaving_live_zone_offers_deck_placement",
         "riko_bp6_auto_batch_of_3_first_only_taken_others_untouched",
         "riko_bp6_auto_does_not_fire_without_live_card_zone_movement",
         "riko_bp6_auto_e2e_cannot_live_triggers",
@@ -7378,12 +7383,9 @@
         "riko_bp6_live_start_aggregate_below_threshold_no_hearts",
         "riko_bp6_live_start_empty_zone_no_hearts",
         "riko_bp6_live_start_mix_fills_3_slots_passes",
-        "riko_bp6_live_start_non_aq_present_all_members_fails",
-        "riko_bp6_live_start_single_miracle_wave_exact_modifier",
-        "riko_bp6_live_start_three_slots_all_aqours_passes",
-        "riko_bp6_live_start_two_miracle_waves_exact_modifier"
+        "riko_bp6_live_start_non_aq_present_all_members_fails"
       ],
-      "covering_test_count": 44,
+      "covering_test_count": 49,
       "is_null": false
     },
     {
@@ -12606,7 +12608,8 @@
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
         "engine/tests/test_modules/untested_abilities_playthrough_test.rs",
         "engine/tests/test_modules/untested_choice_change_target_test.rs",
-        "engine/tests/test_modules/untested_secondary_abilities_test.rs"
+        "engine/tests/test_modules/untested_secondary_abilities_test.rs",
+        "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
         "ai_pay_activates_a_waited_member",
@@ -12640,7 +12643,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 832,
+      "covering_test_count": 837,
       "is_null": false
     },
     {
@@ -20088,21 +20091,27 @@
       ],
       "base": "PL!N-pb1-009",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/miyashita_ai_bp5_test.rs"
+        "engine/tests/test_modules/miyashita_ai_bp5_test.rs",
+        "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
         "niji_bp5_partner_cost10_noblade_energizes_2",
         "niji_bp5_partner_cost15_noblade_energizes_2_and_draws_1",
         "niji_bp5_partner_low_cost_nothing_fires",
         "niji_bp5_partner_not_nijigasaki_nothing_fires",
-        "niji_bp5_partner_with_blade_heart_nothing_fires"
+        "niji_bp5_partner_with_blade_heart_nothing_fires",
+        "reina_fires_after_non_blade_member_left_live_zone",
+        "reina_silent_when_blade_heart_member_left_live_zone",
+        "riko_aqours_live_leaving_live_zone_offers_deck_placement",
+        "riko_ignores_non_aqours_live_leaving_live_zone",
+        "riko_responds_only_to_own_side_live_zone"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 10,
       "is_null": false
     },
     {
@@ -25989,7 +25998,8 @@
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/wonder_zone_max_repeats_test.rs",
         "engine/tests/test_modules/yoshiko_center_ability_test.rs",
-        "engine/tests/test_modules/yoshiko_debut_test.rs"
+        "engine/tests/test_modules/yoshiko_debut_test.rs",
+        "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
         "ai_pay_activates_a_waited_member",
@@ -26023,7 +26033,7 @@
         "bp5015_all_six_colors_present_two_blades",
         "bp5015_missing_colors_no_blades"
       ],
-      "covering_test_count": 403,
+      "covering_test_count": 408,
       "is_null": false
     },
     {
@@ -26109,7 +26119,8 @@
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/wonder_zone_max_repeats_test.rs",
         "engine/tests/test_modules/yoshiko_center_ability_test.rs",
-        "engine/tests/test_modules/yoshiko_debut_test.rs"
+        "engine/tests/test_modules/yoshiko_debut_test.rs",
+        "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
         "ai_pay_activates_a_waited_member",
@@ -26143,7 +26154,7 @@
         "bp5015_all_six_colors_present_two_blades",
         "bp5015_missing_colors_no_blades"
       ],
-      "covering_test_count": 403,
+      "covering_test_count": 408,
       "is_null": false
     },
     {
@@ -26499,7 +26510,8 @@
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/performance_pipeline_test.rs",
         "engine/tests/test_modules/wao_wao_test.rs",
-        "engine/tests/test_modules/yoshiko_debut_test.rs"
+        "engine/tests/test_modules/yoshiko_debut_test.rs",
+        "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
         "cutie_panther_live_start_reduce_hearts",
@@ -26533,7 +26545,7 @@
         "issue6_natsumi_self_only_blade",
         "issue7_hajimari_no_success_live_no_effect"
       ],
-      "covering_test_count": 94,
+      "covering_test_count": 99,
       "is_null": false
     },
     {
