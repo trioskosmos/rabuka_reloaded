@@ -149,3 +149,6 @@ platforms/*/target/
 /tweet_mood/
 
 ll_dbg.txt
+
+# DeepSeek training harness (local experiments)
+/deepseek-harness/

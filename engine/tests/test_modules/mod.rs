@@ -522,3 +522,17 @@ mod check_self_condition_test;
 
 pub mod corpus_smoke_test;
 pub mod characterization_promoted_test;
+
+// Recovered orphans (2026-08-26): these files existed on disk but were never
+// registered, so their tests silently never ran while still counting toward
+// coverage stats. See docs/TEST_HARDENING_PLAN_2026-08-26.md P0.1.
+pub mod untested_abilities_batch22_test;
+pub mod l0_gap_constant4_test;
+pub mod heart_color_test;
+pub mod konata_bp1_test;
+pub mod location_condition_cost_test;
+pub mod shizuku_bp4_aggregate_test;
+// sumire_bp5_test_debug.rs deleted 2026-08-26: stale scratch duplicate of
+// sumire_bp5_test.rs (which covers all its behaviors with real-pipeline flows
+// and a current API). See docs/TEST_HARDENING_PLAN_2026-08-26.md P0.1.
+pub mod dive_false_trigger_test;

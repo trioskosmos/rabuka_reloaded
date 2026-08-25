@@ -151,6 +151,6 @@ fn shizuku_p_rarity_same_as_r() {
         "P rarity: draws 1 card on win");
 }
 
-/// LiveSuccess ability only fires on success (not on loss/ tie).
-/// With tied scores, the condition fails, so no draw occurs.
-/// This is covered by shizuku_tied_score_no_draw.
+// LiveSuccess ability only fires on success (not on loss/ tie).
+// With tied scores, the condition fails, so no draw occurs.
+// This is covered by shizuku_tied_score_no_draw.

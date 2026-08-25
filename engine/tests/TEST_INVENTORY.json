@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T12:30:14.743116+00:00",
+  "generated_at": "2026-08-25T15:52:21.280648+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 486,
-  "n_tests": 2946,
+  "n_tests": 2942,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -1056,6 +1056,7 @@
         "engine/tests/test_modules/chika_bp7_reveal_cost_test.rs",
         "engine/tests/test_modules/dive_auto_trigger_test.rs",
         "engine/tests/test_modules/dive_edge_test.rs",
+        "engine/tests/test_modules/dive_false_trigger_test.rs",
         "engine/tests/test_modules/hanabiko_discard_test.rs",
         "engine/tests/test_modules/miyashita_ai_bp5_test.rs",
         "engine/tests/test_modules/shizuku_pb1_test.rs",
@@ -1074,6 +1075,7 @@
         "ab1_fires_on_direct_placement",
         "ab1_no_niji_target_no_crash",
         "ab1_two_niji_members_only_one_gets_blade",
+        "both_retrieval_arms_own_dive_not_opponents",
         "chika_low_cost_hand_not_selectable",
         "chika_reveal_cost10_places_under",
         "chika_reveal_cost20_places_under_and_draws",
@@ -1090,10 +1092,9 @@
         "kanon_invalidate_liella_live_start",
         "like_a_treasure_accept_adds_niji_live_and_scores",
         "like_a_treasure_duplicate_niji_copies_add_one",
-        "like_a_treasure_multiple_niji_live_adds_one",
-        "like_a_treasure_niji_member_not_added"
+        "like_a_treasure_multiple_niji_live_adds_one"
       ],
-      "covering_test_count": 59,
+      "covering_test_count": 61,
       "is_null": false
     },
     {
@@ -1122,6 +1123,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/helpers/mod.rs",
         "engine/tests/test_modules/characterization_promoted_test.rs",
         "engine/tests/test_modules/kanata_bp1_test.rs",
         "engine/tests/test_modules/kanata_restrict_test.rs",
@@ -2041,6 +2043,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/helpers/mod.rs",
         "engine/tests/test_modules/characterization_promoted_test.rs",
         "engine/tests/test_modules/kanata_bp1_test.rs",
         "engine/tests/test_modules/kanata_restrict_test.rs",
@@ -4621,10 +4624,12 @@
       "covering_files": [
         "engine/tests/test_modules/ability_from_source_test.rs",
         "engine/tests/test_modules/constant_edge_case_test.rs",
+        "engine/tests/test_modules/dive_false_trigger_test.rs",
         "engine/tests/test_modules/l0_gap_constant_test.rs",
         "engine/tests/test_modules/l0_gap_livestart3_test.rs"
       ],
       "covering_tests": [
+        "both_retrieval_arms_own_dive_not_opponents",
         "bp1_001_pay_energy_blade",
         "bp1_005_discard_gains_blade",
         "bp4_007_setsuna_both_energy_15_grants_heart02x2",
@@ -4651,12 +4656,11 @@
         "umi_opponent_score_below_six",
         "umi_opponent_score_drops_below_threshold",
         "umi_opponent_score_exactly_six",
+        "wrong_target_retrieval_does_not_arm_dive",
         "you_pb1_energy_changes_dynamically",
-        "you_pb1_opponent_equal_energy_no_blade",
-        "you_pb1_opponent_less_energy_no_blade",
-        "you_pb1_opponent_more_energy_gains_blade"
+        "you_pb1_opponent_equal_energy_no_blade"
       ],
-      "covering_test_count": 30,
+      "covering_test_count": 32,
       "is_null": false
     },
     {
@@ -4684,10 +4688,12 @@
       "covering_files": [
         "engine/tests/test_modules/ability_from_source_test.rs",
         "engine/tests/test_modules/constant_edge_case_test.rs",
+        "engine/tests/test_modules/dive_false_trigger_test.rs",
         "engine/tests/test_modules/l0_gap_constant_test.rs",
         "engine/tests/test_modules/l0_gap_livestart3_test.rs"
       ],
       "covering_tests": [
+        "both_retrieval_arms_own_dive_not_opponents",
         "bp1_001_pay_energy_blade",
         "bp1_005_discard_gains_blade",
         "bp4_007_setsuna_both_energy_15_grants_heart02x2",
@@ -4714,12 +4720,11 @@
         "umi_opponent_score_below_six",
         "umi_opponent_score_drops_below_threshold",
         "umi_opponent_score_exactly_six",
+        "wrong_target_retrieval_does_not_arm_dive",
         "you_pb1_energy_changes_dynamically",
-        "you_pb1_opponent_equal_energy_no_blade",
-        "you_pb1_opponent_less_energy_no_blade",
-        "you_pb1_opponent_more_energy_gains_blade"
+        "you_pb1_opponent_equal_energy_no_blade"
       ],
-      "covering_test_count": 30,
+      "covering_test_count": 32,
       "is_null": false
     },
     {
@@ -4747,10 +4752,12 @@
       "covering_files": [
         "engine/tests/test_modules/ability_from_source_test.rs",
         "engine/tests/test_modules/constant_edge_case_test.rs",
+        "engine/tests/test_modules/dive_false_trigger_test.rs",
         "engine/tests/test_modules/l0_gap_constant_test.rs",
         "engine/tests/test_modules/l0_gap_livestart3_test.rs"
       ],
       "covering_tests": [
+        "both_retrieval_arms_own_dive_not_opponents",
         "bp1_001_pay_energy_blade",
         "bp1_005_discard_gains_blade",
         "bp4_007_setsuna_both_energy_15_grants_heart02x2",
@@ -4777,12 +4784,11 @@
         "umi_opponent_score_below_six",
         "umi_opponent_score_drops_below_threshold",
         "umi_opponent_score_exactly_six",
+        "wrong_target_retrieval_does_not_arm_dive",
         "you_pb1_energy_changes_dynamically",
-        "you_pb1_opponent_equal_energy_no_blade",
-        "you_pb1_opponent_less_energy_no_blade",
-        "you_pb1_opponent_more_energy_gains_blade"
+        "you_pb1_opponent_equal_energy_no_blade"
       ],
-      "covering_test_count": 30,
+      "covering_test_count": 32,
       "is_null": false
     },
     {
@@ -6344,7 +6350,6 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/sumire_bp5_test.rs",
-        "engine/tests/test_modules/sumire_bp5_test_debug.rs",
         "engine/tests/test_modules/trigger_card_integration_test.rs"
       ],
       "covering_tests": [
@@ -6367,10 +6372,9 @@
         "test_sumire_opponent_energy_no_trigger",
         "test_sumire_opponent_no_trigger",
         "test_sumire_other_card_move_triggers",
-        "test_sumire_play_triggers_draw_and_heart",
         "test_sumire_use_limit_blocks_second"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 20,
       "is_null": false
     },
     {
@@ -32044,9 +32048,11 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/dive_false_trigger_test.rs",
         "engine/tests/test_modules/zero_tested_action_types_test.rs"
       ],
       "covering_tests": [
+        "both_retrieval_arms_own_dive_not_opponents",
         "kanon_invalidate_liella_live_start",
         "natsumi_sunshine_pay_any_energy_for_score",
         "step_zero_to_one_live_start_full_ability",
@@ -32054,9 +32060,10 @@
         "vivid_world_all_heart_colors_present",
         "vivid_world_half_nijigasaki_half_other",
         "vivid_world_live_phase_blade_and_success",
-        "vivid_world_missing_heart_color"
+        "vivid_world_missing_heart_color",
+        "wrong_target_retrieval_does_not_arm_dive"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 10,
       "is_null": false
     },
     {
@@ -32079,9 +32086,11 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/dive_false_trigger_test.rs",
         "engine/tests/test_modules/zero_tested_action_types_test.rs"
       ],
       "covering_tests": [
+        "both_retrieval_arms_own_dive_not_opponents",
         "kanon_invalidate_liella_live_start",
         "natsumi_sunshine_pay_any_energy_for_score",
         "step_zero_to_one_live_start_full_ability",
@@ -32089,9 +32098,10 @@
         "vivid_world_all_heart_colors_present",
         "vivid_world_half_nijigasaki_half_other",
         "vivid_world_live_phase_blade_and_success",
-        "vivid_world_missing_heart_color"
+        "vivid_world_missing_heart_color",
+        "wrong_target_retrieval_does_not_arm_dive"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 10,
       "is_null": false
     },
     {
@@ -32116,6 +32126,7 @@
       "covering_files": [
         "engine/tests/test_modules/dive_auto_trigger_test.rs",
         "engine/tests/test_modules/dive_edge_test.rs",
+        "engine/tests/test_modules/dive_false_trigger_test.rs",
         "engine/tests/test_modules/dive_live_card_test.rs",
         "engine/tests/test_modules/hanabiko_discard_test.rs"
       ],
@@ -32132,6 +32143,7 @@
         "ab1_fires_on_direct_placement",
         "ab1_no_niji_target_no_crash",
         "ab1_two_niji_members_only_one_gets_blade",
+        "both_retrieval_arms_own_dive_not_opponents",
         "dive_live_zone_only_ab1_triggers",
         "dive_no_niji_no_target",
         "dive_not_in_live_zone_no_trigger",
@@ -32148,10 +32160,9 @@
         "only_moved_copy_triggers_static_copy_does_not",
         "skip_placement_then_new_retrieval_still_triggers",
         "two_dive_live_zone_two_blade_grants",
-        "two_dive_retrieved_chain_still_works",
-        "two_static_one_moved_only_one_trigger"
+        "two_dive_retrieved_chain_still_works"
       ],
-      "covering_test_count": 30,
+      "covering_test_count": 32,
       "is_null": false
     },
     {
@@ -32176,6 +32187,7 @@
       "covering_files": [
         "engine/tests/test_modules/dive_auto_trigger_test.rs",
         "engine/tests/test_modules/dive_edge_test.rs",
+        "engine/tests/test_modules/dive_false_trigger_test.rs",
         "engine/tests/test_modules/dive_live_card_test.rs",
         "engine/tests/test_modules/hanabiko_discard_test.rs"
       ],
@@ -32192,6 +32204,7 @@
         "ab1_fires_on_direct_placement",
         "ab1_no_niji_target_no_crash",
         "ab1_two_niji_members_only_one_gets_blade",
+        "both_retrieval_arms_own_dive_not_opponents",
         "dive_live_zone_only_ab1_triggers",
         "dive_no_niji_no_target",
         "dive_not_in_live_zone_no_trigger",
@@ -32208,10 +32221,9 @@
         "only_moved_copy_triggers_static_copy_does_not",
         "skip_placement_then_new_retrieval_still_triggers",
         "two_dive_live_zone_two_blade_grants",
-        "two_dive_retrieved_chain_still_works",
-        "two_static_one_moved_only_one_trigger"
+        "two_dive_retrieved_chain_still_works"
       ],
-      "covering_test_count": 30,
+      "covering_test_count": 32,
       "is_null": false
     },
     {

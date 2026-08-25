@@ -1,5 +1,4 @@
 use crate::helpers::*;
-use rabuka_engine::card::HeartColor;
 
 /// PL!S-PR-029-PR 渡辺 曜:
 /// 常時: 自分か相手のステージにコスト13以上のメンバーがいる場合、ブレード×2を得る。
@@ -15,8 +14,7 @@ fn cost9_alone_does_not_meet_cost13_condition() {
     game.state.player1.stage.stage = [you, -1, -1];
 
     // Process constant abilities
-    let pid = game.state.player1.id.clone();
-    rabuka_engine::turn::TurnEngine::process_constant_abilities(&mut game.state, &pid);
+    game.state.recalculate_constants();
 
     // Condition "self or opponent stage has cost >= 13 member" should FAIL
     // because the only card on stage is cost 9, which is less than 13.
@@ -41,7 +39,8 @@ fn cost13_on_opponent_stage_meets_condition() {
     game.state.player2.stage.stage = [cost13_card, -1, -1];
 
     let pid = game.state.player1.id.clone();
-    rabuka_engine::turn::TurnEngine::process_constant_abilities(&mut game.state, &pid);
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    game.state.recalculate_constants();
 
     let blade = game.state.mods.get_blade_modifier(you);
     assert_eq!(

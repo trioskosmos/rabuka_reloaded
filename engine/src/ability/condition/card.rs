@@ -1534,16 +1534,42 @@ impl<'a> ConditionContext<'a> {
             if condition.get_exclude_self().unwrap_or(false) {
                 filter.exclude_self = self.activating_card_id;
             }
-            cards
-                .iter()
-                .filter(|&&id| {
-                    id != -1
-                        && filter.matches(card_db, id, true)
-                        && self.check_original_blade_filter(condition, id)
-                        && self.check_original_heart_filter(condition, id)
-                        && self.check_heart_type_all_per_card(condition, card_db, id)
-                })
-                .count().u8_count()
+            // 「自分か相手の…にいる場合」 (target=either): the clause passes if
+            // EITHER side's zone alone satisfies the filters. Take the max of
+            // the two per-side match counts so a threshold >1 can never be met
+            // by combining partial matches across both players' zones.
+            let count_side = |zone_cards: &[i16]| -> u8 {
+                zone_cards
+                    .iter()
+                    .filter(|&&id| {
+                        id != -1
+                            && filter.matches(card_db, id, true)
+                            && self.check_original_blade_filter(condition, id)
+                            && self.check_original_heart_filter(condition, id)
+                            && self.check_heart_type_all_per_card(condition, card_db, id)
+                    })
+                    .count().u8_count()
+            };
+            let is_either = condition.get_target() == Some("either")
+                && Zone::from_str(location) != Some(Zone::RevealedCards);
+            let matched = if is_either {
+                let n_self =
+                    count_side(util::zone_cards(self.resolve_condition_player("self"), location));
+                let n_opp = count_side(util::zone_cards(
+                    self.resolve_condition_player("opponent"),
+                    location,
+                ));
+                log::debug!(
+                    "[LOC_COND_EITHER] loc={} n_self={} n_opp={}",
+                    location,
+                    n_self,
+                    n_opp
+                );
+                n_self.max(n_opp)
+            } else {
+                count_side(&cards)
+            };
+            matched
         };
         // For revealed_cards: check that filtered cards collectively have all required
         // heart colors in their base_heart (printed hearts).

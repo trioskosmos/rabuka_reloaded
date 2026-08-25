@@ -694,6 +694,31 @@ impl TestGame {
         )
     }
 
+    /// Activate a SPECIFIC 起動 ability by its runtime index (needed for cards
+    /// printing multiple 起動 clauses, e.g. PL!N-bp1-006-R+ has both a
+    /// discard→activate-energy ab#0 and a pay-2E→draw ab#1).
+    pub fn activate_ability_index(&mut self, stage_card_id: i16, ability_index: usize) {
+        self.try_activate_ability_index(stage_card_id, ability_index)
+            .expect("activate_ability_index failed");
+    }
+
+    /// Try to activate a specific ability index, returning Result.
+    pub fn try_activate_ability_index(
+        &mut self,
+        stage_card_id: i16,
+        ability_index: usize,
+    ) -> Result<(), String> {
+        TurnEngine::execute_main_phase_action_with_ability_index(
+            &mut self.state,
+            &ActionType::UseAbility,
+            Some(stage_card_id),
+            None,
+            None,
+            None,
+            Some(ability_index),
+        )
+    }
+
     /// Set a live card from hand during LiveCardSet phase.
     pub fn set_live_card(&mut self, card_id: i16) {
         TurnEngine::execute_main_phase_action(
