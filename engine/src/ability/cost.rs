@@ -1340,7 +1340,10 @@ let source = cost.source_str().unwrap_or("");
                 .cards
                 .extend(hand_ids.iter().copied());
             for &cid in &hand_ids {
-                gs.push_movement_event(cid, source, "discard", None, target_str, true);
+                // Cost payment ⇒ effect_only=false (mirrors choice.rs:544).
+                // 「カードの効果によって」 triggers must not see cost moves
+                // as effect-caused; costs are player actions, not effects.
+                gs.push_movement_event(cid, source, "discard", None, target_str, false);
             }
         }
         // After the optional cost is settled, only execute the ability's effect

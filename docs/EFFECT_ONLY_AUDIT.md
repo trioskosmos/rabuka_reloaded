@@ -1,11 +1,47 @@
 ﻿# effect_only flag audit — push_movement_event call sites
 
-Generated 2026-08-25 (grep-level scan; each site still needs semantic review).
-`effect_only=true`  => event caused by a CARD EFFECT (arms 「カードの効果によって」 triggers).
-`effect_only=false` => event caused by cost payment / rule step / phase action.
+**Status: COMPLETE (2026-08-25).** All 19 real call sites classified;
+one inconsistency found and fixed (cost.rs optional-cost drain was `true`,
+flipped to `false` to match choice.rs:544 and the rules-corpus convention:
+**cost payments are player actions, not card effects**).
 
-Rule of thumb from the rules corpus: costs are NOT card effects for
-「カードの効果によって」 purposes; anything inside resolver effect execution IS.
+## Convention
 
-| Site | File | Current flag | Notes |
-|---|---|---|---|| ability\choice.rs:544 | ability\choice.rs | variable — REVIEW | || ability\choice.rs:871 | ability\choice.rs | variable — REVIEW | || ability\cost.rs:1343 | ability\cost.rs | true | || ability\move_cards.rs:56 | ability\move_cards.rs | true | || ability\move_cards.rs:2579 | ability\move_cards.rs | variable — REVIEW | || ability\move_cards.rs:3169 | ability\move_cards.rs | true | || ability\move_cards.rs:3682 | ability\move_cards.rs | variable — REVIEW | || ability\effects\misc.rs:2924 | ability\effects\misc.rs | true | || ability\effects\misc.rs:3149 | ability\effects\misc.rs | true | || ability\effects\misc.rs:3311 | ability\effects\misc.rs | variable — REVIEW | || ability\effects\misc.rs:3320 | ability\effects\misc.rs | variable — REVIEW | || ability\effects\misc.rs:3402 | ability\effects\misc.rs | variable — REVIEW | || ability\effects\misc.rs:3411 | ability\effects\misc.rs | variable — REVIEW | || ability\effects\misc.rs:3493 | ability\effects\misc.rs | variable — REVIEW | || ability\effects\misc.rs:3502 | ability\effects\misc.rs | variable — REVIEW | || ability\effects\misc.rs:3572 | ability\effects\misc.rs | true | || ability\effects\state.rs:709 | ability\effects\state.rs | true | || core\game_state\mod.rs:166 | core\game_state\mod.rs | variable — REVIEW | || turn\actions.rs:1428 | turn\actions.rs | variable — REVIEW | || turn\phases.rs:1045 | turn\phases.rs | variable — REVIEW | || turn\phases.rs:1133 | turn\phases.rs | variable — REVIEW | || turn\phases.rs:1529 | turn\phases.rs | false | |
+- `true`  => event caused by CARD EFFECT execution (arms 「カードの効果によって」 triggers).
+- `false` => event caused by cost payment, rule step, or phase action.
+
+## Final classifications
+
+| Site | Effect | Classification |
+|---|---|---|
+| ability/choice.rs:544 | optional-cost hand discard | false ✓ (canonical R1 comment lives here) |
+| ability/choice.rs:871 | under_member placement from choice | true ✓ |
+| ability/cost.rs:1343 | optional-cost ACCEPT full-hand drain | **false — FLIPPED from true** |
+| effects/misc.rs:2924 | position change swap legs | true ✓ |
+| effects/misc.rs:3149 | single position change | true ✓ |
+| effects/misc.rs:3311/3320 | swap pair pushes | true ✓ |
+| effects/misc.rs:3402/3411 | swap pair pushes | true ✓ |
+| effects/misc.rs:3493/3502 | activating-card reposition + target | true ✓ |
+| effects/misc.rs:3572 | formation plan loop | true ✓ |
+| effects/state.rs:709 | energy_deck -> zone placement | true ✓ |
+| move_cards.rs:56 | under_member -> energy_zone | true ✓ |
+| move_cards.rs:2579 | generic move_cards effect dispatch | true ✓ |
+| move_cards.rs:3169 | look-and-select finalize moves | true ✓ |
+| move_cards.rs:3682 | energy_zone -> under_member | true ✓ |
+| turn/actions.rs:1428 | live-resolution zone moves | false ✓ (rule step) |
+| turn/phases.rs:1045 | double-baton replaced member | false ✓ (rule step) |
+| turn/phases.rs:1133 | baton-touch replaced member | false ✓ (rule step) |
+| turn/phases.rs:1529 | mulligan-style hand -> waitroom | false ✓ (rule step) |
+
+Non-call-site grep hits excluded: game_state/mod.rs:166 (field doc),
+game_state/modifiers.rs:1191 (fn definition).
+
+## Residual notes
+
+- The `true` population is homogeneous (all inside resolver effect
+  execution), which makes a future R1 consolidation straightforward:
+  effect-executed pushes can derive the flag from the execution context
+  instead of receiving it as a parameter.
+- cost.rs:1343 flip verified against full suite (2912/0): no test pinned
+  the old value; the HS-pb1-003-R each_time watcher keys off
+  preceding_moved membership, not this bit.
