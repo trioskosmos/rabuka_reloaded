@@ -5,6 +5,8 @@
 - **⛔ NEVER write throwaway Python/PowerShell scripts to patch files.** Use the Edit tool with exact strings read from the file. Script-generated edits are opaque, fail silently on mismatch, and leave litter behind. Read the region, then Edit it directly.
 - **Debug env (`$env:RUST_LOG="debug"`) is for FAILING tests only — it slows full runs down.** Green full-suite checks: plain `cargo test --test run_all`. When diagnosing/verifying: `$env:RUST_LOG="debug"; cargo test --test run_all <failing_substring> -- --nocapture --test-threads=1`. Cargo takes ONE positional filter — pick a substring covering the tests you need.
 - When ANY assertion fails, read the condition-verdict/trace lines from the debug file BEFORE changing code or tests. Never guess at engine internals.
+- **READ WHOLE FLOWS.** When debugging, Read the ENTIRE debug file and the ENTIRE relevant source functions (not 10-line snippets) before forming a hypothesis. Trace the full path: trigger → condition eval → every sub-action → placement. One-line-at-a-time grepping that skips intermediate frames leads to wrong root causes — if two consecutive probes disagree, you skipped something.
+- **ADD PERMANENT `log::debug!` LINES for anything you have even slight doubts about** (condition verdicts, branch taken, computed values, decoded fields). These stay in the code as first-class diagnostics — they cost nothing when RUST_LOG is off and turn the next debugging session into a file read instead of an archaeology dig. Do not remove them when the bug is fixed; they are part of the fix.
 - Do not use `git` to revert or fall back on unless explicitly asked — fix the code properly.
 
 ## Tests

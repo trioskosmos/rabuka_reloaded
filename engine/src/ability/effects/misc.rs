@@ -1946,13 +1946,19 @@ impl AbilityResolver {
             if effect.target_from_selection_any().unwrap_or(false) {
                 selected_for_current.iter().copied().collect()
             } else if let Some(tgt_count) = tc {
-                if !selected_for_current.is_empty() {
+                if !selected_for_current.is_empty() && all_candidates.is_empty() {
+                    // Pure-selection shapes with no filter-matched candidates:
+                    // inherit the preceding step's selection.
                     selected_for_current
                         .iter()
                         .take(tgt_count as usize)
                         .copied()
                         .collect()
                 } else {
+                    // The effect's own filter (card_type/group/location)
+                    // describes fresh targets — a preceding step's selection
+                    // must NOT leak into them (「そうした場合」 chains where
+                    // step 1's choice would otherwise hijack step 2).
                     all_candidates.truncate(tgt_count as usize);
                     all_candidates
                 }

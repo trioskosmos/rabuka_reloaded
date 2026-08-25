@@ -907,6 +907,18 @@ let source = cost.source_str().unwrap_or("");
                                             .is_some_and(|v| vals.contains(&v)),
                                         _ => true,
                                     }
+                                    // Group filter (e.g. 『Aqours』のカード): without
+                                    // it every hand card was reveal-eligible.
+                                    && match cost.group_names_any().as_ref() {
+                                        Some(groups) if !groups.is_empty() => groups.iter().any(
+                                            |g| {
+                                                super::util::card_matches_group_str(
+                                                    card_db, id, Some(g.as_str()),
+                                                )
+                                            },
+                                        ),
+                                        _ => true,
+                                    }
                             })
                             .copied()
                             .collect(),
@@ -925,6 +937,14 @@ let source = cost.source_str().unwrap_or("");
 
                 let has_explicit_count = cost.count.is_some();
                 let explicit_count = cost.count.unwrap_or(1) as usize;
+                log::debug!(
+                    "[REVEAL_COST] card_ids={:?} has_explicit_count={} explicit_count={} group={:?} card_type={:?}",
+                    card_ids,
+                    has_explicit_count,
+                    explicit_count,
+                    cost.group_names_any(),
+                    card_type
+                );
 
                 if has_explicit_count && card_ids.len() <= explicit_count {
                     let cost_source = gs.current_ability_source_card_id();

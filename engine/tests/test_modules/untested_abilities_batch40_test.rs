@@ -38,11 +38,6 @@ fn fire_live_start(game: &mut TestGame, cid: i16) {
 // ====================================================================
 
 #[test]
-#[ignore = "KNOWN GAP (bug 14): implicit そうした場合 gating uses the \
-was_moved/was_selected proxy evaluated while the optional move is still \
-deferred to its selection prompt — the resumed gain_resource re-checks \
-its condition before the answered selection's movement is visible, so \
-the blade never applies even though the deck-top placement succeeded."]
 fn omoi_accept_member_to_deck_top_grants_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
@@ -77,11 +72,6 @@ fn omoi_accept_member_to_deck_top_grants_blade() {
 }
 
 #[test]
-#[ignore = "KNOWN GAP (bug 14, decline half): declining the deferred \
-selection still applies the そうした場合 blade (+1) — the gate records \
-condition_failed=false because the empty answer is not attributed to \
-the gating action. Same was_moved/was_selected proxy as bug 14 accept \
-half."]
 fn omoi_decline_no_blade_no_move() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
@@ -139,10 +129,6 @@ fn omoi_empty_waitroom_no_prompt() {
 // ====================================================================
 
 #[test]
-#[ignore = "KNOWN GAP (bug 15): the reveal -> deck_top_or_bottom chain \
-loses the move on resume — the answered reveal selection does not carry \
-the revealed card into the follow-up placement, leaving it in hand. \
-Related to the deferred-choice bookkeeping of bug 14."]
 fn ruby_reveal_aqours_place_and_gain_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
@@ -159,25 +145,23 @@ fn ruby_reveal_aqours_place_and_gain_blade() {
 
     fire_live_start(&mut game, ruby);
 
-    // Answer every remaining prompt by taking the first offered option:
-    // reveal selection, then deck top-vs-bottom.
+    // First prompt: optional reveal cost gate -> accept.
+    assert!(game.has_pending_choice(), "reveal cost gate offered");
+    game.select_option(1); // Yes: reveal the Aqours card
+    // Then answer the deck top-vs-bottom placement choice.
     let mut guard = 0;
     while game.has_pending_choice() && guard < 10 {
         guard += 1;
         game.select_indices(&[0]);
     }
 
-    // The revealed Aqours card left the hand.
+    // The revealed Aqours card left the hand onto the deck.
     assert!(
         !game.state.player1.hand.cards.contains(&aqours_card),
         "revealed Aqours card moved onto the deck"
     );
-    let on_deck = game.state.player1.main_deck.cards.contains(&aqours_card);
-    let on_deck_top = game.state.player1.main_deck.cards.first() == Some(&aqours_card);
-    assert!(
-        on_deck || on_deck_top,
-        "revealed card ends up on the deck"
-    );
+    let in_deck = game.state.player1.main_deck.cards.contains(&aqours_card);
+    assert!(in_deck, "revealed card ends up on the deck");
 }
 
 #[test]

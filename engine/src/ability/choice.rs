@@ -466,6 +466,20 @@ impl super::resolver::AbilityResolver {
             }
         };
 
+        // Consume the deferred そうした場合 gate (parent-conditional
+        // sequential whose gating move deferred to THIS selection): an
+        // empty/skipped answer drops the remaining actions; a real answer
+        // lets them run.
+        if self.deferred_conditional_gate {
+            self.deferred_conditional_gate = false;
+            if indices.is_empty() {
+                log::debug!("[DEFERRED_GATE] skipped -> dropping remaining actions");
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.pending_actions.clear();
+                }
+            }
+        }
+
         let common_re = |zone: &str,
                          count: usize,
                          desc: String,

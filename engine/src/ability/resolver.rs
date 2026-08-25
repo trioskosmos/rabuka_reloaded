@@ -89,6 +89,11 @@ pub struct AbilityResolver {
     pub keep_shuffle_selected: SmallVec<[u8; 8]>,
     pub spawn_context: EffectSpawnContext,
     pub sub_choice_created: bool,
+    /// Set when a parent-conditional (そうした場合) sequential defers on a
+    /// choice whose outcome decides the gate. The choice answer handler
+    /// consumes it: empty/skip answer drops the remaining actions; a real
+    /// selection lets them run.
+    pub deferred_conditional_gate: bool,
     /// Snapshot of `selected_cards.len()` taken when a choice is created
     /// by a distinct/target_count action. Used by the saved action to exclude
     /// cards selected BEFORE the choice, without excluding the card selected
@@ -205,6 +210,7 @@ impl AbilityResolver {
             keep_shuffle_selected: SmallVec::new(),
             spawn_context: EffectSpawnContext::default(),
             sub_choice_created: false,
+            deferred_conditional_gate: false,
             selected_count_at_save: None,
             pending_stage_cards: SmallVec::new(),
             debug_trace: false,
@@ -231,6 +237,11 @@ impl AbilityResolver {
     }
 
     pub fn can_activate_effect(&self, gs: &mut GameState, effect: &AbilityEffect) -> bool {
+        log::debug!(
+            "[CAN_ACT_ENTER] action={:?} has_cond={}",
+            effect.action,
+            effect.condition.is_some()
+        );
         let ctx = super::condition::ConditionContext::with_moved_and_selected(
             gs,
             &self.moved_cards,

@@ -225,6 +225,22 @@ impl<'a> ConditionContext<'a> {
         }
 
         let count = self.get_count_for_condition(condition);
+        if condition.get_comparison_type() == Some("score") {
+            // Permanent diagnostic for score-aggregate comparisons (tie gates
+            // like 「自分と相手のライブの合計スコアが同じ場合」): the computed
+            // self total vs the opponent threshold is where these silently
+            // diverge.
+            let opp = self.get_count_for_target(condition, "opponent");
+            log::debug!(
+                "[SCORE_CMP] location={:?} aggregate={:?} scope={:?} self_total={} opp_total={} op={:?}",
+                condition.get_location(),
+                condition.get_aggregate(),
+                condition.get_scope(),
+                count,
+                opp,
+                condition.get_operator()
+            );
+        }
 
         if let Some(ref values) = condition.get_values() {
             if condition.get_comparison_type() == Some("score") {

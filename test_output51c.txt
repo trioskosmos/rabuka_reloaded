@@ -1,0 +1,15 @@
+PL!S-pb1-023-L | need_heart={'heart02': 6, 'heart04': 6, 'heart05': 6, 'heart0': 3} | score=9
+PL!SP-bp7-028-L | need_heart={'heart02': 3, 'heart03': 3, 'heart06': 3, 'heart0': 12} | score=8
+BIG MEMBER: PL!-sd1-001-SD | hearts={'heart01': 1, 'heart03': 2, 'heart06': 1}
+BIG MEMBER: PL!-sd1-003-SD | hearts={'heart01': 1, 'heart03': 2, 'heart06': 2}
+BIG MEMBER: PL!-sd1-004-SD | hearts={'heart01': 2, 'heart03': 1, 'heart06': 1}
+BIG MEMBER: PL!-sd1-006-SD | hearts={'heart01': 1, 'heart03': 1, 'heart06': 2}
+BIG MEMBER: PL!-sd1-009-SD | hearts={'heart01': 2, 'heart03': 2, 'heart06': 2}
+BIG MEMBER: PL!-sd1-014-SD | hearts={'heart01': 2, 'heart03': 1, 'heart06': 1}
+BIG MEMBER: PL!-sd1-017-SD | hearts={'heart01': 1, 'heart03': 2, 'heart06': 1}
+BIG MEMBER: PL!-sd1-018-SD | hearts={'heart01': 1, 'heart03': 1, 'heart06': 2}
+BIG MEMBER: PL!-PR-003-PR | hearts={'heart01': 2, 'heart03': 3, 'heart06': 1}
+BIG MEMBER: PL!-PR-004-PR | hearts={'heart01': 3, 'heart03': 1, 'heart06': 2}
+BIG MEMBER: PL!-PR-015-PR | hearts={'heart03': 3, 'heart06': 3}
+BIG MEMBER: PL!-PR-018-PR | hearts={'heart01': 3, 'heart06': 3}
+BIG MEMBER: PL!-PR-020-PR | hearts={'heart01': 1, 'heart02': 1, 'heart06': 3}

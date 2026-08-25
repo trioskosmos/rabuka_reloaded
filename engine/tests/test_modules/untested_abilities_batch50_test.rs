@@ -139,7 +139,15 @@ fn pb2030_choose_third_option_transforms() {
 
 // ====================================================================
 // PL!HS-cl1-012-CL Edelied — tie-score gates cost>=9 yell-revealed fetch
+//
+// Live score totals only count lives whose need_heart is satisfied by
+// stage members (calculate_live_score). We use PL!S-bp7-024-L
+// (score=1, need={heart04:2}) on both sides with a heart04>=2 member
+// staged per player so each side's total is genuinely 1.
 // ====================================================================
+
+const TIED_LIVE: &str = "PL!S-bp7-024-L"; // score 1, need {heart04:2}
+const SATISFYING_MEMBER: &str = "PL!S-PR-014-PR"; // base_heart heart04:2
 
 fn edelied_setup(game: &mut TestGame) {
     let filler = game.new_id("PL!-sd1-010-SD");
@@ -148,29 +156,44 @@ fn edelied_setup(game: &mut TestGame) {
     game.state.player1.live_card_zone.cards.push(live);
 }
 
+/// Place the tied live + a satisfying member for one player.
+fn place_tied_live(game: &mut TestGame, player: u8) {
+    let l = game.new_id(TIED_LIVE);
+    let member = game.id(SATISFYING_MEMBER);
+    let (p, stage_idx) = if player == 1 {
+        (&mut game.state.player1, 2usize)
+    } else {
+        (&mut game.state.player2, 2usize)
+    };
+    p.live_card_zone.cards.push(l);
+    p.stage.stage[stage_idx] = member;
+    // calculate_live_score reads player.stage_hearts (a precomputed
+    // snapshot set during execute_live_victory_determination); tests that
+    // bypass the live flow must populate it explicitly.
+    p.stage_hearts = Some(p.calculate_stage_hearts(
+        &game.db,
+        &game.state.mods.heart_color_multiplier,
+        &game.state.mods.heart_override,
+        &game.state.mods.heart_modifiers,
+        &game.state.mods.heart_copy,
+    ));
+}
+
 #[test]
 fn cl1012_tie_score_retrieves_cost_nine_member() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     edelied_setup(&mut game);
 
-    // Equal-score lives on BOTH sides -> tie.
-    let l1 = game.new_id("PL!S-pb1-023-L"); // score 9
-    let l2 = game.new_id("PL!S-pb1-023-L");
-    game.state.player1.live_card_zone.cards.push(l1);
-    game.state.player2.live_card_zone.cards.push(l2);
+    // Both sides run the same satisfied live -> totals 1 == 1 (tie).
+    place_tied_live(&mut game, 1);
+    place_tied_live(&mut game, 2);
 
     // Yell-revealed pool: an EXPENSIVE member and a cheap one.
     let expensive = game.new_id("PL!HS-bp5-004-R"); // cost 15 >= 9
     let cheap = game.new_id("PL!SP-PR-003-PR"); // cost 2 < 9
     game.state.revealed_cards.push(expensive);
     game.state.revealed_cards.push(cheap);
-    eprintln!(
-        "PROBE cl1012 expensive={} cheap={} revealed={:?}",
-        expensive,
-        cheap,
-        game.state.revealed_cards
-    );
 
     let live_id = game.id_ref("PL!HS-cl1-012-CL");
     fire_trigger(&mut game, live_id, AbilityTrigger::LiveSuccess, "ライブ成功時");
@@ -191,22 +214,14 @@ fn cl1012_tie_score_retrieves_cost_nine_member() {
 }
 
 #[test]
-#[ignore = "KNOWN GAP (bug 18): 「自分と相手のライブの合計スコアが同じ場合」 \
-tie-score comparison is not enforced for this shape — the retrieval fires \
-even when the totals differ (9 vs 8 observed). The COST>=9 filter half IS \
-now fixed and pinned by cl1012_tie_score_retrieves_cost_nine_member; this \
-test tracks the missing tie gate until score-aggregate both-scope \
-comparisons land."]
 fn cl1012_unequal_scores_no_retrieval() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     edelied_setup(&mut game);
 
-    // UNEQUAL live totals: own 9, opponent 8.
-    let mine = game.new_id("PL!S-pb1-023-L"); // score 9
-    let theirs = game.new_id("PL!SP-bp7-028-L"); // score 8
-    game.state.player1.live_card_zone.cards.push(mine);
-    game.state.player2.live_card_zone.cards.push(theirs);
+    // p1 runs the satisfied live (total=1); p2's identical live is NOT
+    // satisfied (no matching member) -> total=0. 1 != 0 -> no tie.
+    place_tied_live(&mut game, 1);
 
     let expensive = game.new_id("PL!HS-bp5-004-R");
     game.state.revealed_cards.push(expensive);

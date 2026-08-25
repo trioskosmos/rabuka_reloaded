@@ -384,6 +384,11 @@ impl AbilityResolver {
                         gs: &mut crate::game_state::GameState,
                         remaining: Vec<Box<AbilityEffect>>,
                     ) {
+                        log::debug!(
+                            "[SAVE_REMAINING] count={} actions={:?}",
+                            remaining.len(),
+                            remaining.iter().map(|a| a.action).collect::<Vec<_>>()
+                        );
                         if !remaining.is_empty() {
                             let mut existing = gs.ability_queue.take_pending_actions();
                             existing.extend(remaining.into_iter().map(|b| *b));
@@ -472,6 +477,18 @@ impl AbilityResolver {
                                 let is_opponent_action = action.action
                                     == ActionType::OpponentAction
                                     || action.action_by().as_deref() == Some("opponent");
+                                // Parent-conditional (そうした場合) gating: when
+                                // the gate could not be evaluated yet (the move
+                                // deferred to a selection), arm the deferred
+                                // gate so the answer handler attributes the
+                                // outcome (empty/skip => drop remaining).
+                                if conditional
+                                    && action.condition.is_none()
+                                    && condition_failed.is_none()
+                                    && !is_opponent_action
+                                {
+                                    self.deferred_conditional_gate = true;
+                                }
                                 // Some handlers fully execute the effect during choice
                                 // resolution (SelectCard moves cards, PositionChange swaps
                                 // members). Re-executing with optional=None would duplicate
