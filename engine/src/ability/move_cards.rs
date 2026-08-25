@@ -757,7 +757,9 @@ impl AbilityResolver {
             card_type_filter,
             group_name,
             cost_limit,
-            None, // cost_operator
+            // Honor the operator (e.g. 「コスト9以上」 >=) — dropping it let
+            // below-threshold cards through the selection.
+            effect.cost_limit_operator_any().map(Operator::as_str),
             character_filter,
             name_fragments,
             None, // distinct
@@ -1782,7 +1784,9 @@ impl AbilityResolver {
                 c.card_type_filter,
                 c.group_name,
                 c.cost_limit,
-                None, // cost_operator
+                // Honor the operator (e.g. 「コスト9以上」 >=) — dropping it
+                // let below-threshold cards through the selection.
+                c.effect.cost_limit_operator_any().map(Operator::as_str),
                 c.character_filter,
                 None, // name_fragments
                 None, // distinct

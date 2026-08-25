@@ -1407,7 +1407,11 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) {
         let choice = effect.choice_any().unwrap_or(false);
-        log::debug!("specify_heart_color: choice={}", choice);
+        log::debug!(
+            "[SPECIFY_HEART] entry: choice_any={} action={:?}",
+            choice,
+            effect.action
+        );
         if choice {
             // Q190 (2025.11.17): ALL heart (heart00) cannot be selected.
             // Present the 6 individual heart colors for the player to choose.

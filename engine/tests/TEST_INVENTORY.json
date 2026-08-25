@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T01:40:14.210801+00:00",
+  "generated_at": "2026-08-25T02:44:06.204089+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 476,
-  "n_tests": 2843,
+  "n_files": 478,
+  "n_tests": 2848,
   "total_cards": 771,
-  "covered_cards": 719,
-  "abilities_on_covered": 884,
+  "covered_cards": 721,
+  "abilities_on_covered": 886,
   "trigger_counts": {
     "起動": [
       89,
@@ -22,7 +22,7 @@
       269
     ],
     "ライブ開始時": [
-      249,
+      250,
       268
     ],
     "(none)": [
@@ -30,7 +30,7 @@
       2
     ],
     "ライブ成功時": [
-      113,
+      114,
       122
     ],
     "常時": [
@@ -44,7 +44,7 @@
   },
   "action_counts": {
     "move_cards": [
-      135,
+      136,
       146
     ],
     "look_and_select": [
@@ -56,7 +56,7 @@
       160
     ],
     "sequential": [
-      207,
+      208,
       219
     ],
     "unknown": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      514,
+      515,
       545
     ],
     "temporal_condition": [
@@ -190,7 +190,7 @@
       13
     ],
     "comparison_condition": [
-      55,
+      56,
       60
     ],
     "card_count_condition": [
@@ -300,19 +300,19 @@
       31
     ],
     "pb2": [
-      40,
+      41,
       43
     ],
     "cl1": [
-      8,
+      9,
       10
     ]
   },
   "depth_counts": {
     "L2+choice": 633,
-    "L1+choice": 175,
+    "L1+choice": 177,
     "L2": 28,
-    "none": 52,
+    "none": 50,
     "L1": 48
   },
   "qa_rulings": {
@@ -9761,7 +9761,8 @@
         "engine/tests/test_modules/untested_abilities_batch11_test.rs",
         "engine/tests/test_modules/untested_abilities_batch42_test.rs",
         "engine/tests/test_modules/untested_abilities_batch47_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch49_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch49_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch50_test.rs"
       ],
       "covering_tests": [
         "bp5010_mill_happens_even_without_arise",
@@ -9790,12 +9791,12 @@
         "cl1004_choose_wait_enemy",
         "cl1010_cheap_member_no_blades",
         "cl1010_expensive_member_two_blades",
+        "cl1012_tie_score_retrieves_cost_nine_member",
         "cl1_006_debut_gains_three_blades",
         "go_master_start_equal_success_cards_no_score",
-        "go_master_start_fewer_success_cards_scores",
-        "jellyfish_member_moved_by_position_change_without_appearing_this_turn_counts"
+        "go_master_start_fewer_success_cards_scores"
       ],
-      "covering_test_count": 70,
+      "covering_test_count": 74,
       "is_null": false
     },
     {
@@ -12041,7 +12042,8 @@
         "engine/tests/test_modules/untested_abilities_batch11_test.rs",
         "engine/tests/test_modules/untested_abilities_batch14_test.rs",
         "engine/tests/test_modules/untested_abilities_batch36_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch49_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch49_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch50_test.rs"
       ],
       "covering_tests": [
         "bp2024_cannot_place_blocks_both_live_zones",
@@ -12055,6 +12057,7 @@
         "cl1004_choose_wait_enemy",
         "cl1010_cheap_member_no_blades",
         "cl1010_expensive_member_two_blades",
+        "cl1012_tie_score_retrieves_cost_nine_member",
         "cl1_006_debut_gains_three_blades",
         "constant_blade_recompute_updates_when_condition_source_changes",
         "go_master_start_equal_success_cards_no_score",
@@ -12071,11 +12074,10 @@
         "note_mermaid_two_distinct_kaleidoscope_members_score",
         "pb1013_higher_cost_member_on_stage_draws",
         "pb1013_only_lower_cost_members_no_draw",
-        "pb2_029_debut_rests_low_cost_member",
-        "removing_teammate_reprohibits_without_stale_state",
-        "sd1022_live_start_grants_blade_to_all_aqours_members"
+        "pb2030_choose_first_option_transforms",
+        "pb2030_choose_third_option_transforms"
       ],
-      "covering_test_count": 33,
+      "covering_test_count": 37,
       "is_null": false
     },
     {
@@ -35122,6 +35124,7 @@
         "engine/tests/test_modules/untested_abilities_batch46_test.rs",
         "engine/tests/test_modules/untested_abilities_batch47_test.rs",
         "engine/tests/test_modules/untested_abilities_batch49_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch50_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
@@ -35159,7 +35162,7 @@
         "bp7020_constant_blades_while_energy_ahead",
         "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly"
       ],
-      "covering_test_count": 326,
+      "covering_test_count": 330,
       "is_null": false
     },
     {
@@ -38049,14 +38052,21 @@
         "PL!HS-cl1-012-CL"
       ],
       "base": "PL!HS-cl1-012",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch50_test.rs"
+      ],
+      "covering_tests": [
+        "cl1012_tie_score_retrieves_cost_nine_member",
+        "pb2030_choose_first_option_transforms",
+        "pb2030_choose_third_option_transforms",
+        "sd2005_specify_color_grants_exactly_two_of_one_color"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -38752,14 +38762,21 @@
         "PL!SP-pb2-030-N"
       ],
       "base": "PL!SP-pb2-030",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch50_test.rs"
+      ],
+      "covering_tests": [
+        "cl1012_tie_score_retrieves_cost_nine_member",
+        "pb2030_choose_first_option_transforms",
+        "pb2030_choose_third_option_transforms",
+        "sd2005_specify_color_grants_exactly_two_of_one_color"
+      ],
+      "covering_test_count": 4,
       "is_null": false
     },
     {
@@ -40880,16 +40897,21 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/bp7_mirai_no_oto_optional_test.rs"
+        "engine/tests/test_modules/bp7_mirai_no_oto_optional_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch50_test.rs"
       ],
       "covering_tests": [
+        "cl1012_tie_score_retrieves_cost_nine_member",
         "mirai_accept_moves_9_to_deck_bottom_and_grants_blade",
         "mirai_accept_moves_available_when_fewer_than_9",
         "mirai_blade_applies_to_all_stage_members",
         "mirai_non_liella_in_discard_not_moved",
-        "mirai_skip_leaves_discard_and_no_blade"
+        "mirai_skip_leaves_discard_and_no_blade",
+        "pb2030_choose_first_option_transforms",
+        "pb2030_choose_third_option_transforms",
+        "sd2005_specify_color_grants_exactly_two_of_one_color"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 9,
       "is_null": false
     },
     {
@@ -40912,16 +40934,21 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/bp7_mirai_no_oto_optional_test.rs"
+        "engine/tests/test_modules/bp7_mirai_no_oto_optional_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch50_test.rs"
       ],
       "covering_tests": [
+        "cl1012_tie_score_retrieves_cost_nine_member",
         "mirai_accept_moves_9_to_deck_bottom_and_grants_blade",
         "mirai_accept_moves_available_when_fewer_than_9",
         "mirai_blade_applies_to_all_stage_members",
         "mirai_non_liella_in_discard_not_moved",
-        "mirai_skip_leaves_discard_and_no_blade"
+        "mirai_skip_leaves_discard_and_no_blade",
+        "pb2030_choose_first_option_transforms",
+        "pb2030_choose_third_option_transforms",
+        "sd2005_specify_color_grants_exactly_two_of_one_color"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 9,
       "is_null": false
     },
     {
@@ -41165,14 +41192,21 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/untested_abilities_batch45_test.rs"
+        "engine/tests/probe_rin.rs",
+        "engine/tests/test_modules/untested_abilities_batch45_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch50_test.rs"
       ],
       "covering_tests": [
         "bp7019_only_two_5ync_no_retrieval",
         "bp7019_three_5ync_retrieves_live_from_waitroom",
-        "bp7025_staged_chisato_gains_blade"
+        "bp7025_staged_chisato_gains_blade",
+        "cl1012_tie_score_retrieves_cost_nine_member",
+        "pb2030_choose_first_option_transforms",
+        "pb2030_choose_third_option_transforms",
+        "probe_sd2005_choice",
+        "sd2005_specify_color_grants_exactly_two_of_one_color"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 8,
       "is_null": false
     },
     {
