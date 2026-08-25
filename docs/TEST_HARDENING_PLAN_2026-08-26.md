@@ -25,6 +25,12 @@ Result: 16 gate shapes, all covered except three families — now tested in
 |---|---|---|
 | PL!S-bp6-002-R+ 桜内梨子 ab#0 | live_card_zone→discard, Aqours live, target=self | positive deck-top/bottom placement; μ's-live negative; own-side-only negative |
 | PL!N-pb1-009-R 天王寺璃奈 ab#0 | live_card_zone→discard + negated has_blade_heart, this_turn | positive draw+hearts; blade-heart-departure negative |
+| PL!N-bp5-005-R+ 宮下愛 ab#0 | stage→discard via REAL baton touch (rules 9.6.2.3.2/.1) | cost-15 newcomer full payoff (+2 energy AND draw); cost-13 boundary (energy only); blade-heart newcomer negative |
+
+Baton-touch semantics pinned from rules.txt + qa_data.json: the 「バトンタッチした」
+event belongs to the ARRIVING member's play (9.6.2.3.2.1); the departed ability's
+conditions describe the NEWCOMER; net payment = newcomer cost − occupant cost.
+Energy assertions require wait-state cards in the pool (activation flips wait→active).
 
 **Engine bugs found and fixed by this round:**
 

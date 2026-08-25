@@ -24,6 +24,23 @@ const NO_BLADE_MEMBER: &str = "PL!-sd1-001-SD";
 /// 花陽: blade_heart={'b_heart03': 1}.
 const BLADE_MEMBER: &str = "PL!-sd1-008-SD";
 
+/// 宮下愛 ab#0 (自動): このメンバーがステージから控え室に置かれたとき、
+/// このメンバーがコスト10以上のブレードハートを持たない『虹ヶ咲』のメンバーと
+/// バトンタッチしてしていた場合、エネルギーを2枚アクティブにする。
+/// コスト15以上…の場合、さらにカードを1枚引く。
+///
+/// Rules 9.6.2.3.2/.1: baton touch = the OCCUPANT goes to the waitroom during
+/// the arrival's cost payment, generating the 「バトンタッチした」 event for
+/// the ARRIVING member's play; this ability's conditions therefore describe
+/// the NEWCOMER.
+const MIYAMIYA: &str = "PL!N-bp5-005-R\u{ff0b}";
+/// 桜坂しずく cost=15, blade_heart=None → full payoff (+2 energy AND draw 1).
+const NEWCOMER_COST15: &str = "PL!N-bp7-003-R\u{ff0b}";
+/// 優木せつ菜 cost=13, blade_heart=None → energy-only branch.
+const NEWCOMER_COST13: &str = "PL!N-bp4-007-R\u{ff0b}";
+/// 天王寺璃奈 cost=13, blade_heart=YES → negated property blocks everything.
+const NEWCOMER_BLADE_HEART: &str = "PL!N-bp4-009-R";
+
 /// Move `card` live_card_zone→waitroom as a real effect-caused zone change
 /// and arm the movement batch exactly like the engine does.
 fn move_live_to_waitroom(g: &mut TestGame, card: i16, owner_side: u8, causer: &str) {
@@ -272,5 +289,155 @@ fn reina_silent_when_blade_heart_member_left_live_zone() {
             .get_heart_modifier(reina, HeartColor::Heart03),
         0,
         "blade-heart departure must NOT grant hearts"
+    );
+}
+
+/// Real baton touch: a cost-15 non-blade-heart Niji member replaces 宮下愛 →
+/// she leaves stage→waitroom, the baton_touch condition passes fully →
+/// activate 2 energy AND draw 1.
+#[test]
+fn miyamiya_baton_touch_cost15_newcomer_full_payoff() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let ai = g.id(MIYAMIYA);
+    let newcomer = g.id(NEWCOMER_COST15);
+    let filler = g.id("PL!-sd1-010-SD");
+
+    g.state.player1.stage.stage[1] = ai;
+    fill_decks(&mut g, filler);
+    g.state.player1.hand.cards.push(newcomer);
+    g.give_energy(25);
+    // Leave 5 in wait state so the ability's "activate 2" has cards to flip.
+    let wait_pool = 5u8;
+    g.state.player1.energy_zone.set_active_count(25 - wait_pool);
+
+    let active_before = g.state.player1.energy_zone.active_count();
+    let hand_before = g.state.player1.hand.cards.len();
+
+    // Playing onto the occupied center slot performs the baton touch
+    // (rules 9.6.2.3.2): Ai -> waitroom, newcomer arrives; net payment =
+    // newcomer cost - Ai's printed cost.
+    g.play_to_stage(newcomer, rabuka_engine::zones::MemberArea::Center);
+    while g.has_pending_choice() {
+        g.select_indices(&[]);
+    }
+
+    let ai_cost = i32::from(
+        g.state.card_database.get_card(ai).unwrap().cost.unwrap(),
+    );
+    let nc_cost = i32::from(
+        g.state
+            .card_database
+            .get_card(newcomer)
+            .unwrap()
+            .cost
+            .unwrap(),
+    );
+    assert_eq!(
+        i32::from(g.state.player1.energy_zone.active_count()),
+        i32::from(active_before) - (nc_cost - ai_cost) + 2,
+        "paid {paid} net after baton discount, then activated 2 wait energy",
+        paid = nc_cost - ai_cost
+    );
+    assert_eq!(
+        g.state.player1.hand.cards.len(),
+        hand_before - 1 + 1,
+        "newcomer left hand (-1) and the ability drew 1 (+1)"
+    );
+}
+
+/// Boundary: cost-13 (>=10 but <15) non-blade-heart Niji newcomer →
+/// energy only, no draw.
+#[test]
+fn miyamiya_baton_touch_cost13_newcomer_energy_only() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let ai = g.id(MIYAMIYA);
+    let newcomer = g.id(NEWCOMER_COST13);
+    let filler = g.id("PL!-sd1-010-SD");
+
+    g.state.player1.stage.stage[1] = ai;
+    fill_decks(&mut g, filler);
+    g.state.player1.hand.cards.push(newcomer);
+    g.give_energy(25);
+    let wait_pool = 5u8;
+    g.state.player1.energy_zone.set_active_count(25 - wait_pool);
+
+    let active_before = g.state.player1.energy_zone.active_count();
+    let hand_before = g.state.player1.hand.cards.len();
+
+    g.play_to_stage(newcomer, rabuka_engine::zones::MemberArea::Center);
+    while g.has_pending_choice() {
+        g.select_indices(&[]);
+    }
+
+    let ai_cost = i32::from(
+        g.state.card_database.get_card(ai).unwrap().cost.unwrap(),
+    );
+    let nc_cost = i32::from(
+        g.state
+            .card_database
+            .get_card(newcomer)
+            .unwrap()
+            .cost
+            .unwrap(),
+    );
+    assert_eq!(
+        i32::from(g.state.player1.energy_zone.active_count()),
+        i32::from(active_before) - (nc_cost - ai_cost) + 2,
+        "cost-13 newcomer still clears the >=10 gate: activate 2 energy"
+    );
+    assert_eq!(
+        g.state.player1.hand.cards.len(),
+        hand_before - 1,
+        "below cost 15: NO draw (newcomer just left hand)"
+    );
+}
+
+/// Negative: the replacing member HAS a blade heart → negated property fails
+/// → no energy activation at all.
+#[test]
+fn miyamiya_baton_touch_blade_heart_newcomer_nothing() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let ai = g.id(MIYAMIYA);
+    let newcomer = g.id(NEWCOMER_BLADE_HEART);
+    let filler = g.id("PL!-sd1-010-SD");
+
+    g.state.player1.stage.stage[1] = ai;
+    fill_decks(&mut g, filler);
+    g.state.player1.hand.cards.push(newcomer);
+    g.give_energy(25);
+    let wait_pool = 5u8;
+    g.state.player1.energy_zone.set_active_count(25 - wait_pool);
+
+    let active_before = g.state.player1.energy_zone.active_count();
+    let hand_before = g.state.player1.hand.cards.len();
+
+    g.play_to_stage(newcomer, rabuka_engine::zones::MemberArea::Center);
+    while g.has_pending_choice() {
+        g.select_indices(&[]);
+    }
+
+    let ai_cost = i32::from(
+        g.state.card_database.get_card(ai).unwrap().cost.unwrap(),
+    );
+    let nc_cost = i32::from(
+        g.state
+            .card_database
+            .get_card(newcomer)
+            .unwrap()
+            .cost
+            .unwrap(),
+    );
+    assert_eq!(
+        i32::from(g.state.player1.energy_zone.active_count()),
+        i32::from(active_before) - (nc_cost - ai_cost),
+        "blade-heart newcomer must NOT activate energy — only the net cost was paid"
+    );
+    assert_eq!(
+        g.state.player1.hand.cards.len(),
+        hand_before - 1,
+        "no draw either — only the normal play happened"
     );
 }

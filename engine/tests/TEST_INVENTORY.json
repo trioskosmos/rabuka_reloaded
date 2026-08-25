@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T17:08:10.345109+00:00",
+  "generated_at": "2026-08-25T17:34:24.550011+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 487,
-  "n_tests": 2953,
+  "n_tests": 2956,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,9 +309,9 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 676,
+    "L2+choice": 677,
     "L1+choice": 185,
-    "L2": 27,
+    "L2": 26,
     "L1": 48
   },
   "qa_rulings": {
@@ -4626,7 +4626,8 @@
         "engine/tests/test_modules/constant_edge_case_test.rs",
         "engine/tests/test_modules/dive_false_trigger_test.rs",
         "engine/tests/test_modules/l0_gap_constant_test.rs",
-        "engine/tests/test_modules/l0_gap_livestart3_test.rs"
+        "engine/tests/test_modules/l0_gap_livestart3_test.rs",
+        "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
         "ab1_no_blade_when_statically_in_live_zone",
@@ -4643,24 +4644,24 @@
         "honoka_distinct_names_two_members",
         "kanon_alone_cannot_live",
         "kanon_with_other_member_no_restriction",
+        "miyamiya_baton_touch_blade_heart_newcomer_nothing",
+        "miyamiya_baton_touch_cost13_newcomer_energy_only",
+        "miyamiya_baton_touch_cost15_newcomer_full_payoff",
         "natural_draw_from_deck_does_not_arm_dive",
         "nsd1_001_targets_other_niji_members_not_self",
+        "reina_fires_after_non_blade_member_left_live_zone",
+        "reina_silent_when_blade_heart_member_left_live_zone",
+        "riko_aqours_live_leaving_live_zone_offers_deck_placement",
         "riko_compound_and_condition_both_met",
         "riko_compound_and_condition_removal",
         "riko_compound_and_opponent_empty",
         "riko_compound_and_own_has_cards",
+        "riko_ignores_non_aqours_live_leaving_live_zone",
+        "riko_responds_only_to_own_side_live_zone",
         "rina_copies_from_multiple_under_cards",
-        "rina_gains_ability_from_under_member",
-        "rina_no_under_cards",
-        "rina_not_on_stage",
-        "rina_only_copies_live_success_not_constant",
-        "rina_respects_cost_limit",
-        "sumire_pr_center_position_grants_blade",
-        "two_dive_copies_only_the_moved_one_places",
-        "umi_opponent_score_below_six",
-        "umi_opponent_score_drops_below_threshold"
+        "rina_gains_ability_from_under_member"
       ],
-      "covering_test_count": 36,
+      "covering_test_count": 44,
       "is_null": false
     },
     {
@@ -4690,7 +4691,8 @@
         "engine/tests/test_modules/constant_edge_case_test.rs",
         "engine/tests/test_modules/dive_false_trigger_test.rs",
         "engine/tests/test_modules/l0_gap_constant_test.rs",
-        "engine/tests/test_modules/l0_gap_livestart3_test.rs"
+        "engine/tests/test_modules/l0_gap_livestart3_test.rs",
+        "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
         "ab1_no_blade_when_statically_in_live_zone",
@@ -4707,24 +4709,24 @@
         "honoka_distinct_names_two_members",
         "kanon_alone_cannot_live",
         "kanon_with_other_member_no_restriction",
+        "miyamiya_baton_touch_blade_heart_newcomer_nothing",
+        "miyamiya_baton_touch_cost13_newcomer_energy_only",
+        "miyamiya_baton_touch_cost15_newcomer_full_payoff",
         "natural_draw_from_deck_does_not_arm_dive",
         "nsd1_001_targets_other_niji_members_not_self",
+        "reina_fires_after_non_blade_member_left_live_zone",
+        "reina_silent_when_blade_heart_member_left_live_zone",
+        "riko_aqours_live_leaving_live_zone_offers_deck_placement",
         "riko_compound_and_condition_both_met",
         "riko_compound_and_condition_removal",
         "riko_compound_and_opponent_empty",
         "riko_compound_and_own_has_cards",
+        "riko_ignores_non_aqours_live_leaving_live_zone",
+        "riko_responds_only_to_own_side_live_zone",
         "rina_copies_from_multiple_under_cards",
-        "rina_gains_ability_from_under_member",
-        "rina_no_under_cards",
-        "rina_not_on_stage",
-        "rina_only_copies_live_success_not_constant",
-        "rina_respects_cost_limit",
-        "sumire_pr_center_position_grants_blade",
-        "two_dive_copies_only_the_moved_one_places",
-        "umi_opponent_score_below_six",
-        "umi_opponent_score_drops_below_threshold"
+        "rina_gains_ability_from_under_member"
       ],
-      "covering_test_count": 36,
+      "covering_test_count": 44,
       "is_null": false
     },
     {
@@ -4754,7 +4756,8 @@
         "engine/tests/test_modules/constant_edge_case_test.rs",
         "engine/tests/test_modules/dive_false_trigger_test.rs",
         "engine/tests/test_modules/l0_gap_constant_test.rs",
-        "engine/tests/test_modules/l0_gap_livestart3_test.rs"
+        "engine/tests/test_modules/l0_gap_livestart3_test.rs",
+        "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
         "ab1_no_blade_when_statically_in_live_zone",
@@ -4771,24 +4774,24 @@
         "honoka_distinct_names_two_members",
         "kanon_alone_cannot_live",
         "kanon_with_other_member_no_restriction",
+        "miyamiya_baton_touch_blade_heart_newcomer_nothing",
+        "miyamiya_baton_touch_cost13_newcomer_energy_only",
+        "miyamiya_baton_touch_cost15_newcomer_full_payoff",
         "natural_draw_from_deck_does_not_arm_dive",
         "nsd1_001_targets_other_niji_members_not_self",
+        "reina_fires_after_non_blade_member_left_live_zone",
+        "reina_silent_when_blade_heart_member_left_live_zone",
+        "riko_aqours_live_leaving_live_zone_offers_deck_placement",
         "riko_compound_and_condition_both_met",
         "riko_compound_and_condition_removal",
         "riko_compound_and_opponent_empty",
         "riko_compound_and_own_has_cards",
+        "riko_ignores_non_aqours_live_leaving_live_zone",
+        "riko_responds_only_to_own_side_live_zone",
         "rina_copies_from_multiple_under_cards",
-        "rina_gains_ability_from_under_member",
-        "rina_no_under_cards",
-        "rina_not_on_stage",
-        "rina_only_copies_live_success_not_constant",
-        "rina_respects_cost_limit",
-        "sumire_pr_center_position_grants_blade",
-        "two_dive_copies_only_the_moved_one_places",
-        "umi_opponent_score_below_six",
-        "umi_opponent_score_drops_below_threshold"
+        "rina_gains_ability_from_under_member"
       ],
-      "covering_test_count": 36,
+      "covering_test_count": 44,
       "is_null": false
     },
     {
@@ -5818,21 +5821,30 @@
       ],
       "base": "PL!N-bp5-005",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/miyashita_ai_bp5_test.rs"
+        "engine/tests/test_modules/miyashita_ai_bp5_test.rs",
+        "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
+        "miyamiya_baton_touch_blade_heart_newcomer_nothing",
+        "miyamiya_baton_touch_cost13_newcomer_energy_only",
+        "miyamiya_baton_touch_cost15_newcomer_full_payoff",
         "niji_bp5_partner_cost10_noblade_energizes_2",
         "niji_bp5_partner_cost15_noblade_energizes_2_and_draws_1",
         "niji_bp5_partner_low_cost_nothing_fires",
         "niji_bp5_partner_not_nijigasaki_nothing_fires",
-        "niji_bp5_partner_with_blade_heart_nothing_fires"
+        "niji_bp5_partner_with_blade_heart_nothing_fires",
+        "reina_fires_after_non_blade_member_left_live_zone",
+        "reina_silent_when_blade_heart_member_left_live_zone",
+        "riko_aqours_live_leaving_live_zone_offers_deck_placement",
+        "riko_ignores_non_aqours_live_leaving_live_zone",
+        "riko_responds_only_to_own_side_live_zone"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -7297,6 +7309,9 @@
         "dia_bp6_live_start_triggers_with_2plus_cards",
         "dia_bp6_lt2_cards_no_trigger",
         "dia_bp6_zero_cards_no_trigger",
+        "miyamiya_baton_touch_blade_heart_newcomer_nothing",
+        "miyamiya_baton_touch_cost13_newcomer_energy_only",
+        "miyamiya_baton_touch_cost15_newcomer_full_payoff",
         "reina_fires_after_non_blade_member_left_live_zone",
         "reina_silent_when_blade_heart_member_left_live_zone",
         "riko_aqours_live_leaving_live_zone_offers_deck_placement",
@@ -7318,12 +7333,9 @@
         "riko_bp6_auto_turn_limit_blocks_second_trigger_exact",
         "riko_bp6_has_heart_type_all",
         "riko_bp6_live_end_clears_all_heart",
-        "riko_bp6_live_start_aggregate_below_threshold_no_hearts",
-        "riko_bp6_live_start_empty_zone_no_hearts",
-        "riko_bp6_live_start_mix_fills_3_slots_passes",
-        "riko_bp6_live_start_non_aq_present_all_members_fails"
+        "riko_bp6_live_start_aggregate_below_threshold_no_hearts"
       ],
-      "covering_test_count": 49,
+      "covering_test_count": 52,
       "is_null": false
     },
     {
@@ -7359,6 +7371,9 @@
         "dia_bp6_live_start_triggers_with_2plus_cards",
         "dia_bp6_lt2_cards_no_trigger",
         "dia_bp6_zero_cards_no_trigger",
+        "miyamiya_baton_touch_blade_heart_newcomer_nothing",
+        "miyamiya_baton_touch_cost13_newcomer_energy_only",
+        "miyamiya_baton_touch_cost15_newcomer_full_payoff",
         "reina_fires_after_non_blade_member_left_live_zone",
         "reina_silent_when_blade_heart_member_left_live_zone",
         "riko_aqours_live_leaving_live_zone_offers_deck_placement",
@@ -7380,12 +7395,9 @@
         "riko_bp6_auto_turn_limit_blocks_second_trigger_exact",
         "riko_bp6_has_heart_type_all",
         "riko_bp6_live_end_clears_all_heart",
-        "riko_bp6_live_start_aggregate_below_threshold_no_hearts",
-        "riko_bp6_live_start_empty_zone_no_hearts",
-        "riko_bp6_live_start_mix_fills_3_slots_passes",
-        "riko_bp6_live_start_non_aq_present_all_members_fails"
+        "riko_bp6_live_start_aggregate_below_threshold_no_hearts"
       ],
-      "covering_test_count": 49,
+      "covering_test_count": 52,
       "is_null": false
     },
     {
@@ -8239,13 +8251,17 @@
         "engine/tests/test_modules/bp7_heart_copy_test.rs",
         "engine/tests/test_modules/bp7_q278_q279_joint_blade_test.rs",
         "engine/tests/test_modules/bp7_under_member_per_unit_blade_test.rs",
-        "engine/tests/test_modules/l0_gap_livestart2_test.rs"
+        "engine/tests/test_modules/l0_gap_livestart2_test.rs",
+        "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
         "bp7_003_per_under_member_blade",
         "chika_constant_blade_counts_only_under",
         "chika_constant_blade_per_member_under",
         "chika_constant_blade_zero_under",
+        "miyamiya_baton_touch_blade_heart_newcomer_nothing",
+        "miyamiya_baton_touch_cost13_newcomer_energy_only",
+        "miyamiya_baton_touch_cost15_newcomer_full_payoff",
         "q278_ayumu_plus_joint_is_two_blades",
         "q279_all_singles_plus_joint_is_three_blades",
         "q279_three_singles_no_joint_is_three_blades",
@@ -8253,6 +8269,11 @@
         "qjoint_alone_is_one_blade",
         "qpartial_singles_plus_joint_counts_new_mitigating_name",
         "qzero_under_is_zero_blades",
+        "reina_fires_after_non_blade_member_left_live_zone",
+        "reina_silent_when_blade_heart_member_left_live_zone",
+        "riko_aqours_live_leaving_live_zone_offers_deck_placement",
+        "riko_ignores_non_aqours_live_leaving_live_zone",
+        "riko_responds_only_to_own_side_live_zone",
         "shizuku_heart_copy_matches_placed_card",
         "shizuku_heart_copy_no_discard_card",
         "shizuku_heart_copy_rejects_cost_over_17",
@@ -8263,7 +8284,7 @@
         "shizuku_live_start_blade_zero_under",
         "sp_bp2_009_per_two_hand_cards_blade"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 28,
       "is_null": false
     },
     {
@@ -8292,13 +8313,17 @@
         "engine/tests/test_modules/bp7_heart_copy_test.rs",
         "engine/tests/test_modules/bp7_q278_q279_joint_blade_test.rs",
         "engine/tests/test_modules/bp7_under_member_per_unit_blade_test.rs",
-        "engine/tests/test_modules/l0_gap_livestart2_test.rs"
+        "engine/tests/test_modules/l0_gap_livestart2_test.rs",
+        "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
         "bp7_003_per_under_member_blade",
         "chika_constant_blade_counts_only_under",
         "chika_constant_blade_per_member_under",
         "chika_constant_blade_zero_under",
+        "miyamiya_baton_touch_blade_heart_newcomer_nothing",
+        "miyamiya_baton_touch_cost13_newcomer_energy_only",
+        "miyamiya_baton_touch_cost15_newcomer_full_payoff",
         "q278_ayumu_plus_joint_is_two_blades",
         "q279_all_singles_plus_joint_is_three_blades",
         "q279_three_singles_no_joint_is_three_blades",
@@ -8306,6 +8331,11 @@
         "qjoint_alone_is_one_blade",
         "qpartial_singles_plus_joint_counts_new_mitigating_name",
         "qzero_under_is_zero_blades",
+        "reina_fires_after_non_blade_member_left_live_zone",
+        "reina_silent_when_blade_heart_member_left_live_zone",
+        "riko_aqours_live_leaving_live_zone_offers_deck_placement",
+        "riko_ignores_non_aqours_live_leaving_live_zone",
+        "riko_responds_only_to_own_side_live_zone",
         "shizuku_heart_copy_matches_placed_card",
         "shizuku_heart_copy_no_discard_card",
         "shizuku_heart_copy_rejects_cost_over_17",
@@ -8316,7 +8346,7 @@
         "shizuku_live_start_blade_zero_under",
         "sp_bp2_009_per_two_hand_cards_blade"
       ],
-      "covering_test_count": 20,
+      "covering_test_count": 28,
       "is_null": false
     },
     {
@@ -12643,7 +12673,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 837,
+      "covering_test_count": 840,
       "is_null": false
     },
     {
@@ -18634,7 +18664,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/untested_abilities_batch7_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch7_test.rs",
+        "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
         "hanamaru_pb1_007_empty_energy_deck_degrades_gracefully",
@@ -18661,14 +18692,14 @@
         "mari_bp5_008_exactly_two_surplus_qualifies",
         "mari_bp5_008_no_surplus_when_need_covers_hearts",
         "mari_bp5_008_opponent_surplus_gates_live_total_bonus",
-        "rin_bp4_009_both_stages_empty_does_not_fire",
-        "rin_bp4_009_equal_totals_do_not_fire",
-        "rin_bp4_009_higher_own_total_does_not_fire",
-        "rin_bp4_009_lower_total_draws_two_puts_one_on_top",
-        "rin_bp4_009_own_empty_stage_counts_as_zero_and_fires",
-        "ruby_pb1_009_combined_count_threshold"
+        "miyamiya_baton_touch_blade_heart_newcomer_nothing",
+        "miyamiya_baton_touch_cost13_newcomer_energy_only",
+        "miyamiya_baton_touch_cost15_newcomer_full_payoff",
+        "reina_fires_after_non_blade_member_left_live_zone",
+        "reina_silent_when_blade_heart_member_left_live_zone",
+        "riko_aqours_live_leaving_live_zone_offers_deck_placement"
       ],
-      "covering_test_count": 33,
+      "covering_test_count": 41,
       "is_null": false
     },
     {
@@ -20100,6 +20131,9 @@
         "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
+        "miyamiya_baton_touch_blade_heart_newcomer_nothing",
+        "miyamiya_baton_touch_cost13_newcomer_energy_only",
+        "miyamiya_baton_touch_cost15_newcomer_full_payoff",
         "niji_bp5_partner_cost10_noblade_energizes_2",
         "niji_bp5_partner_cost15_noblade_energizes_2_and_draws_1",
         "niji_bp5_partner_low_cost_nothing_fires",
@@ -20111,7 +20145,7 @@
         "riko_ignores_non_aqours_live_leaving_live_zone",
         "riko_responds_only_to_own_side_live_zone"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 13,
       "is_null": false
     },
     {
@@ -26033,7 +26067,7 @@
         "bp5015_all_six_colors_present_two_blades",
         "bp5015_missing_colors_no_blades"
       ],
-      "covering_test_count": 408,
+      "covering_test_count": 411,
       "is_null": false
     },
     {
@@ -26154,7 +26188,7 @@
         "bp5015_all_six_colors_present_two_blades",
         "bp5015_missing_colors_no_blades"
       ],
-      "covering_test_count": 408,
+      "covering_test_count": 411,
       "is_null": false
     },
     {
@@ -26545,7 +26579,7 @@
         "issue6_natsumi_self_only_blade",
         "issue7_hajimari_no_success_live_no_effect"
       ],
-      "covering_test_count": 99,
+      "covering_test_count": 102,
       "is_null": false
     },
     {
