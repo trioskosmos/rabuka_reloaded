@@ -301,6 +301,21 @@ Also blocked-on-R1 (smaller):
 - Simultaneous two-player trigger ordering pins need stable event ids to be
   assertable deterministically
 
+Additional finds from the same trench work (not R1-gated):
+
+| # | Finding | Why it matters |
+|---|---|---|
+| A1 | `condition_is_event_based` does not understand **composite conditions** — OR(appearance ∪ area_move) watchers are treated as non-event-based and enqueued on *every* TAS pass, relying entirely on downstream guards | Any future guard regression silently multi-fires these; classification should recurse into `trigger_event.events` |
+| A2 | Debug output has **two independent switches**: gated logs check the `ABILITY_DEBUG` atomic (set by `TestGame::new` unless `--test-threads` appears in argv), plain `log::debug!` needs `RUST_LOG`. Running with `--test-threads=1` silently disables half the diagnostics | Debugging sessions lose the most valuable traces for no reason; derive one switch from `RUST_LOG` |
+| A3 | The `--test-threads` argv sniff itself is brittle (`-j`, env vars, CI runners all bypass it) | Same fix as A2 |
+| A4 | `effect_only` flag on MovementEvents is set inconsistently by callers (cost discards false, hook placements true, some executors unclear) | 「カードの効果によって」 scoping depends on this bit; worth a per-caller audit when R1 lands |
+| A5 | Test choice-answering has three channels (`select_indices` / `select_option` / `select_generated`) with overlapping failure modes — wrong channel yields silent no-ops ("Unknown source position") or raw-index garbage | One `answer_choice(game, idx)` dispatcher keyed off the pending choice's variant would kill a recurring test-bug class |
+| A6 | Corpus smoke parallelization swaps the process-global panic hook for its duration; panics in OTHER tests running concurrently in that window print nothing | Narrow race, cosmetic — note for whoever touches the smoke harness |
+
+Also open, cheap: corpus sweep for additional 「自分のカードの効果によって」/
+「〜でも発動する。」 shapes beyond the 4+7 pinned abilities (appearance-based
+variants may exist without their scope flags decoded).
+
 ### Continuous (parallel track)
 - ~~Test-gap burn-down: prioritize the 176 unreferenced abilities~~ **DONE at L0** —
   936/936 abilities on 771/771 cards referenced (batch 55 closed the list). Remaining
