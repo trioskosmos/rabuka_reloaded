@@ -150,6 +150,27 @@ impl<'a> ConditionContext<'a> {
         if let Some(v) = self.evaluate_check_self_condition(condition) {
             return v;
         }
+        // 「相手のエネルギーが自分よりN枚多い場合」 — relative ACTIVE energy
+        // comparison: (opponent_active - self_active) compared against `count`.
+        // Used by tiered alternatives (1 ahead -> +1; 2+ ahead -> instead +2).
+        if condition.get_comparison_type() == Some("energy_relative") {
+            let me = self.resolve_condition_player(condition.get_target().unwrap_or("self"));
+            let opp = self.game_state.resolve_target_player("opponent");
+            let mine = me.energy_zone.active_count() as i32;
+            let theirs = opp.energy_zone.active_count() as i32;
+            let ahead = (theirs - mine).max(0);
+            let n = condition.get_count().unwrap_or(0);
+            let op = condition.get_operator().unwrap_or(">=");
+            log::debug!(
+                "[ENERGY_REL] mine={} theirs={} ahead={} n={} op={}",
+                mine,
+                theirs,
+                ahead,
+                n,
+                op
+            );
+            return util::compare_counts(Some(op), u8::try_from(ahead).unwrap_or(u8::MAX), n);
+        }
         // "元々のスコアより高いスコアのライブカードがある" — existence of a
         // live card in the zone whose CURRENT (modifier-adjusted) score is
         // higher than its ORIGINAL printed score. Not a count-vs-threshold

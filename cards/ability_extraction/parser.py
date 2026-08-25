@@ -7164,6 +7164,66 @@ def _try_activation_history_tiers(text):
     }
 
 
+def _try_energy_ahead_alternative(text):
+    """〜置いてもよい。そうしたとき、相手のエネルギーが自分よりN1枚多い場合、E1。
+    N2枚以上多い場合、代わりにE2。 — tiered relative-energy alternative
+    (bp7-023-L family). The optional move gates the tiered comparison:
+    「そうしたとき」 means E1/E2 only apply if the move was made."""
+    if "そうしたとき" not in text or "相手のエネルギーが自分より" not in text:
+        return None
+    pre, sep, rest = text.partition("そうしたとき、")
+    if not sep:
+        return None
+    m = re.search(
+        r"相手のエネルギーが自分より(\d+)枚多い場合、([^。]+)。(\d+)枚以上多い場合、代わりに([^。]+)",
+        rest,
+    )
+    if not m:
+        return None
+    n1, eff1_text, n2, eff2_text = m.group(1), m.group(2), m.group(3), m.group(4)
+    move_text = pre.strip().rstrip("。")
+    ct, at = split_condition_action(move_text)
+    move = parse_action(at or move_text)
+    if not isinstance(move, dict):
+        return None
+    primary = parse_action(eff1_text)
+    alternative = parse_action(eff2_text)
+    if not isinstance(primary, dict) or not isinstance(alternative, dict):
+        return None
+    inner = {
+        "text": "そうしたとき、" + m.group(0),
+        "action": "conditional_alternative",
+        "condition": {
+            "type": "comparison_condition",
+            "comparison_type": "energy_relative",
+            "count": int(n1),
+            "operator": "==",
+            "target": "self",
+            "text": f"相手のエネルギーが自分より{n1}枚多い場合",
+        },
+        "primary_effect": primary,
+        "alternative_condition": {
+            "type": "comparison_condition",
+            "comparison_type": "energy_relative",
+            "count": int(n2),
+            "operator": ">=",
+            "target": "self",
+            "text": f"{n2}枚以上多い場合",
+        },
+        "alternative_effect": alternative,
+    }
+    result = {
+        "text": text,
+        "action": "sequential",
+        "actions": [move, inner],
+    }
+    if ct:
+        cond = parse_condition(ct)
+        if cond and cond.get("type") != "custom":
+            result["condition"] = cond
+    return result
+
+
 def _try_conditional_alternative(text):
     """代わりに — conditional alternative effects."""
     if ALTERNATIVE_MARKER not in text:
@@ -9926,6 +9986,7 @@ _EFFECT_HANDLERS = [
     _try_per_unit,  # XにつきY (per-unit gain — restructures text)
     _try_yell_source_modifier,  # エールはデッキの下から行う (yell-source modifier)
     _try_activation_history_tiers,  # このターン…アクティブにしていた場合 tiers (Q203)
+    _try_energy_ahead_alternative,  # 相手のエネルギーが自分よりN枚多い場合 tiers (bp7-023-L)
     _try_conditional_alternative,  # X場合Y、そうでない場合Z (if/else)
     _try_character_specific,  # 「X」のキャラ specific effect
     _try_activation_suffix,  # （この能力は...） activation conditions

@@ -255,6 +255,7 @@ impl AbilityResolver {
             .current_entry()
             .is_some_and(|e| e.cost_paid);
 
+        let mut activation_condition_passed = true;
         if !cost_already_paid {
             if let Some(ref activation_condition) = effect.activation_condition_parsed_any() {
                 let mut merged_cond = Box::clone(activation_condition);
@@ -280,9 +281,18 @@ impl AbilityResolver {
                         crate::ability::log::drain_verdicts_since(snapshot);
                     }
                 }
-                return result;
+                // Fall through to the main condition gate as well — abilities with
+                // BOTH a parenthetical activation-position restriction and a real
+                // condition (e.g. 「このターン、このメンバーがエリアを移動している場合」)
+                // must satisfy both. Early-returning here skipped the has_moved
+                // gate entirely and granted resources unconditionally.
+                if !result {
+                    return false;
+                }
+                activation_condition_passed = true;
             }
         }
+        let _ = activation_condition_passed;
         if let Some(ref condition) = effect.condition {
             if effect.action == crate::ability::enums::ActionType::ConditionalAlternative {
                 // skip — condition is a branch selector, not a gate

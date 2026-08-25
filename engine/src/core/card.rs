@@ -2563,6 +2563,10 @@ pub enum ComparisonType {
     Count,
     #[cfg_attr(feature = "serde_support", serde(rename = "equality"))]
     Equality,
+    /// 「相手のエネルギーが自分よりN枚多い場合」 — compares ACTIVE energy
+    /// counts relatively: (opponent_active - self_active) vs `count`.
+    #[cfg_attr(feature = "serde_support", serde(rename = "energy_relative"))]
+    EnergyRelative,
 }
 
 impl ComparisonType {
@@ -2572,6 +2576,7 @@ impl ComparisonType {
             ComparisonType::Cost => "cost",
             ComparisonType::Count => "count",
             ComparisonType::Equality => "equality",
+            ComparisonType::EnergyRelative => "energy_relative",
         }
     }
 
@@ -2580,6 +2585,7 @@ impl ComparisonType {
             "cost" => ComparisonType::Cost,
             "count" => ComparisonType::Count,
             "equality" => ComparisonType::Equality,
+            "energy_relative" => ComparisonType::EnergyRelative,
             _ => ComparisonType::Score,
         }
     }

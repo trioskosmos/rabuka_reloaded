@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-25T14:08:40.017369",
+  "generated_at": "2026-08-25T15:22:02.504446",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "4dbba632",
+  "engine_commit": "dcb04c2b",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -36733,14 +36733,52 @@
       "cost": null,
       "effect": {
         "text": "自分のステージに『Aqours』のメンバーが2人以上いる場合、自分のエネルギー1枚をエネルギーデッキに置いてもよい。そうしたとき、相手のエネルギーが自分より1枚多い場合、このカードのスコアを+1する。2枚以上多い場合、代わりにスコアを+2する",
-        "action": "conditional_alternative",
-        "alternative_effect": {
-          "text": "スコアを+2する",
-          "action": "modify_score",
-          "value": 2,
-          "operation": "add",
-          "location": "stage"
-        },
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "自分のエネルギー1枚をエネルギーデッキに置いてもよい",
+            "destination": "energy_deck",
+            "count": 1,
+            "target": "self",
+            "optional": true,
+            "action": "move_cards",
+            "source": "energy_zone",
+            "card_type": "energy_card"
+          },
+          {
+            "text": "そうしたとき、相手のエネルギーが自分より1枚多い場合、このカードのスコアを+1する。2枚以上多い場合、代わりにスコアを+2する",
+            "action": "conditional_alternative",
+            "condition": {
+              "type": "comparison_condition",
+              "comparison_type": "energy_relative",
+              "count": 1,
+              "operator": "==",
+              "target": "self",
+              "text": "相手のエネルギーが自分より1枚多い場合"
+            },
+            "primary_effect": {
+              "text": "このカードのスコアを+1する",
+              "action": "modify_score",
+              "value": 1,
+              "operation": "add",
+              "self_target": true
+            },
+            "alternative_condition": {
+              "type": "comparison_condition",
+              "comparison_type": "energy_relative",
+              "count": 2,
+              "operator": ">=",
+              "target": "self",
+              "text": "2枚以上多い場合"
+            },
+            "alternative_effect": {
+              "text": "スコアを+2する",
+              "action": "modify_score",
+              "value": 2,
+              "operation": "add"
+            }
+          }
+        ],
         "condition": {
           "type": "card_count_condition",
           "count": 2,
@@ -36753,18 +36791,6 @@
           "group_names": [
             "Aqours"
           ]
-        },
-        "primary_effect": {
-          "text": "自分のエネルギー1枚をエネルギーデッキに置いてもよい。そうしたとき、相手のエネルギーが自分より1枚多い場合、このカードのスコアを+1する。2枚以上多い場合、",
-          "destination": "energy_deck",
-          "count": 1,
-          "target": "both",
-          "optional": true,
-          "action": "move_cards",
-          "self_target": true,
-          "source": "energy_zone",
-          "card_type": "energy_card",
-          "location": "stage"
         }
       }
     },

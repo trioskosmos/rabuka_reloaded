@@ -21,6 +21,13 @@ impl<'a> ConditionContext<'a> {
     pub(crate) fn evaluate_temporal_condition(&self, condition: &Condition) -> bool {
         let temporal = condition.get_temporal().unwrap_or("");
         let phase = condition.get_phase();
+        log::debug!(
+            "[TEMPORAL_EVAL] temporal={:?} phase={:?} has_nested={} aggregate={:?}",
+            temporal,
+            phase,
+            condition.get_condition().is_some(),
+            condition.get_aggregate()
+        );
 
         match temporal {
             "this_turn" => {
@@ -63,6 +70,10 @@ impl<'a> ConditionContext<'a> {
                     created_turn == self.game_state.turn_number
                 } else {
                     if let Some(nested_condition) = condition.get_condition() {
+                        log::debug!(
+                            "[TEMPORAL_TURN] nested type={:?}",
+                            nested_condition.condition_type()
+                        );
                         match nested_condition.condition_type() {
                             Some(ConditionType::NotMoved) => {
                                 if let Some(activating_card_id) = self.activating_card_id {
@@ -102,6 +113,9 @@ impl<'a> ConditionContext<'a> {
                             _ => self.evaluate_condition(nested_condition),
                         }
                     } else {
+                        log::debug!(
+                            "[TEMPORAL_TURN] no nested condition for temporal=this_turn -> default true"
+                        );
                         true
                     }
                 }
@@ -119,6 +133,10 @@ impl<'a> ConditionContext<'a> {
                         | crate::game_state::Phase::SecondAttackerPerformance
                         | crate::game_state::Phase::LiveVictoryDetermination
                 ) {
+                    log::debug!(
+                        "[DURING_LIVE] phase gate failed: phase={:?}",
+                        self.game_state.current_phase
+                    );
                     return false;
                 }
                 // Build list of zones to check from condition.locations or condition.location
@@ -142,15 +160,22 @@ impl<'a> ConditionContext<'a> {
                 if has_success_or_live_zone {
                     let target = condition.get_target().unwrap_or("self");
                     let player = self.resolve_condition_player(target);
+                    log::debug!(
+                        "[DURING_LIVE] zones={:?} live_cards={:?}",
+                        zones_to_check,
+                        player.live_card_zone.cards
+                    );
 
                     // Aggregate total with heart_colors: sum need_heart across all live cards
                     if condition.get_aggregate() == Some("total")
                         && condition.get_heart_colors().is_some_and(|c| !c.is_empty())
                     {
                         let location = condition.get_location().unwrap_or("live_card_zone");
-                        return self
+                        let res = self
                             .check_aggregate_total(condition, player, location)
                             .unwrap_or(false);
+                        log::debug!("[DURING_LIVE] aggregate_total -> {}", res);
+                        return res;
                     }
 
                     let mut found_match = false;
