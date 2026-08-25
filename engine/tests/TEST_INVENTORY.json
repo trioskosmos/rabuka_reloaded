@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T10:19:12.576919+00:00",
+  "generated_at": "2026-08-25T11:52:19.631065+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 485,
-  "n_tests": 2940,
+  "n_tests": 2943,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -692,7 +692,7 @@
         "bp6_021_skip_cost_no_score_no_retrieval",
         "burn_multiple_under_all_moved_and_scores"
       ],
-      "covering_test_count": 276,
+      "covering_test_count": 278,
       "is_null": false
     },
     {
@@ -1566,7 +1566,7 @@
         "nonfiction_cost_p2_equal_costs_no_score",
         "nonfiction_cost_p2_high_vs_p1_empty_scores"
       ],
-      "covering_test_count": 47,
+      "covering_test_count": 48,
       "is_null": false
     },
     {
@@ -5024,11 +5024,11 @@
         "single_baton_to_non_protected_zone_succeeds",
         "sumire_action_type_string_parsing_play_member_to_stage",
         "sumire_bpb4004_double_baton_removes_both_and_clamps_cost",
+        "sumire_double_baton_choice_path_records_two_touches",
         "sumire_double_baton_integration_via_string_path",
-        "sumire_double_baton_to_left_does_not_activate_debut",
-        "sumire_explicit_double_baton_to_left_no_debut"
+        "sumire_double_baton_to_left_does_not_activate_debut"
       ],
-      "covering_test_count": 37,
+      "covering_test_count": 38,
       "is_null": false
     },
     {
@@ -6910,7 +6910,7 @@
         "no_saint_snow_does_not_fire",
         "only_selects_matching_live_cards"
       ],
-      "covering_test_count": 41,
+      "covering_test_count": 43,
       "is_null": false
     },
     {
@@ -8910,7 +8910,8 @@
       "covering_files": [
         "engine/tests/test_modules/ability_combination_test.rs",
         "engine/tests/test_modules/bp7_ren_both_trigger_test.rs",
-        "engine/tests/test_modules/bp7_ren_energy_placed_gain_blade_test.rs"
+        "engine/tests/test_modules/bp7_ren_energy_placed_gain_blade_test.rs",
+        "engine/tests/test_modules/trigger_scope_test.rs"
       ],
       "covering_tests": [
         "bp5_111_activation_chain_waits_low_blade_opponent",
@@ -8935,9 +8936,15 @@
         "ren_placed_energy_is_wait_not_active",
         "ren_verdicts_show_energy_leg_pass",
         "ren_wrong_source_energy_move_does_not_trigger",
+        "s1_bp7_005_opponent_caused_placement_does_not_fire",
+        "s2_bp4_016_energy_placed_by_opponent_fires",
+        "s2_pb1_006_opponent_caused_move_fires",
+        "s2_pb1_006_own_debut_fires",
+        "s3_bp5_111_opponent_caused_move_does_not_fire",
+        "s3_bp5_111_own_move_fires",
         "sp_bp7_005_double_auto_cascade"
       ],
-      "covering_test_count": 23,
+      "covering_test_count": 29,
       "is_null": false
     },
     {
@@ -8965,7 +8972,8 @@
       "covering_files": [
         "engine/tests/test_modules/ability_combination_test.rs",
         "engine/tests/test_modules/bp7_ren_both_trigger_test.rs",
-        "engine/tests/test_modules/bp7_ren_energy_placed_gain_blade_test.rs"
+        "engine/tests/test_modules/bp7_ren_energy_placed_gain_blade_test.rs",
+        "engine/tests/test_modules/trigger_scope_test.rs"
       ],
       "covering_tests": [
         "bp5_111_activation_chain_waits_low_blade_opponent",
@@ -8990,9 +8998,15 @@
         "ren_placed_energy_is_wait_not_active",
         "ren_verdicts_show_energy_leg_pass",
         "ren_wrong_source_energy_move_does_not_trigger",
+        "s1_bp7_005_opponent_caused_placement_does_not_fire",
+        "s2_bp4_016_energy_placed_by_opponent_fires",
+        "s2_pb1_006_opponent_caused_move_fires",
+        "s2_pb1_006_own_debut_fires",
+        "s3_bp5_111_opponent_caused_move_does_not_fire",
+        "s3_bp5_111_own_move_fires",
         "sp_bp7_005_double_auto_cascade"
       ],
-      "covering_test_count": 23,
+      "covering_test_count": 29,
       "is_null": false
     },
     {
@@ -9675,7 +9689,7 @@
         "q266_cost_b0_waits_nothing_incl_blade0",
         "q266_cost_b1_waits_nothing"
       ],
-      "covering_test_count": 51,
+      "covering_test_count": 52,
       "is_null": false
     },
     {
@@ -10001,7 +10015,7 @@
         "hanayo_pay_optional_cost_waits_member_and_gains_hearts",
         "hanayo_skip_optional_cost_no_effect"
       ],
-      "covering_test_count": 175,
+      "covering_test_count": 177,
       "is_null": false
     },
     {
@@ -10066,7 +10080,7 @@
         "himeno_bp6_q249_cost_reduced_by_three_mirakura",
         "himeno_edge_no_mirakura_skips"
       ],
-      "covering_test_count": 49,
+      "covering_test_count": 51,
       "is_null": false
     },
     {
@@ -13641,6 +13655,7 @@
         "chisato_natsumi_normal_debut_without_baton_touch_fires_nothing",
         "chisato_natsumi_q265_double_baton_both_no_blade_heart",
         "sumire_action_type_string_parsing_play_member_to_stage",
+        "sumire_double_baton_choice_path_records_two_touches",
         "sumire_double_baton_integration_via_string_path",
         "sumire_double_baton_to_left_does_not_activate_debut",
         "sumire_explicit_double_baton_to_left_no_debut",
@@ -13652,7 +13667,7 @@
         "sumire_q194_locked_member_excluded_from_double_baton",
         "sumire_single_baton_stays_single_no_auto_promote"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 22,
       "is_null": false
     },
     {
@@ -14280,12 +14295,14 @@
         "kinako_q94_debut_grants_2_blade",
         "kinako_q94_debut_then_area_move_grants_4_blade",
         "pb2_kinako_under_member_both_players",
+        "s1_bp7_005_opponent_caused_placement_does_not_fire",
+        "s2_bp4_016_energy_placed_by_opponent_fires",
         "s2_pb1_006_opponent_caused_move_fires",
         "s2_pb1_006_own_debut_fires",
         "s3_bp5_111_opponent_caused_move_does_not_fire",
         "s3_bp5_111_own_move_fires"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 11,
       "is_null": false
     },
     {
@@ -21113,6 +21130,8 @@
         "only_selects_matching_live_cards",
         "optional_can_skip",
         "position_change_triggered_grant_blade_to_moved_members",
+        "s1_bp7_005_opponent_caused_placement_does_not_fire",
+        "s2_bp4_016_energy_placed_by_opponent_fires",
         "s2_pb1_006_opponent_caused_move_fires",
         "s2_pb1_006_own_debut_fires",
         "s3_bp5_111_opponent_caused_move_does_not_fire",
@@ -21120,7 +21139,7 @@
         "seira_area_move_wait_blocked_by_immunity",
         "sp_bp7_005_double_auto_cascade"
       ],
-      "covering_test_count": 26,
+      "covering_test_count": 28,
       "is_null": false
     },
     {
@@ -22278,13 +22297,15 @@
         "mijuku_dreamer_refresh_condition_scores",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
+        "s1_bp7_005_opponent_caused_placement_does_not_fire",
+        "s2_bp4_016_energy_placed_by_opponent_fires",
         "s2_pb1_006_opponent_caused_move_fires",
         "s2_pb1_006_own_debut_fires",
         "s3_bp5_111_opponent_caused_move_does_not_fire",
         "s3_bp5_111_own_move_fires",
         "sumire_bpb4004_double_baton_removes_both_and_clamps_cost"
       ],
-      "covering_test_count": 19,
+      "covering_test_count": 21,
       "is_null": false
     },
     {
@@ -22327,13 +22348,15 @@
         "mijuku_dreamer_refresh_condition_scores",
         "niko_pb1009_suppresses_effect_activations_for_the_turn",
         "ruby_bpb7009_front_blade_loss_respects_mirror_and_cost",
+        "s1_bp7_005_opponent_caused_placement_does_not_fire",
+        "s2_bp4_016_energy_placed_by_opponent_fires",
         "s2_pb1_006_opponent_caused_move_fires",
         "s2_pb1_006_own_debut_fires",
         "s3_bp5_111_opponent_caused_move_does_not_fire",
         "s3_bp5_111_own_move_fires",
         "sumire_bpb4004_double_baton_removes_both_and_clamps_cost"
       ],
-      "covering_test_count": 19,
+      "covering_test_count": 21,
       "is_null": false
     },
     {
@@ -32460,7 +32483,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/on_energy_placed_test.rs",
-        "engine/tests/test_modules/trigger_card_integration_test.rs"
+        "engine/tests/test_modules/trigger_card_integration_test.rs",
+        "engine/tests/test_modules/trigger_scope_test.rs"
       ],
       "covering_tests": [
         "hazuki_debut_energy_placement_triggers_energy_watchers",
@@ -32469,9 +32493,15 @@
         "hazuki_energy_phase_no_effect_flag",
         "keke_position_change_swapping_with_natsumi_triggers_natsumi",
         "keke_position_change_swapping_with_sumire_triggers_sumire",
-        "opponent_energy_effect_triggers_hazuki_but_not_sumire"
+        "opponent_energy_effect_triggers_hazuki_but_not_sumire",
+        "s1_bp7_005_opponent_caused_placement_does_not_fire",
+        "s2_bp4_016_energy_placed_by_opponent_fires",
+        "s2_pb1_006_opponent_caused_move_fires",
+        "s2_pb1_006_own_debut_fires",
+        "s3_bp5_111_opponent_caused_move_does_not_fire",
+        "s3_bp5_111_own_move_fires"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 13,
       "is_null": false
     },
     {

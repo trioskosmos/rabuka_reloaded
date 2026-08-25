@@ -98,10 +98,11 @@ pub struct GameModifiers {
     pub last_cost_discard_count: u8,
     /// Card IDs moved from hand to discard by the most recent cost payment.
     pub last_cost_moved_card_ids: SmallVec<[i16; 4]>,
-    /// Dedupe keys for opponent-cause watchers already armed this turn
-    /// (「対戦相手のカードの効果でも発動する。」). Turn-scoped so the same
-    /// watcher can still fire again on LATER moves next turn.
-    pub opp_cause_fired_keys: SmallVec<[u32; 4]>,
+    /// Dedupe keys for opponent-cause watchers (「対戦相手のカードの効果でも
+    /// 発動する。」). Keys fold in the movement_event_counter, so they are
+    /// PER-MOVE: the same watcher arms again on every DISTINCT move. Cleared
+    /// with the movement tracking at turn end.
+    pub opp_cause_fired_keys: SmallVec<[u64; 4]>,
     /// Number of energy cards paid by the most recent cost payment.
     pub last_cost_energy_count: u8,
     /// Stage member(s) that hosted cards moved out from under them by the most

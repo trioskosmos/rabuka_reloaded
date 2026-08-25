@@ -1249,25 +1249,6 @@ impl GameState {
         }
         // Track in cards_moved_this_turn for fast O(1) lookups
         self.cards_moved_this_turn.push(moved_card_id);
-
-        // Opponent-caused trigger arm (energy variant): 「カードの効果によって
-        // 自分のエネルギー置き場に…(相手のカードの効果でも発動する。)」 — an
-        // opponent's effect placing an energy card into THIS player's zone.
-        let is_energy_zone_placement =
-            dest_zone == "energy" || dest_zone == "energy_zone";
-        if is_energy_zone_placement {
-            let zone_owner_is_p1 = self.player1.energy_zone.cards.contains(&moved_card_id);
-            let zone_owner_is_p2 = self.player2.energy_zone.cards.contains(&moved_card_id);
-            let caused_by_opponent = (zone_owner_is_p1
-                && event.cause_player_id != self.player1.id)
-                || (zone_owner_is_p2 && event.cause_player_id != self.player2.id);
-            if caused_by_opponent {
-                self.fire_opponent_cause_energy_watchers(
-                    moved_card_id,
-                    &event.cause_player_id,
-                );
-            }
-        }
     }
 
     pub fn has_card_moved_this_turn(&self, card_id: i16) -> bool {
