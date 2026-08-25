@@ -1430,10 +1430,9 @@ impl GameState {
                 ..Default::default()
             };
             self.trigger_auto_abilities_for_player_with_event(player_id, &event);
-            self.recently_moved_cards = None;
+            self.clear_recently_moved_batch();
             self.recently_appeared_cards.clear();
             self.recently_state_changed.clear();
-            self.recently_moved_from_zone = None;
             // Re-enter the loop to process any abilities just enqueued
             // by the watcher scan (e.g. Hazuki Ren each_time after discard).
             // Keep this_batch_triggered_ability_ids alive through the recursive
@@ -2336,7 +2335,7 @@ impl GameState {
 
     /// Clear movement tracking state after ability resolution.
     pub fn clear_movement_tracking(&mut self) {
-        self.recently_moved_cards = None;
+        self.clear_recently_moved_batch();
         self.recently_appeared_cards.clear();
         self.recently_state_changed.clear();
     }

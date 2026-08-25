@@ -1277,6 +1277,15 @@ impl GameState {
         self.recently_moved_from_zone = None;
     }
 
+    /// Accumulate cards into the current recently-batch WITHOUT resetting the
+    /// from-zone marker (any_number re-prompt pattern: each answered prompt
+    /// adds its moves to the same logical batch). Duplicates are significant:
+    /// identical copy ids can legitimately move more than once.
+    pub fn accumulate_recently_moved(&mut self, card_ids: &[i16]) {
+        let cards = self.recently_moved_cards.get_or_insert_with(SmallVec::new);
+        cards.extend_from_slice(card_ids);
+    }
+
     pub fn clear_card_movement_tracking(&mut self) {
         self.cards_moved_this_turn.clear();
         self.turn_movements.clear();

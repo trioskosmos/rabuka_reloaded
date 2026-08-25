@@ -1019,8 +1019,7 @@ gs.set_recently_moved_batch(card_ids.into(), Some(Zone::LiveCardZone.to_str()));
                     self.moved_cards.extend(moved.iter().copied());
                     // Accumulate across any_number re-prompts unconditionally
                     // (same card ID can appear multiple times under a member).
-                    let combined = gs.recently_moved_cards.get_or_insert_with(SmallVec::new);
-                    combined.extend(moved.iter().copied());
+                    gs.accumulate_recently_moved(&moved);
                 }
                 // any_number re-prompt: after each selection, show remaining cards
                 // Empty indices = player chose to stop selecting (skip).
