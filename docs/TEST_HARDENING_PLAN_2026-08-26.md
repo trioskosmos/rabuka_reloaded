@@ -24,7 +24,7 @@ Method, in order:
 |---|---|
 | P0.1 orphaned mod.rs registration | DONE — 6 files recovered, `sumire_bp5_test_debug.rs` deleted as stale duplicate; konata/location/shizuku fixed to current APIs |
 | P0.2 DIVE! false-trigger audit | DONE — 6 real-game tests in `dive_false_trigger_test.rs`; found + fixed **engine gap**: `movement` key on non-Movement condition variants was dropped by both serde and bytecode decode paths, so static presence re-triggered "when placed" abilities. Fixed via `ConditionCommon.movement` + regenerated decoder |
-| P0.3 `has_pending_choice` soft-guard migration | OPEN (~250 sites) |
+| P0.3 `has_pending_choice` soft-guard migration | IN PROGRESS — ratchet landed: `test_inventory.py --check` fails on any NEW soft-guard site; 282 existing sites across 110 files baselined in `engine/tests/SOFT_GUARD_BASELINE.json` (only goes down). First migration done (card_ability_tests q244). Batch migration continues file-by-file |
 | P1.1 per-test inventory | OPEN |
 | P1.2 or-assertions sweep | DONE — 36 multi-line `||` hits triaged: 10 files tightened to exact outcomes (pl_s_bp7_007 ×3 → exact stage slots; kuroe_dia → selected card on deck top; l0_gap_livesuccess vacuous disjunct removed; batch34 decline now pins waitroom retention; natsumi Q264 adds not-discarded check; opponent_choice wait≠leave both-stay; mia/card_ability/izumi/look_and_select deterministic picks pinned). 22 hits judged legitimate (match guards, loop conditions, error-string chains, engine zone aliasing) |
 | P1.3 helper dedup (`fire_trigger` x40) | DONE — 21 byte-identical clones deleted onto `helpers::fire_trigger`; batch30 keeps a 3-line drain wrapper; batch8's `fire_trigger_nth` kept as genuine extension |

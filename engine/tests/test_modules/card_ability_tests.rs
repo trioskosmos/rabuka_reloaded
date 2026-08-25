@@ -442,9 +442,18 @@ fn q244_mirakura_no_discard_draws_one() {
 
     game.play_to_stage(ability_card, rabuka_engine::zones::MemberArea::Center);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Optional discard cost IS offered (eligible cards exist) — decline it
+    // explicitly instead of soft-guarding.
+    assert!(
+        game.has_pending_choice(),
+        "optional discard cost should be offered when eligible cards exist"
+    );
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectCard".to_string()),
+        "decline path answers a SelectCard prompt"
+    );
+    game.select_indices(&[]);
 
     assert_eq!(
         game.state.player1.waitroom.cards.len(),
