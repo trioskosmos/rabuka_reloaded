@@ -1,6 +1,6 @@
-/// QA tests for Strawberry Trapper (PL!S-pb1-021-L / GuiltyKiss)
+﻿/// QA tests for Strawberry Trapper (PL!S-pb1-021-L / GuiltyKiss)
 ///
-/// Ability (ライブ成功時): compound(and)
+/// Ability (繝ｩ繧､繝匁・蜉滓凾): compound(and)
 ///   (A) group_condition(Aqours, heart05 >= 4) on self stage
 ///   (B) temporal: this_turn + opponent_live_success + no_excess_heart
 /// Effect: modify_score(+2, self_target)
@@ -11,7 +11,7 @@
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
-/// Q36: ライブ成功時 fires during LiveVictoryDetermination, NOT during
+/// Q36: 繝ｩ繧､繝匁・蜉滓凾 fires during LiveVictoryDetermination, NOT during
 /// performance phases. Verify the ability trigger is processed during
 /// LiveVictoryDetermination by checking that the game state changes
 /// (opponent_live_success flag is accessible there).
@@ -94,14 +94,14 @@ fn strawberry_q132_first_attacker_evaluated() {
         .add_heart_modifier(chika, rabuka_engine::card::HeartColor::Heart05, 4);
 
     // Ensure temporal condition (B) passes
-    game.state.opponent_live_success_this_turn = true;
-    game.state.opponent_live_no_excess_heart_this_turn = true;
+    game.state.p2_live_success_this_turn = true;
+    game.state.p2_live_success_no_excess = true;
 
-    game.pass(); // → SecondAttackerPerformance
-    game.pass(); // → LiveVictoryDetermination
-    game.pass(); // → Active (processes LiveSuccess)
+    game.pass(); // 竊・SecondAttackerPerformance
+    game.pass(); // 竊・LiveVictoryDetermination
+    game.pass(); // 竊・Active (processes LiveSuccess)
 
-    // Both conditions met → live card should be in success_live_zone with score +2
+    // Both conditions met 竊・live card should be in success_live_zone with score +2
     assert!(
         !game.state.player1.success_live_card_zone.cards.is_empty(),
         "Q132: Live card should be in success zone when both conditions pass"
@@ -151,14 +151,14 @@ fn strawberry_q142_excess_heart_prevents_score() {
         .add_heart_modifier(chika, rabuka_engine::card::HeartColor::Heart05, 4);
 
     // Temporal condition (B) fails: excess heart present
-    game.state.opponent_live_success_this_turn = true;
-    game.state.opponent_live_no_excess_heart_this_turn = false;
+    game.state.p2_live_success_this_turn = true;
+    game.state.p2_live_success_no_excess = false;
 
-    game.pass(); // → SecondAttackerPerformance
-    game.pass(); // → LiveVictoryDetermination
-    game.pass(); // → Active (processes LiveSuccess)
+    game.pass(); // 竊・SecondAttackerPerformance
+    game.pass(); // 竊・LiveVictoryDetermination
+    game.pass(); // 竊・Active (processes LiveSuccess)
 
-    // Excess heart blocks → no score bonus
+    // Excess heart blocks 竊・no score bonus
     // If live card succeeded (in success_zone), verify no +2
     if !game.state.player1.success_live_card_zone.cards.is_empty() {
         let target = game.state.player1.success_live_card_zone.cards[0];
@@ -170,7 +170,7 @@ fn strawberry_q142_excess_heart_prevents_score() {
     }
 }
 
-/// Group condition: non-Aqours member → group fails → no score.
+/// Group condition: non-Aqours member 竊・group fails 竊・no score.
 #[test]
 fn strawberry_q142_wrong_group_prevents_score() {
     let db = load_real_database();
@@ -196,18 +196,18 @@ fn strawberry_q142_wrong_group_prevents_score() {
     }
 
     // Temporal condition (B) passes
-    game.state.opponent_live_success_this_turn = true;
-    game.state.opponent_live_no_excess_heart_this_turn = true;
+    game.state.p2_live_success_this_turn = true;
+    game.state.p2_live_success_no_excess = true;
 
     // Group condition (A) fails: non-Aqours member on stage
 
-    game.pass(); // → SecondAttackerPerformance
-    game.pass(); // → LiveVictoryDetermination
-    game.pass(); // → Active (processes LiveSuccess)
+    game.pass(); // 竊・SecondAttackerPerformance
+    game.pass(); // 竊・LiveVictoryDetermination
+    game.pass(); // 竊・Active (processes LiveSuccess)
 
-    // Wrong group → no score bonus
+    // Wrong group 竊・no score bonus
     // Live card may have been discarded from live zones (heart requirements unmet)
-    // Verify both live zones are empty — the card was properly removed
+    // Verify both live zones are empty 窶・the card was properly removed
     assert!(
         game.state.player1.success_live_card_zone.cards.is_empty(),
         "Q142: No card in success zone (heart requirements unmet with filler)"
@@ -218,7 +218,7 @@ fn strawberry_q142_wrong_group_prevents_score() {
     );
 }
 
-/// Edge case: opponent_live_success is false → temporal fails → no score.
+/// Edge case: opponent_live_success is false 竊・temporal fails 竊・no score.
 #[test]
 fn strawberry_opponent_didnt_win_no_score() {
     let db = load_real_database();
@@ -249,28 +249,28 @@ fn strawberry_opponent_didnt_win_no_score() {
         .add_heart_modifier(chika, rabuka_engine::card::HeartColor::Heart05, 4);
 
     // Temporal condition (B) fails: opponent didn't win
-    game.state.opponent_live_success_this_turn = false;
-    game.state.opponent_live_no_excess_heart_this_turn = false;
+    game.state.p2_live_success_this_turn = false;
+    game.state.p2_live_success_no_excess = false;
 
-    game.pass(); // → SecondAttackerPerformance
-    game.pass(); // → LiveVictoryDetermination
-    game.pass(); // → Active (processes LiveSuccess)
+    game.pass(); // 竊・SecondAttackerPerformance
+    game.pass(); // 竊・LiveVictoryDetermination
+    game.pass(); // 竊・Active (processes LiveSuccess)
 
-    // Opponent didn't win → no score bonus
+    // Opponent didn't win 竊・no score bonus
     // If live card succeeded, verify no +2 score bonus
     if !game.state.player1.success_live_card_zone.cards.is_empty() {
         let target = game.state.player1.success_live_card_zone.cards[0];
         assert_eq!(
             game.state.mods.get_score_modifier(target),
             0,
-            "Opponent didn't win → no score bonus"
+            "Opponent didn't win 竊・no score bonus"
         );
     } else if !game.state.player1.live_card_zone.cards.is_empty() {
         let target = game.state.player1.live_card_zone.cards[0];
         assert_eq!(
             game.state.mods.get_score_modifier(target),
             0,
-            "Opponent didn't win → no score bonus"
+            "Opponent didn't win 竊・no score bonus"
         );
     }
 }

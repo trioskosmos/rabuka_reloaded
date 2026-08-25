@@ -285,6 +285,15 @@ pub struct GameState {
     pub opponent_live_success_this_turn: bool,
     pub opponent_live_no_excess_heart_this_turn: bool,
     pub self_no_excess_heart_this_turn: bool,
+    /// Per-seat live results (rules Q36: ライブ成功時 resolves at victory
+    /// determination, when BOTH performances are known). The legacy
+    /// opponent_*/self_* fields above are attacker-order-relative; these are
+    /// seat-relative so 「相手がライブを成功させていた場合」 can be evaluated
+    /// from the activating card's OWNER (a P2-owned card's opponent is P1).
+    pub p1_live_success_this_turn: bool,
+    pub p1_live_success_no_excess: bool,
+    pub p2_live_success_this_turn: bool,
+    pub p2_live_success_no_excess: bool,
     pub opponent_live_surplus_count: u8,
     pub self_live_surplus_count: u8,
     pub formation_change_occurred_this_turn: bool,
@@ -525,6 +534,10 @@ impl GameState {
             opponent_live_success_this_turn: false,
             opponent_live_no_excess_heart_this_turn: false,
             self_no_excess_heart_this_turn: false,
+            p1_live_success_this_turn: false,
+            p1_live_success_no_excess: false,
+            p2_live_success_this_turn: false,
+            p2_live_success_no_excess: false,
             opponent_live_surplus_count: 0,
             self_live_surplus_count: 0,
             formation_change_occurred_this_turn: false,

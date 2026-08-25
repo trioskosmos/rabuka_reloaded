@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T17:53:57.883145+00:00",
+  "generated_at": "2026-08-25T18:38:27.612533+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 488,
-  "n_tests": 2958,
+  "n_files": 489,
+  "n_tests": 2959,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -12603,6 +12603,7 @@
         "engine/tests/test_modules/nico_recover_test.rs",
         "engine/tests/test_modules/nozomi_bp4_aggregate_test.rs",
         "engine/tests/test_modules/opponent_choice_tests.rs",
+        "engine/tests/test_modules/opponent_live_success_flow_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test_part2.rs",
         "engine/tests/test_modules/parser_issues_e2e_test_part3.rs",
@@ -12676,7 +12677,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 840,
+      "covering_test_count": 841,
       "is_null": false
     },
     {
@@ -14718,6 +14719,7 @@
         "engine/tests/test_modules/hard_abilities_tier_test.rs",
         "engine/tests/test_modules/l0_gap_constant4_test.rs",
         "engine/tests/test_modules/l0_gap_livestart2_test.rs",
+        "engine/tests/test_modules/opponent_live_success_flow_test.rs",
         "engine/tests/test_modules/qa_new_tests202.rs",
         "engine/tests/test_modules/turn_scope_regression_test.rs",
         "engine/tests/test_modules/yoshiko_center_ability_test.rs",
@@ -14756,7 +14758,7 @@
         "ddd_option_a_retrieves_any_member_from_waitroom",
         "ddd_option_b_requires_two_cards_in_live_zone"
       ],
-      "covering_test_count": 113,
+      "covering_test_count": 114,
       "is_null": false
     },
     {
@@ -26482,6 +26484,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/nagi_live_card_draw_test.rs",
+        "engine/tests/test_modules/opponent_live_success_flow_test.rs",
         "engine/tests/test_modules/untested_abilities_batch29_test.rs",
         "engine/tests/test_modules/untested_abilities_batch34_test.rs",
         "engine/tests/test_modules/untested_abilities_batch36_test.rs",
@@ -26523,7 +26526,7 @@
         "maki_empty_success_zone_zero_blades",
         "margarete_activation_waits_self_and_places_waited_energy"
       ],
-      "covering_test_count": 55,
+      "covering_test_count": 56,
       "is_null": false
     },
     {
@@ -30102,6 +30105,7 @@
       "has_negative": false,
       "covering_files": [
         "engine/tests/test_modules/l0_gap_subunit_success_test.rs",
+        "engine/tests/test_modules/opponent_live_success_flow_test.rs",
         "engine/tests/test_modules/strawberry_test.rs",
         "engine/tests/test_modules/strawberry_trapper_test.rs"
       ],
@@ -30109,6 +30113,7 @@
         "bp6_012_printemps_in_success_grants_heart03",
         "bp6_014_lilywhite_in_success_grants_heart01",
         "bp6_015_bibi_in_success_grants_heart06",
+        "p2_owned_trapper_scores_from_p1_success_in_real_round",
         "strawberry_opponent_didnt_win_no_score",
         "strawberry_q132_first_attacker_evaluated",
         "strawberry_q142_excess_heart_prevents_score",
@@ -30118,7 +30123,7 @@
         "strawberry_trapper_no_opponent_success_no_score",
         "strawberry_trapper_q132_conditions_met_score_plus_2"
       ],
-      "covering_test_count": 11,
+      "covering_test_count": 12,
       "is_null": false
     },
     {

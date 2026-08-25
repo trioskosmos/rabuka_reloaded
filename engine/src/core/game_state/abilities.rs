@@ -2722,6 +2722,10 @@ impl GameState {
         self.formation_change_occurred_this_turn = false;
         self.opponent_live_success_this_turn = false;
         self.opponent_live_no_excess_heart_this_turn = false;
+        self.p1_live_success_this_turn = false;
+        self.p1_live_success_no_excess = false;
+        self.p2_live_success_this_turn = false;
+        self.p2_live_success_no_excess = false;
         self.live_success_triggered_this_turn = false;
         self.live_success_p2_fired = false;
         self.live_success_p1_extra = 0;

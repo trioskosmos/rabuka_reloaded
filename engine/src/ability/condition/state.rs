@@ -1172,11 +1172,40 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(crate) fn evaluate_opponent_live_success_condition(&self, condition: &Condition) -> bool {
-        if !self.game_state.opponent_live_success_this_turn {
+        // Owner-relative: 「相手」 is the opponent OF THE ACTIVATING CARD'S
+        // OWNER, not the fixed second attacker. A P2-owned card's opponent is
+        // P1 (the first attacker), which the legacy attacker-order globals
+        // could never express.
+        let owner_is_p1 = self
+            .activating_card_id
+            .map(|cid| {
+                self.game_state.player1.contains_card(cid)
+                    || !self.game_state.player2.contains_card(cid)
+            })
+            .unwrap_or(true);
+        let (opp_won, opp_no_excess) = if owner_is_p1 {
+            (
+                self.game_state.p2_live_success_this_turn,
+                self.game_state.p2_live_success_no_excess,
+            )
+        } else {
+            (
+                self.game_state.p1_live_success_this_turn,
+                self.game_state.p1_live_success_no_excess,
+            )
+        };
+        log::debug!(
+            "[OPP_LIVE_SUCCESS_EVAL] activating={:?} owner_is_p1={} opp_won={} opp_no_excess={}",
+            self.activating_card_id,
+            owner_is_p1,
+            opp_won,
+            opp_no_excess
+        );
+        if !opp_won {
             return false;
         }
         if condition.get_no_excess_heart().unwrap_or(false) {
-            return self.no_excess_heart_flag("opponent");
+            return opp_no_excess;
         }
         true
     }

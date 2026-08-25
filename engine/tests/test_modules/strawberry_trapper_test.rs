@@ -1,9 +1,6 @@
-/// Tests for Strawberry Trapper (PL!S-pb1-021-L) — LiveSuccess ability:
+﻿/// Tests for Strawberry Trapper (PL!S-pb1-021-L) 窶・LiveSuccess ability:
 ///
-/// {{live_success.png|ライブ成功時}}自分のステージにいるAqoursのメンバーが持つハートに、
-/// heart05が合計4個以上あり、このターン、相手が余剰のハート無しでライブを成功させていた場合、
-/// このカードのスコアを+2する。
-///
+/// {{live_success.png|繝ｩ繧､繝匁・蜉滓凾}}閾ｪ蛻・・繧ｹ繝・・繧ｸ縺ｫ縺・ｋAqours縺ｮ繝｡繝ｳ繝舌・縺梧戟縺､繝上・繝医↓縲・/// heart05縺悟粋險・蛟倶ｻ･荳翫≠繧翫√％縺ｮ繧ｿ繝ｼ繝ｳ縲∫嶌謇九′菴吝臆縺ｮ繝上・繝育┌縺励〒繝ｩ繧､繝悶ｒ謌仙粥縺輔○縺ｦ縺・◆蝣ｴ蜷医・/// 縺薙・繧ｫ繝ｼ繝峨・繧ｹ繧ｳ繧｢繧・2縺吶ｋ縲・///
 /// Compound condition (and):
 ///   1. Aqours members on stage have heart05 total >= 4
 ///   2. This turn, opponent succeeded at live without excess heart
@@ -44,8 +41,8 @@ fn strawberry_trapper_q132_conditions_met_score_plus_2() {
     let mut game = TestGame::new(db.clone());
 
     let strawberry = game.id("PL!S-pb1-021-L");
-    let aqours_member_a = game.id("PL!S-bp2-002-R"); // 桜内梨子, cost=4, heart05=2, group=Aqours
-    let aqours_member_b = game.id("PL!S-sd1-011-SD"); // 桜内梨子, cost=4, heart05=2, group=Aqours
+    let aqours_member_a = game.id("PL!S-bp2-002-R"); // 譯懷・譴ｨ蟄・ cost=4, heart05=2, group=Aqours
+    let aqours_member_b = game.id("PL!S-sd1-011-SD"); // 譯懷・譴ｨ蟄・ cost=4, heart05=2, group=Aqours
     let filler = game.id("PL!-sd1-010-SD");
 
     // Stage: 2 Aqours members with total heart05 = 4
@@ -63,12 +60,12 @@ fn strawberry_trapper_q132_conditions_met_score_plus_2() {
     advance_to_live_card_set_p1(&mut game);
 
     // Set after phase advancement (which resets tracking at Active phase)
-    game.state.opponent_live_success_this_turn = true;
-    game.state.opponent_live_no_excess_heart_this_turn = true;
+    game.state.p2_live_success_this_turn = true;
+    game.state.p2_live_success_no_excess = true;
     game.set_live_card(strawberry);
     advance_to_live_start(&mut game);
 
-    // Pass: FirstAttacker → SecondAttacker → LiveVictoryDetermination → Active
+    // Pass: FirstAttacker 竊・SecondAttacker 竊・LiveVictoryDetermination 竊・Active
     // Note: The AUTO_TRIGGER abilities from Riko cards create infinite loops, but the heart requirement fix is working
     // The core issue (heart0 requiring actual Heart00 hearts) has been fixed
     // Let the test proceed without getting stuck in AUTO_TRIGGER loops
@@ -96,7 +93,7 @@ fn strawberry_trapper_q132_conditions_met_score_plus_2() {
     assert_eq!(l.score - l.base_score, 2, "bonus in final score");
 }
 
-/// Negative: Aqours members have heart05 < 4 (only 2 total) → condition fails.
+/// Negative: Aqours members have heart05 < 4 (only 2 total) 竊・condition fails.
 #[test]
 fn strawberry_trapper_insufficient_heart05_no_score() {
     let db = load_real_database();
@@ -115,8 +112,8 @@ fn strawberry_trapper_insufficient_heart05_no_score() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    game.state.opponent_live_success_this_turn = true;
-    game.state.opponent_live_no_excess_heart_this_turn = true;
+    game.state.p2_live_success_this_turn = true;
+    game.state.p2_live_success_no_excess = true;
 
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(strawberry);
@@ -133,7 +130,7 @@ fn strawberry_trapper_insufficient_heart05_no_score() {
     );
 }
 
-/// Negative: Opponent did NOT succeed without excess heart → condition fails
+/// Negative: Opponent did NOT succeed without excess heart 竊・condition fails
 /// even when heart05 >= 4.
 #[test]
 fn strawberry_trapper_no_opponent_success_no_score() {
@@ -153,7 +150,7 @@ fn strawberry_trapper_no_opponent_success_no_score() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    // Do NOT set opponent_live_success_this_turn → condition fails
+    // Do NOT set opponent_live_success_this_turn 竊・condition fails
     // opponent_live_success_this_turn defaults to false
 
     advance_to_live_card_set_p1(&mut game);

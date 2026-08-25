@@ -89,9 +89,10 @@ fn sd2_007_extra_draw_when_opponent_also_succeeded() {
     // Discard fuel for the follow-up hand-discard.
     game.add_to_hand(game.new_id("PL!-sd1-010-SD"));
 
-    // The engine tracks "opponent also succeeded this turn" via this flag
-    // (set by the live-victory flow when P2's live succeeds).
-    game.state.opponent_live_success_this_turn = true;
+    // The engine records per-seat live results at victory determination;
+    // P1-owned せつ菜's opponent is P2.
+    game.state.p2_live_success_this_turn = true;
+    game.state.p2_live_success_no_excess = true;
 
     let deck_before = game.state.player1.main_deck.cards.len();
     fire_trigger(&mut game, setsuna, AbilityTrigger::LiveSuccess, "ライブ成功時");

@@ -50,6 +50,33 @@ event belongs to the ARRIVING member's play (9.6.2.3.2.1); the departed ability'
 conditions describe the NEWCOMER; net payment = newcomer cost − occupant cost.
 Energy assertions require wait-state cards in the pool (activation flips wait→active).
 
+## §4 Round 4 — opponent-live-success across seats
+
+The only card reading `opponent_live_success` (Strawberry Trapper PL!S-pb1-021-L)
+was "covered" exclusively by synthetic flag injection; no test verified the
+real pipeline ever sets it, and the legacy flag was armed ONLY for P2's success
+(`player2_won`) — a P2-owned card could never see P1 succeed.
+
+Fixes:
+1. Per-seat tracking: `p1/p2_live_success_this_turn` + `_no_excess` on
+   GameState, written at victory determination; reset with the other turn flags.
+2. Owner-relative evaluation: `evaluate_opponent_live_success_condition` picks
+   the seat opposite the ACTIVATING card's owner ([OPP_LIVE_SUCCESS_EVAL]
+   diagnostic).
+3. **Engine bug #5 (ordering)**: LiveSuccess triggers fired at the TOP of
+   `execute_live_victory_determination`, before verdicts/results existed —
+   every real-flow opponent-success evaluation saw stale state. Interim fix:
+   `early_seat_results()` compact-mirror records per-seat outcomes before the
+   trigger block (authoritative pass below re-runs idempotently). Skipped
+   seats don't clobber explicitly-armed values. Follow-up refactor: hoist the
+   authoritative verdict pass above the trigger block and delete the mirror.
+
+New `opponent_live_success_flow_test.rs`: full organic round — P1 exact-fill
+success (海未 + START:DASH!!, heart-less deck so yell adds nothing) vs P2-owned
+Trapper → +2 pinned through the real pipeline.
+
+Suite state after round 4: **2945 passed / 0 failed / 0 ignored.**
+
 ## §3 Round 3 — both-player interaction (mission directive)
 
 Mined abilities.json for the 「対戦相手のカードの効果でも発動する」 marker

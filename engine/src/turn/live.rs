@@ -134,6 +134,169 @@ pub(crate) fn process_yell_revealed_card_icons(
     }
 }
 
+/// BUG#5 workaround (docs/TEST_HARDENING_PLAN_2026-08-26.md §4): ライブ成功時
+/// triggers fire at the TOP of execute_live_victory_determination, but the
+/// authoritative verdicts/results are only computed further down — so
+/// conditions like Strawberry Trapper's 「相手が余剰のハートを持たずにライブを
+/// 成功させていた場合」 saw stale state in every real flow (synthetic-flag
+/// tests masked it). This compact mirror records per-seat outcomes BEFORE the
+/// trigger block runs. The authoritative pass below re-runs idempotently;
+/// keep the two in sync (the organic test in
+/// cross-checks opponent_live_success_flow_test pins them together).
+fn early_seat_results(gs: &mut GameState) {
+    // (won, no_excess) per seat, computed from finalised allocations.
+    let mut results = [(false, false); 2];
+    let mut recorded = [false; 2];
+    for seat_index in 0..2 {
+        let pid = if seat_index == 0 {
+            gs.player1.id.clone()
+        } else {
+            gs.player2.id.clone()
+        };
+        let seat = if seat_index == 0 {
+            &gs.player1
+        } else {
+            &gs.player2
+        };
+        let Some(snap) = gs
+            .performance_snapshots
+            .iter()
+            .rev()
+            .find(|s| s.player_id == pid)
+        else {
+            continue;
+        };
+        if snap.lives.is_empty() || seat.live_card_zone.cards.is_empty() {
+            continue;
+        }
+        let mut all_passed = true;
+        let mut filled_total = [0u8; 8];
+        for (li, l) in snap.lives.iter().enumerate() {
+            let Some(card) = gs.card_database.get_card(l.card_id) else {
+                all_passed = false;
+                break;
+            };
+            let Some(nh) = card.need_heart.as_ref() else {
+                continue;
+            };
+            let mut filled = [0u8; 8];
+            for alloc in &snap.breakdown.allocations {
+                if alloc.target_idx == li as u8 {
+                    filled[alloc.color as usize] += alloc.amount;
+                }
+            }
+            for c in 0..8 {
+                filled_total[c] += filled[c];
+            }
+            let mut required = [0u8; 8];
+            for (color, needed) in &nh.hearts {
+                required[color.index()] = *needed;
+            }
+            if let Some(card_mods) = gs.mods.need_heart_modifiers.get(&l.card_id) {
+                for (color, me) in card_mods {
+                    if me.set != 0 {
+                        required[color.index()] = me.set as u8;
+                    }
+                }
+                for (color, me) in card_mods {
+                    if me.additive != 0 {
+                        let idx = color.index();
+                        let current = required[idx] as i32;
+                        required[idx] =
+                            crate::constants::saturate_u8(current + me.additive as i32);
+                    }
+                }
+            }
+            // Same acceptance rules as the authoritative PASS/FAIL pass:
+            // total coverage, then heart0 bucket, then per-color deficits
+            // coverable by icon_all. Additive modifiers apply in i32 with a
+            // saturating write-back (mirroring the authoritative pass) so a
+            // negative additive cannot wrap into a huge u8 requirement.
+            let mut icon_all = filled[7];
+            let total_filled: u16 = filled.iter().map(|&v| u16::from(v)).sum();
+            let total_required: u16 = required.iter().map(|&v| u16::from(v)).sum();
+            let mut ok = total_filled >= total_required;
+            if ok && required[0] > 0 {
+                let any_hearts: u16 =
+                    filled[1..7].iter().map(|&v| u16::from(v)).sum::<u16>() + u16::from(filled[0]);
+                if any_hearts + u16::from(icon_all) < u16::from(required[0]) {
+                    ok = false;
+                } else {
+                    let used = u16::from(required[0].saturating_sub(any_hearts as u8));
+                    icon_all = icon_all.saturating_sub(used as u8);
+                }
+            }
+            if ok {
+                for idx in 1..7 {
+                    if filled[idx] < required[idx] {
+                        let deficit = required[idx] - filled[idx];
+                        if icon_all >= deficit {
+                            icon_all -= deficit;
+                        } else {
+                            ok = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            if !ok {
+                all_passed = false;
+            }
+        }
+        let no_excess = (0..8).all(|c| {
+            snap.total_hearts[c] >= filled_total[c]
+                && snap.total_hearts[c] - filled_total[c] == 0
+        });
+        let won = all_passed && snap.total_hearts.iter().any(|&v| v > 0);
+        results[seat_index] = (won, no_excess);
+        recorded[seat_index] = true;
+    }
+    // Seats that performed no lives are LEFT untouched: nothing was learned
+    // about them, and synthetic/legacy flows may have armed them explicitly.
+    if recorded[0] {
+        gs.p1_live_success_this_turn = results[0].0;
+        gs.p1_live_success_no_excess = results[0].0 && results[0].1;
+    }
+    if recorded[1] {
+        gs.p2_live_success_this_turn = results[1].0;
+        gs.p2_live_success_no_excess = results[1].0 && results[1].1;
+    }
+    // Diagnostic detail: why each seat was skipped/written.
+    for seat_index in 0..2 {
+        let pid = if seat_index == 0 {
+            gs.player1.id.clone()
+        } else {
+            gs.player2.id.clone()
+        };
+        let seat = if seat_index == 0 {
+            &gs.player1
+        } else {
+            &gs.player2
+        };
+        let info = gs
+            .performance_snapshots
+            .iter()
+            .rev()
+            .find(|s| s.player_id == pid)
+            .map(|s| (s.lives.len(), s.total_hearts.to_vec()))
+            .unwrap_or((usize::MAX, vec![]));
+        log::debug!(
+            "[EARLY_SEAT_DETAIL] seat={} lives={:?} zone_cards={} total_hearts={:?}",
+            pid,
+            info,
+            seat.live_card_zone.cards.len(),
+            info.1
+        );
+    }
+    log::debug!(
+        "[EARLY_SEAT] p1(won={},no_excess={}) p2(won={},no_excess={})",
+        results[0].0,
+        results[0].1,
+        results[1].0,
+        results[1].1
+    );
+}
+
 impl super::TurnEngine {
     fn score_delta_since(
         current: &HashMap<i16, i32>,
@@ -240,6 +403,12 @@ impl super::TurnEngine {
             .iter()
             .map(|(&k, e)| (k, e.total()))
             .collect();
+
+        // BUG#5: record per-seat outcomes BEFORE LiveSuccess triggers fire
+        // (Q36: they resolve at determination timing and must see both
+        // performances' results).
+        early_seat_results(game_state);
+
         // Q48: A live can be won even with total score 0 or less
         // (score comparison determines the winner regardless of absolute value).
         let p1_extra: u8;
@@ -878,6 +1047,12 @@ impl super::TurnEngine {
         if player1_won {
             game_state.self_no_excess_heart_this_turn = p1_surplus == 0;
         }
+        // Per-seat results for owner-relative 「相手がライブを成功させていた」
+        // evaluation (a P2-owned card's opponent is P1, and vice versa).
+        game_state.p1_live_success_this_turn = player1_won;
+        game_state.p1_live_success_no_excess = p1_surplus == 0;
+        game_state.p2_live_success_this_turn = player2_won;
+        game_state.p2_live_success_no_excess = p2_surplus == 0;
 
         // Push performance summary to rule log
 
