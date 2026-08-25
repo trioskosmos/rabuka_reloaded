@@ -466,27 +466,6 @@ impl super::resolver::AbilityResolver {
             }
         }
 
-        let common_re = |zone: &str,
-                         count: usize,
-                         desc: String,
-                         desc_ja: String,
-                         skip: bool,
-                         fi: Option<Vec<usize>>,
-                         tpid: Option<String>,
-                         ct: Option<u8>,
-                         cto: Option<String>|
-         -> ChoiceBuilder {
-            Choice::select_cards(zone, count, desc, skip)
-                .description_ja(Some(desc_ja))
-                .card_type(card_type.clone())
-                .cost_limit(cost_limit, cost_limit_operator.clone())
-                .cost_total(ct, cto)
-                .group(group.clone())
-                .characters(characters.clone())
-                .filtered_indices(fi)
-                .target_player_id(tpid)
-        };
-
         log::debug!(
             "[KANAN_DEBUG] check hand-cost block: zone={} is_hand={} has_cost={} effect_started={}",
             zone,
@@ -621,7 +600,8 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                     Some(available_idxs)
                 };
                 self.pending_choice = Some(
-                    common_re(
+                    self.build_reprompt(
+                        &ctx,
                         Zone::Hand.to_str(),
                         remaining,
                         format!("Select {} more card(s) from hand for cost", remaining),
@@ -672,7 +652,8 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                                 ));
                             }
                             self.pending_choice = Some(
-                                common_re(
+                                self.build_reprompt(
+                                    &ctx,
                                     Zone::Hand.to_str(),
                                     remaining,
                                     format!(
@@ -729,7 +710,8 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                     "手札に一致するカードがありません（スキップで終了）".to_string()
                 };
                 self.pending_choice = Some(
-                    common_re(
+                    self.build_reprompt(
+                        &ctx,
                         Zone::Hand.to_str(),
                         0,
                         desc,
@@ -790,7 +772,8 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                     .clone()
                     .unwrap_or_else(|| "self".to_string().into());
                 self.pending_choice = Some(
-                    common_re(
+                    self.build_reprompt(
+                        &ctx,
                         Zone::Energy.to_str(),
                         0,
                         format!(
