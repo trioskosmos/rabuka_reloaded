@@ -3008,17 +3008,18 @@ modified.destination = Some(Zone::from_source_str(dest));
         selected: &str,
     ) -> Result<(), String> {
         self.apply_effect_modification(gs, |effect| {
-            let chosen = if selected == "1" || selected == "alternative" || selected == "secondary"
+            let chosen: Option<&AbilityEffect> = if selected == "1"
+                || selected == "alternative"
+                || selected == "secondary"
             {
                 effect
                     .alternative_effect_any()
-                    .clone()
-                    .or(effect.compound.primary_effect.as_ref())
+                    .or(effect.compound.primary_effect.as_ref().map(|b| &**b))
             } else {
-                effect.compound.primary_effect.as_ref()
+                effect.compound.primary_effect.as_ref().map(|b| &**b)
             };
             if let Some(sub_effect) = chosen {
-                *effect = *(*sub_effect).clone();
+                *effect = sub_effect.clone();
             }
         })
     }

@@ -1,4 +1,4 @@
-﻿use super::debug::AbDebug;
+use super::debug::AbDebug;
 use super::enums::{ActionType, Zone};
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ChoiceRoute};
@@ -1047,11 +1047,11 @@ let source = cost.source_str().unwrap_or("");
                     .ability
                     .cost
                     .as_ref()
-                    .and_then(|c| c.alternative_effect_any().clone());
+                    .and_then(|c| c.alternative_effect_any());
                 entry.effect_started = false;
                 entry.optional_cost_result = Some(false);
                 if let Some(alt_effect) = alt {
-                    entry.pending_actions = vec![*alt_effect.clone()];
+                    entry.pending_actions = vec![alt_effect.clone()];
                 } else {
                     entry.pending_actions.clear();
                 }

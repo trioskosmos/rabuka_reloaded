@@ -218,7 +218,7 @@ fn evaluate_delayed_mari(game: &mut TestGame, card_id: i16) -> bool {
     let effect_to_apply = if alt_met {
         gained.alternative_effect_any()
     } else {
-        gained.compound.primary_effect.as_ref()
+        gained.compound.primary_effect.as_ref().map(|v| &**v)
     };
     let mut resolver = AbilityResolver::new(game.state.card_database.clone(), Some(card_id));
     resolver.activating_card_id = Some(card_id);

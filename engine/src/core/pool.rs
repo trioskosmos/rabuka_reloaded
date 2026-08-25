@@ -47,10 +47,13 @@ impl<T> Pool<T> {
         }
     }
 
-    pub unsafe fn put(&self, idx: usize, val: T) -> &mut T {
+    /// Write `val` into slot `idx`. Caller must guarantee exclusive access to
+    /// the slot for the lifetime of the pooled value (enforced by the
+    /// PoolBox slot/heap discipline). Returns nothing — handing out `&mut T`
+    /// from a `&self` receiver is unsound under stacked borrows.
+    pub unsafe fn put(&self, idx: usize, val: T) {
         let ptr = self.slots[idx].get().cast::<T>();
         ptr.write(val);
-        &mut *ptr
     }
 
     pub unsafe fn drop_value(&self, idx: usize) {

@@ -770,11 +770,11 @@ impl super::TurnEngine {
                     let base_met = base_cond.is_some_and(|c| ctx.evaluate_condition(c));
                     if alt_met || base_met {
                         let alt_eff = gained.alternative_effect_any();
-                        let prim_eff = gained.compound.primary_effect.as_ref();
+                        let prim_eff = gained.compound.primary_effect.as_ref().map(|b| &**b);
                         let effect_to_apply = if alt_met {
-                            alt_eff.as_ref()
+                            alt_eff
                         } else {
-                            prim_eff.as_ref()
+                            prim_eff
                         };
                         if let Some(apply) = effect_to_apply {
                             let mut resolver = AbilityResolver::new(
