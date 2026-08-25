@@ -1209,6 +1209,23 @@ pub struct AbilityEffect {
 }
 
 impl AbilityEffect {
+    /// 「(対戦相手のカードの効果でも発動する。)」 — this watcher also arms on
+    /// trigger events caused by the OPPOSING player's card effects. Without
+    /// the marker, a movement-watching 自動 fires on own-side causes only.
+    ///
+    /// The marker is the decoded parenthetical attached to this effect's
+    /// filter box; see `GameState::fire_opponent_cause_watchers_for_move`.
+    pub fn fires_on_opponent_effects(&self) -> bool {
+        self.kind
+            .as_ref()
+            .and_then(|k| k.filter())
+            .and_then(|f| f.parenthetical.as_ref())
+            .is_some_and(|ps| {
+                ps.iter()
+                    .any(|p| p.contains("発動する") && p.contains("相手"))
+            })
+    }
+
     /// Total ACTIVE-ENERGY cost of this cost block.
     ///
     /// Single source of truth for affordability (generation filter and the

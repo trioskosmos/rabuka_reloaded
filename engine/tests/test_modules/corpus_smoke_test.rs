@@ -104,18 +104,49 @@ fn every_card_executes_without_panicking() {
     let prev_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));
 
-    let mut failures: Vec<String> = Vec::new();
-    for no in &card_nos {
-        let ok = catch_unwind(AssertUnwindSafe(|| smoke_one_card(&db, no)));
-        if let Err(e) = ok {
-            let msg = e
-                .downcast_ref::<String>()
-                .cloned()
-                .or_else(|| e.downcast_ref::<&str>().map(|s| s.to_string()))
-                .unwrap_or_else(|| "non-string panic".into());
-            failures.push(format!("{no}: {msg}"));
+    // Cards are independent (each gets its own GameState over the shared
+    // read-only Arc<CardDatabase>), so smoke them across a thread pool.
+    // Failures are collected per-worker and merged in deterministic order
+    // (chunks preserve card_no sort order).
+    let workers = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+        .max(1);
+    let chunk_size = card_nos.len().div_ceil(workers);
+
+    let failures: Vec<String> = std::thread::scope(|scope| {
+        let handles: Vec<_> = card_nos
+            .chunks(chunk_size)
+            .map(|chunk| {
+                let db = db.clone();
+                scope.spawn(move || {
+                    let mut fails: Vec<String> = Vec::new();
+                    for no in chunk {
+                        let ok = catch_unwind(AssertUnwindSafe(|| smoke_one_card(&db, no)));
+                        if let Err(e) = ok {
+                            let msg = e
+                                .downcast_ref::<String>()
+                                .cloned()
+                                .or_else(|| {
+                                    e.downcast_ref::<&str>().map(|s| s.to_string())
+                                })
+                                .unwrap_or_else(|| "non-string panic".into());
+                            fails.push(format!("{no}: {msg}"));
+                        }
+                    }
+                    fails
+                })
+            })
+            .collect();
+        let mut all: Vec<String> = Vec::new();
+        for h in handles {
+            match h.join() {
+                Ok(fails) => all.extend(fails),
+                Err(_) => all.push("smoke worker thread panicked (not caught)".into()),
+            }
         }
-    }
+        all
+    });
 
     std::panic::set_hook(prev_hook);
 

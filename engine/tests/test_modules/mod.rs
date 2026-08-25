@@ -1,4 +1,6 @@
+pub mod ability_combination_test;
 pub mod ability_engine_fixes_test;
+pub mod trigger_scope_test;
 pub mod ability_from_source_test;
 pub mod abundant_test;
 pub mod action_coverage_test;
@@ -107,6 +109,7 @@ pub mod untested_abilities_batch52_test;
 pub mod hard_abilities_tier_test;
 pub mod untested_abilities_batch53_test;
 pub mod untested_abilities_batch54_test;
+pub mod untested_abilities_batch55_test;
 pub mod describe_parity_test;
 pub mod cannot_baton_touch_test;
 pub mod card_ability_tests;

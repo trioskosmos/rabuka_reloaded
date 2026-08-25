@@ -64,7 +64,8 @@ Complements (does not replace) `CODE_AUDIT_2026-08-23.md`, `REFACTOR_BACKLOG.md`
 `ABILITY_PIPELINE.md`. Items already in those docs are marked *(known)*.
 
 Corpus today: 2,526 cards / 1,565 with abilities / 2,011 abilities / **936 unique**.
-Test suite: 409 files / ~2,575 tests, all green locally — **but nothing in CI runs them.**
+Test suite: 483 files / ~2,929 tests, all green locally (~1.9s wall) — CI gates via
+`.github/workflows/engine-tests.yml` + `coverage.yml --check` (added 08-24).
 
 ---
 
@@ -272,12 +273,74 @@ Part-0 holes; several silent-fallback paths can eat a regression unnoticed.
 19. P9 abilities.json format v2 (structured cards[], triggers[], discriminator unification)
 
 ### Continuous (parallel track)
-- Test-gap burn-down: prioritize the 176 unreferenced abilities (cl1/PR/sd2/pb2 sets; ライブ成功時×33,
-  ライブ開始時×56 gaps) using BATCH-style plan docs; backfill qa_data `related_cards` (82 rulings);
-  add opponent-as-actor + simultaneous-trigger-ordering matrix tests; one replay/determinism test;
-  one engine↔web_ui choice-contract pinning test.
+- ~~Test-gap burn-down: prioritize the 176 unreferenced abilities~~ **DONE at L0** —
+  936/936 abilities on 771/771 cards referenced (batch 55 closed the list). Remaining
+  quality axes: inferred-depth tail (48×L1, 28×L2), the 08-25 scoping/conjunction
+  directive above, backfill qa_data `related_cards` (82 rulings; 8 rulings still
+  test-unreferenced: Q29/Q31/Q33/Q34/Q37/Q39/Q138/Q139);
+  one replay/determinism test; one engine↔web_ui choice-contract pinning test.
 
-### Current work directive (user, 08-24)
+### Current work directive (user, 08-25) — ACTIVE
+
+**Theme: 自動 abilities × trigger-source scoping × ability combination.**
+The next fidelity frontier is not more single-ability burn-down (L0 gaps = 0); it is
+WHOSE card effect is allowed to activate a trigger, and how abilities behave in
+combination.
+
+Corpus facts (measured 08-25):
+
+- 75 unique 自動 abilities; all condition-gated; 17 are multi-action sequentials.
+- **Trigger-source scoping is a three-arm dimension the parser likely drops today:**
+
+| Arm | Text shape | Uniques | Correct semantics |
+|---|---|---|---|
+| S1 own-only | 「自分のカードの効果によって、…たとき」 | 4 自動 | fires ONLY when own card's effect caused the event |
+| S2 both-sides | 「…たとき。(対戦相手の/相手のカードの効果でも発動する。)」 | 7 自動 | fires from EITHER player's card effect |
+| S3 unscoped | plain 「エリアを移動したとき」「〜が置かれたとき」 | majority of 自動 | check rules.txt: default scope = ? |
+
+- Notable S1 case watches the OPPONENT's stage (「自分のカードの効果によって、相手のステージの…
+  メンバーがウェイト状態になったとき」 PR-family draw): event location ≠ effect owner side.
+- Condition-side cousins (same scoping axis, different clause family):
+  「相手の効果によってはウェイトしない」 restriction;
+  「自分の『Liella!』のカードの効果によって…移動していた場合」 LiveSuccess score gate;
+  「自分の『虹ヶ咲』のカードの効果によって…アクティブにしていた場合」 LiveStart score gate.
+- Combination surface: **405 cards carry >1 ability** (364×2, 41×3); 自動 is ab#1 on
+  16 cards; S2/S1 triggers interleave with OPPONENT chains by definition.
+
+Work items, in order:
+
+1. **DONE 08-25 probe — parser state**: the scoping clauses ARE decoded.
+   - S1: `trigger_event.self_effect_only = true` survives into Condition; engine
+     CONSUMES it in condition/state.rs (area-move + energy-placed arms read
+     `get_self_effect_only()`). Machinery exists — untested.
+   - S2: the parenthetical survives verbatim as `effect.parenthetical:
+     ["対戦相手のカードの効果でも発動する。"]` but NOTHING in the engine reads it for
+     trigger dispatch (only unrelated activation-position uses exist). S2 triggers
+     today behave however the unscoped path behaves — likely own-side or
+     any-source by accident. **This is the primary gap.**
+2. **Engine arm for S2** end-to-end per AGENTS.md: resolve event cause-side at
+   trigger dispatch (MovementEvent already carries `cause_player_id` +
+   `cause_card_id`; energy-placed events carry cause too), gate on
+   effect.parenthetical containing 発動する+相手 → allow opponent-caused;
+   default unscoped (S3) semantics decided FROM rules/rules.txt + qa_data.json,
+   not from current behavior. Then bytecode regen + golden-diff.
+3. **Test matrix per scoping arm** (pos/neg/edge, reusing batch idioms):
+   - S1: own-effect fires ✓; OPPONENT-effect same event MUST NOT fire ✗; own
+     non-matching event ✗; turn1-limit consumed by own then opponent event ✗.
+   - S2: own ✓ AND opponent ✓; non-matching ✗; turn-limit shared across sides.
+   - S3: pin whatever the rules-corpus default turns out to be (consult
+     rules/rules.txt + qa_data.json before writing expectations).
+   - Cross-side event location: own effect waiting an OPPONENT member (S1 draw) —
+     pos, plus own-member-waited-by-opponent neg.
+4. **Combination/conjunction matrix** (supersedes old directive item 3):
+   - auto(ab#1) + sibling 起動/常時 on the same card: firing one must not consume the
+     other's use_limit or leave stale temporary modifiers (16 ab#1-auto cards first).
+   - S2 auto firing inside an OPPONENT's ability chain: queue ordering, choice
+     ownership (who answers the prompt), recalc timing.
+   - two-player simultaneous-trigger ordering pin (already wanted by Continuous).
+5. Feed every finding back as parser/engine tickets per the 08-24 loop below.
+
+### Current work directive (user, 08-24) — standing rules
 1. **Finish the missing tests, one by one, with care** — every new test covers positive AND
    negative cases plus edge cases (empty zones, boundary counts, wrong-type/wrong-name
    exclusions, sibling-ability interference). Take inspiration from the existing corpus of
@@ -341,6 +404,12 @@ Immediate targets (from the C1 decode-audit triage):
 | 08-25 | c37ccd95 | **Batch 53** — look-and-select family: 14 tests / 9 abilities (group-filter looks lilywhite/5yncri5e!/DOLLCHESTRA/Liella, named-member 璃奈/嵐珠 look2, cost-gated looks 起動+opt登場, opt{E}{E}{E} live retrieval, mill3->live recovery). Pure idiom reuse, zero engine changes. Suite **2869/0+0ign**, depth=none ->25 |
 | 08-25 | (b54) | **Batch 54** — yell-revealed retrievals x4, state/formation x4, dual-trigger + specify-color twins: 12 tests / 11 abilities. Suite **2881/0+0ign**, depth=none ->15 |
 | 08-25 | 4eec599d | Batch 42 (6 tests, all green): bp5-015-N all-six-colors collective gate (pos via Honoka+Kanan coverage, missing-colors neg); bp7-015-N exactly-3 CatChu! + optional energy -> draw (pos/neg); bp7-018-N optional live-card discard cost -> look5/take1 (accept + decline). No engine changes needed. Suite **2777/0+4ign**, depth=none ->76 |
+| 08-25 | (b55) | **Batch 55** (parallel session) — final depth=none burn-down: s1013/s1014 look4 debuts, PR-017 self-exile 起動, N-bp5-028 stage-heart02 live gates, SP-bp5-021/023/024 lives, HS-pb1-020/026, HS-bp6-028. During bring-up: encoding corruption of the new file repaired via cp932 round-trip + Edit-tool rewrites; 3 test bugs fixed against printed text (card_no needs fullwidth ＋ `PL!S-bp5-001-R＋`; SP-bp5-023 revealed pool must hold a live with an actual score icon — `has_score_icon()` reads special_heart.score, Next SPARKLING!! has none; SP-bp5-024 rewritten to printed semantics — moved-members gain the chosen heart, NOT live-scales-by-success-zone-count) |
+| 08-25 | (perf) | Corpus smoke test parallelized (std::thread::scope worker pool, deterministic chunk order): every_card_executes_without_panicking 1.93s → ~0.53s; full-suite wall ~3.6s → ~1.9s. Remaining per-test >1s entries are just first-wave attribution of the one-time ~1s DB load (OnceLock), not real work |
+| 08-25 | (b21fix) | **Bug 21 fixed end-to-end — under_member host targeting**: N-bp3-025-L Awakening Promise's 「そうした場合、そのメンバーは…」 gain targeted EVERY stage member matching the card_type filter (correct only by accident when one member staged). New `GameMods.last_under_move_host_ids` recorded by `move_from_under_member`, consumed by `resolve_gain_resource_targets` for Heart+per_unit+per_unit_type=energy_deck, cleared in clear_effect_tracking; guard test awakening_targets_energy_owner_member_only (two staged members each holding under-energy — only the owner gains). Also REVERTED a parallel-session `GR_SELF_PER_UNIT` early-return in misc.rs that landed self-targeted per-unit heart gains on the activating LIVE card — contradicts printed text for both N-bp3-025-L (そのメンバー gains) and SP-bp5-024-L (moved members gain); its [GAIN_MULT] debug log kept. If reintroduced, awakening_targets_energy_owner_member_only is the failing guard. Suite **2895/0**, wall ~1.9s |
+| 08-25 | (b56) | **Batch 56 — ability-COMBINATION tests** (`ability_combination_test.rs`, 7 tests): same-card sibling chains per the 08-25 directive. bp5-111-R 起動 position-change → 自動 waits opponent blade≤2 (pos + empty-stage neg); HS-pb1-003-R 登場 hand-discard → 自動 heart01+blade per discard (pos + no-discard neg, hand accounting exact); SP-bp7-005-R＋ 自動×2 cascade off debut (deck→zone waited placement IS the own-effect energy_placed event arming ab#1; ターン1回 respected); N-bp3-005-R＋ shared-counter pair — playing it as 3rd debut fires draw-to-five AND LiveStart grants 常時 score+1 (asserted via recalc + p1_constant_total_score_bonus), with a threshold-divergence pin at 2 debuts (auto silent / constant grants). Refactor: `fire_trigger` hoisted to tests/helpers (was copy-pasted in batch55). Lesson: multi-ability tests must budget EACH ability's cost/turn-limit — give_energy must cover play costs + activation costs together. Suite **2902/0**, wall ~1.8s |
+| 08-25 | (s2) | **S2 trigger-source scoping IMPLEMENTED** — 「(対戦相手のカードの効果でも発動する。)」 now works, driven by REAL two-seat plays (`Side`/`set_active_side` helpers route P2 through `execute_main_phase_action`; the engine pipeline was already active-player-aware — only test helpers were p1-hardcoded). New `fire_opponent_cause_watchers_for_move`, called from `push_movement_event` on stage→stage moves whose cause ≠ moved card's owner; marker via new `AbilityEffect::fires_on_opponent_effects()` accessor (parenthetical was decoded but dead). Turn-scoped dedupe `opp_cause_fired_keys` shared by hook + generic TAS prevents double-fire per move. Tests: `trigger_scope_test.rs` 4-test matrix incl. the parenthetical pin (opponent-caused move fires +2 more) and S3 default-scope pin (no-parenthetical stays silent on opponent cause). DX: `scan_autos_both` helper hoisted. **Known limits**: hook covers stage→stage only (energy_placed arm pending); dedupe is turn-scoped so a marked watcher arms at most once per turn. Suite **2906/0**, wall ~1.9s |
+| 08-25 | (s1s2) | **Trigger-scoping matrix COMPLETE (6 pins)**: energy-placed S2 arm added — `fire_opponent_cause_energy_watchers`, hooked into push_movement_event for opponent-caused zone→energy placements (SP-bp4-016-N heart06; its comparison_condition needs no cause gate at resolution, hook alone suffices); S1 negative pin added (SP-bp7-005-R＋ ab#1 self_effect_only stays silent on opponent-caused placement — existing state.rs:908 check confirmed live). Matrix: S1 own-only ✓neg-opp / S2 both-sides ✓opp / S3 unscoped ✓own+✓silent-opp. Remaining known limit: marked watchers arm at most once per turn (dedupe is turn-scoped; per-move identity would need richer keys). Suite **2908/0**, wall ~1.8s |
 
 ---
 

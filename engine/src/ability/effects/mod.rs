@@ -87,23 +87,7 @@ impl AbilityResolver {
             gs.non_stackable_effects.push(effect_key);
         }
 
-        // Log effect execution to rule_log
-        // Log effect execution to rule_log (skip compound/dispatch-only types
-        // whose sub-actions log individually, to avoid duplicates).
-        if !effect.text.is_empty()
-            && !matches!(
-                effect.action,
-                ActionType::CompoundAction
-                    | ActionType::Sequential
-                    | ActionType::Choice
-                    | ActionType::ConditionalAlternative
-                    | ActionType::ConditionalOnResult
-                    | ActionType::ConditionalOnOptional
-            )
-        {
-            // Effect details are captured in the structured ability_resolution entry
-            // — no separate [effect] text entry needed.
-        }
+        // Effect details are captured in the structured ability_resolution entry
 
         // Legacy opponent_action wrapper (pre-parser-flatten). Flat effects
         // carry target="opponent" directly and dispatch via ActionType.

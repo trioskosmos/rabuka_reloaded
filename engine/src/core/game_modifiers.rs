@@ -98,8 +98,18 @@ pub struct GameModifiers {
     pub last_cost_discard_count: u8,
     /// Card IDs moved from hand to discard by the most recent cost payment.
     pub last_cost_moved_card_ids: SmallVec<[i16; 4]>,
+    /// Dedupe keys for opponent-cause watchers already armed this turn
+    /// (「対戦相手のカードの効果でも発動する。」). Turn-scoped so the same
+    /// watcher can still fire again on LATER moves next turn.
+    pub opp_cause_fired_keys: SmallVec<[u32; 4]>,
     /// Number of energy cards paid by the most recent cost payment.
     pub last_cost_energy_count: u8,
+    /// Stage member(s) that hosted cards moved out from under them by the most
+    /// recent under_member selection (「そうした場合、そのメンバーは…」 — the gain
+    /// that follows targets THIS member, not every stage member matching the
+    /// card_type filter). Accumulates across any_number re-prompts; cleared by
+    /// `clear_effect_tracking`.
+    pub last_under_move_host_ids: SmallVec<[i16; 4]>,
     /// Per-card delayed "cannot activate" flags. Card_id → remaining turns of
     /// activation block. Decremented each Active phase; member stays wait while >0.
     pub delayed_cannot_active: HashMap<i16, u8>,
@@ -148,6 +158,8 @@ impl GameModifiers {
             last_cost_discard_count: 0,
             last_cost_moved_card_ids: SmallVec::new(),
             last_cost_energy_count: 0,
+            last_under_move_host_ids: SmallVec::new(),
+            opp_cause_fired_keys: SmallVec::new(),
             delayed_cannot_active: HashMap::default(),
             last_surplus_loss_count: 0,
             success_zone_blade_bonuses: HashMap::default(),

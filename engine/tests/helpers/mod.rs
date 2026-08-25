@@ -104,6 +104,54 @@ pub fn push_energy_zone_change(game: &mut TestGame, player: &str) {
         .push_movement_event(-1, "energy_zone", "energy_deck", None, player, true);
 }
 
+    /// Fire a card's auto ability identified by its JA trigger label
+    /// (e.g. 「ライブ開始時」), then resolve the pushed abilities. The canonical way
+    /// to exercise 自動/ライブ開始時/ライブ成功時 triggers without advancing phases.
+    pub fn fire_trigger(
+        game: &mut TestGame,
+        cid: i16,
+        trigger: rabuka_engine::core::types::AbilityTrigger,
+        trig: &str,
+    ) {
+    let ability_id = {
+        let card = game.db.get_card(cid).unwrap();
+        let ab = card
+            .resolved_abilities()
+            .find(|a| a.triggers.as_deref() == Some(trig))
+            .unwrap_or_else(|| panic!("card {} lacks a '{trig}' ability", card.card_no));
+        format!("{}_{}", card.card_no, ab.full_text)
+    };
+    let card_no = game.db.get_card(cid).unwrap().card_no.to_string();
+    let pid = game.state.player1.id.clone();
+    game.state.trigger_auto_ability(
+        ability_id,
+        trigger,
+        pid.clone(),
+        Some(card_no),
+        Some(cid),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(cid);
+    game.state.process_pending_auto_abilities(&pid);
+}
+
+/// Run one auto-scan cycle for BOTH seats: trigger dispatch + resolution +
+/// choice drain. Call after any play whose resolution may have armed
+/// movement/appearance watchers on either side.
+pub fn scan_autos_both(game: &mut TestGame) {
+    let p1 = game.state.player1.id.clone();
+    game.state.trigger_auto_abilities_for_player(&p1);
+    game.state.process_pending_auto_abilities(&p1);
+    let p2 = game.state.player2.id.clone();
+    game.state.trigger_auto_abilities_for_player(&p2);
+    game.state.process_pending_auto_abilities(&p2);
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+    game.drain_auto_ability_choices();
+}
+
 /// Enable the engine's condition-verdict logger, run a TAS scan, and return a
 /// human-readable tree of every condition verdict. Useful for debugging why an
 /// ability did (or didn't) fire without editing engine source.
@@ -256,6 +304,19 @@ pub struct BoardSnapshot {
 //   assert!(game.player().hand.cards.contains(&filler));
 // ====================================================================
 
+// ====================================================================
+// Two-sided play
+// ====================================================================
+
+/// Which seat a side-aware helper operates on. The engine's action pipeline
+/// resolves the acting player from phase/first-attacker (`active_player()`),
+/// so switching sides is just flipping `is_first_attacker`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Side {
+    P1,
+    P2,
+}
+
 pub struct TestGame {
     pub db: Arc<CardDatabase>,
     pub state: GameState,
@@ -391,9 +452,74 @@ impl TestGame {
             .unwrap_or(template_id)
     }
 
+    // ---- Two-sided play (P1/P2 through the real pipeline) ----
+
+    /// Which seat a side-aware helper operates on.
+    pub fn set_active_side(&mut self, side: Side) {
+        let (p1f, p2f) = match side {
+            Side::P1 => (true, false),
+            Side::P2 => (false, true),
+        };
+        self.state.player1.is_first_attacker = p1f;
+        self.state.player2.is_first_attacker = p2f;
+    }
+
+    pub fn add_to_hand_for(&mut self, side: Side, id: i16) {
+        match side {
+            Side::P1 => self.state.player1.hand.cards.push(id),
+            Side::P2 => self.state.player2.hand.cards.push(id),
+        }
+    }
+
+    /// Stock `count` real energy cards into the side's zone as active.
+    pub fn give_energy_for(&mut self, side: Side, count: usize) {
+        for _ in 0..count {
+            let energy_card = self.id("LL-E-001-SD");
+            match side {
+                Side::P1 => self.state.player1.energy_zone.cards.push(energy_card),
+                Side::P2 => self.state.player2.energy_zone.cards.push(energy_card),
+            }
+        }
+        match side {
+            Side::P1 => self.state.player1.energy_zone.add_active(count as u8),
+            Side::P2 => self.state.player2.energy_zone.add_active(count as u8),
+        }
+    }
+
+    /// Play a member to stage AS the given side via the real action pipeline
+    /// (`execute_main_phase_action` routes by active player).
+    pub fn try_play_to_stage_for(
+        &mut self,
+        side: Side,
+        card_id: i16,
+        area: MemberArea,
+    ) -> Result<(), String> {
+        self.set_active_side(side);
+        TurnEngine::execute_main_phase_action(
+            &mut self.state,
+            &ActionType::PlayMemberToStage,
+            Some(card_id),
+            None,
+            Some(area),
+            Some(false),
+        )
+    }
+
+    /// Activate a stage member's 起動 ability AS the given side.
+    pub fn activate_ability_for(&mut self, side: Side, stage_card_id: i16) -> Result<(), String> {
+        self.set_active_side(side);
+        TurnEngine::execute_main_phase_action(
+            &mut self.state,
+            &ActionType::UseAbility,
+            Some(stage_card_id),
+            None,
+            None,
+            None,
+        )
+    }
+
     /// Shortcut for `state.player1` (the active player in our tests).
-    pub fn player(&mut self) -> &mut Player {
-        &mut self.state.player1
+    pub fn player(&mut self) -> &mut Player {        &mut self.state.player1
     }
 
     // ---- Zone setup ----

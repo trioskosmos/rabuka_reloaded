@@ -678,6 +678,7 @@ impl GameState {
         self.mods.last_cost_discard_count = 0;
         self.mods.last_cost_moved_card_ids.clear();
         self.mods.last_cost_energy_count = 0;
+        self.mods.last_under_move_host_ids.clear();
     }
 
     /// Backward-compat: the card that last moved areas (from turn_area_movements).

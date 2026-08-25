@@ -613,6 +613,9 @@ impl AbilityResolver {
                 .resource_icon_count_any()
                 .unwrap_or(effect.count_or(1))
         };
+        log::debug!(
+            "[GAIN_MULT] matching={matching_count} per_unit_count_val={per_unit_count_val} units={units} base={per_unit_base}"
+        );
         units * per_unit_base
     }
     fn gain_heart_colors_from_selected_card(
@@ -1820,6 +1823,26 @@ impl AbilityResolver {
             SmallVec::new()
         };
 
+        // 「そうした場合、そのメンバーは…」 (e.g. PL!N-bp3-025-L Awakening
+        // Promise): a per-unit gain that follows an under_member→energy_deck
+        // move targets THE HOST MEMBER(S) of the moved energy — never the
+        // whole stage card_type-filter match set. Snapshot before the mutable
+        // `player` borrow below.
+        let under_move_hosts: SmallVec<[i16; 4]> = if kind == ResourceKind::Heart
+            && per_unit
+            && per_unit_type_str == Some("energy_deck")
+        {
+            gs.mods.last_under_move_host_ids.clone()
+        } else {
+            SmallVec::new()
+        };
+        if !under_move_hosts.is_empty() {
+            log::debug!(
+                "[UNDER_MOVE_HOSTS] targeting members {:?} for per-unit heart gain",
+                under_move_hosts
+            );
+        }
+
         let player = gs.resolve_target_player_mut(target);
 
         let has_selection_filter =
@@ -1973,7 +1996,9 @@ impl AbilityResolver {
             .clone()
             .or_else(|| effect.heart_color_any().map(|s| s.to_string()))
             .or_else(|| effect.heart_colors_any().first().map(|s| s.to_string()));
-        let mut heart_targets: Vec<i16> = if effect.target_from_selection_any().unwrap_or(false) {
+        let mut heart_targets: Vec<i16> = if !under_move_hosts.is_empty() {
+            under_move_hosts.to_vec()
+        } else if effect.target_from_selection_any().unwrap_or(false) {
             // Explicitly target only the cards selected by the preceding
             // sequential action (e.g. a change_state that activated a member).
             log::debug!(

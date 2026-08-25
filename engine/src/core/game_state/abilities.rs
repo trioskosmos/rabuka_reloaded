@@ -523,6 +523,12 @@ impl GameState {
                             // Re-scan guard: skip re-enqueueing the exact auto
                             // ability that just completed (numeric key).
                             let num_key = ((card_id as u32) << 16) | (ability_idx as u32);
+                            if self.mods.opp_cause_fired_keys.contains(&num_key) {
+                                // Already armed for THIS move by the
+                                // opponent-cause hook (or vice versa): one
+                                // move fires a watcher exactly once.
+                                continue;
+                            }
                             if skip_this_card_auto_key == Some(num_key) {
                                 continue;
                             }
@@ -776,6 +782,193 @@ impl GameState {
             return 1;
         }
         match_count
+    }
+
+    /// Opponent-caused trigger arm: 「(対戦相手のカードの効果でも発動する。)」.
+    ///
+    /// Called from `push_movement_event` for every stage→stage area move whose
+    /// cause player differs from the moved card's owner. Scans the OWNER's
+    /// staged AUTO abilities that carry the parenthetical extension and
+    /// enqueues matching watchers with the move as their trigger batch.
+    pub fn fire_opponent_cause_watchers_for_move(
+        &mut self,
+        moved_card_id: i16,
+        causer_player_id: &str,
+    ) {
+        let owner_pid = if self.player1.contains_card(moved_card_id) {
+            self.player1.id.clone()
+        } else if self.player2.contains_card(moved_card_id) {
+            self.player2.id.clone()
+        } else {
+            return;
+        };
+        if owner_pid == causer_player_id {
+            return; // own-side cause: the normal owner-side TAS handles it
+        }
+        let stage_cards: Vec<i16> = if owner_pid == self.player1.id {
+            self.player1.stage.stage.to_vec()
+        } else {
+            self.player2.stage.stage.to_vec()
+        };
+        for &watcher_id in &stage_cards {
+            if watcher_id == -1 {
+                continue;
+            }
+            let (card_name, card_no, abilities) = match self.card_database.get_card(watcher_id) {
+                Some(c) => (
+                    c.name.to_string(),
+                    c.card_no.to_string(),
+                    c.abilities.clone(),
+                ),
+                None => continue,
+            };
+            for (ability_idx, ar) in abilities.iter().enumerate() {
+                let ability = ar.resolve();
+                if !ability
+                    .triggers
+                    .as_ref()
+                    .is_some_and(|t| &**t == crate::triggers::AUTO)
+                {
+                    continue;
+                }
+                let effect = match ability.effect.as_ref() {
+                    Some(e) => e,
+                    None => continue,
+                };
+                // Only effects carrying the explicit parenthetical extension.
+                let also_opponent = effect.fires_on_opponent_effects();
+                if !also_opponent {
+                    continue;
+                }
+                let condition = match effect.condition.as_ref() {
+                    Some(c) => c,
+                    None => continue,
+                };
+                let saved_activating = self.activating_card;
+                self.activating_card = Some(watcher_id);
+                let moved_one: SmallVec<[i16; 4]> = smallvec::smallvec![moved_card_id];
+                let ctx = crate::ability::condition::ConditionContext::with_moved_cards(
+                    self,
+                    &moved_one,
+                );
+                let passes = ctx.evaluate_condition(condition);
+                self.activating_card = saved_activating;
+                if !passes {
+                    continue;
+                }
+                let num_key = ((watcher_id as u32) << 16) | (ability_idx as u32);
+                if self.mods.opp_cause_fired_keys.contains(&num_key) {
+                    continue;
+                }
+                self.mods.opp_cause_fired_keys.push(num_key);
+                log::debug!(
+                    "[OPP_CAUSE_WATCHER] firing {} (seat {}) on opponent-caused move of {}",
+                    card_name,
+                    owner_pid,
+                    moved_card_id
+                );
+                self.trigger_auto_ability_by_index(
+                    AbilityTrigger::Auto,
+                    owner_pid.clone(),
+                    Some(card_no.clone()),
+                    Some(watcher_id),
+                    ability_idx,
+                    Some(smallvec::smallvec![moved_card_id]),
+                    None,
+                );
+            }
+        }
+    }
+
+    /// Energy variant of [`Self::fire_opponent_cause_watchers_for_move`]:
+    /// 「カードの効果によって自分のエネルギー置き場に…(相手のカードの効果でも
+    /// 発動する。)」 — an opponent's effect placed `energy_card_id` into THIS
+    /// player's energy zone; arm that player's marked staged watchers.
+    pub fn fire_opponent_cause_energy_watchers(
+        &mut self,
+        energy_card_id: i16,
+        causer_player_id: &str,
+    ) {
+        let owner_pid = if self.player1.energy_zone.cards.contains(&energy_card_id) {
+            self.player1.id.clone()
+        } else if self.player2.energy_zone.cards.contains(&energy_card_id) {
+            self.player2.id.clone()
+        } else {
+            return;
+        };
+        if owner_pid == causer_player_id {
+            return;
+        }
+        let stage_cards: Vec<i16> = if owner_pid == self.player1.id {
+            self.player1.stage.stage.to_vec()
+        } else {
+            self.player2.stage.stage.to_vec()
+        };
+        for &watcher_id in &stage_cards {
+            if watcher_id == -1 {
+                continue;
+            }
+            let (card_name, card_no, abilities) = match self.card_database.get_card(watcher_id) {
+                Some(c) => (
+                    c.name.to_string(),
+                    c.card_no.to_string(),
+                    c.abilities.clone(),
+                ),
+                None => continue,
+            };
+            for (ability_idx, ar) in abilities.iter().enumerate() {
+                let ability = ar.resolve();
+                if !ability
+                    .triggers
+                    .as_ref()
+                    .is_some_and(|t| &**t == crate::triggers::AUTO)
+                {
+                    continue;
+                }
+                let effect = match ability.effect.as_ref() {
+                    Some(e) => e,
+                    None => continue,
+                };
+                if !effect.fires_on_opponent_effects() {
+                    continue;
+                }
+                // The watcher's condition compares its OWN energy zone state.
+                let saved_activating = self.activating_card;
+                self.activating_card = Some(watcher_id);
+                let moved_one: SmallVec<[i16; 4]> = smallvec::smallvec![energy_card_id];
+                let ctx = crate::ability::condition::ConditionContext::with_moved_cards(
+                    self,
+                    &moved_one,
+                );
+                let passes = match effect.condition.as_ref() {
+                    Some(c) => ctx.evaluate_condition(c),
+                    None => false,
+                };
+                self.activating_card = saved_activating;
+                if !passes {
+                    continue;
+                }
+                let num_key = ((watcher_id as u32) << 16) | (ability_idx as u32);
+                if self.mods.opp_cause_fired_keys.contains(&num_key) {
+                    continue;
+                }
+                self.mods.opp_cause_fired_keys.push(num_key);
+                log::debug!(
+                    "[OPP_CAUSE_WATCHER] energy arm: firing {} (seat {})",
+                    card_name,
+                    owner_pid
+                );
+                self.trigger_auto_ability_by_index(
+                    AbilityTrigger::Auto,
+                    owner_pid.clone(),
+                    Some(card_no.clone()),
+                    Some(watcher_id),
+                    ability_idx,
+                    Some(smallvec::smallvec![energy_card_id]),
+                    None,
+                );
+            }
+        }
     }
 
     pub fn trigger_auto_ability(

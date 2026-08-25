@@ -843,7 +843,15 @@ impl<'a> ConditionContext<'a> {
                             .recently_moved_cards
                             .as_ref()
                             .map_or(false, |v| v.contains(&cid));
-                    in_pce || (in_tam && in_current_batch)
+                    // Deferred cross-seat resolutions run AFTER the movement
+                    // batch is cleared; the enqueue-time snapshot of the
+                    // triggering batch is the durable record that THIS card's
+                    // move caused this very trigger.
+                    let in_trigger_batch = self
+                        .game_state
+                        .entry_trigger_moved_cards()
+                        .map_or(false, |tm| tm.contains(&cid));
+                    in_pce || (in_tam && in_current_batch) || in_trigger_batch
                 });
                 let area_ok = if !this_card_moved {
                     // "このメンバーがエリアを移動する" — THIS card must have moved.

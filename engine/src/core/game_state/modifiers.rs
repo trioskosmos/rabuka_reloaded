@@ -1223,11 +1223,51 @@ impl GameState {
         // Track turn-level area movement (stage-area-to-stage-area)
         let is_area_move = source_zone == "stage" && dest_zone == "stage";
         if is_area_move {
+            log::debug!(
+                "[AREA_MOVE_RECORDED] card={} cause={} owner_p1={} owner_p2={}",
+                moved_card_id,
+                event.cause_player_id,
+                self.player1.contains_card(moved_card_id),
+                self.player2.contains_card(moved_card_id)
+            );
             self.turn_area_movements.push(event.clone());
             self.position_change_occurred_this_turn = true;
+            // Opponent-caused trigger arm: 「(対戦相手のカードの効果でも
+            // 発動する。)」 — when the CAUSER is not the moved card's owner,
+            // arm that owner's marked watchers right here, while the cause
+            // is unambiguous and before any batch state is cleared.
+            let caused_by_opponent = (self.player1.contains_card(moved_card_id)
+                && event.cause_player_id != self.player1.id)
+                || (self.player2.contains_card(moved_card_id)
+                    && event.cause_player_id != self.player2.id);
+            if caused_by_opponent {
+                self.fire_opponent_cause_watchers_for_move(
+                    moved_card_id,
+                    &event.cause_player_id,
+                );
+            }
         }
         // Track in cards_moved_this_turn for fast O(1) lookups
         self.cards_moved_this_turn.push(moved_card_id);
+
+        // Opponent-caused trigger arm (energy variant): 「カードの効果によって
+        // 自分のエネルギー置き場に…(相手のカードの効果でも発動する。)」 — an
+        // opponent's effect placing an energy card into THIS player's zone.
+        let is_energy_zone_placement =
+            dest_zone == "energy" || dest_zone == "energy_zone";
+        if is_energy_zone_placement {
+            let zone_owner_is_p1 = self.player1.energy_zone.cards.contains(&moved_card_id);
+            let zone_owner_is_p2 = self.player2.energy_zone.cards.contains(&moved_card_id);
+            let caused_by_opponent = (zone_owner_is_p1
+                && event.cause_player_id != self.player1.id)
+                || (zone_owner_is_p2 && event.cause_player_id != self.player2.id);
+            if caused_by_opponent {
+                self.fire_opponent_cause_energy_watchers(
+                    moved_card_id,
+                    &event.cause_player_id,
+                );
+            }
+        }
     }
 
     pub fn has_card_moved_this_turn(&self, card_id: i16) -> bool {
@@ -1261,6 +1301,9 @@ impl GameState {
         self.turn_movements.clear();
         self.cards_appeared_this_turn.clear();
         self.turn_area_movements.clear();
+        // Opponent-cause watcher dedupe is turn-scoped: a given move can arm
+        // a marked watcher once, and the set resets with the movement data.
+        self.mods.opp_cause_fired_keys.clear();
     }
 
     pub fn remove_revealed_card(&mut self, card_id: i16) {

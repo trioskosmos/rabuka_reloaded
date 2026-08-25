@@ -969,6 +969,47 @@ fn awakening_no_energy_nothing_happens() {
     assert_eq!(heart, 0, "no heart bonus when no energy under");
 }
 
+/// 「そうした場合、そのメンバーは…」 — only THE member whose energy moved gains,
+/// even when another stage member also has energy under them.
+#[test]
+fn awakening_targets_energy_owner_member_only() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let a = g.id("PL!N-bp3-025-L");
+    let owner = g.id("PL!-sd1-010-SD");
+    let bystander = g.id("PL!-sd1-011-SD");
+    g.state.player1.stage.stage = [-1, owner, bystander];
+    place_energy_under(&mut g, MemberArea::Center, 2);
+    place_energy_under(&mut g, MemberArea::RightSide, 2);
+    g.state.player1.hand.cards.push(a);
+    let energy_before = g.state.player1.energy_deck.cards.len();
+    advance_to_live_card_set_p1(&mut g);
+    g.set_live_card(a);
+    advance_to_live_start(&mut g);
+    assert!(g.has_pending_choice(), "choice expected");
+    // Global index 0 = first card under the CENTER member (slot order 0..3).
+    g.select_indices(&[0]);
+    if g.has_pending_choice() {
+        g.select_indices(&[]);
+    }
+    assert_eq!(
+        g.state.player1.energy_deck.cards.len(),
+        energy_before + 1,
+        "1 energy moved"
+    );
+    let heart02 = rabuka_engine::card::HeartColor::Heart02;
+    assert_eq!(
+        g.state.mods.get_heart_modifier(owner, heart02),
+        3,
+        "energy owner member gains heart02 x3"
+    );
+    assert_eq!(
+        g.state.mods.get_heart_modifier(bystander, heart02),
+        0,
+        "bystander member with its own under-energy gains nothing"
+    );
+}
+
 /// Move 2 energy → 6 heart02 (2 × 3).
 #[test]
 fn awakening_move_all_energy() {

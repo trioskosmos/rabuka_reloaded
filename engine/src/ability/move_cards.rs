@@ -2661,6 +2661,23 @@ if util::distinct_should_dedupe(distinct) {
                 util::place_card_in_zone(player, *card_id, dst, None, false, 1);
             }
         }
+        // Record which stage member(s) hosted the moved cards so a following
+        // 「そうした場合、そのメンバーは…」 gain step can target THEM specifically
+        // (see resolve_gain_resource_targets / last_under_move_host_ids).
+        let mut host_ids: SmallVec<[i16; 4]> = SmallVec::new();
+        for (si, _) in &cards_to_move {
+            if let Some(&host) = player.stage.stage.get(*si) {
+                if host != -1 && !host_ids.contains(&host) {
+                    host_ids.push(host);
+                }
+            }
+        }
+        drop(player);
+        for host in host_ids {
+            if !gs.mods.last_under_move_host_ids.contains(&host) {
+                gs.mods.last_under_move_host_ids.push(host);
+            }
+        }
         gs.recalculate_constants();
         // Don't save energy card IDs in selected_cards — they would leak
         // into downstream sequential actions (e.g. gain_resource heart targets).
