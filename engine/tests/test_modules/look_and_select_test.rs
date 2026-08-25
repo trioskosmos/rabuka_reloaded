@@ -131,10 +131,11 @@ fn look_and_select_any_number_skip_all() {
     }
 
     assert!(!game.has_pending_choice(), "Ability should have ended");
+    // Docstring: select 0 → BOTH looked-at cards go to discard.
     assert!(
         game.state.player1.waitroom.cards.contains(&card_a)
-            || game.state.player1.waitroom.cards.contains(&card_b),
-        "At least one unmatched card should be in discard"
+            && game.state.player1.waitroom.cards.contains(&card_b),
+        "both looked-at cards should be in discard after skipping selection"
     );
 }
 

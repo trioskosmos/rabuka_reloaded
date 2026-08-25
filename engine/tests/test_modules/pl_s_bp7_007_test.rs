@@ -51,12 +51,14 @@ fn hanamaru_single_matching_auto_adds_to_hand() {
 
     process_debut(&mut game, hanamaru);
 
-    // Engine auto-resolves: 1 valid card → moved to hand, condition passes, followup auto-deploys
-    // Since there IS an empty slot (right), the card should be deployed to stage
-    assert!(
-        game.state.player1.stage.stage[2] == tsushima
-            || game.state.player1.hand.cards.contains(&tsushima),
-        "Card should be either deployed or in hand"
+    // Engine auto-resolves: 1 valid card → moved to hand, condition passes, followup auto-deploys.
+    // Empty right slot exists → exact outcome is deployment to stage[2]
+    // (the hand fallback only applies when no slot is free — see
+    // hanamaru_no_empty_slot_card_in_hand).
+    assert_eq!(
+        game.state.player1.stage.stage[2], tsushima,
+        "matching card with an empty slot must deploy to stage[2], stage={:?} hand={:?}",
+        game.state.player1.stage.stage, game.state.player1.hand.cards
     );
 }
 
@@ -178,13 +180,17 @@ fn hanamaru_both_matching_one_deploys() {
     // Select 津島善子 (index 0)
     game.select_indices(&[0]);
 
-    // After selection, condition passes, deploy should happen
-    // (either prompted or auto-resolved)
-    let on_stage = game.state.player1.stage.stage.iter().any(|&id| id == tsushima || id == kurosawa);
-    let in_hand = game.state.player1.hand.cards.iter().any(|&id| id == tsushima || id == kurosawa);
+    // Selected 津島善子 (index 0) → with an empty right slot the deploy is
+    // deterministic: tsushima lands on stage[2] (same path as
+    // hanamaru_single_matching_auto_adds_to_hand).
+    assert_eq!(
+        game.state.player1.stage.stage[2], tsushima,
+        "selected card must deploy to the empty slot, stage={:?} hand={:?}",
+        game.state.player1.stage.stage, game.state.player1.hand.cards
+    );
     assert!(
-        on_stage || in_hand,
-        "Selected card should be on stage or in hand"
+        !game.state.player1.hand.cards.contains(&kurosawa),
+        "the unchosen card stays out of hand"
     );
 }
 
@@ -205,11 +211,10 @@ fn hanamaru_deploy_to_left_when_right_full() {
 
     process_debut(&mut game, hanamaru);
 
-    // Card should be deployed to left (only empty slot) or in hand
-    let on_left = game.state.player1.stage.stage[0] == tsushima;
-    let in_hand = game.state.player1.hand.cards.iter().any(|&id| id == tsushima);
-    assert!(
-        on_left || in_hand,
-        "Card should be deployed to left or in hand"
+    // Left (index 0) is the only empty slot → deployment there is exact.
+    assert_eq!(
+        game.state.player1.stage.stage[0], tsushima,
+        "matching card deploys to the only empty slot (left), stage={:?}",
+        game.state.player1.stage.stage
     );
 }

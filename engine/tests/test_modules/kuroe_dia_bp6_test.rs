@@ -128,11 +128,11 @@ fn select_card_gains_hearts() {
     assert!(game.has_pending_choice());
     game.select_indices(&[0]);
 
-    // Selected card moved to deck top, removed from live zone
-    assert!(
-        game.state.player1.main_deck.cards.first() == Some(&selectable)
-            || game.state.player1.main_deck.cards.first() == Some(&other),
-        "Selected card should be on deck top"
+    // Selected card (index 0 of [selectable, other]) moved to deck top exactly.
+    assert_eq!(
+        game.state.player1.main_deck.cards.first(),
+        Some(&selectable),
+        "the SELECTED card must be on deck top"
     );
     assert_eq!(
         game.state.player1.live_card_zone.cards.len(),

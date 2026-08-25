@@ -43,11 +43,13 @@ fn mogyu_live_success_surplus_heart01_draws_one() {
         drain_skippables(&mut game);
     }
 
+    // Live resolved: it left the live card zone (win → success zone; the
+    // third disjunct of the old form (!has_pending_choice) made this assert
+    // vacuously true and was removed).
     assert!(
         !game.state.player1.live_card_zone.cards.contains(&live)
-            || game.state.player1.success_live_card_zone.cards.contains(&live)
-            || !game.has_pending_choice(),
-        "live resolved"
+            || game.state.player1.success_live_card_zone.cards.contains(&live),
+        "live resolved out of the live card zone"
     );
 }
 

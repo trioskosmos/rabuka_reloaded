@@ -144,19 +144,20 @@ fn rurino_ozora_only_selects_mirakura_cards() {
         "Non-mirakura card should remain in discard"
     );
 
-    // One mirakura card was recovered to hand
-    let mirakura_in_hand = game.state.player1.hand.cards.contains(&mirakura_card1)
-        || game.state.player1.hand.cards.contains(&mirakura_card2);
+    // Deterministic selection ([0] each prompt): mirakura_card1 (first in
+    // discard order) is the recovered one, card2 stays behind.
     assert!(
-        mirakura_in_hand,
-        "One mirakura card should be recovered to hand"
+        game.state.player1.hand.cards.contains(&mirakura_card1),
+        "first mirakura card should be recovered to hand, hand={:?}",
+        game.state.player1.hand.cards
     );
-    // One mirakura card should still be in discard (the other was recovered)
-    let mirakura_still_in_discard = game.state.player1.waitroom.cards.contains(&mirakura_card1)
-        && game.state.player1.waitroom.cards.contains(&mirakura_card2);
     assert!(
-        !mirakura_still_in_discard,
-        "At most one mirakura card should remain in discard (one was recovered)"
+        !game.state.player1.hand.cards.contains(&mirakura_card2),
+        "second mirakura card should NOT be recovered"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&mirakura_card2),
+        "unrecovered mirakura card remains in discard"
     );
 }
 

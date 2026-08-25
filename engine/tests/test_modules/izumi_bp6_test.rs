@@ -145,14 +145,14 @@ fn izumi_bp6_q257_multiple_matches_prompts_choice() {
     );
 
     game.select_indices(&[0]);
+    // Index 0 = match1 (waitroom insertion order): exact outcome pinned.
     assert!(
-        game.state.player1.hand.cards.contains(&match1)
-            || game.state.player1.hand.cards.contains(&match2),
-        "Q257 Case D: exactly one of the two matching lives should be in hand"
+        game.state.player1.hand.cards.contains(&match1),
+        "Q257 Case D: selected (first) matching live should be in hand"
     );
     assert!(
-        game.state.player1.waitroom.cards.contains(&match1)
-            || game.state.player1.waitroom.cards.contains(&match2),
-        "Q257 Case D: the unchosen matching live should remain in waitroom"
+        game.state.player1.waitroom.cards.contains(&match2)
+            && !game.state.player1.waitroom.cards.contains(&match1),
+        "Q257 Case D: unchosen live stays in waitroom, chosen one left it"
     );
 }

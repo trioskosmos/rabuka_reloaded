@@ -100,11 +100,12 @@ fn mia_accept_discards_one_and_recovers_self() {
         "accept: discarded 1 + recovered 1 → hand stays at 2, got {:?}",
         game.state.player1.hand.cards
     );
-    // One of the two original hand cards was discarded to the waitroom.
+    // The drain loop discards hand index 0 deterministically → f1 exactly.
     assert!(
         game.state.player1.waitroom.cards.contains(&f1)
-            || game.state.player1.waitroom.cards.contains(&f2),
-        "one of the original hand cards should be discarded to the waitroom"
+            && !game.state.player1.waitroom.cards.contains(&f2),
+        "the FIRST hand card (f1) should be the one discarded, waitroom={:?}",
+        game.state.player1.waitroom.cards
     );
 }
 

@@ -116,10 +116,15 @@ fn pr032_declining_keeps_milled_cards_in_waitroom() {
         game.select_indices(&[]); // decline
     }
 
+    // Declined: the live card stays in the waitroom and never reaches the deck
+    // (the test name promises "keeps milled cards in waitroom").
     assert!(
-        !game.state.player1.main_deck.cards.contains(&live)
-            || game.state.player1.main_deck.cards.first() != Some(&live),
-        "declined: live card NOT recovered to deck top"
+        !game.state.player1.main_deck.cards.contains(&live),
+        "declined: live card must not enter the deck at all"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live),
+        "declined: live card stays in the waitroom"
     );
 }
 

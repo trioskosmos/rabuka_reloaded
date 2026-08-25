@@ -614,8 +614,13 @@ fn natsumi_pb2_020_q264_no_trigger_when_zero_cards_revealed() {
     game.pass(); // FirstAttackerPerformance (LiveStart + yell + auto triggers)
     game.pass(); // SecondAttackerPerformance → LiveVictoryDetermination
 
-    // Q264: 0 cards revealed → condition not met → ability should NOT trigger
-    // The live card should still be in hand (not discarded by the ability)
+    // Q264: 0 cards revealed → condition not met → ability should NOT trigger.
+    // Strong form: the live card must NOT be in the discard; it stays where
+    // the flow left it (hand or live zone).
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&liella_live),
+        "Q264: Liella! live card must NOT have been discarded"
+    );
     assert!(
         game.state.player1.hand.cards.contains(&liella_live)
             || game
@@ -624,6 +629,6 @@ fn natsumi_pb2_020_q264_no_trigger_when_zero_cards_revealed() {
                 .live_card_zone
                 .cards
                 .contains(&liella_live),
-        "Q264: Liella! live card should NOT have been discarded"
+        "Q264: Liella! live card should still be in hand or live zone"
     );
 }

@@ -294,11 +294,11 @@ fn serasu_edelnote_appear_triggers_opponent_wait() {
         game.select_indices(&[0]);
     }
 
-    // Verify: one of opponent's members is in wait state
+    // Verify: waiting does not remove members from the stage — BOTH stay.
     assert!(
         game.state.player2.stage.stage.contains(&p2_member_a)
-            || game.state.player2.stage.stage.contains(&p2_member_b),
-        "Opponent member should stay on stage"
+            && game.state.player2.stage.stage.contains(&p2_member_b),
+        "Both opponent members should remain on stage (wait ≠ leave)"
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(p2_member_a),
