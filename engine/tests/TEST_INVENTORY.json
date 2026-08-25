@@ -1,28 +1,28 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-25T01:25:17.217380+00:00",
+  "generated_at": "2026-08-25T01:40:14.210801+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 475,
-  "n_tests": 2838,
+  "n_files": 476,
+  "n_tests": 2843,
   "total_cards": 771,
-  "covered_cards": 716,
-  "abilities_on_covered": 881,
+  "covered_cards": 719,
+  "abilities_on_covered": 884,
   "trigger_counts": {
     "起動": [
       89,
       96
     ],
     "登場": [
-      251,
+      252,
       269
     ],
     "ライブ開始時": [
-      247,
+      249,
       268
     ],
     "(none)": [
@@ -52,11 +52,11 @@
       71
     ],
     "gain_resource": [
-      155,
+      156,
       160
     ],
     "sequential": [
-      206,
+      207,
       219
     ],
     "unknown": [
@@ -120,7 +120,7 @@
       6
     ],
     "choice": [
-      20,
+      21,
       24
     ],
     "conditional_on_optional": [
@@ -174,7 +174,7 @@
   },
   "cond_counts": {
     "none": [
-      511,
+      514,
       545
     ],
     "temporal_condition": [
@@ -284,7 +284,7 @@
       134
     ],
     "bp6": [
-      75,
+      76,
       82
     ],
     "bp7": [
@@ -304,15 +304,15 @@
       43
     ],
     "cl1": [
-      6,
+      8,
       10
     ]
   },
   "depth_counts": {
     "L2+choice": 633,
-    "L1+choice": 172,
+    "L1+choice": 175,
     "L2": 28,
-    "none": 55,
+    "none": 52,
     "L1": 48
   },
   "qa_rulings": {
@@ -9760,13 +9760,15 @@
         "engine/tests/test_modules/untested_abilities_batch10_test.rs",
         "engine/tests/test_modules/untested_abilities_batch11_test.rs",
         "engine/tests/test_modules/untested_abilities_batch42_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch47_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch47_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch49_test.rs"
       ],
       "covering_tests": [
         "bp5010_mill_happens_even_without_arise",
         "bp5010_mills_three_retrieves_arise_member",
         "bp5015_all_six_colors_present_two_blades",
         "bp5015_missing_colors_no_blades",
+        "bp6030_draw_one_discard_one",
         "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
         "chika_bp5_baton_touch_draw_triggers_refresh",
         "chika_bp5_baton_touch_from_ability_member_no_draw",
@@ -9784,17 +9786,16 @@
         "chika_wait_can_select_any_member",
         "chika_wait_target_stays_on_stage",
         "chika_waited_member_gets_score_boost",
+        "cl1004_choose_mill_three",
+        "cl1004_choose_wait_enemy",
+        "cl1010_cheap_member_no_blades",
+        "cl1010_expensive_member_two_blades",
         "cl1_006_debut_gains_three_blades",
         "go_master_start_equal_success_cards_no_score",
         "go_master_start_fewer_success_cards_scores",
-        "jellyfish_member_moved_by_position_change_without_appearing_this_turn_counts",
-        "jellyfish_member_neither_appeared_nor_moved_does_not_count",
-        "jellyfish_mixed_qualifying_and_non_qualifying",
-        "jellyfish_no_qualifying_members_no_reduction",
-        "jellyfish_position_change_swap_creates_countable_movement",
-        "jellyfish_q98_member_appeared_then_left_not_counted"
+        "jellyfish_member_moved_by_position_change_without_appearing_this_turn_counts"
       ],
-      "covering_test_count": 65,
+      "covering_test_count": 70,
       "is_null": false
     },
     {
@@ -12039,15 +12040,21 @@
         "engine/tests/test_modules/untested_abilities_batch10_test.rs",
         "engine/tests/test_modules/untested_abilities_batch11_test.rs",
         "engine/tests/test_modules/untested_abilities_batch14_test.rs",
-        "engine/tests/test_modules/untested_abilities_batch36_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch36_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch49_test.rs"
       ],
       "covering_tests": [
         "bp2024_cannot_place_blocks_both_live_zones",
         "bp2024_positive_control_normal_live_card_is_placeable",
+        "bp6030_draw_one_discard_one",
         "bp7014_constant_heart_lost_when_tied",
         "bp7014_constant_heart_while_opp_energy_ahead",
         "bp7020_constant_blades_off_when_behind",
         "bp7020_constant_blades_while_energy_ahead",
+        "cl1004_choose_mill_three",
+        "cl1004_choose_wait_enemy",
+        "cl1010_cheap_member_no_blades",
+        "cl1010_expensive_member_two_blades",
         "cl1_006_debut_gains_three_blades",
         "constant_blade_recompute_updates_when_condition_source_changes",
         "go_master_start_equal_success_cards_no_score",
@@ -12066,12 +12073,9 @@
         "pb1013_only_lower_cost_members_no_draw",
         "pb2_029_debut_rests_low_cost_member",
         "removing_teammate_reprohibits_without_stale_state",
-        "sd1022_live_start_grants_blade_to_all_aqours_members",
-        "sd2_008_constant_heart_while_cost13_member_on_stage",
-        "sd2_008_constant_heart_without_expensive_member",
-        "temporary_live_end_effect_expires_when_live_phase_ends"
+        "sd1022_live_start_grants_blade_to_all_aqours_members"
       ],
-      "covering_test_count": 28,
+      "covering_test_count": 33,
       "is_null": false
     },
     {
@@ -35117,6 +35121,7 @@
         "engine/tests/test_modules/untested_abilities_batch44_test.rs",
         "engine/tests/test_modules/untested_abilities_batch46_test.rs",
         "engine/tests/test_modules/untested_abilities_batch47_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch49_test.rs",
         "engine/tests/test_modules/untested_abilities_batch7_test.rs",
         "engine/tests/test_modules/untested_abilities_batch8_test.rs",
         "engine/tests/test_modules/untested_abilities_batch9_test.rs",
@@ -35138,6 +35143,7 @@
         "bp5013_mill_three_all_members_two_blades",
         "bp5015_all_six_colors_present_two_blades",
         "bp5015_missing_colors_no_blades",
+        "bp6030_draw_one_discard_one",
         "bp6_011n_deck_with_one_card_still_discards",
         "bp6_011n_empty_deck_and_empty_hand_is_a_clean_noop",
         "bp6_011n_hand_debut_no_draw",
@@ -35151,10 +35157,9 @@
         "bp7014_constant_heart_while_opp_energy_ahead",
         "bp7020_constant_blades_off_when_behind",
         "bp7020_constant_blades_while_energy_ahead",
-        "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly",
-        "bp7_019_places_two_aqours_cards_under_deck"
+        "bp7022_empty_energy_deck_still_changes_position_or_noops_cleanly"
       ],
-      "covering_test_count": 321,
+      "covering_test_count": 326,
       "is_null": false
     },
     {
@@ -37535,14 +37540,22 @@
         "PL!HS-bp6-030-L"
       ],
       "base": "PL!HS-bp6-030",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch49_test.rs"
+      ],
+      "covering_tests": [
+        "bp6030_draw_one_discard_one",
+        "cl1004_choose_mill_three",
+        "cl1004_choose_wait_enemy",
+        "cl1010_cheap_member_no_blades",
+        "cl1010_expensive_member_two_blades"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -37784,15 +37797,21 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/untested_abilities_batch48_test.rs"
+        "engine/tests/test_modules/untested_abilities_batch48_test.rs",
+        "engine/tests/test_modules/untested_abilities_batch49_test.rs"
       ],
       "covering_tests": [
         "bp5026_total_ten_no_bonus",
+        "bp6030_draw_one_discard_one",
         "cl1002_accept_energy_retrieves_dollchestra",
         "cl1002_decline_stays_in_waitroom",
-        "cl1008_self_to_waitroom_retrieves_hasunosora"
+        "cl1004_choose_mill_three",
+        "cl1004_choose_wait_enemy",
+        "cl1008_self_to_waitroom_retrieves_hasunosora",
+        "cl1010_cheap_member_no_blades",
+        "cl1010_expensive_member_two_blades"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 9,
       "is_null": false
     },
     {
@@ -37838,14 +37857,22 @@
         "PL!HS-cl1-004-CL"
       ],
       "base": "PL!HS-cl1-004",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch49_test.rs"
+      ],
+      "covering_tests": [
+        "bp6030_draw_one_discard_one",
+        "cl1004_choose_mill_three",
+        "cl1004_choose_wait_enemy",
+        "cl1010_cheap_member_no_blades",
+        "cl1010_expensive_member_two_blades"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
@@ -37966,14 +37993,22 @@
         "PL!HS-cl1-010-CL"
       ],
       "base": "PL!HS-cl1-010",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
+      "covered": true,
+      "depth": "L1+choice",
+      "has_assert": true,
+      "has_choice": true,
       "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "covering_files": [
+        "engine/tests/test_modules/untested_abilities_batch49_test.rs"
+      ],
+      "covering_tests": [
+        "bp6030_draw_one_discard_one",
+        "cl1004_choose_mill_three",
+        "cl1004_choose_wait_enemy",
+        "cl1010_cheap_member_no_blades",
+        "cl1010_expensive_member_two_blades"
+      ],
+      "covering_test_count": 5,
       "is_null": false
     },
     {
