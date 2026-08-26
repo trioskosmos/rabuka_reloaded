@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T17:12:26.631520+00:00",
+  "generated_at": "2026-08-26T17:14:04.912203+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 509,
-  "n_tests": 3042,
+  "n_files": 510,
+  "n_tests": 3044,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -31844,14 +31844,17 @@
       "has_choice": false,
       "has_negative": false,
       "covering_files": [
+        "engine/tests/test_modules/sp_bp2_015_wien_yell_edge_test.rs",
         "engine/tests/test_modules/sumire_auto_test.rs"
       ],
       "covering_tests": [
         "sumire_q112_cheer_with_blade_heart_no_gain",
         "sumire_q112_positive_no_blade_heart_triggers_heart06",
-        "sumire_q113_no_cheer_no_trigger"
+        "sumire_q113_no_cheer_no_trigger",
+        "sumire_turn_limit_blocks_second_yell",
+        "wien_turn_limit_blocks_second_yell"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 5,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -31925,14 +31928,17 @@
       "has_choice": false,
       "has_negative": false,
       "covering_files": [
+        "engine/tests/test_modules/sp_bp2_015_wien_yell_edge_test.rs",
         "engine/tests/test_modules/wien_n_test.rs"
       ],
       "covering_tests": [
+        "sumire_turn_limit_blocks_second_yell",
         "wien_q112_cheer_with_blade_heart_no_gain",
         "wien_q112_positive_no_blade_heart_triggers_heart03",
-        "wien_q113_no_cheer_no_trigger"
+        "wien_q113_no_cheer_no_trigger",
+        "wien_turn_limit_blocks_second_yell"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 5,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -39657,6 +39663,7 @@
         "engine/tests/test_modules/live_success_rules_test.rs",
         "engine/tests/test_modules/love_u_test.rs",
         "engine/tests/test_modules/smile_test.rs",
+        "engine/tests/test_modules/sp_bp2_015_wien_yell_edge_test.rs",
         "engine/tests/test_modules/start_true_dreams_test.rs",
         "engine/tests/test_modules/sumire_auto_test.rs",
         "engine/tests/test_modules/untested_abilities_batch32_test.rs",
@@ -39700,7 +39707,7 @@
         "live_fails_with_insufficient_hearts",
         "love_u_q192_live_success_all_blade_score_up"
       ],
-      "covering_test_count": 98,
+      "covering_test_count": 100,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
