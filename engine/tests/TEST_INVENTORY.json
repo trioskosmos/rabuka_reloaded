@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T17:44:03.481386+00:00",
+  "generated_at": "2026-08-26T17:47:26.342295+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 516,
-  "n_tests": 3061,
+  "n_files": 517,
+  "n_tests": 3063,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -13752,6 +13752,7 @@
         "engine/tests/test_modules/rin_bp6_test.rs",
         "engine/tests/test_modules/rin_test.rs",
         "engine/tests/test_modules/s_pb1_002_riko_edge_test.rs",
+        "engine/tests/test_modules/s_pb1_006_yohane_edge_test.rs",
         "engine/tests/test_modules/setsuna_bp5_test.rs",
         "engine/tests/test_modules/setsuna_pb1_heart_constant_test.rs",
         "engine/tests/test_modules/shizuku_bp4_aggregate_test.rs",
@@ -13810,7 +13811,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 846,
+      "covering_test_count": 848,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -17563,7 +17564,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/opponent_choice_tests.rs"
+        "engine/tests/test_modules/opponent_choice_tests.rs",
+        "engine/tests/test_modules/s_pb1_006_yohane_edge_test.rs"
       ],
       "covering_tests": [
         "kowareyasuki_opponent_loses_1_no_bonus",
@@ -17572,13 +17574,15 @@
         "kowareyasuki_opponent_loses_surplus_hearts_score_up",
         "serasu_edelnote_appear_no_opponent_member",
         "serasu_edelnote_appear_triggers_opponent_wait",
+        "yohane_opponent_declines_gets_blade4",
+        "yohane_opponent_discards_no_blade",
         "yoshiko_pb1_opponent_discards_skips_blade",
         "yoshiko_pb1_opponent_empty_hand_auto_skips",
         "yoshiko_pb1_opponent_multi_card_discards_skips_blade",
         "yoshiko_pb1_opponent_multi_card_skips_gains_blade",
         "yoshiko_pb1_opponent_skips_gains_blade"
       ],
-      "covering_test_count": 11,
+      "covering_test_count": 13,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,

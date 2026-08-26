@@ -567,3 +567,4 @@ pub mod sp_bp2_004_highest_cost_edge_test;
 pub mod sd2_002_jidou_cause_test;
 pub mod bp7_005_ren_jidou_test;
 pub mod s_pb1_002_riko_edge_test;
+pub mod s_pb1_006_yohane_edge_test;
