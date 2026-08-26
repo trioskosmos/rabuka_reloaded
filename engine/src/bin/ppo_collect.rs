@@ -51,7 +51,7 @@ fn main() {
         network.load_weights(wp).expect("load weights");
         eprintln!("Loaded weights from {}", wp);
     } else {
-        eprintln!("No weights 窶・random policy");
+        eprintln!("No weights  -- random policy");
     }
 
     let (mut t1, mut t2) =

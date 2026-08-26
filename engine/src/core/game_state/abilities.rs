@@ -21,7 +21,7 @@ fn _prohibition_destination_blocks(prohibition: &str, zone: &str) -> bool {
     }
     let dest = parts[2];
     if dest.is_empty() {
-        // No destination specified  Eassume the restriction targets the
+        // No destination specified -- assume the restriction targets the
         // success live card zone (the most common use case for dynamic
         // cannot_place restrictions like メビウスルーチE.
         return zone == Zone::SuccessLiveZone.to_str();
@@ -95,7 +95,7 @@ impl GameState {
     /// Two guarantees make the per-turn limit robust regardless of how the caller
     /// reached us:
     ///   - *Once-per-activation*: a single activation that resolves across several
-    ///     phases/choices (cost ↁEeffect ↁEoptional follow-up) consumes exactly one
+    ///     phases/choices (cost -- effect -- optional follow-up) consumes exactly one
     ///     use. Callers may invoke this from any branch point; the current queue
     ///     entry's `use_limit_recorded` flag deduplicates them.
     ///   - *Overflow-proof*: the count saturates, so a runaway caller can never
@@ -109,7 +109,7 @@ impl GameState {
             .current_entry()
             .is_some_and(|e| e.use_limit_recorded)
         {
-            log::debug!("[use_limit] {key:?} already recorded this activation  Eskipping");
+            log::debug!("[use_limit] {key:?} already recorded this activation -- skipping");
             return false;
         }
         let entry = self.turn_limited_abilities_used.entry(key).or_insert(0);
@@ -220,7 +220,7 @@ impl GameState {
     }
 
     /// Collect (card_id, ability_index) pairs for constant abilities on stage.
-    /// Returns lightweight index pairs instead of cloned AbilityEffects  E    /// callers re-lookup through the card_database Arc to avoid 152B ÁEN clones.
+    /// Returns lightweight index pairs instead of cloned AbilityEffects --     /// callers re-lookup through the card_database Arc to avoid 152B ÁEN clones.
     pub(crate) fn collect_constant_stage_effect_ids(&self) -> Vec<(i16, usize)> {
         self.collect_constant_ids_for(self.stage_card_ids())
     }
@@ -271,11 +271,11 @@ impl GameState {
     fn condition_is_event_based(condition: &crate::card::Condition) -> bool {
         let movement = condition.get_movement();
         // All movement types ("moved", "moves", and "position_change") are event-based.
-        // "moved" ↁEcard has already moved (can be checked now).
-        // "moves" ↁEcard is / was moving (checkable because we set
+        // "moved" -- card has already moved (can be checked now).
+        // "moves" -- card is / was moving (checkable because we set
         //   activating_card to the scanned card, and cards_moved_this_turn
         //   is persistent across the turn).
-        // "position_change" ↁEcard changed position on stage (detected via
+        // "position_change" -- card changed position on stage (detected via
         //   explicit PositionChangeEvent records, no snapshot dependency).
         if movement == Some("moved")
             || movement == Some("moves")
@@ -285,10 +285,10 @@ impl GameState {
         {
             return true;
         }
-        // Appearance  ENOT pre-filtered. Evaluated at resolution time via
+        // Appearance -- NOT pre-filtered. Evaluated at resolution time via
         // can_activate_effect so that both self-triggers (Q245) and
         // group-matching are handled correctly with full resolution context.
-        // card_count (all variants  Ezone counts are stable state checks)
+        // card_count (all variants -- zone counts are stable state checks)
         // Exception: conditions on revealed_cards are NOT event-based because
         // revealed_cards is populated during yell, not at the trigger event.
         if matches!(condition, crate::card::Condition::Location { .. })
@@ -296,12 +296,12 @@ impl GameState {
         {
             return true;
         }
-        // State change (active↔wait)  Epre-filter so the condition only
+        // State change (active↔wait) -- pre-filter so the condition only
         // fires when a recorded transition is available.
         if matches!(condition, crate::card::Condition::State { .. }) {
             return true;
         }
-        // Recurse into compound conditions  Eif any child is event-based,
+        // Recurse into compound conditions -- if any child is event-based,
         // the whole compound is pre-filtered.
         if let crate::card::Condition::Compound { ref conditions, .. } = condition {
             if let Some(ref children) = conditions {
@@ -412,7 +412,7 @@ impl GameState {
                                     // card is on stage (prevents premature triggering
                                     // of "this card is in discard" abilities).
                                     // BUT: skip this guard for "preceding_moved"
-                                    // watchers  Ethose track OTHER cards moving to
+                                    // watchers -- those track OTHER cards moving to
                                     // discard, not the card itself being in discard.
                                     let cond_location = condition
                                         .get_location()
@@ -488,7 +488,7 @@ impl GameState {
                                     }
                                 }
                                 // §9.7.2.1: Compute trigger multiplicity before
-                                // the effect block closes  Econdition and effect
+                                // the effect block closes -- condition and effect
                                 // are only in scope here.
                                 trigger_multiplicity = Self::trigger_instance_count(
                                     &event.moved_cards,
@@ -565,7 +565,7 @@ impl GameState {
                                 continue;
                             }
                             self.this_batch_triggered_ability_ids.push(num_key);
-                            // §9.7.2.1: Multi-trigger  EN trigger instances ↁEN
+                            // §9.7.2.1: Multi-trigger -- N trigger instances -- N
                             // standby entries.  All entries share the same
                             // trigger_moved_cards (full batch) because each
                             // instance independently re-evaluates the condition
@@ -588,7 +588,7 @@ impl GameState {
                             .is_some_and(|t| &**t == crate::triggers::AUTO)
                         {
                             if let Some(ref effect) = ability.effect {
-                                // Live card scan  Euses the same event-based
+                                // Live card scan -- uses the same event-based
                                 // condition check as stage cards.
                                 if let Some(ref condition) = effect.condition {
                                     if Self::condition_is_event_based(condition) {
@@ -743,7 +743,7 @@ impl GameState {
                 None,
             );
         }
-        // Consume the energy flag after every TAS scan  Eeach event should
+        // Consume the energy flag after every TAS scan -- each event should
         // trigger at most one batch of each_time abilities.  The snapshot
         // captured in trigger_auto_ability (above) preserves the flag value
         // for abilities that need it during execution (e.g. Sumire's "moves").
@@ -813,7 +813,7 @@ impl GameState {
 
     /// Per-move dedupe identity for opponent-cause watchers: folds the
     /// ability key, the moved card, and the movement sequence number into one
-    /// u64. The same watcher arms once PER MOVE  Edistinct moves (even within
+    /// u64. The same watcher arms once PER MOVE -- distinct moves (even within
     /// one turn) each get their own key.
     pub(crate) fn opp_cause_key(num_key: u32, moved_card_id: i16, seq: u16) -> u64 {
         (num_key as u64)
@@ -1156,7 +1156,7 @@ impl GameState {
         trigger_substring: &str,
         member_card_id: i16,
     ) {
-        // Only fire for stage member cards  Elive cards' own LiveStart/LiveSuccess
+        // Only fire for stage member cards -- live cards' own LiveStart/LiveSuccess
         // must NOT trigger each_time (each_time watches "メンバーの" = member's abilities).
         let player = if player_id == self.player1.id || player_id == "p1" {
             &self.player1
@@ -1389,7 +1389,7 @@ impl GameState {
                             break;
                         }
                         self.process_current_ability();
-                        // Sub-resolution may queue deeper entries  Ewhile loop catches them
+                        // Sub-resolution may queue deeper entries -- while loop catches them
                         // on next iteration (widening range from pre_len..len).
                         if self.has_pending_choice() {
                             break;
@@ -1413,7 +1413,7 @@ impl GameState {
         //   each_time:discard watchers. The post-loop scan catches these.
         //
         // Q252: "When multiple live cards go to discard simultaneously, can
-        //   I put all of them back with one trigger?" ↁENo, only 1 card per
+        //   I put all of them back with one trigger?" -- No, only 1 card per
         //   trigger instance. The batch scan fires the ability once per batch,
         //   and the ability selects 1 card from the batch.
         let moved_marker = self.recently_moved_cards.is_some();
@@ -1512,7 +1512,7 @@ impl GameState {
         // Skip resolution if this card's abilities are negated
         if card_id.is_some() && self.negated_abilities.contains(&card_id.unwrap()) {
             log::debug!(
-                "[NEGATED] card_id={:?} is negated  Eskipping ability resolution",
+                "[NEGATED] card_id={:?} is negated -- skipping ability resolution",
                 card_id
             );
             // Update the matching trigger_evaluation entry so it doesn't stay "pending"
@@ -1597,11 +1597,11 @@ impl GameState {
         self.activating_ability_index = Some(ability_index);
 
         // Check if a resolver already exists (e.g., cost phase completed, effect needs to run).
-        // If so, reuse it  Eit carries state (revealed_cost_cards, etc.) needed by the effect.
+        // If so, reuse it -- it carries state (revealed_cost_cards, etc.) needed by the effect.
         let mut resolver = if self.ability_queue.has_resolver() {
             log::debug!("[PCA] Reusing existing resolver for effect execution");
             let mut r = self.ability_queue.take_resolver().unwrap();
-            // Don't reset moved_cards/selected_cards  Ethe effect may need
+            // Don't reset moved_cards/selected_cards -- the effect may need
             // them for cost_reference (e.g. previous_moved_card) or conditions.
             r.selected_cards.clear();
             // G1/G3: preserve spawn_context.target across resolver re-use.
@@ -1679,7 +1679,7 @@ impl GameState {
                 .and_then(|e| e.choice_card_no.as_ref())
                 == Some(&crate::ability::types::ChoiceRoute::Choice);
 
-            // Don't set cost_paid for is_select_action choices  Ethose are
+            // Don't set cost_paid for is_select_action choices -- those are
             // "select which target" prompts (e.g. change_state wait) where
             // the actual state change is applied during choice resolution.
             // Setting cost_paid here would prevent the cost handler from
@@ -1793,7 +1793,7 @@ impl GameState {
 
             self.ability_queue.complete_current();
             // Keep activating_card/ability_index alive through the post-resolution
-            // TAS scan below  Ethe guard at line 331-335 uses them to prevent
+            // TAS scan below -- the guard at line 331-335 uses them to prevent
             // re-enqueueing the exact same ability (e.g. each_time watchers that
             // would re-trigger on the same movement batch that just queued them).
             // Cleared AFTER the TAS scan, before process_pending_auto_abilities.
@@ -1824,7 +1824,7 @@ impl GameState {
                 };
                 self.just_completed_ability_key = just_completed_key;
                 self.trigger_auto_abilities_for_player_with_event(&current_pid, &event);
-                // just_completed_ability_key intentionally NOT cleared here  E                // process_pending_auto_abilities' post-loop TAS (line ~803)
+                // just_completed_ability_key intentionally NOT cleared here --                 // process_pending_auto_abilities' post-loop TAS (line ~803)
                 // also needs the guard to prevent re-enqueueing the same
                 // each_time watcher on stale movement data.
 
@@ -2029,7 +2029,7 @@ impl GameState {
                 // English in Japanese mode. Engine is the single source of truth:
                 //   1. generic instruction template translator (parameterized prompts)
                 //   2. effect-backed Japanese description
-                //   3. English prompt (last resort)  Eand we WARN so the gap is caught.
+                //   3. English prompt (last resort) -- and we WARN so the gap is caught.
                 if !obj.contains_key("prompt_ja") {
                     let prompt_en = obj
                         .get("prompt_en")
@@ -2121,7 +2121,7 @@ impl GameState {
                             _ => Vec::new(),
                         };
                         // When filtered_indices is set (look_and_select with greyed-out cards),
-                        // include ALL cards in selection_cards  Efiltered_indices restricts
+                        // include ALL cards in selection_cards -- filtered_indices restricts
                         // selection on the frontend. Otherwise, filter by choice criteria.
                         let filtered: Vec<i16> = if filtered_indices.is_some() {
                             card_ids
@@ -2227,7 +2227,7 @@ impl GameState {
             ("opponent", Some("player2") | Some("p2")) => &mut self.player1,
             ("opponent", _) => &mut self.player2,
             ("both", _) => {
-                log::debug!("WARN: resolve_target_player_mut called with 'both'  Ereturning player1, use execute_for_targets instead");
+                log::debug!("WARN: resolve_target_player_mut called with 'both' -- returning player1, use execute_for_targets instead");
                 &mut self.player1
             }
             _ => &mut self.player1,
@@ -2277,7 +2277,7 @@ impl GameState {
     }
 
     /// Number of DISTINCT group names among `player_id`'s stage members.
-    /// Single source of truth for "グループ名1種類につぁE cost reductions  E    /// used by the resolver's runtime cost adjustment AND by action
+    /// Single source of truth for "グループ名1種類につぁE cost reductions --     /// used by the resolver's runtime cost adjustment AND by action
     /// generation's effective-cost display/gating.
     ///
     /// Membership is resolved through [`crate::ability::util::card_matches_group_str`]
@@ -2472,7 +2472,7 @@ impl GameState {
                     // UNREACHABLE today: no caller passes "as_long_as" to
                     // push_temporary_effect (the 62 「〜かぎり、Econstants run
                     // through recalculate_constants instead). If this arm ever
-                    // fires, real condition re-evaluation must be implemented  E                    // expiring at live end is an approximation.
+                    // fires, real condition re-evaluation must be implemented --                     // expiring at live end is an approximation.
                     log::warn!(
                         "AsLongAs temporary effect expired via live-end approximation \
                          (condition re-eval not implemented): {}",
@@ -2655,7 +2655,7 @@ impl GameState {
                 }
                 _ => {
                     // An effect kind with no revert arm means its modifiers
-                    // LEAK past expiry. Loud on purpose  Eextend this match.
+                    // LEAK past expiry. Loud on purpose -- extend this match.
                     log::warn!(
                         "expired temporary effect '{}' has no revert handler; \
                          its modifiers were NOT reverted. description={}",
@@ -2732,7 +2732,7 @@ impl GameState {
         self.live_success_p2_extra = 0;
         self.last_state_change_wait_to_active_count = 0;
         self.recently_state_changed.clear();
-        // NOTE: turn_state_changes is NOT cleared here  Ethis runs on every
+        // NOTE: turn_state_changes is NOT cleared here -- this runs on every
         // Active-phase entry (each player's normal phase), but 「このターン、E        // spans the whole round (both players' main phases + live). It is
         // cleared at the real turn boundary in advance_phase (victory
         // determination, turn_number increment).

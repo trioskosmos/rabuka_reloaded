@@ -147,7 +147,7 @@ fn rollout_value(
             }
         };
         if game_setup::execute_action(sim, &action).is_err() {
-            // Illegal offer under rollout state 窶・drop it and move on.
+            // Illegal offer under rollout state  -- drop it and move on.
             crate::turn::TurnEngine::advance_phase(sim);
             continue;
         }
@@ -411,7 +411,7 @@ pub fn choose_live_set_v7(gs: &GameState, actions: &[Action], db: &CardDatabase)
         plan
     } else {
         // Uncontested: the stateless heuristic path is already correct and
-        // cheap 窶・no cache needed since it is deterministic tick-to-tick.
+        // cheap  -- no cache needed since it is deterministic tick-to-tick.
         return super::strategy_v5::choose_live_set_v5(gs, actions, db);
     };
     super::strategy_v5::emit(gs, actions, &desired)

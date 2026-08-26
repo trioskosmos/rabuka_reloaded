@@ -97,7 +97,7 @@ fn main() {
 
             let action = if bot.is_some() {
                 if gs.active_player().id == "player1" && gs.current_phase == Phase::Main {
-                    // Use the smart heuristic 窶・no clones, no NN
+                    // Use the smart heuristic  -- no clones, no NN
                     let heuristic =
                         rabuka_engine::bot::evaluation::pick_rollout_action(&actions, &gs);
                     // We record the state for training; the action choice is NOT random
