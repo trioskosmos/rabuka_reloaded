@@ -62,3 +62,30 @@ fn rin_exclude_self_with_only_rin_and_mate() {
     assert_eq!(game.state.mods.get_blade_modifier(mate), 2);
     assert_eq!(game.state.mods.get_blade_modifier(rin), 0, "rin excluded");
 }
+
+#[test]
+fn rin_choice_among_two_mates() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let rin = game.id("PL!-bp4-014-N");
+    let mate1 = game.id("PL!S-sd1-001-SD");
+    let mate2 = game.id("PL!S-sd1-002-SD");
+    game.state.player1.stage.stage = [mate1, rin, mate2];
+    let filler = game.new_id("PL!-sd1-010-SD");
+    fill_decks(&mut game, filler);
+    let plain = game.id("PL!-sd1-020-SD");
+    game.state.player1.live_card_zone.cards.push(plain);
+    fire_live_start(&mut game, rin);
+    // Should have a choice to pick which other member gets blade
+    // If the engine auto-picks, at least one of the two mates gets blade
+    game.drain_auto_ability_choices();
+    if game.has_pending_choice() {
+        // Choose mate1
+        game.select_indices(&[0]);
+        game.drain_auto_ability_choices();
+    }
+    let b1 = game.state.mods.get_blade_modifier(mate1);
+    let b2 = game.state.mods.get_blade_modifier(mate2);
+    assert!(b1 == 2 || b2 == 2, "one of the two mates should get blade, got {} and {}", b1, b2);
+    assert_eq!(game.state.mods.get_blade_modifier(rin), 0);
+}

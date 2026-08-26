@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T17:14:04.912203+00:00",
+  "generated_at": "2026-08-26T17:15:16.735928+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 510,
-  "n_tests": 3044,
+  "n_tests": 3045,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -309,9 +309,9 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 691,
+    "L2+choice": 692,
     "L1+choice": 175,
-    "L2": 26,
+    "L2": 25,
     "L1": 44
   },
   "qa_rulings": {
@@ -381,8 +381,7 @@
       289,
       426,
       604,
-      606,
-      661
+      606
     ]
   },
   "abilities": [
@@ -28245,6 +28244,7 @@
         "natsumi_rain_draws_and_discards_with_hasunosora_on_stage",
         "natsumi_rain_no_hasunosora_no_draw",
         "rin_all_lives_have_triggers_no_blades",
+        "rin_choice_among_two_mates",
         "rin_empty_live_zone_no_blades",
         "rin_exclude_self_with_only_rin_and_mate",
         "rin_live_without_triggers_grants_other_member_two_blades",
@@ -28253,7 +28253,7 @@
         "sd2_007_extra_draw_when_opponent_also_succeeded",
         "sd2_007_single_draw_without_opponent_success"
       ],
-      "covering_test_count": 17,
+      "covering_test_count": 18,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -34643,9 +34643,9 @@
       ],
       "base": "PL!-bp4-014",
       "covered": true,
-      "depth": "L2",
+      "depth": "L2+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/bp4_014_rin_edge_test.rs",
@@ -34656,13 +34656,14 @@
         "mari_heart05_total_exactly_four_grants",
         "mari_heart05_total_two_no_grant",
         "rin_all_lives_have_triggers_no_blades",
+        "rin_choice_among_two_mates",
         "rin_empty_live_zone_no_blades",
         "rin_exclude_self_with_only_rin_and_mate",
         "rin_live_without_triggers_grants_other_member_two_blades",
         "rin_mixed_lives_plain_present_grants",
         "rin_multiple_plain_lives_still_grants"
       ],
-      "covering_test_count": 9,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -39575,7 +39576,7 @@
         "bp6_011n_waitroom_debut_draws_two_discards_one",
         "bp6_016_look_three_reorder_back_on_top"
       ],
-      "covering_test_count": 358,
+      "covering_test_count": 359,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -39602,6 +39603,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/bp4_014_rin_edge_test.rs",
         "engine/tests/test_modules/untested_abilities_batch14_test.rs",
         "engine/tests/test_modules/untested_abilities_test.rs",
         "engine/tests/test_modules/you_debut_test.rs"
@@ -39612,6 +39614,10 @@
         "bp7020_constant_blades_off_when_behind",
         "bp7020_constant_blades_while_energy_ahead",
         "honoka_cost_limit_wait_blocked_by_wait_immunity",
+        "rin_choice_among_two_mates",
+        "rin_exclude_self_with_only_rin_and_mate",
+        "rin_mixed_lives_plain_present_grants",
+        "rin_multiple_plain_lives_still_grants",
         "sd1022_live_start_grants_blade_to_all_aqours_members",
         "test_change_state_choice_bug",
         "test_dia_gain_resource_choice",
@@ -39631,7 +39637,7 @@
         "you_select_2_then_ends",
         "you_select_3_then_ends"
       ],
-      "covering_test_count": 23,
+      "covering_test_count": 27,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
