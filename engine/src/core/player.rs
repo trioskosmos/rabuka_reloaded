@@ -162,11 +162,8 @@ impl Player {
         let card_id = self.stage.stage[index];
         self.stage.stage[index] = crate::constants::EMPTY_SLOT;
         // Recycle under-cards
-        let area = match index {
-            0 => crate::zones::MemberArea::LeftSide,
-            1 => crate::zones::MemberArea::Center,
-            _ => crate::zones::MemberArea::RightSide,
-        };
+        let area = crate::zones::MemberArea::from_index(index)
+            .unwrap_or(crate::zones::MemberArea::RightSide);
         let (member_under, energy_under) = self.stage.recycle_under_cards(area, card_db);
         // Rule 9.6.2.1.2.1: Card is no longer on stage, clean up tracking.
         self.deployed_this_turn.retain(|id| *id != card_id);

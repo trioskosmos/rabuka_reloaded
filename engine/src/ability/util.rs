@@ -2128,12 +2128,11 @@ pub fn stage_first_empty(stage: &[i16; 3]) -> Option<usize> {
     }
 }
 
+/// Single source of truth for stage slot index → area. Delegates to
+/// [`MemberArea::from_index`]; the `RightSide` fallback preserves the
+/// historical `_ => RightSide` arm for out-of-range indices.
 pub fn pos_to_area(pos: usize) -> crate::zones::MemberArea {
-    match pos {
-        0 => crate::zones::MemberArea::LeftSide,
-        1 => crate::zones::MemberArea::Center,
-        _ => crate::zones::MemberArea::RightSide,
-    }
+    crate::zones::MemberArea::from_index(pos).unwrap_or(crate::zones::MemberArea::RightSide)
 }
 
 /// For per_unit_type="discard": count recently-moved cards matching a filter,

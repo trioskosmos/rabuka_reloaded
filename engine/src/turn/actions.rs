@@ -277,11 +277,7 @@ impl super::TurnEngine {
                         let stage_position =
                             player.stage.stage.iter().position(|&id| id == card_id);
                         if let Some(pos) = stage_position {
-                            let stage_area = match pos {
-                                0 => crate::zones::MemberArea::LeftSide,
-                                1 => crate::zones::MemberArea::Center,
-                                _ => crate::zones::MemberArea::RightSide,
-                            };
+                            let stage_area = crate::ability::util::pos_to_area(pos);
                             crate::zones::check_trigger_position(
                                 ability.triggers.as_deref(),
                                 stage_area,

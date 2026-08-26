@@ -6,6 +6,31 @@ use serde::ser::Serializer;
 /// Replaces error-prone zone == "hand" patterns with Zone::Hand.
 #[cfg(feature = "no_std")]
 use alloc::string::{String, ToString};
+
+/// Generates the wire-string tables (`from_str` / `to_str`) for an enum from
+/// one `Variant => "wire_name"` list, so parsing and serialization can never
+/// drift apart. Invoke inside the enum's `impl` block; the receiver of
+/// `to_str` is uniformly `&self`. Human-facing label tables stay hand-written
+/// because their phrasing is intentionally irregular.
+macro_rules! wire_tables {
+    ($($variant:ident => $wire:literal),+ $(,)?) => {
+        /// Convert a wire string to the typed value.
+        /// Returns None for unrecognized names (makes typos detectable at parse time).
+        pub fn from_str(s: &str) -> Option<Self> {
+            match s {
+                $($wire => Some(Self::$variant),)+
+                _ => None,
+            }
+        }
+
+        /// Convert the typed value back to its wire string.
+        pub fn to_str(&self) -> &'static str {
+            match self {
+                $(Self::$variant => $wire,)+
+            }
+        }
+    };
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Zone {
     Hand,
@@ -348,151 +373,86 @@ pub enum ActionType {
 }
 
 impl ActionType {
-    /// Convert a string action name to the typed enum.
-    /// Returns None for unrecognized action names (makes typos detectable at parse time).
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "draw_card" => Some(ActionType::DrawCard),
-            "draw_until_count" => Some(ActionType::DrawUntilCount),
-            "choose_target_player" => Some(ActionType::ChooseTargetPlayer),
-            "move_cards" => Some(ActionType::MoveCards),
-            "discard_card" => Some(ActionType::DiscardCard),
-            "select" => Some(ActionType::Select),
-            "select_number" => Some(ActionType::SelectNumber),
-            "select_cards" => Some(ActionType::SelectCards),
-            "look_and_select" => Some(ActionType::LookAndSelect),
-            "look_at" => Some(ActionType::LookAt),
-            "reveal" => Some(ActionType::Reveal),
-            "reveal_per_group" => Some(ActionType::RevealPerGroup),
-            "reveal_until_live_card" => Some(ActionType::RevealUntilLiveCard),
-            "reveal_until_chosen_card" => Some(ActionType::RevealUntilChosenCard),
-            "change_state" => Some(ActionType::ChangeState),
-            "position_change" => Some(ActionType::PositionChange),
-            "rotation" => Some(ActionType::Rotation),
-            "place_energy_under_member" => Some(ActionType::PlaceEnergyUnderMember),
-            "modify_required_hearts_success" => Some(ActionType::ModifyRequiredHeartsSuccess),
-            "gain_resource" => Some(ActionType::GainResource),
-            "pay_energy" => Some(ActionType::PayEnergy),
-            "gain_ability" => Some(ActionType::GainAbility),
-            "gain_ability_from_source" => Some(ActionType::GainAbilityFromSource),
-            "invalidate_ability" => Some(ActionType::InvalidateAbility),
-            "suppress_ability_trigger" => Some(ActionType::SuppressAbilityTrigger),
-            "activate_ability" => Some(ActionType::ActivateAbility),
-            "modify_score" => Some(ActionType::ModifyScore),
-            "modify_required_hearts" => Some(ActionType::ModifyRequiredHearts),
-            "modify_cost" => Some(ActionType::ModifyCost),
-            "modify_yell_source" => Some(ActionType::ModifyYellSource),
-            "set_cost" => Some(ActionType::SetCost),
-            "set_card_identity" => Some(ActionType::SetCardIdentity),
-            "set_cost_to_use" => Some(ActionType::SetCostToUse),
-            "set_blade_type" => Some(ActionType::SetBladeType),
-            "set_blade_count" => Some(ActionType::SetBladeCount),
-            "set_heart_type" => Some(ActionType::SetHeartType),
-            "specify_heart_color" => Some(ActionType::SpecifyHeartColor),
-            "choose_required_hearts" => Some(ActionType::ChooseRequiredHearts),
-            "sequential" => Some(ActionType::Sequential),
-            "conditional_alternative" => Some(ActionType::ConditionalAlternative),
-            "conditional_on_result" => Some(ActionType::ConditionalOnResult),
-            "conditional_on_optional" => Some(ActionType::ConditionalOnOptional),
-            "restriction" => Some(ActionType::Restriction),
-            "activation_restriction" => Some(ActionType::ActivationRestriction),
-            "modify_limit" => Some(ActionType::ModifyLimit),
-            "shuffle" => Some(ActionType::Shuffle),
-            "re_yell" => Some(ActionType::ReYell),
-            "custom" => Some(ActionType::Custom),
-            "do_nothing" => Some(ActionType::DoNothing),
-            "choice" => Some(ActionType::Choice),
-            "repeat_procedure" => Some(ActionType::RepeatProcedure),
-            "discard_until_count" => Some(ActionType::DiscardUntilCount),
-            "all_blade_timing" => Some(ActionType::AllBladeTiming),
-            "reduce_live_card_set_limit" => Some(ActionType::ReduceLiveCardSetLimit),
-
-            "play_baton_touch" => Some(ActionType::PlayBatonTouch),
-            "modify_required_hearts_global" => Some(ActionType::ModifyRequiredHeartsGlobal),
-            "modify_yell_count" => Some(ActionType::ModifyYellCount),
-            "activation_cost" => Some(ActionType::ActivationCost),
-            "perform_yell" => Some(ActionType::PerformYell),
-            "conditional_optional" => Some(ActionType::ConditionalOptional),
-            "compound_action" => Some(ActionType::CompoundAction),
-            "opponent_action" => Some(ActionType::OpponentAction),
-            "action_by" => Some(ActionType::ActionBy),
-            "sequential_cost" => Some(ActionType::SequentialCost),
-            "choice_condition" => Some(ActionType::ChoiceCondition),
-            "energy_condition" => Some(ActionType::EnergyCondition),
-            _ => None,
-        }
-    }
-
-    /// Convert the typed action back to a string representation.
-    pub fn to_str(&self) -> &'static str {
-        match self {
-            ActionType::DrawCard => "draw_card",
-            ActionType::DrawUntilCount => "draw_until_count",
-            ActionType::ChooseTargetPlayer => "choose_target_player",
-            ActionType::MoveCards => "move_cards",
-            ActionType::DiscardCard => "discard_card",
-            ActionType::Select => "select",
-            ActionType::SelectNumber => "select_number",
-            ActionType::SelectCards => "select_cards",
-            ActionType::LookAndSelect => "look_and_select",
-            ActionType::LookAt => "look_at",
-            ActionType::Reveal => "reveal",
-            ActionType::RevealPerGroup => "reveal_per_group",
-            ActionType::RevealUntilLiveCard => "reveal_until_live_card",
-            ActionType::RevealUntilChosenCard => "reveal_until_chosen_card",
-            ActionType::ChangeState => "change_state",
-            ActionType::PositionChange => "position_change",
-            ActionType::Rotation => "rotation",
-            ActionType::PlaceEnergyUnderMember => "place_energy_under_member",
-            ActionType::ModifyRequiredHeartsSuccess => "modify_required_hearts_success",
-            ActionType::GainResource => "gain_resource",
-            ActionType::PayEnergy => "pay_energy",
-            ActionType::GainAbility => "gain_ability",
-            ActionType::GainAbilityFromSource => "gain_ability_from_source",
-            ActionType::InvalidateAbility => "invalidate_ability",
-            ActionType::SuppressAbilityTrigger => "suppress_ability_trigger",
-            ActionType::ActivateAbility => "activate_ability",
-            ActionType::ModifyScore => "modify_score",
-            ActionType::ModifyRequiredHearts => "modify_required_hearts",
-            ActionType::ModifyCost => "modify_cost",
-            ActionType::ModifyYellSource => "modify_yell_source",
-            ActionType::SetCost => "set_cost",
-            ActionType::SetCardIdentity => "set_card_identity",
-            ActionType::SetCostToUse => "set_cost_to_use",
-            ActionType::SetBladeType => "set_blade_type",
-            ActionType::SetBladeCount => "set_blade_count",
-            ActionType::SetHeartType => "set_heart_type",
-            ActionType::SpecifyHeartColor => "specify_heart_color",
-            ActionType::ChooseRequiredHearts => "choose_required_hearts",
-            ActionType::Sequential => "sequential",
-            ActionType::ConditionalAlternative => "conditional_alternative",
-            ActionType::ConditionalOnResult => "conditional_on_result",
-            ActionType::ConditionalOnOptional => "conditional_on_optional",
-            ActionType::Restriction => "restriction",
-            ActionType::ActivationRestriction => "activation_restriction",
-            ActionType::ModifyLimit => "modify_limit",
-            ActionType::Shuffle => "shuffle",
-            ActionType::ReYell => "re_yell",
-            ActionType::Custom => "custom",
-            ActionType::DoNothing => "do_nothing",
-            ActionType::Choice => "choice",
-            ActionType::RepeatProcedure => "repeat_procedure",
-            ActionType::DiscardUntilCount => "discard_until_count",
-            ActionType::AllBladeTiming => "all_blade_timing",
-            ActionType::ReduceLiveCardSetLimit => "reduce_live_card_set_limit",
-            ActionType::PlayBatonTouch => "play_baton_touch",
-            ActionType::ModifyRequiredHeartsGlobal => "modify_required_hearts_global",
-            ActionType::ModifyYellCount => "modify_yell_count",
-            ActionType::ActivationCost => "activation_cost",
-            ActionType::PerformYell => "perform_yell",
-            ActionType::ConditionalOptional => "conditional_optional",
-            ActionType::CompoundAction => "compound_action",
-            ActionType::OpponentAction => "opponent_action",
-            ActionType::ActionBy => "action_by",
-            ActionType::SequentialCost => "sequential_cost",
-            ActionType::ChoiceCondition => "choice_condition",
-            ActionType::EnergyCondition => "energy_condition",
-        }
+    /// Wire-string tables generated from a single list — see [`wire_tables`].
+    wire_tables! {
+        // Card movement
+        DrawCard => "draw_card",
+        DrawUntilCount => "draw_until_count",
+        MoveCards => "move_cards",
+        DiscardCard => "discard_card",
+        Select => "select",
+        SelectNumber => "select_number",
+        SelectCards => "select_cards",
+        LookAndSelect => "look_and_select",
+        LookAt => "look_at",
+        Reveal => "reveal",
+        RevealPerGroup => "reveal_per_group",
+        RevealUntilLiveCard => "reveal_until_live_card",
+        RevealUntilChosenCard => "reveal_until_chosen_card",
+        // State changes
+        ChangeState => "change_state",
+        PositionChange => "position_change",
+        Rotation => "rotation",
+        PlaceEnergyUnderMember => "place_energy_under_member",
+        ModifyRequiredHeartsSuccess => "modify_required_hearts_success",
+        GainResource => "gain_resource",
+        PayEnergy => "pay_energy",
+        // Ability modifications
+        GainAbility => "gain_ability",
+        GainAbilityFromSource => "gain_ability_from_source",
+        InvalidateAbility => "invalidate_ability",
+        SuppressAbilityTrigger => "suppress_ability_trigger",
+        ActivateAbility => "activate_ability",
+        // Cost modifications
+        ModifyCost => "modify_cost",
+        ModifyYellSource => "modify_yell_source",
+        SetCost => "set_cost",
+        SetCardIdentity => "set_card_identity",
+        SetCostToUse => "set_cost_to_use",
+        // Score and hearts
+        ModifyScore => "modify_score",
+        ModifyRequiredHearts => "modify_required_hearts",
+        // Blade and heart
+        SetBladeType => "set_blade_type",
+        SetBladeCount => "set_blade_count",
+        SetHeartType => "set_heart_type",
+        SpecifyHeartColor => "specify_heart_color",
+        ChooseRequiredHearts => "choose_required_hearts",
+        // Compound effects
+        Sequential => "sequential",
+        ConditionalAlternative => "conditional_alternative",
+        ConditionalOnResult => "conditional_on_result",
+        ConditionalOnOptional => "conditional_on_optional",
+        // Restrictions and limits
+        Restriction => "restriction",
+        ActivationRestriction => "activation_restriction",
+        ModifyLimit => "modify_limit",
+        // Utility
+        Shuffle => "shuffle",
+        ReYell => "re_yell",
+        Custom => "custom",
+        DoNothing => "do_nothing",
+        Choice => "choice",
+        RepeatProcedure => "repeat_procedure",
+        DiscardUntilCount => "discard_until_count",
+        // Replacement and triggers
+        AllBladeTiming => "all_blade_timing",
+        ReduceLiveCardSetLimit => "reduce_live_card_set_limit",
+        // Player target choice / selection / missing variants
+        ChooseTargetPlayer => "choose_target_player",
+        PlayBatonTouch => "play_baton_touch",
+        ModifyRequiredHeartsGlobal => "modify_required_hearts_global",
+        ModifyYellCount => "modify_yell_count",
+        ActivationCost => "activation_cost",
+        PerformYell => "perform_yell",
+        // Internal/procedural action types (used within the engine, not from JSON)
+        ConditionalOptional => "conditional_optional",
+        CompoundAction => "compound_action",
+        OpponentAction => "opponent_action",
+        ActionBy => "action_by",
+        SequentialCost => "sequential_cost",
+        ChoiceCondition => "choice_condition",
+        EnergyCondition => "energy_condition",
     }
 
     /// Human-readable action label for debug/UI output.
@@ -625,81 +585,41 @@ pub enum ConditionType {
 }
 
 impl ConditionType {
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "compound" => Some(Self::Compound),
-            "comparison_condition" => Some(Self::ComparisonCondition),
-            "location_condition" => Some(Self::LocationCondition),
-            "card_count_condition" => Some(Self::CardCountCondition),
-            "card_blade_condition" => Some(Self::CardBladeCondition),
-            "group_condition" => Some(Self::GroupCondition),
-            "position_condition" => Some(Self::PositionCondition),
-            "appearance_condition" => Some(Self::AppearanceCondition),
-            "temporal_condition" => Some(Self::TemporalCondition),
-            "state_condition" => Some(Self::StateCondition),
-            "energy_state_condition" => Some(Self::EnergyStateCondition),
-            "movement_condition" => Some(Self::MovementCondition),
-            "ability_filter_condition" => Some(Self::AbilityFilterCondition),
-            "or_condition" => Some(Self::OrCondition),
-            "any_of_condition" => Some(Self::AnyOfCondition),
-            "score_threshold_condition" => Some(Self::ScoreThresholdCondition),
-            "choice_condition" => Some(Self::ChoiceCondition),
-            "position_change_condition" => Some(Self::PositionChangeCondition),
-            "state_change_condition" => Some(Self::StateChangeCondition),
-            "opponent_choice_condition" => Some(Self::OpponentChoiceCondition),
-            "opponent_live_success" => Some(Self::OpponentLiveSuccess),
-            "complex_condition" => Some(Self::ComplexCondition),
-            "no_excess_heart" => Some(Self::NoExcessHeart),
-            "otherwise_condition" => Some(Self::OtherwiseCondition),
-            "both_condition" => Some(Self::BothCondition),
-            "not_moved" => Some(Self::NotMoved),
-            "has_moved" => Some(Self::HasMoved),
-            "resource_condition" => Some(Self::ResourceCondition),
-            "action_success_condition" => Some(Self::ActionSuccessCondition),
-            "all_cost_comparison_condition" => Some(Self::AllCostComparisonCondition),
-            "highest_cost_on_stage_condition" => Some(Self::HighestCostOnStageCondition),
-            "all_revealed_match_heart_color" => Some(Self::AllRevealedMatchHeartColor),
-            "custom" => Some(Self::Custom),
-            _ => None,
-        }
-    }
-
-    pub fn to_str(self) -> &'static str {
-        match self {
-            Self::Compound => "compound",
-            Self::ComparisonCondition => "comparison_condition",
-            Self::LocationCondition => "location_condition",
-            Self::CardCountCondition => "card_count_condition",
-            Self::CardBladeCondition => "card_blade_condition",
-            Self::GroupCondition => "group_condition",
-            Self::PositionCondition => "position_condition",
-            Self::AppearanceCondition => "appearance_condition",
-            Self::TemporalCondition => "temporal_condition",
-            Self::StateCondition => "state_condition",
-            Self::EnergyStateCondition => "energy_state_condition",
-            Self::MovementCondition => "movement_condition",
-            Self::AbilityFilterCondition => "ability_filter_condition",
-            Self::OrCondition => "or_condition",
-            Self::AnyOfCondition => "any_of_condition",
-            Self::ScoreThresholdCondition => "score_threshold_condition",
-            Self::ChoiceCondition => "choice_condition",
-            Self::PositionChangeCondition => "position_change_condition",
-            Self::StateChangeCondition => "state_change_condition",
-            Self::OpponentChoiceCondition => "opponent_choice_condition",
-            Self::OpponentLiveSuccess => "opponent_live_success",
-            Self::ComplexCondition => "complex_condition",
-            Self::NoExcessHeart => "no_excess_heart",
-            Self::OtherwiseCondition => "otherwise_condition",
-            Self::NotMoved => "not_moved",
-            Self::HasMoved => "has_moved",
-            Self::ResourceCondition => "resource_condition",
-            Self::ActionSuccessCondition => "action_success_condition",
-            Self::AllCostComparisonCondition => "all_cost_comparison_condition",
-            Self::HighestCostOnStageCondition => "highest_cost_on_stage_condition",
-            Self::BothCondition => "both_condition",
-            Self::AllRevealedMatchHeartColor => "all_revealed_match_heart_color",
-            Self::Custom => "custom",
-        }
+    /// Wire-string tables generated from a single list — see [`wire_tables`].
+    wire_tables! {
+        Compound => "compound",
+        ComparisonCondition => "comparison_condition",
+        LocationCondition => "location_condition",
+        CardCountCondition => "card_count_condition",
+        CardBladeCondition => "card_blade_condition",
+        GroupCondition => "group_condition",
+        PositionCondition => "position_condition",
+        AppearanceCondition => "appearance_condition",
+        TemporalCondition => "temporal_condition",
+        StateCondition => "state_condition",
+        EnergyStateCondition => "energy_state_condition",
+        MovementCondition => "movement_condition",
+        AbilityFilterCondition => "ability_filter_condition",
+        OrCondition => "or_condition",
+        AnyOfCondition => "any_of_condition",
+        ScoreThresholdCondition => "score_threshold_condition",
+        ChoiceCondition => "choice_condition",
+        PositionChangeCondition => "position_change_condition",
+        StateChangeCondition => "state_change_condition",
+        OpponentChoiceCondition => "opponent_choice_condition",
+        OpponentLiveSuccess => "opponent_live_success",
+        ComplexCondition => "complex_condition",
+        NoExcessHeart => "no_excess_heart",
+        OtherwiseCondition => "otherwise_condition",
+        BothCondition => "both_condition",
+        NotMoved => "not_moved",
+        HasMoved => "has_moved",
+        ResourceCondition => "resource_condition",
+        ActionSuccessCondition => "action_success_condition",
+        AllCostComparisonCondition => "all_cost_comparison_condition",
+        HighestCostOnStageCondition => "highest_cost_on_stage_condition",
+        AllRevealedMatchHeartColor => "all_revealed_match_heart_color",
+        Custom => "custom",
     }
 }
 

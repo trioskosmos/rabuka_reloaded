@@ -296,19 +296,17 @@ impl AbilityResolver {
         Ok(true)
     }
 
-    fn apply_heart_to_card(
-        &mut self,
+    /// Grant a heart-color distribution to one card through the traced
+    /// modifier API. Shared by every heart-granting path so sign handling
+    /// and trace attribution cannot drift apart between copies.
+    fn grant_heart_distribution(
         gs: &mut GameState,
-        card_id: i16,
-        heart_distribution: &[(crate::card::HeartColor, u8)],
-        is_negative: bool,
-        is_temporary: bool,
-        effect_data: &mut Option<crate::core::types::EffectData>,
-        heart_color_str: &Option<String>,
-        heart_to_add: i16,
         effect_text: &str,
+        card_id: i16,
+        distribution: &[(crate::card::HeartColor, u8)],
+        is_negative: bool,
     ) {
-        for &(color, dist_count) in heart_distribution {
+        for &(color, dist_count) in distribution {
             let dist_amount = if is_negative {
                 -i16::from(dist_count)
             } else {
@@ -323,6 +321,32 @@ impl AbilityResolver {
                 effect_text,
             );
         }
+    }
+
+    /// Grant `amount` blades to one card through the traced modifier API.
+    fn grant_blade(gs: &mut GameState, effect: &AbilityEffect, card_id: i16, amount: i16) {
+        gs.mods.add_blade_modifier_with_trace(
+            card_id,
+            amount,
+            &mut gs.ability_applications,
+            gs.activating_card.unwrap_or(-1),
+            &effect.text,
+        );
+    }
+
+    fn apply_heart_to_card(
+        &mut self,
+        gs: &mut GameState,
+        card_id: i16,
+        heart_distribution: &[(crate::card::HeartColor, u8)],
+        is_negative: bool,
+        is_temporary: bool,
+        effect_data: &mut Option<crate::core::types::EffectData>,
+        heart_color_str: &Option<String>,
+        heart_to_add: i16,
+        effect_text: &str,
+    ) {
+        Self::grant_heart_distribution(gs, effect_text, card_id, heart_distribution, is_negative);
         if is_temporary && effect_data.is_none() {
             if heart_distribution.len() > 1 {
                 let items: Vec<crate::core::types::CardEffectItem> = heart_distribution
@@ -650,14 +674,14 @@ impl AbilityResolver {
                 if crate::ability::debug::ABILITY_DEBUG
                     .load(core::sync::atomic::Ordering::Relaxed)
                 {
-                    if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[GR_SELECTED_BH] selected_id={} has_base_heart={} hearts_count={}",
+                    log::debug!("[GR_SELECTED_BH] selected_id={} has_base_heart={} hearts_count={}",
                         selected_id,
                         selected_card.base_heart.is_some(),
                         selected_card
                             .base_heart
                             .as_ref()
                             .map(|bh| bh.hearts.len())
-                            .unwrap_or(0)); }
+                            .unwrap_or(0));
                 }
                 if let Some(ref base_heart) = selected_card.base_heart {
                     for &(color, _) in &base_heart.hearts {
@@ -665,10 +689,10 @@ impl AbilityResolver {
                             if crate::ability::debug::ABILITY_DEBUG
                                 .load(core::sync::atomic::Ordering::Relaxed)
                             {
-                                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[GR_APPLY] target={} color={:?} before={}",
+                                log::debug!("[GR_APPLY] target={} color={:?} before={}",
                                     target_id,
                                     color,
-                                    gs.mods.get_heart_modifier(target_id, color)); }
+                                    gs.mods.get_heart_modifier(target_id, color));
                             }
                             gs.mods.add_heart_modifier_with_trace(
                                 target_id,
@@ -681,10 +705,10 @@ impl AbilityResolver {
                             if crate::ability::debug::ABILITY_DEBUG
                                 .load(core::sync::atomic::Ordering::Relaxed)
                             {
-                                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[GR_APPLY] target={} color={:?} after={}",
+                                log::debug!("[GR_APPLY] target={} color={:?} after={}",
                                     target_id,
                                     color,
-                                    gs.mods.get_heart_modifier(target_id, color)); }
+                                    gs.mods.get_heart_modifier(target_id, color));
                             }
                             if effect.duration_any().as_deref() == Some("live_end") {
                                 let effect_data = crate::core::types::EffectData::SingleCard {
@@ -1112,34 +1136,20 @@ impl AbilityResolver {
                     );
                 }
                 if kind == ResourceKind::Blade {
-                    gs.mods.add_blade_modifier_with_trace(
-                        card_id,
-                        blades_to_add,
-                        &mut gs.ability_applications,
-                        gs.activating_card.unwrap_or(-1),
-                        &effect.text,
-                    );
+                    Self::grant_blade(gs, effect, card_id, blades_to_add);
                     if is_temporary {
                         effect_data =
                             Some(Self::make_card_effect_data(card_id, blades_to_add, None));
                     }
                 }
                 if kind == ResourceKind::Heart {
-                    for (color, color_amount) in &heart_distribution {
-                        let amount = if is_negative {
-                            -i16::from(*color_amount)
-                        } else {
-                            i16::from(*color_amount)
-                        };
-                        gs.mods.add_heart_modifier_with_trace(
-                            card_id,
-                            *color,
-                            amount,
-                            &mut gs.ability_applications,
-                            gs.activating_card.unwrap_or(-1),
-                            &effect.text,
-                        );
-                    }
+                    Self::grant_heart_distribution(
+                        gs,
+                        &effect.text,
+                        card_id,
+                        &heart_distribution,
+                        is_negative,
+                    );
                     if is_temporary && effect_data.is_none() {
                         let mut items: Vec<crate::core::types::CardEffectItem> = Vec::new();
                         for (color, color_amount) in &heart_distribution {
@@ -1397,21 +1407,7 @@ impl AbilityResolver {
                         gs.mods.get_heart_modifier(card_id, color)
                     );
                 }
-                for &(color, dist_count) in heart_distribution {
-                    let dist_amount = if is_negative {
-                        -i16::from(dist_count)
-                    } else {
-                        i16::from(dist_count)
-                    };
-                    gs.mods.add_heart_modifier_with_trace(
-                        card_id,
-                        color,
-                        dist_amount,
-                        &mut gs.ability_applications,
-                        gs.activating_card.unwrap_or(-1),
-                        &effect.text,
-                    );
-                }
+                Self::grant_heart_distribution(gs, &effect.text, card_id, heart_distribution, is_negative);
             }
             // Build effect_data for heart cleanup on expiry
             if is_temporary && effect_data.is_none() && !targets.is_empty() {
@@ -1636,13 +1632,7 @@ impl AbilityResolver {
                         .collect()
                 };
                 for card_id in stage_ids {
-                    gs.mods.add_blade_modifier_with_trace(
-                        card_id,
-                        blades_to_add,
-                        &mut gs.ability_applications,
-                        gs.activating_card.unwrap_or(-1),
-                        &effect.text,
-                    );
+                    Self::grant_blade(gs, effect, card_id, blades_to_add);
                 }
                 if is_temporary {
                     effect_data = Some(crate::core::types::EffectData::AllCards {
@@ -1657,13 +1647,7 @@ impl AbilityResolver {
                             let player = gs.resolve_target_player_mut(&effect.target_name());
                             let card_id = player.stage.stage[stage_idx];
                             if card_id != -1 {
-                                gs.mods.add_blade_modifier_with_trace(
-                                    card_id,
-                                    blades_to_add,
-                                    &mut gs.ability_applications,
-                                    gs.activating_card.unwrap_or(-1),
-                                    &effect.text,
-                                );
+                                Self::grant_blade(gs, effect, card_id, blades_to_add);
                                 if is_temporary {
                                     effect_data = Some(Self::make_card_effect_data(
                                         card_id,
@@ -1682,13 +1666,7 @@ impl AbilityResolver {
                 && !effect.exclude_self_any().unwrap_or(false)
             {
                 if let Some(card_id) = activating_card_id {
-                    gs.mods.add_blade_modifier_with_trace(
-                        card_id,
-                        blades_to_add,
-                        &mut gs.ability_applications,
-                        gs.activating_card.unwrap_or(-1),
-                        &effect.text,
-                    );
+                    Self::grant_blade(gs, effect, card_id, blades_to_add);
                     if is_temporary {
                         effect_data =
                             Some(Self::make_card_effect_data(card_id, blades_to_add, None));
@@ -1698,13 +1676,7 @@ impl AbilityResolver {
         } else if !all_selected.is_empty() && effect.source_any().is_none() {
             // Pure sequential select→gain_resource: apply to ALL selected cards with full count
             for &card_id in blade_targets.iter() {
-                gs.mods.add_blade_modifier_with_trace(
-                    card_id,
-                    blades_to_add,
-                    &mut gs.ability_applications,
-                    gs.activating_card.unwrap_or(-1),
-                    &effect.text,
-                );
+                Self::grant_blade(gs, effect, card_id, blades_to_add);
             }
         } else {
             let targets: Vec<i16> = if is_all {
@@ -1726,13 +1698,7 @@ impl AbilityResolver {
                 );
             }
             for &card_id in &targets {
-                gs.mods.add_blade_modifier_with_trace(
-                    card_id,
-                    blades_to_add,
-                    &mut gs.ability_applications,
-                    gs.activating_card.unwrap_or(-1),
-                    &effect.text,
-                );
+                Self::grant_blade(gs, effect, card_id, blades_to_add);
             }
         }
         effect_data
@@ -2262,11 +2228,7 @@ impl AbilityResolver {
                 .activating_card
                 .and_then(|c| player.stage.stage.iter().position(|&id| id == c))
                 .unwrap_or(1);
-            let area = match pos {
-                0 => crate::zones::MemberArea::LeftSide,
-                1 => crate::zones::MemberArea::Center,
-                _ => crate::zones::MemberArea::RightSide,
-            };
+            let area = util::pos_to_area(pos);
             let under_cards = player.stage.get_under_cards(area);
             if under_cards.is_empty() {
                 return;
@@ -2340,11 +2302,7 @@ impl AbilityResolver {
                     })
                 })
                 .unwrap_or(1);
-            let area = match idx {
-                0 => crate::zones::MemberArea::LeftSide,
-                1 => crate::zones::MemberArea::Center,
-                _ => crate::zones::MemberArea::RightSide,
-            };
+            let area = util::pos_to_area(idx);
             for _ in 0..count {
                 if let Some(energy) = player.energy_deck.draw() {
                     player.stage.place_under_card(area, energy);
@@ -2458,14 +2416,7 @@ impl AbilityResolver {
                     let player = gs.resolve_target_player(target);
                     (0..3)
                         .filter(|&i| player.stage.stage[i] != -1)
-                        .map(|i| {
-                            match i {
-                                0 => "left",
-                                1 => "center",
-                                _ => "right",
-                            }
-                            .to_string()
-                        })
+                        .map(|i| util::pos_to_area(i).to_string())
                         .collect()
                 };
                 if valid_sources.is_empty() {
@@ -2527,11 +2478,7 @@ impl AbilityResolver {
                                 continue;
                             }
                         }
-                        let pos = match i {
-                            0 => "left",
-                            1 => "center",
-                            _ => "right",
-                        };
+                        let pos = util::pos_to_area(i);
                         if has_explicit_target {
                             sources.push(pos.to_string());
                         } else {
@@ -2876,16 +2823,8 @@ impl AbilityResolver {
         });
 
         if let Some(current_idx) = current_index {
-            let from_area = match current_idx {
-                0 => crate::zones::MemberArea::LeftSide,
-                1 => crate::zones::MemberArea::Center,
-                _ => crate::zones::MemberArea::RightSide,
-            };
-            let to_area = match target_index {
-                0 => crate::zones::MemberArea::LeftSide,
-                1 => crate::zones::MemberArea::Center,
-                _ => crate::zones::MemberArea::RightSide,
-            };
+            let from_area = util::pos_to_area(current_idx);
+            let to_area = util::pos_to_area(target_index);
             let (target_id, source_id) = (
                 player.stage.stage[target_index],
                 player.stage.stage[current_idx],
@@ -3201,11 +3140,7 @@ impl AbilityResolver {
             let front_pos = gs.activating_card.and_then(|cid| {
                 let player = gs.resolve_target_player("self");
                 let idx = player.stage.stage.iter().position(|&id| id == cid)?;
-                let area = match idx {
-                    0 => crate::zones::MemberArea::LeftSide,
-                    1 => crate::zones::MemberArea::Center,
-                    _ => crate::zones::MemberArea::RightSide,
-                };
+                let area = util::pos_to_area(idx);
                 let front = area.front_area();
                 match front {
                     crate::zones::MemberArea::LeftSide => Some("left"),
@@ -3246,16 +3181,8 @@ impl AbilityResolver {
                 log::debug!("[EPCWD] source == target → NOOP");
                 return Ok(()); // same position, no move needed
             }
-            let from_area2 = match source_idx {
-                0 => crate::zones::MemberArea::LeftSide,
-                1 => crate::zones::MemberArea::Center,
-                _ => crate::zones::MemberArea::RightSide,
-            };
-            let to_area2 = match target_index {
-                0 => crate::zones::MemberArea::LeftSide,
-                1 => crate::zones::MemberArea::Center,
-                _ => crate::zones::MemberArea::RightSide,
-            };
+            let from_area2 = util::pos_to_area(source_idx);
+            let to_area2 = util::pos_to_area(target_index);
             let (target_id2, source_id2) = (
                 player.stage.stage[target_index],
                 player.stage.stage[source_idx],
@@ -3337,16 +3264,8 @@ impl AbilityResolver {
                     if current_idx == target_index {
                         return Ok(());
                     }
-                    let from_area = match current_idx {
-                        0 => crate::zones::MemberArea::LeftSide,
-                        1 => crate::zones::MemberArea::Center,
-                        _ => crate::zones::MemberArea::RightSide,
-                    };
-                    let to_area = match target_index {
-                        0 => crate::zones::MemberArea::LeftSide,
-                        1 => crate::zones::MemberArea::Center,
-                        _ => crate::zones::MemberArea::RightSide,
-                    };
+                    let from_area = util::pos_to_area(current_idx);
+                    let to_area = util::pos_to_area(target_index);
                     let (target_id, source_id) = (
                         player.stage.stage[target_index],
                         player.stage.stage[current_idx],
@@ -3430,16 +3349,8 @@ impl AbilityResolver {
                     if current_idx == target_index {
                         return Ok(());
                     }
-                    let from_area3 = match current_idx {
-                        0 => crate::zones::MemberArea::LeftSide,
-                        1 => crate::zones::MemberArea::Center,
-                        _ => crate::zones::MemberArea::RightSide,
-                    };
-                    let to_area3 = match target_index {
-                        0 => crate::zones::MemberArea::LeftSide,
-                        1 => crate::zones::MemberArea::Center,
-                        _ => crate::zones::MemberArea::RightSide,
-                    };
+                    let from_area3 = util::pos_to_area(current_idx);
+                    let to_area3 = util::pos_to_area(target_index);
                     let (target_id3, source_id3) = (
                         player.stage.stage[target_index],
                         player.stage.stage[current_idx],

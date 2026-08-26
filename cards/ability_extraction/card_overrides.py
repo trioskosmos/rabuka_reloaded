@@ -44,54 +44,6 @@ def _text_match(ability, needles):
 
 
 # ------------------------------------------------------------------
-# LL-bp7-001 ab#0 play-cost template (LOAD-BEARING, not cosmetic).
-#
-# "このカードのプレイに際し、手札から「A」「B」「C」のメンバーカードを
-# それぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは
-# 10になる。" is a PLAY-TIME cost modifier, not a triggered ability. The
-# generic parser reads it as conditional_on_optional and loses the contract
-# the engine expects: modify_cost(set) + location hand + characters +
-# optional, which modifiers.rs/phases.rs route as a play-time cost hook.
-# A general handler for 「プレイに際し…コストはNになる」 should eventually
-# replace this override.
-# ------------------------------------------------------------------
-_LL_BP7_001_EFFECT = {
-    "text": None,  # filled from triggerless_text at apply time
-    "action": "modify_cost",
-    "operation": "set",
-    "value": 10,
-    "source": "hand",
-    "location": "hand",
-    "card_type": "member_card",
-    "characters": ["国木田花丸", "優木せつ菜", "嵐千砂都"],
-    "count": 3,
-    "optional": True,
-}
-_LL_BP7_001_COST = {
-    "text": "手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置く",
-    "type": "move_cards",
-    "source": "hand",
-    "zone": "hand",
-    "destination": "discard",
-    "card_type": "member_card",
-    "characters": ["国木田花丸", "優木せつ菜", "嵐千砂都"],
-    "count": 1,
-    "per_character": True,
-    "optional": True,
-}
-
-
-def _apply_ll_bp7_001(ability, ctx):
-    import copy
-
-    eff = copy.deepcopy(_LL_BP7_001_EFFECT)
-    eff["text"] = ctx["triggerless_text"]
-    ability["effect"] = eff
-    ability["cost"] = copy.deepcopy(_LL_BP7_001_COST)
-    return True
-
-
-# ------------------------------------------------------------------
 # PL!N-bp7-029-L Burn!!: parser mis-labels the under_member→energy_zone move
 # as place_energy_under_member (which is for placing *under*). Correct to
 # move_cards.
@@ -165,9 +117,9 @@ OVERRIDES: list = [
         "ab_index": 1,
         "pred": _apply_mari_gain_ability,
     },
-    # ll_bp7_001_play_cost removed: replaced by the generic
-    # parser._try_play_time_cost_set handler for
-    # 「プレイに際し…コストはNになる」.
+    # ll_bp7_001_play_cost removed (with its dead _apply_ll_bp7_001
+    # machinery): replaced by the generic parser._try_play_time_cost_set
+    # handler for 「プレイに際し…コストはNになる」.
     {
         "name": "burn_under_move",
         "cards": ["N-bp7-029-L"],

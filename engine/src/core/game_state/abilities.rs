@@ -369,11 +369,7 @@ impl GameState {
             };
             // Scan stage cards for AUTO abilities
             for (stage_idx, &card_id) in player.stage.stage.iter().enumerate() {
-                let card_position = match stage_idx {
-                    0 => crate::zones::MemberArea::LeftSide,
-                    1 => crate::zones::MemberArea::Center,
-                    _ => crate::zones::MemberArea::RightSide,
-                };
+                let card_position = crate::ability::util::pos_to_area(stage_idx);
                 if card_id == -1 {
                     continue;
                 }
@@ -2234,29 +2230,34 @@ impl GameState {
         }
     }
 
+    /// Which player owns `card_id`, checked across every card-holding zone.
+    /// Single source of truth for owner lookups — used by
+    /// [`Self::resolve_target_player`] and by the condition layer's
+    /// `resolve_condition_player` (which previously re-implemented this scan,
+    /// with a divergent zone list).
+    pub fn owner_of_card(&self, card_id: i16) -> Option<&Player> {
+        let holds = |p: &Player| {
+            p.stage.stage.contains(&card_id)
+                || p.hand.cards.contains(&card_id)
+                || p.live_card_zone.cards.contains(&card_id)
+                || p.energy_zone.cards.contains(&card_id)
+                || p.success_live_card_zone.cards.contains(&card_id)
+                || p.waitroom.cards.contains(&card_id)
+        };
+        if holds(&self.player1) {
+            Some(&self.player1)
+        } else if holds(&self.player2) {
+            Some(&self.player2)
+        } else {
+            None
+        }
+    }
+
     pub fn resolve_target_player(&self, target: &str) -> &Player {
         let master = self.ability_master_id().or_else(|| {
-            self.activating_card.and_then(|cid| {
-                if self.player1.stage.stage.contains(&cid)
-                    || self.player1.live_card_zone.cards.contains(&cid)
-                    || self.player1.success_live_card_zone.cards.contains(&cid)
-                    || self.player1.hand.cards.contains(&cid)
-                    || self.player1.energy_zone.cards.contains(&cid)
-                    || self.player1.waitroom.cards.contains(&cid)
-                {
-                    Some(self.player1.id.clone())
-                } else if self.player2.stage.stage.contains(&cid)
-                    || self.player2.live_card_zone.cards.contains(&cid)
-                    || self.player2.success_live_card_zone.cards.contains(&cid)
-                    || self.player2.hand.cards.contains(&cid)
-                    || self.player2.energy_zone.cards.contains(&cid)
-                    || self.player2.waitroom.cards.contains(&cid)
-                {
-                    Some(self.player2.id.clone())
-                } else {
-                    None
-                }
-            })
+            self.activating_card
+                .and_then(|cid| self.owner_of_card(cid))
+                .map(|p| p.id.clone())
         });
         match (target, master.as_deref()) {
             ("self", Some("player2") | Some("p2")) => &self.player2,

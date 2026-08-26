@@ -832,11 +832,7 @@ gs.set_recently_moved_batch(self.moved_cards.clone(), Some("hand"));
                     .filter(|&i| i < 3)
                     .unwrap_or(1);
                 if chosen_idx < 3 && player.stage.stage[chosen_idx] != -1 {
-                    let area = match chosen_idx {
-                        0 => crate::zones::MemberArea::LeftSide,
-                        1 => crate::zones::MemberArea::Center,
-                        _ => crate::zones::MemberArea::RightSide,
-                    };
+                    let area = util::pos_to_area(chosen_idx);
                     player.stage.place_under_card(area, card_id);
                     gs.mods.clear_all_for_card(card_id);
                     gs.record_card_movement(card_id);
@@ -2768,17 +2764,8 @@ modified.destination = Some(Zone::from_source_str(dest));
                             && dst_idx < 3
                             && player.stage.stage[src_idx] != -1
                         {
-                            use crate::zones::MemberArea;
-                            let from = match src_idx {
-                                0 => MemberArea::LeftSide,
-                                1 => MemberArea::Center,
-                                _ => MemberArea::RightSide,
-                            };
-                            let to = match dst_idx {
-                                0 => MemberArea::LeftSide,
-                                1 => MemberArea::Center,
-                                _ => MemberArea::RightSide,
-                            };
+                            let from = util::pos_to_area(src_idx);
+                            let to = util::pos_to_area(dst_idx);
                             let tgt_id = player.stage.stage[dst_idx];
                             let src_id = player.stage.stage[src_idx];
                             if let Err(e) = player.stage.position_change(from, to) {
@@ -2929,17 +2916,8 @@ modified.destination = Some(Zone::from_source_str(dest));
                     && dst_idx < 3
                     && player.stage.stage[src_idx] != -1
                 {
-                    use crate::zones::MemberArea;
-                    let from = match src_idx {
-                        0 => MemberArea::LeftSide,
-                        1 => MemberArea::Center,
-                        _ => MemberArea::RightSide,
-                    };
-                    let to = match dst_idx {
-                        0 => MemberArea::LeftSide,
-                        1 => MemberArea::Center,
-                        _ => MemberArea::RightSide,
-                    };
+                    let from = util::pos_to_area(src_idx);
+                    let to = util::pos_to_area(dst_idx);
                     let tgt_id = player.stage.stage[dst_idx];
                     let src_id = player.stage.stage[src_idx];
                     if let Err(e) = player.stage.position_change(from, to) {

@@ -786,11 +786,7 @@ impl AbilityResolver {
             .iter()
             .position(|&id| id == card_id)
             .or_else(|| gs.player2.stage.stage.iter().position(|&id| id == card_id))
-            .map(|idx| match idx {
-                0 => crate::zones::MemberArea::LeftSide,
-                1 => crate::zones::MemberArea::Center,
-                _ => crate::zones::MemberArea::RightSide,
-            });
+            .map(util::pos_to_area);
         if let Some(ref kws) = ability.keywords {
             for kw in kws {
                 let pos_ok = match kw {

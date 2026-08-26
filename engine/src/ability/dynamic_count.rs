@@ -139,11 +139,7 @@ impl GameState {
                 let pos = activating_id
                     .and_then(|c| player.stage.stage.iter().position(|&id| id == c))
                     .unwrap_or(1);
-                let area = match pos {
-                    0 => crate::zones::MemberArea::LeftSide,
-                    1 => crate::zones::MemberArea::Center,
-                    _ => crate::zones::MemberArea::RightSide,
-                };
+                let area = crate::ability::util::pos_to_area(pos);
                 player.stage.get_under_cards(area).len().u8_count()
             }
             _ => match dc.count_type.as_str() {

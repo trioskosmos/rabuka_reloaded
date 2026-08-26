@@ -1064,15 +1064,9 @@ impl AbilityResolver {
                     c.destination,
                 );
                 if optional && !decided {
-                    if self.ask_optional_move_gate(
-                        gs,
-                        c.effect,
-                        Zone::Energy,
-                        "Move an energy card from the energy zone to the energy deck?",
-                        "エネルギー置き場のエネルギーをエネルギーデッキに置きますか？",
-                    ) {
-                        return Ok(vec![]);
-                    }
+                if self.gate_optional_source(gs, &c, Zone::Energy) {
+                    return Ok(vec![]);
+                }
                 }
                 if c.destination == "energy_deck" || c.destination == Zone::EnergyDeck.as_str() {
                     // Energy zone→energy_deck movement: take from the end of
@@ -1157,18 +1151,44 @@ impl AbilityResolver {
         true
     }
 
+    /// Per-zone prompts for the shared optional-move gate, so every
+    /// resolve_from_* handler reduces to a single
+    /// `if self.gate_optional_source(gs, c, Zone::X) { return ... }` line and
+    /// the wording lives in exactly one place.
+    fn gate_optional_source(
+        &mut self,
+        gs: &mut GameState,
+        c: &MoveSourceContext,
+        source_zone: Zone,
+    ) -> bool {
+        let (description_en, description_ja) = match source_zone {
+            Zone::Deck => (
+                "Place top card of deck to waiting room?",
+                "山札の上を控え室に置きますか？",
+            ),
+            Zone::DeckBottom => (
+                "Place bottom card of deck to waiting room?",
+                "山札の下を控え室に置きますか？",
+            ),
+            Zone::EnergyDeck => (
+                "Place energy card(s) from the energy deck?",
+                "エネルギーデッキからエネルギーを置きますか？",
+            ),
+            Zone::Energy => (
+                "Move an energy card from the energy zone to the energy deck?",
+                "エネルギー置き場のエネルギーをエネルギーデッキに置きますか？",
+            ),
+            _ => return false,
+        };
+        self.ask_optional_move_gate(gs, c.effect, source_zone, description_en, description_ja)
+    }
+
     fn resolve_from_deck(
         &mut self,
         gs: &mut GameState,
         c: &MoveSourceContext,
     ) -> Result<Vec<i16>, String> {
-        if self.ask_optional_move_gate(
-            gs,
-            c.effect,
-            Zone::Deck,
-            "Place top card of deck to waiting room?",
-            "山札の上を控え室に置きますか？",
-        ) {
+        if self.gate_optional_source(gs, c, Zone::Deck) {
             return Ok(vec![]);
         }
         let player = c.player_mut(gs);
@@ -1216,13 +1236,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         c: &MoveSourceContext,
     ) -> Result<Vec<i16>, String> {
-        if self.ask_optional_move_gate(
-            gs,
-            c.effect,
-            Zone::DeckBottom,
-            "Place bottom card of deck to waiting room?",
-            "山札の下を控え室に置きますか？",
-        ) {
+        if self.gate_optional_source(gs, c, Zone::DeckBottom) {
             return Ok(vec![]);
         }
         let player = c.player_mut(gs);
@@ -1247,15 +1261,7 @@ impl AbilityResolver {
         // machinery (e.g. 宮下 愛's PlaceEnergyUnderMember); the shared gate
         // covers plain energy-deck moves like HOT PASSION!!.
         let under_member = Zone::from_str(&c.destination) == Some(Zone::UnderMember);
-        if !under_member
-            && self.ask_optional_move_gate(
-                gs,
-                c.effect,
-                Zone::EnergyDeck,
-                "Place energy card(s) from the energy deck?",
-                "エネルギーデッキからエネルギーを置きますか？",
-            )
-        {
+        if !under_member && self.gate_optional_source(gs, c, Zone::EnergyDeck) {
             return Ok(vec![]);
         }
         let player = c.player_mut(gs);
@@ -3662,11 +3668,7 @@ if util::distinct_should_dedupe(distinct) {
             }
             return;
         }
-        let area = match target_index {
-            0 => crate::zones::MemberArea::LeftSide,
-            1 => crate::zones::MemberArea::Center,
-            _ => crate::zones::MemberArea::RightSide,
-        };
+        let area = util::pos_to_area(target_index);
         for &card in cids {
             player.stage.place_under_card(area, card);
         }

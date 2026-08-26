@@ -32,27 +32,7 @@ impl<'a> ConditionContext<'a> {
                 return p;
             }
             self.activating_card_id
-                .and_then(|cid| {
-                    let p1 = &self.game_state.player1;
-                    let p2 = &self.game_state.player2;
-                    if p1.stage.stage.contains(&cid)
-                        || p1.hand.cards.contains(&cid)
-                        || p1.live_card_zone.cards.contains(&cid)
-                        || p1.energy_zone.cards.contains(&cid)
-                        || p1.success_live_card_zone.cards.contains(&cid)
-                    {
-                        Some(p1)
-                    } else if p2.stage.stage.contains(&cid)
-                        || p2.hand.cards.contains(&cid)
-                        || p2.live_card_zone.cards.contains(&cid)
-                        || p2.energy_zone.cards.contains(&cid)
-                        || p2.success_live_card_zone.cards.contains(&cid)
-                    {
-                        Some(p2)
-                    } else {
-                        None
-                    }
-                })
+                .and_then(|cid| self.game_state.owner_of_card(cid))
                 .unwrap_or_else(|| self.game_state.resolve_target_player(target))
         } else if target == "both" {
             // For "both" scope in comparison conditions (comparing self vs opponent),
@@ -539,17 +519,9 @@ impl<'a> ConditionContext<'a> {
             Some(idx) => idx,
             None => return false,
         };
-        let master_area = match master_idx {
-            0 => crate::zones::MemberArea::LeftSide,
-            1 => crate::zones::MemberArea::Center,
-            _ => crate::zones::MemberArea::RightSide,
-        };
+        let master_area = util::pos_to_area(master_idx);
         let front_area = master_area.front_area();
-        let front_idx = match front_area {
-            crate::zones::MemberArea::LeftSide => 0,
-            crate::zones::MemberArea::Center => 1,
-            crate::zones::MemberArea::RightSide => 2,
-        };
+        let front_idx = front_area.to_index();
         let opponent = gs.resolve_target_player("opponent");
         let front_card_id = opponent.stage.stage[front_idx];
         if front_card_id == -1 {

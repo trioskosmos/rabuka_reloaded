@@ -283,11 +283,8 @@ impl super::TurnEngine {
                 }
             }
             for (stage_idx, &card_id) in player.stage.stage.iter().enumerate() {
-                let card_position = match stage_idx {
-                    0 => crate::zones::MemberArea::LeftSide,
-                    1 => crate::zones::MemberArea::Center,
-                    _ => crate::zones::MemberArea::RightSide,
-                };
+                let card_position = crate::zones::MemberArea::from_index(stage_idx)
+                    .unwrap_or(crate::zones::MemberArea::RightSide);
                 if card_id != -1 && !game_state.negated_abilities.contains(&card_id) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
                         for (aidx, ar) in card.abilities.iter().enumerate() {

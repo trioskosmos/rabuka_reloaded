@@ -668,22 +668,12 @@ impl GameState {
     pub fn find_card_stage_position(&self, card_id: i16) -> Option<MemberArea> {
         for (idx, &cid) in self.player1.stage.stage.iter().enumerate() {
             if cid == card_id {
-                return Some(match idx {
-                    0 => MemberArea::LeftSide,
-                    1 => MemberArea::Center,
-                    2 => MemberArea::RightSide,
-                    _ => unreachable!(),
-                });
+                return MemberArea::from_index(idx);
             }
         }
         for (idx, &cid) in self.player2.stage.stage.iter().enumerate() {
             if cid == card_id {
-                return Some(match idx {
-                    0 => MemberArea::LeftSide,
-                    1 => MemberArea::Center,
-                    2 => MemberArea::RightSide,
-                    _ => unreachable!(),
-                });
+                return MemberArea::from_index(idx);
             }
         }
         None
