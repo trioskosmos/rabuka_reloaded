@@ -9256,7 +9256,11 @@ def _try_ability_activation(text):
     # fired ability belongs to the card(s) selected by the preceding `select` step.
     elif "その" in target_raw or "それら" in target_raw:
         result["source_card"] = "previous_selected"
-    result["target"] = target_raw
+    # The ability-reference phrase ("そのカードの{{toujyou.png|登場}}能力") is
+    # deliberately NOT stored in `target`: `target` is a player-target field,
+    # and stuffing prose into it leaked icon markup through decode and made
+    # generic player-resolution fall through to player1. The trigger is
+    # extracted into `target_trigger` below; the raw text remains in `text`.
     tm = re.search(r"\{\{(.+?)\}\}", target_raw)
     if tm:
         trigger_raw = tm.group(1)
