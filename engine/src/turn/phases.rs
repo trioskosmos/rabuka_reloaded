@@ -298,16 +298,17 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         let mut resolution_zone = core::mem::take(&mut game_state.resolution_zone);
         // Take snapshots of modifier state BEFORE auto-ability triggers
         // (these are type-converted flat copies, not references — no borrow conflict)
-        let hm: HashMap<i16, HashMap<crate::card::HeartColor, i32>> = game_state
-            .mods
-            .heart_modifiers
-            .iter()
-            .map(|(&k, colors)| {
-                let flat: HashMap<crate::card::HeartColor, i32> =
-                    colors.iter().map(|(&c, e)| (c, e.total())).collect();
-                (k, flat)
-            })
-            .collect();
+        let hm: HashMap<i16, HashMap<crate::card::HeartColor, crate::core::game_modifiers::ModifierEntry>> =
+            game_state
+                .mods
+                .heart_modifiers
+                .iter()
+                .map(|(&k, colors)| {
+                    let flat: HashMap<crate::card::HeartColor, crate::core::game_modifiers::ModifierEntry> =
+                        colors.iter().map(|(&c, e)| (c, *e)).collect();
+                    (k, flat)
+                })
+                .collect();
         let nhm: HashMap<
             i16,
             HashMap<crate::card::HeartColor, crate::core::game_modifiers::ModifierEntry>,
@@ -1042,10 +1043,11 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                 replaced
             };
             for &replaced_id in &double_replaced_ids {
-                game_state.push_movement_event(
+                // B2: typed choke point — alias drift ("energy"/"energy_zone" etc) dies here
+                game_state.push_movement_event_typed(
                     replaced_id,
-                    "stage",
-                    "waitroom",
+                    crate::types::ZoneId::Stage,
+                    crate::types::ZoneId::Waitroom,
                     Some(card_id),
                     &player_id,
                     false,
@@ -1130,10 +1132,10 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             game_state.record_baton_touch(&player_id, Some(card_id));
             game_state.baton_touch_arriving_card_id = Some(card_id);
             if let Some(replaced_id) = replaced_member_id {
-                game_state.push_movement_event(
+                game_state.push_movement_event_typed(
                     replaced_id,
-                    "stage",
-                    "waitroom",
+                    crate::types::ZoneId::Stage,
+                    crate::types::ZoneId::Waitroom,
                     Some(card_id),
                     &player_id,
                     false,
@@ -1540,7 +1542,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
             }
         }
         for cid in removed {
-            game_state.push_movement_event(cid, "hand", "waitroom", None, player_id, false);
+            game_state.push_movement_event_typed(cid, crate::types::ZoneId::Hand, crate::types::ZoneId::Waitroom, None, player_id, false);
         }
         true
     }

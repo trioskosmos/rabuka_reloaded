@@ -2305,8 +2305,20 @@ impl GameState {
             .map(|e| e.player_id.clone())
     }
 
+    /// Shared master-player resolution — used by both mut/non-mut variants.
+    /// Checks the queue entry (ability_master_id) first, then falls back to the
+    /// owning player of the activating card. This makes the two arms identical
+    /// (previously mut lacked the owner fallback and diverged on "both").
+    fn resolve_master_id(&self) -> Option<String> {
+        self.ability_master_id().or_else(|| {
+            self.activating_card
+                .and_then(|cid| self.owner_of_card(cid))
+                .map(|p| p.id.clone())
+        })
+    }
+
     pub fn resolve_target_player_mut(&mut self, target: &str) -> &mut Player {
-        let master = self.ability_master_id();
+        let master = self.resolve_master_id();
         match (target, master.as_deref()) {
             ("self", Some("player2") | Some("p2")) => &mut self.player2,
             ("self", _) => &mut self.player1,
@@ -2316,7 +2328,13 @@ impl GameState {
                 log::debug!("WARN: resolve_target_player_mut called with 'both' -- returning player1, use execute_for_targets instead");
                 &mut self.player1
             }
-            _ => &mut self.player1,
+            _ => {
+                log::debug!(
+                    "WARN: resolve_target_player_mut unknown target '{}' -- defaulting to player1",
+                    target
+                );
+                &mut self.player1
+            }
         }
     }
 
@@ -2344,17 +2362,23 @@ impl GameState {
     }
 
     pub fn resolve_target_player(&self, target: &str) -> &Player {
-        let master = self.ability_master_id().or_else(|| {
-            self.activating_card
-                .and_then(|cid| self.owner_of_card(cid))
-                .map(|p| p.id.clone())
-        });
+        let master = self.resolve_master_id();
         match (target, master.as_deref()) {
             ("self", Some("player2") | Some("p2")) => &self.player2,
             ("self", _) => &self.player1,
             ("opponent", Some("player2") | Some("p2")) => &self.player1,
             ("opponent", _) => &self.player2,
-            _ => &self.player1,
+            ("both", _) => {
+                log::debug!("WARN: resolve_target_player called with 'both' -- returning player1, use execute_for_targets instead");
+                &self.player1
+            }
+            _ => {
+                log::debug!(
+                    "WARN: resolve_target_player unknown target '{}' -- defaulting to player1",
+                    target
+                );
+                &self.player1
+            }
         }
     }
 

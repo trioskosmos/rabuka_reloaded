@@ -345,49 +345,475 @@ impl super::TurnEngine {
         total
     }
 
-    pub fn execute_live_victory_determination(game_state: &mut GameState) {
-        // Rule 8.3.13.1 corrective path: a re-yell whose owner's performance
-        // window closed while their ability was paused on the optional discard
-        // choice never got applied by execute_performance_phase (that window
-        // had already computed its original yell data). Patch the owner's
-        // last snapshot and cheer count here, before scoring re-reads them.
-        if let Some(rb) = game_state.pending_reyell_rebuild.take() {
-            let is_p1 = rb.owner == game_state.player1.id;
-            log::debug!(
-                "[REYELL_APPLY_DEFERRED] owner={} n={} note_icons={} prev={}",
-                rb.owner,
-                rb.yell_cards.len(),
-                rb.note_icons,
-                rb.prev_note_icons
-            );
-            if let Some(snap) = game_state
-                .performance_snapshots
-                .iter_mut()
-                .rev()
-                .find(|s| s.player_id == rb.owner)
-            {
-                snap.yell_cards = rb.yell_cards.clone();
-                snap.total_hearts = rb.total_hearts;
-            }
-            // Rule 8.4.2.1: only the FINAL yell's score icons count.
-            if is_p1 {
-                game_state.player1_cheer_blade_heart_count = rb.note_icons;
-            } else {
-                game_state.player2_cheer_blade_heart_count = rb.note_icons;
-            }
-            game_state.re_yell_occurred = false;
+    fn drain_pending_live_success_choices(
+        game_state: &mut GameState,
+        p1_id: &str,
+        p2_id: &str,
+    ) -> bool {
+        game_state.process_pending_auto_abilities(p1_id);
+        if game_state.has_pending_choice() {
+            log::debug!("[LIVE] pending choice after draining p1 live_success queue — early return");
+            return true;
         }
+        game_state.process_pending_auto_abilities(p2_id);
+        if game_state.has_pending_choice() {
+            log::debug!("[LIVE] pending choice after draining p2 live_success queue — early return");
+            return true;
+        }
+        false
+    }
 
-        // Evaluate constant modify_required_hearts abilities on cards in the
-        // success_live_card_zone (e.g. PL!-bp6-022-L) before any scoring or
-        // heart requirement checks.
-        game_state.evaluate_success_zone_constant_abilities();
+    fn compute_pregame_scores(
+        game_state: &GameState,
+        need_heart_flat: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
+        pre_score_flat: &HashMap<i16, i32>,
+        p1_extra: u8,
+        p2_extra: u8,
+    ) -> (u8, u8) {
+        let p1 = game_state.player1.live_card_zone.calculate_live_score(
+            &game_state.card_database,
+            game_state.player1_cheer_blade_heart_count,
+            game_state.player1.stage_hearts.as_ref(),
+            Some(need_heart_flat),
+            Some(pre_score_flat),
+            game_state.mods.p1_constant_total_score_bonus,
+        ) + p1_extra;
+        let p2 = game_state.player2.live_card_zone.calculate_live_score(
+            &game_state.card_database,
+            game_state.player2_cheer_blade_heart_count,
+            game_state.player2.stage_hearts.as_ref(),
+            Some(need_heart_flat),
+            Some(pre_score_flat),
+            game_state.mods.p2_constant_total_score_bonus,
+        ) + p2_extra;
+        log::debug!("[LIVE_SCORE] p1={} p2={} extras p1={} p2={}", p1, p2, p1_extra, p2_extra);
+        (p1, p2)
+    }
 
-        // Restore performance-time need_heart_modifiers that were cleared by
-        // evaluate_success_zone_constant_abilities. This preserves modifications
-        // from live_start triggers and other non-constant sources.
-        game_state.restore_performance_need_heart_modifiers();
+    fn determine_winners(
+        game_state: &GameState,
+        p1_id: &str,
+        p2_id: &str,
+        p1_score: u8,
+        p2_score: u8,
+    ) -> (bool, bool) {
+        let p1_has = !game_state.player1.live_card_zone.cards.is_empty();
+        let p2_has = !game_state.player2.live_card_zone.cards.is_empty();
+        let p1_all = p1_has
+            && game_state
+                .performance_snapshots
+                .iter()
+                .rev()
+                .find(|s| s.player_id == p1_id)
+                .map_or(false, |s| !s.lives.is_empty() && s.lives.iter().all(|l| l.passed));
+        let p2_all = p2_has
+            && game_state
+                .performance_snapshots
+                .iter()
+                .rev()
+                .find(|s| s.player_id == p2_id)
+                .map_or(false, |s| !s.lives.is_empty() && s.lives.iter().all(|l| l.passed));
+        if ABILITY_DEBUG.load(Ordering::Relaxed) {
+            log::debug!("[LIVE-DBG] === VICTORY DETERMINATION ===");
+            log::debug!(
+                "[LIVE-DBG] P1 score={} has={} all_passed={} zone={:?}",
+                p1_score, p1_has, p1_all, game_state.player1.live_card_zone.cards
+            );
+            log::debug!(
+                "[LIVE-DBG] P2 score={} has={} all_passed={} zone={:?}",
+                p2_score, p2_has, p2_all, game_state.player2.live_card_zone.cards
+            );
+        }
+        let res = if !p1_all && !p2_all {
+            (false, false)
+        } else if p1_all && !p2_all {
+            (true, false)
+        } else if !p1_all && p2_all {
+            (false, true)
+        } else if p1_score > p2_score {
+            (true, false)
+        } else if p2_score > p1_score {
+            (false, true)
+        } else {
+            (true, true)
+        };
+        log::debug!("[LIVE_WINNERS] p1_won={} p2_won={} p1_all={} p2_all={}", res.0, res.1, p1_all, p2_all);
+        res
+    }
 
+    /// Pass 1: populate snap.lives[].passed / required / filled / adjustments.
+    /// Extracted from execute_live_victory_determination to keep that function
+    /// focused on orchestration (B1). Logic unchanged — A4 pipeline helpers used inside.
+    fn populate_live_verdicts(game_state: &mut GameState) {
+        for snap in game_state.performance_snapshots.iter_mut() {
+            if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                log::debug!(
+                    "[LIVE-DBG] === PASS/FAIL CHECK player={} lives={} total_hearts={:?} ===",
+                    snap.player_id,
+                    snap.lives.len(),
+                    snap.total_hearts
+                );
+            }
+            for i in 0..snap.lives.len() {
+                let lc_id = snap.lives[i].card_id;
+                let Some(card) = game_state.card_database.get_card(lc_id).cloned() else {
+                    continue;
+                };
+                snap.lives[i].card_id = lc_id;
+                snap.lives[i].card_no = crate::types::ArcStr::from(card.card_no.as_ref());
+                if card.need_heart.is_none() {
+                    snap.lives[i].passed = true;
+                    let base_score = card.get_score() as i32;
+                    let set_score = game_state.mods.get_score_set_modifier(lc_id);
+                    let additive = game_state.mods.get_score_modifier(lc_id) - set_score;
+                    let effective_base = if set_score != 0 { set_score } else { base_score };
+                    snap.lives[i].score = crate::constants::saturate_u8(effective_base + additive);
+                    continue;
+                }
+                let nh = card.need_heart.as_ref().unwrap();
+                let mut filled = EMPTY_H8;
+                for alloc in &snap.breakdown.allocations {
+                    if alloc.target_idx == i as u8 {
+                        filled[alloc.color as usize] += alloc.amount;
+                    }
+                }
+                if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                    log::debug!("[LIVE-DBG] live[{}] card={} filled_from_allocs={:?}", i, card.card_no, filled);
+                }
+                // Use stats_pipeline::effective_need_heart for required array
+                let eff = crate::core::stats_pipeline::effective_need_heart(
+                    Some(nh),
+                    lc_id,
+                    &game_state.mods.need_heart_modifiers,
+                )
+                .unwrap_or_else(|| nh.clone());
+                let mut required_arr = EMPTY_H8;
+                for (color, needed) in &eff.hearts {
+                    required_arr[color.index()] = *needed;
+                }
+                if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                    log::debug!("[LIVE-DBG] live[{}] required (via pipeline)={:?}", i, required_arr);
+                }
+                let passed = {
+                    let mut icon_all = filled[7];
+                    let mut ok = true;
+                    let total_filled: u8 = filled.iter().sum();
+                    let total_required: u8 = required_arr.iter().sum();
+                    if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                        log::debug!(
+                            "[LIVE-DBG] live[{}] total_filled={} total_required={} icon_all={}",
+                            i, total_filled, total_required, icon_all
+                        );
+                    }
+                    if total_filled < total_required {
+                        ok = false;
+                    }
+                    if ok && required_arr[0] > 0 {
+                        let any_hearts: u8 = filled[1..7].iter().sum::<u8>() + filled[0];
+                        if any_hearts + icon_all < required_arr[0] {
+                            ok = false;
+                        } else {
+                            let used = required_arr[0].saturating_sub(any_hearts);
+                            icon_all = icon_all.saturating_sub(used);
+                        }
+                    }
+                    if ok {
+                        for idx in 1..7 {
+                            if filled[idx] < required_arr[idx] {
+                                let deficit = required_arr[idx] - filled[idx];
+                                if icon_all >= deficit {
+                                    icon_all -= deficit;
+                                } else {
+                                    ok = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                        log::debug!(
+                            "[LIVE-DBG] live[{}] VERDICT: passed={} filled={:?} required={:?}",
+                            i, ok, filled, required_arr
+                        );
+                    }
+                    ok
+                };
+                let mut adjustments = Vec::new();
+                if let Some(color_mods) = game_state.mods.need_heart_modifiers.get(&lc_id) {
+                    let verbose = ABILITY_DEBUG.load(Ordering::Relaxed);
+                    let req_source = verbose.then(|| format!("{} req modifier", card.name));
+                    for (color, entry) in color_mods {
+                        let total = entry.total();
+                        if total != 0 {
+                            let color_label = color.to_string();
+                            adjustments.push(crate::types::Adjustment {
+                                adjustment_type: AdjustmentType::Requirement,
+                                desc: if verbose {
+                                    format!(
+                                        "{} {}",
+                                        if entry.set != 0 {
+                                            "="
+                                        } else if total > 0 {
+                                            "+"
+                                        } else {
+                                            ""
+                                        },
+                                        total,
+                                    )
+                                } else {
+                                    String::new()
+                                },
+                                value: total as i16,
+                                color: color.index() as u8,
+                                source: if verbose {
+                                    format!("{} req modifier ({})", card.name, color_label)
+                                } else {
+                                    String::new()
+                                },
+                            });
+                            let op_str = if verbose && entry.set != 0 {
+                                format!("= {}", entry.set)
+                            } else if verbose && entry.additive > 0 {
+                                format!("+{}", entry.additive)
+                            } else if verbose {
+                                format!("{}", entry.additive)
+                            } else {
+                                String::new()
+                            };
+                            let req_desc = if verbose {
+                                format!("Requirement {}", op_str)
+                            } else {
+                                String::new()
+                            };
+                            snap.breakdown.requirements.push(crate::types::EffectEntry {
+                                source: req_source.clone().unwrap_or_default(),
+                                value: op_str,
+                                desc: req_desc,
+                            });
+                        }
+                    }
+                }
+                snap.lives[i].adjustments = adjustments;
+                snap.lives[i].required = required_arr;
+                snap.lives[i].filled = filled;
+                snap.lives[i].passed = passed;
+                let base_score = card.get_score() as i32;
+                let set_score = game_state.mods.get_score_set_modifier(lc_id);
+                let additive = game_state.mods.get_score_modifier(lc_id) - set_score;
+                let effective_base = if set_score != 0 { set_score } else { base_score };
+                snap.lives[i].score = crate::constants::saturate_u8(effective_base + additive);
+            }
+        }
+    }
+
+    fn finalize_snapshot_fields(
+        game_state: &mut GameState,
+        p1_won: bool,
+        p2_won: bool,
+        p1_score: u8,
+        p2_score: u8,
+        p1_id: &str,
+        p2_id: &str,
+    ) {
+        for snap in game_state.performance_snapshots.iter_mut() {
+            let mut cumulative_used = EMPTY_H8;
+            for i in 0..snap.lives.len() {
+                for alloc in &snap.breakdown.allocations {
+                    if alloc.target_idx == i as u8 {
+                        let source_idx = match alloc.phase {
+                            crate::types::AllocPhase::H00Wild | crate::types::AllocPhase::Wildcard => 0,
+                            crate::types::AllocPhase::AllWild
+                            | crate::types::AllocPhase::CAll
+                            | crate::types::AllocPhase::AllCleanup => 7,
+                            _ => alloc.color as usize,
+                        };
+                        cumulative_used[source_idx] += alloc.amount;
+                    }
+                }
+                let mut spare = EMPTY_H8;
+                for idx in 0..8 {
+                    spare[idx] = snap.total_hearts[idx].saturating_sub(cumulative_used[idx]);
+                }
+                snap.lives[i].spare = spare;
+            }
+            let is_first = snap.player_id == p1_id;
+            snap.p0_wins = p1_won;
+            snap.p1_wins = p2_won;
+            snap.total_score = if is_first { p1_score } else { p2_score };
+            let zone_empty = if is_first {
+                game_state.player1.live_card_zone.cards.is_empty()
+            } else {
+                game_state.player2.live_card_zone.cards.is_empty()
+            };
+            if zone_empty {
+                if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                    log::debug!("[LIVE-DBG] player={} live_card_zone empty → total_score forced to 0", snap.player_id);
+                }
+                snap.total_score = 0;
+            }
+            snap.success = snap.lives.iter().all(|l| l.passed) && snap.total_score > 0;
+            if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                log::debug!("[LIVE-DBG] player={} SUCCESS={} total_score={} all_passed={}", snap.player_id, snap.success, snap.total_score, snap.lives.iter().all(|l| l.passed));
+            }
+            snap.base_score_total = snap.lives.iter().filter(|l| l.passed).map(|l| l.score).sum();
+            snap.card_bonus_total = snap.lives.iter().filter(|l| l.passed).map(|l| l.score.saturating_sub(l.base_score)).sum();
+            for mc in &mut snap.member_contributions {
+                let mut ability_per_color = [0u8; 8];
+                for ab in &mc.ability_heart_bonuses {
+                    if let Some(color_idx) = ab.color {
+                        if color_idx < 8 {
+                            ability_per_color[color_idx as usize] += ab.amount;
+                        }
+                    }
+                }
+                for i in 0..8 {
+                    mc.transform_delta[i] = mc.bonus_hearts[i].saturating_sub(ability_per_color[i]);
+                }
+            }
+        }
+        log::debug!("[FINALIZE_SNAPSHOT] p1_won={} p2_won={} p1_score={} p2_score={}", p1_won, p2_won, p1_score, p2_score);
+    }
+
+    fn revert_live_success_score_modifiers(game_state: &mut GameState, pre_score_flat: &HashMap<i16, i32>) {
+        let post: HashMap<i16, i32> = game_state.mods.score_modifiers.iter().map(|(&k, e)| (k, e.total())).collect();
+        for (&cid, post_total) in &post {
+            let pre = pre_score_flat.get(&cid).copied().unwrap_or(0);
+            let delta = post_total - pre;
+            if delta != 0 {
+                game_state.mods.add_score_modifier(cid, -delta as i16);
+            }
+        }
+        for (&cid, &pre_total) in pre_score_flat {
+            if !post.contains_key(&cid) {
+                game_state.mods.set_score_modifier(cid, pre_total as i16);
+            }
+        }
+        log::debug!("[REVERT_SCORE] reverted {} late score modifiers", post.len());
+    }
+
+    fn process_delayed_gained_effects(game_state: &mut GameState) {
+        if game_state.delayed_gained_effects.is_empty() {
+            return;
+        }
+        let saved_revealed = core::mem::take(&mut game_state.revealed_cards);
+        if let Some(snap) = game_state.performance_snapshots.first() {
+            game_state.revealed_cards = snap.yell_cards.iter().map(|yc| yc.card_id).collect();
+        }
+        let delayed = core::mem::take(&mut game_state.delayed_gained_effects);
+        for (card_id, gained) in &delayed {
+            use crate::ability::condition::ConditionContext;
+            use crate::ability::enums::ActionType;
+            use crate::ability::resolver::AbilityResolver;
+            let ctx = ConditionContext::new(game_state);
+            if gained.action == ActionType::ConditionalAlternative {
+                let alt_cond = gained.compound.alternative_condition.as_ref();
+                let base_cond = gained.condition.as_ref();
+                let alt_met = alt_cond.is_some_and(|c| ctx.evaluate_condition(c));
+                let base_met = base_cond.is_some_and(|c| ctx.evaluate_condition(c));
+                if alt_met || base_met {
+                    let alt_eff = gained.alternative_effect_any();
+                    let prim_eff = gained.compound.primary_effect.as_ref().map(|b| &**b);
+                    let effect_to_apply = if alt_met { alt_eff } else { prim_eff };
+                    if let Some(apply) = effect_to_apply {
+                        let mut resolver = AbilityResolver::new(game_state.card_database.clone(), Some(*card_id));
+                        resolver.activating_card_id = Some(*card_id);
+                        let _ = resolver.execute_effect(game_state, apply);
+                    }
+                }
+            }
+        }
+        game_state.revealed_cards = saved_revealed;
+        log::debug!("[DELAYED_GAINED] processed {} delayed effects", delayed.len());
+    }
+
+    fn merge_late_score_apps(game_state: &mut GameState, p1_id: &str, p2_id: &str) {
+        let late_apps = core::mem::take(&mut game_state.ability_applications);
+        if late_apps.is_empty() {
+            return;
+        }
+        let p1_cards = &game_state.player1.live_card_zone.cards.clone();
+        let p2_cards = &game_state.player2.live_card_zone.cards.clone();
+        for snap in game_state.performance_snapshots.iter_mut() {
+            let player_cards = if snap.player_id == p1_id { p1_cards } else { p2_cards };
+            for app in &late_apps {
+                if (app.effect_type == crate::types::EffectType::ScoreBonus || app.effect_type == crate::types::EffectType::ScoreSet) && player_cards.contains(&app.target_card_id) {
+                    snap.breakdown.scores.push(crate::types::ScoreLine { source: app.ability_text.to_string(), value: app.amount.unsigned_abs() as u8 });
+                }
+            }
+        }
+        log::debug!("[LATE_SCORE] merged {} late score apps", late_apps.len());
+    }
+
+    fn compute_surplus_and_flags(game_state: &mut GameState, p1_won: bool, p2_won: bool, p1_id: &str, p2_id: &str) {
+        let mut p2_surplus = 0u8;
+        let mut p1_surplus = 0u8;
+        for snap in &mut game_state.performance_snapshots {
+            let total_available: u8 = snap.total_hearts.iter().sum();
+            let total_filled: u8 = snap.lives.iter().flat_map(|l| l.filled.iter()).sum();
+            let surplus = total_available.saturating_sub(total_filled);
+            let mut per_color_surplus = [0u8; 8];
+            for color in 0..8 {
+                let total_color = snap.total_hearts[color];
+                let filled_color: u8 = snap.lives.iter().map(|l| l.filled[color]).sum();
+                per_color_surplus[color] = total_color.saturating_sub(filled_color);
+            }
+            snap.surplus_hearts = per_color_surplus;
+            log::debug!("[SURPLUS] player={} total_avail={} total_filled={} surplus={} per_color={:?}", snap.player_id, total_available, total_filled, surplus, per_color_surplus);
+            if snap.player_id == p2_id {
+                p2_surplus = surplus;
+            } else {
+                p1_surplus = surplus;
+            }
+        }
+        game_state.opponent_live_surplus_count = p2_surplus;
+        game_state.self_live_surplus_count = p1_surplus;
+        game_state.live_surplus_ready_this_turn = true;
+        if p2_won {
+            game_state.set_opponent_live_success(p2_surplus == 0);
+        }
+        if p1_won {
+            game_state.self_no_excess_heart_this_turn = p1_surplus == 0;
+        }
+        game_state.p1_live_success_this_turn = p1_won;
+        game_state.p1_live_success_no_excess = p1_surplus == 0;
+        game_state.p2_live_success_this_turn = p2_won;
+        game_state.p2_live_success_no_excess = p2_surplus == 0;
+        log::debug!("[SURPLUS_FLAGS] p1_surplus={} p2_surplus={} p1_won={} p2_won={}", p1_surplus, p2_surplus, p1_won, p2_won);
+    }
+
+    fn apply_deferred_reyell(game_state: &mut GameState) {
+        // Rule 8.3.13.1 corrective path
+        let Some(rb) = game_state.pending_reyell_rebuild.take() else {
+            return;
+        };
+        let is_p1 = rb.owner == game_state.player1.id;
+        log::debug!(
+            "[REYELL_APPLY_DEFERRED] owner={} n={} note_icons={} prev={}",
+            rb.owner,
+            rb.yell_cards.len(),
+            rb.note_icons,
+            rb.prev_note_icons
+        );
+        if let Some(snap) = game_state
+            .performance_snapshots
+            .iter_mut()
+            .rev()
+            .find(|s| s.player_id == rb.owner)
+        {
+            snap.yell_cards = rb.yell_cards.clone();
+            snap.total_hearts = rb.total_hearts;
+        }
+        if is_p1 {
+            game_state.player1_cheer_blade_heart_count = rb.note_icons;
+        } else {
+            game_state.player2_cheer_blade_heart_count = rb.note_icons;
+        }
+        game_state.re_yell_occurred = false;
+        log::debug!("[REYELL_DEFERRED] applied pending rebuild for owner={}", rb.owner);
+    }
+
+    fn rebuild_stage_hearts_with_yell(game_state: &mut GameState) {
+        // A1: now delegates to unified stats_pipeline::stage_hearts internally
         let mult_ref = &game_state.mods.heart_color_multiplier;
         let mut p1_stage = game_state.player1.calculate_stage_hearts(
             &game_state.card_database,
@@ -418,11 +844,22 @@ impl super::TurnEngine {
                 }
             }
         }
-        if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] === STAGE HEARTS AFTER YELL ==="); }
-        if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] P1 stage_hearts={:?}", p1_stage.hearts); }
-        if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] P2 stage_hearts={:?}", p2_stage.hearts); }
+        if ABILITY_DEBUG.load(Ordering::Relaxed) {
+            log::debug!("[LIVE-DBG] === STAGE HEARTS AFTER YELL ===");
+            log::debug!("[LIVE-DBG] P1 stage_hearts={:?}", p1_stage.hearts);
+            log::debug!("[LIVE-DBG] P2 stage_hearts={:?}", p2_stage.hearts);
+        }
         game_state.player1.stage_hearts = Some(p1_stage);
         game_state.player2.stage_hearts = Some(p2_stage);
+    }
+
+    pub fn execute_live_victory_determination(game_state: &mut GameState) {
+        Self::apply_deferred_reyell(game_state);
+
+        game_state.evaluate_success_zone_constant_abilities();
+        game_state.restore_performance_need_heart_modifiers();
+
+        Self::rebuild_stage_hearts_with_yell(game_state);
 
         let player1_id = game_state.player1.id.clone();
         let player2_id = game_state.player2.id.clone();
@@ -574,526 +1011,32 @@ impl super::TurnEngine {
             game_state.live_success_p2_extra = p2_extra;
         }
 
-        // Process any remaining auto-abilities that were queued but not yet resolved
-        // (e.g. when multiple cards have LiveSuccess triggers and a previous call
-        // returned early after the first ability created a pending choice).
-        game_state.process_pending_auto_abilities(&player1_id);
-        if game_state.has_pending_choice() {
-            return;
-        }
-        game_state.process_pending_auto_abilities(&player2_id);
-        if game_state.has_pending_choice() {
+        // Drain any remaining LiveSuccess auto-abilities (choice-gated re-entries)
+        if Self::drain_pending_live_success_choices(game_state, &player1_id, &player2_id) {
             return;
         }
 
-        // Determine winner — use PRE-trigger modifiers so LiveSuccess
-        // triggered changes only apply via pX_extra (no double-count).
-        // (need_heart_flat was built above, before pre-trigger results.)
-        let player1_score = game_state.player1.live_card_zone.calculate_live_score(
-            &game_state.card_database,
-            game_state.player1_cheer_blade_heart_count,
-            game_state.player1.stage_hearts.as_ref(),
-            Some(&need_heart_flat),
-            Some(&pre_score_flat),
-            game_state.mods.p1_constant_total_score_bonus,
-        ) + p1_extra;
-        let player2_score = game_state.player2.live_card_zone.calculate_live_score(
-            &game_state.card_database,
-            game_state.player2_cheer_blade_heart_count,
-            game_state.player2.stage_hearts.as_ref(),
-            Some(&need_heart_flat),
-            Some(&pre_score_flat),
-            game_state.mods.p2_constant_total_score_bonus,
-        ) + p2_extra;
-        // Pass 1: Compute pass/fail for every live card in every snapshot.
-        // This MUST run before victory determination so that snap.lives[i].passed
-        // is populated and can be used to decide who won.
-        // (Q47/Q48: score is not a reliable proxy — score can be 0 and still win.)
-        for snap in game_state.performance_snapshots.iter_mut() {
-            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] === PASS/FAIL CHECK player={} lives={} total_hearts={:?} ===",
-                snap.player_id,
-                snap.lives.len(),
-                snap.total_hearts); }
-            for i in 0..snap.lives.len() {
-                let lc_id = snap.lives[i].card_id;
-                if let Some(card) = game_state.card_database.get_card(lc_id) {
-                    snap.lives[i].card_id = lc_id;
-                    snap.lives[i].card_no = crate::types::ArcStr::from(card.card_no.as_ref());
-                    if let Some(ref nh) = card.need_heart {
-                        let mut filled = EMPTY_H8;
-                        for alloc in &snap.breakdown.allocations {
-                            if alloc.target_idx == i as u8 {
-                                filled[alloc.color as usize] += alloc.amount;
-                            }
-                        }
-                        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] card={} filled_from_allocs={:?}",
-                            i, card.card_no, filled); }
-                        let mut required_arr = EMPTY_H8;
-                        for (color, needed) in &nh.hearts {
-                            required_arr[color.index()] = *needed;
-                        }
-                        if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] base_required={:?}", i, required_arr); }
-                        if let Some(card_mods) = game_state.mods.need_heart_modifiers.get(&lc_id) {
-                            // Q115/Q127: Set-to-X applies first (per-color), then additive stacks.
-                            // A set modifier on one color does NOT erase other colors' requirements.
-                            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] applying {} modifiers",
-                                i,
-                                card_mods.len()); }
-                            for (color, me) in card_mods {
-                                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}]   modifier color={:?} set={} additive={}",
-                                    i, color, me.set, me.additive); }
-                                if me.set != 0 {
-                                    required_arr[color.index()] = me.set as u8;
-                                }
-                            }
-                            for (color, me) in card_mods {
-                                if me.additive != 0 {
-                                    let idx = color.index();
-                                    let current = required_arr[idx] as i32;
-                                    required_arr[idx] = crate::constants::saturate_u8(current + me.additive as i32);
-                                }
-                            }
-                            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] after_modifiers required={:?}",
-                                i, required_arr); }
-                        } else {
-                            if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] no modifiers", i); }
-                        }
-                        let passed = {
-                            // COLORLESS hearts (filled[0], e.g. from b_heart07) count
-                            // toward the heart0/total bucket but can NEVER be used as a
-                            // specific color — only icon_all (filled[7]) can cover a
-                            // colored-note deficit.
-                            let mut icon_all = filled[7];
-                            let mut ok = true;
-                            let total_filled: u8 = filled.iter().sum();
-                            let total_required: u8 = required_arr.iter().sum();
-                            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] total_filled={} total_required={} icon_all={}",
-                                i, total_filled, total_required, icon_all); }
-                            if total_filled < total_required {
-                                if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] FAIL: total_filled({}) < total_required({})",
-                                    i, total_filled, total_required); }
-                                ok = false;
-                            }
-                            if ok && required_arr[0] > 0 {
-                                let any_hearts: u8 = filled[1..7].iter().sum::<u8>() + filled[0];
-                                if any_hearts + icon_all < required_arr[0] {
-                                    if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] FAIL: h00_req={} any_hearts={} icon_all={}",
-                                        i, required_arr[0], any_hearts, icon_all); }
-                                    ok = false;
-                                } else {
-                                    let used = required_arr[0].saturating_sub(any_hearts);
-                                    icon_all = icon_all.saturating_sub(used);
-                                }
-                            }
-                            if ok {
-                                for idx in 1..7 {
-                                    if filled[idx] < required_arr[idx] {
-                                        let deficit = required_arr[idx] - filled[idx];
-                                        if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] color[{}] deficit={} icon_all_remaining={}",
-                                            i, idx, deficit, icon_all); }
-                                        if icon_all >= deficit {
-                                            icon_all -= deficit;
-                                        } else {
-                                            if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] FAIL: color[{}] deficit={} can't cover with icon_all={}",
-                                                i, idx, deficit, icon_all); }
-                                            ok = false;
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] live[{}] VERDICT: passed={} filled={:?} required={:?}",
-                                i, ok, filled, required_arr); }
-                            ok
-                        };
-                        // Populate adjustments and requirements from need_heart_modifiers
-                        let mut adjustments = Vec::new();
-                        if let Some(color_mods) = game_state.mods.need_heart_modifiers.get(&lc_id) {
-                            let verbose = ABILITY_DEBUG.load(Ordering::Relaxed);
-                            let req_source = verbose.then(|| format!("{} req modifier", card.name));
-                            for (color, entry) in color_mods {
-                                let total = entry.total();
-                                if total != 0 {
-                                    let color_label = color.to_string();
-                                    adjustments.push(crate::types::Adjustment {
-                                        adjustment_type: AdjustmentType::Requirement,
-                                        desc: if verbose {
-                                            format!(
-                                                "{} {}",
-                                                if entry.set != 0 {
-                                                    "="
-                                                } else if total > 0 {
-                                                    "+"
-                                                } else {
-                                                    ""
-                                                },
-                                                total,
-                                            )
-                                        } else {
-                                            String::new()
-                                        },
-                                        value: total as i16,
-                                        color: color.index() as u8,
-                                        source: if verbose {
-                                            format!("{} req modifier ({})", card.name, color_label)
-                                        } else {
-                                            String::new()
-                                        },
-                                    });
-                                    let op_str = if verbose && entry.set != 0 {
-                                        format!("= {}", entry.set)
-                                    } else if verbose && entry.additive > 0 {
-                                        format!("+{}", entry.additive)
-                                    } else if verbose {
-                                        format!("{}", entry.additive)
-                                    } else {
-                                        String::new()
-                                    };
-                                    let req_desc = if verbose {
-                                        format!("Requirement {}", op_str)
-                                    } else {
-                                        String::new()
-                                    };
-                                    snap.breakdown.requirements.push(crate::types::EffectEntry {
-                                        source: req_source.clone().unwrap_or_default(),
-                                        value: op_str,
-                                        desc: req_desc,
-                                    });
-                                }
-                            }
-                        }
-                        snap.lives[i].adjustments = adjustments;
-                        snap.lives[i].required = required_arr;
-                        snap.lives[i].filled = filled;
-                        snap.lives[i].passed = passed;
-                    } else {
-                        snap.lives[i].passed = true;
-                    }
-                    let base_score = card.get_score() as i32;
-                    let set_score = game_state.mods.get_score_set_modifier(lc_id);
-                    let additive = game_state.mods.get_score_modifier(lc_id) - set_score;
-                    let effective_base = if set_score != 0 {
-                        set_score
-                    } else {
-                        base_score
-                    };
-                    snap.lives[i].score = crate::constants::saturate_u8(effective_base + additive);
-                }
-            }
-        }
+        // A4: centralised scoring + pass/fail uses stats_pipeline helpers internally
+        let (player1_score, player2_score) =
+            Self::compute_pregame_scores(game_state, &need_heart_flat, &pre_score_flat, p1_extra, p2_extra);
+        Self::populate_live_verdicts(game_state);
+        // NOTE: populate_live_verdicts must run before victory determination so
+        // snap.lives[i].passed is populated (Q47/Q48). Removed duplicated inline
+        // pass/fail block here — the extracted helper above is now the single source.
 
-        // Victory determination — now uses the already-populated snap.lives[i].passed.
-        let player1_has_cards = !game_state.player1.live_card_zone.cards.is_empty();
-        let player2_has_cards = !game_state.player2.live_card_zone.cards.is_empty();
-        // Use .rev().find() — snapshots accumulate across turns/re-entries, so the
-        // LAST snapshot for each player is the current turn's, not the first.
-        let player1_all_passed = player1_has_cards
-            && game_state
-                .performance_snapshots
-                .iter()
-                .rev()
-                .find(|s| s.player_id == player1_id)
-                .map_or(false, |s| {
-                    !s.lives.is_empty() && s.lives.iter().all(|l| l.passed)
-                });
-        let player2_all_passed = player2_has_cards
-            && game_state
-                .performance_snapshots
-                .iter()
-                .rev()
-                .find(|s| s.player_id == player2_id)
-                .map_or(false, |s| {
-                    !s.lives.is_empty() && s.lives.iter().all(|l| l.passed)
-                });
-        if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] === VICTORY DETERMINATION ==="); }
-        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] P1 score={} has_cards={} all_reqs_met={} live_zone={:?}",
+        let (player1_won, player2_won) = Self::determine_winners(
+            game_state,
+            &player1_id,
+            &player2_id,
             player1_score,
-            player1_has_cards,
-            player1_all_passed,
-            game_state.player1.live_card_zone.cards); }
-        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] P2 score={} has_cards={} all_reqs_met={} live_zone={:?}",
             player2_score,
-            player2_has_cards,
-            player2_all_passed,
-            game_state.player2.live_card_zone.cards); }
-        let (player1_won, player2_won) = if !player1_all_passed && !player2_all_passed {
-            if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] RESULT: neither player passed → neither wins"); }
-            (false, false)
-        } else if player1_all_passed && !player2_all_passed {
-            if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] RESULT: only P1 passed → P1 wins"); }
-            (true, false)
-        } else if !player1_all_passed && player2_all_passed {
-            if ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] RESULT: only P2 passed → P2 wins"); }
-            (false, true)
-        } else if player1_score > player2_score {
-            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] RESULT: P1 score({}) > P2 score({}) → P1 wins",
-                player1_score, player2_score); }
-            (true, false)
-        } else if player2_score > player1_score {
-            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] RESULT: P2 score({}) > P1 score({}) → P2 wins",
-                player2_score, player1_score); }
-            (false, true)
-        } else {
-            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] RESULT: equal scores ({}) → both win (Rule 8.4.6.2)",
-                player1_score); }
-            (true, true)
-        };
+        );
 
-        // Pass 2: Finalize the remaining snapshot fields now that victory is determined.
-        for snap in game_state.performance_snapshots.iter_mut() {
-            // Compute per-card spare (余剰ハート): remaining hearts from the pool
-            // after this card's allocation. For each live card, spare = total available
-            // minus all allocations up to and including this card.
-            // Wildcard allocations use alloc.color as the TARGET color, but the
-            // actual pool deduction is from heart00 (index 0) or icon_all (index 7).
-            // We map to the source pool index so spare reflects the real pool.
-            let mut cumulative_used = EMPTY_H8;
-            for i in 0..snap.lives.len() {
-                for alloc in &snap.breakdown.allocations {
-                    if alloc.target_idx == i as u8 {
-                        let source_idx = match alloc.phase {
-                            crate::types::AllocPhase::H00Wild
-                            | crate::types::AllocPhase::Wildcard => 0,
-                            crate::types::AllocPhase::AllWild
-                            | crate::types::AllocPhase::CAll
-                            | crate::types::AllocPhase::AllCleanup => 7,
-                            _ => alloc.color as usize,
-                        };
-                        cumulative_used[source_idx] += alloc.amount;
-                    }
-                }
-                let mut spare = EMPTY_H8;
-                for idx in 0..8 {
-                    spare[idx] = snap.total_hearts[idx].saturating_sub(cumulative_used[idx]);
-                }
-                snap.lives[i].spare = spare;
-            }
-
-            let is_first = snap.player_id == player1_id;
-            snap.p0_wins = player1_won;
-            snap.p1_wins = player2_won;
-            snap.total_score = if is_first {
-                player1_score
-            } else {
-                player2_score
-            };
-            // Rule 8.3.16 + 8.4.2 + Q47: If zone is empty (all cards discarded),
-            // there is no score to sum. Q47: a failed live has "no total score"
-            // (合計スコアがない状態), not 0. Represented as 0 in the snapshot.
-            let zone_empty = if is_first {
-                game_state.player1.live_card_zone.cards.is_empty()
-            } else {
-                game_state.player2.live_card_zone.cards.is_empty()
-            };
-            if zone_empty {
-                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] player={} live_card_zone empty → total_score forced to 0",
-                    snap.player_id); }
-                snap.total_score = 0;
-            }
-            // Rule 8.3.16: If ANY live card's need_heart could not be satisfied,
-            // ALL live cards fail. Success requires ALL cards to pass.
-            snap.success = snap.lives.iter().all(|l| l.passed) && snap.total_score > 0;
-            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) { log::debug!("[LIVE-DBG] player={} SUCCESS={} total_score={} all_passed={}",
-                snap.player_id,
-                snap.success,
-                snap.total_score,
-                snap.lives.iter().all(|l| l.passed)); }
-
-            // Pre-computed score breakdown for the UI display layer.
-            snap.base_score_total = snap
-                .lives
-                .iter()
-                .filter(|l| l.passed)
-                .map(|l| l.score)
-                .sum();
-            snap.card_bonus_total = snap
-                .lives
-                .iter()
-                .filter(|l| l.passed)
-                .map(|l| l.score.saturating_sub(l.base_score))
-                .sum();
-
-            // Pre-computed per-color transform delta for each member contribution.
-            // transform_delta = bonus_hearts - sum(ability_heart_bonuses per color).
-            for mc in &mut snap.member_contributions {
-                let mut ability_per_color = [0u8; 8];
-                for ab in &mc.ability_heart_bonuses {
-                    if let Some(color_idx) = ab.color {
-                        if color_idx < 8 {
-                            ability_per_color[color_idx as usize] += ab.amount;
-                        }
-                    }
-                }
-                for i in 0..8 {
-                    mc.transform_delta[i] = mc.bonus_hearts[i].saturating_sub(ability_per_color[i]);
-                }
-            }
-        }
-
-        // Revert score modifiers added by LiveSuccess-triggered abilities.
-        // The snapshot already captured the correct final score (including bonuses)
-        // at lines 431-439. Delayed gained effects below will re-apply their
-        // bonuses on the cleared state.
-        {
-            let post: HashMap<i16, i32> = game_state
-                .mods
-                .score_modifiers
-                .iter()
-                .map(|(&k, e)| (k, e.total()))
-                .collect();
-            for (&cid, post_total) in &post {
-                let pre = pre_score_flat.get(&cid).copied().unwrap_or(0);
-                let delta = post_total - pre;
-                if delta != 0 {
-                    game_state.mods.add_score_modifier(cid, -delta as i16);
-                }
-            }
-            for (&cid, &pre_total) in &pre_score_flat {
-                if !post.contains_key(&cid) {
-                    game_state.mods.set_score_modifier(cid, pre_total as i16);
-                }
-            }
-        }
-
-        // Process delayed gained effects (e.g. constant gain_ability with
-        // conditional_alternative gained_effect that checks revealed_cards).
-        // These couldn't be evaluated at constant-evaluation time because the
-        // yell result wasn't available yet.
-        if !game_state.delayed_gained_effects.is_empty() {
-            let saved_revealed = core::mem::take(&mut game_state.revealed_cards);
-            // Populate revealed_cards from the first snapshot's yell data.
-            if let Some(snap) = game_state.performance_snapshots.first() {
-                game_state.revealed_cards = snap.yell_cards.iter().map(|yc| yc.card_id).collect();
-            }
-            let delayed = core::mem::take(&mut game_state.delayed_gained_effects);
-            for (card_id, gained) in &delayed {
-                use crate::ability::condition::ConditionContext;
-                use crate::ability::enums::ActionType;
-                use crate::ability::resolver::AbilityResolver;
-                let ctx = ConditionContext::new(game_state);
-                if gained.action == ActionType::ConditionalAlternative {
-                    // Evaluate the conditional_alternative: check alternative
-                    // condition first, then base condition.
-                    let alt_cond = gained.compound.alternative_condition.as_ref();
-                    let base_cond = gained.condition.as_ref();
-                    let alt_met = alt_cond.is_some_and(|c| ctx.evaluate_condition(c));
-                    let base_met = base_cond.is_some_and(|c| ctx.evaluate_condition(c));
-                    if alt_met || base_met {
-                        let alt_eff = gained.alternative_effect_any();
-                        let prim_eff = gained.compound.primary_effect.as_ref().map(|b| &**b);
-                        let effect_to_apply = if alt_met {
-                            alt_eff
-                        } else {
-                            prim_eff
-                        };
-                        if let Some(apply) = effect_to_apply {
-                            let mut resolver = AbilityResolver::new(
-                                game_state.card_database.clone(),
-                                Some(*card_id),
-                            );
-                            resolver.activating_card_id = Some(*card_id);
-                            let _ = resolver.execute_effect(game_state, apply);
-                        }
-                    }
-                }
-            }
-            game_state.revealed_cards = saved_revealed;
-        }
-
-        // Merge LiveSuccess-triggered ability applications into breakdown.scores.
-        // These were recorded after enrich_from_applications ran (in execute_performance_phase),
-        // so they weren't picked up yet.
-        let late_apps = core::mem::take(&mut game_state.ability_applications);
-        if !late_apps.is_empty() {
-            let p1_cards = &game_state.player1.live_card_zone.cards;
-            let p2_cards = &game_state.player2.live_card_zone.cards;
-            for snap in game_state.performance_snapshots.iter_mut() {
-                let player_cards = if snap.player_id == player1_id {
-                    &p1_cards
-                } else {
-                    &p2_cards
-                };
-                for app in &late_apps {
-                    if (app.effect_type == crate::types::EffectType::ScoreBonus
-                        || app.effect_type == crate::types::EffectType::ScoreSet)
-                        && player_cards.contains(&app.target_card_id)
-                    {
-                        snap.breakdown.scores.push(crate::types::ScoreLine {
-                            source: app.ability_text.to_string(),
-                            value: app.amount.unsigned_abs() as u8,
-                        });
-                    }
-                }
-            }
-        }
-
-        // Compute surplus from finalized snapshots.
-        // Surplus = remaining hearts after filling all live card requirements.
-        // Uses actual filled allocations (not just required) to handle cases where
-        // available hearts are less than required.
-        let mut p2_surplus = 0u8;
-        let mut p1_surplus = 0u8;
-        for snap in &mut game_state.performance_snapshots {
-            let total_available: u8 = snap.total_hearts.iter().sum();
-            let total_filled: u8 = snap.lives.iter().flat_map(|l| l.filled.iter()).sum();
-            let surplus = total_available.saturating_sub(total_filled);
-            // Compute per-color surplus
-            let mut per_color_surplus = [0u8; 8];
-            for color in 0..8 {
-                let total_color = snap.total_hearts[color];
-                let filled_color: u8 = snap.lives.iter().map(|l| l.filled[color]).sum();
-                per_color_surplus[color] = total_color.saturating_sub(filled_color);
-            }
-            snap.surplus_hearts = per_color_surplus;
-            log::debug!(
-                "[SURPLUS] player={} total_avail={} total_filled={} surplus={} per_color={:?} lives={}",
-                snap.player_id,
-                total_available,
-                total_filled,
-                surplus,
-                per_color_surplus,
-                snap.lives.len()
-            );
-            for (i, l) in snap.lives.iter().enumerate() {
-                log::debug!(
-                    "[SURPLUS]   live[{}] passed={} required={:?} filled={:?} spare={:?}",
-                    i,
-                    l.passed,
-                    l.required,
-                    l.filled,
-                    l.spare
-                );
-            }
-            for a in &snap.breakdown.allocations {
-                log::debug!(
-                    "[SURPLUS]   alloc target={} color={} amount={} wildcard={}",
-                    a.target_idx,
-                    a.color,
-                    a.amount,
-                    a.wildcard
-                );
-            }
-            if snap.player_id == player2_id {
-                p2_surplus = surplus;
-            } else {
-                p1_surplus = surplus;
-            }
-        }
-        game_state.opponent_live_surplus_count = p2_surplus;
-        game_state.self_live_surplus_count = p1_surplus;
-        game_state.live_surplus_ready_this_turn = true;
-        if player2_won {
-            game_state.set_opponent_live_success(p2_surplus == 0);
-        }
-        if player1_won {
-            game_state.self_no_excess_heart_this_turn = p1_surplus == 0;
-        }
-        // Per-seat results for owner-relative 「相手がライブを成功させていた」
-        // evaluation (a P2-owned card's opponent is P1, and vice versa).
-        game_state.p1_live_success_this_turn = player1_won;
-        game_state.p1_live_success_no_excess = p1_surplus == 0;
-        game_state.p2_live_success_this_turn = player2_won;
-        game_state.p2_live_success_no_excess = p2_surplus == 0;
+        Self::finalize_snapshot_fields(game_state, player1_won, player2_won, player1_score, player2_score, &player1_id, &player2_id);
+        Self::revert_live_success_score_modifiers(game_state, &pre_score_flat);
+        Self::process_delayed_gained_effects(game_state);
+        Self::merge_late_score_apps(game_state, &player1_id, &player2_id);
+        Self::compute_surplus_and_flags(game_state, player1_won, player2_won, &player1_id, &player2_id);
 
         // Push performance summary to rule log
 
@@ -1537,7 +1480,7 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
         card_db: &CardDatabase,
         blade_modifiers: &HashMap<i16, ModifierEntry>,
         heart_override: &HashMap<i16, (HeartColor, u8)>,
-        heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
+        heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
         blade_type_modifiers: &HashMap<i16, BladeColor>,
         orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
         need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
@@ -1570,31 +1513,16 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
             };
         }
 
-        // Capture member contributions (base values + modifiers)
-        // Always computed — even if live card zone is empty, stage members still contribute.
+        // A1+A2: Use stats_pipeline for heart+blade layering (single source of truth)
         let mut member_contributions = Vec::new();
         for i in 0..3 {
             let cid = player.stage.stage[i];
             if cid == -1 {
                 continue;
             }
-            let mut base_h = EMPTY_H8;
-            let mut bonus_h = EMPTY_H8;
-            let mut base_blades = 0u8;
+            let card_opt = card_db.get_card(cid);
             let mut draw_icons = 0u8;
-            let ability_heart_bonuses = Vec::new();
-            let ability_blade_bonuses = Vec::new();
-
-            if let Some(card) = card_db.get_card(cid) {
-                base_blades = card.blade;
-                if let Some(ref bh) = card.base_heart {
-                    for (color, count) in &bh.hearts {
-                        let idx = color.index();
-                        if idx < 8 {
-                            base_h[idx] += count;
-                        }
-                    }
-                }
+            if let Some(card) = card_opt.as_ref() {
                 if let Some(ref sh) = card.special_heart {
                     for (color, count) in &sh.hearts {
                         if *color == HeartColor::Draw {
@@ -1603,60 +1531,20 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
                     }
                 }
             }
-
-            // heart_copy (set_heart_type ref_value="placed_under"): this member's
-            // original hearts become the same as the referenced card's hearts.
-            if let Some(src) = heart_copy.get(&cid) {
-                if let Some(src_card) = card_db.get_card(*src) {
-                    let mut copied = EMPTY_H8;
-                    if let Some(ref bh) = src_card.base_heart {
-                        for (color, count) in &bh.hearts {
-                            let idx = color.index();
-                            if idx < 8 {
-                                copied[idx] += count;
-                            }
-                        }
-                    }
-                    base_h = copied;
-                }
-            }
-
+            // heart pipeline: base vs bonus via stats_pipeline
+            let (base_h, bonus_h) = crate::core::stats_pipeline::member_heart_detail(
+                card_db,
+                cid,
+                heart_override,
+                heart_copy,
+                heart_color_multiplier,
+                heart_modifiers,
+            );
+            // blade pipeline: effective blade parts
+            let printed_blade = card_opt.map(|c| c.blade).unwrap_or(0);
             let entry = blade_modifiers.get(&cid).copied().unwrap_or_default();
-            let (effective_base_blades, bonus_blades) = if entry.set != 0 {
-                // set replaces the base blade — additive stacks on top
-                (
-                    crate::constants::saturate_u8(entry.total()),
-                    0u8,
-                )
-            } else {
-                (base_blades, crate::constants::saturate_u8(entry.total()))
-            };
-            base_blades = effective_base_blades;
-
-            if let Some(mods) = heart_modifiers.get(&cid) {
-                for (color, delta) in mods {
-                    let idx = color.index();
-                    if idx < 8 && *delta > 0 {
-                        bonus_h[idx] += *delta as u8;
-                    }
-                }
-            }
-
-            // Apply heart_color_multiplier (set_heart_type): transform all hearts to one color
-            if let Some(override_color) = heart_color_multiplier.get(&cid) {
-                let total: u8 = base_h.iter().sum();
-                base_h = EMPTY_H8;
-                base_h[override_color.index()] = total;
-            }
-
-            // Check for heart override
-            if let Some(&(override_color, override_count)) = heart_override.get(&cid) {
-                base_h = EMPTY_H8;
-                let idx = override_color.index();
-                if idx < 8 {
-                    base_h[idx] = override_count;
-                }
-            }
+            let (base_blades, bonus_blades) =
+                crate::core::stats_pipeline::effective_blade_parts(&entry, printed_blade);
 
             let is_wait = orientation_modifiers
                 .get(&cid)
@@ -1673,15 +1561,18 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
                 base_notes: 0,
                 bonus_notes: 0,
                 draw_icons,
-                ability_heart_bonuses,
-                ability_blade_bonuses,
-                card_no: card_db
-                    .get_card(cid)
+                ability_heart_bonuses: Vec::new(),
+                ability_blade_bonuses: Vec::new(),
+                card_no: card_opt
                     .map(|c| crate::types::ArcStr::from(c.card_no.as_ref()))
                     .unwrap_or_default(),
                 is_wait,
                 transform_delta: [0u8; 8],
             });
+            log::debug!(
+                "[MEMBER_CONTRIB] cid={} slot={} base_hearts={:?} bonus_hearts={:?} base_blades={} bonus_blades={}",
+                cid, i, base_h, bonus_h, base_blades, bonus_blades
+            );
         }
 
         // Q32/Rule 8.3.6: If the live card zone is empty, no yell, no live card processing.
@@ -2584,7 +2475,7 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
         card_db: &CardDatabase,
         need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
         heart_override: &HashMap<i16, (HeartColor, u8)>,
-        heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
+        heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
         heart_color_multiplier: &HashMap<i16, HeartColor>,
         heart_copy: &HashMap<i16, i16>,
         live_card_ids: &[i16],

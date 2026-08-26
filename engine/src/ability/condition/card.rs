@@ -3041,13 +3041,23 @@ impl<'a> ConditionContext<'a> {
             return false;
         }
         let card_db = &self.game_state.card_database;
+        // A2: unified effective_blade
         let mut total_blades = 0i32;
         for &cid in cards {
-            let base = card_db.get_card(cid).map(|c| c.blade as i32).unwrap_or(0);
-            let set_blade = self.game_state.mods.get_blade_set_modifier(cid);
-            let additive = self.game_state.mods.get_blade_modifier(cid) - set_blade;
-            let effective_base = if set_blade != 0 { set_blade } else { base };
-            total_blades += effective_base + additive;
+            let entry = self
+                .game_state
+                .mods
+                .blade_modifiers
+                .get(&cid)
+                .copied()
+                .unwrap_or_default();
+            total_blades += crate::core::stats_pipeline::effective_blade(card_db, cid, entry) as i32;
+            log::debug!(
+                "[BLADE_PIPELINE] evaluate_card_blade card={} entry={:?} effective={}",
+                cid,
+                entry,
+                crate::core::stats_pipeline::effective_blade(card_db, cid, entry)
+            );
         }
         let names: String = cards
             .iter()

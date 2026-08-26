@@ -52,6 +52,10 @@ jobs:
           (cd cards && python generate_condition_decoder.py)
           diff -u /tmp/cond_before.rs engine/src/ability/condition_decoder_gen.rs \
             || { echo "::error::condition_decoder_gen.rs is stale or hand-edited. Run: python cards/generate_condition_decoder.py"; exit 1; }
+          cp engine/src/ability/effect_decoder_gen.rs /tmp/eff_before.rs
+          (cd cards && python generate_effect_decoder.py)
+          diff -u /tmp/eff_before.rs engine/src/ability/effect_decoder_gen.rs \
+            || { echo "::error::effect_decoder_gen.rs is stale or hand-edited. Run: python cards/generate_effect_decoder.py"; exit 1; }
           echo "Generated decoders are up-to-date."
 
       - name: Summary

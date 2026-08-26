@@ -1086,3 +1086,41 @@ impl StepState {
         self.last_draw_count = 0;
     }
 }
+
+/// B4: typed ability errors — callers previously matched on English prose ("Cannot baton touch - no member…").
+/// Structured enum lets them match discriminants; `Display` preserves the old string for UI/logging.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AbilityError {
+    NoMemberInTargetArea,
+    AreaLocked,
+    BatonTouchProtection,
+    InsufficientEnergy { needed: u8, have: u8, total: usize },
+    InvalidHandIndex,
+    NotMemberCard,
+    CardNotFound,
+    CannotPlace(String),
+    Generic(String),
+    ZoneFull,
+    Other(String),
+}
+
+impl fmt::Display for AbilityError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AbilityError::NoMemberInTargetArea => write!(f, "Cannot baton touch - no member in target area"),
+            AbilityError::AreaLocked => write!(f, "Cannot baton touch: area is locked this turn"),
+            AbilityError::BatonTouchProtection => write!(f, "Cannot baton touch: member has baton touch discard protection"),
+            AbilityError::InsufficientEnergy { needed, have, total } => write!(f, "Could not pay {needed} energy (only {have} active energy available, {total} total energy cards)"),
+            AbilityError::InvalidHandIndex => write!(f, "Invalid hand index"),
+            AbilityError::NotMemberCard => write!(f, "Only member cards can be placed on stage"),
+            AbilityError::CardNotFound => write!(f, "Card not found in database"),
+            AbilityError::CannotPlace(s) => write!(f, "{s}"),
+            AbilityError::Generic(s) | AbilityError::Other(s) => write!(f, "{s}"),
+            AbilityError::ZoneFull => write!(f, "Live card zone is full"),
+        }
+    }
+}
+impl From<AbilityError> for String {
+    fn from(e: AbilityError) -> Self { e.to_string() }
+}
+impl core::error::Error for AbilityError {}

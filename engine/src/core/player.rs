@@ -372,77 +372,15 @@ impl Player {
         heart_modifiers: &HashMap<i16, HashMap<crate::card::HeartColor, ModifierEntry>>,
         heart_copy: &HashMap<i16, i16>,
     ) -> crate::card::BaseHeart {
-        let mut total_hearts = crate::card::HeartMap::new();
-
-        for &card_id in &self.stage.stage {
-            if card_id == crate::constants::EMPTY_SLOT {
-                continue;
-            }
-
-            // 9.9.1.4: a set-type effect replaces the member's original hearts.
-            if let Some(&(override_color, override_count)) = heart_override.get(&card_id) {
-                *total_hearts.entry_or_default(override_color) += override_count;
-                // 9.9.1.5: additive modifiers still stack ON TOP of the set
-                // value (same shape as blade set+additive in total_blades).
-                if let Some(mods) = heart_modifiers.get(&card_id) {
-                    for (color, entry) in mods {
-                        let delta = entry.total();
-                        if delta != 0 {
-                            let new_val = crate::constants::saturate_u8(
-                                total_hearts.get(color).copied().unwrap_or(0) as i32 + delta,
-                            );
-                            if new_val > 0 {
-                                total_hearts.insert(*color, new_val);
-                            } else {
-                                total_hearts.remove(color);
-                            }
-                        }
-                    }
-                }
-                continue;
-            }
-
-            if let Some(&src) = heart_copy.get(&card_id) {
-                if let Some(src_card) = card_db.get_card(src) {
-                    if let Some(ref base_heart) = src_card.base_heart {
-                        for (color, count) in &base_heart.hearts {
-                            *total_hearts.entry_or_default(*color) += count;
-                        }
-                    }
-                }
-            } else if let Some(card) = card_db.get_card(card_id) {
-                if let Some(ref base_heart) = card.base_heart {
-                    if let Some(override_color) = heart_color_multiplier.get(&card_id) {
-                        let total: u8 = base_heart.hearts.values_sum();
-                        *total_hearts.entry_or_default(*override_color) += total;
-                    } else {
-                        for (color, count) in &base_heart.hearts {
-                            *total_hearts.entry_or_default(*color) += count;
-                        }
-                    }
-                }
-            }
-
-            if let Some(mods) = heart_modifiers.get(&card_id) {
-                for (color, entry) in mods {
-                    let delta = entry.total();
-                    if delta != 0 {
-                        let new_val = crate::constants::saturate_u8(
-                            total_hearts.get(color).copied().unwrap_or(0) as i32 + delta,
-                        );
-                        if new_val > 0 {
-                            total_hearts.insert(*color, new_val);
-                        } else {
-                            total_hearts.remove(color);
-                        }
-                    }
-                }
-            }
-        }
-
-        crate::card::BaseHeart {
-            hearts: total_hearts,
-        }
+        // A1: single source of truth via stats_pipeline::stage_hearts
+        crate::core::stats_pipeline::stage_hearts(
+            &self.stage.stage,
+            card_db,
+            heart_override,
+            heart_copy,
+            heart_color_multiplier,
+            heart_modifiers,
+        )
     }
 
     pub fn activate_all_energy(&mut self) {

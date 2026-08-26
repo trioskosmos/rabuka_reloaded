@@ -1385,6 +1385,28 @@ impl GameState {
         self.cards_moved_this_turn.push(card_id);
     }
 
+    /// Typed wrapper: takes canonical ZoneId variants so alias drift ("energy" vs
+    /// "energy_zone") dies at the call boundary. Strings are still accepted via
+    /// the legacy string overload below but this typed path is preferred for new code.
+    pub fn push_movement_event_typed(
+        &mut self,
+        moved_card_id: i16,
+        source_zone: crate::types::ZoneId,
+        dest_zone: crate::types::ZoneId,
+        cause_card_id: Option<i16>,
+        cause_player_id: &str,
+        effect_only: bool,
+    ) {
+        self.push_movement_event(
+            moved_card_id,
+            source_zone.as_str(),
+            dest_zone.as_str(),
+            cause_card_id,
+            cause_player_id,
+            effect_only,
+        )
+    }
+
     /// Push a MovementEvent recording the movement of a card, tracking what caused it.
     /// Also syncs `recently_moved_cards`/`recently_moved_from_zone` for backward compat.
     pub fn push_movement_event(
@@ -1396,11 +1418,24 @@ impl GameState {
         cause_player_id: &str,
         effect_only: bool,
     ) {
+        // B2: alias drift detection — Unknown means the caller used a raw string
+        // that ZoneId::from_str doesn't recognise; log loudly so watchers don't silently die.
+        let src_id = crate::types::ZoneId::from_str(source_zone);
+        let dst_id = crate::types::ZoneId::from_str(dest_zone);
+        if src_id == crate::types::ZoneId::Unknown || dst_id == crate::types::ZoneId::Unknown {
+            log::debug!(
+                "[MOVEMENT_ALIAS_DRIFT] unknown zone raw src='{}' dst='{}' -> src={:?} dst={:?}",
+                source_zone,
+                dest_zone,
+                src_id,
+                dst_id
+            );
+        }
         self.movement_event_counter = self.movement_event_counter.wrapping_add(1);
         let event = crate::types::MovementEvent {
             moved_card_id,
-            source_zone: crate::types::ZoneId::from_str(source_zone),
-            dest_zone: crate::types::ZoneId::from_str(dest_zone),
+            source_zone: src_id,
+            dest_zone: dst_id,
             cause_card_id,
             cause_player_id: cause_player_id.to_string(),
             effect_only,

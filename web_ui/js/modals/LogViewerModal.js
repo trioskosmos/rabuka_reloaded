@@ -370,7 +370,7 @@ export const LogViewerModal = {
             </div>
         `;
 
-        LogViewerModal._addCardImage(div, group.body);
+        LogViewerModal._addCardImage(div, group.body, group.ev);
 
         return div;
     },
@@ -545,8 +545,30 @@ LogViewerModal._resolveCardNameFromBody = (body) => {
     return null;
 };
 
-// Helper: add card image to a modal entry element
-LogViewerModal._addCardImage = (el, body) => {
+// Helper: add card image to a modal entry element.
+// Prefers the structured log entry's source_card_id field (exact attribution)
+// and only falls back to regex-parsing card names out of the text.
+LogViewerModal._addCardImage = (el, body, ev = null) => {
+    const srcId = ev?.source_card_id ?? ev?.metadata?.source_card_id;
+    if (srcId !== undefined && srcId !== null && srcId >= 0) {
+        const srcCard = State.resolveCardData(srcId);
+        if (srcCard?.card_no) {
+            const imgPath = resolveCardImagePath(srcCard.card_no);
+            if (imgPath) {
+                const img = document.createElement('img');
+                img.src = imgPath;
+                img.className = 'log-viewer-card-thumb';
+                img.alt = srcCard.name || '';
+                img.loading = 'lazy';
+                el.insertBefore(img, el.firstChild);
+            }
+            if (!el.dataset.cardId) {
+                Tooltips.attachCardData(el, srcCard);
+            }
+            return;
+        }
+    }
+
     const names = LogViewerModal._getAllCardNames(body);
     if (names.length === 0) return;
 

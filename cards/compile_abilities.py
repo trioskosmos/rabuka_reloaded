@@ -754,10 +754,18 @@ def main():
     build_dir.mkdir(parents=True, exist_ok=True)
 
     (build_dir / "abilities.bin").write_bytes(bytecode)
-    compressed = zlib.compress(bytes(bytecode), level=9)
+    # C3: prepend magic+version header before compression so stale blobs fail far from cause
+    # Magic: b'RBKA' (0x52424B41), version: u32 LE 1. The vm.rs asserts this after decompression.
+    MAGIC = b'RBKA'
+    VERSION = 1
+    header = MAGIC + VERSION.to_bytes(4, 'little')
+    compressed = zlib.compress(header + bytes(bytecode), level=9)
     (build_dir / "abilities.bin.z").write_bytes(compressed)
-    print(f"\n  abilities.bin: {len(bytecode)} bytes ({len(bytecode) / 1024:.1f}KB)")
-    print(f"  compressed: {len(compressed)} bytes ({len(compressed) / 1024:.1f}KB) ({100*(1-len(compressed)/len(bytecode)):.1f}% smaller)")
+    # Also keep uncompressed with header for debugging
+    (build_dir / "abilities.bin").write_bytes(header + bytes(bytecode))
+    print(f"\n  abilities.bin: {len(bytecode) + len(header)} bytes ({(len(bytecode)+len(header)) / 1024:.1f}KB) with header")
+    print(f"  compressed: {len(compressed)} bytes ({len(compressed) / 1024:.1f}KB) ({100*(1-len(compressed)/(len(bytecode)+len(header))):.1f}% smaller)")
+    print(f"  header: magic={MAGIC!r} version={VERSION}")
     print(f"  interned strings: {len(strings)}")
     print(f"  card→ability pairs: {len(card_ability_pairs)}")
 
@@ -785,7 +793,7 @@ def main():
     except Exception:
         pass
 
-    compressed = zlib.compress(bytes(bytecode), level=9)
+    # Recompute compressed already includes header above
     manifest = {
         "schema": "compiled_abilities.v1",
         "compiler": "cards/compile_abilities.py",

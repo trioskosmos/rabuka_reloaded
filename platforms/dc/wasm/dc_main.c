@@ -32,7 +32,7 @@
 
 /* the single wasm instance, so imports can reach linear memory */
 struct w2c_host { int unused; };  /* opaque to the engine; contents are ours */
-w2c_0x24rabuka__wasm0x2Ewasm g_rabuka_inst;
+w2c_rabuka__wasm g_rabuka_inst;
 struct w2c_host g_host;
 
 /* each row is a Shift-JIS byte string (thin = 1 byte, wide = 2 bytes).
@@ -44,17 +44,35 @@ static int dirty = 0;
 static int disp_fb = 0; /* informational: last flipped framebuffer */
 static int back_idx = 1;
 
+/* ---- on-screen vitals (reserved bottom row) ----
+ * Engine text scrolls through rows 0..ROWS-2; row ROWS-1 always shows
+ * fps / avg frame ms / allocator stats so performance can be judged live. */
+static uint64_t last_frame_ms = 0;
+static uint32_t frame_avg_ms = 0;
+static uint32_t fps_x10 = 0;
+static uint32_t frame_count = 0;
+static uint64_t fps_window_start = 0;
+static uint32_t heap_hwm_kb = 0;
+static uint32_t heap_cur_kb = 0;
+static uint32_t heap_rc_kb = 0;
+static uint32_t heap_rc_n = 0;
+
 /* ---- text grid ---- */
 
 static void paint(u16 *dst) {
     for (int i = 0; i < SCREEN_W * SCREEN_H; i++)
         dst[i] = 0x0000;
-    for (int i = 0; i < ROWS; i++) {
+    for (int i = 0; i < ROWS - 1; i++) {
         if (row_len[i] == 0)
             continue;
         bfont_draw_str(dst + i * FONT_H * SCREEN_W, SCREEN_W, true,
                        (const char *)lines[i]);
     }
+    char sb[56];
+    snprintf(sb, sizeof(sb), "%u.%ufps %ums h:%uK c:%uK rc:%uK/%u",
+             fps_x10 / 10, fps_x10 % 10, frame_avg_ms, heap_hwm_kb,
+             heap_cur_kb, heap_rc_kb, heap_rc_n);
+    bfont_draw_str(dst + (ROWS - 1) * FONT_H * SCREEN_W, SCREEN_W, true, sb);
 }
 
 /* Paint KOS's current drawing surface (vram_s) and flip. This is the
@@ -78,11 +96,12 @@ static void scroll_up(void) {
     row_len[ROWS - 1] = 0;
 }
 
-/* cur_line = next row to write; scroll when it runs past the bottom */
+/* cur_line = next row to write; scroll when it runs past the bottom.
+ * Row ROWS-1 is reserved for the vitals overlay. */
 static void ensure_line(void) {
-    if (cur_line >= ROWS) {
+    if (cur_line >= ROWS - 1) {
         scroll_up();
-        cur_line = ROWS - 1;
+        cur_line = ROWS - 2;
     }
 }
 
@@ -256,6 +275,31 @@ u32 w2c_host_host_poll_buttons(struct w2c_host *h) {
 
 void w2c_host_host_wait_vblank(struct w2c_host *h) {
     (void)h;
+    uint64_t now = timer_ms_gettime64();
+    if (last_frame_ms != 0) {
+        uint32_t dt = (uint32_t)(now - last_frame_ms);
+        frame_avg_ms = frame_avg_ms ? (frame_avg_ms * 7 + dt) / 8 : dt;
+    }
+    last_frame_ms = now;
+    frame_count++;
+    if (now >= fps_window_start + 1000) {
+        fps_x10 =
+            (uint32_t)(frame_count * 10000 / (now - fps_window_start + 1));
+        frame_count = 0;
+        fps_window_start = now;
+        /* live allocator stats straight from the engine's exports */
+        heap_hwm_kb =
+            w2c_rabuka__wasm_rabuka_wasm_heap_highwater(
+                &g_rabuka_inst) / 1024;
+        heap_cur_kb = w2c_rabuka__wasm_rabuka_wasm_heap_cursor(
+                          &g_rabuka_inst) / 1024;
+        heap_rc_kb =
+            w2c_rabuka__wasm_rabuka_wasm_heap_recyclable(
+                &g_rabuka_inst) / 1024;
+        heap_rc_n = w2c_rabuka__wasm_rabuka_wasm_heap_entries(
+            &g_rabuka_inst);
+        dirty = 1; /* repaint so the vitals row stays current */
+    }
     frame();
     thd_sleep(8);
 }
@@ -278,9 +322,9 @@ int main(void) {
 
     wasm_rt_init();
     memset(&g_rabuka_inst, 0, sizeof(g_rabuka_inst));
-    wasm2c_0x24rabuka__wasm0x2Ewasm_instantiate(&g_rabuka_inst, &g_host);
+    wasm2c_rabuka__wasm_instantiate(&g_rabuka_inst, &g_host);
 
-    u32 r = w2c_0x24rabuka__wasm0x2Ewasm_rabuka_wasm_game_run(&g_rabuka_inst, 0x5EEDu);
+    u32 r = w2c_rabuka__wasm_rabuka_wasm_game_run(&g_rabuka_inst, 0x5EEDu);
 
     const char *res;
     switch (r) {

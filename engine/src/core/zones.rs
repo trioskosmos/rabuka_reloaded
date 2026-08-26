@@ -383,14 +383,16 @@ impl Stage {
                         continue;
                     }
                 }
-                if let Some(card) = card_db.get_card(card_id) {
+                if card_db.get_card(card_id).is_some() {
+                    // A2: use unified effective_blade
                     let entry = blade_entries.get(&card_id).copied().unwrap_or_default();
-                    if entry.set != 0 {
-                        total += crate::constants::saturate_u8(entry.total());
-                    } else {
-                        total +=
-                            crate::constants::saturate_u8(card.blade as i32 + entry.total());
-                    }
+                    total += crate::core::stats_pipeline::effective_blade(card_db, card_id, entry);
+                    log::debug!(
+                        "[BLADE_PIPELINE] card={} entry={:?} effective={}",
+                        card_id,
+                        entry,
+                        crate::core::stats_pipeline::effective_blade(card_db, card_id, entry)
+                    );
                 }
             }
         }
@@ -411,80 +413,52 @@ impl Stage {
         &self,
         card_db: &CardDatabase,
         heart_override: &HashMap<i16, (HeartColor, u8)>,
-        heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
+        heart_modifiers: &HashMap<i16, HashMap<HeartColor, crate::core::game_modifiers::ModifierEntry>>,
         heart_color_multiplier: &HashMap<i16, HeartColor>,
         heart_copy: &HashMap<i16, i16>,
     ) -> BaseHeart {
-        let mut hearts = HeartMap::new();
+        // A1: single source of truth via stats_pipeline::stage_hearts
+        crate::core::stats_pipeline::stage_hearts(
+            &self.stage,
+            card_db,
+            heart_override,
+            heart_copy,
+            heart_color_multiplier,
+            heart_modifiers,
+        )
+    }
 
-        for &card_id in &self.stage {
-            if card_id == -1 {
-                continue;
-            }
-
-            // 9.9.1.4: a set-type effect replaces the member's original hearts.
-            if let Some(&(override_color, override_count)) = heart_override.get(&card_id) {
-                *hearts.entry_or_default(override_color) += override_count;
-                // 9.9.1.5: additive modifiers still stack ON TOP of the set
-                // value (mirrors the non-override path below).
-                if let Some(mods) = heart_modifiers.get(&card_id) {
-                    for (color, delta) in mods {
-                        let new_val = crate::constants::saturate_u8(
-                            hearts.get(color).copied().unwrap_or(0) as i32 + *delta,
-                        );
-                        if new_val > 0 {
-                            hearts.insert(*color, new_val);
-                        } else {
-                            hearts.remove(color);
-                        }
+    /// Legacy adapter for callers still holding the old i32-valued modifier map
+    /// (e.g. transient test scaffolding). Converts to the canonical ModifierEntry
+    /// form and delegates.
+    pub fn get_available_hearts_i32(
+        &self,
+        card_db: &CardDatabase,
+        heart_override: &HashMap<i16, (HeartColor, u8)>,
+        heart_modifiers_i32: &HashMap<i16, HashMap<HeartColor, i32>>,
+        heart_color_multiplier: &HashMap<i16, HeartColor>,
+        heart_copy: &HashMap<i16, i16>,
+    ) -> BaseHeart {
+        let converted: HashMap<i16, HashMap<HeartColor, crate::core::game_modifiers::ModifierEntry>> =
+            heart_modifiers_i32
+                .iter()
+                .map(|(&cid, colors)| {
+                    let mut m = HashMap::default();
+                    for (&col, &delta) in colors {
+                        let mut e = crate::core::game_modifiers::ModifierEntry::default();
+                        e.additive = delta as i16;
+                        m.insert(col, e);
                     }
-                }
-                continue;
-            }
-
-            let mut card_hearts = HeartMap::new();
-            if let Some(&src) = heart_copy.get(&card_id) {
-                // Copy the referenced card's original hearts onto this member.
-                if let Some(src_card) = card_db.get_card(src) {
-                    if let Some(ref base_heart) = src_card.base_heart {
-                        for (color, count) in &base_heart.hearts {
-                            *card_hearts.entry_or_default(*color) += count;
-                        }
-                    }
-                }
-            } else if let Some(card) = card_db.get_card(card_id) {
-                if let Some(ref base_heart) = card.base_heart {
-                    for (color, count) in &base_heart.hearts {
-                        *card_hearts.entry_or_default(*color) += count;
-                    }
-                }
-            }
-
-            if let Some(override_color) = heart_color_multiplier.get(&card_id) {
-                let total: u8 = card_hearts.values_sum();
-                card_hearts.clear();
-                card_hearts.insert(*override_color, total);
-            }
-
-            for (color, count) in &card_hearts {
-                *hearts.entry_or_default(*color) += count;
-            }
-
-            if let Some(mods) = heart_modifiers.get(&card_id) {
-                for (color, delta) in mods {
-                    let new_val = crate::constants::saturate_u8(
-                        hearts.get(color).copied().unwrap_or(0) as i32 + *delta,
-                    );
-                    if new_val > 0 {
-                        hearts.insert(*color, new_val);
-                    } else {
-                        hearts.remove(color);
-                    }
-                }
-            }
-        }
-
-        BaseHeart { hearts }
+                    (cid, m)
+                })
+                .collect();
+        self.get_available_hearts(
+            card_db,
+            heart_override,
+            &converted,
+            heart_color_multiplier,
+            heart_copy,
+        )
     }
 }
 
@@ -563,42 +537,24 @@ impl LiveCardZone {
                 let card_score =
                     crate::constants::saturate_u8(base_score + modifier);
 
+                // A4: use unified effective_need_heart + check_heart_requirement
                 let heart_needs_satisfied = if let Some(ref need_heart) = card.need_heart {
-                    if !need_heart.hearts.is_empty() {
-                        let effective_need = if let Some(modifiers) = need_heart_modifiers {
-                            if let Some(card_mods) = modifiers.get(card_id) {
-                                // Q115/Q127: Start from base requirements for every color.
-                                // A set modifier on one color does NOT erase other colors.
-                                let mut adjusted = need_heart.clone();
-                                // Apply set overrides per-color first.
-                                for (color, me) in card_mods {
-                                    if me.set != 0 {
-                                        adjusted.hearts.insert(*color, me.set as u8);
-                                    }
-                                }
-                                // Then apply additive modifiers.
-                                for (color, me) in card_mods {
-                                    if me.additive != 0 {
-                                        *adjusted.hearts.entry_or_default(*color) =
-                                            (adjusted.hearts.get(color).copied().unwrap_or(0)
-                                                as i32
-                                                + me.additive as i32)
-                                                .max(0)
-                                                as u8;
-                                    }
-                                }
-                                Some(adjusted)
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        };
-                        let ref_need = effective_need.as_ref().unwrap_or(need_heart);
-                        stage_hearts
-                            .is_some_and(|sh| crate::card::Card::need_heart_satisfied(ref_need, sh))
-                    } else {
+                    if need_heart.hearts.is_empty() {
                         true
+                    } else if let Some(sh) = stage_hearts {
+                        let eff = if let Some(mods) = need_heart_modifiers {
+                            crate::core::stats_pipeline::effective_need_heart(
+                                Some(need_heart),
+                                *card_id,
+                                mods,
+                            )
+                        } else {
+                            Some(need_heart.clone())
+                        };
+                        eff.as_ref()
+                            .is_some_and(|need| crate::card::check_heart_requirement(need, sh))
+                    } else {
+                        false
                     }
                 } else {
                     true

@@ -157,12 +157,27 @@ fn offset_of(idx: usize) -> usize {
     OFFSET_DELTAS[..idx].iter().map(|&d| d as usize).sum()
 }
 
+const BYTECODE_MAGIC: &[u8; 4] = b"RBKA";
+const BYTECODE_VERSION: u32 = 1;
+
+fn strip_bytecode_header(data: Vec<u8>) -> Vec<u8> {
+    if data.len() >= 8 && &data[0..4] == BYTECODE_MAGIC {
+        let ver = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+        assert!(ver == BYTECODE_VERSION, "bytecode version mismatch: got {ver}, expected {BYTECODE_VERSION} — stale blob paired with fresh code (C3). Regenerate via `python cards/compile_abilities.py`");
+        log::debug!("[BYTECODE] magic RBKA version {ver} OK, stripping header");
+        return data[8..].to_vec();
+    }
+    log::debug!("[BYTECODE] no magic header (old blob) — accepting without version check (C3 transition)");
+    data
+}
+
 #[cfg(all(not(feature = "snes"), not(feature = "no_std")))]
 fn get_decompressed_bytecode() -> &'static [u8] {
     use std::sync::OnceLock;
     static CACHE: OnceLock<Vec<u8>> = OnceLock::new();
     CACHE.get_or_init(|| {
-        miniz_oxide::inflate::decompress_to_vec_zlib(COMPRESSED_BYTECODE).expect("bytecode decompress failed")
+        let raw = miniz_oxide::inflate::decompress_to_vec_zlib(COMPRESSED_BYTECODE).expect("bytecode decompress failed");
+        strip_bytecode_header(raw)
     })
 }
 
@@ -175,11 +190,6 @@ fn get_decompressed_bytecode() -> &'static [u8] {
     struct SyncUnsafeCell<T>(UnsafeCell<T>);
     unsafe impl<T> Sync for SyncUnsafeCell<T> {}
 
-    // Once-initialized cache: 0 = uninitialized, 1 = initializing, 2 = ready.
-    // After state 2 the Vec is never mutated again, so unlocked reads of a
-    // ready cache are sound; only the init transition needs coordination.
-    // (The previous plain-bool + UnsafeCell version had no synchronization
-    // at all — two concurrent first-callers could race the decompression.)
     static CACHE: SyncUnsafeCell<Option<Vec<u8>>> = SyncUnsafeCell(UnsafeCell::new(None));
     static STATE: AtomicU8 = AtomicU8::new(0);
 
@@ -193,16 +203,16 @@ fn get_decompressed_bytecode() -> &'static [u8] {
                     .compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed)
                     .is_ok()
                 {
-                    let decompressed = miniz_oxide::inflate::decompress_to_vec_zlib(
+                    let raw = miniz_oxide::inflate::decompress_to_vec_zlib(
                         COMPRESSED_BYTECODE,
                     )
                     .expect("bytecode decompress failed");
+                    let decompressed = strip_bytecode_header(raw);
                     unsafe {
                         *CACHE.0.get() = Some(decompressed);
                     }
                     STATE.store(2, Ordering::Release);
                 }
-                // Lost the init race or just finished initializing — re-check.
             }
             _ => core::hint::spin_loop(),
         }

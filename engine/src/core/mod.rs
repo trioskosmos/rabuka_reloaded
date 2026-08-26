@@ -6,6 +6,7 @@ pub mod game_state;
 pub mod player;
 #[cfg(not(feature = "no_std"))]
 pub mod pool;
+pub mod stats_pipeline;
 pub mod types;
 pub mod zones;
 

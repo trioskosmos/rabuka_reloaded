@@ -168,14 +168,8 @@ fn heart_override_additive_stacks_in_both_stage_heart_calcs() {
         "9.9.1.5: calculate_stage_hearts must apply additive modifiers ON TOP of the override"
     );
 
-    // get_available_hearts takes the legacy i32-valued modifier map; convert.
-    let mods_i32: std::collections::HashMap<i16, std::collections::HashMap<HeartColor, i32>> =
-        game.state
-            .mods
-            .heart_modifiers
-            .iter()
-            .map(|(&cid, colors)| (cid, colors.iter().map(|(&c, e)| (c, e.total())).collect()))
-            .collect();
+    // get_available_hearts now takes canonical ModifierEntry map; use it directly,
+    // and also verify via legacy i32 adapter for backward compatibility.
     let after_zone = game
         .state
         .player1
@@ -183,7 +177,7 @@ fn heart_override_additive_stacks_in_both_stage_heart_calcs() {
         .get_available_hearts(
             &game.db,
             &game.state.mods.heart_override,
-            &mods_i32,
+            &game.state.mods.heart_modifiers,
             &game.state.mods.heart_color_multiplier,
             &game.state.mods.heart_copy,
         )

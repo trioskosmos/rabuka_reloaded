@@ -27,6 +27,111 @@ use crate::rng;
 use crate::turn::TurnEngine;
 use crate::Arc;
 
+/// Auto-resolve a pending choice for the AI (random but legal). Returns false
+/// only if the engine rejects the synthetic answer.
+fn ai_handle_choice(gs: &mut GameState) -> bool {
+    use crate::ability::types::Choice;
+    let choice = match gs.get_pending_choice() {
+        Some(c) => c.clone(),
+        None => return true,
+    };
+    match &choice {
+        Choice::SelectAutoAbility { options, .. } => {
+            if options.is_empty() {
+                return TurnEngine::resume_with_choice(gs, Some(0), None).is_ok();
+            }
+            let idx = crate::rng::rand_range(options.len()) as i16;
+            TurnEngine::resume_with_choice(gs, Some(idx), None).is_ok()
+        }
+        Choice::SelectLiveSuccess { options, .. } => {
+            if options.is_empty() {
+                return TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).is_ok();
+            }
+            let idx = crate::rng::rand_range(options.len());
+            TurnEngine::resume_with_choice(gs, None, Some(vec![idx])).is_ok()
+        }
+        Choice::SelectHeartColor { options, .. }
+        | Choice::SelectHeartType { options, .. } => {
+            if options.is_empty() {
+                return TurnEngine::resume_with_choice(gs, Some(0), None).is_ok();
+            }
+            let idx = crate::rng::rand_range(options.len()) as i16;
+            TurnEngine::resume_with_choice(gs, Some(idx), None).is_ok()
+        }
+        Choice::SelectTarget { options, target, .. } => {
+            let n = options.as_ref().map(|o| o.len()).unwrap_or(2).max(1);
+            let idx = (crate::rng::rand_range(n) as i16).min(n as i16 - 1);
+            // Choice::SelectTarget's string variants are dispatched by the
+            // target name: "choice"/"choice_string"/conditional_optional use
+            // the card-indices channel; everything else uses the i16 channel.
+            match target.as_str() {
+                "choice" | "choice_string" | "conditional_optional" => {
+                    TurnEngine::resume_with_choice(gs, None, Some(vec![idx as usize])).is_ok()
+                }
+                _ => TurnEngine::resume_with_choice(gs, Some(idx), None).is_ok(),
+            }
+        }
+        Choice::SelectPosition { .. } => {
+            let idx = crate::rng::rand_range(3) as i16;
+            TurnEngine::resume_with_choice(gs, Some(idx), None).is_ok()
+        }
+        Choice::SelectCard {
+            zone,
+            count,
+            allow_skip,
+            target_player_id,
+            filtered_indices,
+            ..
+        } => {
+            // Reconstruct the same option list that handle_choice would show,
+            // then pick random legal entries. Using the alias helpers keeps
+            // `target` ("self"/"opponent") resolution honest for p2-abilities.
+            let player = target_player_id
+                .as_ref()
+                .and_then(|pid| {
+                    if pid == &gs.player1.id {
+                        Some(&gs.player1)
+                    } else if pid == &gs.player2.id {
+                        Some(&gs.player2)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| gs.active_player());
+            let card_ids = crate::ability::util::zone_cards(player, zone);
+            let n_options = filtered_indices
+                .as_ref()
+                .map(|fi| fi.len())
+                .unwrap_or(card_ids.len());
+            if n_options == 0 {
+                return TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).is_ok();
+            }
+            // VsAi: the AI never "skips" a mandatory choice; allow_skip paths
+            // are human affordances. Auto-pick instead of skipping.
+            let _ = allow_skip;
+            if *count <= 1 {
+                let idx = crate::rng::rand_range(n_options);
+                let actual = filtered_indices.as_ref().map(|fi| fi[idx]).unwrap_or(idx);
+                TurnEngine::resume_with_choice(gs, None, Some(vec![actual])).is_ok()
+            } else {
+                let want = (*count).min(n_options);
+                let mut picked = Vec::with_capacity(want);
+                let mut seen: crate::HashSet<usize> = crate::HashSet::default();
+                while picked.len() < want {
+                    let idx = crate::rng::rand_range(n_options);
+                    if seen.insert(idx) {
+                        picked.push(filtered_indices.as_ref().map(|fi| fi[idx]).unwrap_or(idx));
+                    }
+                    if seen.len() == n_options {
+                        break;
+                    }
+                }
+                TurnEngine::resume_with_choice(gs, None, Some(picked)).is_ok()
+            }
+        }
+    }
+}
+
 /// AI turn: pick a random action and execute it.
 pub fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
     use crate::game_setup::ActionType;
@@ -47,7 +152,7 @@ pub fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
 }
 
 /// How a match is driven.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum MatchMode {
     VsAi,
     TwoPlayer,
@@ -157,8 +262,37 @@ pub fn run_match<U: PlatformUi>(
         }
 
         if gs.has_pending_choice() {
-            if !handle_choice(ui, &mut gs) {
-                break;
+            // Shared routing for every offline target: the engine's
+            // `can_player_act` is the single source of truth for who must
+            // answer a pending choice (choice_player_id + Choice-embedded
+            // picker/target fallback). Every console (DC wasm, 3DS, GBA,
+            // Wii) must consult it — no per-platform re-routing. The ad-hoc
+            // fixes that lived in web_server and 3DS input are now here.
+            let is_ai_choice = match mode {
+                MatchMode::AiVsAi => true,
+                MatchMode::VsAi => !gs.can_player_act(0),
+                MatchMode::TwoPlayer => false,
+            };
+            if is_ai_choice {
+                log::debug!(
+                    "[CHOICE_ROUTE] auto-picking for AI pid={:?} mode={:?} choice={:?}",
+                    gs.get_pending_choice_player_id(),
+                    mode,
+                    gs.get_pending_choice()
+                );
+                if !ai_handle_choice(&mut gs) {
+                    break;
+                }
+            } else {
+                log::debug!(
+                    "[CHOICE_ROUTE] human-prompted pid={:?} mode={:?} choice={:?}",
+                    gs.get_pending_choice_player_id(),
+                    mode,
+                    gs.get_pending_choice()
+                );
+                if !handle_choice(ui, &mut gs) {
+                    break;
+                }
             }
             gs.reset_loop_detection();
             continue;

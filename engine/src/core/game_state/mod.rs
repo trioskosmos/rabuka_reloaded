@@ -347,9 +347,23 @@ impl GameState {
         use crate::ability::types::Choice;
         let pid_str = || if player_id == 0 { "p1" } else { "p2" };
         if self.has_pending_choice() {
+            // Authoritative: the ability queue stamps who must answer.
+            // This is the single source of truth for pending-choice routing
+            // and is the fix that previously lived ad-hoc in the web server
+            // and 3DS input handler. Keeping it here makes every offline
+            // target (DC wasm, 3DS, GBA) share the same contract without
+            // per-platform re-routing.
             if let Some(cpid) = self.get_pending_choice_player_id() {
-                return cpid == pid_str();
+                let norm = match cpid.as_str() {
+                    "player1" => "p1",
+                    "player2" => "p2",
+                    other => other,
+                };
+                return norm == pid_str();
             }
+            // Fallback when the queue entry hasn't been stamped yet (older
+            // abilities / tests that construct Choice directly). Prefer the
+            // Choice's embedded picker/target over phase-based guessing.
             if let Some(choice) = self.get_pending_choice() {
                 match choice {
                     Choice::SelectAutoAbility {
@@ -359,6 +373,20 @@ impl GameState {
                         player_id: cpid, ..
                     } => {
                         return *cpid == pid_str();
+                    }
+                    Choice::SelectCard {
+                        target_player_id: Some(cpid),
+                        ..
+                    }
+                    | Choice::SelectCard {
+                        picker: Some(cpid), ..
+                    } => {
+                        let norm = match cpid.as_str() {
+                            "player1" => "p1",
+                            "player2" => "p2",
+                            other => other,
+                        };
+                        return norm == pid_str();
                     }
                     _ => {}
                 }

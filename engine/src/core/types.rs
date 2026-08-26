@@ -728,6 +728,36 @@ impl ZoneId {
         }
     }
 
+    /// B3: single conversion layer for the four zone vocabularies (ability/enums::Zone, core/types::ZoneId, bot/encoding::ZoneId, core/card::Location).
+    /// Ability Zone and core ZoneId are the two runtime vocabularies; bot and card Location are thin wrappers.
+    /// Use these instead of scattering `Zone::from_str` / `ZoneId::from_str` ad-hoc.
+    pub fn from_ability_zone(z: crate::ability::enums::Zone) -> Self {
+        match z {
+            crate::ability::enums::Zone::Stage => ZoneId::Stage,
+            crate::ability::enums::Zone::Hand => ZoneId::Hand,
+            crate::ability::enums::Zone::Deck => ZoneId::Deck,
+            crate::ability::enums::Zone::Discard => ZoneId::Discard,
+            crate::ability::enums::Zone::Energy => ZoneId::Energy,
+            crate::ability::enums::Zone::LiveCardZone => ZoneId::LiveCardZone,
+            crate::ability::enums::Zone::SuccessLiveZone => ZoneId::SuccessLiveZone,
+            crate::ability::enums::Zone::RevealedCards => ZoneId::RevealedCards,
+            _ => ZoneId::Unknown,
+        }
+    }
+    pub fn to_ability_zone(self) -> Option<crate::ability::enums::Zone> {
+        match self {
+            ZoneId::Stage => Some(crate::ability::enums::Zone::Stage),
+            ZoneId::Hand => Some(crate::ability::enums::Zone::Hand),
+            ZoneId::Deck => Some(crate::ability::enums::Zone::Deck),
+            ZoneId::Discard | ZoneId::Waitroom => Some(crate::ability::enums::Zone::Discard),
+            ZoneId::Energy | ZoneId::EnergyZone => Some(crate::ability::enums::Zone::Energy),
+            ZoneId::LiveCardZone => Some(crate::ability::enums::Zone::LiveCardZone),
+            ZoneId::SuccessLiveZone | ZoneId::SuccessZone => Some(crate::ability::enums::Zone::SuccessLiveZone),
+            ZoneId::RevealedCards => Some(crate::ability::enums::Zone::RevealedCards),
+            _ => None,
+        }
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             ZoneId::Stage => "stage",

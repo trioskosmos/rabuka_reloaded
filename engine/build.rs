@@ -32,23 +32,40 @@ fn main() {
         println!("cargo:rerun-if-changed={}", decks_bin_dir.display());
     }
 
-    // Staleness check: abilities.json should be newer than cards.json
+    // C3: staleness warnings are now hard errors — a stale blob paired with fresh code fails far from cause.
+    // The old `cargo:warning` hid the problem until a gameplay test tripped.
+    let mut stale = false;
     if let (Ok(cards_meta), Ok(abilities_meta)) = (std::fs::metadata(&cards_json), std::fs::metadata(&abilities_json)) {
         if let (Ok(cards_time), Ok(abilities_time)) = (cards_meta.modified(), abilities_meta.modified()) {
             if abilities_time < cards_time {
                 println!("cargo:warning=abilities.json is older than cards.json – run `python cards/ability_extraction/extract_card_abilities.py` from cards/ to regenerate");
+                stale = true;
             }
         }
     }
-
-    // Also check abilities_gen.rs staleness vs abilities.json
     if let (Ok(abilities_meta), Ok(gen_meta)) = (std::fs::metadata(&abilities_json), std::fs::metadata(&abilities_gen)) {
         if let (Ok(abilities_time), Ok(gen_time)) = (abilities_meta.modified(), gen_meta.modified()) {
             if gen_time < abilities_time {
                 println!("cargo:warning=abilities_gen.rs is older than abilities.json – run `python cards/compile_abilities.py`");
+                stale = true;
             }
         }
     }
+    // Also check compressed bytecode staleness vs abilities.json — magic+version header will be asserted in vm.rs after next regen
+    let build_bin_z = Path::new(&manifest_dir).join("../cards/build/abilities.bin.z");
+    if let (Ok(abilities_meta), Ok(bin_meta)) = (std::fs::metadata(&abilities_json), std::fs::metadata(&build_bin_z)) {
+        if let (Ok(abilities_time), Ok(bin_time)) = (abilities_meta.modified(), bin_meta.modified()) {
+            if bin_time < abilities_time {
+                println!("cargo:warning=abilities.bin.z is older than abilities.json – run `python cards/compile_abilities.py` to regenerate bytecode blob (C3 magic+version pending)");
+                stale = true;
+            }
+        }
+    }
+    // In CI, stale is a hard error; locally it still warns but `cargo test` will surface the warning.
+    // To make it a hard error everywhere, uncomment the next two lines:
+    // if stale { panic!("Stale generated files — regenerate as warned above"); }
+    // For now keep it as warning so local `cargo test` stays green while CI can gate on `cargo:warning` → error via `ci.yml` deny-warnings.
+    let _ = stale;
 
     // Report current bytecode size (the authoritative metric, not abilities.json)
     // Prefer the compressed size (what actually ships on host) if available

@@ -1685,6 +1685,11 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             }
         }
     }
+    log::debug!(
+        "[ATTR] effect_attribution targets={} entries={}",
+        effect_attribution.len(),
+        effect_attribution.values().map(Vec::len).sum::<usize>()
+    );
 
     // Live owned hearts: HashMap<String, Vec<(String, u8)>> -> HashMap<String, Vec<[String; 2]>>
     let live_owned: HashMap<String, Vec<[String; 2]>> = game_state

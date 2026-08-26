@@ -1669,6 +1669,20 @@ pub fn matching_ids(
         .collect()
 }
 
+/// B5: shared candidate-pool builder — the 5 sites
+/// (`game_setup.rs:579/:1353`, `choice.rs:402`, `look.rs:356/607`, `state.rs:20`)
+/// previously re-implemented the same filter loop. Centralize here so filter
+/// drift is impossible; callers pass the already-built `CardFilter`.
+pub fn build_candidate_pool(
+    cards: &[i16],
+    db: &CardDatabase,
+    filter: &CardFilter,
+) -> Vec<i16> {
+    let pool = matching_ids(cards, db, filter, true);
+    log::debug!("[POOL] cards={} -> pool={} (filter ct={:?} group={:?})", cards.len(), pool.len(), filter.card_type, filter.group);
+    pool
+}
+
 pub fn matching_ids_filtered(
     cards: &[i16],
     db: &CardDatabase,
