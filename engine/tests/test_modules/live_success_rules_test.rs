@@ -493,9 +493,14 @@ fn daydream_mermaid_no_niji_in_success_pick_one() {
 
     game.select_option(1); // Pick option 1 (recover)
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Sub-choice: pick the recover target from the waiting room.
+    assert!(game.has_pending_choice(), "recover target selection expected");
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard"
+    );
+    game.select_indices(&[0]);
 
     assert!(
         !game.has_pending_choice(),
@@ -568,31 +573,29 @@ fn daydream_mermaid_q191_niji_in_success_pick_both() {
     );
     game.select_option(1); // Pick option 1 (recover)
 
-    // Sub-choice: pick a card from waitroom
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Sub-choice: pick a card from waitroom ("Select 1 card(s) from the waiting room")
+    assert!(game.has_pending_choice(), "recover target selection expected");
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard"
+    );
+    game.select_indices(&[0]);
 
     // any_number re-prompt: should have remaining option (energy)
     assert!(
         game.has_pending_choice(),
         "Re-prompt after picking 1 option with any_number"
     );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget"
+    );
     game.select_option(0); // Pick the remaining option (energy)
 
-    // The energy option might need to pick a card (energy_deck selection)
-    if game.has_pending_choice() {
-        eprintln!(
-            "[ENERGY_PICK] pending_type={:?}",
-            game.pending_choice_type()
-        );
-        game.select_indices(&[0]);
-    }
-
-    // No more re-prompts (all options consumed)
-    if game.has_pending_choice() {
-        eprintln!("[AFTER_ALL] pending_type={:?}", game.pending_choice_type());
-    }
+    // Observed: the energy option moves the top energy_deck card to the energy
+    // zone directly — no card-selection prompt follows the second option pick.
     assert!(
         !game.has_pending_choice(),
         "No re-prompt after all options consumed"

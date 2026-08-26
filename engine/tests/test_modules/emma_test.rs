@@ -165,10 +165,12 @@ fn emma_live_start_activates_wait_both_gain_heart04() {
         game.select_indices(&[0, 1]);
     }
 
-    // Select the wait member to activate
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Observed: only one wait member is eligible → the change_state leg
+    // auto-resolves with NO prompt (only the hand cost prompt was presented).
+    assert!(
+        !game.has_pending_choice(),
+        "single wait-member candidate auto-activates; no selection prompt expected"
+    );
 
     assert!(!game.has_pending_choice(), "Ability should resolve cleanly");
 
@@ -213,13 +215,28 @@ fn emma_live_start_three_members_only_activated_gets_heart() {
     trigger_emma_live_start(&mut game, emma);
 
     // Optional cost: discard 2 cards
-    if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional discard-2 cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (zone=hand count=2 allow_skip=true) for the cost"
+    );
+    game.select_indices(&[0, 1]);
+    // Two wait members on stage → a real choice which one to activate.
     // Select member_a only to activate
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "change_state member selection prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (zone=stage count=1 allow_skip=false)"
+    );
+    game.select_indices(&[0]);
 
     assert!(!game.has_pending_choice(), "Ability should resolve cleanly");
 
@@ -339,10 +356,12 @@ fn emma_live_start_active_member_not_affected() {
     while game.has_pending_choice() {
         game.select_indices(&[0, 1]);
     }
-    // Select wait_member to activate
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Observed: only one wait member is eligible → the change_state leg
+    // auto-resolves with NO prompt (only the hand cost prompt was presented).
+    assert!(
+        !game.has_pending_choice(),
+        "single wait-member candidate auto-activates; no selection prompt expected"
+    );
 
     assert!(!game.has_pending_choice(), "Ability should resolve cleanly");
 

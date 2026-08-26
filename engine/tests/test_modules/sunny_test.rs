@@ -27,10 +27,19 @@ fn sunny_branch1_1_member_triggers_draw() {
     game.set_live_card(sunny);
     advance_to_live_start(&mut game);
 
-    // Branch 1 requires choosing which card to discard from hand
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Branch 1 requires choosing which card to discard from hand.
+    // Observed: SelectCard zone=hand count=1 allow_skip=false
+    // ("Select 1 card(s) from hand").
+    assert!(
+        game.has_pending_choice(),
+        "Branch 1 hand-discard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard hand discard"
+    );
+    game.select_indices(&[0]);
 
     // Branch 1 fired: at least one card was drawn (from either player's deck)
     // Verify that cards moved: opponent has hand+discard > initial
@@ -221,10 +230,18 @@ fn sunny_branch2_two_non_mus_no_heart() {
     game.set_live_card(sunny);
     advance_to_live_start(&mut game);
 
-    // Branch 1 → discard choice
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Branch 1 → discard choice. Observed: SelectCard zone=hand count=1
+    // allow_skip=false is offered even when no μ's target exists for branch 2.
+    assert!(
+        game.has_pending_choice(),
+        "Branch 1 hand-discard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard hand discard"
+    );
+    game.select_indices(&[0]);
 
     // Branch 2 condition (count>=2) is met, but no μ's member exists to target.
     // The effect should skip the gain_resource silently (no choice presented).
@@ -270,10 +287,18 @@ fn sunny_branch2_one_member_skips_b2() {
     game.set_live_card(sunny);
     advance_to_live_start(&mut game);
 
-    // Branch 1 → discard choice
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Branch 1 → discard choice. Observed: SelectCard zone=hand count=1
+    // allow_skip=false is offered even when no μ's target exists for branch 2.
+    assert!(
+        game.has_pending_choice(),
+        "Branch 1 hand-discard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard hand discard"
+    );
+    game.select_indices(&[0]);
 
     // Branch 2 should NOT fire (only 1 member)
     assert!(
@@ -360,28 +385,45 @@ fn sunny_q211_joint_card_targetable_for_mus_heart() {
     game.set_live_card(sunny);
     advance_to_live_start(&mut game);
 
-    // Branch 1 → draw/discard choice
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Observed 3-step chain:
+    //   1. SelectAutoAbility — the joint card's own LiveStart ability fires
+    //      alongside SUNNY DAY SONG; pick resolution order (index 0).
+    assert!(
+        game.has_pending_choice(),
+        "auto-ability order prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectAutoAbility"),
+        "expected SelectAutoAbility (joint card LiveStart vs SUNNY DAY SONG)"
+    );
+    game.select_indices(&[0]);
 
-    // The joint card also has its own LiveStart ability; drain auto-ability choices
-    game.drain_auto_ability_choices();
+    //   2. SUNNY DAY SONG Branch 1: SelectCard zone=hand count=1
+    //      allow_skip=false ("Select 1 card(s) from hand").
+    assert!(
+        game.has_pending_choice(),
+        "Branch 1 hand-discard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected Branch 1 SelectCard hand discard"
+    );
+    game.select_indices(&[0]);
 
-    // Branch 2 fires (2 members) → should present a heart target selection
+    //   3. Branch 2 fires (joint card + 1 other = 2 members):
+    //      SelectCard zone=stage count=1 group=μ's — heart target selection.
     assert!(
         game.has_pending_choice(),
         "Branch 2 should fire with joint card + 1 other = 2 members"
     );
-
-    // The heart target choice is a SelectTarget for position|destination or similar.
-    // Use generated actions to pick the first offered member.
-    game.select_generated(0);
-
-    // Drain any remaining choices (Branch 3 etc.)
-    while game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected Branch 2 SelectCard stage heart target (group μ's)"
+    );
+    game.select_indices(&[0]);
 
     // Verify the joint card received heart03
     use rabuka_engine::card::HeartColor;

@@ -38,9 +38,18 @@ fn bp5_111_activation_chain_waits_low_blade_opponent() {
     game.give_energy(1); // {E} activation cost
 
     game.activate_ability(saint_snow);
-    if game.has_pending_choice() {
-        game.select_generated(0); // destination area choice
-    }
+    // Observed: the position change always prompts a destination choice
+    // (SelectTarget target=position|destination, allow_skip=false).
+    assert!(
+        game.has_pending_choice(),
+        "position-change destination prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget position|destination"
+    );
+    game.select_generated(0); // destination area choice
     scan_autos_both(&mut game);
 
     assert_eq!(
@@ -68,9 +77,18 @@ fn bp5_111_chain_neg_empty_opponent_stage() {
     game.give_energy(1);
 
     game.activate_ability(saint_snow);
-    if game.has_pending_choice() {
-        game.select_generated(0);
-    }
+    // Observed: the destination prompt is offered even with an empty
+    // opponent stage (SelectTarget target=position|destination).
+    assert!(
+        game.has_pending_choice(),
+        "position-change destination prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget position|destination"
+    );
+    game.select_generated(0); // destination area choice
     scan_autos_both(&mut game);
 
     assert_eq!(
@@ -169,10 +187,13 @@ fn hs_pb1_003_no_discard_no_auto_gain() {
 
     game.play_to_stage(card, MemberArea::Center);
 
-    // No みらくらぱーく！ members in hand: skip whatever is offered.
-    if game.has_pending_choice() {
-        game.select_indices_sequential(&[]);
-    }
+    // No みらくらぱーく！ members in hand: observed behavior is that the
+    // optional discard cost has no eligible candidate, so the engine
+    // auto-skips it — no prompt is offered at all.
+    assert!(
+        !game.has_pending_choice(),
+        "no discard prompt expected with no eligible みらくらぱーく！ member in hand"
+    );
 
     assert_eq!(
         game.state.player1.hand.cards.len(),

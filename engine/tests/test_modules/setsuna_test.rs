@@ -36,9 +36,19 @@ fn setsuna_q157_wait_energy_can_be_placed_under_member() {
     let active_before = game.state.player1.energy_zone.active_count();
 
     game.activate_ability(setsuna);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // The hand debut target is a single candidate (auto-resolves); the engine
+    // then prompts once: SelectCard zone=energy count=1 allow_skip=false
+    // ("Choose energy card(s) to place under member").
+    assert!(
+        game.has_pending_choice(),
+        "energy-under-member SelectCard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for energy placement"
+    );
+    game.select_indices(&[0]);
 
     let total_after = game.state.player1.energy_zone.cards.len();
     let active_after = game.state.player1.energy_zone.active_count();
@@ -69,9 +79,19 @@ fn setsuna_q184_energy_under_member_not_counted() {
     game.give_energy(3);
 
     game.activate_ability(setsuna);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // The hand debut target is a single candidate (auto-resolves); the engine
+    // then prompts once: SelectCard zone=energy count=1 allow_skip=false
+    // ("Choose energy card(s) to place under member").
+    assert!(
+        game.has_pending_choice(),
+        "energy-under-member SelectCard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for energy placement"
+    );
+    game.select_indices(&[0]);
 
     assert_eq!(
         game.state.player1.energy_zone.cards.len(),
@@ -103,9 +123,19 @@ fn setsuna_debuts_to_vacated_area_not_stage_first_empty() {
     game.give_energy(2);
 
     game.activate_ability(setsuna);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // The hand debut target is a single candidate (auto-resolves); the engine
+    // then prompts once: SelectCard zone=energy count=1 allow_skip=false
+    // ("Choose energy card(s) to place under member").
+    assert!(
+        game.has_pending_choice(),
+        "energy-under-member SelectCard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for energy placement"
+    );
+    game.select_indices(&[0]);
 
     // After self_cost removes setsuna from RightSide, last_vacated_stage_area = Some(2).
     // same_area should place the new card at stage[2], NOT at stage[1] (Center).
@@ -141,9 +171,19 @@ fn setsuna_energy_placed_under_vacated_area_not_center() {
     game.give_energy(3);
 
     game.activate_ability(setsuna);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // The hand debut target is a single candidate (auto-resolves); the engine
+    // then prompts once: SelectCard zone=energy count=1 allow_skip=false
+    // ("Choose energy card(s) to place under member").
+    assert!(
+        game.has_pending_choice(),
+        "energy-under-member SelectCard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for energy placement"
+    );
+    game.select_indices(&[0]);
 
     // New card should be on the right side
     assert_eq!(

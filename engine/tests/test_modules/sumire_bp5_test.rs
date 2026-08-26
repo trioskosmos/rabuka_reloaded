@@ -547,36 +547,36 @@ fn sumire_keke_skip_no_trigger() {
     game.play_to_stage(keke, MemberArea::RightSide);
     game.drain_auto_ability_choices();
 
-    // Keke's optional position change prompt: skip it
-    if game.has_pending_choice() {
-        match game.get_pending_choice().clone() {
-            Choice::SelectTarget {
-                target, allow_skip, ..
-            } if target == "position|destination" => {
-                assert!(allow_skip, "Keke's position change should be skippable");
-                // Find and click the Skip action
-                let actions = game.generated_actions();
-                let skip_action = actions.iter().find(|a| {
-                    a.description.contains("Skip")
-                        || a.action_type == rabuka_engine::game_setup::ActionType::ChoiceSkip
-                });
-                if let Some(action) = skip_action {
-                    let params = action.parameters.as_ref().unwrap();
-                    rabuka_engine::turn::TurnEngine::resume_with_choice(
-                        &mut game.state,
-                        params.card_id,
-                        params.card_indices.clone(),
-                    )
-                    .expect("skip should succeed");
-                }
-                game.drain_auto_ability_choices();
-            }
-            _other => {
-                // Not a position destination choice, drain it
-                game.select_indices(&[]);
-                game.drain_auto_ability_choices();
-            }
+    // Keke's optional position change prompt: observed to always be offered
+    // (SelectTarget target=position|destination, allow_skip=true). Skip it.
+    assert!(
+        game.has_pending_choice(),
+        "Keke's optional position change prompt expected"
+    );
+    match game.get_pending_choice().clone() {
+        Choice::SelectTarget {
+            target, allow_skip, ..
+        } if target == "position|destination" => {
+            assert!(allow_skip, "Keke's position change should be skippable");
+            // Find and click the Skip action. NOTE: TestGame::generated_actions()
+            // filters to ChoicePosition for position|destination prompts, so the
+            // unfiltered engine action list is required to see the ChoiceSkip.
+            let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
+            let skip_action = actions
+                .iter()
+                .find(|a| a.action_type == rabuka_engine::game_setup::ActionType::ChoiceSkip);
+            let action =
+                skip_action.expect("Skip action should be generated for skippable choice");
+            let params = action.parameters.as_ref().unwrap();
+            rabuka_engine::turn::TurnEngine::resume_with_choice(
+                &mut game.state,
+                params.card_id,
+                params.card_indices.clone(),
+            )
+            .expect("skip should succeed");
+            game.drain_auto_ability_choices();
         }
+        other => panic!("Expected position|destination choice, got {:?}", other),
     }
 
     assert_eq!(
@@ -643,71 +643,71 @@ fn sumire_formation_change_triggers() {
     game.drain_auto_ability_choices();
 
     // Formation change: 3 members on stage, 3 sequential destination choices
-    // Choice 1: Sumire at Left — pick Center to move her
-    if game.has_pending_choice() {
-        match game.get_pending_choice().clone() {
-            Choice::SelectTarget { target, .. } if target == "position|destination" => {
-                let acts = game.generated_actions();
-                // Pick index 1 = "center" (skip "left" which is her current position)
-                assert!(acts.len() >= 2, "need at least 2 options");
-                // Find the option with stage_area="center"
-                let idx = acts
-                    .iter()
-                    .position(|a| {
-                        a.parameters.as_ref().and_then(|p| p.stage_area.as_deref())
-                            == Some("center")
-                    })
-                    .unwrap_or(1);
-                game.select_generated(idx);
-                game.drain_auto_ability_choices();
-            }
-            _ => {
-                game.select_indices(&[]);
-                game.drain_auto_ability_choices();
-            }
+    // Choice 1: Sumire at Left — pick Center to move her.
+    // Observed: SelectTarget position|destination options=["left","center","right"].
+    assert!(
+        game.has_pending_choice(),
+        "formation change prompt 1 (Sumire) expected"
+    );
+    match game.get_pending_choice().clone() {
+        Choice::SelectTarget { target, .. } if target == "position|destination" => {
+            let acts = game.generated_actions();
+            // Pick index 1 = "center" (skip "left" which is her current position)
+            assert!(acts.len() >= 2, "need at least 2 options");
+            // Find the option with stage_area="center"
+            let idx = acts
+                .iter()
+                .position(|a| {
+                    a.parameters.as_ref().and_then(|p| p.stage_area.as_deref())
+                        == Some("center")
+                })
+                .unwrap_or(1);
+            game.select_generated(idx);
+            game.drain_auto_ability_choices();
         }
+        other => panic!("Expected position|destination choice, got {:?}", other),
     }
 
-    // Choice 2: filler at Center — pick Right
-    if game.has_pending_choice() {
-        match game.get_pending_choice().clone() {
-            Choice::SelectTarget { target, .. } if target == "position|destination" => {
-                let acts = game.generated_actions();
-                let idx = acts
-                    .iter()
-                    .position(|a| {
-                        a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("right")
-                    })
-                    .unwrap_or(0);
-                game.select_generated(idx);
-                game.drain_auto_ability_choices();
-            }
-            _ => {
-                game.select_indices(&[]);
-                game.drain_auto_ability_choices();
-            }
+    // Choice 2: filler at Center — pick Right.
+    // Observed: SelectTarget position|destination options=["left","right"].
+    assert!(
+        game.has_pending_choice(),
+        "formation change prompt 2 (center member) expected"
+    );
+    match game.get_pending_choice().clone() {
+        Choice::SelectTarget { target, .. } if target == "position|destination" => {
+            let acts = game.generated_actions();
+            let idx = acts
+                .iter()
+                .position(|a| {
+                    a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("right")
+                })
+                .unwrap_or(0);
+            game.select_generated(idx);
+            game.drain_auto_ability_choices();
         }
+        other => panic!("Expected position|destination choice, got {:?}", other),
     }
 
-    // Choice 3: 慈 at Right — pick Left (remaining)
-    if game.has_pending_choice() {
-        match game.get_pending_choice().clone() {
-            Choice::SelectTarget { target, .. } if target == "position|destination" => {
-                let acts = game.generated_actions();
-                let idx = acts
-                    .iter()
-                    .position(|a| {
-                        a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("left")
-                    })
-                    .unwrap_or(0);
-                game.select_generated(idx);
-                game.drain_auto_ability_choices();
-            }
-            _ => {
-                game.select_indices(&[]);
-                game.drain_auto_ability_choices();
-            }
+    // Choice 3: 慈 at Right — pick Left (remaining).
+    // Observed: SelectTarget position|destination options=["left"].
+    assert!(
+        game.has_pending_choice(),
+        "formation change prompt 3 (慈) expected"
+    );
+    match game.get_pending_choice().clone() {
+        Choice::SelectTarget { target, .. } if target == "position|destination" => {
+            let acts = game.generated_actions();
+            let idx = acts
+                .iter()
+                .position(|a| {
+                    a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("left")
+                })
+                .unwrap_or(0);
+            game.select_generated(idx);
+            game.drain_auto_ability_choices();
         }
+        other => panic!("Expected position|destination choice, got {:?}", other),
     }
 
     // Sumire moved from Left → Center → triggers

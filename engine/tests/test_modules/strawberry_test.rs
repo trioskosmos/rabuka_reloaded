@@ -35,9 +35,10 @@ fn strawberry_q36_only_fires_in_live_victory_determination() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(strawberry);
     advance_to_live_start(&mut game);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        !game.has_pending_choice(),
+        "no prompt expected at live start (observed: live card set silently)"
+    );
 
     assert!(
         !game.state.opponent_live_success_this_turn,
@@ -84,9 +85,10 @@ fn strawberry_q132_first_attacker_evaluated() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(strawberry);
     advance_to_live_start(&mut game);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        !game.has_pending_choice(),
+        "no prompt expected at live start (observed: live card set silently)"
+    );
 
     // Ensure group condition (A) passes: Aqours member with heart05 >= 4
     game.state
@@ -141,9 +143,10 @@ fn strawberry_q142_excess_heart_prevents_score() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(strawberry);
     advance_to_live_start(&mut game);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        !game.has_pending_choice(),
+        "no prompt expected at live start (observed: live card set silently)"
+    );
 
     // Ensure group condition (A) passes
     game.state
@@ -191,9 +194,10 @@ fn strawberry_q142_wrong_group_prevents_score() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(strawberry);
     advance_to_live_start(&mut game);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        !game.has_pending_choice(),
+        "no prompt expected at live start (observed: live card set silently)"
+    );
 
     // Temporal condition (B) passes
     game.state.p2_live_success_this_turn = true;
@@ -239,9 +243,10 @@ fn strawberry_opponent_didnt_win_no_score() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(strawberry);
     advance_to_live_start(&mut game);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        !game.has_pending_choice(),
+        "no prompt expected at live start (observed: live card set silently)"
+    );
 
     // Ensure group condition (A) passes
     game.state

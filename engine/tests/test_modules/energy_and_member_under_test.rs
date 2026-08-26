@@ -896,10 +896,13 @@ fn awakening_move_1_of_2() {
     g.set_live_card(a);
     advance_to_live_start(&mut g);
     assert!(g.has_pending_choice(), "choice expected");
+    assert_eq!(g.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard");
     g.select_indices(&[0]);
-    if g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Up-to-N optional cost: after moving 1 of 2 under-energy, engine re-prompts
+    // "Select more energy cards (or skip to finish)"; answering empty finalizes.
+    assert!(g.has_pending_choice(), "'select more' re-prompt expected");
+    assert_eq!(g.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard");
+    g.select_indices(&[]);
     assert_eq!(
         g.state.player1.energy_deck.cards.len(),
         energy_before + 1,
@@ -987,11 +990,14 @@ fn awakening_targets_energy_owner_member_only() {
     g.set_live_card(a);
     advance_to_live_start(&mut g);
     assert!(g.has_pending_choice(), "choice expected");
+    assert_eq!(g.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard");
     // Global index 0 = first card under the CENTER member (slot order 0..3).
     g.select_indices(&[0]);
-    if g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Up-to-N optional cost: after moving 1 of 2 under-energy, engine re-prompts
+    // "Select more energy cards (or skip to finish)"; answering empty finalizes.
+    assert!(g.has_pending_choice(), "'select more' re-prompt expected");
+    assert_eq!(g.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard");
+    g.select_indices(&[]);
     assert_eq!(
         g.state.player1.energy_deck.cards.len(),
         energy_before + 1,
@@ -1025,13 +1031,17 @@ fn awakening_move_all_energy() {
     g.set_live_card(a);
     advance_to_live_start(&mut g);
     assert!(g.has_pending_choice(), "choice expected");
+    assert_eq!(g.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard");
     g.select_indices(&[0]);
-    if g.has_pending_choice() {
-        g.select_indices(&[0]);
-    }
-    if g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Up-to-N optional cost re-prompts after each pick ("Select more energy cards
+    // (or skip to finish)") and asks once more with no eligible cards remaining;
+    // the final empty answer finalizes.
+    assert!(g.has_pending_choice(), "'select more' re-prompt expected");
+    assert_eq!(g.pending_choice_type().as_deref(), Some("SelectCard"), "expected SelectCard");
+    g.select_indices(&[0]);
+    // Observed: selecting the LAST eligible under-energy auto-finalizes the
+    // up-to-N chain — the engine issues no further ask once no candidates remain.
+    assert!(!g.has_pending_choice(), "chain auto-finalizes after last card moved");
     assert_eq!(
         g.state.player1.energy_deck.cards.len(),
         energy_before + 2,

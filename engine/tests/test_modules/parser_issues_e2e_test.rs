@@ -129,9 +129,15 @@ fn issue2_rina_cost_total_6_draws_card() {
             game.select_indices(&[]);
         } else {
             game.select_indices(&[0]);
-            if game.has_pending_choice() {
-                game.select_indices(&[0]);
-            }
+            // Up-to-2 cost: after picking 1 of 2, engine re-prompts for the
+            // remaining card (SelectCard zone=discard count=1).
+            assert!(game.has_pending_choice(), "second discard selection expected");
+            assert_eq!(
+                game.pending_choice_type().as_deref(),
+                Some("SelectCard"),
+                "expected SelectCard"
+            );
+            game.select_indices(&[0]);
         }
     }
 
@@ -181,9 +187,15 @@ fn issue2_rina_cost_total_10_no_bonus() {
             game.select_indices(&[]);
         } else {
             game.select_indices(&[0]);
-            if game.has_pending_choice() {
-                game.select_indices(&[0]);
-            }
+            // Up-to-2 cost: after picking 1 of 2, engine re-prompts for the
+            // remaining card (SelectCard zone=discard count=1).
+            assert!(game.has_pending_choice(), "second discard selection expected");
+            assert_eq!(
+                game.pending_choice_type().as_deref(),
+                Some("SelectCard"),
+                "expected SelectCard"
+            );
+            game.select_indices(&[0]);
         }
     }
 
@@ -706,7 +718,7 @@ fn issue9_izumi_debut_draw_2_discard_1() {
 
     game.play_to_stage(izumi, MemberArea::Center);
 
-    // Debut: draw 2 → then discard 1
+    // Debut: draw 2 → then discard 1 ("Select 1 card from hand", allow_skip=false)
     while game.has_pending_choice() {
         if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
             game.select_indices(&[]);
@@ -714,9 +726,13 @@ fn issue9_izumi_debut_draw_2_discard_1() {
             break;
         }
     }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(game.has_pending_choice(), "discard-1 selection expected");
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard"
+    );
+    game.select_indices(&[0]);
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
@@ -753,9 +769,13 @@ fn issue9_izumi_debut_empty_hand() {
             break;
         }
     }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(game.has_pending_choice(), "discard-1 selection expected");
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard"
+    );
+    game.select_indices(&[0]);
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }

@@ -560,24 +560,20 @@ fn test_each_time_drains_between_live_starts_no_mix() {
 
     // ── Step 4: Verify NO SelectAutoAbility appeared for LS#2 vs each_time ──
     // If the fix works, the each_time was force-drained, and LS#2 auto-resolved.
-    // There should be no pending choice.
-    // If the fix is broken, another SelectAutoAbility appears here.
-    if game.has_pending_choice() {
-        match game.get_pending_choice() {
-            rabuka_engine::ability::types::Choice::SelectAutoAbility { .. } => {
-                panic!(
-                    "BUG: each_time leaked into player choice pool!\n\
-                     After LS#1 resolved, a second SelectAutoAbility appeared\n\
-                     meaning the each_time was NOT force-drained and is mixed\n\
-                     with LS#2 in the player's choice. Fix the drain loop."
-                );
-            }
-            _ => {
-                // Some other choice type (e.g. card selection for cost) — fine.
-                // The each_time was correctly drained.
-            }
-        }
-    }
+    // Observed chain: after picking LS#1, the pending choice is its own effect's
+    // SelectHeartColor ("Choose a heart color", options heart01/03/06). A
+    // second SelectAutoAbility here would mean the each_time was NOT
+    // force-drained and is mixed with LS#2 in the player's choice.
+    assert!(
+        game.has_pending_choice(),
+        "LS#1 heart-color prompt expected after resolving LS#1"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectHeartColor"),
+        "expected SelectHeartColor; SelectAutoAbility here would mean the \
+         each_time leaked into the player's choice pool. Fix the drain loop."
+    );
 
     // ── Step 5: Drain any remaining choices ──
     while game.has_pending_choice() {
@@ -635,21 +631,20 @@ fn test_one_live_start_each_time_drains_no_choice() {
     rabuka_engine::turn::TurnEngine::trigger_live_start_abilities(&mut game.state, &"player2");
     game.state.process_pending_auto_abilities(&p1_id);
 
-    // After the fix, everything auto-resolves → no pending choices
-    // (any pending choice here means a SelectAutoAbility appeared OR
-    //  there's a cost/selection choice from a different effect)
-    if game.has_pending_choice() {
-        match game.get_pending_choice() {
-            rabuka_engine::ability::types::Choice::SelectAutoAbility { .. } => {
-                panic!(
-                    "BUG: SelectAutoAbility appeared for 1 LS + 1 each_time.\n\
-                     With only 1 stale entry, available should be 1 → auto-promote.\n\
-                     A SelectAutoAbility means ET leaked into the choice pool."
-                );
-            }
-            _ => {}
-        }
-    }
+    // After the fix, everything auto-resolves except the resolved LS member's
+    // own effect: observed exactly one SelectHeartColor prompt ("Choose a
+    // heart color"). A SelectAutoAbility here would mean ET leaked into the
+    // choice pool.
+    assert!(
+        game.has_pending_choice(),
+        "LS member heart-color prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectHeartColor"),
+        "expected SelectHeartColor; a SelectAutoAbility means ET leaked into \
+         the choice pool (available should have been 1 → auto-promote)"
+    );
 
     while game.has_pending_choice() {
         game.select_indices(&[]);
@@ -729,17 +724,18 @@ fn test_three_live_starts_each_order_possible() {
 
     // After LS_b resolves → each_time force-drained → no SelectAutoAbility should appear.
     // However, LS_b's effect asks "pick heart01/03/06" (sequential choice).
-    // Drain that intermediate heart choice first.
-    if game.has_pending_choice() {
-        match game.get_pending_choice() {
-            rabuka_engine::ability::types::Choice::SelectAutoAbility { .. } => {
-                panic!("After LS_b: each_time leaked into choice pool!");
-            }
-            _ => {
-                game.select_indices(&[]);
-            }
-        }
-    }
+    // Observed: that intermediate choice is a SelectHeartColor prompt.
+    assert!(
+        game.has_pending_choice(),
+        "LS_b heart-color prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectHeartColor"),
+        "After LS_b: expected SelectHeartColor; SelectAutoAbility would mean \
+         each_time leaked into choice pool!"
+    );
+    game.select_indices(&[]);
 
     // ── Choice 2: 2 LS options remaining (no each_time) ──
     assert!(
@@ -759,17 +755,19 @@ fn test_three_live_starts_each_order_possible() {
                 .expect("resume_with_choice failed");
 
             // After LS_a resolves → each_time force-drained.
-            // Drain the heart selection choice from LS_a's effect if present.
-            if game.has_pending_choice() {
-                match game.get_pending_choice() {
-                    rabuka_engine::ability::types::Choice::SelectAutoAbility { .. } => {
-                        panic!("After LS_a: each_time leaked into choice pool!");
-                    }
-                    _ => {
-                        game.select_indices(&[]);
-                    }
-                }
-            }
+            // Observed: the intermediate choice from LS_a's effect is a
+            // SelectHeartColor prompt ("Choose a heart color").
+            assert!(
+                game.has_pending_choice(),
+                "LS_a heart-color prompt expected"
+            );
+            assert_eq!(
+                game.pending_choice_type().as_deref(),
+                Some("SelectHeartColor"),
+                "After LS_a: expected SelectHeartColor; SelectAutoAbility would \
+                 mean each_time leaked into choice pool!"
+            );
+            game.select_indices(&[]);
         }
         other => {
             panic!("Choice 2 expected SelectAutoAbility, got {:?}", other);

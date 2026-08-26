@@ -152,10 +152,12 @@ fn q261_score_first_then_energy() {
         .unwrap_or(0);
     assert_eq!(score_mod, 1, "Score +1 from ab#1");
 
-    // ab#0 resolves next (energy move)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Observed: choosing an option from SelectAutoAbility starts queue processing
+    // which auto-resolves ALL remaining queued abilities in order — no further prompts.
+    assert!(
+        !game.has_pending_choice(),
+        "no prompt expected: remaining queued abilities auto-resolve after the order choice"
+    );
 
     assert!(
         game.state.player1.energy_zone.cards.len() >= 13,
@@ -194,18 +196,17 @@ fn q261_energy_first_then_score() {
     };
     game.select_option(energy_idx);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Observed: choosing an option from SelectAutoAbility starts queue processing
+    // which auto-resolves ALL remaining queued abilities in order — no further prompts.
+    assert!(
+        !game.has_pending_choice(),
+        "no prompt expected: remaining queued abilities auto-resolve after the order choice"
+    );
 
     assert!(
         game.state.player1.energy_zone.cards.len() >= 13,
         "Energy should be >= 13 after ab#0 (12 base + 1)"
     );
-
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
 
     let score_mod = game
         .state
@@ -275,9 +276,13 @@ fn q261_energy_below_threshold() {
         "ab#1 should NOT apply score +1 when only 10 energy"
     );
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Observed: even though ab#1's condition failed at resolution time, choosing an
+    // option from SelectAutoAbility starts queue processing which auto-resolves the
+    // remaining queued abilities (ab#0 still moves 1 energy) — no further prompts.
+    assert!(
+        !game.has_pending_choice(),
+        "no prompt expected: remaining queued abilities auto-resolve after the order choice"
+    );
 
     assert!(
         game.state.player1.energy_zone.cards.len() > 10,
@@ -344,12 +349,12 @@ fn q261_both_conditions_met() {
     };
     game.select_option(energy_idx);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Observed: choosing an option from SelectAutoAbility starts queue processing
+    // which auto-resolves ALL remaining queued abilities in order — no further prompts.
+    assert!(
+        !game.has_pending_choice(),
+        "no prompt expected: remaining queued abilities auto-resolve after the order choice"
+    );
 
     let score_mod = game
         .state

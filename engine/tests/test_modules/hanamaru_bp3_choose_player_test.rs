@@ -28,9 +28,11 @@ fn hanamaru_choose_self_moves_own_live_and_draws() {
     let hand_before = g.state.player1.hand.cards.len();
     g.activate_ability(hanamaru);
     g.select_choice_option(0); // self
-    if g.has_pending_choice() {
-        g.select_indices(&[0]);
-    }
+    // Live selection auto-resolves when exactly one live is eligible — no prompt.
+    assert!(
+        !g.has_pending_choice(),
+        "single-candidate live selection should auto-resolve without prompting"
+    );
     g.drain_auto_ability_choices();
     // waitroom should no longer contain a live (the one we put)
     assert!(!g.state.player1.waitroom.cards.iter().any(|&cid| g.db.get_card(cid).map_or(false, |c| c.is_live())), "live moved from discard");
@@ -50,9 +52,11 @@ fn hanamaru_choose_opponent_moves_opponent_live() {
     let p1_hand_before = g.state.player1.hand.cards.len();
     g.activate_ability(hanamaru);
     g.select_choice_option(1); // opponent
-    if g.has_pending_choice() {
-        g.select_indices(&[0]);
-    }
+    // Live selection auto-resolves when exactly one live is eligible — no prompt.
+    assert!(
+        !g.has_pending_choice(),
+        "single-candidate live selection should auto-resolve without prompting"
+    );
     g.drain_auto_ability_choices();
     assert!(!g.state.player2.waitroom.cards.iter().any(|&cid| g.db.get_card(cid).map_or(false, |c| c.is_live())), "opp live moved");
     let last = g.state.player2.main_deck.cards.last().copied();
@@ -70,13 +74,12 @@ fn hanamaru_no_live_in_chosen_discard_no_move_no_draw() {
     g.state.player1.waitroom.cards.push(mem);
     let hand_before = g.state.player1.hand.cards.len();
     g.activate_ability(hanamaru);
-    g.select_choice_option(0); // self, but no live to select -> should offer no selection? engine may skip
-    // If no selectable live, move should be skipped and conditional draw not happen
-    // Drain any pending live selection if it exists
-    if g.has_pending_choice() {
-        // if it still offers a choice with 0 options, we skip
-        g.select_indices(&[]);
-    }
+    g.select_choice_option(0); // self
+    // Observed: with zero eligible lives the move auto-skips — no prompt is created.
+    assert!(
+        !g.has_pending_choice(),
+        "zero-candidate live selection should auto-skip without prompting"
+    );
     assert_eq!(g.state.player1.hand.cards.len(), hand_before, "no live => no draw (conditional)");
     assert!(g.state.player1.waitroom.cards.contains(&mem), "member untouched");
 }
@@ -90,9 +93,11 @@ fn hanamaru_opponent_no_live_no_draw() {
     let hand_before = g.state.player1.hand.cards.len();
     g.activate_ability(hanamaru);
     g.select_choice_option(1); // opponent has no live
-    if g.has_pending_choice() {
-        g.select_indices(&[]);
-    }
+    // Observed: with zero eligible lives the move auto-skips — no prompt is created.
+    assert!(
+        !g.has_pending_choice(),
+        "zero-candidate live selection should auto-skip without prompting"
+    );
     assert_eq!(g.state.player1.hand.cards.len(), hand_before, "no draw when opponent has no live");
 }
 
@@ -105,7 +110,11 @@ fn hanamaru_targeted_player_determines_deck_bottom_owner() {
     g.state.player1.waitroom.cards.push(live_p1);
     g.activate_ability(hanamaru);
     g.select_choice_option(0);
-    if g.has_pending_choice() { g.select_indices(&[0]); }
+    // Live selection auto-resolves when exactly one live is eligible — no prompt.
+    assert!(
+        !g.has_pending_choice(),
+        "single-candidate live selection should auto-resolve without prompting"
+    );
     g.drain_auto_ability_choices();
     assert!(g.state.player1.energy_zone.active_count() == 0);
     assert_eq!(
@@ -146,7 +155,11 @@ fn hanamaru_turn_limit_once() {
     g.state.player1.waitroom.cards.push(live);
     g.activate_ability(hanamaru);
     g.select_choice_option(0);
-    if g.has_pending_choice() { g.select_indices(&[0]); }
+    // Live selection auto-resolves when exactly one live is eligible — no prompt.
+    assert!(
+        !g.has_pending_choice(),
+        "single-candidate live selection should auto-resolve without prompting"
+    );
     g.drain_auto_ability_choices();
     // second activation same turn should fail
     let live2 = g.id(LIVE2);

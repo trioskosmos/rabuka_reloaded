@@ -39,9 +39,16 @@ fn bp3012_look4_reveals_niji_card_to_hand() {
     game.play_to_stage(me, MemberArea::Center);
     assert!(game.has_pending_choice(), "optional cost offered");
     game.select_indices(&[0]); // pay: discard fodder
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // select the 虹ヶ咲 card (top of the looked four)
-    }
+    assert!(
+        game.has_pending_choice(),
+        "look-at-four reveal prompt expected after paying the optional cost"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (zone=looked_at count=1 allow_skip=true group=虹ヶ咲)"
+    );
+    game.select_indices(&[0]); // select the 虹ヶ咲 card (top of the looked four)
 
     assert!(
         game.state.player1.hand.cards.contains(&niji),
@@ -69,12 +76,26 @@ fn pb1028_look2_adds_one_to_hand() {
 
     game.give_energy(15);
     game.play_to_stage(me, MemberArea::Center);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // pay cost
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // add first looked card to hand
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional discard-1 cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (zone=hand count=1 allow_skip=true) for the cost"
+    );
+    game.select_indices(&[0]); // pay cost
+    assert!(
+        game.has_pending_choice(),
+        "look-at-two add-to-hand prompt expected after paying the cost"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (zone=looked_at count=1 allow_skip=false)"
+    );
+    game.select_indices(&[0]); // add first looked card to hand
 
     assert!(
         game.state.player1.hand.cards.contains(&prize),
@@ -102,12 +123,26 @@ fn bp1011_look5_reveals_live_card_to_hand() {
 
     game.give_energy(15);
     game.play_to_stage(me, MemberArea::Center);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // pay cost
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // select the live card
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional discard-1 cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (zone=hand count=1 allow_skip=true) for the cost"
+    );
+    game.select_indices(&[0]); // pay cost
+    assert!(
+        game.has_pending_choice(),
+        "look-at-five reveal prompt expected after paying the cost"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (zone=looked_at count=1 allow_skip=true live_card)"
+    );
+    game.select_indices(&[0]); // select the live card
 
     assert!(
         game.state.player1.hand.cards.contains(&live_card),

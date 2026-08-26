@@ -35,23 +35,20 @@ fn emma_008_discard_cost_9_retrieve_cost_4() {
 
     v.activate_ability(emma);
 
-    // Cost: select 1 member from hand to discard
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectCard") => v.select_indices(&[0]),
-            Some("SelectAutoAbility") => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
-        }
-    }
+    // Cost: select 1 member from hand to discard (mandatory SelectCard, allow_skip=false)
+    assert!(v.has_pending_choice(), "hand discard cost prompt expected");
+    assert_eq!(
+        v.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "cost should be a SelectCard prompt"
+    );
+    v.select_indices(&[0]);
 
-    // Effect: select 1 member from waitroom (cost < 9 → only lower_card)
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectCard") => v.select_indices(&[0]),
-            Some("SelectAutoAbility") => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
-        }
-    }
+    // Effect: single eligible candidate (cost 4 < 9) auto-resolves — no prompt.
+    assert!(
+        !v.has_pending_choice(),
+        "single-candidate retrieve should auto-resolve without prompting"
+    );
 
     drain_auto(&mut v);
 
@@ -92,14 +89,20 @@ fn emma_008_discard_low_cost_no_eligible_target() {
 
     v.activate_ability(emma);
 
-    // Cost: select 1 member from hand to discard
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectCard") => v.select_indices(&[0]),
-            Some("SelectAutoAbility") => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
-        }
-    }
+    // Cost: select 1 member from hand to discard (mandatory SelectCard, allow_skip=false)
+    assert!(v.has_pending_choice(), "hand discard cost prompt expected");
+    assert_eq!(
+        v.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "cost should be a SelectCard prompt"
+    );
+    v.select_indices(&[0]);
+
+    // No eligible target (cost 9 NOT < 4): retrieve auto-skips without prompting.
+    assert!(
+        !v.has_pending_choice(),
+        "zero-candidate retrieve should auto-skip without prompting"
+    );
 
     drain_auto(&mut v);
 
@@ -143,22 +146,27 @@ fn emma_008_multiple_eligible_targets_prompts_choice() {
 
     v.activate_ability(emma);
 
-    // Cost: select 1 from hand
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectCard") => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
-        }
-    }
+    // Cost: select 1 from hand (mandatory SelectCard, allow_skip=false)
+    assert!(v.has_pending_choice(), "hand discard cost prompt expected");
+    assert_eq!(
+        v.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "cost should be a SelectCard prompt"
+    );
+    v.select_indices(&[0]);
 
-    // Effect: should prompt for choice since there are 2 eligible cards
+    // Effect: 2 eligible cards in waitroom → engine prompts SelectCard zone=discard.
+    assert!(
+        v.has_pending_choice(),
+        "retrieve prompt expected with multiple eligible targets"
+    );
+    assert_eq!(
+        v.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "effect should be a SelectCard prompt"
+    );
     // Select target_a (first eligible)
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectCard") => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
-        }
-    }
+    v.select_indices(&[0]);
 
     drain_auto(&mut v);
 
@@ -201,12 +209,20 @@ fn emma_008_only_equal_cost_not_retrieved() {
 
     v.activate_ability(emma);
 
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectCard") => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
-        }
-    }
+    // Cost: select 1 member from hand to discard (mandatory SelectCard, allow_skip=false)
+    assert!(v.has_pending_choice(), "hand discard cost prompt expected");
+    assert_eq!(
+        v.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "cost should be a SelectCard prompt"
+    );
+    v.select_indices(&[0]);
+
+    // Equal-cost card is not retrievable (cost 9 NOT < 9): retrieve auto-skips, no prompt.
+    assert!(
+        !v.has_pending_choice(),
+        "zero-candidate retrieve should auto-skip without prompting"
+    );
 
     drain_auto(&mut v);
 

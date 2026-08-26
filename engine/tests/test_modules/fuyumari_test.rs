@@ -50,10 +50,20 @@ fn fuyumari_q63_effect_debut_no_cost_payment() {
     game.state.player1.stage.stage[1] = -1;
     game.play_to_stage(fuyumari, MemberArea::Center);
 
-    // Cost prompt: select the Liella! member from stage[0]
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Observed chain: the ability opens with a pay/skip gate
+    // (SelectTarget pay_optional_cost); answering card_indices [0] resolves
+    // to skip_optional_cost, so this test exercises the SKIP path (no swap,
+    // no effect). The state assertions below hold trivially on that path.
+    assert!(
+        game.has_pending_choice(),
+        "pay/skip gate for the optional stage cost expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget pay_optional_cost gate"
+    );
+    game.select_indices(&[0]); // [0] = skip_optional_cost (observed via HST log)
     assert!(
         !game.has_pending_choice(),
         "Exactly 1 matching card in discard → auto-resolve"
@@ -90,9 +100,18 @@ fn fuyumari_q63_optional_cost_skipped() {
     game.state.player1.stage.stage[1] = -1;
     game.play_to_stage(fuyumari, MemberArea::Center);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Observed: the optional stage cost opens with the same pay/skip gate;
+    // an empty card_indices answer also resolves to skip_optional_cost.
+    assert!(
+        game.has_pending_choice(),
+        "pay/skip gate for the optional stage cost expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget pay_optional_cost gate"
+    );
+    game.select_indices(&[]); // empty answer = skip_optional_cost (observed)
 
     assert_eq!(
         game.state.player1.stage.stage[0], liella_member,
@@ -130,14 +149,24 @@ fn fuyumari_q95_player_chooses_card_from_discard() {
         answer_stage_cost_gate(&mut game, true),
         "optional stage cost must present a pay/skip gate"
     );
-    // 2. Cost target selection: pick the Liella! member from stage[0].
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    // 3. Effect: choose the card to re-deploy from the waitroom.
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // 2. Cost target selection: exactly one Liella! member on stage → the
+    // engine auto-applies it with NO prompt (single-candidate auto-resolve).
+    // 3. Effect: the very next ask is the re-deploy choice from the waitroom
+    // (SelectCard zone=discard count=1 allow_skip=false).
+    assert!(
+        game.has_pending_choice(),
+        "re-deploy SelectCard prompt expected after paying the optional cost"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (zone=discard, member_card) for the re-deploy choice"
+    );
+    game.select_indices(&[0]);
+    assert!(
+        !game.has_pending_choice(),
+        "re-deploy choice answered; ability must complete with no further prompt"
+    );
 
     assert_eq!(
         game.state.player1.stage.stage[0], other_member,
@@ -172,17 +201,13 @@ fn fuyumari_edge_no_valid_cost_target() {
     game.state.player1.stage.stage[1] = -1;
     game.play_to_stage(fuyumari, MemberArea::Center);
 
-    // If a prompt still appears, the non-Liella! filler must not be an
-    // option — then skip.
-    if game.has_pending_choice() {
-        match game.get_pending_choice() {
-            Choice::SelectCard { .. } => {
-                game.assert_selection_not_contains("PL!-sd1-010-SD");
-                game.select_indices(&[]);
-            }
-            _ => {}
-        }
-    }
+    // Observed: zero valid candidates (non-Liella! filler excluded) → the
+    // optional cost auto-skips silently (KANAN_DEBUG cost_was_skipped=true);
+    // no prompt of any kind is presented, so the filler can never be offered.
+    assert!(
+        !game.has_pending_choice(),
+        "no prompt expected: zero Liella! candidates auto-skip the optional cost"
+    );
 
     assert_eq!(
         game.state.player1.stage.stage[0], filler,

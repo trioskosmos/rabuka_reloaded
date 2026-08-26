@@ -310,17 +310,12 @@ fn tiny_stars_duplicate_kanon() {
     // Select the first kanon (index 0 in the prompt)
     game.select_indices(&[0]);
 
-    // Verify no more pending choices (keke auto-selected if only 1)
-    if game.has_pending_choice() {
-        match game.pending_choice_type().as_deref() {
-            Some("SelectHeartColor") | Some("SelectHeartType") => {
-                panic!("Unexpected heart color choice - should be fixed")
-            }
-            _ => {
-                game.select_indices(&[0]);
-            }
-        }
-    }
+    // Verify no more pending choices: keke is the sole remaining candidate,
+    // and single-candidate selections auto-resolve (no prompt offered).
+    assert!(
+        !game.has_pending_choice(),
+        "no further choice expected after kanon selection (keke auto-resolves)"
+    );
 
     assert!(
         !game.has_pending_choice(),
@@ -400,17 +395,12 @@ fn tiny_stars_duplicate_keke() {
     // Select the first keke (index 0 in the prompt)
     game.select_indices(&[0]);
 
-    // Verify no more pending choices
-    if game.has_pending_choice() {
-        match game.pending_choice_type().as_deref() {
-            Some("SelectHeartColor") | Some("SelectHeartType") => {
-                panic!("Unexpected heart color choice - should be fixed")
-            }
-            _ => {
-                game.select_indices(&[0]);
-            }
-        }
-    }
+    // Verify no more pending choices: kanon is the sole remaining candidate,
+    // and single-candidate selections auto-resolve (no prompt offered).
+    assert!(
+        !game.has_pending_choice(),
+        "no further choice expected after keke selection (kanon auto-resolves)"
+    );
 
     assert!(
         !game.has_pending_choice(),

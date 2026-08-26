@@ -29,10 +29,16 @@ fn shioriko_bp4_basic_swap_one_niji_one_niji() {
     game.play_to_stage(shioriko, MemberArea::Center);
 
     game.select_indices(&[0]);
-
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "waitroom retrieval SelectCard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (zone=discard, live_card, allow_skip=false)"
+    );
+    game.select_indices(&[0]);
 
     assert!(
         game.state
@@ -110,10 +116,16 @@ fn shioriko_bp4_two_niji_in_success_choose_one() {
     game.play_to_stage(shioriko, MemberArea::Center);
 
     game.select_indices(&[0]);
-
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "waitroom retrieval SelectCard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (zone=discard, live_card, allow_skip=false)"
+    );
+    game.select_indices(&[0]);
 
     assert!(
         game.state.player1.waitroom.cards.contains(&niji_a),
@@ -176,10 +188,16 @@ fn shioriko_bp4_non_niji_in_success_not_offered() {
     game.play_to_stage(shioriko, MemberArea::Center);
 
     game.select_indices(&[0]);
-
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "waitroom retrieval SelectCard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (zone=discard, live_card, allow_skip=false)"
+    );
+    game.select_indices(&[0]);
 
     assert!(
         !game
@@ -229,10 +247,16 @@ fn shioriko_bp4_non_niji_in_discard_not_offered() {
     game.play_to_stage(shioriko, MemberArea::Center);
 
     game.select_indices(&[0]);
-
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "waitroom retrieval SelectCard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (zone=discard, live_card, allow_skip=false)"
+    );
+    game.select_indices(&[0]);
 
     assert!(
         game.state
@@ -319,10 +343,12 @@ fn shioriko_bp4_no_niji_in_discard_after_move_swaps_same_card_back() {
     game.play_to_stage(shioriko, MemberArea::Center);
 
     game.select_indices(&[0]);
-
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Observed: no Nijigasaki in the waitroom → the retrieval leg has zero
+    // candidates and auto-resolves; no second prompt is presented.
+    assert!(
+        !game.has_pending_choice(),
+        "no retrieval prompt expected with an empty Nijigasaki waitroom"
+    );
 
     assert!(
         game.state

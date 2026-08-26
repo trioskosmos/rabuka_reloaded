@@ -76,16 +76,23 @@ fn kanon_select_liella_debut_to_stage() {
 
     // Followup: stage debut choice — pick option 0
     assert!(game.has_pending_choice(), "stage debut choice");
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget"
+    );
     game.select_option(0);
 
-    // Select card from hand to debut, then choose position.
-    assert!(game.has_pending_choice(), "select card from hand");
-    game.select_indices(&[0]);
-
-    // SelectPosition: card_id=0 = "left" (empty slot, Center is occupied by Kanon)
-    if game.has_pending_choice() {
-        game.select_option(0);
-    }
+    // Observed: answering the debut choice moves the Liella! picked from
+    // looked_at straight to the stage; the only follow-up prompt is the
+    // 登場-driven SelectPosition (there is no separate hand-selection ask).
+    assert!(game.has_pending_choice(), "SelectPosition prompt expected");
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectPosition"),
+        "expected SelectPosition"
+    );
+    game.select_option(0);
 
     assert!(
         game.state
@@ -240,18 +247,20 @@ fn kanon_stage_full_falls_back_to_hand() {
     pay_optional_cost(&mut game);
     game.select_indices(&[0]);
 
-    // Try stage debut
-    if game.has_pending_choice() {
-        game.select_option(0);
-    }
-    // Select card from hand for stage
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    // Position choice (stage has no empty slots so this might fail)
-    if game.has_pending_choice() {
-        game.select_option(0);
-    }
+    // Stage debut choice is still offered even though the stage is full.
+    assert!(game.has_pending_choice(), "stage debut choice expected");
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget"
+    );
+    game.select_option(0);
+    // Observed: with all stage slots full the debut fails silently — no hand
+    // selection or position prompt follows; the card falls back to the hand.
+    assert!(
+        !game.has_pending_choice(),
+        "no follow-up prompts when stage is full (debut fails)"
+    );
     assert!(
         !game
             .state

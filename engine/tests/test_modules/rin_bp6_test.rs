@@ -88,65 +88,62 @@ fn rin_bp6_heart03_filter_works() {
     // Select first available heart03 card
     game.select_indices(&[0]);
 
-    // Second sequential sub-action: select the other type
-    if game.has_pending_choice() {
-        {
-            let choice2 = game.get_pending_choice();
-            match choice2 {
-                rabuka_engine::ability::types::Choice::SelectCard {
-                    zone,
-                    filtered_indices,
-                    ..
-                } => {
-                    assert_eq!(zone, "discard", "Second choice zone should be discard");
-                    let indices = filtered_indices.as_ref().unwrap();
-                    let zone_cards = &game.state.player1.waitroom.cards;
-                    for &idx in indices {
-                        assert!(idx < zone_cards.len(), "Index {} out of bounds", idx);
-                        let cid = zone_cards[idx];
-                        let card = game.db.get_card(cid).unwrap();
-                        let has_hc03 = card.base_heart.as_ref().is_some_and(|bh| {
-                            bh.hearts
-                                .contains_key(&rabuka_engine::card::HeartColor::Heart03)
-                        }) || card.need_heart.as_ref().is_some_and(|nh| {
-                            nh.hearts
-                                .contains_key(&rabuka_engine::card::HeartColor::Heart03)
-                        });
-                        assert!(
-                            has_hc03,
-                            "Card at index {} ({}) should have heart03 in second choice",
-                            idx, card.name
-                        );
-                    }
-                    let no_hc_idx = zone_cards.iter().position(|&c| c == no_hc).unwrap();
+    // Second sequential sub-action: heart03 live_card select from discard
+    assert!(
+        game.has_pending_choice(),
+        "second heart03 live-card select prompt expected"
+    );
+    {
+        let choice2 = game.get_pending_choice();
+        match choice2 {
+            rabuka_engine::ability::types::Choice::SelectCard {
+                zone,
+                filtered_indices,
+                ..
+            } => {
+                assert_eq!(zone, "discard", "Second choice zone should be discard");
+                let indices = filtered_indices.as_ref().unwrap();
+                let zone_cards = &game.state.player1.waitroom.cards;
+                for &idx in indices {
+                    assert!(idx < zone_cards.len(), "Index {} out of bounds", idx);
+                    let cid = zone_cards[idx];
+                    let card = game.db.get_card(cid).unwrap();
+                    let has_hc03 = card.base_heart.as_ref().is_some_and(|bh| {
+                        bh.hearts
+                            .contains_key(&rabuka_engine::card::HeartColor::Heart03)
+                    }) || card.need_heart.as_ref().is_some_and(|nh| {
+                        nh.hearts
+                            .contains_key(&rabuka_engine::card::HeartColor::Heart03)
+                    });
                     assert!(
-                        !indices.contains(&no_hc_idx),
-                        "Non-heart03 card should not be in second choice"
+                        has_hc03,
+                        "Card at index {} ({}) should have heart03 in second choice",
+                        idx, card.name
                     );
                 }
-                _ => panic!("Expected SelectCard choice, got {:?}", choice2),
+                let no_hc_idx = zone_cards.iter().position(|&c| c == no_hc).unwrap();
+                assert!(
+                    !indices.contains(&no_hc_idx),
+                    "Non-heart03 card should not be in second choice"
+                );
             }
+            _ => panic!("Expected SelectCard choice, got {:?}", choice2),
         }
 
-        if game.has_pending_choice() {
-            let cb = game.get_pending_choice();
-            let allow_skip = match cb {
-                rabuka_engine::ability::types::Choice::SelectCard { allow_skip, .. } => *allow_skip,
-                _ => false,
-            };
-            if allow_skip {
-                // Skip branch: hand must not change from this choice
-                let hand_before_skip = game.state.player1.hand.cards.len();
-                game.select_indices(&[]);
-                assert_eq!(
-                    game.state.player1.hand.cards.len(),
-                    hand_before_skip,
-                    "skip branch must not add cards to hand"
-                );
-            } else {
-                game.select_indices(&[0]);
-            }
-        }
+        // Observed: this prompt has allow_skip=true (live retrieval is optional);
+        // answering empty finalizes the ability.
+        let allow_skip = match game.get_pending_choice() {
+            rabuka_engine::ability::types::Choice::SelectCard { allow_skip, .. } => *allow_skip,
+            _ => false,
+        };
+        assert!(allow_skip, "observed: live-card select allows skip");
+        let hand_before_skip = game.state.player1.hand.cards.len();
+        game.select_indices(&[]);
+        assert_eq!(
+            game.state.player1.hand.cards.len(),
+            hand_before_skip,
+            "skip branch must not add cards to hand"
+        );
     }
 
     while game.has_pending_choice() {
@@ -200,46 +197,12 @@ fn rin_bp6_no_heart03_cards_skips_cleanly() {
     assert!(game.has_pending_choice(), "Should have cost choice");
     game.select_indices(&[0, 1]);
 
-    // First sub-action: no heart03 cards → should auto-skip (no choice created)
-    // Second sub-action: also no heart03 cards → should auto-skip
-    // If a choice is created, verify it shows 0 options and auto-skip
-    if game.has_pending_choice() {
-        let choice = game.get_pending_choice();
-        match choice {
-            rabuka_engine::ability::types::Choice::SelectCard {
-                filtered_indices,
-                allow_skip,
-                ..
-            } => {
-                let indices = filtered_indices.as_ref().unwrap();
-                assert!(
-                    indices.is_empty(),
-                    "No cards should be selectable when none have heart03"
-                );
-                assert!(*allow_skip, "Should allow skip when no cards match");
-                game.select_indices(&[]);
-            }
-            _ => panic!("Expected SelectCard, got {:?}", choice),
-        }
-    }
-    if game.has_pending_choice() {
-        let choice = game.get_pending_choice();
-        match choice {
-            rabuka_engine::ability::types::Choice::SelectCard {
-                filtered_indices,
-                allow_skip,
-                ..
-            } => {
-                assert!(
-                    filtered_indices.as_ref().unwrap().is_empty(),
-                    "No cards should be selectable"
-                );
-                assert!(*allow_skip, "Should allow skip");
-                game.select_indices(&[]);
-            }
-            _ => panic!("Expected SelectCard, got {:?}", choice),
-        }
-    }
+    // Observed: with zero heart03 candidates BOTH sequential sub-actions auto-skip —
+    // no SelectCard prompt is created at all (FINALIZE_MOVE cards=[] with pending=false).
+    assert!(
+        !game.has_pending_choice(),
+        "zero-candidate selects should auto-skip without prompting"
+    );
 
     while game.has_pending_choice() {
         game.select_indices(&[]);
@@ -286,11 +249,18 @@ fn rin_bp6_only_member_matches_skips_live() {
     assert!(game.has_pending_choice(), "Should have cost choice");
     game.select_indices(&[0, 1]);
 
-    // First sub-action: depends on abilities.json order.
-    // If live_card first and no heart03 live cards → auto-skip or empty choice.
-    // If member_card first → should offer hc_member.
-    // Handle whichever comes first:
-    if game.has_pending_choice() {
+    // First sub-action: member_card select — observed: engine prompts with exactly
+    // hc_member selectable (filtered=[0], allow_skip=true).
+    assert!(
+        game.has_pending_choice(),
+        "first sub-action (heart03 member select) prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for heart03 member select"
+    );
+    {
         let choice = game.get_pending_choice();
         match choice {
             rabuka_engine::ability::types::Choice::SelectCard {
@@ -300,55 +270,28 @@ fn rin_bp6_only_member_matches_skips_live() {
             } => {
                 assert_eq!(zone, "discard");
                 let indices = filtered_indices.as_ref().unwrap();
-                if indices.is_empty() {
-                    // This type has no matches → skip
-                    assert!(matches!(
-                        choice,
-                        rabuka_engine::ability::types::Choice::SelectCard {
-                            allow_skip: true,
-                            ..
-                        }
-                    ));
-                    game.select_indices(&[]);
-                } else {
-                    // This type has matches → select one
-                    let zone_cards = &game.state.player1.waitroom.cards;
-                    for &idx in indices {
-                        let cid = zone_cards[idx];
-                        let card = game.db.get_card(cid).unwrap();
-                        let has_hc03 = card.base_heart.as_ref().is_some_and(|bh| {
-                            bh.hearts
-                                .contains_key(&rabuka_engine::card::HeartColor::Heart03)
-                        });
-                        assert!(has_hc03, "Selectable card must have heart03");
-                    }
-                    game.select_indices(&[0]);
+                assert_eq!(indices.len(), 1, "only hc_member should be selectable");
+                let zone_cards = &game.state.player1.waitroom.cards;
+                for &idx in indices {
+                    let cid = zone_cards[idx];
+                    let card = game.db.get_card(cid).unwrap();
+                    let has_hc03 = card.base_heart.as_ref().is_some_and(|bh| {
+                        bh.hearts
+                            .contains_key(&rabuka_engine::card::HeartColor::Heart03)
+                    });
+                    assert!(has_hc03, "Selectable card must have heart03");
                 }
             }
             _ => panic!("Expected SelectCard, got {:?}", choice),
         }
     }
+    game.select_indices(&[0]);
 
-    // Second sub-action
-    if game.has_pending_choice() {
-        let choice = game.get_pending_choice();
-        match choice {
-            rabuka_engine::ability::types::Choice::SelectCard {
-                filtered_indices,
-                allow_skip,
-                ..
-            } => {
-                let indices = filtered_indices.as_ref().unwrap();
-                if indices.is_empty() {
-                    assert!(*allow_skip, "Should allow skip when no matches");
-                    game.select_indices(&[]);
-                } else {
-                    game.select_indices(&[0]);
-                }
-            }
-            _ => panic!("Expected SelectCard, got {:?}", choice),
-        }
-    }
+    // Second sub-action: zero eligible heart03 live cards → engine auto-skips, no prompt.
+    assert!(
+        !game.has_pending_choice(),
+        "live-card select should auto-skip without prompting when no live matches"
+    );
 
     while game.has_pending_choice() {
         game.select_indices(&[]);

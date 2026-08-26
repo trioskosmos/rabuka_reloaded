@@ -39,17 +39,28 @@ fn q255_dancing_stars_live_success_after_position_change() {
     // First, trigger all AUTO abilities (Live Start etc.)
     TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
     game.state.process_pending_auto_abilities(&player_id);
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Two simultaneous auto abilities → engine asks which to resolve
+    // (SelectAutoAbility); empty selection proceeds with the queued order.
+    assert!(game.has_pending_choice(), "auto-ability selection prompt expected");
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectAutoAbility"),
+        "expected SelectAutoAbility"
+    );
+    game.select_indices(&[]);
 
     // Now trigger LIVE_START abilities (simulating post-LiveStart phase)
     TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
     game.state.process_pending_auto_abilities(&player_id);
-    // Drain the position change choice if there is one
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Dancing stars ab#0 fires → position change destination prompt
+    // ("Choose destination for position change", options left/center/right).
+    assert!(game.has_pending_choice(), "position change destination prompt expected");
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget"
+    );
+    game.select_indices(&[]);
 
     // After ab#0 fires, Honoka should no longer be in center
     let center_card = game.state.player1.stage.stage[1];
@@ -89,16 +100,18 @@ fn q255_dancing_stars_live_success_after_position_change() {
     // Trigger Live Success abilities (Honoka's Live Success)
     TurnEngine::trigger_live_success_abilities(&mut game.state, &player_id);
     game.state.process_pending_auto_abilities(&player_id);
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    assert!(
+        !game.has_pending_choice(),
+        "no prompt expected from Honoka's Live Success processing"
+    );
 
     // Now trigger LIVE_SUCCESS abilities (Dancing stars' ab#1)
     TurnEngine::trigger_live_success_abilities(&mut game.state, &player_id);
     game.state.process_pending_auto_abilities(&player_id);
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    assert!(
+        !game.has_pending_choice(),
+        "no prompt expected from Dancing stars' Live Success processing"
+    );
 
     // --- Verification ---
     // ab#1 should have applied score +1 to Dancing stars on me!

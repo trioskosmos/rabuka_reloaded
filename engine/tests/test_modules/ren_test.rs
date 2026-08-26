@@ -213,13 +213,14 @@ fn ren_ab1_triggers_after_mill_pay_cost_recover_card() {
     )
     .expect("Activate ab#0");
 
-    // Ab#1 should trigger → optional cost prompt → pay
-    if game.has_pending_choice() {
-        let ct = game.pending_choice_type().unwrap_or_default();
-        if ct == "SelectTarget" {
-            game.select_option(1);
-        }
-    }
+    // Ab#1 should trigger → optional cost prompt (conditional_optional) → pay
+    assert!(game.has_pending_choice(), "ab#1 optional cost prompt expected");
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget"
+    );
+    game.select_option(1);
     // Select 1 card from trigger cards to recover
     while game.has_pending_choice() {
         let ct = game.pending_choice_type().unwrap_or_default();
@@ -274,13 +275,14 @@ fn ren_ab1_mill_3_recover_specific_card() {
     )
     .expect("Activate ab#0");
 
-    // Ab#1 should trigger → optional cost prompt → pay
-    if game.has_pending_choice() {
-        let ct = game.pending_choice_type().unwrap_or_default();
-        if ct == "SelectTarget" {
-            game.select_option(1);
-        }
-    }
+    // Ab#1 should trigger → optional cost prompt (conditional_optional) → pay
+    assert!(game.has_pending_choice(), "ab#1 optional cost prompt expected");
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget"
+    );
+    game.select_option(1);
     // SelectCard: pick chisato (the milled card we want)
     let hand_before = game.state.player1.hand.cards.len();
     while game.has_pending_choice() {
@@ -339,13 +341,14 @@ fn ren_ab1_decline_cost_no_recovery() {
     )
     .expect("Activate ab#0");
 
-    // Ab#1 triggers → optional cost prompt → decline
-    if game.has_pending_choice() {
-        let ct = game.pending_choice_type().unwrap_or_default();
-        if ct == "SelectTarget" {
-            game.select_option(0);
-        }
-    }
+    // Ab#1 triggers → optional cost prompt (conditional_optional) → decline
+    assert!(game.has_pending_choice(), "ab#1 optional cost prompt expected");
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget"
+    );
+    game.select_option(0);
 
     assert_eq!(
         game.state.player1.hand.cards.len(),
@@ -389,13 +392,14 @@ fn ren_ab1_only_trigger_cards_not_full_discard() {
     )
     .expect("Activate ab#0");
 
-    // Ab#1 triggers → pay
-    if game.has_pending_choice() {
-        let ct = game.pending_choice_type().unwrap_or_default();
-        if ct == "SelectTarget" {
-            game.select_option(1);
-        }
-    }
+    // Ab#1 triggers → optional cost prompt (conditional_optional) → pay
+    assert!(game.has_pending_choice(), "ab#1 optional cost prompt expected");
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget"
+    );
+    game.select_option(1);
 
     // Select 1 from the 3 trigger cards
     while game.has_pending_choice() {
