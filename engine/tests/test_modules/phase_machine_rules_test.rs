@@ -204,3 +204,64 @@ fn draw_phase_on_empty_main_deck_refreshes_then_draws() {
         "3 waitroom cards shuffled in, 1 drawn out"
     );
 }
+
+/// 8.2.2/8.2.4 — crossing out of a LiveCardSet phase refills the setter's
+/// hand by EXACTLY the number of live cards she placed (two placed ⇒ two
+/// drawn), drawing from the deck TOP in order; a player who placed nothing
+/// draws nothing on her own boundary.
+#[test]
+fn live_card_set_refill_draws_placed_count() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let filler = game.id("PL!-sd1-010-SD");
+    let live1 = game.id("PL!-sd1-020-SD");
+    let live2 = game.new_id("PL!-sd1-020-SD");
+
+    fill_decks(&mut game, filler);
+    game.state.player1.hand.cards.push(live1);
+
+    // Drive to P1's LiveCardSet with a controlled deck top.
+    let mut guard = 0;
+    while !(game.state.current_phase == rabuka_engine::game_state::Phase::LiveCardSetFirstAttacker)
+        && guard < 12
+    {
+        guard += 1;
+        game.pass();
+        while game.has_pending_choice() {
+            game.select_indices(&[]);
+        }
+    }
+
+    game.set_live_card(live1);
+    // A second live arrives by effect (established direct-placement idiom).
+    game.state.player1.live_card_zone.cards.push(live2);
+
+    // Deck top order: [topA, topB, …fillers]. These two are what the refill
+    // must draw, in this order.
+    let top_b = game.new_id("PL!-sd1-010-SD");
+    let top_a = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.main_deck.cards.insert(0, top_b);
+    game.state.player1.main_deck.cards.insert(0, top_a);
+
+    let p2_hand_before = game.state.player2.hand.cards.len();
+
+    // Crossing into the SECOND attacker's LiveCardSet performs P1's refill:
+    // two placed lives ⇒ exactly two draws off the top.
+    game.pass();
+
+    assert_eq!(
+        game.state.player1.hand.cards.to_vec(),
+        vec![top_a, top_b],
+        "8.2.2: refill = placed count (2), drawn from deck TOP in order"
+    );
+
+    // P2 placed nothing: her own refill (crossing into performances) draws 0.
+    let p2_hand_at_refill = game.state.player2.hand.cards.len();
+    assert_eq!(p2_hand_before, p2_hand_at_refill - 0);
+    game.pass(); // Second LiveCardSet → performances: P2's boundary
+    assert_eq!(
+        game.state.player2.hand.cards.len(),
+        p2_hand_at_refill,
+        "placed 0 lives ⇒ 0 refill draws for P2"
+    );
+}

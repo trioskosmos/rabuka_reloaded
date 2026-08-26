@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T10:25:13.220736+00:00",
+  "generated_at": "2026-08-26T10:40:14.770900+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 493,
-  "n_tests": 2981,
+  "n_files": 494,
+  "n_tests": 2983,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -315,14 +315,13 @@
     "L1": 45
   },
   "qa_rulings": {
-    "covered": 275,
+    "covered": 276,
     "total": 280,
     "uncovered_ids": [
       "Q39",
       "Q34",
       "Q33",
-      "Q31",
-      "Q29"
+      "Q31"
     ]
   },
   "abilities": [
@@ -9604,6 +9603,7 @@
         "engine/tests/test_modules/integration_blindspot_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test_part2.rs",
         "engine/tests/test_modules/phase_machine_rules_test.rs",
+        "engine/tests/test_modules/q29_baton_arrival_test.rs",
         "engine/tests/test_modules/stellar_phoenix_test.rs",
         "engine/tests/test_modules/surplus_heart_test.rs",
         "engine/tests/test_modules/target_selection_test.rs"
@@ -9640,7 +9640,7 @@
         "ginko_hs_debut_window_rests_cost_le9_member",
         "hanabiko_baton_touch_replaced_triggers"
       ],
-      "covering_test_count": 65,
+      "covering_test_count": 67,
       "is_null": false
     },
     {

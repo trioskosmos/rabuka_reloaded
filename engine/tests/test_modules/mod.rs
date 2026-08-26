@@ -544,3 +544,4 @@ pub mod cross_player_round5_test;
 pub mod integration_blindspot_test;
 pub mod phase_machine_rules_test;
 pub mod victory_tie_placement_test;
+pub mod q29_baton_arrival_test;
