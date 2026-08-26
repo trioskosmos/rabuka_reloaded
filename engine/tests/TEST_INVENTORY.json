@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T17:55:17.593098+00:00",
+  "generated_at": "2026-08-26T17:56:29.914769+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 522,
-  "n_tests": 3073,
+  "n_files": 523,
+  "n_tests": 3075,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -10144,6 +10144,7 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/sp_bp2_004_extra_test2.rs",
         "engine/tests/test_modules/sp_bp2_004_highest_cost_edge_test.rs",
         "engine/tests/test_modules/sumire_bp2_center_cost_test.rs"
       ],
@@ -10156,13 +10157,15 @@
         "center_lower_cost_no_heart",
         "center_not_highest_right_is",
         "center_tied_with_right_no_heart",
+        "sp_bp2_004_center_empty_no_heart",
         "sp_bp2_004_center_highest_with_empty_side",
         "sp_bp2_004_center_tie_with_both_sides_no_heart",
         "sp_bp2_004_p_variant_same",
+        "sp_bp2_004_p_variant_tie_no_heart",
         "sumire_at_center_highest_gains_heart",
         "three_distinct_costs_center_highest"
       ],
-      "covering_test_count": 13,
+      "covering_test_count": 15,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -16586,6 +16589,7 @@
       "covering_files": [
         "engine/tests/test_modules/mod.rs",
         "engine/tests/test_modules/sp_bp2_004_edge2_test.rs",
+        "engine/tests/test_modules/sp_bp2_004_extra_test2.rs",
         "engine/tests/test_modules/sp_bp2_004_highest_cost_edge_test.rs",
         "engine/tests/test_modules/sumire_bp2_center_cost_test.rs"
       ],
@@ -16599,14 +16603,16 @@
         "center_not_highest_right_is",
         "center_tied_with_right_no_heart",
         "sp_bp2_004_all_empty_no_heart",
+        "sp_bp2_004_center_empty_no_heart",
         "sp_bp2_004_center_highest_with_empty_side",
         "sp_bp2_004_center_only_one_member_gains",
         "sp_bp2_004_center_tie_with_both_sides_no_heart",
         "sp_bp2_004_p_variant_same",
+        "sp_bp2_004_p_variant_tie_no_heart",
         "sumire_at_center_highest_gains_heart",
         "three_distinct_costs_center_highest"
       ],
-      "covering_test_count": 15,
+      "covering_test_count": 17,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
