@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T17:47:26.342295+00:00",
+  "generated_at": "2026-08-26T17:48:36.649705+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 517,
-  "n_tests": 3063,
+  "n_files": 518,
+  "n_tests": 3066,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -43288,7 +43288,8 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/position_change_condition_test.rs"
+        "engine/tests/test_modules/position_change_condition_test.rs",
+        "engine/tests/test_modules/sd2_011_tomari_jidou_test.rs"
       ],
       "covering_tests": [
         "no_position_change_no_trigger",
@@ -43297,9 +43298,12 @@
         "other_syncrise_member_moves_to_center_ability_card_gains_blades",
         "self_target_card_moves_triggers_own_ability",
         "syncrise_member_moves_to_center_triggers_blade_gain",
-        "syncrise_member_moves_to_non_center_no_trigger"
+        "syncrise_member_moves_to_non_center_no_trigger",
+        "tomari_jidou_natural_move_no_trigger",
+        "tomari_jidou_opponent_move_triggers",
+        "tomari_jidou_self_move_triggers"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
