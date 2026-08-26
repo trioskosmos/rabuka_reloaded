@@ -44,10 +44,8 @@ impl super::TurnEngine {
                         if card.card_no.as_ref() == card_no_clone {
                             for (ability_index, ar) in card.abilities.iter().enumerate() {
                                 let ability = ar.resolve();
-                                let trigger_match = ability.triggers.as_ref().is_some_and(|t| {
-                                    t.contains(crate::triggers::DEBUT)
-                                        || t.contains(crate::triggers::DEBUT_EN)
-                                });
+                                let trigger_match =
+                                    ability.has_trigger(crate::triggers::TriggerKind::Debut);
                                 log::debug!(
                                     "[DEBUT_TRIG_DBG]   ability={} triggers={:?} match={}",
                                     ability.full_text,
@@ -240,11 +238,7 @@ impl super::TurnEngine {
                                 ability.triggers
                             );
                         }
-                        if ability
-                            .triggers
-                            .as_ref()
-                            .is_some_and(|t| t.contains(crate::triggers::LIVE_START))
-                        {
+                        if ability.has_trigger(crate::triggers::TriggerKind::LiveStart) {
                             if seen.insert((*card_id, aidx)) {
                                 if crate::ability::debug::ABILITY_DEBUG
                                     .load(core::sync::atomic::Ordering::Relaxed)
@@ -298,11 +292,7 @@ impl super::TurnEngine {
                             ) {
                                 continue;
                             }
-                            if ability
-                                .triggers
-                                .as_ref()
-                                .is_some_and(|t| t.contains(crate::triggers::LIVE_START))
-                            {
+                            if ability.has_trigger(crate::triggers::TriggerKind::LiveStart) {
                                 if seen.insert((card_id, aidx)) {
                                     if crate::ability::debug::ABILITY_DEBUG
                                         .load(core::sync::atomic::Ordering::Relaxed)
@@ -427,11 +417,7 @@ impl super::TurnEngine {
                             ) {
                                 continue;
                             }
-                            if ability
-                                .triggers
-                                .as_ref()
-                                .is_some_and(|t| &**t == crate::triggers::LIVE_SUCCESS)
-                            {
+                            if ability.has_trigger(crate::triggers::TriggerKind::LiveSuccess) {
                                 if !seen.insert((card_id, aidx)) {
                                     continue;
                                 }
@@ -477,9 +463,7 @@ impl super::TurnEngine {
                                     continue;
                                 }
                                 if gained_ability
-                                    .triggers
-                                    .as_ref()
-                                    .is_some_and(|t| &**t == crate::triggers::LIVE_SUCCESS)
+                                    .has_trigger(crate::triggers::TriggerKind::LiveSuccess)
                                 {
                                     if !seen.insert((card_id, crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx)) {
                                         continue;
@@ -523,10 +507,8 @@ impl super::TurnEngine {
                     let card_no = card.card_no.to_string();
                     for (aidx, ar) in card.abilities.iter().enumerate() {
                         let ability = ar.resolve();
-                        let trigger_match = ability.triggers.as_ref().is_some_and(|t| {
-                            &**t == crate::triggers::LIVE_SUCCESS
-                                || t.contains(crate::triggers::LIVE_SUCCESS_EN)
-                        });
+                        let trigger_match =
+                            ability.has_trigger(crate::triggers::TriggerKind::LiveSuccess);
                         if !trigger_match {
                             continue;
                         }
@@ -568,9 +550,7 @@ impl super::TurnEngine {
                     if let Some(gained_list) = game_state.gained_card_abilities.get(card_id) {
                         for (gidx, gained_ability) in gained_list.iter().enumerate() {
                             if gained_ability
-                                .triggers
-                                .as_ref()
-                                .is_some_and(|t| &**t == crate::triggers::LIVE_SUCCESS)
+                                .has_trigger(crate::triggers::TriggerKind::LiveSuccess)
                             {
                                 if !seen.insert((*card_id, crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx)) {
                                     continue;

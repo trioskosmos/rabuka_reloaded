@@ -243,11 +243,7 @@ impl super::TurnEngine {
                 continue;
             }
             let ability = ar.resolve();
-            if ability
-                .triggers
-                .as_ref()
-                .is_some_and(|t| t.contains(crate::triggers::ACTIVATION))
-            {
+            if ability.has_trigger(crate::triggers::TriggerKind::Activation) {
                 let loc = ability
                     .effect
                     .as_ref()
@@ -337,11 +333,7 @@ impl super::TurnEngine {
                 .and_then(|list| {
                     list.iter()
                         .enumerate()
-                        .find(|(_, a)| {
-                            a.triggers
-                                .as_ref()
-                                .is_some_and(|t| t.contains(crate::triggers::ACTIVATION))
-                        })
+                        .find(|(_, a)| a.has_trigger(crate::triggers::TriggerKind::Activation))
                         .map(|(i, a)| (i, a.clone()))
                 })
             {

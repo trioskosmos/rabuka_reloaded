@@ -48,20 +48,23 @@ impl GameState {
         ability: &crate::card::Ability,
         trigger: &crate::game_state::AbilityTrigger,
     ) -> bool {
-        ability.triggers.as_ref().is_some_and(|t| match trigger {
+        use crate::triggers::TriggerKind;
+        match trigger {
             crate::game_state::AbilityTrigger::Activation => {
-                t.contains(crate::triggers::ACTIVATION)
+                ability.has_trigger(TriggerKind::Activation)
             }
-            crate::game_state::AbilityTrigger::Debut => {
-                t.contains(crate::triggers::DEBUT) || t.contains(crate::triggers::DEBUT_EN)
+            crate::game_state::AbilityTrigger::Debut => ability.has_trigger(TriggerKind::Debut),
+            crate::game_state::AbilityTrigger::LiveStart => {
+                ability.has_trigger(TriggerKind::LiveStart)
             }
-            crate::game_state::AbilityTrigger::LiveStart => t.contains(crate::triggers::LIVE_START),
             crate::game_state::AbilityTrigger::LiveSuccess => {
-                t.contains(crate::triggers::LIVE_SUCCESS)
+                ability.has_trigger(TriggerKind::LiveSuccess)
             }
-            crate::game_state::AbilityTrigger::Constant => t.contains(crate::triggers::CONSTANT),
-            crate::game_state::AbilityTrigger::Auto => t.contains(crate::triggers::AUTO),
-        })
+            crate::game_state::AbilityTrigger::Constant => {
+                ability.has_trigger(TriggerKind::Constant)
+            }
+            crate::game_state::AbilityTrigger::Auto => ability.has_trigger(TriggerKind::Auto),
+        }
     }
 
     /// Uses of `(card_id, ability_index)` already consumed this turn.

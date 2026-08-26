@@ -718,6 +718,16 @@ fn default_empty_string() -> String {
 }
 
 impl Ability {
+    /// Does this ability carry the given trigger kind? Parses the `triggers`
+    /// text into kinds via [`crate::triggers::parse_triggers`]; the single
+    /// source of truth for trigger matching across resolver, trigger scans,
+    /// and UI. Replaces scattered substring `contains()` checks.
+    pub fn has_trigger(&self, kind: crate::triggers::TriggerKind) -> bool {
+        self.triggers
+            .as_deref()
+            .is_some_and(|t| crate::triggers::parse_triggers(t).any(|k| k == kind))
+    }
+
     /// Return the text with any leading trigger clause (e.g. `【自】`) stripped.
     /// When `triggerless_text` was explicitly set it is returned directly;
     /// otherwise it is derived from `full_text` on demand.

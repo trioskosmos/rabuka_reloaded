@@ -1184,9 +1184,7 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                             .iter()
                             .filter(|ar| {
                                 ar.resolve()
-                                    .triggers
-                                    .as_ref()
-                                    .is_some_and(|t| t.contains(crate::triggers::BATON_TOUCH))
+                                    .has_trigger(crate::triggers::TriggerKind::BatonTouch)
                             })
                             .map(|ar| {
                                 let ability = ar.resolve();

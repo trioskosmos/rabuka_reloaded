@@ -1719,13 +1719,11 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
             let card_position: MemberArea = area_name.parse().unwrap_or(MemberArea::Center);
             for (ability_index, ar) in card.abilities.iter().enumerate() {
                 let ability = ar.resolve();
-                let can_activate = ability.triggers.as_ref().is_some_and(|t| {
-                    t.contains("main")
-                        || t.contains(crate::triggers::MAIN)
-                        || t.contains(crate::triggers::ACTIVATION)
-                        || (t.contains(crate::triggers::AUTO) && ability.cost.is_some())
-                        || t.contains(crate::triggers::BATON_TOUCH)
-                });
+                let can_activate = ability.has_trigger(crate::triggers::TriggerKind::Main)
+                    || ability.has_trigger(crate::triggers::TriggerKind::Activation)
+                    || (ability.has_trigger(crate::triggers::TriggerKind::Auto)
+                        && ability.cost.is_some())
+                    || ability.has_trigger(crate::triggers::TriggerKind::BatonTouch);
                 if !can_activate {
                     continue;
                 }
@@ -1853,13 +1851,11 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 if !is_discard_activation {
                     continue;
                 }
-                let can_activate = ability.triggers.as_ref().is_some_and(|t| {
-                    t.contains("main")
-                        || t.contains(crate::triggers::MAIN)
-                        || t.contains(crate::triggers::ACTIVATION)
-                        || (t.contains(crate::triggers::AUTO) && ability.cost.is_some())
-                        || t.contains(crate::triggers::BATON_TOUCH)
-                });
+                let can_activate = ability.has_trigger(crate::triggers::TriggerKind::Main)
+                    || ability.has_trigger(crate::triggers::TriggerKind::Activation)
+                    || (ability.has_trigger(crate::triggers::TriggerKind::Auto)
+                        && ability.cost.is_some())
+                    || ability.has_trigger(crate::triggers::TriggerKind::BatonTouch);
                 if !can_activate {
                     continue;
                 }

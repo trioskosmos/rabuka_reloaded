@@ -1403,10 +1403,7 @@ game_state.set_recently_moved_batch(moved_to_waitroom.into(), Some("live_card_zo
         let card = game_state.card_database.get_card(card_id)?;
         for ar in &card.abilities {
             let ability = ar.resolve();
-            let is_constant = ability
-                .triggers
-                .as_ref()
-                .is_some_and(|t| t.contains(crate::triggers::CONSTANT));
+            let is_constant = ability.has_trigger(crate::triggers::TriggerKind::Constant);
             if !is_constant {
                 continue;
             }

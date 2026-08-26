@@ -154,8 +154,7 @@ impl AbilityResolver {
     pub(crate) fn current_ability_is_activation(&self) -> bool {
         self.current_ability
             .as_ref()
-            .and_then(|a| a.triggers.as_ref())
-            .is_some_and(|t| &**t == crate::triggers::ACTIVATION)
+            .is_some_and(|a| a.has_trigger(crate::triggers::TriggerKind::Activation))
     }
 
     /// Emit the shared 「〜してもよい／支払う？」 SelectTarget gate
@@ -798,8 +797,8 @@ impl AbilityResolver {
                 if !pos_ok {
                     // Suppress position condition failures for auto abilities
                     // to avoid noise (they fire on every phase transition).
-                    if ability.triggers.as_deref() != Some(crate::triggers::ACTIVATION)
-                        && ability.triggers.as_deref() != Some(crate::triggers::DEBUT)
+                    if !ability.has_trigger(crate::triggers::TriggerKind::Activation)
+                        && !ability.has_trigger(crate::triggers::TriggerKind::Debut)
                     {
                         let pp2 = gs.player_prefix();
                         gs.push_rule_log(format!(
@@ -1014,7 +1013,7 @@ impl AbilityResolver {
                     // their use_limit for when the board state actually satisfies the
                     // condition.
                     if ability.use_limit.is_some()
-                        && ability.triggers.as_deref() == Some(crate::triggers::ACTIVATION)
+                        && ability.has_trigger(crate::triggers::TriggerKind::Activation)
                     {
                         if let Some(ref key) = ability_key {
                             gs.record_ability_use(*key);

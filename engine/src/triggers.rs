@@ -24,6 +24,65 @@ pub const BATON_TOUCH: &str = "baton touch";
 pub const DEBUT_EN: &str = "Debut";
 pub const LIVE_SUCCESS_EN: &str = "live_success";
 
+/// Parsed trigger kinds decoded from an ability's `triggers` text field.
+/// Single source of truth for trigger matching — consumers ask
+/// `Ability::has_trigger` instead of re-running ad-hoc substring checks,
+/// which could false-positive on a kind name embedded in another token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TriggerKind {
+    /// 起動 — player-initiated
+    Activation,
+    /// 自動 — fires automatically when its condition is met
+    Auto,
+    /// 常時 — always-active passive modifier
+    Constant,
+    /// 登場 — fires when a member is placed on stage
+    Debut,
+    /// ライブ開始時
+    LiveStart,
+    /// ライブ成功時
+    LiveSuccess,
+    /// メイン — available during main phase
+    Main,
+    /// Runtime metadata marker ("baton touch") attached to synthesized
+    /// abilities by baton-touch bookkeeping; never card-printed.
+    BatonTouch,
+}
+
+impl TriggerKind {
+    /// Parse one comma-separated token of a `triggers` field.
+    pub fn from_token(token: &str) -> Option<Self> {
+        let t = token.trim();
+        if t == ACTIVATION {
+            Some(Self::Activation)
+        } else if t == AUTO {
+            Some(Self::Auto)
+        } else if t == CONSTANT {
+            Some(Self::Constant)
+        } else if t == DEBUT || t == DEBUT_EN {
+            Some(Self::Debut)
+        } else if t == LIVE_START {
+            Some(Self::LiveStart)
+        } else if t == LIVE_SUCCESS || t == LIVE_SUCCESS_EN {
+            Some(Self::LiveSuccess)
+        } else if t == MAIN {
+            Some(Self::Main)
+        } else if t == BATON_TOUCH {
+            Some(Self::BatonTouch)
+        } else {
+            None
+        }
+    }
+}
+
+/// Parse the full `triggers` field (e.g. "起動" or "ライブ開始時, 登場")
+/// into its component kinds. Unknown tokens are ignored so newly printed
+/// trigger text degrades to "no recognized trigger" rather than misfiring
+/// as a different kind.
+pub fn parse_triggers(triggers: &str) -> impl Iterator<Item = TriggerKind> + '_ {
+    triggers.split(',').filter_map(TriggerKind::from_token)
+}
+
 /// Canonical English trigger key recorded in structured-log metadata and used to
 /// match a `trigger_evaluation` entry against its eventual `ability_resolution`.
 /// Kept in one place so trigger-scan, resolver, and negated-skip all agree.
