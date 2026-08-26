@@ -557,3 +557,4 @@ pub mod zone_conversion_test;
 pub mod replacement_choose_order_test;
 pub mod jidou_combo_edge_test;
 pub mod bp5_010_shiori_clamp_test;
+pub mod bp5_003_shizuku_edge_test;

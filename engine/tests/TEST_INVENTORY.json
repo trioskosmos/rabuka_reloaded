@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T16:56:48.491816+00:00",
+  "generated_at": "2026-08-26T17:04:40.948434+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 506,
-  "n_tests": 3030,
+  "n_files": 507,
+  "n_tests": 3036,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -378,7 +378,6 @@
   "specific_requirements": {
     "total": 141,
     "thin_idxs": [
-      210,
       289,
       426,
       604,
@@ -12561,12 +12560,16 @@
       "has_choice": true,
       "has_negative": false,
       "covering_files": [
+        "engine/tests/test_modules/bp5_003_shizuku_edge_test.rs",
         "engine/tests/test_modules/shizuku_bp5_test.rs"
       ],
       "covering_tests": [
-        "shizuku_bp5_dynamic_energy_payment_tests"
+        "shizuku_bp5_dynamic_energy_payment_tests",
+        "shizuku_no_live_in_discard_no_selection",
+        "shizuku_p_and_ar_variants_work",
+        "shizuku_turn_limit_blocks_second_activation"
       ],
-      "covering_test_count": 1,
+      "covering_test_count": 4,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -12817,10 +12820,13 @@
         "shiori_live_total_minus_one_allowed_when_base_exists",
         "shiori_live_total_minus_one_clamped_at_zero",
         "shiori_live_total_plus_one_no_floor_needed",
+        "shiori_p2_live_total_floor",
+        "shiori_p_and_ar_variants_share_floor",
         "shiori_parser_emits_floor",
-        "shiori_sequential_both_conditions_present"
+        "shiori_sequential_both_conditions_present",
+        "shiori_surplus_one_no_change"
       ],
-      "covering_test_count": 26,
+      "covering_test_count": 29,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -30512,7 +30518,7 @@
         "issue2_rina_cost_total_10_no_bonus",
         "issue2_rina_cost_total_6_draws_card"
       ],
-      "covering_test_count": 119,
+      "covering_test_count": 122,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

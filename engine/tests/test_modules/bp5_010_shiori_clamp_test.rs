@@ -1,57 +1,27 @@
 use crate::helpers::*;
 use rabuka_engine::card::AbilityEffect;
 use rabuka_engine::ability::resolver::AbilityResolver;
-use rabuka_engine::core::card::CardDatabase;
-
-// Helper to build a live_total modify_score effect with floor
-fn make_live_total_effect(op: &str, value: u8, with_floor: bool) -> AbilityEffect {
-    let text = if with_floor {
-        "この効果ではライブの合計スコアは0未満にはならない"
-    } else {
-        "ライブの合計スコアをテスト"
-    };
-    let mut json = serde_json::json!({
-        "text": text,
-        "action": "modify_score",
-        "operation": op,
-        "value": value,
-        "count": value,
-        "target": "live_total",
-    });
-    if with_floor {
-        json["effect_constraint"] = serde_json::Value::String("min:0".to_string());
-    }
-    let decoded: AbilityEffect = serde_json::from_value(json.clone()).unwrap();
-    // Debug: ensure value decoded
-    // println!("make effect json={} decoded value_any={:?} target={:?}", json, decoded.value_any(), decoded.target_name());
-    decoded
-}
 
 #[test]
 fn shiori_live_total_plus_one_no_floor_needed() {
-    // This card always has floor, so +1 is never clamped. Verify the
-    // constant path works for the simple +1 case via the real card.
+    // Trigger via fire_trigger with surplus 0 -> +1
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let shiori = game.id("PL!N-bp5-010-R");
     game.state.player1.stage.stage = [shiori, -1, -1];
     game.state.mods.p1_constant_total_score_bonus = 0;
-    // No live base, surplus 0 condition will fire +1
-    // We trigger the LiveSuccess ability directly; it will evaluate surplus
-    // via the current snapshot (which defaults to 0 surplus).
+    game.state.live_surplus_ready_this_turn = true;
+    game.state.self_live_surplus_count = 0;
+    game.state.opponent_live_surplus_count = 0;
     fire_trigger(
         &mut game,
         shiori,
         rabuka_engine::core::types::AbilityTrigger::LiveSuccess,
         "ライブ成功時",
     );
-    // After trigger, the +1 should have been applied (surplus 0 -> +1)
-    // If surplus was 1, neither branch fires, so bonus stays 0 or 1.
-    // We just verify it is >=0 and not broken.
-    assert!(
-        game.state.mods.p1_constant_total_score_bonus >= 0,
-        "live_total +1 with floor should be >=0, got {}",
-        game.state.mods.p1_constant_total_score_bonus
+    assert_eq!(
+        game.state.mods.p1_constant_total_score_bonus, 1,
+        "surplus 0 should give +1"
     );
 }
 
@@ -161,4 +131,90 @@ fn shiori_sequential_both_conditions_present() {
     // First is surplus_heart negation (no surplus), second is surplus >=2
     assert!(actions[0]["condition"]["negation"].as_bool().unwrap_or(false));
     assert_eq!(actions[1]["condition"]["count"], 2);
+}
+
+#[test]
+fn shiori_p_and_ar_variants_share_floor() {
+    let abilities: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string("../cards/abilities.json").unwrap()).unwrap();
+    let uniq = abilities["unique_abilities"].as_array().unwrap();
+    for variant in ["PL!N-bp5-010-P", "PL!N-bp5-010-AR"] {
+        let entry = uniq
+            .iter()
+            .find(|a| {
+                a["cards"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|c| c.as_str().unwrap().contains(variant))
+            })
+            .unwrap_or_else(|| panic!("{} should exist", variant));
+        assert_eq!(entry["effect"]["effect_constraint"], "min:0", "{} parent floor", variant);
+        assert_eq!(entry["effect"]["score_floor"], 0);
+    }
+}
+
+#[test]
+fn shiori_surplus_one_no_change() {
+    // Surplus 1 -> neither +1 (needs 0) nor -1 (needs >=2) should fire.
+    // Verify the two conditions are mutually exclusive and cover 0 and >=2 only.
+    let abilities: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string("../cards/abilities.json").unwrap()).unwrap();
+    let entry = abilities["unique_abilities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| {
+            a["cards"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|c| c.as_str().unwrap().contains("PL!N-bp5-010-R"))
+        })
+        .unwrap();
+    let cond0 = &entry["effect"]["actions"][0]["condition"];
+    let cond1 = &entry["effect"]["actions"][1]["condition"];
+    assert!(cond0["negation"].as_bool().unwrap(), "first is no surplus");
+    assert_eq!(cond0["resource_type"], "surplus_heart");
+    assert_eq!(cond1["count"], 2);
+    assert_eq!(cond1["resource_type"], "surplus_heart");
+    // No single surplus value satisfies both: 0 satisfies first, >=2 satisfies second, 1 satisfies neither.
+}
+
+#[test]
+fn shiori_p2_live_total_floor() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let shiori = game.id("PL!N-bp5-010-R");
+    // Put shiori on p2's stage
+    game.state.player2.stage.stage = [shiori, -1, -1];
+    game.state.mods.p2_constant_total_score_bonus = 0;
+    game.state.player2.live_card_zone.cards.clear();
+    game.state.player2.success_live_card_zone.cards.clear();
+    game.state.activating_card = Some(shiori);
+    game.state.ability_queue.push_constant_context("p2".to_string());
+    let abilities: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string("../cards/abilities.json").unwrap()).unwrap();
+    let entry = abilities["unique_abilities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| {
+            a["cards"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|c| c.as_str().unwrap().contains("PL!N-bp5-010-R"))
+        })
+        .unwrap();
+    let action_json = entry["effect"]["actions"][1].clone();
+    let effect: AbilityEffect = serde_json::from_value(action_json).unwrap();
+    let mut resolver = AbilityResolver::new(db, Some(shiori));
+    resolver.execute_modify_score(&mut game.state, &effect).unwrap();
+    assert_eq!(
+        game.state.mods.p2_constant_total_score_bonus, 0,
+        "p2 floor: 0 + (-1) should stay 0"
+    );
+    assert_eq!(game.state.mods.p1_constant_total_score_bonus, 0, "p1 unaffected");
+    game.state.ability_queue.pop_constant_context();
 }
