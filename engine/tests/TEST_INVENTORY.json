@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T17:26:18.474803+00:00",
+  "generated_at": "2026-08-26T17:29:04.925063+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
@@ -8,7 +8,7 @@
     "unique_abilities": 936
   },
   "n_files": 512,
-  "n_tests": 3050,
+  "n_tests": 3051,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -15185,6 +15185,7 @@
         "baad_cage_cost_limit_one_member_no_score",
         "baad_cage_cost_limit_two_hasunosora_members_grants_score",
         "baad_cage_three_members_score_still_one",
+        "bloom_choice_is_exclusive_other_hearts_zero",
         "bloom_live_start_choice_second_option_heart04",
         "bloom_live_start_choice_third_option_heart05",
         "bloom_live_start_heart_choice_changes_requirements",
@@ -15205,10 +15206,9 @@
         "kokoro_boundary_eleven_exactly_reaches_ten",
         "kokoro_decline_leaves_everything_untouched",
         "kokoro_high_member_sets_cost_and_grants_heart05",
-        "kokoro_no_dollchestra_in_hand_no_gate",
-        "live_card_own_live_success_no_trigger"
+        "kokoro_no_dollchestra_in_hand_no_gate"
       ],
-      "covering_test_count": 62,
+      "covering_test_count": 63,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -32243,6 +32243,7 @@
         "engine/tests/test_modules/q127_heart_set_plus_global_test.rs"
       ],
       "covering_tests": [
+        "bloom_choice_is_exclusive_other_hearts_zero",
         "bloom_live_start_choice_second_option_heart04",
         "bloom_live_start_choice_third_option_heart05",
         "bloom_live_start_heart_choice_changes_requirements",
@@ -32258,7 +32259,7 @@
         "q127_wien_plus_bloom_heart04_pattern",
         "q127_wien_plus_bloom_heart05_pattern"
       ],
-      "covering_test_count": 14,
+      "covering_test_count": 15,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -37817,6 +37818,7 @@
         "baad_cage_cost_limit_one_member_no_score",
         "baad_cage_cost_limit_two_hasunosora_members_grants_score",
         "baad_cage_three_members_score_still_one",
+        "bloom_choice_is_exclusive_other_hearts_zero",
         "bloom_live_start_choice_second_option_heart04",
         "bloom_live_start_choice_third_option_heart05",
         "bloom_live_start_heart_choice_changes_requirements",
@@ -37837,10 +37839,9 @@
         "kokoro_boundary_eleven_exactly_reaches_ten",
         "kokoro_decline_leaves_everything_untouched",
         "kokoro_high_member_sets_cost_and_grants_heart05",
-        "kokoro_no_dollchestra_in_hand_no_gate",
-        "live_card_own_live_success_no_trigger"
+        "kokoro_no_dollchestra_in_hand_no_gate"
       ],
-      "covering_test_count": 62,
+      "covering_test_count": 63,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

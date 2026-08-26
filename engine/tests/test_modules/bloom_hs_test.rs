@@ -205,3 +205,28 @@ fn bloom_live_start_choice_third_option_heart05() {
         .get_need_heart_modifier(bloom, rabuka_engine::card::HeartColor::Heart00);
     assert_eq!(heart0_mod, 1, "Bloom: heart0 should be set to 1");
 }
+
+#[test]
+fn bloom_choice_is_exclusive_other_hearts_zero() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let bloom = game.id("PL!HS-bp2-019-L");
+    let hasu = game.id("PL!HS-bp1-002-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..40 { game.state.player1.main_deck.cards.push(filler); }
+    for _ in 0..10 { game.state.player2.main_deck.cards.push(filler); }
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(bloom);
+    game.state.player1.stage.stage = [-1, hasu, -1];
+    game.give_energy(3);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(bloom);
+    advance_to_live_start(&mut game);
+    assert!(game.has_pending_choice());
+    game.select_option(0); // heart01
+    assert_eq!(game.state.mods.get_need_heart_modifier(bloom, rabuka_engine::card::HeartColor::Heart01), 2);
+    assert_eq!(game.state.mods.get_need_heart_modifier(bloom, rabuka_engine::card::HeartColor::Heart04), 0, "heart04 should stay 0 when heart01 chosen");
+    assert_eq!(game.state.mods.get_need_heart_modifier(bloom, rabuka_engine::card::HeartColor::Heart05), 0, "heart05 should stay 0 when heart01 chosen");
+    assert_eq!(game.state.mods.get_need_heart_modifier(bloom, rabuka_engine::card::HeartColor::Heart00), 1);
+}
