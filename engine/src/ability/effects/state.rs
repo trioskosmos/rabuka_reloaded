@@ -720,7 +720,14 @@ impl AbilityResolver {
             player.id.clone()
         };
         for &eid in &placed_energy {
-            gs.push_movement_event(eid, "energy_deck", "energy", cause_cid, &player_id, true);
+            gs.push_movement_event_typed(
+                eid,
+                crate::core::types::ZoneId::EnergyDeck,
+                crate::core::types::ZoneId::EnergyZone,
+                cause_cid,
+                &player_id,
+                true,
+            );
         }
     }
 

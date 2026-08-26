@@ -53,7 +53,14 @@ pub(crate) fn drain_under_cards_to_energy_zone(
             .current_entry()
             .map(|e| e.player_id.clone())
             .unwrap_or_else(|| "p1".to_string());
-        gs.push_movement_event(cid, "under_member", "energy_zone", gs.activating_card, &pid, true);
+        gs.push_movement_event_typed(
+            cid,
+            crate::core::types::ZoneId::UnderMember,
+            crate::core::types::ZoneId::EnergyZone,
+            gs.activating_card,
+            &pid,
+            true,
+        );
     }
     gs.recalculate_constants();
     moved

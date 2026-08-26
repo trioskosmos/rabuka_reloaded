@@ -2926,7 +2926,14 @@ impl AbilityResolver {
                 let moved_ids = [target_id, source_id];
                 for &cid in &moved_ids {
                     if cid != -1 {
-                        gs.push_movement_event(cid, "stage", "stage", cause_cid, &mover_pid, true);
+                        gs.push_movement_event_typed(
+                            cid,
+                            crate::core::types::ZoneId::Stage,
+                            crate::core::types::ZoneId::Stage,
+                            cause_cid,
+                            &mover_pid,
+                            true,
+                        );
                     }
                 }
             } else {
