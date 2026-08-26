@@ -74,6 +74,24 @@ NEGATIVE_RE = re.compile(r"(negative|cannot|not_|_not|cannot_activate|already_wa
 # choice/edge signals
 CHOICE_RE = re.compile(r"(has_pending_choice|pending_choice_type|select_indices|drain_auto|SelectCard|SelectTarget)")
 
+# Condition types encoding specific, rule-heavy requirements. Abilities with one
+# of these (or a use_limit) need explicit positive AND negative choice-level
+# tests, so they are surfaced separately from plain L0/L1 coverage.
+SPECIAL_CONDITION_TYPES = {
+    "ability_filter_condition",        # watches other ABILITIES resolving
+    "all_cost_comparison_condition",
+    "card_blade_condition",
+    "energy_state_condition",
+    "highest_cost_on_stage_condition",
+    "position_condition",
+    "state_change_condition",
+    "state_condition",
+}
+
+# Full-text markers for 自動 (jidou) interaction categories.
+WATCHES_ABILITIES_MARKER = "能力が解決"      # fires when another ability resolves
+EFFECT_CAUSE_MARKERS = ("効果によって", "効果でも発動する")  # effect-caused / also fires off opponent effects
+
 FN_TEST_RE = re.compile(r"^\s*#\[test\]\s*\n\s*(?:pub\s+)?fn\s+(\w+)", re.MULTILINE)
 COVERS_RE = re.compile(r"@covers\s+([A-Z0-9!+\-]+\S*)", re.IGNORECASE)
 
@@ -324,6 +342,10 @@ def build_inventory():
         depth, flags = infer_ability_depth(covering_texts, covered_rels, covering_fns)
         if not covered:
             depth = "none"
+
+        # jidou (自動) interaction flags
+        watches_abilities = WATCHES_ABILITIES_MARKER in full_text
+        effect_cause = any(m in full_text for m in EFFECT_CAUSE_MARKERS)
 
         # dedup
         covered_rels = sorted(set(covered_rels))

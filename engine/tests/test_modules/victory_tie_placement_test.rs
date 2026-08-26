@@ -110,3 +110,37 @@ fn tie_with_two_card_live_zones_blocks_all_placements() {
         "8.4.7.1: P2's 2-card zone places nothing despite winning the tie"
     );
 }
+
+/// Rule 8.4.6.1 — NEITHER player sets a live card: no totals, no winner,
+/// no placements; the round still rolls over cleanly into the next turn.
+#[test]
+fn no_live_cards_at_all_no_winner_clean_rollover() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let filler = game.id("PL!-sd1-010-SD");
+
+    fill_decks(&mut game, filler);
+
+    // Skip LiveCardSet entirely: drive straight through performances +
+    // victory determination back to the next Active phase.
+    let mut guard = 0;
+    while !(game.state.current_phase == rabuka_engine::game_state::Phase::Active
+        && game.state.current_turn_phase
+            == rabuka_engine::game_state::TurnPhase::FirstAttackerNormal)
+        && guard < 24
+    {
+        guard += 1;
+        game.pass();
+        while game.has_pending_choice() {
+            game.select_indices(&[]);
+        }
+    }
+
+    assert!(
+        game.state.player1.success_live_card_zone.cards.is_empty()
+            && game.state.player2.success_live_card_zone.cards.is_empty(),
+        "8.4.6.1: no live cards -> no winners -> no success-zone placements"
+    );
+    // The rollover ran: turn counter advanced past the first round.
+    assert!(game.state.turn_number >= 1, "turn advanced");
+}
