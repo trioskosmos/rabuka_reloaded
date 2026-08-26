@@ -541,3 +541,4 @@ pub mod cross_player_interaction_test;
 pub mod opponent_live_success_flow_test;
 pub mod combined_ability_chain_test;
 pub mod cross_player_round5_test;
+pub mod integration_blindspot_test;

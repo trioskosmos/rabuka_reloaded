@@ -52,6 +52,39 @@ both players fire same phase), 5.2.1 (ウェイトにする has no state precond
 9.6.3.1/.1.3 (exact-count must choose when possible; zero eligible ⇒ ignored,
 no prompt), Q267 (mill deck-out refresh).
 
+## §6 Round 6 — finder blind spots (integration-level)
+
+Gaps the per-ability inventory structurally cannot see; new file
+`integration_blindspot_test.rs`:
+
+1. **Real-rollover expiry** — live_end temporary effects were only ever
+   expired by CALLING `check_expired_effects()` directly with a hand-set turn
+   phase (modifier_layer_characterization_test). Nothing proved the actual
+   victory→Active rollover (`turn/phases.rs`) invokes it. New test grants via a
+   real ability INSIDE the live, passes through performances/victory, asserts
+   the grant reverts exactly at the rollover.
+2. **Dual-trigger second windows** — 13 abilities carry 「登場/ライブ開始時」;
+   tests always fire ONE window manually. PL!N-bp5-004-R 果林 had debut-only
+   coverage, PL!HS-bp6-004-R 吟子 live-start-only. New tests drive the missing
+   windows through REAL flow (play_to_stage / phase advance), including gate
+   edges: original-blade==EXACTLY-4 (果林) and cost<=9 (吟子).
+3. Flow lesson pinned by these tests: after a mid-turn main-phase action, the
+   fixed 5-pass walk lands on the WRONG seat's LiveCardSet — drive phases
+   explicitly; SelectAutoAbility prompts must be answered with SELECTIONS
+   (empty answer declines the resolution under test).
+
+Observation (not yet fixed): 果林's dual-trigger change_state raises a
+pay_optional_cost-style gate despite no `optional` flag in her parsed effect —
+answering "Yes" resolves correctly, so behavior is right but the gate is
+suspect; left as an audit note.
+
+Ruling gaps surfaced for future rounds: Q29 (arrival-turn baton-touch ban —
+mechanism `deployed_this_turn` exists and is cleared at rollover; covered
+indirectly via kasumi/sumire_bp4/qa_new_tests198 but no direct Q29 pin),
+Q31 (duplicate card numbers in live zone — implicitly covered by
+performance_snapshot_audit test 2 using two copies of one card number),
+Q39/Q34/Q33 (yell-before-heart-check ordering + live-card cleanup timing).
+
 ## ﾂｧ2 Zone-change / source-gate audit (round 2)
 
 Systematic scan of every trigger-gate key in abilities.json (zone_change
