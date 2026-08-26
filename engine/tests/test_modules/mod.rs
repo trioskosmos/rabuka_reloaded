@@ -539,3 +539,4 @@ pub mod dive_false_trigger_test;
 pub mod zone_change_gate_test;
 pub mod cross_player_interaction_test;
 pub mod opponent_live_success_flow_test;
+pub mod combined_ability_chain_test;
