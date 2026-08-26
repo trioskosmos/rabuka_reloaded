@@ -90,6 +90,26 @@ Q31 (duplicate card numbers in live zone — implicitly covered by
 performance_snapshot_audit test 2 using two copies of one card number),
 Q39/Q34/Q33 (yell-before-heart-check ordering + live-card cleanup timing).
 
+## §7 Round 7 — non-ability game systems (phase machine)
+
+New `phase_machine_rules_test.rs` — systems with no ability text that the
+ability inventory structurally cannot see. Empirical facts now pinned:
+
+| Rule | Pinned behavior |
+|---|---|
+| 7.4.1 | Waited member + waited energy stand ONLY for the turn player across the Active→Energy boundary; the other player's persist |
+| 7.5.2 | Energy phase moves the TOP energy-deck card into the zone (executes on the Energy→Draw transition); EMPTY deck = silent skip, no panic |
+| 7.6.2+Q267 | Draw phase draws exactly 1 even from an empty main deck — waitroom refresh feeds it silently (deck ends at waitroom−1) |
+
+CRITICAL identity model for future tests: `is_first_attacker` NEVER flips
+(fixed RPS result); the turn player comes from `current_turn_phase`
+(FirstAttackerNormal / SecondAttackerNormal). Several earlier test drafts
+wrongly assumed the flag tracks the turn.
+
+Also pinned implicitly: `deck_refreshed_this_turn` is set ONLY by explicit
+effect-driven refreshes (mill/look overdraw), NOT by the silent phase-draw
+refresh — an internal-marker distinction, documented on the test.
+
 ## ﾂｧ2 Zone-change / source-gate audit (round 2)
 
 Systematic scan of every trigger-gate key in abilities.json (zone_change
