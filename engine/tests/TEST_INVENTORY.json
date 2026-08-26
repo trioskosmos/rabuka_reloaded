@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T17:34:11.340808+00:00",
+  "generated_at": "2026-08-26T17:37:47.826068+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 512,
-  "n_tests": 3052,
+  "n_files": 513,
+  "n_tests": 3055,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -10140,6 +10140,7 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/sp_bp2_004_highest_cost_edge_test.rs",
         "engine/tests/test_modules/sumire_bp2_center_cost_test.rs"
       ],
       "covering_tests": [
@@ -10151,10 +10152,13 @@
         "center_lower_cost_no_heart",
         "center_not_highest_right_is",
         "center_tied_with_right_no_heart",
+        "sp_bp2_004_center_highest_with_empty_side",
+        "sp_bp2_004_center_tie_with_both_sides_no_heart",
+        "sp_bp2_004_p_variant_same",
         "sumire_at_center_highest_gains_heart",
         "three_distinct_costs_center_highest"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 13,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10627,6 +10631,7 @@
         "engine/tests/test_modules/dazzling_test.rs",
         "engine/tests/test_modules/kanon_test.rs",
         "engine/tests/test_modules/nonfiction_cost_comparison_test.rs",
+        "engine/tests/test_modules/sp_bp2_004_highest_cost_edge_test.rs",
         "engine/tests/test_modules/sumire_bp2_center_cost_test.rs",
         "engine/tests/test_modules/untested_abilities_batch16_test.rs",
         "engine/tests/test_modules/untested_abilities_batch18_test.rs",
@@ -10664,7 +10669,7 @@
         "keke_look_select_liella_with_blade_heart",
         "keke_look_select_sunny_passion_member"
       ],
-      "covering_test_count": 88,
+      "covering_test_count": 91,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -10699,6 +10704,7 @@
         "engine/tests/test_modules/dazzling_test.rs",
         "engine/tests/test_modules/kanon_test.rs",
         "engine/tests/test_modules/nonfiction_cost_comparison_test.rs",
+        "engine/tests/test_modules/sp_bp2_004_highest_cost_edge_test.rs",
         "engine/tests/test_modules/sumire_bp2_center_cost_test.rs",
         "engine/tests/test_modules/untested_abilities_batch16_test.rs",
         "engine/tests/test_modules/untested_abilities_batch18_test.rs",
@@ -10736,7 +10742,7 @@
         "keke_look_select_liella_with_blade_heart",
         "keke_look_select_sunny_passion_member"
       ],
-      "covering_test_count": 88,
+      "covering_test_count": 91,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -16570,6 +16576,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/mod.rs",
+        "engine/tests/test_modules/sp_bp2_004_highest_cost_edge_test.rs",
         "engine/tests/test_modules/sumire_bp2_center_cost_test.rs"
       ],
       "covering_tests": [
@@ -16581,10 +16588,13 @@
         "center_lower_cost_no_heart",
         "center_not_highest_right_is",
         "center_tied_with_right_no_heart",
+        "sp_bp2_004_center_highest_with_empty_side",
+        "sp_bp2_004_center_tie_with_both_sides_no_heart",
+        "sp_bp2_004_p_variant_same",
         "sumire_at_center_highest_gains_heart",
         "three_distinct_costs_center_highest"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 13,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
