@@ -11,6 +11,8 @@ fn main() {
     println!("cargo:rerun-if-changed={}", abilities_gen.display());
     let build_bin_z = Path::new(&manifest_dir).join("../cards/build/abilities.bin.z");
     println!("cargo:rerun-if-changed={}", build_bin_z.display());
+    let manifest_path = Path::new(&manifest_dir).join("../cards/build/generation_manifest.json");
+    println!("cargo:rerun-if-changed={}", manifest_path.display());
 
     // Binary blobs embedded via include_bytes! in the *_gen.rs modules.
     // include_bytes! itself does track these files for change detection, but
@@ -48,6 +50,27 @@ fn main() {
             if gen_time < abilities_time {
                 println!("cargo:warning=abilities_gen.rs is older than abilities.json – run `python cards/compile_abilities.py`");
                 stale = true;
+            }
+        }
+    }
+    // Also check generation_manifest.json freshness — its fileInputs.sha256 must match abilities.json.
+    let manifest_path = Path::new(&manifest_dir).join("../cards/build/generation_manifest.json");
+    if let (Ok(abilities_meta), Ok(manifest_meta)) = (std::fs::metadata(&abilities_json), std::fs::metadata(&manifest_path)) {
+        if let (Ok(abilities_time), Ok(manifest_time)) = (abilities_meta.modified(), manifest_meta.modified()) {
+            if manifest_time < abilities_time {
+                println!("cargo:warning=generation_manifest.json is older than abilities.json – re-run `python cards/compile_abilities.py` or `python ability_extraction/extract_card_abilities.py`");
+                stale = true;
+            }
+        }
+        // Self-hash check: manifest's own inputs sha must match current abilities.json hash (cheap string check).
+        if let (Ok(manifest_text), Ok(abilities_bytes)) = (std::fs::read_to_string(&manifest_path), std::fs::read(&abilities_json)) {
+            // abilities.json hash is hex of sha256 — manifest stores it under fileInputs["abilities.json"] if present.
+            // We just check that the manifest text contains the current file length as a cheap freshness signal when hash lib not linked.
+            // Full sha verification lives in `cards/test_inventory.py --check` and CI; build.rs keeps a cheap mtime+size guard.
+            let abilities_len = abilities_bytes.len().to_string();
+            if !manifest_text.contains(&abilities_len) {
+                // Not a hard error — size can legitimately differ after regen lag, but flag for attention.
+                println!("cargo:warning=generation_manifest.json may be stale (size hint {} not found) – regenerate", abilities_len);
             }
         }
     }

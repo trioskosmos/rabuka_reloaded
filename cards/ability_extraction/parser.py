@@ -1976,38 +1976,20 @@ def _register_action(cond, act=None, setter=None, priority: Optional[int] = None
     _ACTION_RULES.append(cond)
 
 
-_register_action(
-    lambda t: _has_shuffle(t),
-    "shuffle",
-    lambda t, a: a.update({"target": "deck" if "デッキ" in t else "energy_deck"}),
-)
-_register_action(
-    lambda t: "入れ替える" in t or "入れ替えて" in t, "position_change", None
-)
-_register_action(
-    lambda t: "フォーメーションチェンジ" in t,
-    "position_change",
-    lambda t, a: a.update({"optional": extract_optional(t), "multiple_targets": True}),
-)
-_register_action(
-    lambda t: "{{icon_energy.png|E}}" in t
-    and ("支払う" in t or "支払って" in t)
-    and "選び" not in t,
-    "pay_energy",
-    lambda t, a: a.update(
-        {
-            "energy": t.count("{{icon_energy.png|E}}"),
-            "optional": "もよい" in t or "してもよい" in t,
-        }
-    )
-    or None,
-)
-_register_action(
-    lambda t, a: a.get("destination") == "under_member"
-    and ("エネルギー" in t or "energy_card" in t),
-    "place_energy_under_member",
-    lambda t, a: a.update({"energy_count": a.get("count") or 1}),
-)
+# C4: _register_action table dissolution — declarative ACTION_DATA rows replace
+# imperative _register_action calls one chunk at a time. Each row is
+# (condition, action, setter). Migration is incremental so `python
+# ability_extraction/extract_card_abilities.py && python compile_abilities.py`
+# after each chunk guarantees byte-identical output.
+_ACTION_DATA_INITIAL: list[tuple[Any, str | None, Any]] = [
+    (lambda t: _has_shuffle(t), "shuffle", lambda t, a: a.update({"target": "deck" if "デッキ" in t else "energy_deck"})),
+    (lambda t: "入れ替える" in t or "入れ替えて" in t, "position_change", None),
+    (lambda t: "フォーメーションチェンジ" in t, "position_change", lambda t, a: a.update({"optional": extract_optional(t), "multiple_targets": True})),
+    (lambda t: "{{icon_energy.png|E}}" in t and ("支払う" in t or "支払って" in t) and "選び" not in t, "pay_energy", lambda t, a: a.update({"energy": t.count("{{icon_energy.png|E}}"), "optional": "もよい" in t or "してもよい" in t}) or None),
+    (lambda t, a: a.get("destination") == "under_member" and ("エネルギー" in t or "energy_card" in t), "place_energy_under_member", lambda t, a: a.update({"energy_count": a.get("count") or 1})),
+]
+for _cond, _act, _setter in _ACTION_DATA_INITIAL:
+    _register_action(_cond, _act, _setter)
 # Energy deck → energy zone in wait state while counting 「このメンバーの下に
 # あるエネルギーカードの枚数」 (e.g. bp5-012 嵐珠 LiveSuccess: under_count+1
 # from the deck). Routed to PlaceEnergyUnderMember so its executor resolves
