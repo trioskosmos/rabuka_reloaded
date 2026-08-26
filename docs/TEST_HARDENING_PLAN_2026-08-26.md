@@ -73,10 +73,15 @@ Gaps the per-ability inventory structurally cannot see; new file
    explicitly; SelectAutoAbility prompts must be answered with SELECTIONS
    (empty answer declines the resolution under test).
 
-Observation (not yet fixed): 果林's dual-trigger change_state raises a
-pay_optional_cost-style gate despite no `optional` flag in her parsed effect —
-answering "Yes" resolves correctly, so behavior is right but the gate is
-suspect; left as an audit note.
+RESOLVED observation: 果林's dual-trigger change_state raises a
+「Pay optional cost: Put this member to wait state?」 gate during resolution.
+NOT a bug: her printed text is 「このメンバーをウェイトにしてもよい：相手の…」
+— an optional self-cost that the parser correctly emits as
+cost={optional:true, self_cost:true} and the engine correctly gates on.
+Initial "suspect gate" diagnosis came from reading only `effect`, never
+`cost`; the new permanent [PAY_SKIP_GATE] diagnostic (resolver.rs) logs
+route+description for every gate emission and would have answered this
+immediately.
 
 Ruling gaps surfaced for future rounds: Q29 (arrival-turn baton-touch ban —
 mechanism `deployed_this_turn` exists and is cleared at rollover; covered

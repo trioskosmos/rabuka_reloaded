@@ -173,6 +173,12 @@ impl AbilityResolver {
         allow_skip: bool,
         options: Option<Vec<String>>,
     ) {
+        log::debug!(
+            "[PAY_SKIP_GATE] route={:?} desc_en={:?} desc_ja={:?}",
+            route.as_ref().map(|r| format!("{:?}", r)),
+            description_en,
+            description_ja
+        );
         self.pending_choice = Some(crate::ability::types::Choice::SelectTarget {
             target: crate::ability::types::PAY_SKIP_TARGET.to_string(),
             description: description_en.clone(),
