@@ -770,16 +770,24 @@ class PriorityRegistry:
 
     def __init__(self, name: str = "registry"):
         self._handlers: List[Tuple[int, str, Callable]] = []
+        self._post_normalizers: Dict[str, Callable] = {}
         self._name = name
         self._sorted = False
 
-    def register(self, priority: int, name: str, handler) -> None:
+    def register(self, priority: int, name: str, handler, post_normalize: Optional[Callable] = None) -> None:
         self._handlers.append((priority, name, handler))
+        if post_normalize is not None:
+            self._post_normalizers[name] = post_normalize
         self._sorted = False
 
     def unregister(self, name: str) -> None:
         self._handlers = [(p, n, h) for p, n, h in self._handlers if n != name]
+        self._post_normalizers.pop(name, None)
         self._sorted = False
+
+    def get_post_normalize(self, name: str) -> Optional[Callable]:
+        """Return the post-normalize callback registered for `name`, or None."""
+        return self._post_normalizers.get(name)
 
     def sorted_handlers(self):
         if not self._sorted:

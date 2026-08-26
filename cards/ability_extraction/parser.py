@@ -1597,6 +1597,9 @@ def parse_effect(text: str) -> Dict[str, Any]:
     for _priority, hn, handler in _effect_registry.sorted_handlers():
         result = handler(text)
         if result is not None:
+            _post = _effect_registry.get_post_normalize(hn)
+            if _post is not None:
+                result = _post(text, result)
             _merge_parenthetical(result, parenthetical)
             # Apply duration prefix info
             if "duration" in effect and "duration" not in result:
@@ -1758,6 +1761,9 @@ def parse_condition(text: str) -> Dict[str, Any]:
     for _priority, name, handler in _condition_registry.sorted_handlers():
         result = handler(text)
         if result is not None:
+            _post = _condition_registry.get_post_normalize(name)
+            if _post is not None:
+                result = _post(text, result)
             # Extract cost_limit and card_property from text for handlers
             # that don't set these fields themselves (e.g. _try_heart_possession).
             # Only extract when the key is truly absent (not just None) to avoid
