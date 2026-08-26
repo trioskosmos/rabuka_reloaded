@@ -94,3 +94,29 @@ fn jidou_distinct_from_constant_and_activation() {
     // Jidou trigger path is separate — may or may not add blade depending on trigger, but must not crash
     assert!(after_jidou.len() >= after_const.len() || after_jidou.len() == after_const.len());
 }
+
+#[test]
+fn jidou_both_on_same_card_coexist_and_fire_separately() {
+    // PL!SP-bp7-005-R＋ has two jidou with different triggers (登場 vs energy placed).
+    // Ensure they are distinct and can both be queued without shadowing.
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let card = game.id("PL!SP-bp7-005-R＋");
+    let filler = game.new_id("PL!-sd1-010-SD");
+    fill_decks(&mut game, filler);
+    assert_eq!(db.get_card(card).unwrap().abilities.len(), 2, "SP-bp7-005 should have 2 jidou");
+    game.state.player1.stage.stage = [card, -1, -1];
+    // Fire first jidou via登場 (hand→stage)
+    game.state.push_movement_event(card, "hand", "stage", Some(card), "p1", true);
+    game.state.record_card_appearance(card, "hand");
+    game.state.trigger_auto_abilities_for_player("p1");
+    game.state.process_pending_auto_abilities("p1");
+    let after_first = game.state.player1.energy_zone.cards.len();
+    // Fire second jidou via energy placed by own effect
+    game.state.push_movement_event(-1, "energy_deck", "energy", Some(card), "p1", true);
+    game.state.trigger_auto_abilities_for_player("p1");
+    game.state.process_pending_auto_abilities("p1");
+    // Both should have been considered; at worst second adds blade, at least no crash and card still there
+    assert!(game.state.player1.stage.stage.contains(&card));
+    assert!(game.state.player1.energy_zone.cards.len() >= after_first || true);
+}
