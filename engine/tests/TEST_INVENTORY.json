@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T15:31:01.518869+00:00",
+  "generated_at": "2026-08-26T16:29:22.910674+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 504,
-  "n_tests": 3020,
+  "n_files": 505,
+  "n_tests": 3025,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -7590,6 +7590,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/bp6_020_dancing_stars_watchers_test.rs",
+        "engine/tests/test_modules/jidou_combo_edge_test.rs",
         "engine/tests/test_modules/keke_bp5_test.rs",
         "engine/tests/test_modules/kotori_bp5_003_test.rs",
         "engine/tests/test_modules/qa_new_tests255.rs"
@@ -7604,6 +7605,11 @@
         "bp6020_ab1_non_mus_resolver_no_score_even_with_mus_staged_and_moved",
         "bp6020_ab1_once_per_turn_single_score_for_two_resolvers",
         "bp6020_ab1_q255_moved_before_resolution_scores",
+        "jidou_both_on_same_card_coexist_and_fire_separately",
+        "jidou_distinct_from_constant_and_activation",
+        "jidou_effect_cause_both_sides",
+        "jidou_paired_with_other_ability_both_fire",
+        "jidou_watching_live_start_resolve_triggers",
         "keke_discard_0_no_blade_heart_members",
         "keke_discard_1_no_blade_heart_member",
         "keke_discard_2_no_blade_heart_members",
@@ -7614,7 +7620,7 @@
         "kotori_ab1_discard_non_mus_recover_live",
         "q255_dancing_stars_live_success_after_position_change"
       ],
-      "covering_test_count": 18,
+      "covering_test_count": 23,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -7645,6 +7651,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/bp6_020_dancing_stars_watchers_test.rs",
+        "engine/tests/test_modules/jidou_combo_edge_test.rs",
         "engine/tests/test_modules/keke_bp5_test.rs",
         "engine/tests/test_modules/kotori_bp5_003_test.rs",
         "engine/tests/test_modules/qa_new_tests255.rs"
@@ -7659,6 +7666,11 @@
         "bp6020_ab1_non_mus_resolver_no_score_even_with_mus_staged_and_moved",
         "bp6020_ab1_once_per_turn_single_score_for_two_resolvers",
         "bp6020_ab1_q255_moved_before_resolution_scores",
+        "jidou_both_on_same_card_coexist_and_fire_separately",
+        "jidou_distinct_from_constant_and_activation",
+        "jidou_effect_cause_both_sides",
+        "jidou_paired_with_other_ability_both_fire",
+        "jidou_watching_live_start_resolve_triggers",
         "keke_discard_0_no_blade_heart_members",
         "keke_discard_1_no_blade_heart_member",
         "keke_discard_2_no_blade_heart_members",
@@ -7669,7 +7681,7 @@
         "kotori_ab1_discard_non_mus_recover_live",
         "q255_dancing_stars_live_success_after_position_change"
       ],
-      "covering_test_count": 18,
+      "covering_test_count": 23,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -9726,6 +9738,7 @@
         "engine/tests/test_modules/ability_combination_test.rs",
         "engine/tests/test_modules/bp7_ren_both_trigger_test.rs",
         "engine/tests/test_modules/bp7_ren_energy_placed_gain_blade_test.rs",
+        "engine/tests/test_modules/jidou_combo_edge_test.rs",
         "engine/tests/test_modules/trigger_scope_test.rs"
       ],
       "covering_tests": [
@@ -9733,6 +9746,11 @@
         "bp5_111_chain_neg_empty_opponent_stage",
         "hs_pb1_003_debut_discards_feed_auto_gain",
         "hs_pb1_003_no_discard_no_auto_gain",
+        "jidou_both_on_same_card_coexist_and_fire_separately",
+        "jidou_distinct_from_constant_and_activation",
+        "jidou_effect_cause_both_sides",
+        "jidou_paired_with_other_ability_both_fire",
+        "jidou_watching_live_start_resolve_triggers",
         "n_bp3_005_constant_grant_and_counting_auto_combo",
         "n_bp3_005_two_debuts_auto_silent_but_constant_grants",
         "ren_016_ab0_own_effect_places_energy_gains_blade",
@@ -9753,13 +9771,9 @@
         "ren_wrong_source_energy_move_does_not_trigger",
         "s1_bp7_005_opponent_caused_placement_does_not_fire",
         "s2_bp4_016_energy_placed_by_opponent_fires",
-        "s2_pb1_006_opponent_drag_arms_per_move",
-        "s2_pb1_006_own_debut_fires",
-        "s3_bp5_111_opponent_caused_move_does_not_fire",
-        "s3_bp5_111_own_move_fires",
-        "sp_bp7_005_double_auto_cascade"
+        "s2_pb1_006_opponent_drag_arms_per_move"
       ],
-      "covering_test_count": 29,
+      "covering_test_count": 34,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -9794,6 +9808,7 @@
         "engine/tests/test_modules/ability_combination_test.rs",
         "engine/tests/test_modules/bp7_ren_both_trigger_test.rs",
         "engine/tests/test_modules/bp7_ren_energy_placed_gain_blade_test.rs",
+        "engine/tests/test_modules/jidou_combo_edge_test.rs",
         "engine/tests/test_modules/trigger_scope_test.rs"
       ],
       "covering_tests": [
@@ -9801,6 +9816,11 @@
         "bp5_111_chain_neg_empty_opponent_stage",
         "hs_pb1_003_debut_discards_feed_auto_gain",
         "hs_pb1_003_no_discard_no_auto_gain",
+        "jidou_both_on_same_card_coexist_and_fire_separately",
+        "jidou_distinct_from_constant_and_activation",
+        "jidou_effect_cause_both_sides",
+        "jidou_paired_with_other_ability_both_fire",
+        "jidou_watching_live_start_resolve_triggers",
         "n_bp3_005_constant_grant_and_counting_auto_combo",
         "n_bp3_005_two_debuts_auto_silent_but_constant_grants",
         "ren_016_ab0_own_effect_places_energy_gains_blade",
@@ -9821,13 +9841,9 @@
         "ren_wrong_source_energy_move_does_not_trigger",
         "s1_bp7_005_opponent_caused_placement_does_not_fire",
         "s2_bp4_016_energy_placed_by_opponent_fires",
-        "s2_pb1_006_opponent_drag_arms_per_move",
-        "s2_pb1_006_own_debut_fires",
-        "s3_bp5_111_opponent_caused_move_does_not_fire",
-        "s3_bp5_111_own_move_fires",
-        "sp_bp7_005_double_auto_cascade"
+        "s2_pb1_006_opponent_drag_arms_per_move"
       ],
-      "covering_test_count": 29,
+      "covering_test_count": 34,
       "is_null": false,
       "use_limit": 2,
       "watches_abilities": false,
@@ -40859,6 +40875,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/bp6_020_dancing_stars_watchers_test.rs",
+        "engine/tests/test_modules/jidou_combo_edge_test.rs",
         "engine/tests/test_modules/qa_new_tests255.rs"
       ],
       "covering_tests": [
@@ -40871,9 +40888,14 @@
         "bp6020_ab1_non_mus_resolver_no_score_even_with_mus_staged_and_moved",
         "bp6020_ab1_once_per_turn_single_score_for_two_resolvers",
         "bp6020_ab1_q255_moved_before_resolution_scores",
+        "jidou_both_on_same_card_coexist_and_fire_separately",
+        "jidou_distinct_from_constant_and_activation",
+        "jidou_effect_cause_both_sides",
+        "jidou_paired_with_other_ability_both_fire",
+        "jidou_watching_live_start_resolve_triggers",
         "q255_dancing_stars_live_success_after_position_change"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 15,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": true,
@@ -40903,6 +40925,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/bp6_020_dancing_stars_watchers_test.rs",
+        "engine/tests/test_modules/jidou_combo_edge_test.rs",
         "engine/tests/test_modules/qa_new_tests255.rs"
       ],
       "covering_tests": [
@@ -40915,9 +40938,14 @@
         "bp6020_ab1_non_mus_resolver_no_score_even_with_mus_staged_and_moved",
         "bp6020_ab1_once_per_turn_single_score_for_two_resolvers",
         "bp6020_ab1_q255_moved_before_resolution_scores",
+        "jidou_both_on_same_card_coexist_and_fire_separately",
+        "jidou_distinct_from_constant_and_activation",
+        "jidou_effect_cause_both_sides",
+        "jidou_paired_with_other_ability_both_fire",
+        "jidou_watching_live_start_resolve_triggers",
         "q255_dancing_stars_live_success_after_position_change"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 15,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": true,

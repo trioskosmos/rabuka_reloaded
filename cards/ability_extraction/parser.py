@@ -6312,12 +6312,13 @@ def _fill_defaults_move_cards(action, text, action_text, _cached_source, _cached
 def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
     """Consolidated post-dispatch normalization. Fills defaults every action needs.
 
-    Field ownership: parse_action owns initial extraction of source,
+    Field ownership (C6): parse_action owns ALL field extraction (source,
     destination, count, card_type, target, state_change, cost_limit,
-    optional, max, position and group_names. This function only fills
-    fields those extractions left unset (guarded by `not in action`) plus
-    action-type-specific defaults, so it is also safe to call on fresh
-    sub-action dicts with the full sentence as `text`.
+    optional, max, position and group_names). This function ONLY fills
+    defaults for fields left unset (guarded by `not in action`) plus
+    action-type-specific defaults, so it is safe to call on fresh
+    sub-action dicts. No extraction should be added here — add it to
+    parse_action instead.
     """
     action_text = action.get("text", text) or text
     a = action.get("action")
