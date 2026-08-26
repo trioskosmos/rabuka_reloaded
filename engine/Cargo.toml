@@ -118,8 +118,12 @@ rand_chacha = "0.3"
 bincode = "1.3"
 
 [[bench]]
+# Requires the profiling feature so bare `cargo test` does not pull
+# criterion + its dependency tree into every test build. Run benches with:
+#   cargo bench --features profiling
 name = "performance"
 harness = false
+required-features = ["profiling"]
 
 [[bin]]
 name = "rabuka_engine"
@@ -201,4 +205,16 @@ test = false
 [[bin]]
 name = "hunt_loop"
 path = "src/bin/hunt_loop.rs"
+test = false
+
+# These two were previously auto-discovered from src/bin/ — without explicit
+# entries, bare `cargo test` built an empty unittest harness for each.
+[[bin]]
+name = "describe_dump"
+path = "src/bin/describe_dump.rs"
+test = false
+
+[[bin]]
+name = "turn_replay"
+path = "src/bin/turn_replay.rs"
 test = false
