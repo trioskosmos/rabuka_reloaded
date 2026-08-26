@@ -65,26 +65,28 @@ fn yoshiko_006_revived_from_discard_gains_blade() {
     v.activate_ability(mari);
 
     // Handle "select card from discard" choice
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectCard") => {
-                // Find yoshiko in waitroom after 008's cost moved 008 there too
-                let idx = v
-                    .state
-                    .player1
-                    .waitroom
-                    .cards
-                    .iter()
-                    .position(|&c| c == yoshiko)
-                    .unwrap();
-                v.select_indices(&[idx]);
-                // After selection, the MoveCards effect places 006 on stage
-                // Then 006's debut triggers
-                drain_auto(&mut v);
-            }
-            _ => v.select_indices(&[]),
-        }
-    }
+    assert!(
+        v.has_pending_choice(),
+        "MoveCards discard-selection prompt expected after 008 activation"
+    );
+    assert_eq!(
+        v.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (waiting room, count=1, no skip)"
+    );
+    // Find yoshiko in waitroom after 008's cost moved 008 there too
+    let idx = v
+        .state
+        .player1
+        .waitroom
+        .cards
+        .iter()
+        .position(|&c| c == yoshiko)
+        .unwrap();
+    v.select_indices(&[idx]);
+    // After selection, the MoveCards effect places 006 on stage
+    // Then 006's debut triggers
+    drain_auto(&mut v);
 
     assert!(
         v.state.player1.waitroom.cards.contains(&mari),

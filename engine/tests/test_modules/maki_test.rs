@@ -79,10 +79,18 @@ fn maki_q177_debut_triggers_draw_via_ab0() {
     // hand after play: filler only (1 card)
     let hand_after_play = game.state.player1.hand.cards.len();
 
-    // Pay optional cost (wait Maki herself as Center BiBi member)
-    if game.has_pending_choice() {
-        game.select_option(1);
-    }
+    // Pay optional cost (wait Maki herself as Center BiBi member).
+    // Observed: SelectTarget pay_optional_cost gate is offered.
+    assert!(
+        game.has_pending_choice(),
+        "optional wait-a-BiBi-member cost must be offered"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget optional-cost gate"
+    );
+    game.select_option(1);
     // Opponent chooses a member to wait (select cheap_opp at index 0)
     assert!(
         game.has_pending_choice(),
@@ -144,10 +152,18 @@ fn maki_edge_cost5_opponent_draws_nothing() {
     game.state.player1.stage.stage[1] = -1;
     game.play_to_stage(maki, rabuka_engine::zones::MemberArea::Center);
 
-    // Skip optional cost (choose "Skip" option index 0)
-    if game.has_pending_choice() {
-        game.select_option(0); // skip → no effect fires
-    }
+    // Skip optional cost (choose "Skip" option index 0).
+    // Observed: SelectTarget pay_optional_cost gate is offered.
+    assert!(
+        game.has_pending_choice(),
+        "optional wait cost must be offered"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget optional-cost gate"
+    );
+    game.select_option(0); // skip → no effect fires
     // Cost was skipped → opponent action doesn't fire → no choice
     while game.has_pending_choice() {
         game.select_indices(&[]);
@@ -199,10 +215,19 @@ fn maki_edge_no_opponent_member_no_draw() {
 
     let hand_after_play = game.state.player1.hand.cards.len();
 
-    // Skip optional cost (choose "Skip" option index 0)
-    if game.has_pending_choice() {
-        game.select_option(0);
-    }
+    // Skip optional cost (choose "Skip" option index 0).
+    // Observed: SelectTarget pay_optional_cost gate is offered even though
+    // the effect would have no targets.
+    assert!(
+        game.has_pending_choice(),
+        "optional wait cost must be offered"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget optional-cost gate"
+    );
+    game.select_option(0);
     // Opponent has no members → no pending choice after skip
     while game.has_pending_choice() {
         game.select_indices(&[]);

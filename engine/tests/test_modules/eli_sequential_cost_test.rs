@@ -42,9 +42,16 @@ fn eli_bp5_sequential_wait_then_discard_works() {
 
     // Remaining: looked_at selection — the first 5 are μ's cost 9 → match
     // Pick 1 to hand
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "looked_at selection prompt expected after hand discard"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (looked_at)"
+    );
+    game.select_indices(&[0]);
 
     // Hand had 2 cards after play, cost discarded 1 → hand = 1,
     // then looked_at selection added 1 → hand = 2

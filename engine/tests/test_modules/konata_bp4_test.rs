@@ -85,16 +85,33 @@ fn konata_bp4_deploy_non_blade_heart_member_stays_active() {
 
     game.play_to_stage(konata, MemberArea::Center);
 
-    if game.has_pending_choice() {
-        game.select_option(1);
-    }
+    // Observed chain (same as the BH test): SelectTarget optional 2E gate,
+    // then ONE SelectPosition for the deployed member.
+    assert!(
+        game.has_pending_choice(),
+        "optional 2E cost must be offered"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget optional-cost gate"
+    );
+    game.select_option(1);
 
-    if game.has_pending_choice() {
-        game.select_generated(0);
-    }
-    if game.has_pending_choice() {
-        game.select_generated(0); // choose position
-    }
+    assert!(
+        game.has_pending_choice(),
+        "position choice for the deployed member must appear"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectPosition"),
+        "expected SelectPosition prompt"
+    );
+    game.select_generated(0);
+    assert!(
+        !game.has_pending_choice(),
+        "no further prompts after the deploy position choice"
+    );
 
     // The deployed member must actually be on stage for this negative to
     // mean anything.

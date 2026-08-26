@@ -53,11 +53,19 @@ fn kinako_activate_discards_matching_card() {
     )
     .expect("activate_ability failed");
 
-    // Should have a pending choice to select the cost card
-    if game.has_pending_choice() {
-        // Select the first index (cost_card which is at hand index 0)
-        game.select_indices(&[0]);
-    }
+    // Should have a pending choice to select the cost card.
+    // Observed: SelectCard zone=hand count=1 (cost_limit filter applied).
+    assert!(
+        game.has_pending_choice(),
+        "cost-card selection must be prompted"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard cost prompt"
+    );
+    // Select the first index (cost_card which is at hand index 0)
+    game.select_indices(&[0]);
 
     // Verify cost_card was discarded from hand
     assert!(
@@ -110,12 +118,18 @@ fn kinako_q108_sumire_discard_no_blade() {
     )
     .expect("activate_ability failed");
 
-    // Select Sumire as cost card
-    if game.has_pending_choice() {
-        let t = game.pending_choice_type().unwrap_or_default();
-        eprintln!("[POST ACTIVATE] choice={:?}", t);
-        game.select_indices(&[0]);
-    }
+    // Select Sumire as cost card.
+    // Observed: SelectCard zone=hand count=1 is prompted.
+    assert!(
+        game.has_pending_choice(),
+        "cost-card selection must be prompted"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard cost prompt"
+    );
+    game.select_indices(&[0]);
 
     // Drain any remaining choices (debut ability activation followup, etc.)
     while game.has_pending_choice() {
@@ -175,10 +189,18 @@ fn kinako_q240_non_center_debut_activates() {
     )
     .expect("activate_ability failed");
 
-    // Select debut_card as cost
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Select debut_card as cost.
+    // Observed: SelectCard zone=hand count=1 is prompted.
+    assert!(
+        game.has_pending_choice(),
+        "cost-card selection must be prompted"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard cost prompt"
+    );
+    game.select_indices(&[0]);
     // Drain followup: if the debut ability triggers additional choices
     while game.has_pending_choice() {
         eprintln!("[CTRL DRAIN] choice={:?}", game.pending_choice_type());

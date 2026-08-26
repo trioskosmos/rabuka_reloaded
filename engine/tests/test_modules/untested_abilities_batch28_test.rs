@@ -29,9 +29,16 @@ fn pb1007_with_lilywhite_member_retrieves_mus_live() {
     game.state.player1.waitroom.cards.push(mus_live);
 
     game.activate_ability(me);
-    if game.has_pending_choice() {
-        game.select_indices(&[0, 1, 2]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "hand cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the 3-card hand cost"
+    );
+    game.select_indices(&[0, 1, 2]);
 
     assert!(
         game.state.player1.hand.cards.contains(&mus_live),
@@ -61,9 +68,16 @@ fn pb1007_without_lilywhite_member_no_retrieval() {
     game.state.player1.waitroom.cards.push(mus_live);
 
     game.activate_ability(me);
-    if game.has_pending_choice() {
-        game.select_indices(&[0, 1, 2]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "hand cost prompt expected even when retrieval condition fails"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the 3-card hand cost"
+    );
+    game.select_indices(&[0, 1, 2]);
 
     assert!(
         !game.state.player1.hand.cards.contains(&mus_live),

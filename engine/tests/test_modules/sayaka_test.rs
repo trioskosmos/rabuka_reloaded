@@ -30,9 +30,16 @@ fn sayaka_q63_ability_debut_no_cost_payment() {
 
     game.activate_ability(sayaka);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "member-from-discard selection prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the debut member pick (zone=discard)"
+    );
+    game.select_indices(&[0]);
 
     assert_eq!(
         game.state.player1.energy_zone.active_count(),
@@ -67,10 +74,17 @@ fn sayaka_q80_debut_to_vacated_area_same_turn() {
 
     game.activate_ability(sayaka);
 
-    if game.has_pending_choice() {
-        // Select the only eligible card in discard
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "member-from-discard selection prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the debut member pick (zone=discard)"
+    );
+    // Select the only eligible card in discard
+    game.select_indices(&[0]);
 
     // The area vacated by sayaka should now be filled by the new member
     assert_eq!(

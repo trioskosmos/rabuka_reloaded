@@ -69,27 +69,17 @@ fn setup_honoka(
     (honoka, deck_before)
 }
 
-/// Pay the optional cost: SelectTarget (pay/skip) → select "pay",
-/// then SelectCard (hand discard) → select [0].
+/// Pay the optional cost. OBSERVED on every variant: the cost is offered
+/// directly as a skippable SelectCard ("Select 1 card(s) from hand
+/// (or skip)") — no SelectTarget gate precedes it.
 fn pay_optional_cost(game: &mut TestGame) {
     assert!(game.has_pending_choice(), "Should have cost choice");
-    let ct = game.pending_choice_type();
-    match ct.as_deref() {
-        Some("SelectTarget") => {
-            game.select_option(1);
-        }
-        Some("SelectCard") => {
-            game.select_indices(&[0]);
-            return;
-        }
-        other => panic!("Unexpected cost choice type: {:?}", other),
-    }
-    if game.has_pending_choice() {
-        let ct2 = game.pending_choice_type();
-        if ct2.as_deref() == Some("SelectCard") {
-            game.select_indices(&[0]);
-        }
-    }
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard skippable discard-cost prompt"
+    );
+    game.select_indices(&[0]);
 }
 
 /// Pay cost and return the looked_at_cards count.
@@ -102,11 +92,19 @@ fn pay_cost_and_get_look_count(game: &mut TestGame) -> usize {
     game.state.looked_at_cards.len()
 }
 
-/// Select [0] from looked_at, then drain any remaining prompts.
+/// Answer the outstanding looked_at pick with [0], then drain any trailing
+/// SelectAutoAbility prompts.
 fn drain_after_look(game: &mut TestGame) {
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "looked_at pick must still be pending"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard looked_at prompt"
+    );
+    game.select_indices(&[0]);
     while game.has_pending_choice() {
         let ct = game.pending_choice_type();
         match ct.as_deref() {
@@ -118,21 +116,16 @@ fn drain_after_look(game: &mut TestGame) {
     }
 }
 
-/// Skip the optional cost entirely.
+/// Skip the optional cost entirely. OBSERVED: skippable SelectCard; the
+/// empty answer declines.
 fn skip_optional_cost(game: &mut TestGame) {
     assert!(game.has_pending_choice(), "Should have cost choice");
-    let ct = game.pending_choice_type();
-    match ct.as_deref() {
-        Some("SelectTarget") => {
-            game.select_option(0);
-        }
-        Some("SelectCard") => {
-            let _ = game.try_select_indices(&[]);
-        }
-        _ => {
-            let _ = game.try_select_indices(&[]);
-        }
-    }
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard skippable discard-cost prompt"
+    );
+    game.select_indices(&[]);
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +388,6 @@ fn honoka_bp5_selected_card_goes_to_hand() {
     pay_optional_cost(&mut game);
 
     assert!(game.has_pending_choice());
-    game.select_indices(&[0]);
     drain_after_look(&mut game);
 
     assert!(game.state.player1.hand.cards.contains(&target));
@@ -426,7 +418,6 @@ fn honoka_bp5_nonselected_goes_to_waitroom() {
 
     assert!(game.has_pending_choice());
     assert_eq!(game.state.looked_at_cards.len(), 3);
-    game.select_indices(&[0]);
     drain_after_look(&mut game);
 
     assert!(game.state.player1.hand.cards.contains(&card_a));
@@ -459,9 +450,12 @@ fn honoka_bp5_no_hand_cannot_pay_cost() {
 
     trigger_live_success(&mut game, honoka);
 
-    if game.has_pending_choice() {
-        let _ = game.try_select_indices(&[]);
-    }
+    // No hand cards exist -> the optional discard cost is unpayable and
+    // auto-skips (observed: no prompt at all, nothing looked at).
+    assert!(
+        !game.has_pending_choice(),
+        "unpayable optional cost (empty hand) must auto-skip without prompting"
+    );
 
     assert!(game.state.looked_at_cards.is_empty());
 }

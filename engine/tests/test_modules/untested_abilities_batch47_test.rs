@@ -127,9 +127,16 @@ fn pb2047_all_liella_stage_waits_enemy_cost_two_member() {
     game.add_to_hand(fodder);
     let enemy = fire_enemy_wait_test(&mut game, "PL!SP-PR-010-PR"); // cost 2
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // accept the discard
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional discard cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the discard cost"
+    );
+    game.select_indices(&[0]); // accept the discard
 
     assert_eq!(
         game.state.mods.get_orientation_modifier(enemy),
@@ -155,9 +162,16 @@ fn pb2047_non_liella_on_stage_no_enemy_wait() {
     game.state.player2.stage.stage[0] = enemy;
 
     fire_live_start(&mut game, live);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional discard cost prompt expected even when the wait condition fails"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the discard cost"
+    );
+    game.select_indices(&[0]);
 
     assert_ne!(
         game.state.mods.get_orientation_modifier(enemy),

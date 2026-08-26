@@ -54,9 +54,10 @@ fn performance_pipeline_blade_yell_heart_score() {
     game.set_live_card(live_card);
 
     // P2 sets the same live card
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    assert!(
+        !game.has_pending_choice(),
+        "setting P2's live card must not prompt (live-start costs resolve later)"
+    );
     game.state.player2.hand.cards.push(live_card);
     game.pass();
     game.set_live_card(live_card);

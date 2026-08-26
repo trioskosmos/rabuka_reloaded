@@ -144,6 +144,13 @@ fn cheer_pipeline_score_icon() {
     let mut saw_result = false;
     for _ in 0..10 {
         if game.has_pending_choice() {
+            // DASH's optional arrange is the only expected prompt here.
+            assert_eq!(
+                game.pending_choice_type().as_deref(),
+                Some("SelectCard"),
+                "expected SelectCard (looked_at arrange), got {:?}",
+                game.pending_choice_type()
+            );
             game.select_indices(&[]);
             continue;
         }

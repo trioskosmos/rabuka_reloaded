@@ -121,10 +121,11 @@ fn ai_option_1_places_energy_under_nijigasaki_member() {
     assert!(game.has_pending_choice(), "choice should be offered");
     game.select_choice_option(1);
 
-    // If the engine asks which member to place under, pick one.
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // place_energy_under_member auto-resolves: no member-under prompt follows.
+    assert!(
+        !game.has_pending_choice(),
+        "place_energy_under_member must not prompt for the under-member"
+    );
 
     assert_eq!(
         game.state.player1.energy_deck.cards.len(),

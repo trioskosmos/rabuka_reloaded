@@ -23,9 +23,16 @@ fn run_flow(db: std::sync::Arc<rabuka_engine::card::CardDatabase>, replaced_no: 
     let deck_before = game.state.player1.main_deck.cards.len();
 
     game.play_to_stage(me, MemberArea::LeftSide);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "hand-discard prompt expected after the baton debut"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (hand, count=1)"
+    );
+    game.select_indices(&[0]);
 
     assert_eq!(
         game.state.player1.main_deck.cards.len(),

@@ -83,9 +83,16 @@ fn pr032_mills_shortfall_and_recovers_live_to_deck_top() {
         "waitroom 5 of 8 -> mill exactly 3"
     );
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // accept: put the live card on deck top
-    }
+    assert!(
+        game.has_pending_choice(),
+        "live-card retrieval prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the retrieval (zone=discard, allow_skip)"
+    );
+    game.select_indices(&[0]); // accept: put the live card on deck top
 
     assert_eq!(
         game.state.player1.main_deck.cards.first(),
@@ -112,9 +119,16 @@ fn pr032_declining_keeps_milled_cards_in_waitroom() {
 
     fire_debut(&mut game);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[]); // decline
-    }
+    assert!(
+        game.has_pending_choice(),
+        "live-card retrieval prompt expected (decline path)"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the retrieval (zone=discard, allow_skip)"
+    );
+    game.select_indices(&[]); // decline
 
     // Declined: the live card stays in the waitroom and never reaches the deck
     // (the test name promises "keeps milled cards in waitroom").

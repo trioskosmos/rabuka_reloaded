@@ -195,9 +195,16 @@ fn wwd_energy_not_ahead_after_cost_no_bonus() {
     } // opponent ahead either way
 
     fire_live_start(&mut game, live);
-    if game.has_pending_choice() {
-        game.select_option(1); // accept
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional energy-pay cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget (pay_optional_cost:skip)"
+    );
+    game.select_option(1); // accept
 
     assert_eq!(
         game.state.mods.get_score_modifier(live),

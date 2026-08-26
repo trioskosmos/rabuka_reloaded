@@ -41,6 +41,14 @@ fn run_full_turn(game: &mut TestGame) {
             break;
         }
         if game.has_pending_choice() {
+            // Only expected prompt in these flows: the LookAndSelect arrange
+            // (SelectCard from looked_at); empty answer is a legal skip.
+            assert_eq!(
+                game.pending_choice_type().as_deref(),
+                Some("SelectCard"),
+                "unexpected prompt during performance turn (expected looked_at SelectCard), got {:?}",
+                game.pending_choice_type()
+            );
             game.select_indices(&[]);
         } else {
             game.pass();

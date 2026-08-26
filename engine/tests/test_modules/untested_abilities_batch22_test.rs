@@ -22,9 +22,16 @@ fn look5_reveal_cost9_member(db: std::sync::Arc<rabuka_engine::card::CardDatabas
     // me rests itself as part of the cost
     assert!(game.has_pending_choice(), "optional discard cost offered");
     game.select_indices(&[0]); // discard fodder
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // select the qualifying member (deck top)
-    }
+    assert!(
+        game.has_pending_choice(),
+        "looked-at reveal prompt expected after paying the cost"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (looked_at, count=1)"
+    );
+    game.select_indices(&[0]); // select the qualifying member (deck top)
 
     assert!(
         game.state.player1.hand.cards.contains(&target),

@@ -280,12 +280,12 @@ fn pr_ai_empty_deck_no_draw_no_hang() {
 
     game.play_to_stage(ai, MemberArea::Center);
 
-    // Cost should be skipped (only 1 card in hand at the time of cost).
-    // Even if a choice is presented, calling select_indices on an empty
-    // list is a no-op skip.
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Cost should be skipped (only 1 card in hand at the time of cost):
+    // no prompt at all — zero eligible candidates auto-skip.
+    assert!(
+        !game.has_pending_choice(),
+        "cost with no eligible cards must auto-skip without prompting"
+    );
 
     // Hand should still be 0 (no draw possible from empty deck).
     assert_eq!(

@@ -75,9 +75,16 @@ fn look_and_select_any_number_full_selection() {
 
     // Select both looked-at cards
     game.select_indices(&[0]);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "second looked_at selection prompt expected (1 card remaining)"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the remaining looked_at pick"
+    );
+    game.select_indices(&[0]);
 
     // Resolve order prompt (any_order)
     while game.has_pending_choice() {
@@ -237,14 +244,17 @@ fn setup_yoshiko_test(game: &mut TestGame, top_cards: Vec<i16>) -> i16 {
 }
 
 fn pay_optional_cost(game: &mut TestGame) {
-    if game.has_pending_choice() {
-        let pc = game.get_pending_choice();
-        if matches!(pc, rabuka_engine::ability::types::Choice::SelectCard { zone, allow_skip: true, .. } if zone == "hand")
-        {
-            // Select index 0 (the filler card in hand)
-            game.select_indices(&[0]);
-        }
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional discard-from-hand cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard cost prompt (zone=hand, allow_skip)"
+    );
+    // Select index 0 (the filler card in hand)
+    game.select_indices(&[0]);
 }
 
 /// Member card with heart05=2 in looked-at → pick Member card → card to hand.

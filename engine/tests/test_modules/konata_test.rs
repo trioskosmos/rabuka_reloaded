@@ -34,9 +34,10 @@ fn konata_q77_debuted_this_turn_activates_energy() {
 
     game.activate_ability(konata);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        !game.has_pending_choice(),
+        "2E energy cost auto-pays; ability activation must not prompt"
+    );
 
     // The engine activates the first matching ability (ab#1: 2E → draw 1).
     // Net active change: -2E (ab#1 cost) = -2.
@@ -69,9 +70,10 @@ fn konata_no_debut_condition_fails() {
 
     game.activate_ability(konata);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        !game.has_pending_choice(),
+        "2E energy cost auto-pays even with no debut recorded; must not prompt"
+    );
 
     // No member debuted → debut_count_this_turn = 0, but ab#1 fires first:
     // Cost: 2E paid (active drops by 2). Draw 1 card.

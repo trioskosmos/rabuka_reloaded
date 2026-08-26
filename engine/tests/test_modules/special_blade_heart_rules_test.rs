@@ -129,7 +129,10 @@ fn accept_discard(game: &mut TestGame) {
         eprintln!("[DIA] accepting discard of {} revealed cards", count);
         game.select_indices(&(0..count).collect::<Vec<_>>());
     } else {
-        game.select_indices(&[]);
+        panic!(
+            "expected Dia's SelectCard yell-discard prompt, got {:?}",
+            game.get_pending_choice()
+        );
     }
 }
 

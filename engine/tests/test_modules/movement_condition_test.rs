@@ -232,26 +232,26 @@ fn chisato_movement_triggers_with_both_flags() {
     // Play Keke → debut → optional position change → swap with Chisato
     game.play_to_stage(keke, MemberArea::RightSide);
     game.drain_auto_ability_choices();
-    if game.has_pending_choice() {
-        match game.get_pending_choice().clone() {
-            rabuka_engine::ability::types::Choice::SelectTarget { target, .. }
-                if target == "position|destination" =>
-            {
-                let acts = game.generated_actions();
-                let left_idx = acts
-                    .iter()
-                    .position(|a| {
-                        a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("left")
-                    })
-                    .unwrap();
-                game.select_generated(left_idx);
-                game.drain_auto_ability_choices();
-            }
-            _ => {
-                game.select_indices(&[]);
-                game.drain_auto_ability_choices();
-            }
-        }
+    // Keke's position_change destination prompt is always offered here.
+    assert!(
+        game.has_pending_choice(),
+        "Keke position destination prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget (position|destination)"
+    );
+    {
+        let acts = game.generated_actions();
+        let left_idx = acts
+            .iter()
+            .position(|a| {
+                a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("left")
+            })
+            .unwrap();
+        game.select_generated(left_idx);
+        game.drain_auto_ability_choices();
     }
 
     // 千砂都 moved via Keke's position change → TAS fired automatically

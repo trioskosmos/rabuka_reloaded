@@ -42,9 +42,16 @@ fn mia_q73_deck_has_live_card_after_refresh() {
     game.play_to_stage(mia, MemberArea::Center);
 
     // Debut auto ability fires: optional cost (discard 1 from hand)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // discard filler
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional discard cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the discard cost"
+    );
+    game.select_indices(&[0]); // discard filler
 
     // Now reveal_until_live_card runs. Deck has 3 fillers, then refreshes from waitroom.
     // The live card from waitroom gets revealed and goes to hand.
@@ -77,9 +84,16 @@ fn mia_q102_no_live_card_anywhere() {
     game.give_energy(10);
     game.play_to_stage(mia, MemberArea::Center);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // discard filler
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional discard cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the discard cost"
+    );
+    game.select_indices(&[0]); // discard filler
 
     // After reveal_until_live_card: deck should have 0 cards (all revealed)
     let deck_count = game.state.player1.main_deck.len();

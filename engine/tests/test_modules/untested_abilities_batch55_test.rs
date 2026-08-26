@@ -205,9 +205,16 @@ fn s1014_look4_takes_live_requiring_two_heart02() {
 
 fn fire_debut_accept(game: &mut TestGame, me: i16) {
     fire_trigger(game, me, AbilityTrigger::Debut, "登場");
-    if game.has_pending_choice() {
-        game.select_option(0); // hand-cost gates list pay first
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional discard cost prompt expected on debut"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (hand cost gate)"
+    );
+    game.select_option(0); // hand-cost gates list pay first
     let mut guard = 0;
     while game.has_pending_choice() && guard < 10 {
         guard += 1;

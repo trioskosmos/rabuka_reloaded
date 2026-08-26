@@ -9,10 +9,19 @@
 ///   reveal=true, per_group=true, per_group_count=1
 use crate::helpers::*;
 
+/// Pay the optional hand-discard cost. Observed on every Mei debut with a
+/// hand card: SelectCard zone=hand count=1 allow_skip=true.
 fn discard_cost_if_pending(game: &mut TestGame) {
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional discard cost must be offered (hand card present)"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard skippable discard-cost prompt"
+    );
+    game.select_indices(&[0]);
 }
 
 fn discard_before(game: &TestGame) -> usize {
@@ -20,10 +29,18 @@ fn discard_before(game: &TestGame) -> usize {
 }
 
 fn select_and_finish(game: &mut TestGame, count: usize) {
-    for _ in 0..count {
-        if game.has_pending_choice() {
-            game.select_indices(&[0]);
-        }
+    for i in 0..count {
+        assert!(
+            game.has_pending_choice(),
+            "look_and_select pick #{} must be prompted",
+            i + 1
+        );
+        assert_eq!(
+            game.pending_choice_type().as_deref(),
+            Some("SelectCard"),
+            "expected SelectCard looked_at prompt"
+        );
+        game.select_indices(&[0]);
     }
     while game.has_pending_choice() {
         game.select_indices(&[]);
@@ -133,14 +150,23 @@ fn mei_bp5_per_group_rejects_two_from_same_group() {
 
     discard_cost_if_pending(&mut game);
 
-    // Try to pick 2 cards from Love Live! series (indices [1, 2])
-    if game.has_pending_choice() {
-        let result = game.try_select_indices(&[1, 2]);
-        assert!(
-            result.is_err(),
-            "Per-group should reject 2 cards from same series"
-        );
-    }
+    // Try to pick 2 cards from Love Live! series (indices [1, 2]).
+    // Observed: SelectCard zone=looked_at count=3 is prompted and the
+    // engine rejects the same-group pair.
+    assert!(
+        game.has_pending_choice(),
+        "look_and_select prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard looked_at prompt"
+    );
+    let result = game.try_select_indices(&[1, 2]);
+    assert!(
+        result.is_err(),
+        "Per-group should reject 2 cards from same series"
+    );
     // After rejection, no further choices (ability terminated).
     assert!(
         !game.has_pending_choice(),

@@ -57,9 +57,12 @@ fn kanon_ab1_live_success_fires_but_live_fails_no_hearts() {
     advance_to_live_start(&mut game);
 
     // Skip LiveStart "unless pay" optional cost
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Observed: with insufficient energy the conditional-on-optional cost
+    // auto-skips and the discard fires directly — no prompt is offered.
+    assert!(
+        !game.has_pending_choice(),
+        "unpayable 'unless 2E' LiveStart cost must auto-skip without prompting"
+    );
 
     // Give 6 active energy for LiveSuccess optional cost
     for _ in 0..6 {
@@ -120,9 +123,12 @@ fn kanon_q93_partial_resolution_one_card() {
     advance_to_live_start(&mut game);
 
     // Skip the optional 2E cost → discard effect fires
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Observed: no energy means the conditional-on-optional cost auto-skips;
+    // the discard resolves directly without a prompt.
+    assert!(
+        !game.has_pending_choice(),
+        "unpayable 'unless 2E' LiveStart cost must auto-skip without prompting"
+    );
 
     // Q93: With 1 hand card and skipping the 2E cost,
     // the effect should discard cards from hand.
@@ -156,9 +162,12 @@ fn kanon_q93_partial_resolution_zero_cards() {
     advance_to_live_start(&mut game);
 
     // Skip optional cost → discard 2 fires, but 0 cards to discard → no-op
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Observed: the unpayable conditional-on-optional cost auto-skips and
+    // the (empty) discard resolves without a prompt.
+    assert!(
+        !game.has_pending_choice(),
+        "unpayable 'unless 2E' LiveStart cost must auto-skip without prompting"
+    );
 
     // Q93: With 0 hand cards, the discard does nothing (no error/crash)
     assert!(

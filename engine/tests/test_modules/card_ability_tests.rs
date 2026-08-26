@@ -394,18 +394,28 @@ fn mirakura_discard_then_draws_count_plus_one() {
 
     game.play_to_stage(ability_card, rabuka_engine::zones::MemberArea::Center);
 
-    // Cost may auto-pay (Exact match: 1 eligible = count=1) or create a Prompt choice.
-    // Handle both cases:
-    if game.has_pending_choice() {
-        // Choice created — select the one eligible card
-        let ct = game.pending_choice_type();
-        assert_eq!(ct, Some("SelectCard".to_string()));
-        game.select_indices(&[0]);
-        // Sequential re-prompt: skip to proceed to draw action
-        if game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
-    }
+    // Observed chain: the optional same-name discard is NOT auto-paid — it
+    // prompts as an any-number SelectCard ("Select any number of card(s)
+    // from hand"), then re-asks under cap ("Select more card(s) from hand
+    // (or skip to finish)"); the empty answer finalizes.
+    assert!(
+        game.has_pending_choice(),
+        "optional discard cost must be prompted"
+    );
+    let ct = game.pending_choice_type();
+    assert_eq!(ct, Some("SelectCard".to_string()));
+    game.select_indices(&[0]);
+    // Sequential re-prompt: skip to proceed to draw action
+    assert!(
+        game.has_pending_choice(),
+        "up-to-N re-ask expected after the discard"
+    );
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectCard".to_string()),
+        "expected SelectCard re-ask prompt"
+    );
+    game.select_indices(&[]);
 
     // Effect: draw 2 (1 discarded + 1 bonus)
     assert!(

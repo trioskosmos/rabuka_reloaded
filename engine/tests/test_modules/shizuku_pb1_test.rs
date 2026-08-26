@@ -149,9 +149,16 @@ fn shizuku_bp1_live_start_gains_chosen_heart() {
     game.pass();
     game.pass();
 
-    if game.has_pending_choice() {
-        game.select_option(1);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional discard cost prompt expected before heart selection"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget (pay_optional_cost:skip)"
+    );
+    game.select_option(1);
     assert!(
         game.has_pending_choice(),
         "heart color selection should be pending"

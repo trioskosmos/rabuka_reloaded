@@ -293,9 +293,10 @@ fn nozomi_bp3007_skipped_cost_means_no_look() {
         AbilityTrigger::LiveStart,
         "ライブ開始時",
     );
-    if game.has_pending_choice() {
-        game.select_option(0); // decline the optional cost
-    }
+    assert!(
+        !game.has_pending_choice(),
+        "empty hand → optional 2-discard auto-skips, must not prompt"
+    );
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }

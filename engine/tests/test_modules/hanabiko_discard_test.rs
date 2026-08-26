@@ -354,10 +354,13 @@ fn hanabiko_replaced_by_new_card_on_same_position_triggers() {
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     g.state.process_pending_auto_abilities(&pid);
 
-    // If recently_moved_cards was set, ab#0 should fire
-    if g.has_pending_choice() {
-        g.select_indices(&[]); // decline discard
-    }
+    // Observed: any ab#0 discard prompt from the replacement already surfaced
+    // and was drained during play_to_stage above; the explicit TAS scan here
+    // must not leave a fresh prompt behind.
+    assert!(
+        !g.has_pending_choice(),
+        "no fresh discard prompt expected after explicit TAS scan"
+    );
 }
 
 /// Baton touch: another card baton-touches to Hanabiko's position →

@@ -230,10 +230,18 @@ fn q196_activate_zero_members_on_stage() {
 
     // The engine auto-processes the self_cost (removes shizuku), then
     // presents a SelectCard for the move_cards cost step.
+    // Observed: SelectCard zone=hand count=1 allow_skip=false.
+    assert!(
+        game.has_pending_choice(),
+        "move_cards cost selection must be prompted"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard cost prompt"
+    );
     // Select 1 card to discard.
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    game.select_indices(&[0]);
 
     // Effect resolves: draw 1, then blade grant (no targets → skip)
     while game.has_pending_choice() {
@@ -281,15 +289,25 @@ fn q196_activate_with_niji_member_grants_blade() {
     )
     .expect("activate from hand");
 
-    // Self-cost removes shizuku, then SelectCard for remaining cost step
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Self-cost removes shizuku, then SelectCard for remaining cost step.
+    // Observed: SelectCard zone=hand count=1 allow_skip=false.
+    assert!(
+        game.has_pending_choice(),
+        "move_cards cost selection must be prompted"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard cost prompt"
+    );
+    game.select_indices(&[0]);
 
-    // Blade target selection: choose 1 虹ヶ咲 member
-    if game.has_pending_choice() {
-        game.select_generated(0);
-    }
+    // Blade target selection: with 上原歩夢 as the only 虹ヶ咲 member on
+    // stage the single candidate auto-resolves — no prompt (observed).
+    assert!(
+        !game.has_pending_choice(),
+        "lone blade-target candidate must auto-resolve without prompting"
+    );
 
     while game.has_pending_choice() {
         game.select_indices(&[]);

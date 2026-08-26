@@ -152,9 +152,16 @@ fn bs5019_success_zone_two_retrieves_two_members() {
 
     fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
     // 「2枚まで」 max selection: answer with both candidate indices at once.
-    if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "up-to-2 member selection prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (revealed_cards, count=2)"
+    );
+    game.select_indices(&[0, 1]);
     let mut guard = 0;
     while game.has_pending_choice() && guard < 10 {
         guard += 1;

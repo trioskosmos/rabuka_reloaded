@@ -31,12 +31,27 @@ fn run_look_reveal(db: std::sync::Arc<rabuka_engine::card::CardDatabase>, me_no:
     game.give_energy(15);
 
     game.play_to_stage(me, MemberArea::Center);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // pay optional discard cost
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // select the matching card (deck top)
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional discard cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the discard cost"
+    );
+    game.select_indices(&[0]); // pay optional discard cost
+
+    assert!(
+        game.has_pending_choice(),
+        "looked_at reveal prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the looked_at pick"
+    );
+    game.select_indices(&[0]); // select the matching card (deck top)
 
     assert!(
         game.state.player1.hand.cards.contains(&target),

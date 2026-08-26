@@ -65,11 +65,18 @@ fn bp6_021_accept_cost_scores_and_retrieves() {
     game.add_to_discard(mus_live);
 
     fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
-    // A single cost candidate is AUTO-PAID without a prompt (documented
-    // engine behavior); only answer if a prompt actually appeared.
-    if game.has_pending_choice() {
-        assert!(answer_optional(&mut game, true), "unexpected prompt shape");
-    }
+    // Even with a single cost candidate the optional gate IS offered
+    // (observed: SelectTarget pay_optional_cost:skip_optional_cost).
+    assert!(
+        game.has_pending_choice(),
+        "optional μ's-member cost gate must be offered"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget optional-cost gate"
+    );
+    assert!(answer_optional(&mut game, true), "unexpected prompt shape");
 
     assert_eq!(
         game.state.mods.get_score_modifier(live),
@@ -142,10 +149,11 @@ fn cl1_009_retrieves_cost_four_boundary() {
     game.state.revealed_cards.push(target);
 
     fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
-    // Single valid candidate may auto-resolve; only answer a real prompt.
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Single valid candidate auto-resolves — no selection prompt.
+    assert!(
+        !game.has_pending_choice(),
+        "single cost-4 candidate must auto-resolve without prompting"
+    );
 
     assert!(
         game.state.player1.hand.cards.contains(&target),
@@ -164,10 +172,11 @@ fn cl1_009_retrieves_cost_nine_boundary() {
     game.state.revealed_cards.push(target);
 
     fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
-    // Single valid candidate may auto-resolve; only answer a real prompt.
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Single valid candidate auto-resolves — no selection prompt.
+    assert!(
+        !game.has_pending_choice(),
+        "single cost-9 candidate must auto-resolve without prompting"
+    );
 
     assert!(
         game.state.player1.hand.cards.contains(&target),
@@ -229,10 +238,11 @@ fn hs_bp6_032_retrieves_low_cost_member() {
     game.state.revealed_cards.push(target);
 
     fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
-    // Single valid candidate may auto-resolve; only answer a real prompt.
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Single valid candidate auto-resolves — no selection prompt.
+    assert!(
+        !game.has_pending_choice(),
+        "single cost-4 candidate must auto-resolve without prompting"
+    );
 
     assert!(
         game.state.player1.hand.cards.contains(&target),

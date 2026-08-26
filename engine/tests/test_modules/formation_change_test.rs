@@ -65,10 +65,14 @@ fn stay_in_place_no_new_move() {
     game.select_option(0); // left → left (stay)
     assert!(game.has_pending_choice(), "Second choice");
     game.select_option(1); // center → center (stay)
-                           // Third choice may or may not be present — handle gracefully
-    if game.has_pending_choice() {
-        game.select_indices(&[2]); // right → right (stay)
-    }
+                           // Third choice is always offered (observed).
+    assert!(game.has_pending_choice(), "Third choice expected");
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget (position|destination)"
+    );
+    game.select_indices(&[2]); // right → right (stay)
 
     while game.has_pending_choice() {
         game.select_indices(&[0]);

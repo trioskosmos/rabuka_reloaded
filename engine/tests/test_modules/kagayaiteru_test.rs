@@ -61,10 +61,17 @@ fn kagayaiteru_live_success_draw_then_discard() {
     game.pass();
     game.pass();
 
-    // LiveSuccess fired: drew 2, then if hand > 0, a discard choice appears
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // LiveSuccess fired: drew 2, then a mandatory hand discard choice appears
+    assert!(
+        game.has_pending_choice(),
+        "post-LiveSuccess hand discard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the discard"
+    );
+    game.select_indices(&[0]);
 
     // After draws and discard, hand should have changed from initial
     let hand_after = game.state.player1.hand.cards.len();
@@ -109,10 +116,17 @@ fn kagayaiteru_q125_cannot_place_in_success_zone() {
     game.pass();
     game.pass();
 
-    // LiveSuccess fired (draw 2) and created a discard choice
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // LiveSuccess fired (draw 2) and created a mandatory hand discard choice
+    assert!(
+        game.has_pending_choice(),
+        "post-LiveSuccess hand discard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the discard"
+    );
+    game.select_indices(&[0]);
 
     // Pass again to complete LiveVictoryDetermination (move to success / waitroom)
     game.pass();

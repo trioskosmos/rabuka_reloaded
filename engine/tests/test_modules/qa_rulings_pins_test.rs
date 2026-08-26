@@ -31,9 +31,16 @@ fn q139_under_energy_moves_with_member() {
     }
 
     game.activate_ability(mover);
-    if game.has_pending_choice() {
-        game.select_generated(0);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "activation move-destination prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget (position|destination)"
+    );
+    game.select_generated(0);
     scan_autos_both(&mut game);
 
     assert_eq!(

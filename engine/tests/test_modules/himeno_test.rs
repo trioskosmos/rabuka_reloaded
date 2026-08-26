@@ -119,14 +119,22 @@ fn himeno_edge_no_mirakura_skips() {
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(himeno, rabuka_engine::zones::MemberArea::LeftSide);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    } // pay cost
+    assert!(
+        game.has_pending_choice(),
+        "optional hand-discard cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the cost"
+    );
+    game.select_indices(&[0]); // pay cost
       // Look_and_select shows 5 cards (group filter not applied at select level)
-      // Consume the looked_at choice
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    } // skip looked_at selection
+      // No みらくらぱーく！ among the top 5 → no looked_at reveal prompt appears.
+    assert!(
+        !game.has_pending_choice(),
+        "no mirakurapark match -> looked_at selection must be auto-skipped"
+    );
 
     assert!(!game.has_pending_choice(), "Ability should have ended");
     assert_eq!(

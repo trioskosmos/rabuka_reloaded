@@ -29,10 +29,17 @@ fn bp1009_activation_draws_one_discards_one() {
     let waitroom_before = game.state.player1.waitroom.cards.len();
 
     game.activate_ability(me);
-    if game.has_pending_choice() {
-        // Discard 1 from hand — pick index 0 (whichever card that is).
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "hand discard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the discard"
+    );
+    // Discard 1 from hand — pick index 0 (whichever card that is).
+    game.select_indices(&[0]);
 
     assert_eq!(game.state.player1.hand.cards.len(), 1, "net hand size stays 1");
     assert_eq!(
@@ -99,11 +106,18 @@ fn pb1024_live_success_keeps_non_selected_cards() {
 
     fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
     // Discard selection exists — discard the two drawn cards (last two indices).
-    if game.has_pending_choice() {
-        let n = game.state.player1.hand.cards.len();
-        assert!(n >= 2, "need at least the 2 drawn cards in hand");
-        game.select_indices(&[n - 2, n - 1]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "discard-2 prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the 2-card discard"
+    );
+    let n = game.state.player1.hand.cards.len();
+    assert!(n >= 2, "need at least the 2 drawn cards in hand");
+    game.select_indices(&[n - 2, n - 1]);
 
     assert!(
         game.state.player1.hand.cards.contains(&kept),

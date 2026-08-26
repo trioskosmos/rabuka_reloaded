@@ -56,50 +56,38 @@ fn deploy_target(
     .expect("play deployer to stage");
 
     // Deployer's debut: optional 2E → PAY.
-    if game.has_pending_choice() {
-        match game.get_pending_choice() {
-            Choice::SelectTarget { target: t, .. }
-                if t == "pay_optional_cost:skip_optional_cost"
-                    || t == "conditional_optional" =>
-            {
-                game.select_option(1);
-            }
-            _ => {}
+    // Observed: SelectTarget pay_optional_cost gate is offered.
+    match game.get_pending_choice() {
+        Choice::SelectTarget { target: t, .. }
+            if t == "pay_optional_cost:skip_optional_cost"
+                || t == "conditional_optional" =>
+        {
+            game.select_option(1);
         }
-    } else {
-        panic!("deployer's optional debut must offer the 2E payment");
+        other => panic!(
+            "deployer's optional 2E debut must offer the SelectTarget payment gate, got {:?}",
+            other
+        ),
     }
 
-    // Select the SAME-NAME target from hand. With exactly one same-name
-    // candidate the engine auto-selects (no prompt) — tolerate both shapes.
-    let mut hand_prompt_seen = false;
-    if game.has_pending_choice() {
-        if let Choice::SelectCard { zone, .. } = game.get_pending_choice() {
-            if zone == "hand" {
-                hand_prompt_seen = true;
-                let tpos = game
-                    .state
-                    .player1
-                    .hand
-                    .cards
-                    .iter()
-                    .position(|&c| c == target)
-                    .expect("target still in hand");
-                game.select_indices(&[tpos]);
-            }
-        }
-    }
-    let _ = hand_prompt_seen;
+    // Select the SAME-NAME target from hand: OBSERVED — with exactly one
+    // same-name candidate the engine auto-selects; NO hand prompt appears.
+    // The next pending choice is already the placement SelectPosition.
 
     // Place into the first offered area.
-    if game.has_pending_choice() {
-        if matches!(
+    // Observed: exactly one SelectPosition prompt appears after deployment.
+    assert!(
+        game.has_pending_choice(),
+        "position choice for the deployed member expected"
+    );
+    assert!(
+        matches!(
             game.get_pending_choice(),
             Choice::SelectPosition { .. }
-        ) {
-            game.select_generated(0);
-        }
-    }
+        ),
+        "expected SelectPosition prompt"
+    );
+    game.select_generated(0);
     // Whatever is pending NOW belongs to the DEPLOYED card's own debut
     // (its cost prompt etc.) — the caller drives and verifies it. Eating
     // it here would hide the very behavior these tests exist to check.

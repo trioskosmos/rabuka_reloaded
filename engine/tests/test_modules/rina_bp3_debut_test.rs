@@ -30,9 +30,18 @@ fn cost_paid_applies_wait_state() {
         "Should have optional cost choice"
     );
     game.select_option(1);
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Observed: after paying, the look_and_select prompt (SelectCard
+    // zone=looked_at count=2) appears; select nothing.
+    assert!(
+        game.has_pending_choice(),
+        "look_and_select prompt expected after paying cost"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard looked_at prompt"
+    );
+    game.select_indices(&[]);
 
     let orientation = game.state.mods.get_orientation_modifier(rin);
     assert_eq!(
@@ -214,10 +223,18 @@ fn select_both_cards_stay_on_deck() {
     );
     game.try_select_indices(&[0, 1]).unwrap();
 
-    // Order choice: pick first card (index 0) to be on top
-    if game.has_pending_choice() {
-        game.select_option(0);
-    }
+    // Order choice: pick first card (index 0) to be on top.
+    // Observed: SelectTarget target="order" is prompted.
+    assert!(
+        game.has_pending_choice(),
+        "order choice must be prompted after selecting both"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget order prompt"
+    );
+    game.select_option(0);
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
@@ -272,10 +289,18 @@ fn select_both_cards_any_order_card_b_on_top() {
     );
     game.try_select_indices(&[0, 1]).unwrap();
 
-    // Order choice: pick card_b (index 1) to be on top
-    if game.has_pending_choice() {
-        game.select_option(1);
-    }
+    // Order choice: pick card_b (index 1) to be on top.
+    // Observed: SelectTarget target="order" is prompted.
+    assert!(
+        game.has_pending_choice(),
+        "order choice must be prompted after selecting both"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget order prompt"
+    );
+    game.select_option(1);
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }

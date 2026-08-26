@@ -241,11 +241,6 @@ fn honoka_center_requirement_left_side_fails() {
         result.is_err(),
         "Ability should fail from left side (center required)"
     );
-    if let Ok(_) = result {
-        if game.has_pending_choice() {
-            game.select_indices(&[0]);
-        }
-    }
 }
 
 #[test]

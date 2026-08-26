@@ -147,12 +147,11 @@ fn riko_q130_opponent_multi_card_skips() {
     game.play_to_stage(riko, rabuka_engine::zones::MemberArea::LeftSide);
 
     // Opponent has 0 live cards (all filler) — move_cards with card_type: "live_card"
-    // finds no targets and auto-skips without setting optional_cost_evaluated.
-    // conditional_on_optional presents Skip/Pay. Choose "Skip" (option 0).
-    if game.has_pending_choice() {
-        game.assert_conditional_optional(&["Skip", "Pay"]);
-        game.select_option(0);
-    }
+    // finds no eligible targets and auto-skips silently; no Skip/Pay gate is presented.
+    assert!(
+        !game.has_pending_choice(),
+        "no eligible live-card targets -> move_cards must auto-skip without prompting"
+    );
 
     assert!(!game.has_pending_choice(), "No pending choices");
     assert_eq!(game.state.player2.hand.cards.len(), 3, "P2 hand untouched");
@@ -175,11 +174,11 @@ fn riko_q130_opponent_empty_hand_auto_skip() {
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(riko, rabuka_engine::zones::MemberArea::LeftSide);
 
-    // No discard prompt, but conditional_on_optional may present Skip/Pay.
-    if game.has_pending_choice() {
-        game.assert_conditional_optional(&["Skip", "Pay"]);
-        game.select_option(0);
-    }
+    // No discard prompt and no Skip/Pay gate: empty opponent hand auto-skips silently.
+    assert!(
+        !game.has_pending_choice(),
+        "empty opponent hand -> ability must resolve without any prompt"
+    );
 
     assert!(!game.has_pending_choice(), "Ability should resolve cleanly");
     assert_eq!(game.state.player2.hand.cards.len(), 0, "P2 empty hand");

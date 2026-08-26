@@ -85,9 +85,12 @@ fn maki_decline_no_blades() {
     }
 
     fire_live_start(&mut game, maki);
-    if game.has_pending_choice() {
-        game.select_indices(&[]); // decline
-    }
+    // No hand fodder exists -> the optional discard cost is unpayable and
+    // auto-skips (Q92): no prompt at all.
+    assert!(
+        !game.has_pending_choice(),
+        "unpayable optional cost (empty hand) must auto-skip without prompting"
+    );
 
     assert_eq!(
         game.state.mods.get_blade_modifier(maki),
@@ -109,9 +112,16 @@ fn maki_empty_success_zone_zero_blades() {
     game.add_to_hand(hand_fodder);
 
     fire_live_start(&mut game, maki);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // accept anyway
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional discard cost must be prompted when a hand card exists"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard skippable discard-cost prompt"
+    );
+    game.select_indices(&[0]); // accept anyway
 
     assert_eq!(
         game.state.mods.get_blade_modifier(maki),
@@ -172,9 +182,11 @@ fn honoka_decline_no_blades_anywhere() {
     game.state.player1.stage.stage[0] = mate_a;
 
     fire_live_start(&mut game, honoka);
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // No hand fodder exists -> the optional discard cost auto-skips (Q92).
+    assert!(
+        !game.has_pending_choice(),
+        "unpayable optional cost (empty hand) must auto-skip without prompting"
+    );
 
     assert_eq!(game.state.mods.get_blade_modifier(mate_a), 0);
 }

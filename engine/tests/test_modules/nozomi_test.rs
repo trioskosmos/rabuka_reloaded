@@ -40,9 +40,17 @@ fn nozomi_q229_baton_touch_triggers_discard_then_draw() {
     game.give_energy(13);
     game.play_to_stage(nozomi, rabuka_engine::zones::MemberArea::Center);
 
-    if game.has_pending_choice() {
-        game.try_select_indices(&[0, 1]).unwrap();
-    }
+    // P1 must discard down to 3 (mandatory SelectCard from hand).
+    assert!(
+        game.has_pending_choice(),
+        "P1 discard-to-3 prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (discard to 3)"
+    );
+    game.try_select_indices(&[0, 1]).unwrap();
 
     assert_eq!(
         game.state.player1.hand.cards.len(),

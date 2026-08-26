@@ -12,16 +12,30 @@ fn advance_to_live_set(game: &mut TestGame) {
 
 /// Helper: answer "choose self or opponent" with "自分" (self).
 fn choose_self(game: &mut TestGame) {
-    if game.has_pending_choice() {
-        game.select_option(0);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "self-or-opponent prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget self_or_opponent prompt"
+    );
+    game.select_option(0);
 }
 
 /// Helper: answer "choose self or opponent" with "相手" (opponent).
 fn choose_opponent(game: &mut TestGame) {
-    if game.has_pending_choice() {
-        game.select_option(1);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "self-or-opponent prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget self_or_opponent prompt"
+    );
+    game.select_option(1);
 }
 
 /// Deck starts with 2 cards → set_live_card draws 1 → look at 2, deck has 1.

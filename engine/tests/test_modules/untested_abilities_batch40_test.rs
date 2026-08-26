@@ -86,9 +86,16 @@ fn omoi_decline_no_blade_no_move() {
     game.state.player1.waitroom.cards.push(wr_member);
 
     fire_live_start(&mut game, live);
-    if game.has_pending_choice() {
-        game.select_indices(&[]); // decline
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional recovery prompt expected (waitroom member present)"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (discard-zone recovery, allow_skip)"
+    );
+    game.select_indices(&[]); // decline
 
     assert!(
         game.state.player1.waitroom.cards.contains(&wr_member),

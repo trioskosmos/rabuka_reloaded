@@ -32,9 +32,16 @@ fn natsumi_rain_draws_and_discards_with_hasunosora_on_stage() {
 
     let deck_before = game.state.player1.main_deck.cards.len();
     fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // choose which hand card to discard
-    }
+    assert!(
+        game.has_pending_choice(),
+        "hand discard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the discard"
+    );
+    game.select_indices(&[0]); // choose which hand card to discard
 
     assert_eq!(
         deck_before - game.state.player1.main_deck.cards.len(),
@@ -96,9 +103,16 @@ fn sd2_007_extra_draw_when_opponent_also_succeeded() {
 
     let deck_before = game.state.player1.main_deck.cards.len();
     fire_trigger(&mut game, setsuna, AbilityTrigger::LiveSuccess, "ライブ成功時");
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // choose which hand card to discard
-    }
+    assert!(
+        game.has_pending_choice(),
+        "hand discard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the discard"
+    );
+    game.select_indices(&[0]); // choose which hand card to discard
 
     assert_eq!(
         deck_before - game.state.player1.main_deck.cards.len(),

@@ -124,9 +124,16 @@ fn kanan_livestart_converts_all_hearts_to_heart04() {
     game.pass();
 
     // Kanan's LiveStart ability fires. Its cost is optional 2E — pay by selecting option 1.
-    if game.has_pending_choice() {
-        game.select_option(1);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "Kanan LiveStart optional 2E cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget (pay_optional_cost)"
+    );
+    game.select_option(1);
 
     // Verify heart_color_multiplier only contains Kanan (not filler)
     assert_eq!(

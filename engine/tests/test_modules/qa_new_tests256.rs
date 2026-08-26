@@ -35,22 +35,41 @@ fn q256_maki_reveal_crossroads_replacement() {
     // Play Maki to stage → debut triggers
     game.play_to_stage(maki, MemberArea::Center);
 
-    // Step 1: Optional reveal cost — choose 錯覚CROSSROADS from hand
-    // The reveal prompts a choice to select a live card from hand.
-    // crossroads was pushed after maki, so it's at index 0 in hand.
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Step 1: Optional reveal cost — observed: SelectCard zone=hand
+    // count=1 allow_skip=true; crossroads is at hand index 0.
+    assert!(
+        game.has_pending_choice(),
+        "reveal-cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard reveal-cost prompt"
+    );
+    game.select_indices(&[0]);
 
-    // Step 2: Effect step a — choose a card from success zone to return to hand
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Effect step a returns the success-zone card to hand AUTOMATICALLY
+    // (single candidate, can_skip=false -> no prompt), so the next thing
+    // pending is already the step-b replacement choice.
+    // Observed: SelectCard zone=discard count=1 allow_skip=true
+    // group=μ's live_card — "Choose a live card from discard to place in
+    // your success zone (or skip to place the original card)".
+    assert!(
+        game.has_pending_choice(),
+        "replacement-choice prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard replacement prompt"
+    );
+    game.select_indices(&[0]);
 
-    // Step 3: Effect step b — revealed card should trigger replacement choice
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Ability fully resolved after the replacement pick.
+    assert!(
+        !game.has_pending_choice(),
+        "no further prompts after the replacement choice"
+    );
 
     // Verifications:
     // 1. 錯覚CROSSROADS should be in waitroom (replaced from success zone placement)

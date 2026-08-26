@@ -131,9 +131,17 @@ fn activation_discard_cost_feeds_movement_views() {
     let events_before = game.state.turn_movements.len();
 
     game.activate_ability(me);
-    if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
-    }
+    // Proteinbar's cost is a mandatory 2-card hand discard.
+    assert!(
+        game.has_pending_choice(),
+        "proteinbar cost discard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (hand cost discard)"
+    );
+    game.select_indices(&[0, 1]);
 
     // R1 UNIFIED (2026-08): cost discards paid through the choice path now
     // emit hand->waitroom events and feed cards_moved_this_turn like every

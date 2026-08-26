@@ -36,10 +36,17 @@ fn kasumi_ability_only_from_discard() {
     // Note: 3 energy given — 2 spent on play_to_stage, 1 remains for activation test
 
     // After play_to_stage, the debut ability (look at 3 → reorder) fires and
-    // creates a pending choice. Skip it before testing activation.
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // creates a pending choice. Observed: SelectCard zone=looked_at count=3.
+    assert!(
+        game.has_pending_choice(),
+        "debut look-at-3 must prompt"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard looked_at prompt"
+    );
+    game.select_indices(&[]);
 
     // Should NOT be able to activate from stage (card not in discard)
     assert!(
@@ -385,13 +392,22 @@ fn kasumi_q122_look_top3_no_refresh_with_exactly_3() {
 
     // Q122: Debut look_and_select fires, deck had exactly 3 cards.
     // The look doesn't move cards from deck, so no refresh occurs.
-    if game.has_pending_choice() {
-        game.assert_stage_pos(
-            MemberArea::Center,
-            kasumi,
-            "Kasumi should be on stage after debut",
-        );
-    }
+    // Observed: SelectCard zone=looked_at count=3 is prompted.
+    assert!(
+        game.has_pending_choice(),
+        "debut look-at-3 must prompt even with exactly 3 deck cards"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard looked_at prompt"
+    );
+    game.select_indices(&[]);
+    game.assert_stage_pos(
+        MemberArea::Center,
+        kasumi,
+        "Kasumi should be on stage after debut",
+    );
 }
 
 #[test]
@@ -412,12 +428,21 @@ fn kasumi_ab0_debut_look_topdeck_arrange() {
     game.play_to_stage(kasumi, MemberArea::Center);
 
     // Ab#0 fires: look at top 3, arrange any on top, discard rest
-    // Verify the ability was recognized (debut triggers on play)
-    if game.has_pending_choice() {
-        game.assert_stage_pos(
-            MemberArea::Center,
-            kasumi,
-            "Kasumi should be on center stage after debut",
-        );
-    }
+    // Verify the ability was recognized (debut triggers on play).
+    // Observed: SelectCard zone=looked_at count=3 is prompted.
+    assert!(
+        game.has_pending_choice(),
+        "debut look-at-3 must prompt"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard looked_at prompt"
+    );
+    game.select_indices(&[]);
+    game.assert_stage_pos(
+        MemberArea::Center,
+        kasumi,
+        "Kasumi should be on center stage after debut",
+    );
 }

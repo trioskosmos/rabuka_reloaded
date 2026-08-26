@@ -53,10 +53,17 @@ fn bp4011_wait_self_center_mus_member_two_blades() {
 
     fire_live_start(&mut game, me);
 
-    // Accept the optional self-wait if offered; else already waited.
-    if game.has_pending_choice() {
-        game.select_option(1); // Yes: wait self
-    }
+    // Optional self-wait cost gate is always presented; answer "Yes: wait self".
+    assert!(
+        game.has_pending_choice(),
+        "pay-optional-cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget pay_optional_cost gate"
+    );
+    game.select_option(1); // Yes: wait self
 
     assert_eq!(
         game.state.mods.get_orientation_modifier(me),
@@ -92,9 +99,16 @@ fn bp4017_twin_center_mus_member_one_blade() {
     game.state.player1.stage.stage[1] = center;
 
     fire_live_start(&mut game, me);
-    if game.has_pending_choice() {
-        game.select_option(1);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "pay-optional-cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget pay_optional_cost gate"
+    );
+    game.select_option(1);
 
     assert_eq!(
         game.state.mods.get_blade_modifier(center),

@@ -184,9 +184,16 @@ fn s3_bp5_111_own_move_fires() {
 
     // OWN 起動 moves the watcher itself -> auto waits the low-blade opponent.
     game.activate_ability(watcher);
-    if game.has_pending_choice() {
-        game.select_generated(0);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "activation move-destination prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget (position|destination)"
+    );
+    game.select_generated(0);
     scan_autos_both(&mut game);
 
     assert!(

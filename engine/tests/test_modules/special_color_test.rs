@@ -294,11 +294,25 @@ fn liella_blade_2_gets_correct_modifier() {
     game.set_live_card(special);
     advance_to_live_start(&mut game);
 
-    // PR-012-PR has its own LiveStart ability (optional: discard 1 from hand,
-    // gain blade). Decline it so set_blade_count's result is visible.
-    if game.state.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Two live-start autos are queued: the live card's set_blade_count and
+    // PR-012-PR's own optional discard. Resolve them in order, declining the
+    // discard so set_blade_count's result is visible.
+    assert!(
+        game.state.has_pending_choice(),
+        "live-start ability-selection prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectAutoAbility"),
+        "expected SelectAutoAbility (two queued live-start autos)"
+    );
+    game.select_indices(&[0]);
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (PR-012-PR optional hand discard cost)"
+    );
+    game.select_indices(&[]);
 
     assert_eq!(
         game.state.mods.get_blade_modifier(liella_blade2),

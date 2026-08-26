@@ -294,23 +294,12 @@ fn dia_position_change_no_saintsnow_skips_gracefully() {
     assert!(game.has_pending_choice(), "Dia's 登場 choice expected");
     game.select_option(1);
 
-    // No SaintSnow on stage → source selection should not appear
-    // (valid_sources is empty → execute_position_change returns Ok(()) immediately)
-    if game.has_pending_choice() {
-        let actions = game.generated_actions();
-        assert!(
-            actions.is_empty(),
-            "No source options expected with zero SaintSnow, got: {:?}",
-            actions
-                .iter()
-                .map(|a| a
-                    .parameters
-                    .as_ref()
-                    .and_then(|p| p.stage_area.as_deref())
-                    .unwrap_or("?"))
-                .collect::<Vec<_>>()
-        );
-    }
+    // No SaintSnow on stage → source selection must NOT appear
+    // (valid_sources is empty → execute_position_change auto-skips silently).
+    assert!(
+        !game.has_pending_choice(),
+        "position_change with zero eligible sources must auto-skip without prompting"
+    );
 
     // Verify stage unchanged
     assert_eq!(game.state.player1.stage.stage[0], filler);

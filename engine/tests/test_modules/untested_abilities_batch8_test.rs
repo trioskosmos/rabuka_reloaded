@@ -632,12 +632,14 @@ fn mia_bp4023_optional_wait_cost_gates_draw_discard() {
     // SKIP the optional cost → effect does not run at all.
     let hand_before = game.state.player1.hand.cards.len(); // 1
     fire_trigger(&mut game, mia, AbilityTrigger::Debut, "登場");
-    if game.has_pending_choice() {
-        match game.pending_choice_type().as_deref() {
-            Some("SelectTarget") => game.select_option(0), // decline
-            Some("SelectCard") => game.select_indices(&[]),
-            other => panic!("unexpected {other:?}"),
-        }
+    assert!(
+        game.has_pending_choice(),
+        "optional wait-cost offer expected on debut"
+    );
+    match game.pending_choice_type().as_deref() {
+        Some("SelectTarget") => game.select_option(0), // decline
+        Some("SelectCard") => game.select_indices(&[]),
+        other => panic!("unexpected {other:?}"),
     }
     assert_eq!(
         game.state.player1.hand.cards.len(),

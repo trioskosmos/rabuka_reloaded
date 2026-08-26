@@ -25,16 +25,6 @@ fn select_position_option(game: &mut TestGame, area: &str) {
     game.select_generated(idx);
 }
 
-/// Helper: resolve a SelectAutoAbility by choosing the option at `option_index`.
-/// `option_index` is the index within the SelectAutoAbility options list.
-fn select_auto_ability_option(game: &mut TestGame, option_index: i16) {
-    // For SelectAutoAbility, the result is built from card_id = option_index.
-    TurnEngine::resume_with_choice(&mut game.state, Some(option_index), None)
-        .expect("select_auto_ability_option failed");
-}
-
-use rabuka_engine::turn::TurnEngine;
-
 /// SCENARIO: Playing Shiki to stage while Chisato is on stage.
 /// Shiki's position-gated debut fires. Chisato hasn't moved → her auto not queued.
 #[test]
@@ -106,22 +96,12 @@ fn third_member_position_change_no_energy_for_chisato() {
     game.play_to_stage(kinako, rabuka_engine::zones::MemberArea::LeftSide);
 
     // Playing Kinako triggers TAS → Chisato's auto queued.
-    // Drain it before activating Kinako's kidou.
-    // But DON'T drain automatically — check what happens first.
-    if game.has_pending_choice() {
-        let choice = game.get_pending_choice().clone();
-        match choice {
-            rabuka_engine::ability::types::Choice::SelectAutoAbility { .. } => {
-                // Select the first available (whatever it is) to clear queue
-                select_auto_ability_option(&mut game, 0);
-                // Continue draining
-                game.drain_auto_ability_choices();
-            }
-            _ => {
-                game.select_option(0);
-            }
-        }
-    }
+    // Observed: no prompt surfaces here — the queued auto resolves later,
+    // during Kinako's own activation flow.
+    assert!(
+        !game.has_pending_choice(),
+        "no prompt expected right after playing Kinako (Chisato auto resolves at activation)"
+    );
 
     // Now activate Kinako's kidou (position change)
     game.activate_ability(kinako);

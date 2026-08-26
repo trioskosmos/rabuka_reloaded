@@ -293,12 +293,15 @@ fn position_change_filters_by_group_names() {
     // The live start trigger fires and the sequential effect starts.
     // First sub-action: position_change with group_names=[みらくらぱーく！], exclude_self=true
     // Only Center (member_same) should be offered — Left (member_other) should NOT.
-    if game.has_pending_choice() {
-        let _choice_type = game.pending_choice_type();
-        // Should be a position choice (SelectTarget with position|destination)
-        // or possibly a select card choice
-        game.dbg_choice();
-    }
+    assert!(
+        game.has_pending_choice(),
+        "position_change destination prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget (position|destination)"
+    );
 
     // The position change should only offer the Center area (みらくらぱーく！ member)
     // We'll check by looking at the generated actions

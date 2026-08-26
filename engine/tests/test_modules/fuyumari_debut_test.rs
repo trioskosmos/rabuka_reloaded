@@ -216,12 +216,26 @@ fn fuyumari_q118_card_count_integrity() {
     game.play_to_stage(fuyumari, rabuka_engine::zones::MemberArea::LeftSide);
 
     game.select_indices(&[0]);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // opponent selects first of the two
-    }
+    assert!(
+        game.has_pending_choice(),
+        "second live-card selection prompt expected (1 remaining)"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the remaining live-card pick"
+    );
+    game.select_indices(&[0]);
+    assert!(
+        game.has_pending_choice(),
+        "opponent selection prompt expected after both lives are picked"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the opponent's pick from selected_cards"
+    );
+    game.select_indices(&[0]); // opponent selects first of the two
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }

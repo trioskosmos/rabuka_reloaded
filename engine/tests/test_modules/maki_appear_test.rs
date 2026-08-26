@@ -38,10 +38,17 @@ fn maki_baton_touch_places_cheap_member_on_stage() {
         "Maki on stage after baton touch"
     );
 
-    // Now move_cards (formerly appear) may need a card selection choice
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // select cheap from hand
-    }
+    // move_cards (formerly appear) always offers the hand selection here.
+    assert!(
+        game.has_pending_choice(),
+        "appear hand selection prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (cheap member from hand)"
+    );
+    game.select_indices(&[0]); // select cheap from hand
     // Resolve any remaining choices (positioning sub-choice, etc.)
     while game.has_pending_choice() {
         game.select_option(0);

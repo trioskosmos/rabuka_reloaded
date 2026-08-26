@@ -40,12 +40,23 @@ fn dream_believers_one_hasetsu_plus_other_pass() {
     game.pass();
     game.pass();
 
-    while game.has_pending_choice() {
-        game.select_option(1);
-        if game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
-    }
+    // Observed chain: exactly ONE prompt — SelectTarget
+    // pay_optional_cost:skip_optional_cost "Pay 1 energy (or skip)?".
+    // Paying it applies the +1 score; no follow-up prompt appears.
+    assert!(
+        game.has_pending_choice(),
+        "optional pay-1-energy score gate must be offered"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget optional-cost gate"
+    );
+    game.select_option(1);
+    assert!(
+        !game.has_pending_choice(),
+        "no further prompts after paying the gate"
+    );
 
     let mod_val = game.state.mods.get_score_modifier(dream);
     eprintln!("[DREAM] 1 hasetsu + 1 other: mod={}", mod_val);
@@ -85,12 +96,33 @@ fn dream_believers_q212_multiname_no_match() {
     game.pass();
     game.pass();
 
-    while game.has_pending_choice() {
-        game.select_option(1);
-        if game.has_pending_choice() {
-            game.select_indices(&[]);
-        }
-    }
+    // Observed chain: the multi-name member's own LiveStart queues alongside
+    // Dream Believers' — first a SelectAutoAbility pick surfaces, then the
+    // SelectTarget "Pay 1 energy (or skip)?" gate.
+    assert!(
+        game.has_pending_choice(),
+        "auto-ability pick expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectAutoAbility"),
+        "expected SelectAutoAbility pick first"
+    );
+    game.select_indices(&[]);
+    assert!(
+        game.has_pending_choice(),
+        "pay-1-energy score gate expected after the auto-ability pick"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget optional-cost gate"
+    );
+    game.select_option(1);
+    assert!(
+        !game.has_pending_choice(),
+        "no further prompts after paying the gate"
+    );
 
     let mod_val = game.state.mods.get_score_modifier(dream);
     eprintln!("[DREAM] rurino + multi: mod={} (expected 0)", mod_val);

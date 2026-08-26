@@ -73,9 +73,16 @@ fn cl1002_decline_stays_in_waitroom() {
     let (me, doll) = cl1002_setup(&mut game);
 
     game.play_to_stage(me, MemberArea::LeftSide);
-    if game.has_pending_choice() {
-        game.select_indices(&[]); // decline
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional energy cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget (pay_optional_cost:skip)"
+    );
+    game.select_indices(&[]); // decline
 
     assert!(
         !game.state.player1.hand.cards.contains(&doll),

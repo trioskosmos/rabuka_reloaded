@@ -44,14 +44,29 @@ fn dazzling_q187_exclude_selected_liella_other_pickable() {
     game.drain_auto_ability_choices();
 
     // LiveStart fires: 3 sequential actions
-    // Action 0: select 1 from the 3 named members (stage, CardSelect choice)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // pick kanon (index 0 on stage)
-    }
-    // Action 1: select 1 Liella! member OTHER than kanon (exclude_selected=true)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // pick the other Liella! member
-    }
+    // Action 0: select 1 from the 3 named members.
+    // Observed: SelectCard zone=stage count=1 is prompted.
+    assert!(
+        game.has_pending_choice(),
+        "first member selection must be prompted"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard stage prompt"
+    );
+    game.select_indices(&[0]); // pick kanon (index 0 on stage)
+    // Action 1: select 1 Liella! member OTHER than kanon (exclude_selected=true).
+    assert!(
+        game.has_pending_choice(),
+        "exclude_selected second selection must be prompted"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard stage prompt"
+    );
+    game.select_indices(&[0]); // pick the other Liella! member
 
     // After both selections, blade gain_resource should add blade to both selected
     let _has_blade = |id: i16| {

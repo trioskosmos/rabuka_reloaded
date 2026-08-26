@@ -139,9 +139,16 @@ fn yuna_sp222_live_start_optional_energy_places_wait_energy() {
 
     // Trigger again (no turn limit on this auto ability within a test) → pay.
     trigger_auto(&mut game, yuna, AbilityTrigger::LiveStart, "ライブ開始時");
-    if game.has_pending_choice() {
-        game.select_option(1); // pay
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional E payment prompt expected on re-trigger"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "expected SelectTarget (pay_optional_cost:skip)"
+    );
+    game.select_option(1); // pay
     assert_eq!(
         game.state.player1.energy_zone.cards.len(),
         zone_before + 1,

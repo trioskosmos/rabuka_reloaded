@@ -57,13 +57,14 @@ fn p2_first_attacker_performance_finalizes_p2_snapshot() {
     let sac = game.new_id(FILLER);
     game.state.player2.main_deck.cards.insert(0, sac);
 
-    // Drive performance + victory to the next Active, answering anything.
+    // Drive performance + victory to the next Active. No prompts are created
+    // during this drive (verified via RUST_LOG=debug PENDING_CHOICE trace).
     let mut saw_result = false;
     for _ in 0..30 {
-        if game.has_pending_choice() {
-            game.select_indices(&[]);
-            continue;
-        }
+        assert!(
+            !game.has_pending_choice(),
+            "performance drive must not create any pending choice"
+        );
         let phase = game.state.current_phase.to_string();
         if phase.contains("Live Result") {
             saw_result = true;

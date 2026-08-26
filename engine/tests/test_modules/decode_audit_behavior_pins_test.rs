@@ -39,12 +39,14 @@ fn mifune_same_name_in_success_zone_gains_heart04() {
 
     fire_trigger(&mut game, mifune, AbilityTrigger::LiveStart, "ライブ開始時");
 
-    // 「ライブカードを1枚選ぶ」 — with exactly one candidate this may auto-
-    // resolve or prompt a SelectCard.
-    if game.has_pending_choice() {
-        assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
-        game.select_indices(&[0]);
-    }
+    // 「ライブカードを1枚選ぶ」 — observed: a SelectCard live_card_zone
+    // prompt appears even with exactly one candidate.
+    assert!(
+        game.has_pending_choice(),
+        "live-card selection must be prompted"
+    );
+    assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
+    game.select_indices(&[0]);
 
     assert_eq!(
         game.state.mods.get_heart_modifier(niji_live_a, HeartColor::Heart04),
@@ -68,10 +70,14 @@ fn mifune_different_name_in_success_zone_no_heart04() {
     game.state.player1.success_live_card_zone.cards.push(other_live);
 
     fire_trigger(&mut game, mifune, AbilityTrigger::LiveStart, "ライブ開始時");
-    if game.has_pending_choice() {
-        assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
-        game.select_indices(&[0]);
-    }
+    // Observed: SelectCard live_card_zone prompt appears even when the
+    // selection would be discarded by the name gate.
+    assert!(
+        game.has_pending_choice(),
+        "live-card selection must be prompted"
+    );
+    assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
+    game.select_indices(&[0]);
 
     assert_eq!(
         game.state.mods.get_heart_modifier(niji_live, HeartColor::Heart04),
@@ -93,10 +99,14 @@ fn mifune_empty_success_zone_no_heart04() {
     game.state.player1.live_card_zone.cards.push(niji_live);
 
     fire_trigger(&mut game, mifune, AbilityTrigger::LiveStart, "ライブ開始時");
-    if game.has_pending_choice() {
-        assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
-        game.select_indices(&[0]);
-    }
+    // Observed: SelectCard live_card_zone prompt appears even with a single
+    // candidate and an empty success zone.
+    assert!(
+        game.has_pending_choice(),
+        "live-card selection must be prompted"
+    );
+    assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
+    game.select_indices(&[0]);
 
     assert_eq!(
         game.state.mods.get_heart_modifier(niji_live, HeartColor::Heart04),

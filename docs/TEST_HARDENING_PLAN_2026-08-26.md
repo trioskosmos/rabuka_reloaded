@@ -1,16 +1,16 @@
-# Test Hardening & Parser/Engine Fix Plan — 2026-08-26
+﻿# Test Hardening & Parser/Engine Fix Plan 窶・2026-08-26
 
 ## Mission (standing directive)
 
 **Engine and parser rewrites while adding more tests for possible in-game
 scenarios that have not yet been considered.** Keep examining the existing test
 corpus to find what still needs writing. Tests where **both players use
-abilities against each other** are required — one-sided scenarios are not
+abilities against each other** are required 窶・one-sided scenarios are not
 enough for a two-player simulator.
 
 Method, in order:
 1. Read `engine/rules/rules.txt` and `cards/qa_data.json` for the EXACT rules
-   process before writing any scenario — no guessed semantics.
+   process before writing any scenario 窶・no guessed semantics.
 2. Mine abilities.json for interaction shapes (whose-effect gates, cross-player
    triggers, opponent choices) and check them against existing tests.
 3. Write real-game flows, not synthetic state injection.
@@ -22,40 +22,39 @@ Method, in order:
 
 | Item | State |
 |---|---|
-| P0.1 orphaned mod.rs registration | DONE — 6 files recovered, `sumire_bp5_test_debug.rs` deleted as stale duplicate; konata/location/shizuku fixed to current APIs |
-| P0.2 DIVE! false-trigger audit | DONE — 6 real-game tests in `dive_false_trigger_test.rs`; found + fixed **engine gap**: `movement` key on non-Movement condition variants was dropped by both serde and bytecode decode paths, so static presence re-triggered "when placed" abilities. Fixed via `ConditionCommon.movement` + regenerated decoder |
-| P0.3 `has_pending_choice` soft-guard migration | IN PROGRESS — ratchet landed: `test_inventory.py --check` fails on any NEW soft-guard site; 282 existing sites across 110 files baselined in `engine/tests/SOFT_GUARD_BASELINE.json` (only goes down). First migration done (card_ability_tests q244). Batch migration continues file-by-file |
+| P0.1 orphaned mod.rs registration | DONE 窶・6 files recovered, `sumire_bp5_test_debug.rs` deleted as stale duplicate; konata/location/shizuku fixed to current APIs |
+| P0.2 DIVE! false-trigger audit | DONE 窶・6 real-game tests in `dive_false_trigger_test.rs`; found + fixed **engine gap**: `movement` key on non-Movement condition variants was dropped by both serde and bytecode decode paths, so static presence re-triggered "when placed" abilities. Fixed via `ConditionCommon.movement` + regenerated decoder |
+| P0.3 `has_pending_choice` soft-guard migration | NEARLY DONE — 282 -> 12 sites via ratchet + two parallel-agent waves (21 + 86 files) 窶・ratchet landed: `test_inventory.py --check` fails on any NEW soft-guard site; 282 existing sites across 110 files baselined in `engine/tests/SOFT_GUARD_BASELINE.json` (only goes down). First migration done (card_ability_tests q244). Batch migration continues file-by-file |
 | P1.1 per-test inventory | OPEN |
-| P1.2 or-assertions sweep | DONE — 36 multi-line `||` hits triaged: 10 files tightened to exact outcomes (pl_s_bp7_007 ×3 → exact stage slots; kuroe_dia → selected card on deck top; l0_gap_livesuccess vacuous disjunct removed; batch34 decline now pins waitroom retention; natsumi Q264 adds not-discarded check; opponent_choice wait≠leave both-stay; mia/card_ability/izumi/look_and_select deterministic picks pinned). 22 hits judged legitimate (match guards, loop conditions, error-string chains, engine zone aliasing) |
-| P1.3 helper dedup (`fire_trigger` x40) | DONE — 21 byte-identical clones deleted onto `helpers::fire_trigger`; batch30 keeps a 3-line drain wrapper; batch8's `fire_trigger_nth` kept as genuine extension |
+| P1.2 or-assertions sweep | DONE 窶・36 multi-line `||` hits triaged: 10 files tightened to exact outcomes (pl_s_bp7_007 ﾃ・ 竊・exact stage slots; kuroe_dia 竊・selected card on deck top; l0_gap_livesuccess vacuous disjunct removed; batch34 decline now pins waitroom retention; natsumi Q264 adds not-discarded check; opponent_choice wait竕leave both-stay; mia/card_ability/izumi/look_and_select deterministic picks pinned). 22 hits judged legitimate (match guards, loop conditions, error-string chains, engine zone aliasing) |
+| P1.3 helper dedup (`fire_trigger` x40) | DONE 窶・21 byte-identical clones deleted onto `helpers::fire_trigger`; batch30 keeps a 3-line drain wrapper; batch8's `fire_trigger_nth` kept as genuine extension |
 | P2.* parser/pipeline hardening | OPEN |
-| P3.* engine quality debt | PARTIAL — either-target location_condition fixed ([LOC_COND_EITHER]); mojibake/queue-u8/runaway counters still open |
+| P3.* engine quality debt | PARTIAL 窶・either-target location_condition fixed ([LOC_COND_EITHER]); mojibake/queue-u8/runaway counters still open |
 
-## §2 Zone-change / source-gate audit (round 2)
+## ﾂｧ2 Zone-change / source-gate audit (round 2)
 
 Systematic scan of every trigger-gate key in abilities.json (zone_change
 source/destination, movement on non-Movement variants, self_effect_only,
 check_self, temporal phase_target) cross-referenced against the test corpus.
-Result: 16 gate shapes, all covered except three families — now tested in
+Result: 16 gate shapes, all covered except three families 窶・now tested in
 `engine/tests/test_modules/zone_change_gate_test.rs`:
 
 | Card | Gate | Tests |
 |---|---|---|
-| PL!S-bp6-002-R+ 桜内梨子 ab#0 | live_card_zone→discard, Aqours live, target=self | positive deck-top/bottom placement; μ's-live negative; own-side-only negative |
-| PL!N-pb1-009-R 天王寺璃奈 ab#0 | live_card_zone→discard + negated has_blade_heart, this_turn | positive draw+hearts; blade-heart-departure negative |
-| PL!N-bp5-005-R+ 宮下愛 ab#0 | stage→discard via REAL baton touch (rules 9.6.2.3.2/.1) | cost-15 newcomer full payoff (+2 energy AND draw); cost-13 boundary (energy only); blade-heart newcomer negative |
+| PL!S-bp6-002-R+ 譯懷・譴ｨ蟄・ab#0 | live_card_zone竊壇iscard, Aqours live, target=self | positive deck-top/bottom placement; ﾎｼ's-live negative; own-side-only negative |
+| PL!N-pb1-009-R 螟ｩ邇句ｯｺ迺・･・ab#0 | live_card_zone竊壇iscard + negated has_blade_heart, this_turn | positive draw+hearts; blade-heart-departure negative |
+| PL!N-bp5-005-R+ 螳ｮ荳区・ ab#0 | stage竊壇iscard via REAL baton touch (rules 9.6.2.3.2/.1) | cost-15 newcomer full payoff (+2 energy AND draw); cost-13 boundary (energy only); blade-heart newcomer negative |
 
-Baton-touch semantics pinned from rules.txt + qa_data.json: the 「バトンタッチした」
-event belongs to the ARRIVING member's play (9.6.2.3.2.1); the departed ability's
-conditions describe the NEWCOMER; net payment = newcomer cost − occupant cost.
-Energy assertions require wait-state cards in the pool (activation flips wait→active).
+Baton-touch semantics pinned from rules.txt + qa_data.json: the 縲後ヰ繝医Φ繧ｿ繝・メ縺励◆縲・event belongs to the ARRIVING member's play (9.6.2.3.2.1); the departed ability's
+conditions describe the NEWCOMER; net payment = newcomer cost 竏・occupant cost.
+Energy assertions require wait-state cards in the pool (activation flips wait竊誕ctive).
 
-## §4 Round 4 — opponent-live-success across seats
+## ﾂｧ4 Round 4 窶・opponent-live-success across seats
 
 The only card reading `opponent_live_success` (Strawberry Trapper PL!S-pb1-021-L)
 was "covered" exclusively by synthetic flag injection; no test verified the
 real pipeline ever sets it, and the legacy flag was armed ONLY for P2's success
-(`player2_won`) — a P2-owned card could never see P1 succeed.
+(`player2_won`) 窶・a P2-owned card could never see P1 succeed.
 
 Fixes:
 1. Per-seat tracking: `p1/p2_live_success_this_turn` + `_no_excess` on
@@ -64,43 +63,42 @@ Fixes:
    the seat opposite the ACTIVATING card's owner ([OPP_LIVE_SUCCESS_EVAL]
    diagnostic).
 3. **Engine bug #5 (ordering)**: LiveSuccess triggers fired at the TOP of
-   `execute_live_victory_determination`, before verdicts/results existed —
-   every real-flow opponent-success evaluation saw stale state. Fix:
+   `execute_live_victory_determination`, before verdicts/results existed 窶・   every real-flow opponent-success evaluation saw stale state. Fix:
    `record_pretrigger_live_results()` records per-seat outcomes before the
    trigger block using the SAME score formula as the post-trigger totals
    (extras = 0 by construction). The later authoritative pass remains as
    post-extras truth. Skipped seats don't clobber explicitly-armed values.
    Follow-up refactor item RESOLVED: mirror upgraded to exact score formula
    rather than deleted (deleting would require reordering the trigger/score
-   dependency chain — triggers feed extras feed final scores).
+   dependency chain 窶・triggers feed extras feed final scores).
 
-New `opponent_live_success_flow_test.rs`: full organic round — P1 exact-fill
-success (海未 + START:DASH!!, heart-less deck so yell adds nothing) vs P2-owned
-Trapper → +2 pinned through the real pipeline.
+New `opponent_live_success_flow_test.rs`: full organic round 窶・P1 exact-fill
+success (豬ｷ譛ｪ + START:DASH!!, heart-less deck so yell adds nothing) vs P2-owned
+Trapper 竊・+2 pinned through the real pipeline.
 
 Suite state after round 4: **2945 passed / 0 failed / 0 ignored.**
 
-## §3 Round 3 — both-player interaction (mission directive)
+## ﾂｧ3 Round 3 窶・both-player interaction (mission directive)
 
-Mined abilities.json for the 「対戦相手のカードの効果でも発動する」 marker
+Mined abilities.json for the 縲悟ｯｾ謌ｦ逶ｸ謇九・繧ｫ繝ｼ繝峨・蜉ｹ譫懊〒繧ら匱蜍輔☆繧九・marker
 class (6 cards) and for effects that move OPPONENT members (exactly one:
-PL!HS-pb1-014-R 安養寺姫芽 debut, position_change dest=front target=opponent).
+PL!HS-pb1-014-R 螳蛾､雁ｯｺ蟋ｫ闃ｽ debut, position_change dest=front target=opponent).
 
-New `cross_player_interaction_test.rs`: 姫芽's MiraKura-gated debut force-
-repositions P2's 可可 → 可可's own area-move watcher must fire from the
+New `cross_player_interaction_test.rs`: 蟋ｫ闃ｽ's MiraKura-gated debut force-
+repositions P2's 蜿ｯ蜿ｯ 竊・蜿ｯ蜿ｯ's own area-move watcher must fire from the
 opponent-caused move (heart06 until live end); plus a gate-blocked negative.
 
 **Engine bug #4 found and fixed:**
 `fire_opponent_cause_watchers_for_move` enqueues the watcher with a
 trigger_moved_cards SNAPSHOT, but resolution-time evaluation of
 `position_change` conditions only consulted live scratch state
-(`position_change_events`, `recently_moved_cards`) — which the enqueuing
+(`position_change_events`, `recently_moved_cards`) 窶・which the enqueuing
 player's batch loop legitimately clears (abilities.rs:1433-1445) before the
 other seat's queue resolves. The watcher armed, then silently did nothing.
 Fix: the position_change arm of evaluate_movement_condition now falls back to
 the entry snapshot via entry_trigger_moved_cards(), with a [POS_CHANGE_EVAL]
 diagnostic line. Also noted: answering a non-skippable SelectTarget with empty
-indices silently no-ops ("Unknown source position") — queued as P0.3/P3 work.
+indices silently no-ops ("Unknown source position") 窶・queued as P0.3/P3 work.
 
 Suite state after round 3: **2944 passed / 0 failed / 0 ignored.**
 
@@ -110,15 +108,15 @@ Suite state after round 3: **2944 passed / 0 failed / 0 ignored.**
    (actions.rs BCR dispatch): only the `card_id` channel was mapped through
    the options array; an answer arriving via `card_indices` (the normal
    `select_indices`/web-UI channel) fell through and the raw index became the
-   destination string `"0"`, matching no zone — the chosen card silently
+   destination string `"0"`, matching no zone 窶・the chosen card silently
    vanished. Fixed by mapping `card_indices.first()` through `options` first.
    Found by `riko_responds_only_to_own_side_live_zone`.
 
 2. *(Prior round)* `movement` on non-Movement condition variants was dropped by
-   both decode paths — see commit history.
+   both decode paths 窶・see commit history.
 
 Note: `blade_heart` is its OWN printed field (`cards.json .blade_heart`,
-b_heart icons) distinct from the `blade` stat — picked test members accordingly.
+b_heart icons) distinct from the `blade` stat 窶・picked test members accordingly.
 
 Suite state after round 2: **2939 passed / 0 failed / 0 ignored.**
 
@@ -129,13 +127,12 @@ full-width-plus card-ID typos, not engine gaps.
 ---
 
 Working plan derived from the full-repo audit (engine src, cards/ parser ecosystem,
-abilities.json, engine/tests). Guiding directive: **work on tests and fixes together** —
-every parser gap gets an end-to-end test, every engine fix pins behavior, no documenting
+abilities.json, engine/tests). Guiding directive: **work on tests and fixes together** 窶・every parser gap gets an end-to-end test, every engine fix pins behavior, no documenting
 around gaps (AGENTS.md rule).
 
 ---
 
-## P0 — Silent test death / false confidence
+## P0 窶・Silent test death / false confidence
 
 ### P0.1 Register the 7 orphaned test files (`test_modules/mod.rs` drift)
 Files present on disk but never compiled into `run_all`:
@@ -156,34 +153,34 @@ Then add a CI guard: every `*_test.rs` under `test_modules/` must appear in `mod
 ### P0.2 False-positive trigger audits (the "DIVE! class" of bugs)
 Pattern: auto abilities whose triggers are **compound** (temporal gate AND a
 zone_change/count gate). Any effect elsewhere in the DB that touches the same zone
-transition is a candidate for falsely arming them. See §1 for the worked example.
+transition is a candidate for falsely arming them. See ﾂｧ1 for the worked example.
 
 Workstream:
 1. Enumerate all auto abilities whose trigger includes `zone_change` +
    `source/destination` gates (grep `abilities.json`).
 2. For each, identify sibling effects in the DB performing the same transition
-   (mass retrieval, per-card retrieval, reveal/look-without-move, deck→hand,
+   (mass retrieval, per-card retrieval, reveal/look-without-move, deck竊檀and,
    opponent-side moves).
-3. Write negative tests: sibling card moved ≠ self moved → NO trigger.
-4. Write positive controls: self actually moved via another card's effect → trigger.
+3. Write negative tests: sibling card moved 竕 self moved 竊・NO trigger.
+4. Write positive controls: self actually moved via another card's effect 竊・trigger.
 5. Where a negative fails, classify: test bug vs engine bug vs parser gap; fix end-to-end.
 
-First concrete instance done here: **DIVE! (PL!N-bp4-026-L)** — see §1 below.
+First concrete instance done here: **DIVE! (PL!N-bp4-026-L)** 窶・see ﾂｧ1 below.
 
 ### P0.3 Kill the `if game.has_pending_choice()` soft-guard pattern
-WRITING_TESTS.md explicitly forbids it; it appears ~250× across ~105 files.
+WRITING_TESTS.md explicitly forbids it; it appears ~250ﾃ・across ~105 files.
 A missing prompt means the ability fires free / skips cost and the assert still passes.
 Plan: migrate file-by-file to `drain_choices_strict` / dispatch-on-choice loops
 (already exist in helpers/mod.rs), add a grep-based CI lint banning the guard outside
 explicitly-negative tests.
 
-## P1 — Coverage honesty
+## P1 窶・Coverage honesty
 
 ### P1.1 Make `test_inventory.py` per-test, not per-file
 Current: substring presence of a card_no anywhere in a file = "covered"; L1 inferred
 from `"assert" in text` anywhere in the covering file. Headline "771/771 covered" is
 file-granular, not ability-granular. Change to parse each `#[test] fn` body and map
-card → asserting test; exclude unregistered (orphaned) files from stats until P0.1 lands.
+card 竊・asserting test; exclude unregistered (orphaned) files from stats until P0.1 lands.
 
 ### P1.2 Or-assertions and vacuous asserts
 Replace `assert!(a || b)` outcome-tolerance tests (e.g. `pl_s_bp7_007_test.rs`) with
@@ -195,7 +192,7 @@ tests in early `qa_new_tests*.rs`.
 ~50 `fill_decks` variants with three signatures. Consolidate onto `helpers::`,
 delete local clones mechanically, one batch family per commit.
 
-## P2 — Parser/pipeline hardening (each item ships with a regression test)
+## P2 窶・Parser/pipeline hardening (each item ships with a regression test)
 
 ### P2.1 Single source of truth for opcode/tag tables
 `COND_TO_VARIANT_TAG` / `ACTION_TO_VARIANT_TAG` / `COST_TYPE_TO_ACTION`
@@ -211,7 +208,7 @@ them); unknown field types emit silent `skip_value()` arms. Add generation-time 
 
 ### P2.3 Compiler input mutation
 `compile_abilities.py` renames keys on the live parsed JSON mid-walk (non-idempotent).
-Encode from deep-copied data; add a round-trip test: compile twice → identical bytes.
+Encode from deep-copied data; add a round-trip test: compile twice 竊・identical bytes.
 
 ### P2.4 Scraper loudness
 Fetch failure currently breaks pagination and writes truncated output with exit 0;
@@ -224,27 +221,27 @@ keys, `type` mixing three namespaces, `zone` duplicating `source`. Fill hash/ver
 generation time; drop provably-dead keys in one coordinated regeneration (bytecode
 regenerate + golden diff + full suite).
 
-## P3 — Engine quality debt (fix alongside touching nearby code)
+## P3 窶・Engine quality debt (fix alongside touching nearby code)
 
-- u8 indexing in `ability_queue.rs` slot bookkeeping → widen or saturate.
+- u8 indexing in `ability_queue.rs` slot bookkeeping 竊・widen or saturate.
 - Process-lifetime runaway counters (`PCA_CALLS`, `CHOICE_CALLS`, queue `clear()`)
-  → per-game reset semantics.
+  竊・per-game reset semantics.
 - Web-server lock handling: replace silent `if let Ok(lock())` skips with logged
   recovery via existing `lock_recover`.
 - Mojibake in runtime strings/comments (`game_state/abilities.rs:1515,756`;
   AI-artifact comment `player.rs:491`); pin `PYTHONUTF8=1` in Python scripts.
-- Consolidate 11× duplicated `MemberArea→index` matches onto `to_index()`.
+- Consolidate 11ﾃ・duplicated `MemberArea竊段ndex` matches onto `to_index()`.
 - Pair-call invariant `evaluate_success_zone_constant_abilities()` +
-  `restore_performance_need_heart_modifiers()` → single method.
+  `restore_performance_need_heart_modifiers()` 竊・single method.
 
-## §1 Worked example: DIVE! false-positive trigger surface
+## ﾂｧ1 Worked example: DIVE! false-positive trigger surface
 
 Card: `PL!N-bp4-026-L` ("DIVE!"), two auto abilities:
 
-- **ab#0** — trigger = AND(temporal: *own* main phase, `zone_change discard→hand`,
-  self-target). Effect: optional move 1 "DIVE!" hand→live zone; then
+- **ab#0** 窶・trigger = AND(temporal: *own* main phase, `zone_change discard竊檀and`,
+  self-target). Effect: optional move 1 "DIVE!" hand竊値ive zone; then
   `reduce_live_card_set_limit` +1.
-- **ab#1** — condition = location(self in live zone, `movement: moved`). Effect:
+- **ab#1** 窶・condition = location(self in live zone, `movement: moved`). Effect:
   1 Nijigasaki member gains blade+2 until live end.
 
 Existing tests (`dive_auto_trigger_test.rs`, `dive_edge_test.rs`, `dive_live_card_test.rs`)
@@ -254,11 +251,11 @@ in `dive_false_trigger_test.rs`:
 
 | # | Scenario | Expected |
 |---|----------|----------|
-| F1 | Another live card moved discard→hand | ab#0 must NOT fire |
-| F2 | DIVE! moved main_deck→hand | ab#0 must NOT fire (source gate) |
+| F1 | Another live card moved discard竊檀and | ab#0 must NOT fire |
+| F2 | DIVE! moved main_deck竊檀and | ab#0 must NOT fire (source gate) |
 | F3 | DIVE! revealed/looked at in discard, not moved | ab#0 must NOT fire |
 | F4 | Opponent's DIVE! moved during our phase scan | P1's copy unaffected; P2's fires only in P2's own main phase |
-| F5 | Mass retrieval sweeping DIVE! discard→hand | ab#0 SHOULD fire (positive control) |
+| F5 | Mass retrieval sweeping DIVE! discard竊檀and | ab#0 SHOULD fire (positive control) |
 | F6 | ab#1 with DIVE! statically in live zone, nothing moved this turn | NO blade grant |
 | F7 | ab#1 re-scan next turn after movement flag cleared | NO re-grant |
 | F8 | Two DIVE!s, only one moved | exactly one placement choice / limit bump |

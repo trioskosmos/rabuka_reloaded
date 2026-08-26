@@ -49,10 +49,11 @@ fn umi_bp3_live_start_select_heart_and_scale_with_success() {
 
     // Resolve the first choice (heart color select — SelectTarget option)
     game.select_option(0);
-    // Resolve the second choice (per-unit card selection — SelectCard indices)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // The heart gain resolves directly after the color choice; no card selection appears.
+    assert!(
+        !game.has_pending_choice(),
+        "per-unit heart gain must resolve without a further prompt"
+    );
 
     // The ability should have granted 3 heart01 (1 per success zone card)
     // The heart modifier is on Umi's card via gs.mods, not stage_hearts (which is None outside live performance)

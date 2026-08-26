@@ -108,9 +108,16 @@ fn target_count_on_draw_until_count() {
     }
     game.play_to_stage(card, rabuka_engine::zones::MemberArea::Center);
     // Pay the optional cost with the two remaining hand cards.
-    if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "optional discard-2 cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (hand, count=2, allow_skip)"
+    );
+    game.select_indices(&[0, 1]);
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }

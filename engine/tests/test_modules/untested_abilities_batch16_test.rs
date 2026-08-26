@@ -29,10 +29,17 @@ fn proteinbar_discard2_retrieves_niji_member() {
     game.state.player1.hand.cards.push(f2);
 
     game.activate_ability(me);
-    if game.has_pending_choice() {
-        // Discard-cost selection: choose both hand cards.
-        game.select_indices(&[0, 1]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "2-card hand-discard cost must be prompted"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard discard-cost prompt"
+    );
+    // Discard-cost selection: choose both hand cards.
+    game.select_indices(&[0, 1]);
 
     assert!(
         game.state.player1.hand.cards.contains(&niji),
@@ -64,9 +71,16 @@ fn bp3004_rest_self_and_discard_retrieves_niji_live() {
     game.state.player1.hand.cards.push(f1);
 
     game.activate_ability(me);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "1-card hand-discard cost must be prompted"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard discard-cost prompt"
+    );
+    game.select_indices(&[0]);
 
     assert_eq!(
         game.state.mods.orientation_modifiers.get(&me).copied(),
@@ -97,9 +111,16 @@ fn bp4018_rests_self_to_waitroom_retrieves_liella() {
     game.state.player1.waitroom.cards.push(liella);
 
     game.activate_ability(me);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "waitroom retrieval must be prompted (self now in waitroom = 2 candidates)"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard retrieval prompt"
+    );
+    game.select_indices(&[0]);
 
     assert!(
         game.state.player1.waitroom.cards.contains(&me),

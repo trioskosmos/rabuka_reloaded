@@ -153,9 +153,16 @@ fn bp6_011n_waitroom_debut_draws_two_discards_one() {
 
     let deck_before = game.state.player1.main_deck.cards.len();
     fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // choose which hand card to discard
-    }
+    assert!(
+        game.has_pending_choice(),
+        "hand discard prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the discard"
+    );
+    game.select_indices(&[0]); // choose which hand card to discard
 
     assert_eq!(
         deck_before - game.state.player1.main_deck.cards.len(),
@@ -220,9 +227,16 @@ fn bp6_011n_deck_with_one_card_still_discards() {
     game.add_to_hand(discard_me);
 
     fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "hand discard prompt expected even when the draw comes up short"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the discard"
+    );
+    game.select_indices(&[0]);
 
     assert!(
         game.state.player1.main_deck.cards.is_empty(),

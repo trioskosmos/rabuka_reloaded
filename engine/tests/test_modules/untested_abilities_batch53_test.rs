@@ -249,9 +249,10 @@ fn bpsp2005_decline_pay_skips_the_look() {
 
     fire_debut(&mut game, me);
     // No energy given -> an unpayable optional gate is auto-skipped (Q92).
-    if game.has_pending_choice() {
-        game.select_option(0); // No
-    }
+    assert!(
+        !game.has_pending_choice(),
+        "unpayable optional {{E}}{{E}} gate must auto-skip without prompting"
+    );
 
     assert_eq!(game.state.player1.main_deck.cards.len(), deck_before);
     assert!(!game.state.player1.hand.cards.contains(&kanon));
@@ -302,9 +303,10 @@ fn pbs2007_decline_keeps_waitroom_untouched() {
 
     fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
     // No energy given -> an unpayable optional gate is auto-skipped (Q92).
-    if game.has_pending_choice() {
-        game.select_option(0); // No
-    }
+    assert!(
+        !game.has_pending_choice(),
+        "unpayable optional {{E}}{{E}}{{E}} gate must auto-skip without prompting"
+    );
 
     assert!(
         game.state.player1.waitroom.cards.contains(&live),
@@ -365,10 +367,18 @@ fn hspb1004_decline_hand_cost_no_mill_no_recover() {
     let deck_before = game.state.player1.main_deck.cards.len();
 
     game.play_to_stage(me, MemberArea::Center);
-    // Decline the optional hand discard (first choice).
-    if game.has_pending_choice() {
-        game.select_option(1);
-    }
+    // Decline the optional hand discard: skippable SelectCard, option 1 =
+    // skip (observed: SEL_CARD indices=[1] -> optional_skipped=true).
+    assert!(
+        game.has_pending_choice(),
+        "optional hand-discard cost must be offered"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected skippable SelectCard cost prompt"
+    );
+    game.select_option(1);
     let mut guard = 0;
     while game.has_pending_choice() && guard < 10 {
         guard += 1;

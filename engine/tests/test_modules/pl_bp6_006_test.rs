@@ -25,17 +25,27 @@ fn maki_bp6_setup(game: &mut TestGame, deck_top: &[i16]) -> i16 {
 fn drain_cost_and_color(game: &mut TestGame) {
     // Drain cost (hand discard) and heart color selection.
     // Do NOT drain subsequent choices (revealed_cards selection, etc.).
-    if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectCard") {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        let typ = game.pending_choice_type();
-        if typ.as_deref() == Some("SelectHeartColor") {
-            game.select_option(1); // heart02
-        } else if typ.as_deref() == Some("SelectTarget") {
-            game.select_option(1);
-        }
-    }
+    assert!(
+        game.has_pending_choice(),
+        "hand discard cost prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the hand discard cost"
+    );
+    game.select_indices(&[0]);
+
+    assert!(
+        game.has_pending_choice(),
+        "heart color selection prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectHeartColor"),
+        "expected SelectHeartColor prompt"
+    );
+    game.select_option(1); // heart02
 }
 
 /// All 5 revealed cards have heart02 → condition met → blade+3, selection enabled.
@@ -222,9 +232,16 @@ fn maki_bp6_blade_expires_at_live_end() {
     drain_cost_and_color(&mut game);
 
     // Selection + drain
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // select the only μ's card (after filter)
-    }
+    assert!(
+        game.has_pending_choice(),
+        "revealed_cards selection prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the μ's-card selection"
+    );
+    game.select_indices(&[0]); // select the only μ's card (after filter)
 
     // Blade should be +3 during live
     assert_eq!(

@@ -56,20 +56,6 @@ fn select_burn_move(game: &mut TestGame) {
     }
 }
 
-fn select_burn_skip(game: &mut TestGame) {
-    use rabuka_engine::ability::types::Choice;
-    if game.has_pending_choice() {
-        let ch = game.state.get_pending_choice().cloned().unwrap();
-        match ch {
-            Choice::SelectTarget { target, .. } if target.contains("pay_optional_cost") => {
-                game.select_choice_option(0); // Skip
-            }
-            _ => game.select_indices(&[]),
-        }
-    }
-    game.drain_auto_ability_choices();
-}
-
 #[test]
 fn burn_no_under_no_move_no_score() {
     let (mut g, _mem) = stage_with_under(MEMBER, 0);
@@ -78,7 +64,13 @@ fn burn_no_under_no_move_no_score() {
     for _ in 0..10 { g.give_energy(1); }
     let score_before = g.state.mods.get_score_modifier(burn);
     trigger_burn_success(&mut g, burn);
-    select_burn_skip(&mut g);
+    // 0 under cards → zero eligible candidates → the move effect auto-skips
+    // without any prompt.
+    assert!(
+        !g.has_pending_choice(),
+        "Burn!! with 0 under cards must not prompt (zero eligible candidates auto-skip)"
+    );
+    g.drain_auto_ability_choices();
     let score_after = g.state.mods.get_score_modifier(burn);
     assert_eq!(score_after, score_before, "0 under +10 total should be 0 – needs 1+ moved");
 }
@@ -117,7 +109,19 @@ fn burn_skip_optional_no_score_even_with_10_total() {
     let burn = g.id(BURN);
     g.state.player1.success_live_card_zone.cards.push(burn);
     trigger_burn_success(&mut g, burn);
-    select_burn_skip(&mut g);
+    // Observed chain: SelectCard zone=stage count=1 allow_skip=true
+    // ("Choose a member whose under energies to move"); empty answer declines.
+    assert!(
+        g.has_pending_choice(),
+        "Burn!! under-member selection prompt expected"
+    );
+    assert_eq!(
+        g.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (stage member whose under to move)"
+    );
+    g.select_indices(&[]); // decline optional move
+    g.drain_auto_ability_choices();
     let score = g.state.mods.get_score_modifier(burn);
     assert_eq!(score, 0, "skip optional -> 0 moved => no score even with 10 total");
 }

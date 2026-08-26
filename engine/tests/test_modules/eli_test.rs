@@ -36,18 +36,25 @@ fn eli_q79_vacated_area_can_play_new_member() {
 
     // The ability creates a selection choice because waitroom has 2 member cards
     // (target_member + Eli after self_cost). Resolve the choice first.
-    if game.has_pending_choice() {
-        // Find target_member's index in waitroom to recover it
-        let idx = game
-            .state
-            .player1
-            .waitroom
-            .cards
-            .iter()
-            .position(|&id| id == target_member)
-            .expect("target_member should be in waitroom");
-        game.select_indices(&[idx]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "waitroom recover selection prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (recover from waitroom)"
+    );
+    // Find target_member's index in waitroom to recover it
+    let idx = game
+        .state
+        .player1
+        .waitroom
+        .cards
+        .iter()
+        .position(|&id| id == target_member)
+        .expect("target_member should be in waitroom");
+    game.select_indices(&[idx]);
 
     // After activation, center should be empty (self_cost removed Eli)
     assert_eq!(

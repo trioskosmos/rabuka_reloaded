@@ -134,11 +134,12 @@ fn you_ability_select_multiple_cards() {
     game.select_indices(&[0]);
     assert!(game.has_pending_choice(), "select q3 must be offered");
     game.select_indices(&[0]);
-    // selecting up to max (3) auto-finalizes without a skip prompt when
-    // no matching cards remain — only assert skip when a choice is pending
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Observed: picking the 3rd of 3 eligible cards reaches the max cap and
+    // the ability auto-finalizes — no skip prompt is offered.
+    assert!(
+        !game.has_pending_choice(),
+        "reaching max (3) picks must auto-finalize without prompting"
+    );
     resolve_all_up_to(&mut game, 30);
     assert!(game.state.player1.hand.cards.contains(&q1), "Q1 in hand");
     assert!(game.state.player1.hand.cards.contains(&q2), "Q2 in hand");
@@ -239,11 +240,12 @@ fn you_select_2_then_ends() {
     game.select_indices(&[0]);
     assert!(game.has_pending_choice(), "select q2 must be offered");
     game.select_indices(&[0]);
-    // selecting up to max (3) auto-finalizes without a skip prompt when
-    // no matching cards remain — only assert skip when a choice is pending
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Observed: after the last eligible card is picked (2 < max 3) the
+    // ability auto-finalizes when no eligible cards remain — no skip prompt.
+    assert!(
+        !game.has_pending_choice(),
+        "exhausting eligible cards must auto-finalize without prompting"
+    );
     resolve_all_up_to(&mut game, 30);
     assert!(game.state.player1.hand.cards.contains(&q1), "Q1 in hand");
     assert!(game.state.player1.hand.cards.contains(&q2), "Q2 in hand");
@@ -279,11 +281,12 @@ fn you_select_3_then_ends() {
     game.select_indices(&[0]);
     assert!(game.has_pending_choice(), "select q3 must be offered");
     game.select_indices(&[0]);
-    // selecting up to max (3) auto-finalizes without a skip prompt when
-    // no matching cards remain — only assert skip when a choice is pending
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Observed: picking the 3rd of 3 eligible cards reaches the max cap and
+    // the ability auto-finalizes — no skip prompt is offered.
+    assert!(
+        !game.has_pending_choice(),
+        "reaching max (3) picks must auto-finalize without prompting"
+    );
     resolve_all_up_to(&mut game, 30);
     assert!(game.state.player1.hand.cards.contains(&q1), "Q1 in hand");
     assert!(game.state.player1.hand.cards.contains(&q2), "Q2 in hand");

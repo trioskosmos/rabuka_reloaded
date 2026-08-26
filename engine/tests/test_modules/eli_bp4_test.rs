@@ -68,9 +68,17 @@ fn eli_bp4_all_at_once_discard() {
     game.activate_ability(eli);
     assert!(game.has_pending_choice(), "Should prompt for hand discard");
     game.select_indices(&[0]);
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Observed: the cost still re-prompts for the second single discard.
+    assert!(
+        game.has_pending_choice(),
+        "Should re-prompt for second discard"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard (hand discard 2/2)"
+    );
+    game.select_indices(&[0]);
     assert!(
         game.has_pending_choice(),
         "Should prompt for live card selection from discard"

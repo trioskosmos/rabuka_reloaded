@@ -31,23 +31,23 @@ fn rina_q226_position_clamps_to_bottom() {
     game.play_to_stage(rina, rabuka_engine::zones::MemberArea::LeftSide);
 
     // Debut triggers. Cost: discard top 2 (auto: deck 4→2).
-    // Then optional: place live card from discard at 4th-from-top.
-    // Deck has 2 cards, position 4 clamps to 2 (bottom).
-    if game.has_pending_choice() {
-        game.select_option(0); // pay the optional cost
-    }
-    // Select the live card from discard (find its position — deck auto-discard pushes cards ahead of it)
-    if game.has_pending_choice() {
-        let live_idx = game
-            .state
-            .player1
-            .waitroom
-            .cards
-            .iter()
-            .position(|&c| c == live)
-            .unwrap();
-        game.select_indices(&[live_idx]);
-    }
+    // Then a single optional prompt: place live card from discard (allow_skip).
+    assert!(
+        game.has_pending_choice(),
+        "optional live-card placement prompt expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected SelectCard for the placement (zone=discard, allow_skip)"
+    );
+    game.select_indices(&[0]); // place the live card from the waitroom top
+
+    // Placement is single-step; no further prompt may appear.
+    assert!(
+        !game.has_pending_choice(),
+        "placement resolves in one step; no second prompt expected"
+    );
 
     // Deck should have 3 cards: 1 (the live card placed at bottom) + 2 (remaining)
     // Actually: initial 4, discards top 2 → deck=2. Places live at 4th from top → clamped to index 2 → deck[2] = live

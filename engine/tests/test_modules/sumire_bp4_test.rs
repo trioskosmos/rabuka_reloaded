@@ -52,15 +52,16 @@ fn sumire_q193_q194_baton_touch_draw_and_deploy() {
     .expect("play with double baton via card_indices");
 
     // After baton touch + debut: draw 2 cards (auto).
-    // If multiple matching cards in discard, a card selection choice appears.
-    // If exactly 1 match, card auto-selected (no choice).
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    // If multiple empty stage slots, choose deployment position.
-    if game.has_pending_choice() {
-        game.select_option(0);
-    }
+    // Deploy target auto-resolves (single matching candidate) → no card selection prompt.
+    assert!(
+        !game.has_pending_choice(),
+        "single-candidate deploy must auto-resolve without a card selection prompt"
+    );
+    // Deployment position also auto-resolves → no position prompt.
+    assert!(
+        !game.has_pending_choice(),
+        "deployment must not prompt for a position choice here"
+    );
 
     // Q194: Double baton touch replaced 2 members
     assert_eq!(
