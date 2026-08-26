@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-26T23:11:42.979050",
+  "generated_at": "2026-08-27T01:47:48.970622",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "fdd54187",
+  "engine_commit": "ef7ba876",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -16240,16 +16240,14 @@
       "cost": null,
       "effect": {
         "text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが元々持つ{{icon_blade.png|ブレード}}の数は3つになる",
-        "duration": "live_end",
+        "action": "set_blade_count",
         "count": 3,
-        "card_type": "member_card",
-        "target": "self",
-        "position": "center",
+        "duration": "live_end",
+        "original_value": true,
         "group_names": [
           "Liella!"
         ],
-        "action": "set_blade_count",
-        "original_value": true
+        "position": "center"
       }
     },
     {

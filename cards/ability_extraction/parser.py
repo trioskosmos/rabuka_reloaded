@@ -1686,30 +1686,6 @@ def parse_effect(text: str) -> Dict[str, Any]:
     normalized = re.sub(r"\s+", "", fallback_text)
     pattern_text = re.sub(r"\{\{[^|]+\|([^}]+)\}\}", r"\1", normalized)
 
-    # 「（元々持つ）ブレードの数はNつになる」 → set_blade_count(N).
-    # Generalized handler for play-time/continuous blade-count setting;
-    # the icon template sits between ブレード and の数 in raw text, so
-    # match on the icon-stripped form.
-    blade_set_m = re.search(r"ブレードの数は(\d+)つになる", pattern_text)
-
-    extra_checks = [
-        (
-            lambda: blade_set_m is not None,
-            lambda: effect.update(
-                {"action": "set_blade_count", "count": int(blade_set_m.group(1))}
-            )
-            or (
-                effect.update({"duration": "live_end"})
-                if "duration" not in effect and "ライブ終了時まで" in pattern_text
-                else None
-            ),
-        ),
-    ]
-    for check, apply in extra_checks:
-        if check():
-            apply()
-            break
-
     # Ensure action field
     if "action" not in effect and "actions" not in effect:
         effect["action"] = "custom"
@@ -10291,6 +10267,36 @@ for _ri, _h in enumerate(_EFFECT_RULES):
 for _i, _h in enumerate(_EFFECT_HANDLERS):
     _hn = getattr(_h, "__name__", f"handler_{_i}")
     _effect_registry.register(100 + _i, _hn, _h)
+
+
+def _try_blade_count_set(text):
+    """「（元々持つ）ブレードの数はNつになる」 → set_blade_count(N).
+
+    Play-time/continuous blade-count setting. The icon template sits between
+    ブレード and の数 in raw text, so match on the icon-stripped form.
+    Registered at priority 10000 so it runs after every legacy handler but
+    before the parse_action fallback — replacing the former extra_checks
+    lambda block in parse_effect.
+    """
+    normalized = re.sub(r"\s+", "", text)
+    pattern_text = re.sub(r"\{\{[^|]+\|([^}]+)\}\}", r"\1", normalized)
+    m = re.search(r"ブレードの数は(\d+)つになる", pattern_text)
+    if not m:
+        return None
+    result = {
+        "text": text,
+        "action": "set_blade_count",
+        "count": int(m.group(1)),
+    }
+    if "ライブ終了時まで" in pattern_text:
+        result["duration"] = "live_end"
+    return result
+
+
+# Priority 10000: runs after every legacy handler (100+) but before the
+# parse_action fallback, so this phrase is claimed declaratively instead of
+# via a post-hoc override lambda.
+_effect_registry.register(10000, "blade_count_set", _try_blade_count_set)
 
 
 def _try_play_time_cost_set(text):
