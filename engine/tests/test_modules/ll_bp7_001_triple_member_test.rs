@@ -7,6 +7,7 @@
 /// ab#2 (ライブ成功時): 自分の控え室からメンバーカードを1枚手札に加える。
 use crate::helpers::*;
 use rabuka_engine::ability::types::Choice;
+use rabuka_engine::core::types::AbilityTrigger;
 
 const HANAMARU: &str = "PL!S-bp2-016-N";
 const SETSUNA: &str = "PL!N-PR-009-PR";
@@ -267,23 +268,12 @@ fn triple_debut_no_live_card_in_waitroom() {
 // ====================================================================
 
 fn trigger_live_success(game: &mut TestGame, card_id: i16) {
-    let card = game.db.get_card(card_id).unwrap();
-    let ab = card
-        .resolved_abilities()
-        .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
-        .unwrap();
-    let pid = game.state.player1.id.clone();
-    game.state.trigger_auto_ability(
-        format!("{}_{}", card.card_no, ab.full_text),
-        rabuka_engine::core::types::AbilityTrigger::LiveSuccess,
-        pid.clone(),
-        Some(card.card_no.to_string()),
-        Some(card_id),
-        None,
-        None,
+    fire_trigger(
+        game,
+        card_id,
+        AbilityTrigger::LiveSuccess,
+        "ライブ成功時",
     );
-    game.state.activating_card = Some(card_id);
-    game.state.process_pending_auto_abilities(&pid);
     game.drain_auto_ability_choices();
 }
 

@@ -9,7 +9,6 @@
 /// stage whose ORIGINAL blade count is <= 3.
 use crate::helpers::*;
 use rabuka_engine::core::types::AbilityTrigger;
-use rabuka_engine::zones::MemberArea;
 
 const GINKO: &str = "PL!HS-PR-035-PR";
 const M1: &str = "PL!-sd1-001-SD";
@@ -102,5 +101,4 @@ fn gin_ko_places_opponent_discard_under_opponent_deck() {
         p2_deck_before + 3,
         "3 cards added to the opponent's deck bottom"
     );
-    let _ = MemberArea::Center;
 }

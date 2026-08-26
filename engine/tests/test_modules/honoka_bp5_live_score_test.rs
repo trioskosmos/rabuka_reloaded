@@ -19,24 +19,12 @@ use rabuka_engine::core::types::AbilityTrigger;
 // ---------------------------------------------------------------------------
 
 fn trigger_live_success(game: &mut TestGame, card_id: i16) {
-    let card = game.db.get_card(card_id).unwrap();
-    let ab = card
-        .resolved_abilities()
-        .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
-        .expect("Card must have LiveSuccess ability");
-    let ability_id = format!("{}_{}", card.card_no, ab.full_text);
-    game.state.trigger_auto_ability(
-        ability_id,
+    fire_trigger(
+        game,
+        card_id,
         AbilityTrigger::LiveSuccess,
-        game.state.player1.id.clone(),
-        Some(card.card_no.to_string()),
-        Some(card_id),
-        None,
-        None,
+        "ライブ成功時",
     );
-    game.state.activating_card = Some(card_id);
-    let pid = game.state.player1.id.clone();
-    game.state.process_pending_auto_abilities(&pid);
 }
 
 /// Setup: Honoka on stage, hand cards, deck filled with known filler cards.

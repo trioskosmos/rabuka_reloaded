@@ -314,11 +314,6 @@ fn tiny_stars_duplicate_kanon() {
         "no further choice expected after kanon selection (keke auto-resolves)"
     );
 
-    assert!(
-        !game.has_pending_choice(),
-        "After selecting kanon, no more choices expected"
-    );
-
     let chosen_blade = game.state.mods.get_blade_modifier(kanon1);
     let chosen_heart = game
         .state
@@ -397,11 +392,6 @@ fn tiny_stars_duplicate_keke() {
     assert!(
         !game.has_pending_choice(),
         "no further choice expected after keke selection (kanon auto-resolves)"
-    );
-
-    assert!(
-        !game.has_pending_choice(),
-        "After selecting keke, no more choices expected"
     );
 
     assert_eq!(

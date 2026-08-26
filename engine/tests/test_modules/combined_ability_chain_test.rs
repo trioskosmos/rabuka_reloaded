@@ -114,7 +114,7 @@ fn determination_cascade_p1_failure_relocation_p2_success() {
 
     // Drive exactly like opponent_live_success_flow_test: fixed pass counts
     // reach each LiveCardSet phase, then determination.
-    let mut seen = |g: &mut TestGame| {
+    let seen = |g: &mut TestGame| {
         while g.has_pending_choice() {
             g.select_indices(&[0]);
         }

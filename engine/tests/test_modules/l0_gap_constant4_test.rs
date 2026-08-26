@@ -1,19 +1,6 @@
 /// L0 gap coverage: additional Constant and LiveStart heart/blade abilities.
 use crate::helpers::*;
-use rabuka_engine::ability::types::Choice;
 use rabuka_engine::card::HeartColor;
-
-fn drain_skips(game: &mut TestGame) {
-    let mut guard = 0;
-    while game.has_pending_choice() && guard < 30 {
-        guard += 1;
-        match game.get_pending_choice() {
-            Choice::SelectAutoAbility { .. } => game.select_indices(&[]),
-            Choice::SelectCard { allow_skip: true, .. } => game.select_indices(&[]),
-            _ => break,
-        }
-    }
-}
 
 /// PL!SP-bp5-011-R: 常時 left→heart02×3, center→heart03×3, right→heart05×3.
 /// Tests all three position variants.

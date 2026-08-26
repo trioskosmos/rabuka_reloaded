@@ -38,25 +38,15 @@ fn accept_swap_to(game: &mut TestGame, dest: &str) {
     }
 }
 
-/// Fire a LiveSuccess trigger for a card manually (same pattern as jimo_ai_dash_test).
+/// Fire a LiveSuccess trigger for a card manually (delegates to the shared
+/// helper; kept as a named wrapper for readability at call sites).
 fn trigger_live_success(game: &mut TestGame, card_id: i16) {
-    let card = game.db.get_card(card_id).unwrap();
-    let ab = card
-        .resolved_abilities()
-        .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
-        .unwrap();
-    let pid = game.state.player1.id.clone();
-    game.state.trigger_auto_ability(
-        format!("{}_{}", card.card_no, ab.full_text),
+    fire_trigger(
+        game,
+        card_id,
         rabuka_engine::core::types::AbilityTrigger::LiveSuccess,
-        pid.clone(),
-        Some(card.card_no.to_string()),
-        Some(card_id),
-        None,
-        None,
+        "ライブ成功時",
     );
-    game.state.activating_card = Some(card_id);
-    game.state.process_pending_auto_abilities(&pid);
 }
 
 fn score_mod(game: &TestGame, card_id: i16) -> i32 {

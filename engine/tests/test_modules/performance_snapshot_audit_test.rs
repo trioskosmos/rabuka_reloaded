@@ -437,26 +437,28 @@ fn audit_set_zero_removes_requirement() {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// TEST 7: Card with no need_heart field always passes
+// TEST 7: Invalid live-zone card (a MEMBER) yields no live performance
 //
-// Use a member/energy card (no need_heart) placed in live zone.
-// Even with 0 stage hearts, it should always report passed=true.
+// Every ライブ card in the DB has need_heart, so "live card without
+// requirements" is untestable fiction. What IS real: check_timing removes a
+// non-live card from the live zone before performance (rules 8.3.x invalid
+// live card), so it must produce NO lives entry, no success-zone placement,
+// and zero score. The old version of this test asserted nothing — its
+// `if let Some(lc)` never ran because lives was always empty.
 // ──────────────────────────────────────────────────────────────────
 #[test]
-fn audit_no_need_heart_always_passes() {
+fn audit_member_as_live_card_is_invalid_no_live_entry() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    // PL!N-sd1-025-SD has need_heart h0=4 — use a card without any need_heart.
-    // PL!-sd1-001-SD (穂乃果 member) has no need_heart
-    let live_no_req = game.id("PL!-sd1-001-SD");
+    let member_as_live = game.id("PL!-sd1-001-SD"); // 穂乃果, a MEMBER
     let filler = game.id("PL!-sd1-010-SD");
 
     // Zero stage — no hearts at all
     setup_game(&mut game, [-1, -1, -1], filler);
-    game.state.player1.hand.cards.push(live_no_req);
+    game.state.player1.hand.cards.push(member_as_live);
 
-    run_to_end(&mut game, &[live_no_req]);
-    dump_perf(&mut game, "no_need_heart");
+    run_to_end(&mut game, &[member_as_live]);
+    dump_perf(&mut game, "member_as_live_invalid");
 
     let perf = game
         .state
@@ -469,17 +471,15 @@ fn audit_no_need_heart_always_passes() {
         "VERIFY: lives={:?}",
         perf.lives.iter().map(|l| l.passed).collect::<Vec<_>>()
     );
-    if let Some(lc) = perf.lives.first() {
-        assert!(
-            lc.passed,
-            "Card without need_heart must always pass regardless of stage"
-        );
-    }
-    // Score may be >0 (card score) even without requirements
-    eprintln!(
-        "VERIFY: total_score={} success={}",
-        perf.total_score, perf.success
+    assert!(
+        perf.lives.is_empty(),
+        "a member removed as an invalid live card must not produce a lives entry"
     );
+    assert!(
+        !perf.success,
+        "no valid live performed -> no success"
+    );
+    assert_eq!(perf.total_score, 0, "no valid live -> zero score");
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -565,18 +565,16 @@ fn audit_both_players_fail_no_winner() {
         .state
         .performance_snapshots
         .iter()
-        .find(|s| s.player_id == "p1");
+        .find(|s| s.player_id == "p1")
+        .expect("P1 must have a performance snapshot");
     let p2_snap = game
         .state
         .performance_snapshots
         .iter()
-        .find(|s| s.player_id == "p2");
-    if let Some(s) = p1_snap {
-        assert!(!s.success, "P1 success should be false");
-    }
-    if let Some(s) = p2_snap {
-        assert!(!s.success, "P2 success should be false");
-    }
+        .find(|s| s.player_id == "p2")
+        .expect("P2 must have a performance snapshot");
+    assert!(!p1_snap.success, "P1 success should be false");
+    assert!(!p2_snap.success, "P2 success should be false");
 }
 
 // ──────────────────────────────────────────────────────────────────

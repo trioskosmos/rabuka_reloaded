@@ -28,23 +28,7 @@ const HIGH5: &str = "PL!N-sd2-001-SD2"; // 上原歩夢, blade 5
 /// Fire オードリー's ライブ成功時 ability, answering the member-selection choice
 /// with the FIRST candidate. Drives the real ability queue / resolver / select.
 fn trigger_live_success(game: &mut TestGame, audrey: i16) {
-    let card = game.db.get_card(audrey).unwrap();
-    let ab = card
-        .resolved_abilities()
-        .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
-        .expect("オードリー ab#0 should be a ライブ成功時 ability");
-    let pid = game.state.player1.id.clone();
-    game.state.trigger_auto_ability(
-        format!("{}_{}", card.card_no, ab.full_text),
-        AbilityTrigger::LiveSuccess,
-        pid.clone(),
-        Some(card.card_no.to_string()),
-        Some(audrey),
-        None,
-        None,
-    );
-    game.state.activating_card = Some(audrey);
-    game.state.process_pending_auto_abilities(&pid);
+    fire_trigger(game, audrey, AbilityTrigger::LiveSuccess, "ライブ成功時");
 
     // オードリー ab#0 begins with a SelectCard (choose 1 虹ヶ咲 member).
     let mut guard = 0;
