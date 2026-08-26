@@ -579,3 +579,4 @@ pub mod sp_bp2_004_extra_test4;
 pub mod sp_bp2_004_extra_test5;
 pub mod sp_bp2_004_extra_test6;
 pub mod sp_bp2_004_extra_test7;
+pub mod sp_bp2_004_extra_test8;
