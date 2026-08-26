@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T17:51:19.436695+00:00",
+  "generated_at": "2026-08-26T17:52:28.852748+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 519,
-  "n_tests": 3068,
+  "n_files": 520,
+  "n_tests": 3070,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -23057,6 +23057,7 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/bp5_333_erena_edge_test2.rs",
         "engine/tests/test_modules/l0_gap_constant5_test.rs",
         "engine/tests/test_modules/state_condition_test.rs"
       ],
@@ -23065,12 +23066,14 @@
         "erena_active_no_heart",
         "erena_default_active_no_heart",
         "erena_in_wait_gains_heart05",
+        "erena_p_variant_wait_gains_heart",
         "erena_wait_not_on_stage",
+        "erena_wait_then_active_loses_heart",
         "erena_wait_to_active_switches_heart",
         "pb1_002_per_opponent_waited_heart06",
         "sp_bp7_009_left_right_grants_heart02"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -23098,6 +23101,7 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/bp5_333_erena_edge_test2.rs",
         "engine/tests/test_modules/l0_gap_constant5_test.rs",
         "engine/tests/test_modules/state_condition_test.rs"
       ],
@@ -23106,12 +23110,14 @@
         "erena_active_no_heart",
         "erena_default_active_no_heart",
         "erena_in_wait_gains_heart05",
+        "erena_p_variant_wait_gains_heart",
         "erena_wait_not_on_stage",
+        "erena_wait_then_active_loses_heart",
         "erena_wait_to_active_switches_heart",
         "pb1_002_per_opponent_waited_heart06",
         "sp_bp7_009_left_right_grants_heart02"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 10,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
