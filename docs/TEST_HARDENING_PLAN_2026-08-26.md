@@ -65,11 +65,14 @@ Fixes:
    diagnostic).
 3. **Engine bug #5 (ordering)**: LiveSuccess triggers fired at the TOP of
    `execute_live_victory_determination`, before verdicts/results existed —
-   every real-flow opponent-success evaluation saw stale state. Interim fix:
-   `early_seat_results()` compact-mirror records per-seat outcomes before the
-   trigger block (authoritative pass below re-runs idempotently). Skipped
-   seats don't clobber explicitly-armed values. Follow-up refactor: hoist the
-   authoritative verdict pass above the trigger block and delete the mirror.
+   every real-flow opponent-success evaluation saw stale state. Fix:
+   `record_pretrigger_live_results()` records per-seat outcomes before the
+   trigger block using the SAME score formula as the post-trigger totals
+   (extras = 0 by construction). The later authoritative pass remains as
+   post-extras truth. Skipped seats don't clobber explicitly-armed values.
+   Follow-up refactor item RESOLVED: mirror upgraded to exact score formula
+   rather than deleted (deleting would require reordering the trigger/score
+   dependency chain — triggers feed extras feed final scores).
 
 New `opponent_live_success_flow_test.rs`: full organic round — P1 exact-fill
 success (海未 + START:DASH!!, heart-less deck so yell adds nothing) vs P2-owned

@@ -134,16 +134,23 @@ pub(crate) fn process_yell_revealed_card_icons(
     }
 }
 
-/// BUG#5 workaround (docs/TEST_HARDENING_PLAN_2026-08-26.md §4): ライブ成功時
-/// triggers fire at the TOP of execute_live_victory_determination, but the
-/// authoritative verdicts/results are only computed further down — so
-/// conditions like Strawberry Trapper's 「相手が余剰のハートを持たずにライブを
-/// 成功させていた場合」 saw stale state in every real flow (synthetic-flag
-/// tests masked it). This compact mirror records per-seat outcomes BEFORE the
-/// trigger block runs. The authoritative pass below re-runs idempotently;
-/// keep the two in sync (the organic test in
-/// cross-checks opponent_live_success_flow_test pins them together).
-fn early_seat_results(gs: &mut GameState) {
+/// Pre-trigger per-seat live results (docs/TEST_HARDENING_PLAN_2026-08-26.md
+/// §4, engine bug #5): ライブ成功時 triggers fire at the TOP of
+/// execute_live_victory_determination, but the authoritative verdicts and
+/// scores are only computed further down — so conditions like Strawberry
+/// Trapper's 「相手が余剰のハートを持たずにライブを成功させていた場合」 saw
+/// stale state in every real flow (synthetic-flag tests masked it).
+///
+/// This records each seat's outcome BEFORE the trigger block runs, using the
+/// SAME score formula as the post-trigger totals (extras = 0 at this point,
+/// since trigger bonuses land in pX_extra afterwards). The later
+/// authoritative writes remain as post-extras truth for display/subsequent
+/// turns; opponent_live_success_flow_test pins the two together.
+fn record_pretrigger_live_results(
+    gs: &mut GameState,
+    need_heart_flat: &HashMap<i16, HashMap<crate::card::HeartColor, ModifierEntry>>,
+    pre_score_flat: &HashMap<i16, i32>,
+) {
     // (won, no_excess) per seat, computed from finalised allocations.
     let mut results = [(false, false); 2];
     let mut recorded = [false; 2];
@@ -247,7 +254,33 @@ fn early_seat_results(gs: &mut GameState) {
             snap.total_hearts[c] >= filled_total[c]
                 && snap.total_hearts[c] - filled_total[c] == 0
         });
-        let won = all_passed && snap.total_hearts.iter().any(|&v| v > 0);
+        // Same score formula as the post-trigger totals (extras are zero
+        // here by construction — trigger bonuses land in pX_extra after
+        // this point).
+        let seat = if seat_index == 0 {
+            &gs.player1
+        } else {
+            &gs.player2
+        };
+        let cheer = if seat_index == 0 {
+            gs.player1_cheer_blade_heart_count
+        } else {
+            gs.player2_cheer_blade_heart_count
+        };
+        let bonus = if seat_index == 0 {
+            gs.mods.p1_constant_total_score_bonus
+        } else {
+            gs.mods.p2_constant_total_score_bonus
+        };
+        let pre_score = seat.live_card_zone.calculate_live_score(
+            &gs.card_database,
+            cheer,
+            seat.stage_hearts.as_ref(),
+            Some(need_heart_flat),
+            Some(pre_score_flat),
+            bonus,
+        );
+        let won = all_passed && pre_score > 0;
         results[seat_index] = (won, no_excess);
         recorded[seat_index] = true;
     }
@@ -404,10 +437,28 @@ impl super::TurnEngine {
             .map(|(&k, e)| (k, e.total()))
             .collect();
 
+        // Determine winner — use PRE-trigger modifiers so LiveSuccess
+        // triggered changes only apply via pX_extra (no double-count).
+        let need_heart_flat: HashMap<i16, HashMap<crate::card::HeartColor, ModifierEntry>> =
+            game_state
+                .mods
+                .need_heart_modifiers
+                .iter()
+                .map(|(&k, colors)| {
+                    let flat: HashMap<HeartColor, ModifierEntry> =
+                        colors.iter().map(|(&c, e)| (c, *e)).collect();
+                    (k, flat)
+                })
+                .collect();
+
         // BUG#5: record per-seat outcomes BEFORE LiveSuccess triggers fire
         // (Q36: they resolve at determination timing and must see both
         // performances' results).
-        early_seat_results(game_state);
+        record_pretrigger_live_results(
+            game_state,
+            &need_heart_flat,
+            &pre_score_flat,
+        );
 
         // Q48: A live can be won even with total score 0 or less
         // (score comparison determines the winner regardless of absolute value).
@@ -537,17 +588,7 @@ impl super::TurnEngine {
 
         // Determine winner — use PRE-trigger modifiers so LiveSuccess
         // triggered changes only apply via pX_extra (no double-count).
-        let need_heart_flat: HashMap<i16, HashMap<crate::card::HeartColor, ModifierEntry>> =
-            game_state
-                .mods
-                .need_heart_modifiers
-                .iter()
-                .map(|(&k, colors)| {
-                    let flat: HashMap<HeartColor, ModifierEntry> =
-                        colors.iter().map(|(&c, e)| (c, *e)).collect();
-                    (k, flat)
-                })
-                .collect();
+        // (need_heart_flat was built above, before pre-trigger results.)
         let player1_score = game_state.player1.live_card_zone.calculate_live_score(
             &game_state.card_database,
             game_state.player1_cheer_blade_heart_count,
