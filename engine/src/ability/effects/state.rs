@@ -962,6 +962,14 @@ impl AbilityResolver {
             .push(format!("{} {}: [[log_set_cost]]", pp, act_name));
         for card_id in card_ids {
             gs.mods.set_cost_modifier(card_id, value as i16);
+            gs.record_ability_application(
+                gs.activating_card.unwrap_or(-1),
+                effect.text.to_string(),
+                "cost_set",
+                card_id,
+                None,
+                value as i16,
+            );
         }
     }
 
@@ -1027,6 +1035,14 @@ impl AbilityResolver {
         for (card_id, pid) in stage_card_ids {
             if let Some(color) = blade_color {
                 gs.mods.set_blade_type_modifier(card_id, color);
+                gs.record_ability_application(
+                    gs.activating_card.unwrap_or(-1),
+                    effect.text.to_string(),
+                    "blade_type_set",
+                    card_id,
+                    None,
+                    0,
+                );
             }
             let ed = crate::core::types::EffectData::SetBladeCount { card_id };
             util::push_temporary_effect(
@@ -1402,6 +1418,14 @@ impl AbilityResolver {
         }
         for &card_id in &stage_cards {
             gs.mods.set_blade_modifier(card_id, value as i16);
+            gs.record_ability_application(
+                gs.activating_card.unwrap_or(-1),
+                effect.text.to_string(),
+                "blade_set",
+                card_id,
+                None,
+                value as i16,
+            );
             // Register for cleanup at live end / duration expiry
             if effect.duration_any().is_some() {
                 util::push_temporary_effect(
@@ -1678,6 +1702,14 @@ impl AbilityResolver {
                 // Additive (not the `set` field) so live_end revert via
                 // remove_cost_modifier restores exactly what was applied.
                 gs.mods.add_cost_modifier(*card_id, *d);
+                gs.record_ability_application(
+                    gs.activating_card.unwrap_or(-1),
+                    effect.text.to_string(),
+                    "cost_bonus",
+                    *card_id,
+                    None,
+                    *d,
+                );
                 log::debug!("[MOD_COST_REF] card={} applied delta={}", card_id, d);
             }
             if let Some(dur) = duration {
@@ -1716,8 +1748,24 @@ impl AbilityResolver {
         for card_id in &card_ids {
             if operation == "set" {
                 gs.mods.set_cost_modifier(*card_id, delta);
+                gs.record_ability_application(
+                    gs.activating_card.unwrap_or(-1),
+                    effect.text.to_string(),
+                    "cost_set",
+                    *card_id,
+                    None,
+                    delta,
+                );
             } else {
                 gs.mods.add_cost_modifier(*card_id, delta);
+                gs.record_ability_application(
+                    gs.activating_card.unwrap_or(-1),
+                    effect.text.to_string(),
+                    "cost_bonus",
+                    *card_id,
+                    None,
+                    delta,
+                );
             }
         }
         if let Some(dur) = duration {

@@ -6,6 +6,8 @@ mod board;
 mod card_art_gen;
 mod display;
 mod font_tiles_gen;
+mod overlay;
+mod texticons_gen;
 
 pub mod decks_baked;
 pub mod gba_ui;

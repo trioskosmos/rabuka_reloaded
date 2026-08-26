@@ -422,8 +422,23 @@ impl Stage {
                 continue;
             }
 
+            // 9.9.1.4: a set-type effect replaces the member's original hearts.
             if let Some(&(override_color, override_count)) = heart_override.get(&card_id) {
                 *hearts.entry_or_default(override_color) += override_count;
+                // 9.9.1.5: additive modifiers still stack ON TOP of the set
+                // value (mirrors the non-override path below).
+                if let Some(mods) = heart_modifiers.get(&card_id) {
+                    for (color, delta) in mods {
+                        let new_val = crate::constants::saturate_u8(
+                            hearts.get(color).copied().unwrap_or(0) as i32 + *delta,
+                        );
+                        if new_val > 0 {
+                            hearts.insert(*color, new_val);
+                        } else {
+                            hearts.remove(color);
+                        }
+                    }
+                }
                 continue;
             }
 

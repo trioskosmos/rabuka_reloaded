@@ -1,0 +1,27 @@
+﻿
+> gba_cargo_out.txt:10:warning: unused imports: `ToString` and `vec::Vec`
+  gba_cargo_out.txt:11: --> C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\core\game_state\tracking.rs:4:
+22
+  gba_cargo_out.txt:12:  |
+  gba_cargo_out.txt:13:4 |     string::{String, ToString},
+  gba_cargo_out.txt:14:  |                      ^^^^^^^^
+  gba_cargo_out.txt:15:5 |     vec::Vec,
+  gba_cargo_out.txt:16:  |     ^^^^^^^^
+> gba_cargo_out.txt:20:warning: unused doc comment
+  gba_cargo_out.txt:21:   --> C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\ability\enums.rs:376:5
+  gba_cargo_out.txt:22:    |
+  gba_cargo_out.txt:23:376 |     /// Wire-string tables generated from a single list 窶・see [`wire_tables`].
+  gba_cargo_out.txt:24:    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc doe
+s not generate document
+  gba_cargo_out.txt:25:ation for macro invocations
+  gba_cargo_out.txt:26:    |
+> gba_cargo_out.txt:30:warning: unused doc comment
+  gba_cargo_out.txt:31:   --> C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\ability\enums.rs:588:5
+  gba_cargo_out.txt:32:    |
+  gba_cargo_out.txt:33:588 |     /// Wire-string tables generated from a single list 窶・see [`wire_tables`].
+  gba_cargo_out.txt:34:    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc doe
+s not generate document
+  gba_cargo_out.txt:35:ation for macro invocations
+  gba_cargo_out.txt:36:    |
+
+

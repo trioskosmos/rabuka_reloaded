@@ -2398,6 +2398,72 @@ impl AbilityResolver {
             .unwrap_or_default();
         gs.rule_log
             .push(format!("{} {}: [[log_position_change]]", pp, act_name));
+
+        // Each-time resolution watchers (「…能力が解決したとき、そのメンバーを
+        // ポジションチェンジする」): the member to move is the RESOLVER carried
+        // by the queue entry (triggering_member_id), at its CURRENT area.
+        // The parsed `position` field belongs to the TRIGGER clause
+        // (「センターエリアにいる…」) and must not be read as a source or
+        // destination here (Q255: the resolver may already have left center).
+        if effect.trigger_type_any().as_deref() == Some("each_time") {
+            if let Some(triggering_member) = gs
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.triggering_member_id)
+            {
+                let cur_idx = {
+                    let player = gs.resolve_target_player_mut(target);
+                    player
+                        .stage
+                        .stage
+                        .iter()
+                        .position(|&id| id == triggering_member)
+                };
+                let Some(cur_idx) = cur_idx else {
+                    log::debug!(
+                        "[RESOLVE_WATCHER] triggering member {} not on {} stage — nothing to move",
+                        triggering_member,
+                        target
+                    );
+                    return Ok(());
+                };
+                let cur_area = util::pos_to_area(cur_idx).to_string();
+                let valid_destinations: Vec<String> = ["left", "center", "right"]
+                    .iter()
+                    .filter(|p| **p != cur_area.as_str())
+                    .map(|p| p.to_string())
+                    .collect();
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.choice_card_no = Some(ChoiceRoute::Raw(format!(
+                        "position_change:{}:{}",
+                        target, cur_area
+                    )));
+                }
+                let member_name = self.card_name(triggering_member);
+                self.pending_choice = Some(Choice::SelectTarget {
+                    target: "position|destination".to_string(),
+                    description: format!(
+                        "Choose destination for {} (currently at {})",
+                        member_name,
+                        util::pos_to_area(cur_idx)
+                    ),
+                    description_en: Some(format!(
+                        "Choose destination for {} (currently at {})",
+                        member_name,
+                        util::pos_to_area(cur_idx)
+                    )),
+                    description_ja: Some(format!(
+                        "{}の移動先を選択（現在: {}）",
+                        member_name,
+                        util::pos_to_area(cur_idx)
+                    )),
+                    allow_skip: effect.optional.unwrap_or(false),
+                    options: Some(valid_destinations),
+                });
+                return Ok(());
+            }
+        }
+
         // Check source_position from effect (new parser field), fall back to position param
         let source_pos_binding = effect.source_position_any();
         let source_pos = source_pos_binding

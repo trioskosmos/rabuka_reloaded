@@ -108,6 +108,11 @@ pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
     let mut scroll: usize = 0;
     let vis = ui.option_rows();
     let cols = ui.option_cols();
+    // Same hoist as menu_select: wrap once, swap the cursor per frame.
+    let rows: Vec<String> = items
+        .iter()
+        .map(|item| one_line(&format!("   {item}"), cols))
+        .collect();
     loop {
         if sel < scroll {
             scroll = sel;
@@ -118,9 +123,12 @@ pub fn select(ui: &mut dyn PlatformUi, items: &[&str], title: &str) -> usize {
         ui.clear_screen();
         ui.println(title);
         let end = (scroll + vis).min(items.len());
+        let mut buf = String::new();
         for n in scroll..end {
-            let prefix = if n == sel { " >" } else { "  " };
-            ui.println(&one_line(&format!("{prefix} {}", items[n]), cols));
+            buf.clear();
+            buf.push_str(if n == sel { " >" } else { "  " });
+            buf.push_str(&rows[n][2..]);
+            ui.println(&buf);
         }
         if items.len() > end {
             ui.println(&format!("  .. {} more", items.len() - end));
@@ -158,6 +166,13 @@ pub fn menu_select(
     let mut scroll: usize = 0;
     let vis = ui.option_rows();
     let cols = ui.option_cols();
+    // Rows are invariant while the menu is open; wrap them once (the 3-space
+    // base keeps the original "prefix + space + item" layout) and per frame
+    // only swap the cursor onto a reused buffer.
+    let rows: Vec<String> = all_items
+        .iter()
+        .map(|item| one_line(&format!("   {item}"), cols))
+        .collect();
     loop {
         if sel < scroll {
             scroll = sel;
@@ -168,9 +183,12 @@ pub fn menu_select(
         ui.clear_screen();
         ui.println(title);
         let end = (scroll + vis).min(all_items.len());
+        let mut buf = String::new();
         for n in scroll..end {
-            let prefix = if n == sel { " >" } else { "  " };
-            ui.println(&one_line(&format!("{prefix} {}", all_items[n]), cols));
+            buf.clear();
+            buf.push_str(if n == sel { " >" } else { "  " });
+            buf.push_str(&rows[n][2..]);
+            ui.println(&buf);
         }
         if all_items.len() > end {
             ui.println(&format!("  .. {} more", all_items.len() - end));
@@ -204,27 +222,63 @@ pub fn human_turn(
     let mut scroll = 0;
     let vis = ui.option_rows().min(9);
     let cols = ui.option_cols();
+
+    // Nothing on this screen changes between frames except the cursor: gs is
+    // read-only until an action executes (which returns). Building every line
+    // via format! + DB lookups *per poll* was the dominant cost on interpreted
+    // console targets (Dreamcast/WAMR), so construct it all once up front.
+    let header_turn = format!("Turn {} | {:?}", gs.turn_number, gs.current_phase);
+    let p1 = &gs.player1;
+    let p2 = &gs.player2;
+    let is_p1 = gs.active_player().id == "p1";
+    let tag = |a: bool| if a { ">>" } else { "  " };
+    let header_p1 = format!(
+        "{} P1 h:{} e:{} dk:{}",
+        tag(is_p1),
+        p1.hand.cards.len(),
+        p1.energy_zone.active_count(),
+        p1.main_deck.cards.len()
+    );
+    let header_p2 = format!(
+        "{} P2 h:{} e:{} dk:{}",
+        tag(!is_p1),
+        p2.hand.cards.len(),
+        p2.energy_zone.active_count(),
+        p2.main_deck.cards.len()
+    );
+    // Rows carry the neutral 2-char prefix through one_line so the wrapped
+    // width matches the original exactly; per frame only bytes [0..2] differ,
+    // swapped onto a reused buffer instead of re-running fmt machinery.
+    let rows: Vec<String> = acts
+        .iter()
+        .map(|a| {
+            let line = a.description.lines().next().unwrap_or("");
+            let tag_str = a
+                .parameters
+                .as_ref()
+                .and_then(|p| p.card_no.as_ref())
+                .and_then(|n| gs.card_database.get_card_by_no(n))
+                .map(|c| format!(" [{}]", c.name))
+                .unwrap_or_default();
+            one_line(&format!("  {line}{tag_str}"), cols)
+        })
+        .collect();
+    let action_cards: Vec<String> = {
+        let mut v: Vec<String> = Vec::new();
+        for a in acts {
+            if let Some(n) = a.parameters.as_ref().and_then(|p| p.card_no.as_ref()) {
+                if !v.contains(n) {
+                    v.push(n.clone());
+                }
+            }
+        }
+        v
+    };
     loop {
         ui.clear_screen();
-        ui.println(&format!("Turn {} | {:?}", gs.turn_number, gs.current_phase));
-        let p1 = &gs.player1;
-        let p2 = &gs.player2;
-        let is_p1 = gs.active_player().id == "p1";
-        let tag = |a: bool| if a { ">>" } else { "  " };
-        ui.println(&format!(
-            "{} P1 h:{} e:{} dk:{}",
-            tag(is_p1),
-            p1.hand.cards.len(),
-            p1.energy_zone.active_count(),
-            p1.main_deck.cards.len()
-        ));
-        ui.println(&format!(
-            "{} P2 h:{} e:{} dk:{}",
-            tag(!is_p1),
-            p2.hand.cards.len(),
-            p2.energy_zone.active_count(),
-            p2.main_deck.cards.len()
-        ));
+        ui.println(&header_turn);
+        ui.println(&header_p1);
+        ui.println(&header_p2);
         if sel < scroll {
             scroll = sel;
         }
@@ -232,30 +286,15 @@ pub fn human_turn(
             scroll = sel + 1 - vis;
         }
         let end = (scroll + vis).min(acts.len());
+        let mut buf = String::new();
         for a in scroll..end {
-            let prefix = if a == sel { " >" } else { "  " };
-            let line = acts[a].description.lines().next().unwrap_or("");
-            let tag_str = match &acts[a].parameters {
-                Some(p) => p
-                    .card_no
-                    .as_ref()
-                    .and_then(|n| gs.card_database.get_card_by_no(n))
-                    .map(|c| format!(" [{}]", c.name))
-                    .unwrap_or_default(),
-                None => String::new(),
-            };
-            ui.println(&one_line(&format!("{prefix}{line}{tag_str}"), cols));
+            buf.clear();
+            buf.push_str(if a == sel { " >" } else { "  " });
+            buf.push_str(&rows[a]);
+            ui.println(&buf);
         }
         if acts.len() > end {
             ui.println(&format!("  .. {} more", acts.len() - end));
-        }
-        let mut action_cards: Vec<String> = Vec::new();
-        for a in acts {
-            if let Some(n) = a.parameters.as_ref().and_then(|p| p.card_no.as_ref()) {
-                if !action_cards.contains(n) {
-                    action_cards.push(n.clone());
-                }
-            }
         }
         ui.set_actionable_cards(&action_cards);
         ui.set_selected_action(

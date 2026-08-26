@@ -310,6 +310,7 @@ impl AbilityResolver {
                 effect.value_or_count(1) as u8,
                 effect.heart_colors_any(),
                 effect.target_name(),
+                &effect.text,
             ),
             ActionType::ModifyYellCount => {
                 self.execute_modify_yell_count(gs, effect);

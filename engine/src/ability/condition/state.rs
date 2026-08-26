@@ -7,6 +7,8 @@ use crate::card::{CardProperty, Condition};
 use crate::game_state::Phase;
 use crate::HashSet;
 #[cfg(feature = "no_std")]
+use alloc::string::ToString;
+#[cfg(feature = "no_std")]
 use alloc::vec::Vec;
 
 impl<'a> ConditionContext<'a> {

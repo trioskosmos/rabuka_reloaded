@@ -388,6 +388,16 @@ impl GameState {
                         ) {
                             continue;
                         }
+                        // Resolution-watchers (「…能力が解決したとき」) arm ONLY
+                        // via the post-resolution hook; a board-state scan would
+                        // fire them on every pass.
+                        if ability
+                            .effect
+                            .as_ref()
+                            .is_some_and(|e| Self::effect_is_ability_resolution_watcher(e))
+                        {
+                            continue;
+                        }
                         if ability
                             .triggers
                             .as_ref()
@@ -586,6 +596,16 @@ impl GameState {
                             .as_ref()
                             .is_some_and(|t| &**t == crate::triggers::AUTO)
                         {
+                            // Resolution-watchers (「…能力が解決したとき」) arm ONLY
+                            // via the post-resolution hook; a board-state scan
+                            // would fire them on every pass.
+                            if ability
+                                .effect
+                                .as_ref()
+                                .is_some_and(|e| Self::effect_is_ability_resolution_watcher(e))
+                            {
+                                continue;
+                            }
                             if let Some(ref effect) = ability.effect {
                                 // Live card scan -- uses the same event-based
                                 // condition check as stage cards.
@@ -1142,6 +1162,45 @@ impl GameState {
         (None, None)
     }
 
+    /// Recursive condition-tree search: first non-empty group filter found.
+    fn condition_tree_group_names<'a>(
+        cond: &'a crate::card::Condition,
+    ) -> Option<&'a [String]> {
+        if let Some(g) = cond.get_group_names() {
+            if !g.is_empty() {
+                return Some(g);
+            }
+        }
+        if let Some(children) = cond.get_conditions() {
+            for c in children {
+                if let Some(g) = Self::condition_tree_group_names(c) {
+                    return Some(g);
+                }
+            }
+        }
+        None
+    }
+
+    /// True for 自動 abilities whose trigger clause watches an ability
+    /// RESOLUTION (「…（ライブ開始時|ライブ成功時）能力が解決したとき」).
+    /// These arm ONLY via `trigger_each_time_for_member` after a real
+    /// LS/LSS ability completes — their group/location condition also reads
+    /// as a static board query, so the TAS must never fire them on its own.
+    fn effect_is_ability_resolution_watcher(effect: &crate::card::AbilityEffect) -> bool {
+        fn tree_has(cond: &crate::card::Condition) -> bool {
+            if cond.get_text().is_some_and(|t| t.contains("能力が解決")) {
+                return true;
+            }
+            cond.get_conditions()
+                .is_some_and(|cs| cs.iter().any(|c| tree_has(c)))
+        }
+        effect.trigger_type_any().as_deref() == Some("each_time")
+            && effect
+                .condition
+                .as_ref()
+                .is_some_and(|c| tree_has(c))
+    }
+
     /// Internal: Process all standby abilities for a single player.
     /// Stops early if an ability creates a pending choice.
     /// Trigger each_time abilities on live cards for a specific member's resolution.
@@ -1188,6 +1247,34 @@ impl GameState {
                     };
                     if !watch_text.is_some_and(|t| t.contains(trigger_substring)) {
                         continue;
+                    }
+                    // The triggering member must satisfy the watcher's GROUP
+                    // filter (e.g. 『μ's』のメンバーの…能力が解決したとき).
+                    // Q255 keeps the position requirement loose — the member
+                    // may already have left center by resolution time — so
+                    // only group identity is enforced here.
+                    if let Some(groups) = effect
+                        .condition
+                        .as_ref()
+                        .and_then(|c| Self::condition_tree_group_names(c))
+                    {
+                        let member_matches = groups.iter().any(|g| {
+                            crate::ability::util::card_matches_group_str(
+                                &self.card_database,
+                                member_card_id,
+                                Some(g.as_str()),
+                            )
+                        });
+                        log::debug!(
+                            "[RESOLVE_WATCHER] card={} member={} groups={:?} match={}",
+                            card.card_no,
+                            member_card_id,
+                            groups,
+                            member_matches
+                        );
+                        if !member_matches {
+                            continue;
+                        }
                     }
                     abilities.push((card_id, ability_idx, card_id));
                 }

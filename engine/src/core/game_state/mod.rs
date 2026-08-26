@@ -125,6 +125,10 @@ pub struct GameState {
     /// Full Ability structs dynamically added to cards via gain_ability.
     /// These are scanned by the trigger pipeline alongside original card abilities.
     pub gained_card_abilities: HashMap<i16, Vec<crate::card::Ability>>,
+    /// Granting card id for each entry in gained_card_abilities (index-aligned
+    /// per target card). Lets display/UI attribute a gained ability to the card
+    /// that granted it.
+    pub gained_ability_sources: HashMap<i16, Vec<i16>>,
     /// Gained effects that couldn't be evaluated at constant time (e.g. because
     /// they depend on revealed_cards from the yell).  Stored as `(card_id, effect)`
     /// and evaluated during `execute_live_victory_determination` when the yell
@@ -457,6 +461,7 @@ impl GameState {
             cards_moved_this_turn: SmallVec::new(),
             gained_abilities: HashMap::default(),
             gained_card_abilities: HashMap::default(),
+            gained_ability_sources: HashMap::default(),
             delayed_gained_effects: SmallVec::new(),
             scratch_exp_blade: HashMap::default(),
             scratch_exp_score: HashMap::default(),
@@ -1194,8 +1199,12 @@ impl GameState {
                     "score_bonus" => crate::types::EffectType::ScoreBonus,
                     "score_set" => crate::types::EffectType::ScoreSet,
                     "transform" => crate::types::EffectType::Transform,
-                    "need_heart_mod" => crate::types::EffectType::NeedHeartMod,
+                    "need_heart_mod" | "need_heart_set" => crate::types::EffectType::NeedHeartMod,
                     "heart_override" => crate::types::EffectType::HeartOverride,
+                    "cost_bonus" => crate::types::EffectType::CostBonus,
+                    "cost_set" => crate::types::EffectType::CostSet,
+                    "blade_set" => crate::types::EffectType::BladeSet,
+                    "blade_type_set" => crate::types::EffectType::BladeTypeSet,
                     _ => crate::types::EffectType::HeartBonus,
                 },
                 target_card_id,

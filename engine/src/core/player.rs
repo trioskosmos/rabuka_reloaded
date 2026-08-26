@@ -379,8 +379,26 @@ impl Player {
                 continue;
             }
 
+            // 9.9.1.4: a set-type effect replaces the member's original hearts.
             if let Some(&(override_color, override_count)) = heart_override.get(&card_id) {
                 *total_hearts.entry_or_default(override_color) += override_count;
+                // 9.9.1.5: additive modifiers still stack ON TOP of the set
+                // value (same shape as blade set+additive in total_blades).
+                if let Some(mods) = heart_modifiers.get(&card_id) {
+                    for (color, entry) in mods {
+                        let delta = entry.total();
+                        if delta != 0 {
+                            let new_val = crate::constants::saturate_u8(
+                                total_hearts.get(color).copied().unwrap_or(0) as i32 + delta,
+                            );
+                            if new_val > 0 {
+                                total_hearts.insert(*color, new_val);
+                            } else {
+                                total_hearts.remove(color);
+                            }
+                        }
+                    }
+                }
                 continue;
             }
 

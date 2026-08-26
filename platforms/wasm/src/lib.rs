@@ -138,40 +138,81 @@ pub extern "C" fn rabuka_wasm_game_run(seed: u32) -> u32 {
     }
 }
 
-// ---- Bump allocator over a static heap in linear memory ----
-// DC has 16 MB, GBA/Jaguar need 512 KB. Use the smallest that fits the
-// active target: DC needs ~4 MB for two 60-card decks + VM state; the
-// 512 KB build OOMs at handle_mulligan_confirmation's Vec spill and
-// freezes on the `loop {}` panic handler (mulligan → Main).
+// ---- Heap over a static array in linear memory ----
+// Bump allocator PLUS recycling: dealloc'd blocks are recorded in a table and
+// reused best-fit by later allocs. The engine drops Vecs/Strings constantly
+// (per-screen buffers, choice lists); a pure bump ratchet leaked all of it,
+// which is why 8MB survived where 2MB died mid-match. Reuse bounds the heap
+// near the true working set. If the recycle table fills, we fall back to
+// leaking (the old behavior) rather than failing.
 #[cfg(feature = "jaguar")]
 const HEAP_SIZE: usize = 512 * 1024;
 #[cfg(not(feature = "jaguar"))]
-const HEAP_SIZE: usize = 8 * 1024 * 1024;
+const HEAP_SIZE: usize = 2 * 1024 * 1024;
 
-struct BumpAlloc(u32);
+/// Max simultaneously-tracked freed blocks. Each entry is (offset, len).
+const RECYCLE_CAP: usize = 4096;
+
+struct RecycleAlloc;
 
 static mut HEAP: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
 static mut CURSOR: usize = 0;
 static mut HIGH_WATER: usize = 0;
+static mut RECYCLE: [(u32, u32); RECYCLE_CAP] = [(0, 0); RECYCLE_CAP];
+static mut RECYCLE_LEN: usize = 0;
 
 #[global_allocator]
-static GLOBAL_ALLOC: BumpAlloc = BumpAlloc(0);
+static GLOBAL_ALLOC: RecycleAlloc = RecycleAlloc;
 
-unsafe impl GlobalAlloc for BumpAlloc {
+unsafe impl GlobalAlloc for RecycleAlloc {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let start = CURSOR;
-        let aligned = (start + layout.align() - 1) & !(layout.align() - 1);
-        let end = aligned + layout.size();
-        if end > HEAP_SIZE {
-            return core::ptr::null_mut();
+        let align = layout.align().max(4);
+        // First-fit reuse: take the first tracked free block that satisfies
+        // size + alignment. Best-fit scanned the whole table per alloc inside
+        // interpreted code; first-fit exits early and keeps allocation nearly
+        // free. Fragmentation risk is acceptable — block sizes repeat heavily
+        // in this engine (per-screen buffers, choice lists).
+        let mut hit: usize = usize::MAX;
+        for i in 0..RECYCLE_LEN {
+            let (off, len) = RECYCLE[i];
+            if len as usize >= layout.size() && (off as usize) % align == 0 {
+                hit = i;
+                break;
+            }
         }
-        CURSOR = end;
+        let off = if hit != usize::MAX {
+            let (off, _) = RECYCLE[hit];
+            RECYCLE[hit] = RECYCLE[RECYCLE_LEN - 1];
+            RECYCLE_LEN -= 1;
+            off as usize
+        } else {
+            // fresh bump slice
+            let start = (CURSOR + align - 1) & !(align - 1);
+            let end = start + layout.size();
+            if end > HEAP_SIZE {
+                return core::ptr::null_mut();
+            }
+            CURSOR = end;
+            start
+        };
+        let end = off + layout.size();
         if end > HIGH_WATER {
             HIGH_WATER = end;
         }
-        HEAP.as_mut_ptr().add(aligned)
+        HEAP.as_mut_ptr().add(off)
     }
-    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {}
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        if layout.size() == 0 || RECYCLE_LEN >= RECYCLE_CAP {
+            return; // nothing to track, or table full -> leak (old behavior)
+        }
+        let base = HEAP.as_mut_ptr() as usize;
+        let off = ptr as usize - base;
+        if off >= HEAP_SIZE {
+            return;
+        }
+        RECYCLE[RECYCLE_LEN] = (off as u32, layout.size() as u32);
+        RECYCLE_LEN += 1;
+    }
 }
 
 /// Peak bytes handed out by the bump allocator across all allocations so far

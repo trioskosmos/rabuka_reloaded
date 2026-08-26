@@ -91,30 +91,59 @@ pub(crate) fn char_cols(c: char) -> usize {
     }
 }
 
+/// Column width estimate for a `{{name|label}}` texticon token's inner part.
+/// Renderers substitute the token with a baked icon whose width varies by
+/// name; the label's column count (min 2, like a CJK glyph) is a close
+/// portable estimate good enough to wrap around.
+fn token_cols(inner: &str) -> usize {
+    let label = inner.split('|').next_back().unwrap_or("");
+    2.max(label.chars().map(char_cols).sum())
+}
+
+/// Split `text` into per-char pieces, keeping `{{...}}` texticon tokens as
+/// single atomic `(width, token)` units so wrapping never cuts a token in
+/// half (renderers draw the whole token as one inline icon).
+fn text_units(text: &str) -> Vec<(usize, &str)> {
+    let mut units: Vec<(usize, &str)> = Vec::new();
+    let mut i = 0usize;
+    while i < text.len() {
+        if text[i..].starts_with("{{") {
+            if let Some(close) = text[i + 2..].find("}}") {
+                let end = i + 2 + close + 2;
+                let inner = &text[i + 2..i + 2 + close];
+                units.push((token_cols(inner), &text[i..end]));
+                i = end;
+                continue;
+            }
+        }
+        let ch = text[i..].chars().next().unwrap();
+        units.push((char_cols(ch), &text[i..i + ch.len_utf8()]));
+        i += ch.len_utf8();
+    }
+    units
+}
+
 /// Wrap `text` into lines of at most `cols` half-width columns, honouring
-/// existing newlines as hard breaks.
-pub(crate) fn wrap_text(text: &str, cols: usize) -> Vec<String> {
+/// existing newlines as hard breaks and keeping `{{...}}` texticon tokens
+/// intact. Public so console ports reuse it instead of re-rolling
+/// token-unaware wrappers.
+pub fn wrap_text(text: &str, cols: usize) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut cur = String::new();
     let mut w = 0usize;
-    for ch in text.chars() {
-        if ch == '\n' {
-            if !cur.is_empty() {
+    for piece in text.split('\n') {
+        for (cw, unit) in text_units(piece) {
+            if w + cw > cols && !cur.is_empty() {
                 out.push(core::mem::take(&mut cur));
+                w = 0;
             }
-            w = 0;
-            continue;
+            cur.push_str(unit);
+            w += cw;
         }
-        let cw = char_cols(ch);
-        if w + cw > cols && !cur.is_empty() {
+        if !cur.is_empty() {
             out.push(core::mem::take(&mut cur));
-            w = 0;
         }
-        cur.push(ch);
-        w += cw;
-    }
-    if !cur.is_empty() {
-        out.push(cur);
+        w = 0;
     }
     if out.is_empty() {
         out.push(String::new());
@@ -124,16 +153,17 @@ pub(crate) fn wrap_text(text: &str, cols: usize) -> Vec<String> {
 
 /// Truncate `text` to a single line of at most `cols` columns, marking the
 /// cut so the player knows more is available (see the L/R detail viewer).
-pub(crate) fn one_line(text: &str, cols: usize) -> String {
+/// `{{...}}` texticon tokens are kept whole: a token that no longer fits
+/// ends the line instead of being cut in half. Public for console ports.
+pub fn one_line(text: &str, cols: usize) -> String {
     let mut s = String::new();
     let mut w = 0usize;
-    for ch in text.chars() {
-        let cw = char_cols(ch);
+    for (cw, unit) in text_units(text) {
         if w + cw > cols {
             s.push_str("..");
             break;
         }
-        s.push(ch);
+        s.push_str(unit);
         w += cw;
     }
     s

@@ -21,7 +21,20 @@ currently theoretical; see the audit note in `src/triggers.rs`.
 ### Section 9 — continuous effect layering
 | Rule | Description |
 |---|---|
-| **9.9.1.2–9.9.1.7** | Layered application order: grant/lose ability → non-numeric → set-value → additive → dependency ordering (9.9.1.6) → timestamp order (9.9.1.7/.1/.2). `recalculate_constants` applies typed modifier tables with no layering/timestamps. |
+| **9.9.1.6** | Dependency ordering between simultaneous continuous effects (A applied first changes what B applies to). No card-data case exists today; `recalculate_constants` has no dependency pass. |
+| **9.9.1.7** | Timestamp ordering for same-layer effects (constant = zone-entry time; other = play time). Not tracked; only observable with ≥2 competing effects in the SAME layer on one stat — no real cards collide today (single set_blade_count / set_card_identity source each). |
+
+Partially implemented (audited 2026-08-26):
+- **9.9.1.4→9.9.1.5 set-then-additive layering**: IMPLEMENTED and TESTED.
+  Blade: `ModifierEntry{set,additive}` with `total()=set+additive`; base blade
+  ignored when a set is present (`zones.rs::total_blades`). Q195 pin
+  (`special_color_test.rs`) + end-to-end two-live-card flow
+  (`rule_9_9_layering_test.rs::blade_set_then_additive_stacks_through_real_cards`).
+  Heart: heart-type SET no longer swallows additive gains — fixed in both
+  `player.rs::calculate_stage_hearts` and `zones.rs::get_available_hearts`
+  (override branch previously `continue`d past heart_modifiers); pinned by
+  `rule_9_9_layering_test.rs::heart_override_additive_stacks_in_both_stage_heart_calcs`.
+  The live.rs performance path already kept bonuses separate.
 
 ### Section 10/11/12 — rule processes & keywords
 | Rule | Description | Note |
@@ -70,7 +83,7 @@ currently theoretical; see the audit note in `src/triggers.rs`.
 | **10.5 invalid-card processes**, refresh (10.2 incl. mid-effect deferral), victory (10.3), check-timing cascade (9.5.3), baton touch (9.6.2.3.2), Turn1/Turn2 (11.2/.3), position/formation change (11.10/11.11), center/left/right restrictions (11.7–11.9) | Covered by existing test suite (`cargo test --test run_all`). |
 
 ## Highest gameplay impact
-1. Continuous-effect layering order (9.9) — verified missing by direct read of `recalculate_constants` (`modifiers.rs:221`): single additive pass, no set/add layers, no dependency or timestamp ordering.
+1. ~~Continuous-effect layering order (9.9)~~ — DOWNGRADED 2026-08-26: set→additive layering implemented + tested for blade and heart (see Section 9 note); only dependency/timestamp ordering (9.9.1.6/.7) remains, with no card-data case today.
 2. End-of-turn triggers (8.4.10–12) — zero card usage today, but blocks future sets.
 3. Phase-begin triggers (7.x/8.x) — same.
 4. Mid-effect win/loss (1.2.4) — `check_victory_condition` only runs inside `check_timing`.

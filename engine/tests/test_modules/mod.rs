@@ -1,7 +1,8 @@
-pub mod ability_combination_test;
+﻿pub mod ability_combination_test;
 pub mod ability_engine_fixes_test;
 pub mod qa_rulings_pins_test;
 pub mod trigger_scope_test;
+pub mod bp6_020_dancing_stars_watchers_test;
 pub mod ability_from_source_test;
 pub mod abundant_test;
 pub mod action_coverage_test;
@@ -341,7 +342,7 @@ pub mod wien_pb2_test;
 pub mod you_debut_test;
 pub mod zero_tested_action_types_test;
 
-// PVP room / web server integration tests (excluded from main test suite 窶・runs slowly)
+// PVP room / web server integration tests (excluded from main test suite 遯ｶ繝ｻruns slowly)
 // pub mod pvp_room_test;
 
 // Playthrough of coverage-gap test cards
@@ -432,7 +433,7 @@ pub mod pl_sp_pb2_005_test;
 pub mod trigger_card_integration_test;
 pub mod upper_batch_on_yell_test;
 
-// Otherwise-condition routing (reveal 竊・conditional 竊・otherwise)
+// Otherwise-condition routing (reveal 遶翫・conditional 遶翫・otherwise)
 pub mod otherwise_condition_flow_test;
 
 // Multi-color heart gain (PL!S-PR-040-PR / PL!N-PR-023-PR)
@@ -446,42 +447,42 @@ pub mod modifier_layer_characterization_test;
 pub mod wakana_shiki_test;
 pub mod zettai_lover_test;
 
-// KALEIDOSCORE debut: discard 竊・energy wait + conditional draw (PL!SP-pb2-013-R)
+// KALEIDOSCORE debut: discard 遶翫・energy wait + conditional draw (PL!SP-pb2-013-R)
 pub mod keke_pb2_013_debut_test;
 
 // CatChu! per-unit energy activation (PL!SP-pb2-018-R)
 pub mod catchu_energy_activation_test;
 pub mod live_cards_disappear_test;
-// §5.5: ディストーション per-unit need-heart modification + score gate (PL!SP-pb2-048-L)
+// ﾂｧ5.5: 繝・ぅ繧ｹ繝医・繧ｷ繝ｧ繝ｳ per-unit need-heart modification + score gate (PL!SP-pb2-048-L)
 pub mod distortion_need_hearts_test;
 
-// Q176: 蝨堤伐豬ｷ譛ｪ pb1-013 窶・opponent picks from your hand blind, reveal live 竊・+1 score
+// Q176: 陜ｨ蝣､莨占ｱｬ・ｷ隴幢ｽｪ pb1-013 遯ｶ繝ｻopponent picks from your hand blind, reveal live 遶翫・+1 score
 pub mod umi_pb1_013_test;
-// Q176 companion: 蝨堤伐豬ｷ譛ｪ PR-014 窶・you pick from opponent's hand blind, reveal 竊・draw
+// Q176 companion: 陜ｨ蝣､莨占ｱｬ・ｷ隴幢ｽｪ PR-014 遯ｶ繝ｻyou pick from opponent's hand blind, reveal 遶翫・draw
 pub mod umi_pr014_test;
 
-// 繝弱Φ繝輔ぅ繧ｯ繧ｷ繝ｧ繝ｳ!! (PL!SP-bp4-024) 窶・LiveStart cost comparison (ab#0)
+// 郢晏ｼｱﾎｦ郢晁ｼ斐≦郢ｧ・ｯ郢ｧ・ｷ郢晢ｽｧ郢晢ｽｳ!! (PL!SP-bp4-024) 遯ｶ繝ｻLiveStart cost comparison (ab#0)
 pub mod nonfiction_cost_comparison_test;
 
-// SELF CONTROL!! + 鮖ｿ隗定＊濶ｯ: position_change triggers moved-this-turn blade grant
+// SELF CONTROL!! + 魄厄ｽｿ髫怜ｮ夲ｼ頑ｿｶ・ｯ: position_change triggers moved-this-turn blade grant
 pub mod self_control_position_change_test;
 
-// 黒澤ルビィ (PL!S-bp7-018-N) 登場: move a chosen stage member to the center area.
+// 鮟呈ｾ､繝ｫ繝薙ぅ (PL!S-bp7-018-N) 逋ｻ蝣ｴ: move a chosen stage member to the center area.
 pub mod ruby_bp7_center_position_test;
 
-// 嵐 千砂都 (PL!SP-bp7-003) ab#2 起動: reveal a cost-10-or-20 member, place under, draw 2.
+// 蠏・蜊・る・ (PL!SP-bp7-003) ab#2 襍ｷ蜍・ reveal a cost-10-or-20 member, place under, draw 2.
 pub mod chika_bp7_reveal_cost_test;
 
-// 譯懷・譴ｨ蟄・(PL!S-bp5-002) 窶・LiveStart center: left_cost == right_cost 竊・wait opponent low-blade
+// 隴ｯ諛ｷ繝ｻ隴ｴ・ｨ陝・・(PL!S-bp5-002) 遯ｶ繝ｻLiveStart center: left_cost == right_cost 遶翫・wait opponent low-blade
 // Verifies require_position_cards: both positions must have cards (empty = no trigger)
 pub mod riko_bp5_center_cost_equal_test;
 
-// Wonder zone (PL!-bp5-020-L) 窶・modify_required_hearts per-unit with per_unit_heart_colors + max_repeats
+// Wonder zone (PL!-bp5-020-L) 遯ｶ繝ｻmodify_required_hearts per-unit with per_unit_heart_colors + max_repeats
 pub mod auto_system_stress_test;
 pub mod baton_touch_order_test;
 pub mod wonder_zone_max_repeats_test;
 
-// 蟷ｳ螳牙錐縺吶∩繧・(PL!SP-bp2-004-R) 窶・constant: center has highest cost 竊・heart03
+// 陝ｷ・ｳ陞ｳ迚咎倹邵ｺ蜷ｶ竏ｩ郢ｧ繝ｻ(PL!SP-bp2-004-R) 遯ｶ繝ｻconstant: center has highest cost 遶翫・heart03
 pub mod sumire_bp2_center_cost_test;
 
 // Rule/ability structured logging: bounded buffers, no "pending" residue after
@@ -545,3 +546,6 @@ pub mod integration_blindspot_test;
 pub mod phase_machine_rules_test;
 pub mod victory_tie_placement_test;
 pub mod q29_baton_arrival_test;
+pub mod ability_resolution_watcher_test;
+pub mod ability_chain_combo_test;
+pub mod rule_9_9_layering_test;

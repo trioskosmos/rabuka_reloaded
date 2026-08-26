@@ -3361,6 +3361,14 @@ modified.destination = Some(Zone::from_source_str(dest));
             let color = crate::card::parse_heart_color(chosen);
             if let Some(card_id) = gs.activating_card {
                 gs.set_heart_override(card_id, color, count.max(1), "live_end");
+                gs.record_ability_application(
+                    card_id,
+                    format!("Treat hearts as {} ×{}", chosen, count.max(1)),
+                    "heart_override",
+                    card_id,
+                    Some(color.index() as u8),
+                    count.max(1) as i16,
+                );
             }
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.conditional_choice = Some(ConditionalChoice::Str(chosen.clone()));

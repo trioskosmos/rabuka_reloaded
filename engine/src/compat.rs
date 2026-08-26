@@ -98,4 +98,74 @@ pub(crate) mod atomic {
     // the single game thread, so exposing it as Sync is safe.
     #[cfg(not(target_has_atomic = "32"))]
     unsafe impl Sync for AtomicU32 {}
+
+    /// `AtomicUsize` for targets without pointer-width atomics (GBA
+    /// ARMv4T has no atomic instructions at all). Same single-threaded
+    /// `Cell`-based drop-in as [`AtomicU32`] above.
+    #[cfg(target_has_atomic = "ptr")]
+    pub use core::sync::atomic::AtomicUsize;
+
+    #[cfg(not(target_has_atomic = "ptr"))]
+    pub struct AtomicUsize(core::cell::Cell<usize>);
+
+    #[cfg(not(target_has_atomic = "ptr"))]
+    impl AtomicUsize {
+        pub const fn new(v: usize) -> Self {
+            AtomicUsize(core::cell::Cell::new(v))
+        }
+        pub fn fetch_add(&self, v: usize, _order: core::sync::atomic::Ordering) -> usize {
+            let cur = self.0.get();
+            self.0.set(cur.wrapping_add(v));
+            cur
+        }
+        pub fn load(&self, _order: core::sync::atomic::Ordering) -> usize {
+            self.0.get()
+        }
+        pub fn store(&self, v: usize, _order: core::sync::atomic::Ordering) {
+            self.0.set(v);
+        }
+    }
+
+    #[cfg(not(target_has_atomic = "ptr"))]
+    unsafe impl Sync for AtomicUsize {}
+
+    /// `AtomicU8` for targets without 8-bit atomics (GBA ARMv4T). Used by the
+    /// bytecode-cache init state machine, which on a single-core console only
+    /// ever runs from the game thread.
+    #[cfg(target_has_atomic = "8")]
+    pub use core::sync::atomic::AtomicU8;
+
+    #[cfg(not(target_has_atomic = "8"))]
+    pub struct AtomicU8(core::cell::Cell<u8>);
+
+    #[cfg(not(target_has_atomic = "8"))]
+    impl AtomicU8 {
+        pub const fn new(v: u8) -> Self {
+            AtomicU8(core::cell::Cell::new(v))
+        }
+        pub fn load(&self, _order: core::sync::atomic::Ordering) -> u8 {
+            self.0.get()
+        }
+        pub fn store(&self, v: u8, _order: core::sync::atomic::Ordering) {
+            self.0.set(v);
+        }
+        pub fn compare_exchange(
+            &self,
+            current: u8,
+            new: u8,
+            _success: core::sync::atomic::Ordering,
+            _failure: core::sync::atomic::Ordering,
+        ) -> Result<u8, u8> {
+            let cur = self.0.get();
+            if cur == current {
+                self.0.set(new);
+                Ok(cur)
+            } else {
+                Err(cur)
+            }
+        }
+    }
+
+    #[cfg(not(target_has_atomic = "8"))]
+    unsafe impl Sync for AtomicU8 {}
 }

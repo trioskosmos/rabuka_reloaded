@@ -75,7 +75,8 @@ pub fn ability_count() -> usize {
 // oracle test `bytecode_no_silent_decode_fallbacks` pins the total at 0 so a
 // new gap fails CI loudly. Repetition across repeated decodes is harmless:
 // expected is zero, and nonzero is nonzero.
-use core::sync::atomic::{AtomicUsize, Ordering};
+use crate::compat::atomic::AtomicUsize;
+use core::sync::atomic::Ordering;
 
 static DECODE_FALLBACKS: AtomicUsize = AtomicUsize::new(0);
 
@@ -168,7 +169,8 @@ fn get_decompressed_bytecode() -> &'static [u8] {
 #[cfg(all(not(feature = "snes"), feature = "no_std"))]
 fn get_decompressed_bytecode() -> &'static [u8] {
     use core::cell::UnsafeCell;
-    use core::sync::atomic::{AtomicU8, Ordering};
+    use crate::compat::atomic::AtomicU8;
+    use core::sync::atomic::Ordering;
 
     struct SyncUnsafeCell<T>(UnsafeCell<T>);
     unsafe impl<T> Sync for SyncUnsafeCell<T> {}

@@ -522,21 +522,29 @@ impl AbilityResolver {
                 pp, act_name, operation, per_color_value, hc
             ));
             for card_id in &card_ids {
+                let (op_kind, delta) = match operation {
+                    "decrease" => ("need_heart_mod", -(value as i16)),
+                    "increase" => ("need_heart_mod", value as i16),
+                    "set" => ("need_heart_set", per_color_value as i16),
+                    _ => return Err(format!("Unknown operation: {}", operation)),
+                };
                 match operation {
-                    "decrease" => {
-                        gs.mods
-                            .add_need_heart_modifier(*card_id, color, -(value as i16));
-                    }
-                    "increase" => {
-                        gs.mods
-                            .add_need_heart_modifier(*card_id, color, value as i16);
-                    }
                     "set" => {
                         gs.mods
                             .set_need_heart_modifier(*card_id, color, per_color_value as i16);
                     }
-                    _ => return Err(format!("Unknown operation: {}", operation)),
+                    _ => {
+                        gs.mods.add_need_heart_modifier(*card_id, color, delta);
+                    }
                 }
+                gs.record_ability_application(
+                    gs.activating_card.unwrap_or(-1),
+                    effect.text.to_string(),
+                    op_kind,
+                    *card_id,
+                    Some(color.index() as u8),
+                    delta,
+                );
             }
         }
         Ok(())
@@ -549,6 +557,7 @@ impl AbilityResolver {
         value: u8,
         heart_colors: &[String],
         target: &str,
+        effect_text: &str,
     ) -> Result<(), String> {
         let colors = if heart_colors.is_empty() {
             vec!["heart00".to_string()]
@@ -569,6 +578,14 @@ impl AbilityResolver {
                 };
                 gs.mods
                     .add_need_heart_modifier(*card_id, color, modifier_value);
+                gs.record_ability_application(
+                    gs.activating_card.unwrap_or(-1),
+                    effect_text.to_string(),
+                    "need_heart_mod",
+                    *card_id,
+                    Some(color.index() as u8),
+                    modifier_value,
+                );
             }
         }
         let pp = self.player_prefix(gs);
@@ -690,6 +707,14 @@ impl AbilityResolver {
                 let color = crate::card::parse_heart_color(color_str);
                 gs.mods
                     .add_need_heart_modifier(card_id, color, delta as i16);
+                gs.record_ability_application(
+                    gs.activating_card.unwrap_or(-1),
+                    effect.text.to_string(),
+                    "need_heart_mod",
+                    card_id,
+                    Some(color.index() as u8),
+                    delta as i16,
+                );
             }
         }
     }

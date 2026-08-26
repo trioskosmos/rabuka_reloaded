@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-26T18:18:37.696469",
+  "generated_at": "2026-08-26T21:20:25.376071",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "0c393f48",
+  "engine_commit": "8c1df4a4",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -33050,6 +33050,10 @@
       "cost": null,
       "effect": {
         "text": "自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_start.png|ライブ開始時}}能力が解決したとき、そのメンバーをポジションチェンジする",
+        "card_type": "member_card",
+        "action": "position_change",
+        "exclude_self": true,
+        "trigger_type": "each_time",
         "condition": {
           "text": "自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_start.png|ライブ開始時}}能力が解決したとき",
           "group_names": [
@@ -33061,9 +33065,6 @@
           "position": "center",
           "type": "group_condition"
         },
-        "card_type": "member_card",
-        "action": "position_change",
-        "exclude_self": true,
         "position": "center"
       }
     },
@@ -33081,22 +33082,36 @@
       "effect": {
         "text": "自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_success.png|ライブ成功時}}能力が解決したとき、そのメンバーがこのターン中に移動している場合、このカードのスコアを+1する",
         "condition": {
-          "type": "temporal_condition",
-          "temporal": "this_turn",
-          "condition": {
-            "type": "has_moved",
-            "text": "自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_success.png|ライブ成功時}}能力が解決したとき、そのメンバーがこのターン中に移動している場合",
-            "group_names": [
-              "μ's"
-            ],
-            "position": "center"
-          },
-          "text": "自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_success.png|ライブ成功時}}能力が解決したとき、そのメンバーがこのターン中に移動している場合",
-          "trigger_event": {
-            "type": "temporal",
-            "event_type": "has_moved"
-          },
-          "card_type": "member_card",
+          "type": "compound",
+          "operator": "and",
+          "conditions": [
+            {
+              "type": "temporal_condition",
+              "temporal": "this_turn",
+              "condition": {
+                "type": "has_moved",
+                "text": "そのメンバーがこのターン中に移動している場合"
+              },
+              "text": "そのメンバーがこのターン中に移動している場合",
+              "trigger_event": {
+                "type": "temporal",
+                "event_type": "has_moved"
+              },
+              "card_type": "member_card"
+            },
+            {
+              "text": "自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_success.png|ライブ成功時}}能力が解決したとき",
+              "group_names": [
+                "μ's"
+              ],
+              "target": "self",
+              "location": "stage",
+              "card_type": "member_card",
+              "position": "center",
+              "type": "group_condition"
+            }
+          ],
+          "text": "そのメンバーがこのターン中に移動している場合、かつ、自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_success.png|ライブ成功時}}能力が解決したとき",
           "group_names": [
             "μ's"
           ],
@@ -33106,6 +33121,10 @@
         "value": 1,
         "operation": "add",
         "self_target": true,
+        "trigger_type": "each_time",
+        "group_names": [
+          "μ's"
+        ],
         "position": "center"
       }
     },

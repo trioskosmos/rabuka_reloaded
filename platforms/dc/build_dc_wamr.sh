@@ -52,7 +52,7 @@ NINC="-nostdinc -I$GCC_INC -I$GCC_FIXED -I$NEWLIB_INC \
 -I$WAMR/core/shared/mem-alloc \
 -I$WAMR/core/shared/utils"
 
-DEFS="-DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_FAST_INTERP=0 \
+DEFS="-DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_FAST_INTERP=1 \
 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_FAST_JIT=0 \
 -DWASM_ENABLE_SIMD=0 -DWASM_ENABLE_GC=0 -DWASM_ENABLE_STRINGREF=0 \
 -DWASM_ENABLE_LIBC_BUILTIN=1 -DWASM_ENABLE_LIBC_WASI=0 \
@@ -101,7 +101,7 @@ kos-cc -Oz -g0 $DEFS -I$DCBUILD -I$WAMR/core/iwasm/include \
 
 for f in \
   $WAMR/core/iwasm/interpreter/wasm_loader.c \
-  $WAMR/core/iwasm/interpreter/wasm_interp_classic.c \
+  $WAMR/core/iwasm/interpreter/wasm_interp_fast.c \
   $WAMR/core/iwasm/interpreter/wasm_runtime.c \
   $WAMR/core/iwasm/common/wasm_exec_env.c \
   $WAMR/core/iwasm/common/wasm_loader_common.c \
@@ -114,13 +114,16 @@ for f in \
   $WAMR/core/iwasm/libraries/libc-builtin/libc_builtin_wrapper.c \
   ; do
   o=$(basename "$f" .c).o
-  $SH_GCC $CPUFLAGS -Oz -g0 $NINC $DEFS -c "$f" -o "$o"
+  # -O2: the interpreter dispatch loop is the hottest code on the target;
+  # size-opt (-Oz) cost measurable speed. Loader is hot too in FI mode
+  # (pre-decodes every opcode at load time).
+  $SH_GCC $CPUFLAGS -O2 -g0 $NINC $DEFS -c "$f" -o "$o"
 done
 
 OBJS="wasm_blob.o bh_assert.o bh_bitmap.o bh_common.o bh_hashmap.o bh_leb128.o \
 bh_list.o bh_log.o bh_queue.o bh_vector.o runtime_timer.o mem_alloc.o \
 ems_alloc.o ems_gc.o ems_hmu.o ems_kfc.o kos_platform.o wasm_loader.o \
-wasm_interp_classic.o wasm_runtime.o wasm_exec_env.o wasm_loader_common.o \
+wasm_interp_fast.o wasm_runtime.o wasm_exec_env.o wasm_loader_common.o \
 wasm_memory.o wasm_native.o wasm_runtime_common.o wasm_shared_memory.o \
 wasm_blocking_op.o invokeNative_general.o libc_builtin_wrapper.o"
 echo "interpreter OK"

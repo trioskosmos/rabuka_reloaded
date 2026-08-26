@@ -4,7 +4,8 @@
 Generates from the real card database (cards/abilities.json) + test suite
 (engine/tests/**/*.rs):
 
-  * engine/tests/TEST_COVERAGE.md   -- coverage tables + gap lists
+  * engine/tests/TEST_COVERAGE.md   -- coverage tables + gap lists + jidou
+                                       (自動) interaction & specific-requirement reports
   * docs/ABILITY_MATRIX.md          — trigger×action matrix + condition/set breakdown
   * engine/tests/TEST_INVENTORY.json — machine-readable per-ability rows
   * engine/tests/TEST_INVENTORY.md  — human-readable per-ability index
@@ -391,6 +392,9 @@ def build_inventory():
             "base": base,
             "is_null": bool(u.get("is_null")),
             "use_limit": u.get("use_limit"),
+            "watches_abilities": watches_abilities,
+            "effect_cause": effect_cause,
+            "jidou_partners": [],  # filled after the loop
             "covered": covered,
             "depth": depth,
             "has_assert": flags["has_assert"],
@@ -411,6 +415,24 @@ def build_inventory():
     covered_cards = sum(card_covered.values())
     abilities_on_covered = sum(1 for r in rows if r["covered"])
 
+    # jidou (自動) multi-ability partners: same base card carries >=1 other ability
+    idxs_by_base = defaultdict(set)
+    for r in rows:
+        idxs_by_base[r["base"]].add(r["idx"])
+    for r in rows:
+        if "自動" in r["trigger_list"]:
+            r["jidou_partners"] = sorted(idxs_by_base[r["base"]] - {r["idx"]})
+
+    def _is_thin(r):
+        """Thin coverage: no choice-level exercise or exercised by <= 1 test fn."""
+        return ("choice" not in r["depth"]) or r["covering_test_count"] <= 1
+
+    specific_thin = sorted(
+        r["idx"] for r in rows
+        if (r["condition"] in SPECIAL_CONDITION_TYPES or r["use_limit"] or r["watches_abilities"])
+        and _is_thin(r)
+    )
+
     qa = build_qa_coverage(all_src)
 
     return {
@@ -428,6 +450,11 @@ def build_inventory():
         "total_cards": total_cards,
         "covered_cards": covered_cards,
         "abilities_on_covered": abilities_on_covered,
+        "specific_requirements_total": sum(
+            1 for r in rows
+            if r["condition"] in SPECIAL_CONDITION_TYPES or r["use_limit"] or r["watches_abilities"]
+        ),
+        "specific_requirements_thin": specific_thin,
         "qa": qa,
         "all_src_len": len(all_src),
     }
@@ -513,6 +540,9 @@ def render_coverage(inv):
     w("")
     w("These abilities' cards are **not referenced by any test** (L0 gap). Highest-value targets for new tests. Grouped by trigger type.")
     w("")
+    if not untested_sorted:
+        w("_None — every ability's card is referenced by at least one test._")
+        w("")
     by_trig = defaultdict(list)
     for r in untested_sorted:
         by_trig[r[2]].append(r)
@@ -526,6 +556,99 @@ def render_coverage(inv):
             safe = text.replace("|", "/").replace("\n", " ")
             w(f"| `{card}` | {card_set(card)} | {act} | {cond} | {safe} |")
         w("")
+
+    # jidou (自動) interaction coverage
+    def _ability_row(r):
+        safe = r["full_text"].replace("|", "/").replace("\n", " ")
+        return (
+            f"| `{r['base']}` | {r['condition']} | {r['depth']} | "
+            f"{r['covering_test_count']} | {safe[:110]} |"
+        )
+
+    jidou_rows = [r for r in rows if "自動" in r["trigger_list"]]
+    watchers = [r for r in jidou_rows if r["watches_abilities"]]
+    effect_cause = [r for r in jidou_rows if r["effect_cause"] and not r["watches_abilities"]]
+    multi = [r for r in jidou_rows if r["jidou_partners"]]
+
+    w("## Jidou (自動) interaction coverage")
+    w("")
+    w("自動 abilities rarely act alone — they chain off other abilities, off effect *causes*, or share a card with other abilities. These lists group every 自動 by interaction shape; `Depth`/`Tests` say how well the **interaction** is exercised.")
+    w("")
+    w(f"### A. Jidou watching other abilities resolve (`能力が解決`)  ({len(watchers)})")
+    w("")
+    w("Highest-risk category: requires a full live phase with another ability resolving on the same stage.")
+    w("")
+    if watchers:
+        w("| Card | Condition | Depth | Tests | Text |")
+        w("|---|---|---|---|---|")
+        for r in sorted(watchers, key=lambda r: (r["covering_test_count"], r["idx"])):
+            w(_ability_row(r))
+    else:
+        w("_None._")
+    w("")
+    w(f"### B. Jidou gated on effect causes (`効果によって` / `対戦相手の効果でも発動する`)  ({len(effect_cause)})")
+    w("")
+    if effect_cause:
+        w("| Card | Condition | Depth | Tests | Text |")
+        w("|---|---|---|---|---|")
+        for r in sorted(effect_cause, key=lambda r: (r["covering_test_count"], r["idx"])):
+            w(_ability_row(r))
+    else:
+        w("_None._")
+    w("")
+    w(f"### C. Cards pairing a jidou with another ability  ({len(multi)})")
+    w("")
+    w("`#partners` lists the other abilities on the same card (inventory idx:trigger) — combo behavior needs a test driving BOTH, not each in isolation.")
+    w("")
+    if multi:
+        w("| Card | Partners | Depth | Tests |")
+        w("|---|---|---|---|")
+        for r in sorted(multi, key=lambda r: (r["covering_test_count"], r["idx"])):
+            partners = ", ".join(
+                f"#{j}:{(rows[j]['trigger_list'][0] if rows[j]['trigger_list'] else '?')}"
+                for j in r["jidou_partners"][:4]
+            )
+            w(f"| `{r['base']}` | {partners} | {r['depth']} | {r['covering_test_count']} |")
+    else:
+        w("_None._")
+    w("")
+
+    # specific-requirement abilities needing more than an L0/L1 glance
+    specific_total = inv["specific_requirements_total"]
+    thin_idxs = set(inv["specific_requirements_thin"])
+    specific_thin_rows = [
+        r for r in rows
+        if r["idx"] in thin_idxs
+        and (r["condition"] in SPECIAL_CONDITION_TYPES or r["use_limit"] or r["watches_abilities"])
+    ]
+    w("## Specific-requirement abilities — thin coverage")
+    w("")
+    w(
+        f"{specific_total} abilities carry a rare condition type (state/position/energy/highest-cost/"
+        "blade-compare/ability-filter), a use_limit, or watch other abilities resolve. Listed below are "
+        "the ones with **thin** coverage (no choice-level exercise, or exercised by ≤1 test fn) — these "
+        "are today's highest-value new-test targets now that the L0 gap list is empty."
+    )
+    w("")
+    if specific_thin_rows:
+        w("| Card | Why specific | Condition | Depth | Tests | Text |")
+        w("|---|---|---|---|---|---|")
+        for r in sorted(specific_thin_rows, key=lambda r: (r["condition"], r["idx"])):
+            why = []
+            if r["watches_abilities"]:
+                why.append("watches abilities")
+            if r["use_limit"]:
+                why.append(f"use_limit={r['use_limit']}")
+            if r["condition"] in SPECIAL_CONDITION_TYPES:
+                why.append(r["condition"])
+            safe = r["full_text"].replace("|", "/").replace("\n", " ")
+            w(
+                f"| `{r['base']}` | {'+'.join(why)} | {r['condition']} | {r['depth']} | "
+                f"{r['covering_test_count']} | {safe[:100]} |"
+            )
+    else:
+        w("_None — all specific-requirement abilities have choice-level coverage from ≥2 test fns._")
+    w("")
 
     w("## Official QA rulings (cards/qa_data.json)")
     w("")
@@ -728,6 +851,10 @@ def main():
             "covering_tests": r["covering_tests"],
             "covering_test_count": r["covering_test_count"],
             "is_null": r["is_null"],
+            "use_limit": r["use_limit"],
+            "watches_abilities": r["watches_abilities"],
+            "effect_cause": r["effect_cause"],
+            "jidou_partners": r["jidou_partners"],
         })
 
     json_text = json.dumps({
@@ -748,6 +875,21 @@ def main():
             "covered": inv["qa"]["covered"],
             "total": inv["qa"]["total"],
             "uncovered_ids": [r["id"] for r in inv["qa"]["rows"] if not r["covered"]],
+        },
+        "jidou_conjunction": {
+            "ability_watchers": [r["idx"] for r in inv["abilities"] if r["watches_abilities"]],
+            "effect_cause": [
+                r["idx"] for r in inv["abilities"]
+                if r["effect_cause"] and not r["watches_abilities"]
+            ],
+            "multi_ability_cards": [
+                r["idx"] for r in inv["abilities"]
+                if "自動" in r["trigger_list"] and r["jidou_partners"]
+            ],
+        },
+        "specific_requirements": {
+            "total": inv["specific_requirements_total"],
+            "thin_idxs": inv["specific_requirements_thin"],
         },
         "abilities": json_rows,
     }, ensure_ascii=False, indent=2) + "\n"
@@ -799,6 +941,7 @@ def main():
     # summary
     print(f"abilities={len(inv['abilities'])} cards={inv['total_cards']} covered_cards={inv['covered_cards']} ({inv['covered_cards']}/{inv['total_cards']}) n_tests~{inv['n_tests']}")
     print(f"depth: {dict(inv['depth_counts'])}")
+    print(f"jidou interaction: watchers+cause+multi = {sum(1 for r in inv['abilities'] if r['watches_abilities'])}+{sum(1 for r in inv['abilities'] if r['effect_cause'])}+{sum(1 for r in inv['abilities'] if '自動' in r['trigger_list'] and r['jidou_partners'])}; specific-requirement thin: {len(inv['specific_requirements_thin'])}/{inv['specific_requirements_total']}")
     return 0
 
 

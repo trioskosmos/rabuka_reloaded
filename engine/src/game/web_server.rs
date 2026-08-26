@@ -638,6 +638,11 @@ fn filter_display_for_player(
         card.heart_transform = None;
     };
 
+    // Collect the ids of cards about to be hidden so bonus attribution
+    // (effect_attribution / ability_applications) can be stripped for them —
+    // a face-down card must not leak its sources or received bonuses.
+    let mut hidden_target_ids: Vec<i16> = Vec::new();
+
     // Determine opponent player index (0 for player1, 1 for player2)
     let opp_idx = if requester_player_id == 0 { 1 } else { 0 };
 
@@ -648,6 +653,7 @@ fn filter_display_for_player(
         &mut display.player1.hand
     };
     for card in &mut opp_hand.cards {
+        hidden_target_ids.push(card.id);
         hide_card(card);
     }
 
@@ -675,6 +681,7 @@ fn filter_display_for_player(
             &mut display.player1.live_zone
         };
         for card in &mut opp_live.cards {
+            hidden_target_ids.push(card.id);
             hide_card(card);
         }
     }
@@ -701,6 +708,17 @@ fn filter_display_for_player(
                 display.pending_choice = None;
             }
         }
+    }
+
+    // 5. Strip bonus attribution and application traces that target hidden
+    // cards so face-down information never leaks through the UI overlays.
+    if !hidden_target_ids.is_empty() {
+        display
+            .effect_attribution
+            .retain(|target, _| !hidden_target_ids.contains(target));
+        display
+            .ability_applications
+            .retain(|app| !hidden_target_ids.contains(&app.target_card_id));
     }
 }
 

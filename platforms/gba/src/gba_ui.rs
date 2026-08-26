@@ -65,6 +65,14 @@ impl<'u, 'd, I: InputSource> GbaUi<'u, 'd, I> {
     }
 
     fn render_board_view(&mut self, gs: &GameState) -> bool {
+        // Start opens the in-game menu overlay (Game Log / Cards). The
+        // blocking menu consumes input until closed; report the frame as
+        // consumed so the engine skips its own navigation for it.
+        if self.input.just_pressed(Button::Start) {
+            crate::overlay::run_start_menu(self.display, self.input, gs);
+            return true;
+        }
+
         if self.input.just_pressed(Button::Select) {
             self.view = View::Actions;
             self.display.render_action_text();
@@ -161,6 +169,10 @@ impl<'u, 'd, I: InputSource> platform_ui::PlatformUi for GbaUi<'u, 'd, I> {
         match self.view {
             View::Board => self.render_board_view(gs),
             View::Actions => {
+                if self.input.just_pressed(Button::Start) {
+                    crate::overlay::run_start_menu(self.display, self.input, gs);
+                    return true;
+                }
                 if self.input.just_pressed(Button::Select)
                     || self.input.just_pressed(Button::B)
                 {

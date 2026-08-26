@@ -73,6 +73,27 @@ pub struct AbilityApplicationDisplay {
     pub effect_type: String,
     pub target_card_id: i16,
     pub amount: i16,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub ability_text: Option<String>,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub heart_color: Option<u8>,
+}
+
+/// UI-facing attribution entry: one bonus on one card, attributed to the
+/// card/ability that granted it. Keyed by target card id in
+/// GameStateDisplay::effect_attribution.
+#[derive(Clone)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+pub struct BonusSourceDisplay {
+    pub source_card_id: i16,
+    pub ability_text: String,
+    /// Bonus category: blade | heart | score | score_set | cost | cost_set |
+    /// need_heart | gained_ability
+    pub kind: String,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub amount: i32,
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub color: Option<String>,
 }
 
 #[derive(Clone)]
@@ -524,6 +545,11 @@ pub struct GameStateDisplay {
     pub revealed_cost_cards: Vec<i16>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub ability_applications: Vec<AbilityApplicationDisplay>,
+    /// Per-target-card bonus attribution (source card + ability text for every
+    /// persistent bonus on the card). Built from the constant/success-zone
+    /// source maps and gained-ability provenance.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub effect_attribution: HashMap<i16, Vec<BonusSourceDisplay>>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub effect_creation_counter: u8,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -1590,8 +1616,75 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             effect_type: app.effect_type.as_str().to_string(),
             target_card_id: app.target_card_id,
             amount: app.amount,
+            ability_text: Some(app.ability_text.to_string()),
+            heart_color: app.heart_color,
         })
         .collect();
+
+    // ── Per-card bonus attribution ────────────────────────────────────
+    // Merge every per-source bonus record into one lookup keyed by target
+    // card id so the frontend can show WHERE each bonus comes from.
+    let mut effect_attribution: HashMap<i16, Vec<BonusSourceDisplay>> = HashMap::default();
+    {
+        let push =
+            |attr: &mut HashMap<i16, Vec<BonusSourceDisplay>>,
+             src: &crate::core::game_modifiers::BonusSource| {
+                attr.entry(src.target_card_id).or_default().push(BonusSourceDisplay {
+                    source_card_id: src.source_card_id,
+                    ability_text: src.ability_text.clone(),
+                    kind: src.kind.clone(),
+                    amount: src.amount,
+                    color: src.color.clone(),
+                });
+            };
+        for s in &game_state.mods.constant_blade_sources {
+            push(&mut effect_attribution, s);
+        }
+        for s in &game_state.mods.constant_heart_sources {
+            push(&mut effect_attribution, s);
+        }
+        for s in &game_state.mods.constant_cost_sources {
+            push(&mut effect_attribution, s);
+        }
+        for s in &game_state.mods.constant_need_heart_sources {
+            push(&mut effect_attribution, s);
+        }
+        for s in &game_state.mods.success_zone_blade_sources {
+            push(&mut effect_attribution, s);
+        }
+        for s in &game_state.mods.success_zone_heart_sources {
+            push(&mut effect_attribution, s);
+        }
+        for s in &game_state.mods.success_zone_score_sources {
+            push(&mut effect_attribution, s);
+        }
+        // Constant score bonuses (existing tuple records).
+        for (cid, text, val) in &game_state.mods.constant_score_sources {
+            effect_attribution.entry(*cid).or_default().push(BonusSourceDisplay {
+                source_card_id: *cid,
+                ability_text: text.clone(),
+                kind: "score".to_string(),
+                amount: *val as i32,
+                color: None,
+            });
+        }
+        // Gained abilities: attribute the gained trigger to the granting card.
+        for (target, sources) in &game_state.gained_ability_sources {
+            if let Some(abilities) = game_state.gained_card_abilities.get(target) {
+                for (i, src_cid) in sources.iter().enumerate() {
+                    if let Some(ability) = abilities.get(i) {
+                        effect_attribution.entry(*target).or_default().push(BonusSourceDisplay {
+                            source_card_id: *src_cid,
+                            ability_text: ability.full_text.clone(),
+                            kind: "gained_ability".to_string(),
+                            amount: 0,
+                            color: None,
+                        });
+                    }
+                }
+            }
+        }
+    }
 
     // Live owned hearts: HashMap<String, Vec<(String, u8)>> -> HashMap<String, Vec<[String; 2]>>
     let live_owned: HashMap<String, Vec<[String; 2]>> = game_state
@@ -1857,6 +1950,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             })
             .collect(),
         ability_applications: ability_apps,
+        effect_attribution,
         effect_creation_counter: game_state.effect_creation_counter,
         last_state_change_wait_to_active_count: game_state.last_state_change_wait_to_active_count,
         constant_blade_bonuses: game_state

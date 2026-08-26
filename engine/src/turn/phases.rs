@@ -1255,6 +1255,14 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                         .and_then(|c| c.cost)
                         .unwrap_or(0);
                     game_state.mods.set_cost_modifier(card_id, (base as i32 - red as i32) as i16);
+                    game_state.record_ability_application(
+                        card_id,
+                        "Play-time cost reduction".to_string(),
+                        "cost_set",
+                        card_id,
+                        None,
+                        (base as i32 - red as i32) as i16,
+                    );
                     Self::shuffle_waitroom_members_to_deck_bottom(game_state, &player_id);
                     game_state.push_rule_log(format!(
                         "{} uses play-time cost reduction: {} cost reduced by {}, waitroom members shuffled to deck bottom",
@@ -1268,6 +1276,14 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
                         return Err("Required hand cards for play-time alternative cost not found".to_string());
                     }
                     game_state.mods.set_cost_modifier(card_id, set_value);
+                    game_state.record_ability_application(
+                        card_id,
+                        "Play-time alternative cost".to_string(),
+                        "cost_set",
+                        card_id,
+                        None,
+                        set_value,
+                    );
                     game_state.push_rule_log(format!(
                         "{} uses play-time alternative cost: discarded {n} members, cost set to {set_value}",
                         player_id

@@ -56,7 +56,8 @@ pub struct Display<'a> {
     detail_active: bool,
 }
 
-/// 4bpp text/board palette (bank 0).
+/// 4bpp text/board palette (bank 0). Entries 7..=15 are the texticon colours,
+/// mirrored by `tools/bake_texticon_tiles.py` PALETTE_TARGETS — keep in sync.
 static TEXT_PALETTE: Palette16 = const {
     let mut palette = [Rgb15::BLACK; 16];
     palette[0] = Rgb15::BLACK;
@@ -66,18 +67,37 @@ static TEXT_PALETTE: Palette16 = const {
     palette[4] = Rgb::new(245, 158, 11).to_rgb15(); // gold
     palette[5] = Rgb::new(46, 204, 113).to_rgb15(); // green
     palette[6] = Rgb::new(160, 174, 192).to_rgb15(); // dim
+    palette[7] = Rgb::new(224, 32, 96).to_rgb15(); // icon red
+    palette[8] = Rgb::new(240, 128, 176).to_rgb15(); // icon pink
+    palette[9] = Rgb::new(112, 64, 144).to_rgb15(); // icon purple
+    palette[10] = Rgb::new(128, 192, 0).to_rgb15(); // icon lime
+    palette[11] = Rgb::new(232, 224, 0).to_rgb15(); // icon yellow
+    palette[12] = Rgb::new(0, 168, 168).to_rgb15(); // icon teal
+    palette[13] = Rgb::new(48, 160, 224).to_rgb15(); // icon sky
+    palette[14] = Rgb::new(184, 120, 48).to_rgb15(); // icon brown
+    palette[15] = Rgb::new(128, 128, 128).to_rgb15(); // icon gray
     Palette16::new(palette)
 };
 
 /// Text palette for the card-detail view, on bank 15 (reserved from the art's
 /// 240-colour palette so the two never collide). Matches 3DS COL_CARD_OPAQUE
-/// dark panel + white text.
+/// dark panel + white text. Entries 7..=15 mirror TEXT_PALETTE so baked
+/// texticon tiles render with the same colours in both banks.
 static DETAIL_TEXT_PALETTE: Palette16 = const {
     let mut palette = [Rgb15::BLACK; 16];
     palette[0] = Rgb15::BLACK;
     palette[1] = Rgb15::WHITE;
     palette[2] = Rgb::new(26, 35, 50).to_rgb15(); // zone fill behind text
     palette[6] = Rgb::new(160, 174, 192).to_rgb15(); // dim
+    palette[7] = Rgb::new(224, 32, 96).to_rgb15(); // icon red
+    palette[8] = Rgb::new(240, 128, 176).to_rgb15(); // icon pink
+    palette[9] = Rgb::new(112, 64, 144).to_rgb15(); // icon purple
+    palette[10] = Rgb::new(128, 192, 0).to_rgb15(); // icon lime
+    palette[11] = Rgb::new(232, 224, 0).to_rgb15(); // icon yellow
+    palette[12] = Rgb::new(0, 168, 168).to_rgb15(); // icon teal
+    palette[13] = Rgb::new(48, 160, 224).to_rgb15(); // icon sky
+    palette[14] = Rgb::new(184, 120, 48).to_rgb15(); // icon brown
+    palette[15] = Rgb::new(128, 128, 128).to_rgb15(); // icon gray
     Palette16::new(palette)
 };
 
@@ -120,6 +140,45 @@ impl<'a> Display<'a> {
         }
     }
 
+    /// Look up a `{{name|...}}` token's icon: (start tile index, width in
+    /// cells). Names are stored without the `.png` suffix.
+    fn icon(name: &str) -> Option<(u16, i32)> {
+        crate::texticons_gen::TEXTICON_GLYPHS
+            .iter()
+            .find(|(n, _, _)| *n == name)
+            .map(|&(_, t, cells)| (t, cells as i32))
+    }
+
+    /// Find the next `{{name.png|label}}` token at or after byte `from`.
+    /// Returns (token_start, token_end, name-without-.png).
+    fn find_token<'t>(text: &'t str, from: usize) -> Option<(usize, usize, &'t str)> {
+        let open = text[from..].find("{{")? + from;
+        let close = text[open + 2..].find("}}")? + open + 2;
+        let inner = &text[open + 2..close];
+        let name = inner.split('|').next().unwrap_or(inner);
+        let name = name.strip_suffix(".png").unwrap_or(name);
+        Some((open, close + 2, name))
+    }
+
+    /// Place a baked texticon (cells of 2x2 tiles) at (tx, ty).
+    fn place_icon(
+        bg: &mut RegularBackground,
+        ts: &TileSet,
+        e: TileEffect,
+        tile: u16,
+        cells: i32,
+        tx: i32,
+        ty: i32,
+    ) {
+        for c in 0..cells {
+            let idx = tile + (c * 4) as u16;
+            bg.set_tile((tx + c * 2, ty), ts, TileSetting::new(idx, e));
+            bg.set_tile((tx + c * 2 + 1, ty), ts, TileSetting::new(idx + 1, e));
+            bg.set_tile((tx + c * 2, ty + 1), ts, TileSetting::new(idx + 2, e));
+            bg.set_tile((tx + c * 2 + 1, ty + 1), ts, TileSetting::new(idx + 3, e));
+        }
+    }
+
     /// Place a 16px (2x2 tile) glyph at (tx, ty); returns its width in tiles.
     fn place_glyph(bg: &mut RegularBackground, ts: &TileSet, e: TileEffect, ch: char, tx: i32, ty: i32) -> i32 {
         let (idx, cols) = Self::glyph(ch);
@@ -130,16 +189,88 @@ impl<'a> Display<'a> {
         cols as i32
     }
 
-    /// Render one line of 16px text at (tx0, ty), clipped to COLS.
-    fn blit_line(bg: &mut RegularBackground, ts: &TileSet, e: TileEffect, text: &str, tx0: i32, ty: i32) {
-        let mut tx = tx0;
-        for ch in text.chars() {
+    /// Render one line of 16px text at (tx0, ty), clipped to COLS. When
+    /// `wrap` is set, an overlong line continues on the next text row (used
+    /// by the free-form `swap_buffers` screen); otherwise trailing glyphs
+    /// past COLS are clipped (board bars / fixed panes).
+    ///
+    /// `{{name.png|label}}` tokens render as their baked texticon tiles
+    /// inline (mirroring the 3DS `render_text_with_icons`); unknown names
+    /// fall back to drawing the raw token text.
+    fn blit_text(
+        bg: &mut RegularBackground,
+        ts: &TileSet,
+        e: TileEffect,
+        text: &str,
+        mut tx: i32,
+        mut ty: i32,
+        wrap: bool,
+    ) {
+        let mut draw_ch = |bg: &mut RegularBackground, ch: char, tx: i32, ty: i32| -> i32 {
             let (_, cols) = Self::glyph(ch);
             if tx + cols as i32 > COLS {
-                break;
+                if !wrap {
+                    return cols as i32; // clipped: consume without drawing
+                }
+                return -(cols as i32); // signal wrap needed
             }
-            tx += Self::place_glyph(bg, ts, e, ch, tx, ty);
+            Self::place_glyph(bg, ts, e, ch, tx, ty)
+        };
+        let mut pos = 0usize;
+        while pos < text.len() {
+            match Self::find_token(text, pos) {
+                None => {
+                    for ch in text[pos..].chars() {
+                        let w = draw_ch(bg, ch, tx, ty);
+                        if w < 0 {
+                            tx = 0;
+                            ty += 2;
+                            tx += draw_ch(bg, ch, tx, ty);
+                        } else {
+                            tx += w;
+                        }
+                    }
+                    break;
+                }
+                Some((s, e_, name)) => {
+                    for ch in text[pos..s].chars() {
+                        let w = draw_ch(bg, ch, tx, ty);
+                        if w < 0 {
+                            tx = 0;
+                            ty += 2;
+                            tx += draw_ch(bg, ch, tx, ty);
+                        } else {
+                            tx += w;
+                        }
+                    }
+                    match Self::icon(name) {
+                        Some((tile, cells)) if tx + cells <= COLS => {
+                            Self::place_icon(bg, ts, e, tile, cells, tx, ty);
+                            tx += cells;
+                        }
+                        _ => {
+                            // Unknown icon: draw the raw token text.
+                            for ch in text[s..e_].chars() {
+                                let w = draw_ch(bg, ch, tx, ty);
+                                if w < 0 {
+                                    tx = 0;
+                                    ty += 2;
+                                    tx += draw_ch(bg, ch, tx, ty);
+                                } else {
+                                    tx += w;
+                                }
+                            }
+                        }
+                    }
+                    pos = e_;
+                }
+            }
         }
+    }
+
+    /// Render one line of 16px text at (tx0, ty), clipped to COLS.
+    fn blit_line(bg: &mut RegularBackground, ts: &TileSet, e: TileEffect, text: &str, tx0: i32, ty: i32) {
+        Self::blit_text(bg, ts, e, text, tx0, ty, false);
     }
 
     /// Render the integrated board: 8bpp shared-palette card art on an
@@ -283,7 +414,7 @@ impl<'a> Display<'a> {
             TileFormat::FourBpp,
         );
 
-        Self::blit_line(&mut tbg, &font_ts, e, "ACTIONS  [Select: Board]", 0, 0);
+        Self::blit_line(&mut tbg, &font_ts, e, "ACTIONS [Sel:Board] [Sta:Menu]", 0, 0);
         let mut row = 2i32;
         for line in self.buf.split('\n') {
             if row + 2 > ROWS {
@@ -384,24 +515,14 @@ impl<'a> Display<'a> {
         );
 
         let e = TileEffect::new(false, false, 0);
-        let mut tx = 0i32;
         let mut ty = 0i32;
 
-        for ch in self.buf.chars() {
-            if ch == '\n' {
-                tx = 0;
-                ty += 2;
-                continue;
-            }
-            let (_, cols) = Self::glyph(ch);
-            if tx + cols as i32 > COLS {
-                tx = 0;
-                ty += 2;
-            }
+        for line in self.buf.split('\n') {
             if ty + 2 > ROWS {
                 break;
             }
-            tx += Self::place_glyph(&mut bg, &tileset, e, ch, tx, ty);
+            Self::blit_text(&mut bg, &tileset, e, line, 0, ty, true);
+            ty += 2;
         }
 
         let mut frame = self.gfx.frame();

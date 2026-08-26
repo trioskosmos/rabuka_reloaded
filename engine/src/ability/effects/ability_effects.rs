@@ -372,6 +372,10 @@ impl AbilityResolver {
                     .entry(card_id)
                     .or_default()
                     .push(gained_ability);
+                gs.gained_ability_sources
+                    .entry(card_id)
+                    .or_default()
+                    .push(gs.activating_card.unwrap_or(-1));
                 // Per-card score gains must ALSO apply immediately: many flows
                 // and assertions read mods.score_modifiers right after
                 // resolution, and live.rs computes live card scores from it.
@@ -540,6 +544,10 @@ impl AbilityResolver {
                             .entry(activating_card)
                             .or_default()
                             .push(gained);
+                        gs.gained_ability_sources
+                            .entry(activating_card)
+                            .or_default()
+                            .push(src_id);
                     }
                 }
             }

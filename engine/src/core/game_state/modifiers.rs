@@ -113,7 +113,11 @@ impl GameState {
     }
 
     /// Grant blade to host members from constant under-card abilities. See call site.
-    fn grant_under_card_constant_blades(&mut self, exp_blade: &mut HashMap<i16, i16>) {
+    fn grant_under_card_constant_blades(
+        &mut self,
+        exp_blade: &mut HashMap<i16, i16>,
+        exp_blade_sources: &mut Vec<crate::core::game_modifiers::BonusSource>,
+    ) {
         for (under_cid, host) in self
             .player1
             .stage
@@ -168,6 +172,14 @@ impl GameState {
                     .unwrap_or(effect.count_any().unwrap_or(1))
                     as i16;
                 *exp_blade.entry(host).or_insert(0) += count;
+                exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
+                    source_card_id: under_cid,
+                    ability_text: effect.text.to_string(),
+                    target_card_id: host,
+                    amount: count as i32,
+                    color: None,
+                    kind: "blade".to_string(),
+                });
             }
         }
     }
@@ -183,6 +195,9 @@ impl GameState {
         exp_heart: HashMap<i16, HashMap<String, i16>>,
         exp_prohibition: Vec<String>,
         exp_global_need_heart: Vec<(i16, String, i16)>,
+        exp_blade_sources: Vec<crate::core::game_modifiers::BonusSource>,
+        exp_heart_sources: Vec<crate::core::game_modifiers::BonusSource>,
+        exp_global_nh_sources: Vec<crate::core::game_modifiers::BonusSource>,
         p1_constant_score_bonus: i32,
         p2_constant_score_bonus: i32,
     ) {
@@ -196,6 +211,7 @@ impl GameState {
             self.mods.add_blade_modifier(cid, val);
         }
         self.mods.constant_blade_bonuses = exp_blade;
+        self.mods.constant_blade_sources = exp_blade_sources;
         self.scratch_exp_blade = old_blade;
 
         // Score
@@ -234,6 +250,7 @@ impl GameState {
             }
         }
         self.mods.constant_heart_bonuses = exp_heart;
+        self.mods.constant_heart_sources = exp_heart_sources;
 
         tdbg!("RC:11 PROHIBITION");
         // Apply restriction effects from constant abilities.
@@ -259,6 +276,7 @@ impl GameState {
                 .add_need_heart_modifier(*card_id, hc, *delta as i16);
         }
         self.mods.constant_global_need_heart = exp_global_need_heart;
+        self.mods.constant_need_heart_sources = exp_global_nh_sources;
         tdbg!("RC:12b GLOBAL_NEED_HEART_DONE");
     }
 
@@ -301,6 +319,11 @@ impl GameState {
         let mut exp_prohibition: Vec<String> = Vec::new();
         self.constant_cannot_activate_members.clear();
         let mut exp_global_need_heart: Vec<(i16, String, i16)> = Vec::new();
+        // Per-source attribution for everything accumulated below (UI bonus
+        // provenance). Mirrors the exp_* maps entry-for-entry.
+        let mut exp_blade_sources: Vec<crate::core::game_modifiers::BonusSource> = Vec::new();
+        let mut exp_heart_sources: Vec<crate::core::game_modifiers::BonusSource> = Vec::new();
+        let mut exp_global_nh_sources: Vec<crate::core::game_modifiers::BonusSource> = Vec::new();
         let mut p1_constant_score_bonus: i32 = 0;
         let mut p2_constant_score_bonus: i32 = 0;
         let mut jyouji_statuses: Vec<crate::types::ConstantAbilityStatus> = Vec::new();
@@ -512,6 +535,14 @@ impl GameState {
                                         if is_front {
                                             for tid in self.constant_front_targets(card_id, effect) {
                                                 *exp_blade.entry(tid).or_insert(0) += delta;
+                                                exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
+                                                    source_card_id: card_id,
+                                                    ability_text: effect.text.to_string(),
+                                                    target_card_id: tid,
+                                                    amount: delta as i32,
+                                                    color: None,
+                                                    kind: "blade".to_string(),
+                                                });
                                             }
                                         } else if effect.all_any().unwrap_or(false) {
                                             // Grant to ALL matching stage members on the
@@ -540,14 +571,30 @@ impl GameState {
                                                                 .get_card(u)
                                                                 .map_or(false, |c| c.is_member())
                                                         });
-                                                    if !has_member_under {
-                                                        continue;
-                                                    }
+                                                if !has_member_under {
+                                                    continue;
                                                 }
+                                            }
                                                 *exp_blade.entry(mid).or_insert(0) += delta;
+                                                exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
+                                                    source_card_id: card_id,
+                                                    ability_text: effect.text.to_string(),
+                                                    target_card_id: mid,
+                                                    amount: delta as i32,
+                                                    color: None,
+                                                    kind: "blade".to_string(),
+                                                });
                                             }
                                         } else {
                                             *exp_blade.entry(card_id).or_insert(0) += delta;
+                                            exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
+                                                source_card_id: card_id,
+                                                ability_text: effect.text.to_string(),
+                                                target_card_id: card_id,
+                                                amount: delta as i32,
+                                                color: None,
+                                                kind: "blade".to_string(),
+                                            });
                                         }
                                     }
                                     "heart" | "ハート" => {
@@ -599,6 +646,14 @@ impl GameState {
                                                 .or_default()
                                                 .entry(crate::ability::util::HEART_ALL_KEY.to_string())
                                                 .or_insert(0) += n as i16;
+                                            exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
+                                                source_card_id: card_id,
+                                                ability_text: effect.text.to_string(),
+                                                target_card_id: card_id,
+                                                amount: n as i32,
+                                                color: Some(crate::ability::util::HEART_ALL_KEY.to_string()),
+                                                kind: "heart".to_string(),
+                                            });
                                         } else {
                                             let hc_list = effect.heart_colors_any().to_vec();
                                             let per_entry = crate::ability::util::heart_gain_per_entry(
@@ -611,6 +666,14 @@ impl GameState {
                                                     .or_default()
                                                     .entry(hc.clone())
                                                     .or_insert(0) += per_entry;
+                                                exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
+                                                    source_card_id: card_id,
+                                                    ability_text: effect.text.to_string(),
+                                                    target_card_id: card_id,
+                                                    amount: per_entry as i32,
+                                                    color: Some(hc.clone()),
+                                                    kind: "heart".to_string(),
+                                                });
                                             }
                                         }
                                     }
@@ -721,6 +784,14 @@ impl GameState {
                                         .or_default()
                                         .entry("all".to_string())
                                         .or_insert(0) += 1i16;
+                                    exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
+                                        source_card_id: card_id,
+                                        ability_text: effect.text.to_string(),
+                                        target_card_id: card_id,
+                                        amount: 1,
+                                        color: Some("all".to_string()),
+                                        kind: "gained_ability".to_string(),
+                                    });
                                 } else if let Some(gain_text) = effect.ability_gain_any().as_deref()
                                 {
                                     // Determine which player this card belongs to
@@ -807,6 +878,7 @@ impl GameState {
                                 } else {
                                     effect.heart_colors_any().to_vec()
                                 };
+                                let host_id = card_id;
                                 for card_id in &target_cards {
                                     for color in &colors {
                                         exp_global_need_heart.push((
@@ -814,6 +886,16 @@ impl GameState {
                                             color.clone(),
                                             delta as i16,
                                         ));
+                                        exp_global_nh_sources.push(
+                                            crate::core::game_modifiers::BonusSource {
+                                                source_card_id: host_id,
+                                                ability_text: effect.text.to_string(),
+                                                target_card_id: *card_id,
+                                                amount: delta as i32,
+                                                color: Some(color.clone()),
+                                                kind: "need_heart".to_string(),
+                                            },
+                                        );
                                     }
                                 }
                             }
@@ -838,6 +920,14 @@ impl GameState {
                                                         as i32;
                                                     *exp_blade.entry(card_id).or_insert(0) +=
                                                         n as i16;
+                                                    exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
+                                                        source_card_id: card_id,
+                                                        ability_text: effect.text.to_string(),
+                                                        target_card_id: card_id,
+                                                        amount: n,
+                                                        color: None,
+                                                        kind: "blade".to_string(),
+                                                    });
                                                 }
                                                 "heart" | "ハート" => {
                                                     let n = sub.count.unwrap_or(1) as i32;
@@ -853,6 +943,14 @@ impl GameState {
                                                             .or_default()
                                                             .entry(hc.clone())
                                                             .or_insert(0) += per_color;
+                                                        exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
+                                                            source_card_id: card_id,
+                                                            ability_text: effect.text.to_string(),
+                                                            target_card_id: card_id,
+                                                            amount: per_color as i32,
+                                                            color: Some(hc.clone()),
+                                                            kind: "heart".to_string(),
+                                                        });
                                                     }
                                                 }
                                                 _ => {}
@@ -880,7 +978,7 @@ impl GameState {
         // 下に置かれているかぎり、そのメンバーはブレードを得る"). The blade is
         // granted to the HOST member the card is stacked under, not the card itself
         // (which isn't on stage).
-        self.grant_under_card_constant_blades(&mut exp_blade);
+        self.grant_under_card_constant_blades(&mut exp_blade, &mut exp_blade_sources);
 
         self.commit_constant_results(
             exp_blade,
@@ -888,6 +986,9 @@ impl GameState {
             exp_heart,
             exp_prohibition,
             exp_global_need_heart,
+            exp_blade_sources,
+            exp_heart_sources,
+            exp_global_nh_sources,
             p1_constant_score_bonus,
             p2_constant_score_bonus,
         );
@@ -955,6 +1056,8 @@ impl GameState {
         // Set-operation modifiers ("このカードのコストはNになる") override the cost
         // to an absolute value rather than adjusting it by a delta.
         let mut expected_set: HashMap<i16, i16> = HashMap::default();
+        // Per-source attribution for the committed cost bonuses.
+        let mut cost_sources: Vec<crate::core::game_modifiers::BonusSource> = Vec::new();
         {
             // Chain stage and hand ability IDs, look up each effect, filter to ModifyCost
             let all_ids = stage_ids.iter().chain(hand_ids.iter());
@@ -1042,6 +1145,30 @@ impl GameState {
                                 .count();
                             log::debug!("[COST_MOD_PER_UNIT_DEBUG] group_matches={}", matches);
                             matches as u8
+                        } else if Zone::from_str(count_zone) == Some(Zone::UnderMember) {
+                            // UnderMember is a 2D structure that zone_cards cannot
+                            // represent — flatten every stage slot's under-cards,
+                            // honoring the group filter (e.g. pb2-006 桜小路きな子:
+                            // 「下にある『Liella!』のメンバーカード1枚につき」).
+                            let card_db = &self.card_database;
+                            let group_name = effect.group_name();
+                            let matches = player
+                                .stage
+                                .under_cards
+                                .iter()
+                                .flatten()
+                                .copied()
+                                .filter(|&id| match group_name {
+                                    Some(g) => crate::ability::util::card_matches_group_str(
+                                        card_db, id, Some(g),
+                                    ),
+                                    None => true,
+                                })
+                                .count();
+                            log::debug!(
+                                "[COST_MOD_PER_UNIT] under_member group={group_name:?} count={matches}"
+                            );
+                            matches as u8
                         } else {
                             let cards: Vec<i16> =
                                 crate::ability::util::zone_cards(player, count_zone).to_vec();
@@ -1074,10 +1201,38 @@ impl GameState {
                     let op_str = effect.operation_any().unwrap_or("add");
                     let op = op_str;
                     match op {
-                        "add" => *expected.entry(cid).or_insert(0) += value as i16,
-                        "subtract" => *expected.entry(cid).or_insert(0) -= value as i16,
+                        "add" => {
+                            *expected.entry(cid).or_insert(0) += value as i16;
+                            cost_sources.push(crate::core::game_modifiers::BonusSource {
+                                source_card_id: cid,
+                                ability_text: effect.text.to_string(),
+                                target_card_id: cid,
+                                amount: value,
+                                color: None,
+                                kind: "cost".to_string(),
+                            });
+                        }
+                        "subtract" => {
+                            *expected.entry(cid).or_insert(0) -= value as i16;
+                            cost_sources.push(crate::core::game_modifiers::BonusSource {
+                                source_card_id: cid,
+                                ability_text: effect.text.to_string(),
+                                target_card_id: cid,
+                                amount: -(value),
+                                color: None,
+                                kind: "cost".to_string(),
+                            });
+                        }
                         "set" => {
                             expected_set.insert(cid, value as i16);
+                            cost_sources.push(crate::core::game_modifiers::BonusSource {
+                                source_card_id: cid,
+                                ability_text: effect.text.to_string(),
+                                target_card_id: cid,
+                                amount: value,
+                                color: None,
+                                kind: "cost_set".to_string(),
+                            });
                         }
                         _ => {}
                     }
@@ -1102,6 +1257,7 @@ impl GameState {
         }
         self.mods.constant_cost_bonuses = expected;
         self.mods.constant_cost_set_bonuses = expected_set;
+        self.mods.constant_cost_sources = cost_sources;
     }
 
     pub fn set_heart_override(
@@ -1381,6 +1537,7 @@ impl GameState {
     pub fn clear_gained_abilities_for_card(&mut self, card_id: i16) {
         self.gained_abilities.remove(&card_id);
         self.gained_card_abilities.remove(&card_id);
+        self.gained_ability_sources.remove(&card_id);
     }
 
     /// Single choke point for zone-exit cleanup (rule 4.1.4: a card that
@@ -1482,6 +1639,10 @@ impl GameState {
         for (cid, val) in &old_sz_score {
             self.mods.remove_score_modifier(*cid, *val as i16);
         }
+        // Source attribution is rebuilt from scratch alongside the bonuses.
+        self.mods.success_zone_blade_sources.clear();
+        self.mods.success_zone_heart_sources.clear();
+        self.mods.success_zone_score_sources.clear();
 
         // Track non-stackable effects locally so they are reset each evaluation
         let mut local_non_stackable: HashSet<String> = HashSet::default();
@@ -1680,6 +1841,16 @@ impl GameState {
                                 .success_zone_blade_bonuses
                                 .entry(target_id)
                                 .or_insert(0) += amount as i16;
+                            self.mods.success_zone_blade_sources.push(
+                                crate::core::game_modifiers::BonusSource {
+                                    source_card_id: cid,
+                                    ability_text: effect.text.to_string(),
+                                    target_card_id: target_id,
+                                    amount,
+                                    color: None,
+                                    kind: "blade".to_string(),
+                                },
+                            );
                         }
                     }
                     "heart" | "ハート" => {
@@ -1701,6 +1872,16 @@ impl GameState {
                                     .or_default()
                                     .entry(color_str.clone())
                                     .or_insert(0) += per_color;
+                                self.mods.success_zone_heart_sources.push(
+                                    crate::core::game_modifiers::BonusSource {
+                                        source_card_id: cid,
+                                        ability_text: effect.text.to_string(),
+                                        target_card_id: target_id,
+                                        amount: per_color as i32,
+                                        color: Some(color_str.clone()),
+                                        kind: "heart".to_string(),
+                                    },
+                                );
                             }
                         }
                     }
@@ -1736,6 +1917,16 @@ impl GameState {
                             self.mods
                                 .success_zone_score_bonuses
                                 .insert(target_id, value);
+                            self.mods.success_zone_score_sources.push(
+                                crate::core::game_modifiers::BonusSource {
+                                    source_card_id: cid,
+                                    ability_text: effect.text.to_string(),
+                                    target_card_id: target_id,
+                                    amount: value as i32,
+                                    color: None,
+                                    kind: "score_set".to_string(),
+                                },
+                            );
                         }
                         _ => {
                             self.mods.add_score_modifier(target_id, value);
@@ -1744,6 +1935,16 @@ impl GameState {
                                 .success_zone_score_bonuses
                                 .entry(target_id)
                                 .or_insert(0) += value;
+                            self.mods.success_zone_score_sources.push(
+                                crate::core::game_modifiers::BonusSource {
+                                    source_card_id: cid,
+                                    ability_text: effect.text.to_string(),
+                                    target_card_id: target_id,
+                                    amount: value as i32,
+                                    color: None,
+                                    kind: "score".to_string(),
+                                },
+                            );
                         }
                     }
                 }

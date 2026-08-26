@@ -879,6 +879,10 @@ pub enum EffectType {
     Transform,
     NeedHeartMod,
     HeartOverride,
+    CostBonus,
+    CostSet,
+    BladeSet,
+    BladeTypeSet,
 }
 
 impl EffectType {
@@ -891,6 +895,10 @@ impl EffectType {
             EffectType::Transform => "transform",
             EffectType::NeedHeartMod => "need_heart_mod",
             EffectType::HeartOverride => "heart_override",
+            EffectType::CostBonus => "cost_bonus",
+            EffectType::CostSet => "cost_set",
+            EffectType::BladeSet => "blade_set",
+            EffectType::BladeTypeSet => "blade_type_set",
         }
     }
 }

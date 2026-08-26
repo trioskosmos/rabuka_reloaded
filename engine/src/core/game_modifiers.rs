@@ -57,6 +57,30 @@ impl ModifierEntry {
     }
 }
 
+/// Per-source attribution record for a persistent bonus on a card.
+/// Populated wherever a modifier is (re)applied with its origin known:
+/// recalculate_constants, success-zone evaluation, gained abilities.
+/// Consumed by game_state_to_display → effect_attribution so the UI can
+/// show WHERE each bonus on a card comes from.
+#[derive(Debug, Clone)]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+pub struct BonusSource {
+    pub source_card_id: i16,
+    pub ability_text: String,
+    pub target_card_id: i16,
+    pub amount: i32,
+    /// Heart color string ("heart01", "all", …) for heart/need-heart bonuses.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub color: Option<String>,
+    /// Bonus category: "blade" | "heart" | "score" | "cost" | "need_heart" |
+    /// "gained_ability". Lets the frontend pick the matching texticon badge.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub kind: String,
+}
+
 /// Holds all modifier data for GameState.
 /// Extracted to reduce the 99-field GameState struct.
 #[derive(Debug, Clone)]
@@ -89,6 +113,18 @@ pub struct GameModifiers {
     /// Source info for constant score bonuses: (card_id, ability_text, value)
     /// Populated by recalculate_constants for display in breakdown.scores.
     pub constant_score_sources: Vec<(i16, String, i16)>,
+    /// Per-source attribution for constant (常時) bonuses, rebuilt on every
+    /// recalculate_constants pass. Keyed lists hold one entry per (source
+    /// ability, target) pair so the UI can attribute each bonus.
+    pub constant_blade_sources: Vec<BonusSource>,
+    pub constant_heart_sources: Vec<BonusSource>,
+    pub constant_cost_sources: Vec<BonusSource>,
+    pub constant_need_heart_sources: Vec<BonusSource>,
+    /// Per-source attribution for success-zone constant bonuses, rebuilt on
+    /// every evaluate_success_zone_constant_modifiers pass.
+    pub success_zone_blade_sources: Vec<BonusSource>,
+    pub success_zone_heart_sources: Vec<BonusSource>,
+    pub success_zone_score_sources: Vec<BonusSource>,
     pub heart_color_multiplier: HashMap<i16, HeartColor>,
     /// Copy another card's original hearts onto a member. Key: target member
     /// card_id, value: source card_id whose hearts are copied (e.g. "このメンバーが
@@ -154,6 +190,13 @@ impl GameModifiers {
             p1_constant_total_score_bonus: 0,
             p2_constant_total_score_bonus: 0,
             constant_score_sources: Vec::new(),
+            constant_blade_sources: Vec::new(),
+            constant_heart_sources: Vec::new(),
+            constant_cost_sources: Vec::new(),
+            constant_need_heart_sources: Vec::new(),
+            success_zone_blade_sources: Vec::new(),
+            success_zone_heart_sources: Vec::new(),
+            success_zone_score_sources: Vec::new(),
             heart_color_multiplier: HashMap::default(),
             heart_copy: HashMap::default(),
             last_cost_discard_count: 0,

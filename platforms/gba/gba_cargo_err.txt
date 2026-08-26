@@ -1,0 +1,22 @@
+﻿
+> gba_cargo_out.txt:61:error[E0599]: no method named `to_string` found for struct `ArcStr` in the current scope
+  gba_cargo_out.txt:62:    --> src\overlay.rs:126:64
+  gba_cargo_out.txt:63:     |
+  gba_cargo_out.txt:64: 126 |                 show_card_detail(display, input, gs, c.card_no.to_string());
+  gba_cargo_out.txt:65:     |                                                                ^^^^^^^^^ method not found
+ in `ArcStr`
+  gba_cargo_out.txt:66:     |
+  gba_cargo_out.txt:67:    ::: C:\Users\trios\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\lib
+rary\alloc\src\string.r
+  gba_cargo_out.txt:68:s:2917:8
+  gba_cargo_out.txt:69:     |
+  gba_cargo_out.txt:70:2917 |     fn to_string(&self) -> String;
+  gba_cargo_out.txt:71:     |        --------- the method is available for `ArcStr` here
+  gba_cargo_out.txt:72:     |
+  gba_cargo_out.txt:73:     = help: items from traits can only be used if the trait is in scope
+  gba_cargo_out.txt:74:help: trait `ToString` which provides `to_string` is implemented but not in scope; perhaps you w
+ant to import it
+  gba_cargo_out.txt:75:     |
+> gba_cargo_out.txt:99:error: could not compile `rabuka_gba` (lib) due to 1 previous error; 2 warnings emitted
+
+
