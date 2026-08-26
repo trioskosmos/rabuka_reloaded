@@ -11085,6 +11085,48 @@ def _mark_live_total_score(node):
             _mark_live_total_score(it)
 
 
+def _mark_live_total_clamp(node, original_text: str = ""):
+    """「この効果ではライブの合計スコアは０未満にはならない」 is a per-effect floor.
+
+    The sentence has no verb, so the sequential splitter drops it. Detect it on
+    the parent text and stamp `effect_constraint: min:0` + `score_floor:0` on
+    the parent sequential and on each modify_score child so score.rs can enforce
+    the floor at application time (mirrors the global saturate but scoped to
+    this effect as printed).
+    """
+    if not isinstance(node, dict):
+        return
+    src = original_text or node.get("text", "") or ""
+    # Full-width digits normalized, but keep ０ for regex
+    has_clamp_phrase = ("この効果では" in src and "未満にはならない" in src) or (
+        "この効果では" in node.get("text", "") and "未満にはならない" in node.get("text", "")
+    )
+    if not has_clamp_phrase:
+        # Also check if any child text was stripped but parent still holds it
+        for v in node.values():
+            if isinstance(v, str) and "この効果では" in v and "未満にはならない" in v:
+                has_clamp_phrase = True
+                break
+    if has_clamp_phrase and "0未満" in src.replace("０", "0"):
+        # Stamp parent
+        if node.get("action") == "sequential":
+            node["effect_constraint"] = "min:0"
+            node["score_floor"] = 0
+        # Stamp children
+        for act in node.get("actions", []):
+            if isinstance(act, dict) and act.get("action") == "modify_score":
+                act["effect_constraint"] = "min:0"
+                act["score_floor"] = 0
+        # Recurse for nested
+        for v in node.values():
+            if isinstance(v, dict):
+                _mark_live_total_clamp(v, src)
+            elif isinstance(v, list):
+                for it in v:
+                    if isinstance(it, dict):
+                        _mark_live_total_clamp(it, src)
+
+
 def _state_energy_is_object(txt: str) -> bool:
     """True when エネルギー is the OBJECT of a state change (activate/wait),
     not merely mentioned (e.g. as an under-member count reference)."""
@@ -11406,6 +11448,7 @@ def _normalize_effect_tree(effect, original_text=None):
     _strip_leaked_draw_g(effect)
     _enrich_gain_abilities(effect)
     _mark_live_total_score(effect)
+    _mark_live_total_clamp(effect, original_text or effect.get("text", "") or "")
     _mark_success_pile_difference(effect)
     _canonicalize_dynamic_counts(effect)
     effect = _walk_split_mixed(effect)
@@ -13045,13 +13088,13 @@ def _validate_semantic(abilities):
             "できない but no restriction/negation structure",
         ),
         # ─── Self-referential effect clamps ───
-        # 「この効果ではライブの合計スコアは０未満にならない」 style clauses have
-        # no structural home yet (score.rs hardcodes the behavior); flag them so
-        # new occurrences are visible.
+        # 「この効果ではライブの合計スコアは０未満にならない」 → now represented as
+        # score_floor:0 / effect_constraint:"min:0" on parent + each modify_score child.
         (
             "effect_self_clamp",
             r"この効果では.{0,20}ない",
-            lambda e, eff: False,
+            lambda e, eff: _json_has_field(eff, "score_floor", 0)
+            or _json_has_field(eff, "effect_constraint", "min:0"),
             "Self-referential effect clamp (この効果では…) has no structural representation",
         ),
         # ─── Number selection ───

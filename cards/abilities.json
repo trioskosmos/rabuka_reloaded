@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-27T02:35:48.518771",
+  "generated_at": "2026-08-27T02:43:37.725411",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "ef83b3f9",
+  "engine_commit": "8ac1f436",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -9418,7 +9418,9 @@
             "action": "modify_score",
             "value": 1,
             "operation": "add",
-            "target": "live_total"
+            "target": "live_total",
+            "effect_constraint": "min:0",
+            "score_floor": 0
           },
           {
             "text": "自分が余剰ハートを2つ以上持つ場合、ライブの合計スコアを-1する",
@@ -9432,9 +9434,13 @@
             "action": "modify_score",
             "value": 1,
             "operation": "remove",
-            "target": "live_total"
+            "target": "live_total",
+            "effect_constraint": "min:0",
+            "score_floor": 0
           }
-        ]
+        ],
+        "effect_constraint": "min:0",
+        "score_floor": 0
       }
     },
     {

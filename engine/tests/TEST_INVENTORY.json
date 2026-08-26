@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T16:29:22.910674+00:00",
+  "generated_at": "2026-08-26T16:56:48.491816+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 505,
-  "n_tests": 3025,
+  "n_files": 506,
+  "n_tests": 3030,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -12788,6 +12788,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/bp5_010_shiori_clamp_test.rs",
         "engine/tests/test_modules/mifune_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test_part3.rs"
       ],
@@ -12812,9 +12813,14 @@
         "saikou_edge_no_cards",
         "saikou_edge_score1_only",
         "saikou_edge_score2_only",
-        "saikou_edge_score5_only"
+        "saikou_edge_score5_only",
+        "shiori_live_total_minus_one_allowed_when_base_exists",
+        "shiori_live_total_minus_one_clamped_at_zero",
+        "shiori_live_total_plus_one_no_floor_needed",
+        "shiori_parser_emits_floor",
+        "shiori_sequential_both_conditions_present"
       ],
-      "covering_test_count": 21,
+      "covering_test_count": 26,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -30465,6 +30471,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/bp5_010_shiori_clamp_test.rs",
         "engine/tests/test_modules/bp7_q271_colorful_dreams_test.rs",
         "engine/tests/test_modules/card_ability_tests.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
@@ -30505,7 +30512,7 @@
         "issue2_rina_cost_total_10_no_bonus",
         "issue2_rina_cost_total_6_draws_card"
       ],
-      "covering_test_count": 114,
+      "covering_test_count": 119,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

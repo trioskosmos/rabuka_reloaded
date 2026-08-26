@@ -11,7 +11,7 @@ use alloc::{
 use smallvec::SmallVec;
 
 impl AbilityResolver {
-    pub(crate) fn execute_modify_score(
+    pub fn execute_modify_score(
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
@@ -49,10 +49,103 @@ impl AbilityResolver {
             None
         };
 
+        let is_live_total = target == "live_total";
+        // live_total is effect-scoped to the live owner (self), not a literal player id.
+        let resolved_target = if is_live_total { "self" } else { target.as_str() };
         let orientation_modifiers = gs.mods.orientation_modifiers.clone();
         let last_energy = gs.mods.last_cost_energy_count;
+        // ── live_total: constant total bonus (not per-card) with per-effect floor ──
+        // Only the floor case needs constant routing; other live_total stay per-card
+        // (which saturates via zones.rs) to avoid breaking per_unit live_total cards.
+        let has_floor = is_live_total
+            && (effect.effect_constraint_any().as_deref() == Some("min:0")
+                || effect.text.contains("未満にはならない"));
+        if is_live_total && has_floor {
+            let delta: i16 = match operation.as_str() {
+                "add" => value as i16,
+                "remove" => -(value as i16),
+                "set" => value as i16,
+                _ => 0,
+            };
+            // Resolve correctly via player lookup: use resolved_target ("self") to pick owner
+            let owner_is_p1 = {
+                let p = gs.resolve_target_player(resolved_target);
+                p.id == gs.player1.id
+            };
+            let current_bonus = if owner_is_p1 {
+                gs.mods.p1_constant_total_score_bonus
+            } else {
+                gs.mods.p2_constant_total_score_bonus
+            };
+            // Estimate live base total for floor check (live + success zones, since
+            // LiveSuccess fires after cards may have been moved to success)
+            let base_total: i32 = {
+                let player = gs.resolve_target_player(resolved_target);
+                player
+                    .live_card_zone
+                    .cards
+                    .iter()
+                    .chain(player.success_live_card_zone.cards.iter())
+                    .filter_map(|&cid| gs.card_database.get_card(cid).map(|c| c.get_score() as i32))
+                    .sum()
+            };
+            let projected_total = base_total + current_bonus as i32 + delta as i32;
+            let clamped_delta = if has_floor && projected_total < 0 {
+                // Clamp so total stays >=0
+                let max_negative = -(base_total + current_bonus as i32);
+                max_negative.max(delta as i32) as i16
+            } else {
+                delta
+            };
+            if clamped_delta == 0 && has_floor && delta < 0 {
+                log::debug!("[SCORE_CLAMP] live_total floor 0 blocked delta {}", delta);
+                // Still record but with 0 delta for audit
+            } else {
+                if owner_is_p1 {
+                    gs.mods.p1_constant_total_score_bonus += clamped_delta;
+                } else {
+                    gs.mods.p2_constant_total_score_bonus += clamped_delta;
+                }
+            }
+            let card_id = gs.activating_card.unwrap_or(-1);
+            let pp = gs.player_prefix();
+            let act_name = gs
+                .activating_card
+                .and_then(|id| gs.card_database.get_card(id))
+                .map(|c| c.name.to_string())
+                .unwrap_or_default();
+            gs.push_rule_log(format!(
+                "{} {}: [[log_score_modify:op={},value={},applied={},live_total=true,floor={}]]",
+                pp, act_name, operation, value, if clamped_delta != 0 {1} else {0}, has_floor
+            ));
+            gs.record_ability_application(
+                gs.activating_card.unwrap_or(-1),
+                effect.text.to_string(),
+                if operation == "set" { "score_set" } else { "score_bonus" },
+                card_id,
+                None,
+                clamped_delta,
+            );
+            // Temporary effect for revert (live-scoped, will be cleared after live)
+            let effect_data = Some(crate::core::types::EffectData::MultiCard {
+                items: vec![crate::core::types::CardEffectItem {
+                    card_id,
+                    amount: clamped_delta,
+                    color: None,
+                }],
+            });
+            util::push_temporary_effect(
+                gs,
+                &format!("modify_score_{}", operation),
+                duration.as_deref(),
+                &target,
+                &format!("Modify live_total by {} (clamped delta {})", delta, clamped_delta),
+                effect_data,
+            );
+            return Ok(());
+        }
         let (live_card_ids, final_value) = {
-            let player = gs.resolve_target_player_mut(&target);
+            let player = gs.resolve_target_player_mut(resolved_target);
 
             // Use CardFilter::from_effect (not filter_subset) so that
             // need_heart_total, need_heart_operator, and other condition
