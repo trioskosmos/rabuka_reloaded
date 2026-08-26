@@ -24,12 +24,33 @@ Method, in order:
 |---|---|
 | P0.1 orphaned mod.rs registration | DONE 窶・6 files recovered, `sumire_bp5_test_debug.rs` deleted as stale duplicate; konata/location/shizuku fixed to current APIs |
 | P0.2 DIVE! false-trigger audit | DONE 窶・6 real-game tests in `dive_false_trigger_test.rs`; found + fixed **engine gap**: `movement` key on non-Movement condition variants was dropped by both serde and bytecode decode paths, so static presence re-triggered "when placed" abilities. Fixed via `ConditionCommon.movement` + regenerated decoder |
-| P0.3 `has_pending_choice` soft-guard migration | NEARLY DONE — 282 -> 12 sites via ratchet + two parallel-agent waves (21 + 86 files) 窶・ratchet landed: `test_inventory.py --check` fails on any NEW soft-guard site; 282 existing sites across 110 files baselined in `engine/tests/SOFT_GUARD_BASELINE.json` (only goes down). First migration done (card_ability_tests q244). Batch migration continues file-by-file |
+| P0.3 `has_pending_choice` soft-guard migration | DONE 窶・12 -> 4 sites: b9_more probe-if deleted; parser_issues_p3 nested redundant if removed; umi_bp3 + edelnote advance loops rewritten as `while !pending`; performance_snapshot_audit (3 sites) and performance_phase_rules migrated to dispatch-on-prompt-type with panic on ANY unexpected prompt; helpers::scan_autos_both now answers via variant-dispatched `answer_choice`. Remaining 4 baselined as genuinely legitimate (generic helper, optional DASH arrange, structural on_choice loop) |
 | P1.1 per-test inventory | OPEN |
 | P1.2 or-assertions sweep | DONE 窶・36 multi-line `||` hits triaged: 10 files tightened to exact outcomes (pl_s_bp7_007 ﾃ・ 竊・exact stage slots; kuroe_dia 竊・selected card on deck top; l0_gap_livesuccess vacuous disjunct removed; batch34 decline now pins waitroom retention; natsumi Q264 adds not-discarded check; opponent_choice wait竕leave both-stay; mia/card_ability/izumi/look_and_select deterministic picks pinned). 22 hits judged legitimate (match guards, loop conditions, error-string chains, engine zone aliasing) |
 | P1.3 helper dedup (`fire_trigger` x40) | DONE 窶・21 byte-identical clones deleted onto `helpers::fire_trigger`; batch30 keeps a 3-line drain wrapper; batch8's `fire_trigger_nth` kept as genuine extension |
 | P2.* parser/pipeline hardening | OPEN |
 | P3.* engine quality debt | MOSTLY DONE -- either-target fixed, mojibake fixed, non-skippable silent no-op fixed (empty answers now Err); remaining: queue-u8 indexing, runaway counters per-game semantics, web-server lock logging |
+
+## §5 Round 5 — seat-relative / cross-player abilities (L1-depth mining)
+
+Mined TEST_INVENTORY for `相手`-shaped abilities still at L1 depth (no
+negative/mirror coverage). New file `cross_player_round5_test.rs`. Ledger of
+what existed vs what was missing:
+
+| Card | Existing coverage | Missing until now → added test |
+|---|---|---|
+| PL!S-bp6-022-L (ライブ成功時: 相手のエネルギーが自分より多い→スコア+1) | batch12, both tests fired from P1 only (`fire_trigger` hardcodes pid=p1) | P2-owned copy fired AS p2 (+/- mirror); mirror boards each side pinned independently; waited energy counts per rules 4.7.4 (`cards.len()` not `active_count()`) |
+| PL!SP-pb2-029-N (登場/開始時: 相手のコスト2以下をウェイト) | batch11, single-sided debut only | Mirror standoff — both seats debut their own メイ via real play_to_stage with seat flip; cost gate protects opposing メイ (9>2); already-waited eligible target re-selected no-op; cost-4 negative; 9.6.3.1.3 no-prompt pin |
+| PL!N-bp7-009-R (登場: 自分と相手それぞれ7枚ミル) | bp7_q267 file pins refresh boundaries + both-refresh THOROUGHLY (do NOT duplicate) | ADDED: P2-fired copy (seat-relative "自分と相手"); exact top-card identity across both mills — no cross-pollination. Note: engine resolves both-target move_cards OPPONENT-first then self (`execute_move_cards_both`); fill_decks seeds 30/deck not 20 |
+| PL!HS-PR-035-PR (登場: 相手の控え室メンバー3枚→相手デッキ底+ブレード3以下ウェイト) | bp7_ginko file (L1, placement only) | ADDED accept/decline/P2-seat tests. Found + fixed **engine bug #6**: the follow-up rest resolved against the prior step's `selected_cards` (the 3 discard→deck-bottom members, never on stage) instead of scanning the opponent's STAGE — the printed clause 「相手のステージにいる元々…ブレード3つ以下のメンバー1人をウェイトにする」 could never fire. Fixed END-TO-END: (a) state.rs member_op falls back to the stage scan when NO selected card is on the target stage (diagnostic line kept); (b) **parser fix** — the select-followup emitter no longer stamps `source="selected_cards"` onto clauses that scope their own objects with an existence qualifier (`〜にいる／〜にある`); PR-035-PR now parses `source="stage"`. Backreference verbs (「そのライブカードを手札に加える」, しずく bp5-003) keep the stamp — first regen attempt over-matched `手札に` and broke shizuku_bp5, caught by suite, narrowed to existence qualifiers. Golden diff vs HEAD = exactly one semantic line. Grounding: printed text scopes the rest to stage members; Q118/Q154 gate the rest on the move; Q102 + 9.6.3.1.3 keep the zero-candidates no-op; DB scan confirmed this was the ONLY change_state+source=selected_cards ability |
+| PL!SP-bp5-027-L (成功時: 自エネルギー置き→そうした場合相手は1枚引く) | batch32 (accept/skip, own-side) | planned: conditional gate = opponent draw ONLY on accept; empty energy deck edge; combo with 4.7.4 (waited energy it places feeds bp6-022-L comparison) |
+| PL!S-bp7-025-L (成功時 choice: 相手コスト4以下2人までウェイト+次ターン非アクティブ制限 / draw 1) | batch9 (L1+choice) | planned: option A cost gate + restriction carry-over; option B draw |
+
+Rules grounding used: 4.7.4 ('エネルギー'=energy-zone cards, orientation-
+independent), 8.4.4→8.4.5→8.4.6 (LiveSuccess resolves before score compare,
+both players fire same phase), 5.2.1 (ウェイトにする has no state precondition),
+9.6.3.1/.1.3 (exact-count must choose when possible; zero eligible ⇒ ignored,
+no prompt), Q267 (mill deck-out refresh).
 
 ## ﾂｧ2 Zone-change / source-gate audit (round 2)
 

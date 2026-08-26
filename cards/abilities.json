@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-26T17:22:17.536917",
+  "generated_at": "2026-08-26T18:18:37.696469",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "b83ffdc4",
+  "engine_commit": "0c393f48",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -23992,7 +23992,7 @@
           },
           {
             "text": "相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする",
-            "source": "selected_cards",
+            "source": "stage",
             "state_change": "wait",
             "count": 1,
             "card_type": "member_card",

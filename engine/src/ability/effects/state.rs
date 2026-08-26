@@ -306,7 +306,21 @@ impl AbilityResolver {
                         candidates.push((pos, card_id));
                     }
                 }
-            } else {
+                // A prior step's selection that left NO card on the target
+                // stage cannot be the object of a stage rest (waiting requires
+                // the stage). Fall through to the stage scan so stage-scoped
+                // follow-up clauses like 「（そうした場合、）相手のステージにいる
+                // 元々…ブレード3つ以下のメンバー1人をウェイトにする」
+                // (百生吟子 PL!HS-PR-035-PR, whose select/move steps populate
+                // selected_cards from the DISCARD) still resolve correctly.
+                if candidates.is_empty() {
+                    log::debug!(
+                        "[EXEC_CHANGE_STATE] prior selection {:?} has no card on the target stage; scanning the stage instead",
+                        self.selected_cards
+                    );
+                }
+            }
+            if candidates.is_empty() {
                 // Collect all potential candidates (filter by card_type, group, etc.)
                 // in a first pass, then filter by orientation in a second pass
                 // to avoid borrow conflicts with gs.mods.

@@ -1138,6 +1138,25 @@ impl AbilityResolver {
         if decided {
             return false;
         }
+        // 9.6.3.1.3: when NOTHING can be chosen, the target is ignored and
+        // its effects are skipped — an empty source zone must not raise a
+        // 「〜してもよい」 pay/skip gate at all (the move resolves as a no-op
+        // and the conditional continuation stays gated on moved_any).
+        let player = gs.resolve_target_player(effect.target.as_deref().unwrap_or("self"));
+        let available = match source_zone {
+            Zone::EnergyDeck => player.energy_deck.cards.len(),
+            Zone::Deck | Zone::DeckTop | Zone::DeckBottom => player.main_deck.cards.len(),
+            Zone::Energy => player.energy_zone.cards.len(),
+            _ => usize::MAX,
+        };
+        if available == 0 {
+            log::debug!(
+                "[OPTIONAL_GATE] source {:?} has no cards for {} -> skipping pay/skip gate",
+                source_zone,
+                description_en
+            );
+            return false;
+        }
         self.emit_pay_skip_gate(
             gs,
             Some(crate::ability::types::ChoiceRoute::Raw(

@@ -8811,7 +8811,29 @@ def _try_conditional_sequential(text):
             if sa.get("action_by") == "opponent":
                 sa.setdefault("source", "selected_cards")
             else:
-                sa["source"] = "selected_cards"
+                # Stamp the selection reference only when the follow-up clause
+                # does NOT scope its own objects with an existence qualifier.
+                # A clause like 「そうした場合、相手のステージにいる…メンバー
+                # 1人をウェイトにする」 (百生吟子 PL!HS-PR-035-PR) resolves
+                # against the members IN that zone; forcing
+                # source="selected_cards" made the engine look for the chosen
+                # cards on the stage (they were just placed under the deck)
+                # and silently no-op. Backreference verbs like
+                # 「そのライブカードを手札に加える」 (桜坂しずく
+                # PL!N-bp5-003-R) must keep the stamp, so destination phrases
+                # (手札に加える) do NOT count — only 〜にいる／〜にある do.
+                names_own_zone = any(
+                    k in clean
+                    for k in (
+                        "ステージにい",
+                        "控え室にある",
+                        "控え室にい",
+                        "デッキにある",
+                        "手札にある",
+                    )
+                )
+                if not names_own_zone:
+                    sa["source"] = "selected_cards"
 
     # For select actions with an explicit destination in the first-part text
     # (e.g. "選び、デッキの一番上に置いてもよい"), insert a move_cards step
