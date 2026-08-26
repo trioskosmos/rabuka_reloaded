@@ -143,6 +143,35 @@ fn ren_ab1_no_energy_placed_no_blade() {
     );
 }
 
+/// Turn1 blocks second energy placement same turn.
+#[test]
+fn ren_016_turn1_blocks_second_energy_placed() {
+    let mut game = TestGame::new(load_real_database());
+    let ren = game.id("PL!SP-bp7-016-N");
+    fill_deck_and_energy(&mut game);
+    game.state.player1.stage.stage = [ren, -1, -1];
+    game.state.player1.energy_deck.cards.push(game.id("PL!-sd1-010-SD"));
+    game.state.player1.energy_deck.cards.push(game.id("PL!-sd1-010-SD"));
+    let placer = game.id(ENERGY_PLACER);
+    game.state.player1.hand.cards.push(placer);
+    game.state.player1.hand.cards.push(game.id(ENERGY_PLACER));
+    let blade_before = blade(&game, ren);
+    game.play_to_stage(placer, MemberArea::RightSide);
+    drain_auto_choices(&mut game);
+    assert_eq!(blade(&game, ren), blade_before + 1);
+    // Second placer same turn
+    let placer2 = game.id(ENERGY_PLACER);
+    game.state.player1.hand.cards.push(placer2);
+    // Need to give energy for second placer? It also places energy, but turn limit should block second blade
+    // We simulate second energy placement via direct movement event (own effect)
+    game.state.push_movement_event(-1, "energy_deck", "energy", Some(placer2), "p1", true);
+    let pid = game.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    game.state.process_pending_auto_abilities(&pid);
+    drain_auto_choices(&mut game);
+    assert_eq!(blade(&game, ren), blade_before + 1, "ターン1回 should block second blade");
+}
+
 /// An OPPONENT card's effect placing energy must NOT trigger ("自分のカードの効果").
 #[test]
 fn ren_ab1_opponent_effect_places_energy_no_blade() {
