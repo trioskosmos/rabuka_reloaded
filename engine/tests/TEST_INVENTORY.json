@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T09:02:56.002359+00:00",
+  "generated_at": "2026-08-26T10:25:13.220736+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 491,
-  "n_tests": 2977,
+  "n_files": 493,
+  "n_tests": 2981,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -9603,6 +9603,7 @@
         "engine/tests/test_modules/hanabiko_discard_test.rs",
         "engine/tests/test_modules/integration_blindspot_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test_part2.rs",
+        "engine/tests/test_modules/phase_machine_rules_test.rs",
         "engine/tests/test_modules/stellar_phoenix_test.rs",
         "engine/tests/test_modules/surplus_heart_test.rs",
         "engine/tests/test_modules/target_selection_test.rs"
@@ -9622,6 +9623,7 @@
         "ab1_no_niji_target_no_crash",
         "ab1_rescan_after_flags_cleared_does_not_double_grant",
         "ab1_two_niji_members_only_one_gets_blade",
+        "active_phase_stands_only_the_turn_players_cards",
         "bella_q173_single_life_places_single_waited_energy",
         "bella_q173_two_lives_succeed_both_trigger_waited_placement",
         "both_in_live_zone_both_trigger",
@@ -9632,14 +9634,13 @@
         "dive_live_zone_only_ab1_triggers",
         "dive_no_niji_no_target",
         "dive_not_in_live_zone_no_trigger",
+        "draw_phase_on_empty_main_deck_refreshes_then_draws",
+        "energy_phase_draws_one_and_empty_deck_skips",
         "full_chain_setsuna_debut_retrieval",
         "ginko_hs_debut_window_rests_cost_le9_member",
-        "hanabiko_baton_touch_replaced_triggers",
-        "hanabiko_decline_discard_no_retrieval",
-        "hanabiko_hand_to_discard_no_trigger",
-        "hanabiko_replaced_by_new_card_on_same_position_triggers"
+        "hanabiko_baton_touch_replaced_triggers"
       ],
-      "covering_test_count": 62,
+      "covering_test_count": 65,
       "is_null": false
     },
     {
@@ -10308,7 +10309,7 @@
         "audit_additive_modifier_stacks_on_base",
         "audit_allocations_match_filled",
         "audit_both_players_fail_no_winner",
-        "audit_no_need_heart_always_passes",
+        "audit_member_as_live_card_is_invalid_no_live_entry",
         "audit_p1_passes_p2_fails_p1_wins",
         "audit_set_zero_removes_requirement",
         "audit_sufficient_hearts_passes",
@@ -12655,6 +12656,7 @@
         "engine/tests/test_modules/untested_abilities_playthrough_test.rs",
         "engine/tests/test_modules/untested_choice_change_target_test.rs",
         "engine/tests/test_modules/untested_secondary_abilities_test.rs",
+        "engine/tests/test_modules/victory_tie_placement_test.rs",
         "engine/tests/test_modules/zone_change_gate_test.rs"
       ],
       "covering_tests": [
@@ -12673,7 +12675,7 @@
         "audit_additive_modifier_stacks_on_base",
         "audit_allocations_match_filled",
         "audit_both_players_fail_no_winner",
-        "audit_no_need_heart_always_passes",
+        "audit_member_as_live_card_is_invalid_no_live_entry",
         "audit_p1_passes_p2_fails_p1_wins",
         "audit_set_zero_removes_requirement",
         "audit_sufficient_hearts_passes",
@@ -12689,7 +12691,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 841,
+      "covering_test_count": 842,
       "is_null": false
     },
     {
@@ -26078,6 +26080,7 @@
         "engine/tests/test_modules/untested_abilities_batch42_test.rs",
         "engine/tests/test_modules/untested_abilities_batch43_test.rs",
         "engine/tests/test_modules/untested_abilities_batch44_test.rs",
+        "engine/tests/test_modules/victory_tie_placement_test.rs",
         "engine/tests/test_modules/wao_wao_test.rs",
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/wonder_zone_max_repeats_test.rs",
@@ -26101,7 +26104,7 @@
         "audit_additive_modifier_stacks_on_base",
         "audit_allocations_match_filled",
         "audit_both_players_fail_no_winner",
-        "audit_no_need_heart_always_passes",
+        "audit_member_as_live_card_is_invalid_no_live_entry",
         "audit_p1_passes_p2_fails_p1_wins",
         "audit_set_zero_removes_requirement",
         "audit_sufficient_hearts_passes",
@@ -26117,7 +26120,7 @@
         "bp5015_all_six_colors_present_two_blades",
         "bp5015_missing_colors_no_blades"
       ],
-      "covering_test_count": 424,
+      "covering_test_count": 425,
       "is_null": false
     },
     {
@@ -26200,6 +26203,7 @@
         "engine/tests/test_modules/untested_abilities_batch42_test.rs",
         "engine/tests/test_modules/untested_abilities_batch43_test.rs",
         "engine/tests/test_modules/untested_abilities_batch44_test.rs",
+        "engine/tests/test_modules/victory_tie_placement_test.rs",
         "engine/tests/test_modules/wao_wao_test.rs",
         "engine/tests/test_modules/wien_n_test.rs",
         "engine/tests/test_modules/wonder_zone_max_repeats_test.rs",
@@ -26223,7 +26227,7 @@
         "audit_additive_modifier_stacks_on_base",
         "audit_allocations_match_filled",
         "audit_both_players_fail_no_winner",
-        "audit_no_need_heart_always_passes",
+        "audit_member_as_live_card_is_invalid_no_live_entry",
         "audit_p1_passes_p2_fails_p1_wins",
         "audit_set_zero_removes_requirement",
         "audit_sufficient_hearts_passes",
@@ -26239,7 +26243,7 @@
         "bp5015_all_six_colors_present_two_blades",
         "bp5015_missing_colors_no_blades"
       ],
-      "covering_test_count": 424,
+      "covering_test_count": 425,
       "is_null": false
     },
     {

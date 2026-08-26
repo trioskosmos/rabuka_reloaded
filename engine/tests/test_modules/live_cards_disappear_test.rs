@@ -141,11 +141,27 @@ fn live_cards_stuck_in_live_zone_instead_of_discard() {
         "CARDS VANISHED - {} cards lost!",
         total_before - total_after
     );
-    assert!(
-        game.state.player1.waitroom.cards.len() == 3
-            || game.state.player1.live_card_zone.cards.len() == 3,
-        "3 live cards should be in waitroom or live_zone, got waitroom={} live_zone={}",
+    // Zero-stage boards => every live fails hearts => rule 8.4.8 sends ALL
+    // remaining live-zone cards to the waitroom at victory determination.
+    // The old OR-assert tolerated "stuck in live zone" (the very bug this
+    // file was named after), so pin the exact correct outcome instead.
+    assert_eq!(
+        game.state.player1.live_card_zone.cards.len(),
+        0,
+        "8.4.8: failed live cards must leave the live zone"
+    );
+    assert_eq!(
         game.state.player1.waitroom.cards.len(),
-        game.state.player1.live_card_zone.cards.len()
+        3,
+        "all three failed lives land in the waitroom"
+    );
+    assert!(
+        game.state.player1.success_live_card_zone.cards.is_empty(),
+        "failed lives never reach the success zone"
+    );
+    assert!(
+        game.state.revealed_cards.is_empty()
+            && game.state.resolution_zone.cards.is_empty(),
+        "yell/reveal scratch zones must be drained by victory determination"
     );
 }
