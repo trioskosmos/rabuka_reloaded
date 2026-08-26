@@ -813,10 +813,11 @@ fn ayumu_kanon_koko_debut_recover_from_discard() {
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(ayumu, rabuka_engine::zones::MemberArea::Center);
 
-    // Debut auto-triggers: if there's a pending choice for selecting which member to recover
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Debut auto-triggers: single recovery candidate auto-resolves.
+    assert!(
+        !game.has_pending_choice(),
+        "single-candidate recovery must not prompt"
+    );
 
     // Verify the member card was recovered from discard to hand
     assert!(
@@ -2158,9 +2159,13 @@ fn you_abilityless_card_not_in_choice() {
 
     // Select only the named copy
     game.select_indices(&[0]);
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Under-cap re-ask: the optional cost still asks once more; finalise
+    // with an empty answer since no eligible copies remain.
+    assert!(
+        game.has_pending_choice(),
+        "finalize re-ask expected while under cap"
+    );
+    game.select_indices(&[]);
 
     // Filler should still be in hand (it was not eligible for selection)
     assert!(
@@ -2848,16 +2853,9 @@ fn umi_pr014_appear_reveal_and_draw_when_no_live_card() {
     game.state.player1.stage.stage = [-1, -1, -1];
     game.play_to_stage(umi, rabuka_engine::zones::MemberArea::LeftSide);
 
-    // 登場 trigger: reveal 3 from opponent's hand → no live cards → draw 1
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // 登場 trigger: reveal 3 from opponent's hand → no live cards → draw 1.
+    // The reveal resolves automatically — no prompts.
+    assert!(!game.has_pending_choice(), "reveal must not prompt");
 
     // Umi cost is 2, we had 3 energy
     let energy_after = game.state.player1.energy_zone.active_count();
@@ -2923,15 +2921,9 @@ fn umi_pr014_appear_reveal_no_draw_when_live_card_present() {
     game.state.player1.stage.stage = [-1, -1, -1];
     game.play_to_stage(umi, rabuka_engine::zones::MemberArea::LeftSide);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Reveal resolves automatically — no prompts even when a live card
+    // is among the revealed cards (the draw is simply suppressed).
+    assert!(!game.has_pending_choice(), "reveal must not prompt");
 
     // P1 should NOT draw because a live card was among the revealed cards
     assert_eq!(

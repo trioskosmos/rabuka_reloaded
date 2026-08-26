@@ -23,7 +23,6 @@
   "engine/tests/test_modules/formation_change_test.rs": 1,
   "engine/tests/test_modules/fuyumari_debut_test.rs": 2,
   "engine/tests/test_modules/fuyumari_test.rs": 5,
-  "engine/tests/test_modules/gameplay_test.rs": 8,
   "engine/tests/test_modules/hanabiko_discard_test.rs": 1,
   "engine/tests/test_modules/hanamaru_bp3_choose_player_test.rs": 6,
   "engine/tests/test_modules/heart_override_test.rs": 1,
