@@ -1,9 +1,9 @@
-use crate::helpers::*;
+﻿use crate::helpers::*;
 use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
-/// Keke's debut: place a Liella! cost≤4 from hand into an EMPTY slot
+/// Keke's debut: place a Liella! cost竕､4 from hand into an EMPTY slot
 #[test]
 fn keke_place_in_empty_slot() {
     let db = load_real_database();
@@ -23,43 +23,32 @@ fn keke_place_in_empty_slot() {
     // Play Keke from hand to Center (index of keke in hand is 1)
     v.play_to_stage(keke, MemberArea::Center);
 
-    // Process debut auto ability (Keke's debut fires)
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => {
-                v.select_indices(&[0]);
-            }
-            _ => {}
-        }
-    }
+    // Debut resolves straight into the hand-selection prompt (no
+    // SelectAutoAbility wrapper).
+    assert!(v.has_pending_choice(), "hand-selection prompt expected");
+    assert_eq!(
+        v.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected hand SelectCard"
+    );
+    let idx = v
+        .state
+        .player1
+        .hand
+        .cards
+        .iter()
+        .position(|&c| c == liella)
+        .unwrap();
+    v.select_indices(&[idx]);
 
-    // The optional effect should now prompt: select a card from hand
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectCard") => {
-                let idx = v
-                    .state
-                    .player1
-                    .hand
-                    .cards
-                    .iter()
-                    .position(|&c| c == liella)
-                    .unwrap();
-                v.select_indices(&[idx]);
-            }
-            _ => v.select_indices(&[]),
-        }
-    }
-
-    // If position choice (multiple empty slots): pick Left
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectPosition") => {
-                v.select_option(0); // left
-            }
-            _ => v.select_indices(&[]),
-        }
-    }
+    // Multiple empty slots remain 竊・destination IS asked; pick Left.
+    assert!(v.has_pending_choice(), "position prompt expected");
+    assert_eq!(
+        v.pending_choice_type().as_deref(),
+        Some("SelectPosition"),
+        "expected SelectPosition"
+    );
+    v.select_option(0); // left
 
     // Keke should be on Center (played), Liella! should be on stage somewhere
     assert_eq!(v.state.player1.stage.stage[1], keke, "Keke at Center");
@@ -91,43 +80,31 @@ fn keke_place_in_occupied_slot() {
 
     v.play_to_stage(keke, MemberArea::Center);
 
-    // Process debut auto ability
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => {
-                v.select_indices(&[0]);
-            }
-            _ => {}
-        }
-    }
-
-    // Select Liella! from hand
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectCard") => {
-                let idx = v
-                    .state
-                    .player1
-                    .hand
-                    .cards
-                    .iter()
-                    .position(|&c| c == liella)
-                    .unwrap();
-                v.select_indices(&[idx]);
-            }
-            _ => v.select_indices(&[]),
-        }
-    }
+    // Debut resolves straight into the hand-selection prompt.
+    assert!(v.has_pending_choice(), "hand-selection prompt expected");
+    assert_eq!(
+        v.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected hand SelectCard"
+    );
+    let idx = v
+        .state
+        .player1
+        .hand
+        .cards
+        .iter()
+        .position(|&c| c == liella)
+        .unwrap();
+    v.select_indices(&[idx]);
 
     // Position choice: pick Left (occupied by filler)
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectPosition") => {
-                v.select_option(0); // left
-            }
-            _ => v.select_indices(&[]),
-        }
-    }
+    assert!(v.has_pending_choice(), "position prompt expected");
+    assert_eq!(
+        v.pending_choice_type().as_deref(),
+        Some("SelectPosition"),
+        "expected SelectPosition"
+    );
+    v.select_option(0); // left
 
     // Verify: Liella! replaced filler at Left
     assert_eq!(
@@ -185,46 +162,30 @@ fn keke_blocked_from_locked_area() {
     )
     .expect("play Keke failed");
 
-    // Process Keke's debut ability
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => {
-                v.select_indices(&[0]);
-            }
-            _ => {}
-        }
-    }
-
-    // Select Liella! from hand
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectCard") => {
-                let idx = v
-                    .state
-                    .player1
-                    .hand
-                    .cards
-                    .iter()
-                    .position(|&c| c == liella)
-                    .unwrap();
-                v.select_indices(&[idx]);
-            }
-            _ => v.select_indices(&[]),
-        }
-    }
+    // Debut resolves straight into the hand-selection prompt.
+    assert!(v.has_pending_choice(), "hand-selection prompt expected");
+    assert_eq!(
+        v.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "expected hand SelectCard"
+    );
+    let idx = v
+        .state
+        .player1
+        .hand
+        .cards
+        .iter()
+        .position(|&c| c == liella)
+        .unwrap();
+    v.select_indices(&[idx]);
 
     // Center is locked (starter debuted there this turn)
     // Left is locked (Keke debuted there this turn)
-    // Only Right should be available
-    if v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectPosition") => {
-                // Only Right (2) should be available
-                v.select_indices(&[0]);
-            }
-            _ => v.select_indices(&[]),
-        }
-    }
+    // Only Right remains available → placed automatically, no prompt.
+    assert!(
+        !v.has_pending_choice(),
+        "single unlocked slot must not prompt"
+    );
 
     // Liella! should be at Right (the only unlocked slot)
     assert_eq!(
