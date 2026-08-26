@@ -4,6 +4,7 @@ import * as i18n from '../i18n/index.js';
 import { Tooltips } from '../ui_tooltips.js';
 import { DOMUtils } from '../utils/DOMUtils.js';
 import { DOM_IDS } from '../constants_dom.js';
+import { badgeTooltip } from '../utils/Attribution.js';
 
 function openCardDetailModal(card, zoneHint) {
     const m = window.__modals?.CardDetailModal;
@@ -1315,6 +1316,12 @@ export const CardRenderer = {
                 badge.title = `Heart transform → ${card.heart_transform}`;
             } else if (b.value !== null) {
                 badge.title = `${b.type.replace('bonus-', '').replace('set-', '')} ${b.isAdditive && b.value > 0 ? '+' : ''}${b.value}`;
+            }
+            // Source attribution tooltip: "from <card>: 「ability text」"
+            const attrTip = badgeTooltip(card.id, b.type);
+            if (attrTip) {
+                badge.title = badge.title ? `${badge.title}\n${attrTip}` : attrTip;
+                badge.classList.add('has-attribution');
             }
             container.appendChild(badge);
         });

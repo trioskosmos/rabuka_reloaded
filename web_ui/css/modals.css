@@ -493,3 +493,70 @@
     padding-top: 8px;
     border-top: 1px solid var(--border);
 }
+
+/* ── Card detail: bonus attribution ("where does this come from") ── */
+#card-detail-attribution {
+    margin-top: 8px;
+}
+.attr-section {
+    margin-bottom: 8px;
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+.attr-title {
+    font-size: 0.7rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent-cyan, #22d3ee);
+    margin-bottom: 4px;
+}
+.attr-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 0.72rem;
+}
+.attr-entry:last-child {
+    border-bottom: none;
+}
+.attr-source-thumb {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 36px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.06);
+}
+.attr-source-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.attr-entry-body {
+    min-width: 0;
+    flex: 1;
+}
+.attr-line1 {
+    line-height: 1.3;
+}
+.attr-line1 b {
+    color: #fff;
+}
+.attr-from {
+    color: var(--accent-cyan, #22d3ee);
+    opacity: 0.9;
+}
+.attr-line2 {
+    color: var(--text-dim, #9ca3af);
+    font-size: 0.66rem;
+    white-space: normal;
+    word-break: break-word;
+    max-height: 2.6em;
+    overflow: hidden;
+}

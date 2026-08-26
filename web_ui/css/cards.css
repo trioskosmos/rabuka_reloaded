@@ -632,6 +632,14 @@
     background: rgba(0, 0, 0, 0.85);
 }
 
+/* Badges with known source attribution get a subtle cyan glow so users
+   can hover/tap for the "where does this come from" tooltip. */
+.bonus-badge.has-attribution {
+    border-color: rgba(34, 211, 238, 0.75);
+    box-shadow: 0 0 4px rgba(34, 211, 238, 0.35);
+    cursor: help;
+}
+
 /* --- Need-heart modifier badges (on live zone cards) --- */
 .nh-mod-container {
     position: absolute;

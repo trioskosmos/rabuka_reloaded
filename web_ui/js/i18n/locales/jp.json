@@ -597,5 +597,19 @@
   "cost_skip_no_active_energy": "アクティブエネルギーなし",
   "cost_skip_compound_insufficient_energy": "エネルギー不足（複合コスト）",
 
+  "attr_active_effects": "効果の詳細",
+  "attr_recent_activity": "最近の効果",
+  "attr_none": "有効なボーナスなし",
+  "attr_from": "{card} から",
+  "attr_gained_from": "{card} から能力を獲得",
+  "attr_kind_blade": "ブレード",
+  "attr_kind_heart": "ハート",
+  "attr_kind_score": "スコア",
+  "attr_kind_score_set": "スコア（設定）",
+  "attr_kind_cost": "コスト",
+  "attr_kind_cost_set": "コスト（設定）",
+  "attr_kind_need_heart": "必要ハート",
+  "attr_kind_gained_ability": "獲得能力",
+
   "heuristics": []
 }

@@ -1065,3 +1065,19 @@
         font-size: 1.6rem;
     }
 }
+
+/* ── HeaderStats blade drill-down popover ── */
+.stat-item-clickable {
+    cursor: pointer;
+}
+.blade-breakdown-popover {
+    position: fixed;
+    z-index: 10050;
+    min-width: 220px;
+    max-width: 320px;
+    padding: 8px 10px;
+    background: var(--bg-dark, #16181d);
+    border: 1px solid var(--border, rgba(255,255,255,0.15));
+    border-radius: 8px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}

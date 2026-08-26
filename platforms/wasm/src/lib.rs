@@ -151,7 +151,12 @@ const HEAP_SIZE: usize = 512 * 1024;
 const HEAP_SIZE: usize = 2 * 1024 * 1024;
 
 /// Max simultaneously-tracked freed blocks. Each entry is (offset, len).
-const RECYCLE_CAP: usize = 4096;
+const RECYCLE_CAP: usize = 8192;
+/// Blocks smaller than this are not worth table slots.
+const MIN_TRACK: usize = 8;
+/// When a reused block exceeds the request by this much, the tail goes back
+/// to the table instead of being wasted inside the handed-out block.
+const SPLIT_MIN_TAIL: usize = 32;
 
 struct RecycleAlloc;
 
@@ -160,6 +165,7 @@ static mut CURSOR: usize = 0;
 static mut HIGH_WATER: usize = 0;
 static mut RECYCLE: [(u32, u32); RECYCLE_CAP] = [(0, 0); RECYCLE_CAP];
 static mut RECYCLE_LEN: usize = 0;
+static mut RECYCLE_BYTES: usize = 0;
 
 #[global_allocator]
 static GLOBAL_ALLOC: RecycleAlloc = RecycleAlloc;
@@ -167,24 +173,35 @@ static GLOBAL_ALLOC: RecycleAlloc = RecycleAlloc;
 unsafe impl GlobalAlloc for RecycleAlloc {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let align = layout.align().max(4);
-        // First-fit reuse: take the first tracked free block that satisfies
-        // size + alignment. Best-fit scanned the whole table per alloc inside
-        // interpreted code; first-fit exits early and keeps allocation nearly
-        // free. Fragmentation risk is acceptable — block sizes repeat heavily
-        // in this engine (per-screen buffers, choice lists).
+        // First-fit reuse. All table entries are canonicalized to 8-byte
+        // alignment on free, so any align <= 8 request matches purely on
+        // size; larger alignments still get the explicit modulo check.
         let mut hit: usize = usize::MAX;
         for i in 0..RECYCLE_LEN {
             let (off, len) = RECYCLE[i];
-            if len as usize >= layout.size() && (off as usize) % align == 0 {
+            if (len as usize) >= layout.size() && (off as usize) % align == 0 {
                 hit = i;
                 break;
             }
         }
-        let off = if hit != usize::MAX {
-            let (off, _) = RECYCLE[hit];
+        let off: usize = if hit != usize::MAX {
+            let (boff, blen) = RECYCLE[hit];
             RECYCLE[hit] = RECYCLE[RECYCLE_LEN - 1];
             RECYCLE_LEN -= 1;
-            off as usize
+            RECYCLE_BYTES -= blen as usize;
+            let boff = boff as usize;
+            let blen = blen as usize;
+            // Split oversized tails back into the table (kept 8-aligned).
+            if blen >= layout.size() + SPLIT_MIN_TAIL {
+                let tail = ((boff + layout.size() + 7) & !7) as u32;
+                let tail_len = boff + blen - tail as usize;
+                if tail_len >= MIN_TRACK && RECYCLE_LEN < RECYCLE_CAP {
+                    RECYCLE[RECYCLE_LEN] = (tail, tail_len as u32);
+                    RECYCLE_LEN += 1;
+                    RECYCLE_BYTES += tail_len;
+                }
+            }
+            boff
         } else {
             // fresh bump slice
             let start = (CURSOR + align - 1) & !(align - 1);
@@ -202,16 +219,31 @@ unsafe impl GlobalAlloc for RecycleAlloc {
         HEAP.as_mut_ptr().add(off)
     }
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        if layout.size() == 0 || RECYCLE_LEN >= RECYCLE_CAP {
-            return; // nothing to track, or table full -> leak (old behavior)
+        if layout.size() < MIN_TRACK || RECYCLE_LEN >= RECYCLE_CAP {
+            return; // nothing worth tracking, or table full -> leak
         }
         let base = HEAP.as_mut_ptr() as usize;
-        let off = ptr as usize - base;
+        let mut off = ptr as usize - base;
+        let mut size = layout.size();
         if off >= HEAP_SIZE {
             return;
         }
-        RECYCLE[RECYCLE_LEN] = (off as u32, layout.size() as u32);
+        // Canonicalize to 8-byte alignment: shift the start forward within
+        // the block so EVERY entry can serve align-4 and align-8 requests.
+        // Without this, 4-aligned stragglers accumulated permanently and the
+        // bump cursor ratcheted upward until the heap froze mid-match.
+        let mis = off & 7;
+        if mis != 0 {
+            let adv = 8 - mis;
+            if size <= adv + MIN_TRACK {
+                return;
+            }
+            off += adv;
+            size -= adv;
+        }
+        RECYCLE[RECYCLE_LEN] = (off as u32, size as u32);
         RECYCLE_LEN += 1;
+        RECYCLE_BYTES += size;
     }
 }
 
@@ -221,6 +253,21 @@ unsafe impl GlobalAlloc for RecycleAlloc {
 #[no_mangle]
 pub extern "C" fn rabuka_wasm_heap_highwater() -> u32 {
     unsafe { HIGH_WATER as u32 }
+}
+
+/// Allocator internals for the console status bar: cursor (fresh-bump front),
+/// recyclable bytes currently sitting in the table, and table entry count.
+#[no_mangle]
+pub extern "C" fn rabuka_wasm_heap_cursor() -> u32 {
+    unsafe { CURSOR as u32 }
+}
+#[no_mangle]
+pub extern "C" fn rabuka_wasm_heap_recyclable() -> u32 {
+    unsafe { RECYCLE_BYTES as u32 }
+}
+#[no_mangle]
+pub extern "C" fn rabuka_wasm_heap_entries() -> u32 {
+    unsafe { RECYCLE_LEN as u32 }
 }
 
 /// Zero-arg diagnostic for `wasm-interp --run-all-exports` (which only invokes

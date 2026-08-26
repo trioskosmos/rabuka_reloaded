@@ -5,6 +5,7 @@
 import { State } from '../state.js';
 import * as i18n from '../i18n/index.js';
 import { PerformanceRenderer } from './PerformanceRenderer.js';
+import { sourceName } from '../utils/Attribution.js';
 
 export const HeaderStats = {
     cache: {
@@ -96,6 +97,77 @@ export const HeaderStats = {
             selected += cardData.score || 0;
         });
         return (player.current_score || 0) + selected;
+    },
+
+    // ── Blade drill-down ────────────────────────────────────────────
+    // Clicking a blades summary shows a popover breaking the total down by
+    // granting card (from engine effect_attribution).
+    toggleBladeBreakdown: (player, anchorEl) => {
+        const existing = document.getElementById('blade-breakdown-popover');
+        if (existing) { existing.remove(); return; }
+
+        const members = [player.stage?.left_side, player.stage?.center, player.stage?.right_side]
+            .filter(m => m && typeof m.id === 'number' && m.id >= 0);
+        const bySource = new Map();
+        const attr = State.data?.effect_attribution || {};
+        members.forEach(m => {
+            (attr[m.id] || []).forEach(e => {
+                if (e.kind !== 'blade' || !e.amount) return;
+                if (!bySource.has(e.source_card_id)) {
+                    bySource.set(e.source_card_id, { name: sourceName(e.source_card_id), text: e.ability_text, total: 0, targets: [] });
+                }
+                const rec = bySource.get(e.source_card_id);
+                rec.total += e.amount;
+                rec.targets.push(m.name || '?');
+            });
+        });
+
+        const pop = document.createElement('div');
+        pop.id = 'blade-breakdown-popover';
+        pop.className = 'blade-breakdown-popover';
+        const title = document.createElement('div');
+        title.className = 'attr-title';
+        title.textContent = i18n.t('attr_active_effects');
+        pop.appendChild(title);
+        if (!bySource.size) {
+            const empty = document.createElement('div');
+            empty.style.cssText = 'font-size:0.72rem;opacity:0.6;';
+            empty.textContent = i18n.t('attr_none');
+            pop.appendChild(empty);
+        } else {
+            bySource.forEach(rec => {
+                const row = document.createElement('div');
+                row.className = 'attr-entry';
+                const body = document.createElement('div');
+                body.className = 'attr-entry-body';
+                const line1 = document.createElement('div');
+                line1.className = 'attr-line1';
+                line1.innerHTML = `<b>${rec.total > 0 ? '+' : ''}${rec.total}</b> <span class="attr-from">${i18n.t('attr_from', { card: rec.name })}</span>`;
+                body.appendChild(line1);
+                if (rec.text) {
+                    const line2 = document.createElement('div');
+                    line2.className = 'attr-line2';
+                    line2.textContent = rec.text;
+                    body.appendChild(line2);
+                }
+                row.appendChild(body);
+                pop.appendChild(row);
+            });
+        }
+        document.body.appendChild(pop);
+
+        const rect = anchorEl.getBoundingClientRect();
+        pop.style.left = Math.min(rect.left, window.innerWidth - pop.offsetWidth - 8) + 'px';
+        pop.style.top = (rect.bottom + 4) + 'px';
+
+        setTimeout(() => {
+            const close = (ev) => {
+                if (pop.contains(ev.target)) return;
+                pop.remove();
+                document.removeEventListener('click', close, true);
+            };
+            document.addEventListener('click', close, true);
+        }, 0);
     },
 
     render: (state, _p0, _p1, getPhaseKey) => {
@@ -250,10 +322,11 @@ export const HeaderStats = {
         }
         if (HeaderStats.cache.player1Blades) {
             const b = getBladesCount(pPerspective);
-            HeaderStats.cache.player1Blades.innerHTML = `<span class="stat-item" title="Perspective Blades">
+            HeaderStats.cache.player1Blades.innerHTML = `<span class="stat-item stat-item-clickable" title="${i18n.t('attr_active_effects')}">
                 <img src="img/texticon/icon_blade.png" class="heart-mini-icon">
                 <span class="stat-value">${b}</span>
             </span>`;
+            HeaderStats.cache.player1Blades.onclick = (ev) => HeaderStats.toggleBladeBreakdown(pPerspective, HeaderStats.cache.player1Blades);
         }
         if (HeaderStats.cache.player1NeedHearts) {
             const nh = getNeedHearts(pPerspective, true, false);
@@ -266,10 +339,11 @@ export const HeaderStats = {
         }
         if (HeaderStats.cache.player2Blades) {
             const b = getBladesCount(pOpponent);
-            HeaderStats.cache.player2Blades.innerHTML = `<span class="stat-item" title="Opponent Blades">
+            HeaderStats.cache.player2Blades.innerHTML = `<span class="stat-item stat-item-clickable" title="${i18n.t('attr_active_effects')}">
                 <img src="img/texticon/icon_blade.png" class="heart-mini-icon">
                 <span class="stat-value">${b}</span>
             </span>`;
+            HeaderStats.cache.player2Blades.onclick = (ev) => HeaderStats.toggleBladeBreakdown(pOpponent, HeaderStats.cache.player2Blades);
         }
         if (HeaderStats.cache.player2NeedHearts) {
             const nh = getNeedHearts(pOpponent, false, true);

@@ -1,6 +1,7 @@
 import { State } from '../state.js';
 import { TextEnricher } from '../utils/TextEnricher.js';
 import { ModalManager } from '../utils/ModalManager.js';
+import { renderActiveEffects, renderRecentApplications } from '../utils/Attribution.js';
 import { resolveCardImagePath } from '../components/CardRenderer.js';
 import { ActionButtons } from '../components/ActionButtons.js';
 import { DOM_IDS } from '../constants_dom.js';
@@ -136,6 +137,25 @@ function render() {
             const rawText = TextEnricher.getEffectiveRawText(cardObj) || '';
             if (rawText) html += `<div class="card-detail-ability">${TextEnricher.enrichAbilityText(rawText)}</div>`;
             textEl.innerHTML = html;
+        }
+    }
+
+    // Active effects / bonus attribution — shows WHERE each bonus on this
+    // card comes from (source card + ability text). Same modal serves
+    // desktop and mobile.
+    const actionsElRef = document.getElementById('card-detail-actions');
+    let attrHost = document.getElementById('card-detail-attribution');
+    if (!attrHost && actionsElRef?.parentNode) {
+        attrHost = document.createElement('div');
+        attrHost.id = 'card-detail-attribution';
+        actionsElRef.parentNode.insertBefore(attrHost, actionsElRef);
+    }
+    if (attrHost) {
+        attrHost.innerHTML = '';
+        if (!isHidden && typeof card.id === 'number' && card.id >= 0) {
+            attrHost.appendChild(renderActiveEffects(card.id));
+            const recent = renderRecentApplications(card.id);
+            if (recent) attrHost.appendChild(recent);
         }
     }
 

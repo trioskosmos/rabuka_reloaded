@@ -7648,6 +7648,13 @@ def _try_each_time(text):
             rest = text[m.end() :].strip()
             sub = parse_effect(rest)
             if sub:
+                # The trigger clause's positional qualifier (「センターエリアに
+                # いる…」) describes WHERE THE RESOLVER SITS, not where the
+                # effect moves anything. It belongs in `condition` only
+                # (_finish_each_time merges it there); a `position` left on the
+                # effect body would be read as a source/destination by
+                # position_change execution.
+                sub.pop("position", None)
                 return _finish_each_time(text, m.group(1).strip(), sub)
     if EACH_TIME_MARKER not in text:
         return None
@@ -10870,6 +10877,19 @@ def _walk_propagate_position(d, d_ctx, d_text):
     # Also don't set position when multiple positions are detected (comma-separated):
     # "left_side,right_side" belongs in activation_position, not position.
     # The position field is a cross-comparison filter expecting a single value.
+    #
+    # If the merged condition ALREADY carries the positional qualifier
+    # (e.g. each_time resolution watchers: 「センターエリアにいる…能力が
+    # 解決したとき、そのメンバーをポジションチェンジする」), the qualifier
+    # describes the TRIGGER context — duplicating it onto the action body
+    # would make position_change read it as a source/destination.
+    cond = d.get("condition")
+    if (
+        d.get("trigger_type") == "each_time"
+        and isinstance(cond, dict)
+        and cond.get("position")
+    ):
+        return
     if (
         "position" not in d
         and "source_position" not in d

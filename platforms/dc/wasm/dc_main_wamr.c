@@ -38,17 +38,58 @@ static int cur_line = 0;
 static int dirty = 0;
 static int back_idx = 1;
 
+/* ---- on-screen vitals (reserved bottom row) ----
+ * The engine scrolls through rows 0..ROWS-2; row ROWS-1 always shows
+ * fps / avg frame ms / heap high-water so performance and memory can be
+ * judged live without external tooling. */
+static wasm_module_inst_t g_inst = NULL;
+static wasm_exec_env_t g_exec = NULL;
+static wasm_function_inst_t hwm_fn = NULL;
+static wasm_function_inst_t cur_fn = NULL;
+static wasm_function_inst_t rc_bytes_fn = NULL;
+static wasm_function_inst_t rc_n_fn = NULL;
+static uint64_t last_frame_ms = 0;
+static uint32_t frame_avg_ms = 0;
+static uint32_t fps_x10 = 0;
+static uint32_t frame_count = 0;
+static uint64_t fps_window_start = 0;
+static uint32_t heap_hwm_kb = 0;
+static uint32_t heap_cur_kb = 0;
+static uint32_t heap_rc_kb = 0;
+static uint32_t heap_rc_n = 0;
+
+static uint32_t call0(wasm_function_inst_t fn) {
+    if (!fn || !g_inst || !g_exec)
+        return 0;
+    uint32_t args[1] = { 0 };
+    if (!wasm_runtime_call_wasm(g_exec, fn, 0, args))
+        return 0;
+    return args[0];
+}
+
+static void poll_heap_stats(void) {
+    heap_hwm_kb = call0(hwm_fn) / 1024;
+    heap_cur_kb = call0(cur_fn) / 1024;
+    heap_rc_kb = call0(rc_bytes_fn) / 1024;
+    heap_rc_n = call0(rc_n_fn);
+}
+
 /* ---- text grid ---- */
 
 static void paint(uint16_t *dst) {
     for (int i = 0; i < SCREEN_W * SCREEN_H; i++)
         dst[i] = 0x0000;
-    for (int i = 0; i < ROWS; i++) {
+    for (int i = 0; i < ROWS - 1; i++) {
         if (row_len[i] == 0)
             continue;
         bfont_draw_str(dst + i * FONT_H * SCREEN_W, SCREEN_W, true,
                        (const char *)lines[i]);
     }
+    char sb[56];
+    snprintf(sb, sizeof(sb), "%u.%ufps %ums h:%uK c:%uK rc:%uK/%u", fps_x10 / 10,
+             fps_x10 % 10, frame_avg_ms, heap_hwm_kb, heap_cur_kb, heap_rc_kb,
+             heap_rc_n);
+    bfont_draw_str(dst + (ROWS - 1) * FONT_H * SCREEN_W, SCREEN_W, true, sb);
 }
 
 static void frame(void) {
@@ -68,9 +109,9 @@ static void scroll_up(void) {
 }
 
 static void ensure_line(void) {
-    if (cur_line >= ROWS) {
+    if (cur_line >= ROWS - 1) {
         scroll_up();
-        cur_line = ROWS - 1;
+        cur_line = ROWS - 2;
     }
 }
 
@@ -238,6 +279,21 @@ static int32_t host_poll_buttons(wasm_exec_env_t env) {
 
 static void host_wait_vblank(wasm_exec_env_t env) {
     (void)env;
+    uint64_t now = timer_ms_gettime64();
+    if (last_frame_ms != 0) {
+        uint32_t dt = (uint32_t)(now - last_frame_ms);
+        frame_avg_ms = frame_avg_ms ? (frame_avg_ms * 7 + dt) / 8 : dt;
+    }
+    last_frame_ms = now;
+    frame_count++;
+    if (now >= fps_window_start + 1000) {
+        fps_x10 =
+            (uint32_t)(frame_count * 10000 / (now - fps_window_start + 1));
+        frame_count = 0;
+        fps_window_start = now;
+        poll_heap_stats();
+        dirty = 1; /* repaint so the vitals row stays current */
+    }
     frame();
     thd_sleep(8);
 }
@@ -318,6 +374,16 @@ int main(void) {
         frame();
         for (;;) ;
     }
+
+    /* vitals plumbing for the status row */
+    g_inst = inst;
+    g_exec = env;
+    hwm_fn = wasm_runtime_lookup_function(inst, "rabuka_wasm_heap_highwater");
+    cur_fn = wasm_runtime_lookup_function(inst, "rabuka_wasm_heap_cursor");
+    rc_bytes_fn =
+        wasm_runtime_lookup_function(inst, "rabuka_wasm_heap_recyclable");
+    rc_n_fn = wasm_runtime_lookup_function(inst, "rabuka_wasm_heap_entries");
+    fps_window_start = timer_ms_gettime64();
 
     uint32 args[1] = { 0x5EEDu };
     if (!wasm_runtime_call_wasm(env, run, 1, args)) {

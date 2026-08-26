@@ -1,9 +1,0 @@
-﻿C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\game\deck_builder.rs
-C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\game\deck_parser.rs
-C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\game\display.rs
-C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\game\game_setup.rs
-C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\game\match_runner.rs
-C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\game\menu.rs
-C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\game\mod.rs
-C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\game\platform_ui.rs
-C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine\src\game\web_server.rs

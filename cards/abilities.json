@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-26T21:20:25.376071",
+  "generated_at": "2026-08-26T23:11:42.979050",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "8c1df4a4",
+  "engine_commit": "fdd54187",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -18784,7 +18784,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のステージに『蓮ノ空』のメンバーが登場するたび、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "text": "{{center.png|センター}}自分のステージに『蓮ノ空』のメンバーが登場するたび、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "blade",
@@ -33064,8 +33064,7 @@
           "card_type": "member_card",
           "position": "center",
           "type": "group_condition"
-        },
-        "position": "center"
+        }
       }
     },
     {

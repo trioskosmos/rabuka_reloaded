@@ -470,5 +470,19 @@
   "cost_skip_no_active_energy": "no active energy",
   "cost_skip_compound_insufficient_energy": "insufficient energy (compound)",
 
+  "attr_active_effects": "Active Effects",
+  "attr_recent_activity": "Recent Ability Activity",
+  "attr_none": "No active bonuses",
+  "attr_from": "from {card}",
+  "attr_gained_from": "Gained ability from {card}",
+  "attr_kind_blade": "blade",
+  "attr_kind_heart": "hearts",
+  "attr_kind_score": "score",
+  "attr_kind_score_set": "score (set)",
+  "attr_kind_cost": "cost",
+  "attr_kind_cost_set": "cost (set)",
+  "attr_kind_need_heart": "required hearts",
+  "attr_kind_gained_ability": "gained ability",
+
   "heuristics": []
 }
