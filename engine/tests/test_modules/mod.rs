@@ -562,3 +562,4 @@ pub mod hs_cl1_003_edge_test;
 pub mod bp4_014_rin_edge_test;
 pub mod sp_bp2_015_wien_yell_edge_test;
 pub mod sd2_002_edge_test;
+pub mod bp7_012_kanon_edge_test;
