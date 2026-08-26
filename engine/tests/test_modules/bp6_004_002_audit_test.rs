@@ -256,30 +256,30 @@ fn riko_bp6_auto_e2e_heart_failure_triggers() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(mw);
 
-    // Handle any live-start triggers (e.g. P2 pass)
+    // Drive the FULL round: P1 fails MIRACLE WAVE's 12-heart requirement →
+    // lives go to waitroom → Riko's auto fires and offers the optional
+    // deck-top/bottom placement → ACCEPT it ([0]) so she relocates the live.
+    for _ in 0..8 {
+        while game.has_pending_choice() {
+            game.select_indices(&[0]);
+        }
+        game.pass();
+    }
     while game.has_pending_choice() {
-        game.select_indices(&[]);
+        game.select_indices(&[0]);
     }
 
-    // Advance: FirstAttackerPerformance (Riko BP6 auto ability fires here)
-    // P1's heart check fails → cards move to waitroom → second check fires → Riko triggers
-    game.pass();
-
-    // BUG?: Riko BP6's auto never offers a prompt here. Debug trace shows her
-    // move_cards condition evaluates FAILED on this path:
-    //   [PRECEDING_MOVED] card_type="live_card" actual=0 op>=1 -> false
-    // i.e. the heart-failure live-card movement is not visible to the
-    // preceding-moved condition, so the dispatch below could never fire and
-    // the trailing waitroom assert passes vacuously.
-    assert!(
-        !game.has_pending_choice(),
-        "BUG?: Riko BP6 auto must not prompt when its preceding-moved condition fails"
-    );
-
-    // Verify the live card left the waitroom
+    // Riko's effect moved the failed live onto her deck (top); later natural
+    // draws in the loop may pull it into hand — either way it must NOT be
+    // back in the waitroom.
     assert!(
         !game.state.player1.waitroom.cards.contains(&mw),
-        "MIRACLE WAVE should no longer be in waitroom after Riko BP6 trigger"
+        "failed live must leave the waitroom via Riko BP6 auto"
+    );
+    assert!(
+        game.state.player1.main_deck.cards.contains(&mw)
+            || game.state.player1.hand.cards.contains(&mw),
+        "relocated live ends up in deck or (after draws) hand"
     );
 }
 
