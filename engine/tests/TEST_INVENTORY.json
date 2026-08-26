@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T18:39:15.069998+00:00",
+  "generated_at": "2026-08-26T18:41:37.220800+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 533,
-  "n_tests": 3096,
+  "n_files": 534,
+  "n_tests": 3098,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -2466,6 +2466,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/hs_bp1_003_distinct_test.rs",
         "engine/tests/test_modules/kinako_hs_test.rs",
         "engine/tests/test_modules/pl_hs_bp1_003_test.rs",
         "engine/tests/test_modules/victory_road_test.rs"
@@ -2479,6 +2480,8 @@
         "baad_cage_cost_limit_one_member_no_score",
         "baad_cage_cost_limit_two_hasunosora_members_grants_score",
         "baad_cage_three_members_score_still_one",
+        "distinct_names_gain_when_all_different",
+        "distinct_names_no_gain_when_same_name",
         "duplicate_names_fails_distinct_condition",
         "empty_area_fails_all_areas_condition",
         "kinako_hs_q81_multiname_has_individual_names_in_card_db",
@@ -2498,10 +2501,9 @@
         "test_each_time_drains_between_live_starts_no_mix",
         "test_live_success_each_time_drains_after_success",
         "test_one_live_start_each_time_drains_no_choice",
-        "test_three_live_starts_each_order_possible",
-        "two_members_both_get_all_heart"
+        "test_three_live_starts_each_order_possible"
       ],
-      "covering_test_count": 29,
+      "covering_test_count": 31,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -2531,6 +2533,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/hs_bp1_003_distinct_test.rs",
         "engine/tests/test_modules/kinako_hs_test.rs",
         "engine/tests/test_modules/pl_hs_bp1_003_test.rs",
         "engine/tests/test_modules/victory_road_test.rs"
@@ -2544,6 +2547,8 @@
         "baad_cage_cost_limit_one_member_no_score",
         "baad_cage_cost_limit_two_hasunosora_members_grants_score",
         "baad_cage_three_members_score_still_one",
+        "distinct_names_gain_when_all_different",
+        "distinct_names_no_gain_when_same_name",
         "duplicate_names_fails_distinct_condition",
         "empty_area_fails_all_areas_condition",
         "kinako_hs_q81_multiname_has_individual_names_in_card_db",
@@ -2563,10 +2568,9 @@
         "test_each_time_drains_between_live_starts_no_mix",
         "test_live_success_each_time_drains_after_success",
         "test_one_live_start_each_time_drains_no_choice",
-        "test_three_live_starts_each_order_possible",
-        "two_members_both_get_all_heart"
+        "test_three_live_starts_each_order_possible"
       ],
-      "covering_test_count": 29,
+      "covering_test_count": 31,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -2596,10 +2600,13 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/hs_bp1_003_distinct_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/q38_live_card_zone_test.rs"
       ],
       "covering_tests": [
+        "distinct_names_gain_when_all_different",
+        "distinct_names_no_gain_when_same_name",
         "eutopia_q38_score_condition_checks_live_card_count",
         "eutopia_q38_three_live_cards_score_plus_2",
         "issue10_dream_with_you_high_blade_plus_1_score",
@@ -2627,11 +2634,9 @@
         "issue6_natsumi_self_and_other_blade",
         "issue6_natsumi_self_only_blade",
         "issue7_hajimari_no_success_live_no_effect",
-        "issue7_hajimari_set_modifier_replaces_not_adds",
-        "issue7_hajimari_set_required_hearts",
-        "issue9_izumi_debut_draw_2_discard_1"
+        "issue7_hajimari_set_modifier_replaces_not_adds"
       ],
-      "covering_test_count": 34,
+      "covering_test_count": 36,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -2661,10 +2666,13 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/hs_bp1_003_distinct_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/q38_live_card_zone_test.rs"
       ],
       "covering_tests": [
+        "distinct_names_gain_when_all_different",
+        "distinct_names_no_gain_when_same_name",
         "eutopia_q38_score_condition_checks_live_card_count",
         "eutopia_q38_three_live_cards_score_plus_2",
         "issue10_dream_with_you_high_blade_plus_1_score",
@@ -2692,11 +2700,9 @@
         "issue6_natsumi_self_and_other_blade",
         "issue6_natsumi_self_only_blade",
         "issue7_hajimari_no_success_live_no_effect",
-        "issue7_hajimari_set_modifier_replaces_not_adds",
-        "issue7_hajimari_set_required_hearts",
-        "issue9_izumi_debut_draw_2_discard_1"
+        "issue7_hajimari_set_modifier_replaces_not_adds"
       ],
-      "covering_test_count": 34,
+      "covering_test_count": 36,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -15221,6 +15227,7 @@
       "covering_files": [
         "engine/tests/test_modules/bloom_hs_test.rs",
         "engine/tests/test_modules/hard_abilities_tier_test.rs",
+        "engine/tests/test_modules/hs_bp1_003_distinct_test.rs",
         "engine/tests/test_modules/pl_hs_bp1_003_test.rs",
         "engine/tests/test_modules/q127_heart_set_plus_global_test.rs",
         "engine/tests/test_modules/sayaka_loop_test.rs",
@@ -15245,6 +15252,8 @@
         "ddd_option_a_retrieves_any_member_from_waitroom",
         "ddd_option_b_requires_two_cards_in_live_zone",
         "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
+        "distinct_names_gain_when_all_different",
+        "distinct_names_no_gain_when_same_name",
         "duplicate_names_fails_distinct_condition",
         "empty_area_fails_all_areas_condition",
         "kanan_cannot_mill_itself",
@@ -15255,11 +15264,9 @@
         "kinako_non_liella_movement_gives_no_discount",
         "kokoro_below_threshold_sets_cost_without_heart",
         "kokoro_boundary_eleven_exactly_reaches_ten",
-        "kokoro_decline_leaves_everything_untouched",
-        "kokoro_high_member_sets_cost_and_grants_heart05",
-        "kokoro_no_dollchestra_in_hand_no_gate"
+        "kokoro_decline_leaves_everything_untouched"
       ],
-      "covering_test_count": 63,
+      "covering_test_count": 65,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -37916,6 +37923,7 @@
       "covering_files": [
         "engine/tests/test_modules/bloom_hs_test.rs",
         "engine/tests/test_modules/hard_abilities_tier_test.rs",
+        "engine/tests/test_modules/hs_bp1_003_distinct_test.rs",
         "engine/tests/test_modules/pl_hs_bp1_003_test.rs",
         "engine/tests/test_modules/q127_heart_set_plus_global_test.rs",
         "engine/tests/test_modules/sayaka_loop_test.rs",
@@ -37940,6 +37948,8 @@
         "ddd_option_a_retrieves_any_member_from_waitroom",
         "ddd_option_b_requires_two_cards_in_live_zone",
         "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
+        "distinct_names_gain_when_all_different",
+        "distinct_names_no_gain_when_same_name",
         "duplicate_names_fails_distinct_condition",
         "empty_area_fails_all_areas_condition",
         "kanan_cannot_mill_itself",
@@ -37950,11 +37960,9 @@
         "kinako_non_liella_movement_gives_no_discount",
         "kokoro_below_threshold_sets_cost_without_heart",
         "kokoro_boundary_eleven_exactly_reaches_ten",
-        "kokoro_decline_leaves_everything_untouched",
-        "kokoro_high_member_sets_cost_and_grants_heart05",
-        "kokoro_no_dollchestra_in_hand_no_gate"
+        "kokoro_decline_leaves_everything_untouched"
       ],
-      "covering_test_count": 63,
+      "covering_test_count": 65,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

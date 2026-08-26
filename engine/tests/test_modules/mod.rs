@@ -584,3 +584,4 @@ pub mod sp_bp2_004_extra_test9;
 pub mod sp_bp2_004_extra_test10;
 pub mod sp_bp2_004_extra_test11;
 pub mod bp4_014_ability_filter_edge_test;
+pub mod hs_bp1_003_distinct_test;
