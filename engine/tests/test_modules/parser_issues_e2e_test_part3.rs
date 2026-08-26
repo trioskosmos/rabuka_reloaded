@@ -205,9 +205,6 @@ fn issue9_karin_select_from_discard_place_on_deck() {
             game.select_indices(&[]);
         } else {
             game.select_indices(&[0]);
-            if game.has_pending_choice() {
-                game.select_indices(&[0]);
-            }
         }
     }
 

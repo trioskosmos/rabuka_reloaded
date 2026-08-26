@@ -19,10 +19,9 @@
 use crate::helpers::*;
 
 fn advance_to_live_start(game: &mut TestGame) {
-    for _ in 0..20 {
-        if game.has_pending_choice() {
-            break;
-        }
+    let mut passes = 0;
+    while !game.has_pending_choice() && passes < 20 {
+        passes += 1;
         game.pass();
     }
 }

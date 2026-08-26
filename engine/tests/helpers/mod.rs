@@ -149,7 +149,9 @@ pub fn scan_autos_both(game: &mut TestGame) {
     game.state.trigger_auto_abilities_for_player(&p2);
     game.state.process_pending_auto_abilities(&p2);
     if game.has_pending_choice() {
-        game.select_indices(&[0]);
+        // Variant-dispatched answer: never sends a card index down the
+        // option/position channel (the "Unknown source position" bug class).
+        answer_choice(game, 0);
     }
     game.drain_auto_ability_choices();
 }

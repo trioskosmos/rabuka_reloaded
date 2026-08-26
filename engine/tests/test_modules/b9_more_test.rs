@@ -30,9 +30,6 @@ fn cutie_panther_live_start_reduce_hearts() {
         .add_orientation_modifier(opp, "wait");
     for _ in 0..5 {
         game.pass();
-        if game.has_pending_choice() {
-            eprintln!("[PROBE] pending after pass {}", game.state.current_phase);
-        }
         while game.has_pending_choice() {
             game.select_indices(&[]);
         }

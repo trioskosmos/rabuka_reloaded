@@ -1,11 +1,5 @@
 {
   "engine/tests/helpers/mod.rs": 2,
-  "engine/tests/test_modules/b9_more_test.rs": 1,
   "engine/tests/test_modules/cheer_pipeline_test.rs": 1,
-  "engine/tests/test_modules/edelnote_test.rs": 1,
-  "engine/tests/test_modules/parser_issues_e2e_test_part3.rs": 1,
-  "engine/tests/test_modules/performance_phase_rules_test.rs": 1,
-  "engine/tests/test_modules/performance_snapshot_audit_test.rs": 3,
-  "engine/tests/test_modules/special_blade_heart_rules_test.rs": 1,
-  "engine/tests/test_modules/umi_bp3_test.rs": 1
+  "engine/tests/test_modules/special_blade_heart_rules_test.rs": 1
 }

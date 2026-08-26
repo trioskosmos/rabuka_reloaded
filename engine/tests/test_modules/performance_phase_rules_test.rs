@@ -40,18 +40,15 @@ fn run_full_turn(game: &mut TestGame) {
         if game.state.current_phase == Phase::Active && !game.has_pending_choice() {
             break;
         }
-        if game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
             // Only expected prompt in these flows: the LookAndSelect arrange
             // (SelectCard from looked_at); empty answer is a legal skip.
-            assert_eq!(
-                game.pending_choice_type().as_deref(),
-                Some("SelectCard"),
-                "unexpected prompt during performance turn (expected looked_at SelectCard), got {:?}",
-                game.pending_choice_type()
-            );
-            game.select_indices(&[]);
-        } else {
-            game.pass();
+            Some("SelectCard") => game.select_indices(&[]),
+            Some(other) => panic!(
+                "unexpected prompt during performance turn (expected looked_at SelectCard or none), got {:?}",
+                other
+            ),
+            None => game.pass(),
         }
     }
 }

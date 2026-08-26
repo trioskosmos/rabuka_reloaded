@@ -35,10 +35,9 @@ fn umi_bp3_live_start_select_heart_and_scale_with_success() {
 
     // Advance until live start triggers the pending choice.
     // Stop passing as soon as pending_choice is set (next pass would auto-resolve it).
-    for _ in 0..20 {
-        if game.has_pending_choice() {
-            break;
-        }
+    let mut passes = 0;
+    while !game.has_pending_choice() && passes < 20 {
+        passes += 1;
         game.pass();
     }
 

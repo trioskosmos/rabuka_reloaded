@@ -38,16 +38,25 @@ fn run_to_end(game: &mut TestGame, live_cards: &[i16]) {
     game.pass(); // LiveCardSetFirstAttacker -> LiveCardSetSecondAttacker
     game.pass(); // LiveCardSetSecondAttacker -> FirstAttackerPerformance
 
-    // Loop until we return to Active phase, resolving any choices created by LiveStart/yell/LiveSuccess
+    // Loop until we return to Active phase, resolving any choices created by LiveStart/yell/LiveSuccess.
+    // The ONLY legal prompt in these abilityless-card flows is START:DASH!!'s
+    // optional looked_at arrange (SelectCard, empty = legal skip); anything
+    // else must fail loudly instead of being blindly skipped.
     for _ in 0..20 {
         if game.state.current_phase == rabuka_engine::game_state::Phase::Active
             && !game.has_pending_choice()
         {
             break;
         }
-        if game.has_pending_choice() {
-            game.select_indices(&[]);
-        } else {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectCard") => game.select_indices(&[]),
+            Some(other) => panic!(
+                "unexpected prompt during run_to_end (expected SelectCard arrange or none), got {:?}",
+                other
+            ),
+            None => {}
+        }
+        if !game.has_pending_choice() {
             game.pass();
         }
     }
@@ -514,16 +523,23 @@ fn audit_both_players_fail_no_winner() {
     game.state.player2.hand.cards.push(live2);
     game.set_live_card(live2);
 
-    // Run to Active
+    // Run to Active — same strict prompt contract as run_to_end: only the
+    // START:DASH!! looked_at arrange may appear.
     for _ in 0..20 {
         if game.state.current_phase == rabuka_engine::game_state::Phase::Active
             && !game.has_pending_choice()
         {
             break;
         }
-        if game.has_pending_choice() {
-            game.select_indices(&[]);
-        } else {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectCard") => game.select_indices(&[]),
+            Some(other) => panic!(
+                "unexpected prompt running to Active (expected SelectCard arrange or none), got {:?}",
+                other
+            ),
+            None => {}
+        }
+        if !game.has_pending_choice() {
             game.pass();
         }
     }
@@ -715,16 +731,23 @@ fn audit_p1_passes_p2_fails_p1_wins() {
     game.state.player2.hand.cards.push(live2);
     game.set_live_card(live2);
 
-    // Run to Active
+    // Run to Active — same strict prompt contract as run_to_end: only the
+    // START:DASH!! looked_at arrange may appear.
     for _ in 0..20 {
         if game.state.current_phase == rabuka_engine::game_state::Phase::Active
             && !game.has_pending_choice()
         {
             break;
         }
-        if game.has_pending_choice() {
-            game.select_indices(&[]);
-        } else {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectCard") => game.select_indices(&[]),
+            Some(other) => panic!(
+                "unexpected prompt running to Active (expected SelectCard arrange or none), got {:?}",
+                other
+            ),
+            None => {}
+        }
+        if !game.has_pending_choice() {
             game.pass();
         }
     }
