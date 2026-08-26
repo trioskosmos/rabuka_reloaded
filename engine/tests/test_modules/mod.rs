@@ -559,3 +559,4 @@ pub mod jidou_combo_edge_test;
 pub mod bp5_010_shiori_clamp_test;
 pub mod bp5_003_shizuku_edge_test;
 pub mod hs_cl1_003_edge_test;
+pub mod bp4_014_rin_edge_test;
