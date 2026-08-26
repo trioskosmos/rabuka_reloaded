@@ -43,7 +43,7 @@ pub struct Player {
 
     pub exclusion_zone: ExclusionZone,
 
-    /// G8: while a 恋になりたいAQUARIUM-style live card (custom
+    /// G8: while a 諱九↓縺ｪ繧翫◆縺БQUARIUM-style live card (custom
     /// yell_source_modifier) is in this player's live/success zone, their yell
     /// reveals from the deck BOTTOM instead of the top. Refreshed each
     /// recalculate_constants by GameState::refresh_yell_sources.
@@ -51,11 +51,11 @@ pub struct Player {
 
     // Rule 9.6.2.1.2.1: Track card IDs that moved from non-stage to stage this turn.
     // When checking if an area can be specified for playing a new member, resolve the
-    // card currently in that area — if its ID is in this set, the area is locked.
+    // card currently in that area 窶・if its ID is in this set, the area is locked.
     // This is member-based (not area-based) because:
     //   - R4 (11.10) may position-change the card to a different area
     //   - R3 (4.1.4 exclusion) confirms member-area movement preserves card identity
-    //   - R1 checks "メンバーカードのあるエリア" = current location of the card
+    //   - R1 checks "繝｡繝ｳ繝舌・繧ｫ繝ｼ繝峨・縺ゅｋ繧ｨ繝ｪ繧｢" = current location of the card
     pub deployed_this_turn: SmallVec<[i16; 4]>,
 
     pub stage_hearts: Option<crate::card::BaseHeart>,
@@ -136,7 +136,7 @@ impl Player {
     // Helper method to remove a card from hand by index
 
     /// Rule 9.6.2.1.2.1: Check if the area currently contains a member deployed this turn.
-    /// The restriction follows the member (R4), not the area — if the member position-changes,
+    /// The restriction follows the member (R4), not the area 窶・if the member position-changes,
     /// the destination area becomes locked, not the vacated one.
     pub fn is_area_locked(&self, area: crate::zones::MemberArea) -> bool {
         let idx = match area {
@@ -149,7 +149,7 @@ impl Player {
     }
 
     /// Rule 10.5.3-10.5.4: Remove a member from stage and recycle its under-cards.
-    /// Member cards under → waitroom. Energy cards under → energy deck.
+    /// Member cards under 竊・waitroom. Energy cards under 竊・energy deck.
     /// Returns the removed member card ID.
     pub fn remove_member_from_stage_with_recycling(
         &mut self,
@@ -184,19 +184,19 @@ impl Player {
     // Rule 9.6.2.1: Specify card and target area
     // Rule 9.6.2.3: Determine and pay cost
     //   Cost = card.cost - cost_reduction + cost_increase
-    //   Cost reduction: 常時 abilities (modify_cost/subtract/hand)
-    //   Cost increase: 常時 abilities (success_live_zone → +cost)
-    // Rule 9.6.2.3.2: Baton touch — replace member in target area,
+    //   Cost reduction: 蟶ｸ譎・abilities (modify_cost/subtract/hand)
+    //   Cost increase: 蟶ｸ譎・abilities (success_live_zone 竊・+cost)
+    // Rule 9.6.2.3.2: Baton touch 窶・replace member in target area,
     //   subtract replaced member's cost from payment
     //
-    // Q206: "Baton touch target is wait → can I still play?"
-    //   → Yes. Wait-state members still occupy the area for baton touch.
+    // Q206: "Baton touch target is wait 竊・can I still play?"
+    //   竊・Yes. Wait-state members still occupy the area for baton touch.
     //
-    // Q219: "Does 常時 cost reduction apply during baton touch?"
-    //   → Yes. Cost modifiers are evaluated before baton touch reduction.
+    // Q219: "Does 蟶ｸ譎・cost reduction apply during baton touch?"
+    //   竊・Yes. Cost modifiers are evaluated before baton touch reduction.
     //
     // Q225 / Q235: "How does &-name (multi-member) cards count?"
-    //   → One card = one member. For group checks, they count as one
+    //   竊・One card = one member. For group checks, they count as one
     //   member under ANY of their names (player's choice).
     pub fn move_card_from_hand_to_stage(
         &mut self,
@@ -441,7 +441,7 @@ impl Player {
     }
 
     /// Q280: activate all energy IN WAIT except `excluded` cards that carry a
-    /// "このエネルギーは次のターンのアクティブフェイズにアクティブしない" flag.
+    /// "縺薙・繧ｨ繝阪Ν繧ｮ繝ｼ縺ｯ谺｡縺ｮ繧ｿ繝ｼ繝ｳ縺ｮ繧｢繧ｯ繝・ぅ繝悶ヵ繧ｧ繧､繧ｺ縺ｫ繧｢繧ｯ繝・ぅ繝悶＠縺ｪ縺・ flag.
     /// Energy activation is tracked as an aggregate `active_energy_count`, so the
     /// flagged cards are subtracted from the count instead of being keyed per card.
     pub fn activate_all_energy_exclude(&mut self, excluded: usize) {
@@ -488,16 +488,14 @@ impl Player {
         })
     }
 
-    // ... (rest of the code remains the same)
-
     // Rule 10.2 / Q53 / Q85 / Q86 / Q100 / Q101 / Q104: Refresh procedure
     //
-    // Rule 10.2.1: Refresh is NOT limited to check timing — it can interrupt
+    // Rule 10.2.1: Refresh is NOT limited to check timing 窶・it can interrupt
     //   mid-effect processing (e.g. during look_at, draw, mill). The interrupted
     //   processing resumes after the refresh completes.
     //
     // Rule 10.2.2: Two independent triggers:
-    //   10.2.2.1: Main deck is empty AND waitroom has ≥1 card
+    //   10.2.2.1: Main deck is empty AND waitroom has 竕･1 card
     //   10.2.2.2: "Look at N from top of deck" instruction, but deck has < N cards
     //
     // Rule 10.2.3: Procedure:
@@ -507,21 +505,20 @@ impl Player {
     //   already drawn/looked-at from the deck stay above the refreshed cards.
     //
     // Q85: "Look at 5 from deck, deck has 4"
-    //   ① Look 4 from deck → ② deck < 5 triggers 10.2.2.2 refresh →
-    //      shuffle discard UNDER those 4 → ③ look 1 more (total 5) → ④ resolve
+    //   竭 Look 4 from deck 竊・竭｡ deck < 5 triggers 10.2.2.2 refresh 竊・    //      shuffle discard UNDER those 4 竊・竭｢ look 1 more (total 5) 竊・竭｣ resolve
     //
     // Q86: "Look at 5 from deck, deck has exactly 5"
     //   No refresh during look. If resolution empties the deck, refresh happens
     //   after (including just-discarded looked cards if they went to waitroom).
     //
     // Q104: "Mill 5 from deck, deck has 4"
-    //   ① Mill 4 → deck = 0, waitroom ≥1 → refresh (10.2.2.1) → ② mill 1 more
+    //   竭 Mill 4 竊・deck = 0, waitroom 竕･1 竊・refresh (10.2.2.1) 竊・竭｡ mill 1 more
     //   The 4 just-milled cards ARE included in the refresh.
     //
-    // Q100: Yell — revealed cards in resolution area are NOT in waitroom yet,
+    // Q100: Yell 窶・revealed cards in resolution area are NOT in waitroom yet,
     //   so they are NOT included in the refresh when deck hits 0 during yell.
     //
-    // Q101: Yell — if BOTH deck AND waitroom become 0 during processing,
+    // Q101: Yell 窶・if BOTH deck AND waitroom become 0 during processing,
     //   the effect stops. A new refresh triggers later when waitroom gets cards.
     //
     // Q122: "Look at 3 from deck, deck has exactly 3" (rearrange type):
@@ -529,8 +526,8 @@ impl Player {
     //   If all 3 are then discarded, refresh happens after.
     //
     // Energy deck: does NOT refresh. Energy cards are recycled via:
-    //   Rule 10.5.3 — member underneath without a member above → waitroom
-    //   Rule 10.5.4 — energy card in waitroom → energy deck instead
+    //   Rule 10.5.3 窶・member underneath without a member above 竊・waitroom
+    //   Rule 10.5.4 窶・energy card in waitroom 竊・energy deck instead
     pub fn refresh(&mut self) {
         // Rule 10.2.2.1: Deck empty AND waitroom has cards
         if self.main_deck.is_empty() && !self.waitroom.cards.is_empty() {
