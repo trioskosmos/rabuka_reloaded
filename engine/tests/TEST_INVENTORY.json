@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T17:48:36.649705+00:00",
+  "generated_at": "2026-08-26T17:51:19.436695+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 518,
-  "n_tests": 3066,
+  "n_files": 519,
+  "n_tests": 3068,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -9735,6 +9735,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/ability_combination_test.rs",
+        "engine/tests/test_modules/bp7_005_ren_ab0_test.rs",
         "engine/tests/test_modules/bp7_005_ren_jidou_test.rs",
         "engine/tests/test_modules/bp7_ren_both_trigger_test.rs",
         "engine/tests/test_modules/bp7_ren_energy_placed_gain_blade_test.rs",
@@ -9757,6 +9758,8 @@
         "ren_016_ab0_own_effect_places_energy_gains_blade",
         "ren_016_no_energy_placed_no_blade",
         "ren_016_turn1_blocks_second_energy_placed",
+        "ren_ab0_debut_places_energy_wait",
+        "ren_ab0_energy_return_places_energy_wait",
         "ren_ab1_no_energy_placed_no_blade",
         "ren_ab1_opponent_effect_places_energy_no_blade",
         "ren_ab1_own_effect_places_energy_gains_blade",
@@ -9769,11 +9772,9 @@
         "ren_opponent_energy_move_does_not_trigger",
         "ren_other_member_appearance_does_not_trigger",
         "ren_placed_energy_is_wait_not_active",
-        "ren_verdicts_show_energy_leg_pass",
-        "ren_wrong_source_energy_move_does_not_trigger",
-        "s1_bp7_005_opponent_caused_placement_does_not_fire"
+        "ren_verdicts_show_energy_leg_pass"
       ],
-      "covering_test_count": 36,
+      "covering_test_count": 38,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -9806,6 +9807,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/ability_combination_test.rs",
+        "engine/tests/test_modules/bp7_005_ren_ab0_test.rs",
         "engine/tests/test_modules/bp7_005_ren_jidou_test.rs",
         "engine/tests/test_modules/bp7_ren_both_trigger_test.rs",
         "engine/tests/test_modules/bp7_ren_energy_placed_gain_blade_test.rs",
@@ -9828,6 +9830,8 @@
         "ren_016_ab0_own_effect_places_energy_gains_blade",
         "ren_016_no_energy_placed_no_blade",
         "ren_016_turn1_blocks_second_energy_placed",
+        "ren_ab0_debut_places_energy_wait",
+        "ren_ab0_energy_return_places_energy_wait",
         "ren_ab1_no_energy_placed_no_blade",
         "ren_ab1_opponent_effect_places_energy_no_blade",
         "ren_ab1_own_effect_places_energy_gains_blade",
@@ -9840,11 +9844,9 @@
         "ren_opponent_energy_move_does_not_trigger",
         "ren_other_member_appearance_does_not_trigger",
         "ren_placed_energy_is_wait_not_active",
-        "ren_verdicts_show_energy_leg_pass",
-        "ren_wrong_source_energy_move_does_not_trigger",
-        "s1_bp7_005_opponent_caused_placement_does_not_fire"
+        "ren_verdicts_show_energy_leg_pass"
       ],
-      "covering_test_count": 36,
+      "covering_test_count": 38,
       "is_null": false,
       "use_limit": 2,
       "watches_abilities": false,

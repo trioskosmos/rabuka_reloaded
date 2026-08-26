@@ -569,3 +569,4 @@ pub mod bp7_005_ren_jidou_test;
 pub mod s_pb1_002_riko_edge_test;
 pub mod s_pb1_006_yohane_edge_test;
 pub mod sd2_011_tomari_jidou_test;
+pub mod bp7_005_ren_ab0_test;
