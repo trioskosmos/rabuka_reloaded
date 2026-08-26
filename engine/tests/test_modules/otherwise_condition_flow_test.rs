@@ -69,7 +69,9 @@ fn karin_reveal_condition_met_cheap_member_goes_to_hand() {
     advance_to_live_start(&mut game);
 
     while game.has_pending_choice() {
-        game.select_indices(&[]);
+        // Karin's conditional effect prompts mandatorily when the reveal
+        // matches — answer first option; no-op when nothing was asked.
+        game.select_indices(&[0]);
     }
 
     assert!(
@@ -103,7 +105,9 @@ fn karin_reveal_condition_met_cheap_member_not_in_discard() {
     advance_to_live_start(&mut game);
 
     while game.has_pending_choice() {
-        game.select_indices(&[]);
+        // Karin's conditional effect prompts mandatorily when the reveal
+        // matches — answer first option; no-op when nothing was asked.
+        game.select_indices(&[0]);
     }
 
     assert!(
@@ -142,7 +146,9 @@ fn karin_reveal_condition_met_card_removed_from_deck_top() {
     advance_to_live_start(&mut game);
 
     while game.has_pending_choice() {
-        game.select_indices(&[]);
+        // Karin's conditional effect prompts mandatorily when the reveal
+        // matches — answer first option; no-op when nothing was asked.
+        game.select_indices(&[0]);
     }
 
     assert!(
@@ -180,7 +186,9 @@ fn karin_reveal_condition_met_hand_count_increases() {
     advance_to_live_start(&mut game);
 
     while game.has_pending_choice() {
-        game.select_indices(&[]);
+        // Karin's conditional effect prompts mandatorily when the reveal
+        // matches — answer first option; no-op when nothing was asked.
+        game.select_indices(&[0]);
     }
 
     // During advance_to_live_card_set_p1 one card is drawn from the deck,
@@ -220,7 +228,9 @@ fn karin_reveal_non_member_live_card_goes_to_discard() {
     advance_to_live_start(&mut game);
 
     while game.has_pending_choice() {
-        game.select_indices(&[]);
+        // Karin's conditional effect prompts mandatorily when the reveal
+        // matches — answer first option; no-op when nothing was asked.
+        game.select_indices(&[0]);
     }
 
     assert!(
@@ -254,7 +264,9 @@ fn karin_reveal_non_member_not_added_to_hand() {
     advance_to_live_start(&mut game);
 
     while game.has_pending_choice() {
-        game.select_indices(&[]);
+        // Karin's conditional effect prompts mandatorily when the reveal
+        // matches — answer first option; no-op when nothing was asked.
+        game.select_indices(&[0]);
     }
 
     assert!(
@@ -290,7 +302,9 @@ fn karin_reveal_expensive_member_goes_to_discard() {
     advance_to_live_start(&mut game);
 
     while game.has_pending_choice() {
-        game.select_indices(&[]);
+        // Karin's conditional effect prompts mandatorily when the reveal
+        // matches — answer first option; no-op when nothing was asked.
+        game.select_indices(&[0]);
     }
 
     assert!(
@@ -335,7 +349,9 @@ fn karin_reveal_condition_met_position_changes() {
     advance_to_live_start(&mut game);
 
     while game.has_pending_choice() {
-        game.select_indices(&[]);
+        // Karin's conditional effect prompts mandatorily when the reveal
+        // matches — answer first option; no-op when nothing was asked.
+        game.select_indices(&[0]);
     }
 
     // Position change should move karin out of center
@@ -382,7 +398,9 @@ fn karin_reveal_condition_not_met_position_unchanged() {
     advance_to_live_start(&mut game);
 
     while game.has_pending_choice() {
-        game.select_indices(&[]);
+        // Karin's conditional effect prompts mandatorily when the reveal
+        // matches — answer first option; no-op when nothing was asked.
+        game.select_indices(&[0]);
     }
 
     assert_eq!(
@@ -418,7 +436,9 @@ fn karin_reveal_card_in_exactly_one_zone() {
     advance_to_live_start(&mut game);
 
     while game.has_pending_choice() {
-        game.select_indices(&[]);
+        // Karin's conditional effect prompts mandatorily when the reveal
+        // matches — answer first option; no-op when nothing was asked.
+        game.select_indices(&[0]);
     }
 
     let in_hand = game.state.player1.hand.cards.contains(&deck_top);
@@ -463,7 +483,9 @@ fn karin_reveal_condition_met_deck_top_becomes_filler() {
     advance_to_live_start(&mut game);
 
     while game.has_pending_choice() {
-        game.select_indices(&[]);
+        // Karin's conditional effect prompts mandatorily when the reveal
+        // matches — answer first option; no-op when nothing was asked.
+        game.select_indices(&[0]);
     }
 
     assert_eq!(
@@ -501,7 +523,9 @@ fn karin_reveal_condition_failed_deck_top_becomes_filler() {
     advance_to_live_start(&mut game);
 
     while game.has_pending_choice() {
-        game.select_indices(&[]);
+        // Karin's conditional effect prompts mandatorily when the reveal
+        // matches — answer first option; no-op when nothing was asked.
+        game.select_indices(&[0]);
     }
 
     assert_eq!(

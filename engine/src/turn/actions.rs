@@ -553,6 +553,42 @@ impl super::TurnEngine {
         let pending = game_state.ability_queue.is_waiting_for_choice().cloned();
         let choice = pending.ok_or("No pending choice to resume")?;
 
+        // Robustness (P3): a NON-skippable prompt must never receive an
+        // empty answer. Previously such answers fell through to handlers
+        // that silently no-opped (e.g. position|destination resolving to
+        // "Unknown source position"), dropping cards without any error.
+        {
+            let empty_answer = card_id.is_none()
+                && card_indices.as_deref().map_or(true, |v| v.is_empty());
+            let skippable = match &choice {
+                crate::ability::types::Choice::SelectCard { allow_skip, .. }
+                | crate::ability::types::Choice::SelectTarget { allow_skip, .. }
+                | crate::ability::types::Choice::SelectPosition { allow_skip, .. } => {
+                    *allow_skip
+                }
+                _ => true,
+            };
+            if empty_answer && !skippable {
+                let kind = match &choice {
+                    crate::ability::types::Choice::SelectCard { .. } => "SelectCard",
+                    crate::ability::types::Choice::SelectTarget { .. } => "SelectTarget",
+                    crate::ability::types::Choice::SelectPosition { .. } => "SelectPosition",
+                    crate::ability::types::Choice::SelectHeartColor { .. } => "SelectHeartColor",
+                    crate::ability::types::Choice::SelectHeartType { .. } => "SelectHeartType",
+                    crate::ability::types::Choice::SelectAutoAbility { .. } => {
+                        "SelectAutoAbility"
+                    }
+                    crate::ability::types::Choice::SelectLiveSuccess { .. } => {
+                        "SelectLiveSuccess"
+                    }
+                };
+                return Err(format!(
+                    "non-skippable {} prompt requires a selection - empty answer rejected",
+                    kind
+                ));
+            }
+        }
+
         // Record a structured `choice_resolved` entry: what was offered vs chosen.
         // Skipped under `headless`  Ethe label computation itself allocates.
         #[cfg(not(feature = "headless"))]

@@ -60,7 +60,17 @@ fn q255_dancing_stars_live_success_after_position_change() {
         Some("SelectTarget"),
         "expected SelectTarget"
     );
-    game.select_indices(&[]);
+    // Mandatory destination prompts (options left/center/right) — answer
+    // each with the first slot; queued chains may ask more than once.
+    game.select_indices(&[0]);
+    while game.has_pending_choice() {
+        assert_eq!(
+            game.pending_choice_type().as_deref(),
+            Some("SelectTarget"),
+            "expected only position|destination prompts in the chain"
+        );
+        game.select_indices(&[0]);
+    }
 
     // After ab#0 fires, Honoka should no longer be in center
     let center_card = game.state.player1.stage.stage[1];

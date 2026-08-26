@@ -61,18 +61,20 @@ fn emma_bp5_q215_only_wait_energy_available() {
     // Place 1 energy (the only one) → zone empty → activation tries to
     // activate 2 from nothing → should not panic
     game.activate_ability(emma);
-    // Observed: a SelectCard zone=energy count=1 prompt appears even though
-    // only one energy exists; the empty answer declines further placement.
-    assert!(
-        game.has_pending_choice(),
-        "energy placement/selection prompt expected"
-    );
-    assert_eq!(
-        game.pending_choice_type().as_deref(),
-        Some("SelectCard"),
-        "expected SelectCard energy-zone prompt"
-    );
-    game.select_indices(&[]);
+    // Observed: TWO mandatory SelectCard zone=energy count=1 prompts fire
+    // (activation tries 2 placements with only 1 energy available). Answer
+    // each; the engine saturates when the zone runs dry.
+    let mut guard = 0;
+    while game.has_pending_choice() {
+        guard += 1;
+        assert!(guard <= 5, "runaway energy-selection prompts");
+        assert_eq!(
+            game.pending_choice_type().as_deref(),
+            Some("SelectCard"),
+            "expected SelectCard energy-zone prompt"
+        );
+        game.select_indices(&[0]);
+    }
 
     let ecount = game.state.player1.energy_zone.cards.len();
     eprintln!("[EMMA] only 1 energy: after placement: {} cards", ecount);

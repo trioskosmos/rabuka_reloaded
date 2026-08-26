@@ -23,6 +23,21 @@ fn setup_p1_deck(game: &mut TestGame, live_ids: &[i16]) {
     }
 }
 
+/// Decline skippable prompts; accept mandatory selections (first option).
+fn answer_prompts(game: &mut TestGame) {
+    while game.has_pending_choice() {
+        let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
+        if actions
+            .iter()
+            .any(|a| a.action_type == ActionType::ChoiceSkip)
+        {
+            game.select_indices(&[]);
+        } else {
+            game.select_indices(&[0]);
+        }
+    }
+}
+
 /// GALAXY with no Kanan — live card in yell → +1.
 #[test]
 fn q253_galaxy_gets_plus_one() {
@@ -146,43 +161,17 @@ fn q253_both_succeed_two_live_cards() {
     game.state.player1.hand.cards.push(galaxy);
     game.set_live_card(galaxy);
     advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    answer_prompts(&mut game);
 
     // First performance phase — yell, then Kanan's LiveSuccess
     game.pass();
-    // Process all pending choices: auto-skip yell-triggered abilities,
-    // but explicitly select a card for Kanan's non-optional move.
-    while game.has_pending_choice() {
-        let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
-        let has_skip = actions
-            .iter()
-            .any(|a| a.action_type == ActionType::ChoiceSkip);
-        if !has_skip
-            && actions
-                .iter()
-                .any(|a| a.action_type == ActionType::ChoiceSelect)
-        {
-            game.select_indices(&[0]);
-            break;
-        }
-        game.select_indices(&[]);
-    }
-    // Consume any remaining choices from performance phase
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    answer_prompts(&mut game);
     // Second performance phase
     game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    answer_prompts(&mut game);
     // Victory determination
     game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    answer_prompts(&mut game);
 
     assert_eq!(game.state.mods.get_score_modifier(galaxy), 1);
 }
