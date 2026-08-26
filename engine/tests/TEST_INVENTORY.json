@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T17:41:25.038752+00:00",
+  "generated_at": "2026-08-26T17:44:03.481386+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 515,
-  "n_tests": 3058,
+  "n_files": 516,
+  "n_tests": 3061,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -13751,6 +13751,7 @@
         "engine/tests/test_modules/riko_test.rs",
         "engine/tests/test_modules/rin_bp6_test.rs",
         "engine/tests/test_modules/rin_test.rs",
+        "engine/tests/test_modules/s_pb1_002_riko_edge_test.rs",
         "engine/tests/test_modules/setsuna_bp5_test.rs",
         "engine/tests/test_modules/setsuna_pb1_heart_constant_test.rs",
         "engine/tests/test_modules/shizuku_bp4_aggregate_test.rs",
@@ -13809,7 +13810,7 @@
         "ayumu_constant_three_live_cards_still_gains_blade",
         "ayumu_constant_two_live_cards_gains_blade"
       ],
-      "covering_test_count": 843,
+      "covering_test_count": 846,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -17392,15 +17393,19 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/riko_test.rs"
+        "engine/tests/test_modules/riko_test.rs",
+        "engine/tests/test_modules/s_pb1_002_riko_edge_test.rs"
       ],
       "covering_tests": [
+        "riko_opponent_declines_gains_live_total",
+        "riko_opponent_discards_live_no_gain",
+        "riko_opponent_no_live_in_hand_no_choice",
         "riko_q130_opponent_discards_skips_conditional",
         "riko_q130_opponent_empty_hand_auto_skip",
         "riko_q130_opponent_multi_card_skips",
         "riko_q130_opponent_skips_triggers_conditional"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 7,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
