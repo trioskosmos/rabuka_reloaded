@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T17:37:47.826068+00:00",
+  "generated_at": "2026-08-26T17:39:15.914561+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 513,
-  "n_tests": 3055,
+  "n_files": 514,
+  "n_tests": 3057,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -13639,17 +13639,20 @@
       "covering_files": [
         "engine/tests/test_modules/cross_player_interaction_test.rs",
         "engine/tests/test_modules/sd2_002_basic_test.rs",
-        "engine/tests/test_modules/sd2_002_edge_test.rs"
+        "engine/tests/test_modules/sd2_002_edge_test.rs",
+        "engine/tests/test_modules/sd2_002_jidou_cause_test.rs"
       ],
       "covering_tests": [
         "himeko_debut_repositions_opponent_member_and_koko_responds",
         "himeko_gate_blocked_no_reposition_no_koko_response",
+        "keke_jidou_effect_only_false_no_trigger",
+        "keke_jidou_self_effect_move_triggers",
         "sd2_002_kidou_position_change_grants_heart_bonus",
         "sd2_002_natural_move_no_heart",
         "sd2_002_opponent_effect_area_move_triggers_heart",
         "sd2_002_turn_limit_blocks_second_move"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 8,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -25475,17 +25478,20 @@
       "covering_files": [
         "engine/tests/test_modules/cross_player_interaction_test.rs",
         "engine/tests/test_modules/sd2_002_basic_test.rs",
-        "engine/tests/test_modules/sd2_002_edge_test.rs"
+        "engine/tests/test_modules/sd2_002_edge_test.rs",
+        "engine/tests/test_modules/sd2_002_jidou_cause_test.rs"
       ],
       "covering_tests": [
         "himeko_debut_repositions_opponent_member_and_koko_responds",
         "himeko_gate_blocked_no_reposition_no_koko_response",
+        "keke_jidou_effect_only_false_no_trigger",
+        "keke_jidou_self_effect_move_triggers",
         "sd2_002_kidou_position_change_grants_heart_bonus",
         "sd2_002_natural_move_no_heart",
         "sd2_002_opponent_effect_area_move_triggers_heart",
         "sd2_002_turn_limit_blocks_second_move"
       ],
-      "covering_test_count": 6,
+      "covering_test_count": 8,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
