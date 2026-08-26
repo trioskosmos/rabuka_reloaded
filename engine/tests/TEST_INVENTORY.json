@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-08-26T17:04:40.948434+00:00",
+  "generated_at": "2026-08-26T17:08:33.445673+00:00",
   "stats": {
     "total_cards": 2526,
     "cards_with_abilities": 1565,
     "total_abilities": 2011,
     "unique_abilities": 936
   },
-  "n_files": 507,
-  "n_tests": 3036,
+  "n_files": 508,
+  "n_tests": 3039,
   "total_cards": 771,
   "covered_cards": 771,
   "abilities_on_covered": 936,
@@ -310,9 +310,9 @@
   },
   "depth_counts": {
     "L2+choice": 691,
-    "L1+choice": 174,
+    "L1+choice": 175,
     "L2": 26,
-    "L1": 45
+    "L1": 44
   },
   "qa_rulings": {
     "covered": 280,
@@ -382,8 +382,7 @@
       426,
       604,
       606,
-      661,
-      834
+      661
     ]
   },
   "abilities": [
@@ -7313,6 +7312,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/himeno_bp_versions_test.rs",
+        "engine/tests/test_modules/hs_cl1_003_edge_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/qa_new_tests238.rs",
         "engine/tests/test_modules/rurino_bp5_test.rs",
@@ -7331,6 +7331,9 @@
         "himeno_bp5_same_group_cost_auto_skips_when_only_no_group_cards",
         "himeno_bp5_same_group_cost_excludes_no_group_cards",
         "himeno_bp5_same_group_cost_filters_hand_cards",
+        "hs_cl1_already_wait_no_blade",
+        "hs_cl1_choice_among_multiple_mirakura",
+        "hs_cl1_turn_limit_blocks_second",
         "issue10_dream_with_you_high_blade_plus_1_score",
         "issue10_dream_with_you_no_blade_no_score",
         "issue11_fanfare_15plus_cards_gives_blade",
@@ -7345,12 +7348,9 @@
         "issue17_suzu_cost_bonus_condition_met",
         "issue17_suzu_cost_bonus_condition_not_met",
         "issue1_kanon_invalidate_and_recover",
-        "issue1_kanon_no_liella_on_stage_no_recovery",
-        "issue2_rina_cost_total_10_no_bonus",
-        "issue2_rina_cost_total_6_draws_card",
-        "issue3_karin_live_start_draw_card"
+        "issue1_kanon_no_liella_on_stage_no_recovery"
       ],
-      "covering_test_count": 60,
+      "covering_test_count": 63,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -7383,6 +7383,7 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/himeno_bp_versions_test.rs",
+        "engine/tests/test_modules/hs_cl1_003_edge_test.rs",
         "engine/tests/test_modules/parser_issues_e2e_test.rs",
         "engine/tests/test_modules/qa_new_tests238.rs",
         "engine/tests/test_modules/rurino_bp5_test.rs",
@@ -7401,6 +7402,9 @@
         "himeno_bp5_same_group_cost_auto_skips_when_only_no_group_cards",
         "himeno_bp5_same_group_cost_excludes_no_group_cards",
         "himeno_bp5_same_group_cost_filters_hand_cards",
+        "hs_cl1_already_wait_no_blade",
+        "hs_cl1_choice_among_multiple_mirakura",
+        "hs_cl1_turn_limit_blocks_second",
         "issue10_dream_with_you_high_blade_plus_1_score",
         "issue10_dream_with_you_no_blade_no_score",
         "issue11_fanfare_15plus_cards_gives_blade",
@@ -7415,12 +7419,9 @@
         "issue17_suzu_cost_bonus_condition_met",
         "issue17_suzu_cost_bonus_condition_not_met",
         "issue1_kanon_invalidate_and_recover",
-        "issue1_kanon_no_liella_on_stage_no_recovery",
-        "issue2_rina_cost_total_10_no_bonus",
-        "issue2_rina_cost_total_6_draws_card",
-        "issue3_karin_live_start_draw_card"
+        "issue1_kanon_no_liella_on_stage_no_recovery"
       ],
-      "covering_test_count": 60,
+      "covering_test_count": 63,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -42691,18 +42692,22 @@
       ],
       "base": "PL!HS-cl1-003",
       "covered": true,
-      "depth": "L1",
+      "depth": "L1+choice",
       "has_assert": true,
-      "has_choice": false,
+      "has_choice": true,
       "has_negative": false,
       "covering_files": [
-        "engine/tests/test_modules/bp4_live_start_change_state_gain_test.rs"
+        "engine/tests/test_modules/bp4_live_start_change_state_gain_test.rs",
+        "engine/tests/test_modules/hs_cl1_003_edge_test.rs"
       ],
       "covering_tests": [
         "cl_gain_resource_cost_pays_when_no_condition_target",
-        "cl_gain_resource_pay_cost_wait_gain_blade"
+        "cl_gain_resource_pay_cost_wait_gain_blade",
+        "hs_cl1_already_wait_no_blade",
+        "hs_cl1_choice_among_multiple_mirakura",
+        "hs_cl1_turn_limit_blocks_second"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 5,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
