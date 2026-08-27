@@ -158,6 +158,7 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e);
 
 void rb_execute_effect(GameState *g, int actor, AbilityEffect *e) {
     if (!e) return;
+    if (e->has_condition && e->condition && !rb_eval_condition(g, actor, e->condition)) return;
     for (int i = 0; i < e->n_child; i++)
         rb_execute_effect(g, actor, e->child[i]);
     if (!e->action) return;
