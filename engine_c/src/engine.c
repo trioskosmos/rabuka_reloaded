@@ -112,12 +112,31 @@ static int heart_color_of(AbilityEffect *e, int dflt) {
 }
 
 /* Move `count` cards from one of actor's zones to another. */
+static int card_matches_card_type_filter(int card_idx, const char *filter){
+    if(!filter) return 1;
+    Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
+    int is_live = (c.n_hearts==0 && c.cost==0 && c.blade==0);
+    int is_member = !is_live;
+    int match=0;
+    if(!strcmp(filter,"live_card") && is_live) match=1;
+    else if(!strcmp(filter,"member_card") && is_member) match=1;
+    else if(!strcmp(filter,"card")) match=1;
+    else if(!strcmp(filter,"energy_card")) match=0;
+    else match=1;
+    rb_free_card(&c);
+    return match;
+}
+static void do_move_filtered(GameState *g, int actor, RbZone src, RbZone dst, int count, int to_top, const char *card_type_filter);
 static void do_move(GameState *g, int actor, RbZone src, RbZone dst, int count, int to_top) {
+    do_move_filtered(g, actor, src, dst, count, to_top, NULL);
+}
+static void do_move_filtered(GameState *g, int actor, RbZone src, RbZone dst, int count, int to_top, const char *card_type_filter) {
     RbPlayer *A = &g->p[actor];
     if (src == RB_ZONE_STAGE) {
         int moved = 0;
-        for (int pos = 0; pos < RB_STAGE_SIZE && moved < count; pos++) {
-            if (A->stage[pos] >= 0) {
+        int limit = (count<0)? RB_STAGE_SIZE : count;
+        for (int pos = 0; pos < RB_STAGE_SIZE && moved < limit; pos++) {
+            if (A->stage[pos] >= 0 && card_matches_card_type_filter(A->stage[pos], card_type_filter)) {
                 int c = A->stage[pos]; A->stage[pos] = -1; A->stage_wait[pos] = 0;
                 if (dst == RB_ZONE_STAGE) { /* relocate on stage: first empty */
                     for (int q = 0; q < RB_STAGE_SIZE; q++)
@@ -134,8 +153,12 @@ static void do_move(GameState *g, int actor, RbZone src, RbZone dst, int count, 
     RbBag *sb = zone_bag(A, src);
     if (!sb) return;
     int n = (count < 0) ? sb->n : count;
-    for (int i = 0; i < n && sb->n > 0; i++) {
-        int c = bag_take_first(sb);
+    /* Collect matching indices first to avoid skipping */
+    int moved=0;
+    for (int i = sb->n-1; i >=0 && moved < n; i--) {
+        int cid = sb->cards[i];
+        if (!card_matches_card_type_filter(cid, card_type_filter)) continue;
+        int c = bag_remove_at(sb, i);
         if (dst == RB_ZONE_STAGE) {
             for (int q = 0; q < RB_STAGE_SIZE; q++)
                 if (A->stage[q] < 0) { A->stage[q] = c; break; }
@@ -143,13 +166,13 @@ static void do_move(GameState *g, int actor, RbZone src, RbZone dst, int count, 
             RbBag *db = zone_bag(A, dst);
             if (!db) { bag_push(sb, c); break; }
             if (to_top && dst == RB_ZONE_DECK) {
-                /* push to front */
                 if (db->n < RB_MAX_ZONE) {
                     for (int k = db->n; k > 0; k--) db->cards[k] = db->cards[k-1];
                     db->cards[0] = c; db->n++;
                 }
             } else bag_push(db, c);
         }
+        moved++;
     }
 }
 
@@ -220,19 +243,17 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
         int col = heart_color_of(e, RB_HEART_PINK);
         O->hearts[col] += cnt;
     } else if (!strcmp(act, "move_cards")) {
-        /* Full zone dispatch — supports deck_top/bottom/recently_moved/those_cards etc.
-           For portable stub, those_cards/recently_moved are treated as hand→discard
-           so headless still makes progress; host can override via choice. */
         const char *src_s = e->source ? e->source : "hand";
         const char *dst_s = e->destination ? e->destination : "discard";
         if (!strcmp(src_s,"those_cards")||!strcmp(src_s,"recently_moved")||!strcmp(src_s,"looked_at")||!strcmp(src_s,"selected_cards")) src_s="hand";
         if (!strcmp(dst_s,"those_cards")||!strcmp(dst_s,"recently_moved")||!strcmp(dst_s,"looked_at")) dst_s="discard";
+        if (!strcmp(dst_s,"under_member")||!strcmp(dst_s,"same_area")||!strcmp(dst_s,"empty_area")) dst_s="discard";
         RbZone src = RB_ZONE_HAND, dst = RB_ZONE_DISCARD;
         rb_zone_of_str(src_s, &src);
         rb_zone_of_str(dst_s, &dst);
         int to_top = (e->destination && (!strcmp(e->destination, "deck_top")||!strcmp(e->destination,"deck_top_or_bottom")));
-        /* card_type filter would narrow, but stub moves regardless to keep tests moving */
-        do_move(g, who, src, dst, cnt, to_top);
+        const char *ctype = extra(e, "card_type");
+        do_move_filtered(g, who, src, dst, cnt, to_top, ctype);
     } else if (!strcmp(act, "change_state")) {
         const char *st = extra(e, "state");
         if(!st) st = extra(e, "to_state");
