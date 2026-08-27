@@ -1,3 +1,385 @@
+# Roadmap
+
+_Consolidated from: REFACTOR_ROADMAP_2026-08-26.md, REFACTOR_BACKLOG.md, REWRITE_PRIORITIES.md, TEST_HARDENING_PLAN_2026-08-26.md_
+
+## Refactor Roadmap  (`REFACTOR_ROADMAP_2026-08-26.md`)
+
+# Refactor & Test Roadmap — 2026-08-26 (deep audit)
+
+Derived from full reads of rules.txt structure, cards/abilities.json marker
+scans, engine duplication mapping, and parser-pipeline architecture audit.
+Supersedes the stale entries in RULES_GAP_ANALYSIS.md where noted.
+
+## A. Correctness risks (do first — these are bug factories)
+
+### A1. Three divergent stage-heart pipelines ★ highest priority
+| Impl | Order applied |
+|---|---|
+| `zones.rs::get_available_hearts` | override → copy → base → multiplier → additive mods |
+| `player.rs::calculate_stage_hearts` | same shape, but override path **duplicated internally** (already drifted once — the 9.9 bug we fixed lived here) |
+| `turn/live.rs` member-contribution loop (~1576–1685) | copy → blades → mods → multiplier → override (**different order**) |
+
+Two of the three run during a single live resolution (`live.rs:392/399` call
+B; `live.rs:1743/2602` call A). The heart_override-swallowed-additives bug we
+fixed existed *because* of this triplication; the ordering divergence is a
+live correctness risk for any card combining copy+multiplier+override.
+
+**Rewrite:** single `HeartPipeline::compute(stage, mods…) -> BaseHeart` (+ a
+per-member detail view feeding `MemberContribution`). Pin with a
+characterization test FIRST: same board through all three entry points must
+produce identical multisets (today it may not — that diff IS the test).
+
+### A2. Blade set-rule re-implemented 4×
+Canonical `zones.rs::total_blades`; inline copies at `live.rs:1624`,
+`condition/card.rs:3044`, `condition/card.rs:2789`. Extract
+`effective_blade(card_id) -> u8`. Same characterization-test-first approach.
+
+### A3. `resolve_target_player` mut/non-mut divergence
+`abilities.rs:2308` (_mut) vs `:2346` — non-mut falls back through
+activating_card/owner_of_card, mut does not; both silently default unknowns
+(incl. `"both"`) to player1. 100+ call sites. Make the two arms identical,
+return Result or an explicit Owner enum, log-and-default only at the UI edge.
+
+### A4. need-heart satisfaction computed by hand twice inside live.rs
+(~218–255 allocation scoring, ~613–700 pass/fail) instead of calling
+`card.rs::check_heart_requirement`. Fold into A1's rewrite.
+
+## B. Engine refactors (mechanical, medium value)
+
+- **B1. Split `execute_live_victory_determination` (882 lines)** — contains
+  its own heart math + need-heart scorer + trigger ordering; splitting forces A1/A4.
+- **B2. Movement-event recording choke point** — 25+ raw-string
+  `push_movement_event` callsites (misc.rs, move_cards.rs, phases.rs,
+  actions.rs, choice.rs, cost.rs); make it take `(Zone, Zone)` typed args so
+  `"energy"|"energy_zone"`-style aliases die at the boundary. Persisted
+  strings are pattern-matched later — alias drift = silently dead watchers.
+- **B3. Collapse four parallel zone vocabularies** (`ability/enums::Zone`,
+  `core/types::ZoneId`, `bot/encoding::ZoneId`, `core/card::Location`) into
+  one conversion layer.
+- **B4. Typed errors**: 104 `Result<_, String>` in ability/ — callers match on
+  English prose ("Cannot baton touch - no member…"). Error enum.
+- **B5. Candidate-pool builders ×5** (`game_setup.rs:579/:1353`,
+  `choice.rs:402`, `look.rs:356/607`, `state.rs:20`) share filter logic that
+  will drift — extract shared pool builder.
+- **B6. Dead code decisions**: `ExclusionZone` fully modeled but ZERO cards
+  use 除外/バインド (keep — future sets); `repeat_prompt_choice()` doc claims
+  to be the single construction point yet is dead — verify & delete;
+  consolidate bot strategy v2→v5 layer cake; add ONE no_std target to CI so
+  gated stubs can't rot.
+
+## C. Parser/pipeline hardening (each ships with its own guard)
+
+1. **CI hole: `effect_decoder_gen.rs` has NO freshness check** — coverage.yml
+   diffs only the condition decoder. A Rust type missing from the effect
+   READER_MAP is *silently skipped* at decode. Add the second diff + wire
+   `validate_schema.py` into CI or delete it (currently implies safety,
+   delivers none, checked nowhere).
+2. **Golden snapshot for abilities.json** — today the only shape guards are
+   validation-count baselines; a walker reshuffle ships unnoticed until a
+   gameplay test trips. Commit a golden (diff ignoring generated_at) or
+   hash-pin; regenerate deliberately.
+3. **Version the bytecode blob** — abilities.bin.z has no magic/header; a
+   stale blob paired with fresh code fails far from the cause. Prepend
+   magic+version, assert in vm.rs; make build.rs staleness warnings errors.
+4. **Dissolve `_register_action` (767-line inline table)** into declarative
+   data rows like CONDITION_PATTERNS — greppable/diffable, no logic change.
+5. **Retire zero-hit handlers** (7 confirmed: those_cards_add_hand_optional,
+   opponent_after_conditional, sou_shinakatta, heart_choice,
+   kore_niyori_cascade, baton_touch_effect, energy_under_member) via the
+   repo's own disable→regen→removal-diff methodology; fold ~20 single-hit
+   handlers into `_EFFECT_RULES` rows over time.
+6. **`_fill_defaults` ownership split** (PARSER_NOTES structural issue #1):
+   move extraction into parse_action, leave defaults-only. Reduces the 3–5×
+   field-extraction surface that makes walker-guard changes risky.
+7. **Do NOT touch**: `_walk`↔`_propagate_context` merge, FIX 10/12/13a/13b
+   dissolution — removal-diffed as live with tiny blast radii.
+
+## D. Test-frontier additions (from rules mass × card data)
+
+- §9 is 382 lines (~23% of the rulebook) — check-timing cascade (9.5),
+  play-procedure (9.6), auto-ability processing (9.7), replacement effects
+  (9.10), LKI (9.11), source identification (9.12) deserve the same
+  phase-machine treatment §7 of TEST_HARDENING_PLAN gave the turn machine.
+- Replacement effects (9.10.2): multiple replacements on one event =
+  affected-party chooses order — only "each-applies-once" exists; write the
+  choose-order scenario when ≥2 replacement cards coexist (data check needed).
+- Q39/Q34/Q33/Q31/Q29 rulings still unpinned (flagged in TEST_COVERAGE.md).
+- Cross-seat mirror coverage per TEST_HARDENING_PLAN §5 ledger — two planned
+  rows remain (SP-bp5-027-L conditional gate, S-bp7-025-L option carry-over).
+- Timestamp-ordering layer collisions (9.9.1.7): the two singleton set-cards
+  (PL!S-bp3-019-L score=4, LL-bp7-001-R＋ cost=10) are the only future
+  collision candidates — pin them individually NOW so later stacks are
+  detectable.
+
+## E. Facts worth remembering
+
+- Exclusion zone: engine-complete, card-empty (rule 4.13).
+- Mulligan: fully interactive implementation, rulebook-only (6.2.1.6).
+- 手札に加える = biggest effect family (119 unique abilities / 309 cards).
+- Surplus hearts: 17 cards, heavyweight support — asymmetry OK.
+- Trigger labels well-centralized (triggers.rs); residual raw substring
+  checks at game_state/modifiers.rs:1030/1666 should use TriggerKind.
+
+---
+
+## Refactor Backlog  (`REFACTOR_BACKLOG.md`)
+
+# Refactor Backlog — only what is actually left
+
+_Created 2026-08-22. Supersedes `docs/simplification_plan.md`, `docs/ENGINE_BIG_REFACTOR.md`,
+and `docs/OPTIONAL_GATE_CENTRALIZATION.md` (deleted; full text in git history). This file lists
+**only items verified as still undone**, each with a necessity verdict against the current tree._
+
+Baseline when written: ~2,503 engine tests green, 936 unique abilities, parser mid-WIP
+(`parser.py`, `move_cards.rs`, `abilities_gen.rs` have uncommitted work).
+
+---
+
+## 1. Verified-dead code (safe to remove, low value — do opportunistically)
+
+### 1a. `ActionType::SetCardIdentityAllRegions` — DEAD
+- **Proof**: `"set_card_identity_all_regions"` occurs 0 times in `cards/abilities.json`; no test
+  constructs the variant; the only entry points are `enums.rs` from_str/to_str/label and the
+  dispatch arm at `effects/mod.rs:419`.
+- **Keep**: `execute_set_card_identity_all_regions()` (`effects/state.rs:1431`) — it is called
+  live from `ability_effects.rs:45` (via `SetCardIdentity` + all-regions flag) and must survive.
+- **Verdict**: removal is a 4-file mechanical edit. Not urgent; bundle with the next enum-touching change.
+
+### 1b. `ActionType::ConditionalOptional` — DEAD as input, ALIVE as internal tag — DO NOT naively remove
+- 0 occurrences in `abilities.json`, but `compound.rs:955` synthesizes `target:
+  "conditional_optional"` as an **internal routing tag** re-entering through `ActionType::from_str`.
+- **Verdict**: removing requires migrating the internal tag to a typed enum first. Defer until
+  someone touches `compound.rs` anyway.
+
+### 1c. `ActionType::ChoiceCondition` (the *action*, not the condition) — likely dead, verify first
+- The 4 `choice_condition` hits in `abilities.json` are the **EffectFilter field**
+  (`effect_decoder_gen.rs:247`), not actions. `Condition::Choice` is heavily used and stays.
+- **Verdict**: confirm the action variant has no emitter, then treat like 1a.
+
+### 1d. Parser duplicate dispatch rules — real, but blocked
+- `引いてもよい` standalone rule shadows behind the broader `引く/引き/引い` rule
+  (`parser.py:2203-2213` vs `2189-2195`); `ハート.*得る` registered twice (`parser.py:2464`,
+  `2562`).
+- **Blocked**: `parser.py` currently has uncommitted WIP from another session. Removing rules
+  changes parse output → requires regenerating `abilities.json` + bytecode + full suite run.
+  Do after the WIP lands.
+
+---
+
+## 2. Deliberately KEPT (do not "clean up")
+
+### 2a. `vm.rs::populate_from_json` deep-compare oracle (old Phase 3)
+- Called "dead decoder duplication" by the old plan — wrong framing: it is the JSON-vs-bytecode
+  equivalence oracle used by `bytecode_deep_compare_test.rs`. It is the safety net that makes
+  bytecode regeneration trustworthy.
+- **Verdict**: KEEP permanently while bytecode abilities exist.
+
+### 2b. `ModifyRequiredHeartsGlobal`
+- Old plan claimed the parser never emits it. False: **3 live abilities** use it
+  (verified in `abilities.json`). Variant stays.
+
+### 2c. God-function decomposition (old Big-Refactor Phase 1)
+- Still true that `execute_gain_resource` (~1,225 lines, `effects/misc.rs:739`),
+  `handle_select_card` (~662, `choice.rs:409`), `recalculate_constants` (~606,
+  `game_state/modifiers.rs:221`) are huge — but `SelectionContext` already landed, and
+  decomposition is pure readability churn with regression risk across ~2,500 tests.
+- **Verdict**: decompose opportunistically, one function per PR, only when a behavior change
+  already requires touching that function. Never as a dedicated sweep.
+
+### 2d. Action-unification ideas (draw_card→move_cards+flag, unified until_count, etc.)
+- Cross-cutting parser+engine+testschema churn; every item invalidates baked bytecode and the
+  coverage matrix for zero behavioral gain. The `EffectFilter::target` magic-string
+  (`"position|destination"` compared in 5 sites) is the only piece with real bug potential —
+  fix that one string into a typed enum if it ever bites; ignore the rest.
+
+---
+
+## 3. Doc corrections recorded here because their source docs were deleted
+
+### 3a. Optional-gate centralization never existed as described
+- The deleted `OPTIONAL_GATE_CENTRALIZATION.md` claimed a central gate +
+  `offer_optional_skip` + `is_optional_self_gating_action` allowlist. **None of these symbols
+  ever existed in `engine/src`** (verified via git log -S). What is real:
+  `handle_optional_cost_payment` (`cost.rs:988`) + `ChoiceRoute::OptionalCost`; optional-cost
+  prompting remains distributed (`effects/state.rs:79`, `draw.rs:96`, `misc.rs:29`).
+- If optional gating ever feels inconsistent, centralizing it is NEW work, not a done deed.
+
+### 3b. Platform runner unification — DONE, doc deleted
+- Executed in commit `cf261ee3`: shared runner lives at `engine/src/game/match_runner.rs`
+  (`run_embedded_game` / `run_match`); all ports including later snes/genesis/cdi/wasm call it.
+  No duplicated front-end loops remain.
+
+### 3c. Known-issues list refreshed
+- `engine/ISSUES_FOUND.md` (2026-06-16) was rewritten 2026-08-22: 7 of 9 entries verified fixed
+  (Default impls at `card.rs:355` / `game_modifiers.rs:120`, `.or_default()`, unused
+  imports/vars/fns). Only "commands return exit code 1" remains unverified.
+
+---
+
+## Rewrite Priorities  (`REWRITE_PRIORITIES.md`)
+
+# Rewrite Priorities — Ranked by Size / Effort
+
+Derived from full-suite analysis (parser ecosystem, engine ability core, test suite).
+Ground truth = `engine/tests` (~2,946 tests). Constraint honored throughout: **no file
+splits** — all improvements stay within existing file layout.
+
+> **Blocker:** HEAD does not compile (half-landed `Box<AbilityEffect>` migration:
+> card.rs:2237, choice.rs:3016/3018, cost.rs:1054, live.rs:777; 5 stale WIP stashes
+> likely hold related work). Nothing below can be validated until this lands.
+
+---
+
+## P0 — `describe.rs`: merge EN/JA twin tables into one data-driven table
+
+**Effort: Large · Risk: Low · Payoff: removes the largest mechanical duplication in the core**
+
+- `describe_effect_en` (:96–549, ~453 lines) and `describe_effect_ja` (:771–1200,
+  ~429 lines) are parallel giant matches over identical action strings.
+- Parallel helper families duplicated too: `zone_label`(:26)/`zone_label_ja`(:669),
+  `card_type_label`(:49)/`card_type_label_ja`(:691), `state_verb`(:60)/`state_verb_ja`(:702),
+  `resource_label`(:69)/`resource_label_ja`(:711), `duration_label`(:78)/`duration_label_ja`(:720).
+- Rewrite as one table `action → (en_fmt, ja_fmt)`; ~880 lines → ~450.
+- Drift class already has a guarding test (`choice_prompt_templates_all_have_japanese`,
+  :1202) — the table makes that structural instead of enforced-by-test.
+- Validation: golden-diff current output via `bin/describe_dump.rs` before/after.
+
+## P1 — Python parser registry hardening (`cards/ability_extraction/parser.py`, ~12.6k lines)
+
+**Effort: Large · Risk: Medium (corpus-wide) · Payoff: kills the #1 silent-corruption class**
+
+- 84 ordered `_register_action(...)` substring rules where **registration order =
+  semantics** (move_cards must beat change_state only by ordering accident,
+  e.g. parser.py:2095–2123). Introduce per-rule dependency declaration or explicit
+  priority so reordering can't silently change corpus output.
+- Deduplicate cost-field extraction: `_extract_basic_cost_fields` (:911–971) vs
+  `parse_cost` fallback tail (:1487–1535) extract characters/groups/count/card_type/
+  target 3–5× (lru_cache blunts cost, not clarity debt).
+- Unify continuation-line detection in `extract_card_abilities.py:243–260`
+  (three ad-hoc code paths for similar clause shapes).
+- Loud failures for subprocess steps in `extract_card_abilities.py:583–605`
+  (nonzero exit from `compile_abilities.py` currently ignored; decoder-regen failure
+  only WARNs → stale bytecode can pass locally).
+- Litter removal: `_d.py` (reads `%TEMP%`), print-only `test_parsing()` run on every
+  extraction (:457–500), dead duplicate `lines = []` (generate_condition_decoder.py:197).
+
+## P2 — Derive variant-tag mirror tables from card.rs (`cards/compile_abilities.py`)
+
+**Effort: Medium-Large · Risk: Low · Payoff: eliminates a whole drift class**
+
+- `COND_TO_VARIANT_TAG` / `ACTION_TO_VARIANT_TAG` (:122–231) are hand-maintained
+  mirrors of the serde enums in `engine/src/core/card.rs`. Unknown keys silently fall
+  back to generic TAG_OBJECT encoding (safe but larger/slower, unreported).
+- Reuse the brace-counting Rust-decl parsing already proven in
+  `generate_condition_decoder.py` / `generate_effect_decoder.py` to emit these maps.
+- Bonus while there: shared `rust_decl_parser.py` used by all three generators
+  (they currently carry two subtly different parsers; alias handling exists in only one),
+  plus generator-side assertion that every parsed field type resolves in READER_MAP
+  (unknown types currently emit silent skip arms — generate_effect_decoder.py:264+).
+
+## P3 — `choice.rs` + `look.rs`: deduplicate selection/prompt machinery
+
+**Effort: Medium · Risk: Low-Medium · Payoff: shrinks the worst god-function's surface**
+
+- `handle_select_card` is ~678 lines (choice.rs:402–1080).
+- "Select {} more card(s)…" EN+JA reprompt hand-rolled **12×** (:627, :679, :722,
+  :1147, :1273, :1358, :1459, :1542, :1847, :2137, :2254, :2305×2 inside
+  `handle_discard_selection`). One private builder next to existing `build_reprompt` (:1080).
+- `look.rs`: verbatim 65-line `or_card_types` block copy-pasted between
+  `execute_select` (:362–424) and `execute_select_cards` (:660–722); route both
+  zone listings through `util::zone_cards` (util.rs:1812) instead of local reimplementations.
+- Trivial adjacent win: `resolver.rs::can_activate_effect` duplicates its position-merge
+  block verbatim at :297–305 and :340–346.
+
+## P4 — `modifiers.rs`: unify GainResource candidate-selection
+
+**Effort: Medium · Risk: High (needs care) · Payoff: highest bug-risk duplication removed**
+
+- Two independent implementations of "which stage members get how much":
+  - `recalculate_constants` blade path (:232–870 overall; GainResource arm :391+)
+  - `apply_success_zone_effect` GainResource path (:1528–1639)
+- Subtly different filter sets (position/group/all_any/under-card on one side;
+  stage iteration + group filters on the other) — divergence here produces wrong BP
+  that tests may not cover yet.
+- Extract shared candidate-selection + amount-resolution helper; keep both entry points.
+- Adjacent: `misc.rs` `apply_heart_resource` (:1287–1448) vs `apply_blade_resource`
+  (:1603–1739) share the empty-targets → position-based → fallback-to-self skeleton;
+  parameterize by resource kind (~150 lines saved).
+
+## P5 — Deck/draw loop unification (`move_cards.rs`, `effects/draw.rs`)
+
+**Effort: Medium · Risk: Medium · Payoff: one loop shape instead of four drifting ones**
+
+- `resolve_from_deck` (:1160–1212, incl. Q104 refresh loop + type/group re-push),
+  `resolve_from_deck_bottom` (:1214–1239), `resolve_from_energy_deck` (:1241–1272),
+  and `draw.rs` distinct-filter draw (:458–481) are four shapes of the same loop.
+- Parameterize on draw direction + optional gate text; fold distinct-draw in last.
+
+## P6 — Test infrastructure: registration gate + strict-drain backfill
+
+**Effort: Medium spread over time · Risk: None · Payoff: stops silent test loss forever**
+
+- **mod.rs drift is real**: 8 files on disk never declared in `test_modules/mod.rs`
+  (~21 tests never compiled/run): `check_self_condition_test`, `heart_color_test`,
+  `konata_bp1_test`, `location_condition_cost_test`, `shizuku_bp4_aggregate_test`,
+  `sumire_bp5_test_debug` (debug scaffolding?), `untested_abilities_batch22_test`,
+  `l0_gap_constant4_test` (holds both `#[ignore]`d tests). Fix or delete explicitly.
+- Extend `cards/test_inventory.py --check` to assert every `test_modules/*.rs` is
+  declared — converts drift detection into an automated CI gate.
+- Delete empty placeholder stubs: `abundant_test.rs`, `qa_remaining_tests2.rs`,
+  `unique_abilities_test.rs`.
+- Backfill adoption of the (excellent, underused) helper API:
+  - ~862 hand-rolled drain guard-loops in 246 files vs `drain_choices_strict`
+    (helpers/mod.rs:1041, used in 20 files) — migrate opportunistically per touched file.
+  - `fire_trigger` (27 files) vs ~198 local debut/drain setup re-implementations.
+  - `board_snapshot`/`assert_board_matches` (helpers/mod.rs:1084): **used 0 times**
+    — built for exactly the move/mill/refresh tests where collateral zone damage slips through.
+- Tighten weak assertions when touched: inequality bounds with derivable exact values
+  (`b7_constant_ability_test.rs:71–75`, energy-leak-proofing), and
+  `action_coverage_test.rs:96–112` counting arbitrary `Err`s as success via error-string
+  whitelisting.
+
+## P7 — God-function opportunistic decomposition (per existing backlog policy)
+
+**Effort: Ongoing, one function per PR · Risk: varies · Payoff: maintainability**
+
+Per `docs/REFACTOR_BACKLOG.md` policy (decompose opportunistically, no big-bang):
+`handle_select_card` (678 L), `recalculate_constants` (638 L),
+`execute_gain_resource` (517 L), `execute_position_change` (514 L),
+`evaluate_appearance_stage` (453 L), `trigger_auto_abilities_for_player_with_event`
+(401 L), `process_current_ability` (388 L), `evaluate_comparison_condition` (376 L),
+`execute_move_cards` (352 L), `get_count_for_condition` (323 L).
+P3/P4/P5 above pre-collapse the duplication inside several of these.
+
+## P8 — Small hygiene sweep
+
+**Effort: Hours · Risk: Trivial**
+
+- Dead code: `vm.rs:109 decode_fallback_count` (never called);
+  `resolver.rs:292/326/329` set-then-discarded `activation_condition_passed`;
+  backlog-verified dead enum variants (`SetCardIdentityAllRegions`) when an
+  enum-touching PR happens anyway.
+- `parser_utils.py:973–977`: `EffectPattern.setter` swallows exceptions while the
+  parallel `ActionRule.apply` logs loudly (:913–917) — make it match.
+- Zone membership checks duplicated across modules (`condition.rs:895`,
+  `resolver.rs:414`, `condition/card.rs:3288`) → route through one helper.
+- 47 hand-built `Choice::SelectTarget{..}` structs across `src/ability` → builder
+  pattern (36 `description_ja:` sites alone).
+
+---
+
+## Explicitly NOT recommended
+
+- Splitting any file (user constraint; also conflicts with the no-big-bang backlog policy).
+- Big-bang test DSL migration — the 862 drain loops should convert opportunistically,
+  each verified against green suite, never in bulk.
+- Rewriting the generated decoder files directly — edit the generators only
+  (AGENTS.md rule).
+
+---
+
+## Test Hardening Plan  (`TEST_HARDENING_PLAN_2026-08-26.md`)
+
 # Test Hardening & Parser/Engine Fix Plan 窶・2026-08-26
 
 ## Mission (standing directive)
@@ -340,3 +722,5 @@ in `dive_false_trigger_test.rs`:
 | F8 | Two DIVE!s, only one moved | exactly one placement choice / limit bump |
 
 Any failure here is classified test-bug/engine-bug/parser-gap and fixed end-to-end.
+
+---

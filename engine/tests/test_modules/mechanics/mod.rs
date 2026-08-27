@@ -7,5 +7,4 @@
     pub mod max_distinct_names_test;
     pub mod size_budget_test;
     pub mod turn_number_condition_test;
-    pub mod unique_abilities_test;
     pub mod zone_conversion_test;

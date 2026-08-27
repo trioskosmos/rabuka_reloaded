@@ -1311,7 +1311,7 @@ mod tracking;
 #[cfg(test)]
 mod serde_roundtrip_tests {
     use super::*;
-    use crate::card::{Card, CardDatabase};
+    use crate::card::CardDatabase;
     use crate::player::Player;
     use crate::zones::Stage;
     use crate::Arc;

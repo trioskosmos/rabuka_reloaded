@@ -69,48 +69,6 @@ impl GameState {
         }
     }
 
-    /// Shared candidate selection for GainResource constant/success-zone effects.
-    /// Filters stage members by position and group — the two predicates that
-    /// `recalculate_constants` and `apply_success_zone_effect` previously
-    /// reimplemented independently. Front-targeting (`position == "front"`)
-    /// is handled separately via `constant_front_targets`.
-    fn gain_resource_candidates_filtered(
-        &self,
-        effect: &crate::card::AbilityEffect,
-        player: &crate::player::Player,
-    ) -> Vec<i16> {
-        let card_db = &self.card_database;
-        player
-            .stage
-            .stage
-            .iter()
-            .enumerate()
-            .filter(|&(_, &id)| id != -1)
-            .filter(|&(pos, _)| {
-                if let Some(ref pos_req) = effect.position_any() {
-                    let pos_str = pos_req.get_position();
-                    match pos_str {
-                        Some("center") => pos == 1,
-                        Some("left") | Some("left_side") => pos == 0,
-                        Some("right") | Some("right_side") => pos == 2,
-                        _ => true,
-                    }
-                } else {
-                    true
-                }
-            })
-            .filter(|&(_, &id)| {
-                if let Some(ref groups) = effect.group_names_any() {
-                    groups.iter().any(|g| {
-                        crate::ability::util::card_matches_group_str(card_db, id, Some(g.as_str()))
-                    })
-                } else {
-                    true
-                }
-            })
-            .map(|(_, &id)| id)
-            .collect()
-    }
 
     /// Grant blade to host members from constant under-card abilities. See call site.
     fn grant_under_card_constant_blades(
