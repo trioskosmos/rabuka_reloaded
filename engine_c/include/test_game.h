@@ -22,9 +22,13 @@ void test_add_to_hand(TestGame *tg, int card_id);
 void test_add_to_discard(TestGame *tg, int card_id);
 void test_add_to_stage(TestGame *tg, int area, int card_id); /* area 0=left 1=center 2=right */
 void test_add_to_success(TestGame *tg, int card_id);
+void test_add_to_live(TestGame *tg, int card_id);
+void test_add_to_deck(TestGame *tg, int card_id);
 void test_give_energy(TestGame *tg, int count);
 int  test_play_to_stage(TestGame *tg, int card_id, int area);
+int  test_try_play_to_stage(TestGame *tg, int card_id, int area); /* returns 1 on success */
 void test_recalc(TestGame *tg);
+void test_clear_mods_for_card(TestGame *tg, int card_id);
 const char *test_card_name(int card_id);
 
 /* board helpers for assertions */
