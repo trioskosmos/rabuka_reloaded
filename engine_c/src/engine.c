@@ -227,8 +227,20 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
         if (W->energy_active > RB_MAX_ENERGY_CARDS) W->energy_active = RB_MAX_ENERGY_CARDS;
     } else if (!strcmp(act, "pay_energy") || !strcmp(act, "pay_cost") ||
                !strcmp(act, "activation_cost")) {
+        /* Optional pay-or-skip gate (mirrors ability/cost.rs: has_skip_prompt / handle_optional_cost_payment).
+           If the effect is marked optional and active energy insufficient, emit a pay/skip choice
+           instead of auto-paying. Host auto-drains via skip. */
+        if (e->is_optional && W->energy_active < cnt) {
+            rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, 1, "pay_optional_cost:skip");
+            return;
+        }
+        if (W->energy_active < cnt) {
+            /* insufficient without optional flag → treat as skip for portability (don't go negative) */
+            return;
+        }
         W->energy_active -= cnt;
         if (W->energy_active < 0) W->energy_active = 0;
+        rb_recalc_constants(g);
     } else if (!strcmp(act, "modify_score") || !strcmp(act, "gain_score")) {
         W->score += cnt;
     } else if (!strcmp(act, "gain_heart") ||
@@ -322,13 +334,38 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
     if (P->stage[stage_pos] >= 0) return 0; /* occupied */
     Card c;
     if (!rb_decode_card_by_index((uint32_t)P->hand.cards[hand_idx], &c)) return 0;
-    int cost = c.cost;
-    if (P->energy_active < cost) { rb_free_card(&c); return 0; }
+    int cid = P->hand.cards[hand_idx];
+    int base_cost = c.cost;
+    int cost_mod = rb_mods_get_cost(&g->mods, cid);
+    int cost = base_cost + cost_mod;
+    if (cost < 0) cost = 0;
+    /* Cost gate: sequential_cost validation (mirrors ability/cost.rs:validate_cost)
+       For member play, only pay_energy is relevant; check active energy. */
+    if (P->energy_active < cost) {
+        /* optional cost skip: if paid card is optional and insufficient, allow skip
+           via pay-or-skip gate (engine/src/ability/cost.rs: has_skip_prompt). For
+           member play the cost is never optional, so we must reject. */
+        rb_free_card(&c); return 0;
+    }
     P->energy_active -= cost;
+    /* Recalculate constants after cost payment (energy count changed may affect
+       conditional cost modifiers — see Rust cost.rs pay_energy path). */
+    rb_recalc_constants(g);
     int card = bag_remove_at(&P->hand, hand_idx);
     P->stage[stage_pos] = card; P->stage_wait[stage_pos] = 0;
-    if (c.ability && c.ability->effect)
-        rb_execute_effect(g, pl, c.ability->effect);
+    /* Deput: queue debut trigger instead of immediate execute, mirroring
+       engine/src/turn/triggers.rs:trigger_debut_abilities . For now execute
+       immediate if queue is idle, but also queue for later auto-drain. */
+    if (c.ability && c.ability->effect) {
+        if (c.ability->triggers && rb_trigger_is(c.ability->triggers,"登場")) {
+            rb_trigger_debut(g, pl, card);
+            /* If no pending choice was queued, execute now (host auto-drains) */
+            if (!rb_has_pending_choice(g))
+                rb_execute_effect(g, pl, c.ability->effect);
+        } else {
+            rb_execute_effect(g, pl, c.ability->effect);
+        }
+    }
     rb_free_card(&c);
     return 1;
 }

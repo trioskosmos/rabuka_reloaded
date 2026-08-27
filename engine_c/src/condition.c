@@ -246,11 +246,27 @@ static int eval_group(const struct GameState *g, int actor, const Condition *c) 
 /* ── appearance (variant 5) ── */
 static int eval_appearance(const struct GameState *g, int actor, const Condition *c) {
     int ap=0; if (get_bool(c,"appearance",&ap) && !ap) return 0;
-    /* characters field: check stage has group match — stub true if stage non-empty */
     const CondValue *chars = find_val(c, "characters");
     if (!chars || chars->tag!=RB_TAG_ARRAY || chars->arr_n==0) return 1;
     int pl = target_player_idx(actor, c);
-    return count_in_zone(g, pl, "stage")>0;
+    /* characters/group filter: check stage has at least one card matching any listed group/character */
+    const RbPlayer *P=&g->p[pl];
+    int ids[RB_MAX_ZONE]; int n=0;
+    for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]!=RB_EMPTY_SLOT) ids[n++]=P->stage[i];
+    if(n==0) return 0;
+    for(int i=0;i<n;i++){
+        Card card; if(!rb_decode_card_by_index((uint32_t)ids[i],&card)) continue;
+        const char *gname = rb_card_string(card.group_idx);
+        const char *uname = rb_card_string(card.unit_idx);
+        int matched=0;
+        for(uint32_t gi=0;gi<chars->arr_n;gi++) if(chars->arr[gi].tag==RB_TAG_STR && chars->arr[gi].s){
+            if(gname && (!strcmp(gname,chars->arr[gi].s)||strstr(gname,chars->arr[gi].s))) matched=1;
+            if(uname && (!strcmp(uname,chars->arr[gi].s)||strstr(uname,chars->arr[gi].s))) matched=1;
+        }
+        rb_free_card(&card);
+        if(matched) return 1;
+    }
+    return 0;
 }
 
 /* ── temporal (variant 6) ── */
@@ -291,12 +307,24 @@ static int eval_state(const struct GameState *g, int actor, const Condition *c) 
     return eval_operator(matching, op, cnt);
 }
 
-/* ── resource / card_blade (variant 8) ── */
+/* ── resource / card_blade (variant 8) + energy_state (variant ~11) ── */
 static int eval_resource(const struct GameState *g, int actor, const Condition *c) {
     int pl = target_player_idx(actor, c);
     int thr=1; get_i(c,"count",&thr); if(!thr) thr=1;
     const char *op=get_str(c,"operator");
-    int actual = count_in_zone(g, pl, "stage");
+    /* energy_state_condition checks active energy or energy_zone count.
+       Distinguish by location field if present. */
+    const char *loc = get_str(c, "location");
+    int actual;
+    if (loc && (!strcmp(loc,"energy")||!strcmp(loc,"energy_zone"))) {
+        actual = g->p[pl].energy_active;
+        const char *state = get_str(c,"state");
+        if(state && !strcmp(state,"wait")){
+            actual = g->p[pl].energy.n - g->p[pl].energy_active;
+        }
+    } else {
+        actual = count_in_zone(g, pl, "stage");
+    }
     return eval_operator(actual, op, thr);
 }
 static int eval_no_excess(const struct GameState *g, int actor, const Condition *c){
