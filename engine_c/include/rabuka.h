@@ -249,9 +249,58 @@ typedef enum {
     RB_PHASE_DONE
 } RbPhase;
 
+/* ── Choice / ability queue (engine/src/ability/choice.rs + ability_queue.rs) ── */
+typedef enum {
+    RB_CHOICE_NONE = 0,
+    RB_CHOICE_SELECT_CARD,
+    RB_CHOICE_SELECT_TARGET, /* pay_skip / position|destination / double_baton etc. */
+    RB_CHOICE_SELECT_HEART_COLOR
+} RbChoiceKind;
+
+typedef struct {
+    RbChoiceKind kind;
+    char zone[32];        /* e.g. "hand", "looked_at" */
+    char card_type[32];   /* member_card / live_card / energy_card */
+    int  count;           /* how many to pick */
+    int  allow_skip;      /* 1 = may skip */
+    char target[64];      /* for SELECT_TARGET: "pay_optional_cost:skip..." etc. */
+    char description[128];
+} RbChoice;
+
+typedef struct {
+    int card_id;      /* activating card's deck index (0..4095) */
+    int ability_idx;  /* 0..n */
+    int cost_paid;    /* 1 after cost emitted */
+    int effect_started;
+} RbQueueEntry;
+
+#define RB_QUEUE_DEPTH 16
+#define RB_USE_TRACK  256  /* (card_id<<4|ability_idx) slots per turn */
+
+typedef struct {
+    RbChoice pending;
+    int      has_pending;      /* 1 if choice is waiting for player input */
+    int      actor;            /* player who must answer (0/1) */
+    AbilityEffect *deferred;   /* sequential remainder after pay_skip gate */
+    RbQueueEntry entries[RB_QUEUE_DEPTH];
+    int      n_entries;
+    int      cur;              /* index of current entry being resolved */
+    int      use_keys[RB_USE_TRACK];
+    int      use_counts[RB_USE_TRACK];
+    int      n_uses;
+    int      use_turn;         /* turn number for which use_keys are valid */
+} RbAbilityQueue;
+
+int  rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx);
+void rb_queue_clear(RbAbilityQueue *q);
+int  rb_queue_has_pending(const RbAbilityQueue *q);
+int  rb_use_limit_reached(RbAbilityQueue *q, int card_id, int ability_idx, int limit, int cur_turn);
+void rb_record_use(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn);
+
 typedef struct GameState {
     RbPlayer p[2];
     RbMods   mods;            /* global modifiers (blades/hearts/scores/costs) */
+    RbAbilityQueue queue;     /* pending choice / deferred sequential */
     int      active;          /* player taking the normal-phase turn */
     int      first_attacker;  /* 0/1 winner of RPS for first turn */
     int      second_attacker; /* the other player */
@@ -283,7 +332,19 @@ int  rb_play_card(GameState *g, int pl, int hand_idx);
 int  rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos); /* to stage */
 int  rb_activate_ability(GameState *g, int pl, int hand_idx);
 
+/* ── Triggers / phase (triggers.c / phase.c) ── */
+int  rb_trigger_is(const char *triggers, const char *needle);
+int  rb_trigger_debut(GameState *g, int pl, int card_id);
+void rb_recalc_constants(GameState *g);
+void rb_advance_phase(GameState *g);
+
 /* ── Effect execution (public for testing / harness) ── */
 void rb_execute_effect(GameState *g, int actor, AbilityEffect *e);
+
+/* ── Choice API (portable shim calls these instead of reading GameState directly) ── */
+int       rb_has_pending_choice(const GameState *g);
+const RbChoice *rb_get_pending_choice(const GameState *g);
+int       rb_resume_with_choice(GameState *g, int selected_idx); /* 0..count-1, -1=skip */
+void      rb_clear_pending_choice(GameState *g);
 
 #endif /* RABUKA_H */

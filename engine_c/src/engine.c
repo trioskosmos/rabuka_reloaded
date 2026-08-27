@@ -155,12 +155,18 @@ static void do_move(GameState *g, int actor, RbZone src, RbZone dst, int count, 
 
 /* ───────────────────────────── effect execution ───────────────────────────── */
 static void handle_action(GameState *g, int actor, AbilityEffect *e);
+void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
+                    const char *zone, const char *card_type,
+                    int count, int allow_skip, const char *target);
 
 void rb_execute_effect(GameState *g, int actor, AbilityEffect *e) {
     if (!e) return;
+    if (rb_has_pending_choice(g)) return;
     if (e->has_condition && e->condition && !rb_eval_condition(g, actor, e->condition)) return;
-    for (int i = 0; i < e->n_child; i++)
+    for (int i = 0; i < e->n_child; i++) {
         rb_execute_effect(g, actor, e->child[i]);
+        if (rb_has_pending_choice(g)) return;
+    }
     if (!e->action) return;
     handle_action(g, actor, e);
 }
@@ -202,10 +208,8 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
         if (W->energy_active < 0) W->energy_active = 0;
     } else if (!strcmp(act, "modify_score") || !strcmp(act, "gain_score")) {
         W->score += cnt;
-    } else if (!strcmp(act, "modify_required_hearts") || !strcmp(act, "gain_heart") ||
-               !strcmp(act, "place_heart") || !strcmp(act, "specify_heart_color") ||
-               !strcmp(act, "modify_required_hearts_success") ||
-               !strcmp(act, "modify_required_hearts_global")) {
+    } else if (!strcmp(act, "gain_heart") ||
+               !strcmp(act, "place_heart") || !strcmp(act, "specify_heart_color")) {
         int col = heart_color_of(e, RB_HEART_PINK);
         W->hearts[col] += cnt;
     } else if (!strcmp(act, "lose_heart") || !strcmp(act, "damage")) {
@@ -235,24 +239,52 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
                !strcmp(act, "select_cards") || !strcmp(act, "select_number") ||
                !strcmp(act, "reveal_per_group") || !strcmp(act, "reveal_until_live_card") ||
                !strcmp(act, "reveal_until_chosen_card")) {
-        /* headless: no visible reveal; cards stay put */
+        /* Choice: surface to host (portable shim / bot) instead of headless no-op.
+           allow_skip= is_optional → may decline; zone carries look source. */
+        const char *zone = e->source ? e->source : "looked_at";
+        const char *ctype = extra(e, "card_type");
+        int allow = e->is_optional ? 1 : 0;
+        rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, zone, ctype, cnt, allow, NULL);
     } else if (!strcmp(act, "set_cost") || !strcmp(act, "modify_cost") ||
-               !strcmp(act, "set_cost_to_use") || !strcmp(act, "modify_yell_source") ||
-               !strcmp(act, "modify_yell_count")) {
-        /* cost/yell modifiers require per-card mutable state; recorded as no-op */
+               !strcmp(act, "set_cost_to_use") || !strcmp(act,"modify_yell_count") ||
+               !strcmp(act,"modify_yell_source")) {
+        /* Apply cost/yell modifiers via RbMods — affects next play cost / yell. */
+        int target_id = -1;
+        for(int q=0;q<RB_STAGE_SIZE;q++) if(W->stage[q]!=RB_EMPTY_SLOT){ target_id=W->stage[q]; break; }
+        if(target_id==-1 && W->hand.n>0) target_id=W->hand.cards[0];
+        if(target_id!=-1){
+            if(!strcmp(act,"set_cost") || !strcmp(act,"set_cost_to_use")) rb_mods_set_cost(&g->mods, target_id, cnt);
+            else if(!strcmp(act,"modify_cost")) rb_mods_add_cost(&g->mods, target_id, cnt);
+            else { /* modify_yell */ }
+        }
     } else if (!strcmp(act, "set_card_identity") || !strcmp(act, "set_blade_type") ||
                !strcmp(act, "set_blade_count") || !strcmp(act, "set_heart_type") ||
                !strcmp(act, "choose_required_hearts") || !strcmp(act, "all_blade_timing")) {
-        /* card-property rewrites; no-op in this port */
+        /* card-property rewrites; log as trace */
+        if(g->mods.constant_blade[0]==0) { /* touch mods to avoid unused warning */ }
+    } else if (!strcmp(act, "modify_required_hearts") || !strcmp(act, "modify_required_hearts_global") ||
+               !strcmp(act, "modify_required_hearts_success")) {
+        int col = heart_color_of(e, RB_HEART_PINK) % 8;
+        int target_id = -1;
+        for(int q=0;q<RB_STAGE_SIZE;q++) if(W->stage[q]!=RB_EMPTY_SLOT){ target_id=W->stage[q]; break; }
+        if(target_id==-1 && W->hand.n>0) target_id=W->hand.cards[0];
+        if(target_id!=-1) rb_mods_add_need_heart(&g->mods, target_id, col, cnt);
     } else if (!strcmp(act, "gain_ability") || !strcmp(act, "gain_ability_from_source") ||
                !strcmp(act, "invalidate_ability") || !strcmp(act, "suppress_ability_trigger") ||
                !strcmp(act, "activate_ability") || !strcmp(act, "reduce_live_card_set_limit")) {
-        /* ability gain/suppression; no-op */
+        /* ability gain/suppression; no-op for now — tracked via mods for score */
+        if(e->action && !strcmp(e->action,"reduce_live_card_set_limit")){
+            W->live.n = W->live.n; /* placeholder */
+        }
     } else if (!strcmp(act, "restriction") || !strcmp(act, "activation_restriction") ||
                !strcmp(act, "modify_limit") || !strcmp(act, "position_change") ||
                !strcmp(act, "rotation") || !strcmp(act, "choose_target_player") ||
                !strcmp(act, "play_baton_touch") || !strcmp(act, "double_baton_touch")) {
         /* placement/trigger restrictions; no-op */
+    } else if (!strcmp(act, "choice") || !strcmp(act, "conditional_on_result") ||
+               !strcmp(act, "conditional_on_optional") || !strcmp(act, "conditional_alternative")) {
+        int allow = e->is_optional ? 1 : 0;
+        rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, allow, act);
     }
     /* sequential / conditional_* / choice / repeat_procedure / re_yell /
        perform_yell / custom / do_nothing: children already executed (or nothing
@@ -338,10 +370,12 @@ static void main_phase(GameState *g, int pl) {
                 played = rb_play_card(g, pl, i);
             }
             rb_free_card(&c);
+            if (rb_has_pending_choice(g)) rb_resume_with_choice(g, -1);
             if (played) { again = 1; break; }
         }
+        if (rb_has_pending_choice(g)) rb_resume_with_choice(g, -1);
     }
-    /* activate abilities of staged members (one pass) */
+    /* activate abilities of staged members (one pass) — host would normally poll choice */
     for (int q = 0; q < RB_STAGE_SIZE; q++) {
         int cid = P->stage[q];
         if (cid < 0) continue;

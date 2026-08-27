@@ -32,10 +32,16 @@ int main(int argc, char **argv) {
     rb_seed(0xCAFE);
     rb_game_init(&g, deck0, n0, deck1, n1);
 
-    /* ── run a match ── */
+    /* ── run a match — portable host drains pending_choice by auto-skipping optional picks ── */
     int steps = 0;
     while (g.winner < 0 && steps < 200) {
         rb_turn(&g);
+        while (rb_has_pending_choice(&g)) {
+            const RbChoice *ch = rb_get_pending_choice(&g);
+            printf("[host] pending choice kind=%d zone=%s count=%d allow_skip=%d target=%s → auto-skip\n",
+                   ch ? (int)ch->kind : -1, ch ? ch->zone : "?", ch ? ch->count : 0, ch ? ch->allow_skip : 0, ch ? ch->target : "?");
+            rb_resume_with_choice(&g, -1);
+        }
         steps++;
         if (steps <= 10 || steps % 20 == 0) rb_print_state(&g);
     }
