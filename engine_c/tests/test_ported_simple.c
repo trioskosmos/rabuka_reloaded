@@ -116,23 +116,33 @@ static void hanayo_real_constant_via_multi_ability(void){
     TestGame tg; test_game_new(&tg);
     int hanayo = test_id(&tg,"PL!-bp4-008-R");
     int n = rb_card_num_abilities((uint32_t)hanayo);
-    /* With multi-ability support, hanayo now correctly reports 1 ability (the
-       constant modify_cost). The effect's condition is currently decoded as
-       flat extra fields (operator/comparison_type/aggregate) rather than a
-       nested Condition, so has_cond==0 and recalc does not apply the +3.
-       The synthetic hanayo tests above already verify the condition evaluator
-       for this exact aggregate=total score case, so this real-card test just
-       verifies the pairs table plumbing. */
     CHECK_EQ(n,1,"hanayo has 1 ability (constant) via pairs table");
     test_add_to_stage(&tg,1,hanayo);
     add_score3_live(&tg); add_score3_live(&tg);
     test_recalc(&tg);
-    /* Known gap: real hanayo's condition is not yet decoded as a nested
-       Condition, so recalc sees has_cond 0 and would always apply, but our
-       current recalc for this card's ability has count 6 (threshold) not value
-       3, and the condition fields are flattened as extra, so it does not yet
-       correctly gate. For now expect 0 and rely on synthetic for the logic. */
-    CHECK_EQ(rb_mods_get_cost(&tg.state.mods,hanayo),0,"hanayo real: constant not yet applied via recalc (known gap, synthetic covers)");
+    CHECK_EQ(rb_mods_get_cost(&tg.state.mods,hanayo),3,"hanayo real: constant +3 when success total >=6");
+}
+static void hanayo_real_below_threshold(void){
+    TestGame tg; test_game_new(&tg);
+    int hanayo = test_id(&tg,"PL!-bp4-008-R");
+    test_add_to_stage(&tg,1,hanayo);
+    add_score3_live(&tg); // total 3 <6
+    test_recalc(&tg);
+    CHECK_EQ(rb_mods_get_cost(&tg.state.mods,hanayo),0,"hanayo real: no cost mod when success total 3");
+}
+static void hanayo_real_dynamic(void){
+    TestGame tg; test_game_new(&tg);
+    int hanayo = test_id(&tg,"PL!-bp4-008-R");
+    test_add_to_stage(&tg,1,hanayo);
+    add_score3_live(&tg);
+    test_recalc(&tg);
+    CHECK_EQ(rb_mods_get_cost(&tg.state.mods,hanayo),0,"hanayo dynamic real: initially 0");
+    add_score3_live(&tg);
+    test_recalc(&tg);
+    CHECK_EQ(rb_mods_get_cost(&tg.state.mods,hanayo),3,"hanayo dynamic real: +3 after reaching 6");
+    tg.state.p[0].success.n--;
+    test_recalc(&tg);
+    CHECK_EQ(rb_mods_get_cost(&tg.state.mods,hanayo),0,"hanayo dynamic real: back to 0 after drop to 3");
 }
 
 /* Mechanics: basic bag/zone smoke from batch support */
@@ -155,9 +165,11 @@ int main(void){
     hanayo_not_on_stage_no_mod();
     hanayo_play_cost_unaffected();
     hanayo_real_constant_via_multi_ability();
+    hanayo_real_below_threshold();
+    hanayo_real_dynamic();
     smoke_bag_limits();
     rb_unload();
     if(failures){ printf("\n%d FAILURES\n",failures); return 1; }
-    printf("\nALL PORTED SIMPLE CHECKS PASSED (%d)\n", 10);
+    printf("\nALL PORTED SIMPLE CHECKS PASSED (%d)\n", 13);
     return 0;
 }

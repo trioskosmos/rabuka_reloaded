@@ -218,8 +218,13 @@ static void effect_set_extra(AbilityEffect *e, const char *k, const char *v) {
     e->n_extra++;
 }
 
-/* decode a single effect from current cursor (assumes TAG_OBJVAR already read) */
+/* decode a single effect from current cursor (assumes TAG_OBJVAR already read).
+    Rust: TAG_OBJECT_VARIANT (0x09) + variant u8 + len + fields.
+    The variant selects EffectKind but C stores only action string; we consume
+    the byte and ignore it. Mirrors vm.rs:decode_ability_effect_direct . */
 static AbilityEffect *decode_effect_body(Rdr *r) {
+    uint8_t variant;
+    if (!rd_u8(r, &variant)) return NULL;
     uint32_t count, i;
     if (!rd_len(r, &count)) return NULL;
     AbilityEffect *e = effect_new();

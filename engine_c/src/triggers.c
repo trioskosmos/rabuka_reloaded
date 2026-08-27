@@ -1,5 +1,6 @@
 #include "rabuka.h"
 #include <string.h>
+#include <stdlib.h>
 
 /* Portable trigger scan — mirrors engine/src/triggers.rs:canonical_trigger
    + engine/src/turn/triggers.rs . Wire trigger strings are Japanese:
@@ -57,7 +58,18 @@ int rb_trigger_live_start(GameState *g, int pl) {
     of engine/src/core/game_state/modifiers.rs:recalculate_constants . */
 static void apply_constant_effect(GameState *g, int host_cid, AbilityEffect *e) {
     if (!e || !e->action) return;
-    if (!strcmp(e->action,"modify_score")) {
+    if (!strcmp(e->action,"modify_cost")) {
+        /* hanayo: operation add value 3 count 3 — duration as_long_as.
+           Rust: constant +3 to Stage member cost when condition true.
+           Extras: operation, value, duration, card_type — count is the delta. */
+        int cnt = e->count>=0?e->count:1;
+        /* Some constant costs encode delta in extra "value" not count (hanayo value=3 count=3 both 3, but be robust) */
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"value")){
+            int v = atoi(e->extra_v[i]); if(v) cnt = v;
+        }
+        rb_mods_add_cost(&g->mods, host_cid, cnt);
+        g->mods.constant_cost[host_cid]+=cnt;
+    } else if (!strcmp(e->action,"modify_score")) {
         int cnt=e->count>=0?e->count:1;
         rb_mods_add_score(&g->mods, host_cid, cnt);
         g->mods.constant_score[host_cid]+=cnt;
@@ -123,6 +135,7 @@ void rb_recalc_constants(GameState *g) {
     for (int i = 0; i < RB_MAX_CARD_IDS; i++) {
         if (g->mods.constant_blade[i]) { rb_mods_add_blade(&g->mods, i, -g->mods.constant_blade[i]); g->mods.constant_blade[i]=0; }
         if (g->mods.constant_score[i]) { rb_mods_add_score(&g->mods, i, -g->mods.constant_score[i]); g->mods.constant_score[i]=0; }
+        if (g->mods.constant_cost[i])  { rb_mods_add_cost(&g->mods, i, -g->mods.constant_cost[i]);  g->mods.constant_cost[i]=0; }
         /* heart/need_heart constants were not tracked before — now clear those too
            by scanning all card ids for any non-zero heart mods that came from constants.
            We lack a dedicated constant_heart map, so we just leave heart mods as-is
