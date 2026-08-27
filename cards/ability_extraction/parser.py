@@ -2104,22 +2104,28 @@ _register_action(
     )[-1],
 )
 _register_action(
-    lambda t: "アクティブにしてもよい" in t
-    or "アクティブにする" in t
-    or ("アクティブにし" in t and "しない" not in t),
-    "change_state",
-    lambda t, a: a.update(
-        {
-            "state_change": "active",
-            "card_type": "energy_card" if "エネルギー" in t else "member_card",
-        }
+    ActionRule(
+        condition=lambda t: "アクティブにしてもよい" in t
+        or "アクティブにする" in t
+        or ("アクティブにし" in t and "しない" not in t),
+        action="change_state",
+        setter=lambda t, a: (
+            a.update(
+                {
+                    "state_change": "active",
+                    "card_type": "energy_card" if "エネルギー" in t else "member_card",
+                }
+            ),
+            a.update({"optional": True}) if "してもよい" in t else None,
+        )[-1],
     )
-    or (a.update({"optional": True}) if "してもよい" in t else None),
 )
 _register_action(
-    lambda t: "のみ起動できる" in t or "のみ発動する" in t,
-    "activation_restriction",
-    lambda t, a: a.update({"restriction_type": "only"}),
+    ActionRule(
+        match_any=["のみ起動できる", "のみ発動する"],
+        action="activation_restriction",
+        defaults={"restriction_type": "only"},
+    )
 )
 _register_action(
     "支払って発動させる",
@@ -2413,7 +2419,7 @@ _register_action(
         or bool(re.search(r"選ん(?!だ)", t)),
         action="select",
         setter=lambda t, a: a.update(
-            {"heart_colors": [m.group(1) for m in re.finditer(r"\|(heart\d{2})}", t)]}
+            {"heart_colors": extract_heart_colors_from_text(t)}
         )
         if not a.get("source") and not a.get("card_type") and "{{heart_" in t
         else None,
@@ -2553,15 +2559,19 @@ _register_action(
 # If "コスト" text contains heart icons, it's about required hearts (not energy cost)
 
 _register_action(
-    lambda t: ("コストを" in t or "コストが" in t or "コストは" in t)
-    and "{{heart_" in t,
-    "modify_required_hearts",
-    _handle_required_hearts,
+    ActionRule(
+        condition=lambda t: ("コストを" in t or "コストが" in t or "コストは" in t)
+        and "{{heart_" in t,
+        action="modify_required_hearts",
+        setter=_handle_required_hearts,
+    )
 )
 _register_action(
-    lambda t: "コストを" in t or "コストが" in t or "コストは" in t,
-    "modify_cost",
-    lambda t, a: _handle_cost_modification(t, a),
+    ActionRule(
+        condition=lambda t: "コストを" in t or "コストが" in t or "コストは" in t,
+        action="modify_cost",
+        setter=lambda t, a: _handle_cost_modification(t, a),
+    )
 )
 _register_action(
     ActionRule(

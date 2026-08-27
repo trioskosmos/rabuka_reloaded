@@ -613,7 +613,6 @@ impl super::TurnEngine {
         p1_score: u8,
         p2_score: u8,
         p1_id: &str,
-        p2_id: &str,
     ) {
         for snap in game_state.performance_snapshots.iter_mut() {
             let mut cumulative_used = EMPTY_H8;
@@ -734,7 +733,13 @@ impl super::TurnEngine {
         let p1_cards = &game_state.player1.live_card_zone.cards.clone();
         let p2_cards = &game_state.player2.live_card_zone.cards.clone();
         for snap in game_state.performance_snapshots.iter_mut() {
-            let player_cards = if snap.player_id == p1_id { p1_cards } else { p2_cards };
+            let player_cards = if snap.player_id == p1_id {
+                p1_cards
+            } else if snap.player_id == p2_id {
+                p2_cards
+            } else {
+                continue;
+            };
             for app in &late_apps {
                 if (app.effect_type == crate::types::EffectType::ScoreBonus || app.effect_type == crate::types::EffectType::ScoreSet) && player_cards.contains(&app.target_card_id) {
                     snap.breakdown.scores.push(crate::types::ScoreLine { source: app.ability_text.to_string(), value: app.amount.unsigned_abs() as u8 });
@@ -759,10 +764,10 @@ impl super::TurnEngine {
             }
             snap.surplus_hearts = per_color_surplus;
             log::debug!("[SURPLUS] player={} total_avail={} total_filled={} surplus={} per_color={:?}", snap.player_id, total_available, total_filled, surplus, per_color_surplus);
-            if snap.player_id == p2_id {
-                p2_surplus = surplus;
-            } else {
+            if snap.player_id == p1_id {
                 p1_surplus = surplus;
+            } else if snap.player_id == p2_id {
+                p2_surplus = surplus;
             }
         }
         game_state.opponent_live_surplus_count = p2_surplus;
@@ -1032,7 +1037,7 @@ impl super::TurnEngine {
             player2_score,
         );
 
-        Self::finalize_snapshot_fields(game_state, player1_won, player2_won, player1_score, player2_score, &player1_id, &player2_id);
+        Self::finalize_snapshot_fields(game_state, player1_won, player2_won, player1_score, player2_score, &player1_id);
         Self::revert_live_success_score_modifiers(game_state, &pre_score_flat);
         Self::process_delayed_gained_effects(game_state);
         Self::merge_late_score_apps(game_state, &player1_id, &player2_id);

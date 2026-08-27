@@ -4,6 +4,7 @@ use rabuka_engine::card::HeartColor;
 use rabuka_engine::turn::TurnEngine;
 
 fn trigger_auto(game: &mut TestGame, target_id: i16) {
+    assert!(game.state.player1.stage.stage.contains(&target_id), "target should be on stage before trigger");
     let pid = game.state.player1.id.clone();
     TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
     game.state.process_pending_auto_abilities(&pid);

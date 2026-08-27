@@ -433,7 +433,19 @@ tdbg!("PHASE_ACTIVE:4 wait activated");
         game_state.yell_occurred = !revealed_ids.is_empty();
         game_state.trigger_auto_abilities_for_player(&performer_id);
         game_state.process_pending_auto_abilities(&performer_id);
-        game_state.yell_occurred = false;
+        // Keep yell_occurred true until ordering choices are resolved so that
+        // yell-triggered autos queued during this window can still pass their
+        // yell_occurred check when the UI resolves the ordering. Only defer
+        // for SelectAutoAbility ordering; other pending choices (e.g. re-yell
+        // discard) should clear the flag so the next yell window is clean.
+        let pending_is_auto_order = game_state
+            .get_pending_choice()
+            .is_some_and(|c| matches!(c, crate::ability::types::Choice::SelectAutoAbility { .. }));
+        if !game_state.has_pending_choice() || !pending_is_auto_order {
+            game_state.yell_occurred = false;
+        } else {
+            log::debug!("[YELL_WINDOW_DEFERRED] performer={} yell_occurred kept true for SelectAutoAbility", performer_id);
+        }
 
         // Rule 8.3.13.1: If a re-yell occurred, apply the rebuilt yell data
         // stashed by execute_perform_yell. The rebuild lives there (not here)

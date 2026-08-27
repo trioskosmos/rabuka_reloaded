@@ -133,6 +133,7 @@ pub(crate) mod atomic {
     /// bytecode-cache init state machine, which on a single-core console only
     /// ever runs from the game thread.
     #[cfg(target_has_atomic = "8")]
+    #[allow(unused_imports)]
     pub use core::sync::atomic::AtomicU8;
 
     #[cfg(not(target_has_atomic = "8"))]

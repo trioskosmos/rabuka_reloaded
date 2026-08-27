@@ -34,7 +34,8 @@ fn kanon_select_three_any_order_and_draw() {
     // Should prompt to select 3 cards (one per group) with any_order
     assert!(game.has_pending_choice(), "should prompt to select CatChu!/KALEIDOSCORE/5yncri5e! (any_order)");
     let ch = game.get_pending_choice().clone();
-    // println!("choice {:?}", ch);
+    // Verify the choice is a card selection (group cards) - use ch to satisfy warning and document expectation
+    assert!(matches!(&ch, rabuka_engine::ability::types::Choice::SelectCard { .. } | rabuka_engine::ability::types::Choice::SelectTarget { .. }), "kanon should offer SelectCard or SelectTarget, got {:?}", ch);
     // Select all three (indices 0,1,2) - order matters for deck bottom
     game.select_indices(&[0, 1, 2]);
     game.drain_auto_ability_choices();

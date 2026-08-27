@@ -813,13 +813,23 @@ impl<'a> ConditionContext<'a> {
         let has_prop = |id: i16| -> bool {
             let c = card_db.get_card(id);
             match prop {
-                "has_blade_heart" => c.is_some_and(|c| c.has_blade_heart()),
+                "has_blade_heart" => {
+                    // For yell-triggered revealed_cards checks, only blade_heart counts (not special_heart score/draw)
+                    // Otherwise (e.g. deck/hand filters) the legacy has_blade_heart (including special) is intended
+                    if location == "revealed_cards" && condition.get_yell_trigger() == Some(true) {
+                        c.is_some_and(|c| c.has_blade_heart_strict())
+                    } else {
+                        c.is_some_and(|c| c.has_blade_heart())
+                    }
+                }
                 "has_score_icon" => c.is_some_and(|c| c.has_score_icon()),
                 "has_all_blade" => c.is_some_and(|c| c.has_all_blade()),
                 _ => false,
             }
         };
-        check_cards.iter().any(|&id| has_prop(id)) != condition.get_negation().unwrap_or(false)
+        let any = check_cards.iter().any(|&id| has_prop(id));
+        let neg = condition.get_negation().unwrap_or(false);
+        any != neg
     }
 
     pub(crate) fn check_baton_touch(&self, condition: &Condition) -> bool {

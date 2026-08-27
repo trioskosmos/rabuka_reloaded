@@ -128,7 +128,6 @@ fn yell_multiple_no_blade_vs_mixed() {
     let filler = game.id("PL!-sd1-010-SD");
     let m_no1 = game.id("PL!S-bp2-002-R");
     let m_no2 = game.new_id("PL!S-bp2-002-R");
-    let m_blade = game.id("PL!-pb1-014-R");
     game.state.player1.stage.stage = [filler, sumire, -1];
     // Two no-blade -> gain
     trigger_yell(&mut game, sumire, filler, &[m_no1, m_no2]);

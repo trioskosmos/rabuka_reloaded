@@ -22,7 +22,6 @@ fn try_baton(replaced_no: &str) -> (bool, usize, usize) {
     g.state.player1.main_deck.cards.push(d1);
     g.state.player1.main_deck.cards.push(d2);
     let deck_before = deck_len(&g);
-    let hand_before = hand_len(&g);
     g.play_to_stage(me, MemberArea::LeftSide);
     let had_choice = g.has_pending_choice();
     if had_choice {
@@ -105,6 +104,6 @@ fn pr045_hand_size_after_draw_discard_net_plus1() {
     g.play_to_stage(me, MemberArea::LeftSide);
     assert!(g.has_pending_choice());
     g.select_indices(&[0]);
-    // Net: drew 2, discarded 1, played 1 -> hand should be before (1) -1 (played) +2 (draw) -1 (discard) =1
-    assert_eq!(hand_len(&g), 1, "hand net should be 1 after baton 7 draw2 discard1");
+    // Net: drew 2, discarded 1, played 1 -> hand should be before (1) -1 (played) +2 (draw) -1 (discard) = hand_before
+    assert_eq!(hand_len(&g), hand_before, "hand net should be hand_before after baton 7 draw2 discard1");
 }

@@ -611,3 +611,4 @@ pub mod n_pb1_017_miyashita_test;
 pub mod sp_bp4_008_position_test;
 pub mod sp_bp1_003_cost_total_test;
 pub mod s_bp3_006_cost_ref_test;
+pub mod sp_bp2_015_proper_gameplay_test;

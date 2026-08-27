@@ -198,7 +198,7 @@ fn mia_q190_choose_heart05_grants_heart05() {
 fn mia_q190_no_live_in_hand_still_prompts_skip() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let mia = setup_mia(&mut game);
+    setup_mia(&mut game);
     let live_for_zone = game.id("PL!-sd1-019-SD");
     let filler = game.id("PL!-sd1-010-SD");
     game.add_to_hand(live_for_zone);

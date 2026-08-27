@@ -54,7 +54,6 @@ fn cost13_exact_boundary_triggers() {
     let mut game = TestGame::new(db);
     let you = game.id("PL!S-PR-029-PR"); // cost 9
     let cost13_exact = game.id("PL!-sd1-003-SD"); // cost 13 exact
-    let cost12 = game.id("PL!N-bp1-007-R"); // cost 13? need cost 12 — use PL!S-bp2-009 is 4, so use cost 12 card PL!S-PR-028? Actually cost 12 card: PL!S-PR-014 cost 15 no, use PL!N-bp1-007 is 13, so need 12: PL!S-bp2-016? Check cost 12: PL!N-bp3-012 is 4, not. Use PL!S-bp2-016 cost? Let's use PL!S-bp2-009 cost 4 as low, not 12. Instead use a known cost 12: PL!N-bp3-003 cost 9, not. Use cost12 card PL!N-bp1-007 is 13, so not. We'll use filler cost 4 as low and exact 13 as boundary — low already tested, but add exact 13 on self.
     game.state.player1.stage.stage = [you, cost13_exact, -1];
     game.state.player2.stage.stage = [-1, -1, -1];
     game.state.recalculate_constants();

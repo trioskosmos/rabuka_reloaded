@@ -1,6 +1,5 @@
 /// Edges for idx82 (Liella baton + energy7 -> 2 wait energy) and idx83 (energy10 -> 3 blade)
 use crate::helpers::*;
-use rabuka_engine::card::HeartColor;
 
 #[test]
 fn liella_baton_with_energy7_places_two_wait() {

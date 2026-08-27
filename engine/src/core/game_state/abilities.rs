@@ -1539,9 +1539,11 @@ impl GameState {
             "player2" => "p2",
             other => other,
         };
+        log::debug!("[PPA_ENTER] raw={} active={} queue_len_before={}", raw_player_id, active_player_id, self.ability_queue.len());
         // Rule 9.5.3.2: Active player resolves ALL their standby abilities first
         // (one at a time, back to rule processing between each)
         self.process_player_abilities(active_player_id);
+        log::debug!("[PPA_AFTER_ACTIVE] queue_len={} has_choice={}", self.ability_queue.len(), self.has_pending_choice());
         if self.has_pending_choice() {
             return;
         }

@@ -137,7 +137,7 @@ fn mebius_restriction_expires_next_live() {
         // We check that success zone is not universally blocked: at least next_live OR mebius could be there
         // Since we are in a new live, the previous block should have expired, so next_live should be placeable if it succeeds
         // This is a smoke test that the restriction does not persist beyond live_end
-        assert!(game.state.player1.success_live_card_zone.cards.len() >= 0, "restriction should have expired");
+        assert_eq!(game.state.player1.success_live_card_zone.cards.len(), 0, "restriction should have expired - success zone empty after live_end");
     } else {
         // If not in live phase, at least verify waitrooms still contain first mebius and success zones are still empty for first
         assert!(game.state.player1.waitroom.cards.contains(&mebius_p1));

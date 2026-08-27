@@ -373,7 +373,7 @@ pub enum ActionType {
 }
 
 impl ActionType {
-    /// Wire-string tables generated from a single list — see [`wire_tables`].
+    // Wire-string tables generated from a single list — see [`wire_tables`].
     wire_tables! {
         // Card movement
         DrawCard => "draw_card",
@@ -585,7 +585,7 @@ pub enum ConditionType {
 }
 
 impl ConditionType {
-    /// Wire-string tables generated from a single list — see [`wire_tables`].
+    // Wire-string tables generated from a single list — see [`wire_tables`].
     wire_tables! {
         Compound => "compound",
         ComparisonCondition => "comparison_condition",

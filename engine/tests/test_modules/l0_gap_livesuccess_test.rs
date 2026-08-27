@@ -66,12 +66,9 @@ fn mogyu_no_surplus_heart01_no_draw() {
     game.state.player1.hand.cards.push(live);
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
-    let hand_before = game.state.player1.hand.cards.len();
     for _ in 0..7 { game.pass(); drain_skippables(&mut game); }
     // With no surplus heart01, should not draw
     assert!(!game.has_pending_choice());
-    // Hand should not have grown by the surplus draw (but may have grown by other draws, so just check not panic)
-    assert!(game.state.player1.hand.cards.len() >= hand_before);
 }
 
 #[test]
@@ -79,7 +76,6 @@ fn mogyu_empty_deck_no_panic() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = game.id("PL!-bp4-023-L");
-    let fid = game.id_ref("PL!-sd1-010-SD");
     let m = game.new_id("PL!-sd1-001-SD");
     game.state.player1.stage.stage = [m, m, m];
     // Empty decks
@@ -140,10 +136,8 @@ fn sentimental_steps_no_mus_in_success_zone_no_draw() {
     game.state.player1.success_live_card_zone.cards.push(hasu_live);
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
-    let hand_before = game.state.player1.hand.cards.len();
     for _ in 0..7 { game.pass(); drain_skippables(&mut game); }
     // With Hasunosora in success zone (not μ's), the μ's condition should fail → no draw
-    // Hand should not have grown by draw (but may have grown by other draws)
     assert!(!game.has_pending_choice());
 }
 

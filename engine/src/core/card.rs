@@ -3954,6 +3954,10 @@ impl Card {
                 .is_some_and(|sh| !sh.hearts.is_empty())
     }
 
+    pub fn has_blade_heart_strict(&self) -> bool {
+        self.blade_heart.is_some()
+    }
+
     pub fn has_score_icon(&self) -> bool {
         self.special_heart
             .as_ref()
