@@ -85,14 +85,14 @@ static void apply_constant_effect(GameState *g, int host_cid, AbilityEffect *e) 
             for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"heart_color")) hc=e->extra_v[i];
             int col=0;
             if(hc){
-                if(!strcmp(hc,"pink")||!strcmp(hc,"heart00")) col=0;
-                else if(!strcmp(hc,"red")) col=1;
-                else if(!strcmp(hc,"yellow")) col=2;
-                else if(!strcmp(hc,"green")) col=3;
-                else if(!strcmp(hc,"blue")) col=4;
-                else if(!strcmp(hc,"purple")) col=5;
-                else if(!strcmp(hc,"orange")) col=6;
-                else if(!strcmp(hc,"all")) col=7;
+                if(!strcmp(hc,"pink")||!strcmp(hc,"heart00")||!strcmp(hc,"heart0")) col=0;
+                else if(!strcmp(hc,"red")||!strcmp(hc,"heart01")||!strcmp(hc,"heart1")) col=1;
+                else if(!strcmp(hc,"yellow")||!strcmp(hc,"heart02")||!strcmp(hc,"heart2")) col=2;
+                else if(!strcmp(hc,"green")||!strcmp(hc,"heart03")||!strcmp(hc,"heart3")) col=3;
+                else if(!strcmp(hc,"blue")||!strcmp(hc,"heart04")||!strcmp(hc,"heart4")) col=4;
+                else if(!strcmp(hc,"purple")||!strcmp(hc,"heart05")||!strcmp(hc,"heart5")) col=5;
+                else if(!strcmp(hc,"orange")||!strcmp(hc,"heart06")||!strcmp(hc,"heart6")) col=6;
+                else if(!strcmp(hc,"all")||!strcmp(hc,"heart07")||!strcmp(hc,"b_all")) col=7;
             }
             int cnt=e->count>=0?e->count:1;
             rb_mods_add_heart(&g->mods, host_cid, col, cnt);
@@ -157,13 +157,13 @@ void rb_recalc_constants(GameState *g) {
                 if (ab.triggers && rb_trigger_is(ab.triggers,"常時") && ab.effect) {
                     AbilityEffect *e=ab.effect;
                     int cond_ok=1;
-                    if(e->has_condition && e->condition) cond_ok=rb_eval_condition(g, pl, e->condition);
+                    if(e->has_condition && e->condition) cond_ok=rb_eval_condition_for_host(g, pl, cid, e->condition);
                     if(cond_ok) apply_constant_effect(g, cid, e);
                     else {
                         for(int i=0;i<e->n_child;i++){
                             AbilityEffect *ch=e->child[i];
                             int ch_ok=1;
-                            if(ch->has_condition && ch->condition) ch_ok=rb_eval_condition(g, pl, ch->condition);
+                            if(ch->has_condition && ch->condition) ch_ok=rb_eval_condition_for_host(g, pl, cid, ch->condition);
                             if(ch_ok) apply_constant_effect(g, cid, ch);
                         }
                     }

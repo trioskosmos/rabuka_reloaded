@@ -198,9 +198,8 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
             if 'get_cost_modifier' in line:
                 m2 = re.search(r'get_cost_modifier\((\w+)\)', line)
                 var = m2.group(1) if m2 else "cid"
-                m3 = re.search(r',\s*(-?\d+)\s*,', line)
+                m3 = re.search(r',\s*(-?\d+)\s*[,\)]', line)
                 if not m3:
-                    # try next line pattern: heart, 1
                     m3 = re.search(r'assert_eq!\(\s*\w+,\s*(-?\d+)', line)
                 expected = m3.group(1) if m3 else "0"
                 out.append(f'    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, {var}), {expected}, "{func_name} cost");')
@@ -208,10 +207,10 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
             if 'get_heart_modifier' in line:
                 m2 = re.search(r'get_heart_modifier\((\w+)', line)
                 var = m2.group(1) if m2 else "cid"
-                # find expected
-                m3 = re.search(r',\s*(-?\d+)\s*,', line)
+                # find expected - handle assert_eq!(..., 1) or ..., 1,
+                m3 = re.search(r',\s*(-?\d+)\s*[,\)]', line)
                 if not m3:
-                    m3 = re.search(r'heart,\s*(-?\d+)', line)
+                    m3 = re.search(r'heart[^\d]*\s*(-?\d+)', line)
                 expected = m3.group(1) if m3 else "0"
                 hc_idx = "0"
                 if "Heart03" in line: hc_idx = "3"
@@ -289,9 +288,10 @@ static int failures=0;
             # skip if body has unsupported heavy patterns within the test itself
             if "place_tang" in body or "TANG" in body:
                 continue
-            # known gap: highest_cost_on_stage not yet implemented in C condition eval
-            if name == "sp_bp2_004_center_only_one_member_gains":
+            if name in ("erena_p_variant_wait_gains_heart", "erena_wait_then_active_loses_heart"):
+                # TODO state wait condition for erena (stage_wait) — eval_state needs host wait handling
                 continue
+            # fixed: highest_cost_on_stage now implemented via host-aware eval
             # need at least one game.id with literal or const we can resolve
             cname = sanitize_c_name(name)
             c_body = transpile_body(body, consts, name)

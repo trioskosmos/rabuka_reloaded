@@ -173,8 +173,50 @@ static int eval_location(const struct GameState *g, int actor, const Condition *
     return actual > 0;
 }
 
-/* ── comparison (variant 2) ── handles count vs threshold generic */
-static int eval_comparison(const struct GameState *g, int actor, const Condition *c) {
+static int eval_highest_cost(const struct GameState *g, int actor, int host_cid, const Condition *c);
+
+static int eval_highest_cost(const struct GameState *g, int actor, int host_cid, const Condition *c) {
+    (void)host_cid;
+    // SP-bp2-004: center member is highest cost among stage members
+    // Condition: position=center, location=stage, operator > (or >=)
+    // Text: "center area has member with greatest cost" — i.e. center member exists and its cost is strictly greater than all others.
+    // This is NOT about host being at center; host is the card whose ability is being evaluated (sumire) which may be at left/right or center.
+    // We check existence of center member and that its cost is max.
+    const RbPlayer *P = &g->p[actor];
+    int center_cid = P->stage[1];
+    if (center_cid == RB_EMPTY_SLOT) return 0;
+    Card center; if (!rb_decode_card_by_index((uint32_t)center_cid, &center)) return 0;
+    int center_cost = center.cost;
+    rb_free_card(&center);
+    int max_other = -1;
+    int count_max = 0;
+    int max_val = -1;
+    for (int i=0;i<RB_STAGE_SIZE;i++) {
+        int cid = P->stage[i];
+        if (cid==RB_EMPTY_SLOT) continue;
+        Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
+        int cst = cc.cost;
+        rb_free_card(&cc);
+        if (cst > max_val) { max_val = cst; count_max = 1; }
+        else if (cst == max_val) count_max++;
+        if (cid != center_cid && cst > max_other) max_other = cst;
+    }
+    // If center is alone, max_other is -1 -> true
+    if (max_other < 0) return 1;
+    const char *op = get_str(c, "operator");
+    if (!op) op = ">";
+    // For ">" the center must be strictly greater than all others
+    if (!strcmp(op, ">")) {
+        return center_cost > max_other;
+    }
+    if (!strcmp(op, ">=")) {
+        return center_cost >= max_other;
+    }
+    // For other ops, compare center_cost vs max_other
+    return eval_operator(center_cost, op, max_other);
+}
+
+static int eval_comparison_inner(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     const char *loc = get_str(c, "location");
     const char *agg = get_str(c, "aggregate");
     const char *ctype = get_str(c, "comparison_type");
@@ -206,6 +248,10 @@ static int eval_comparison(const struct GameState *g, int actor, const Condition
         int thr=0; get_i(c,"count",&thr);
         const char *op=get_str(c,"operator");
         return eval_operator(sum, op, thr);
+    }
+    const char *pos = get_str(c, "position");
+    if (pos && !strcmp(pos, "center") && loc && !strcmp(loc, "stage") && host_cid >= 0) {
+        return eval_highest_cost(g, actor, host_cid, c);
     }
     if (loc) return eval_location(g, actor, c);
     int cnt=0, has_cnt=get_i(c, "count", &cnt);
@@ -397,14 +443,14 @@ static int eval_choice(const struct GameState *g, int actor, const Condition *c)
 static int eval_complex(const struct GameState *g, int actor, const Condition *c){ (void)g;(void)actor;(void)c; return 1; }
 
 
-static int eval_condition_inner(const struct GameState *g, int actor, const Condition *c) {
+static int eval_condition_inner_host(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     if (!c) return 1;
     int negation=0; get_bool(c,"negation",&negation);
     int r=1;
     switch (c->variant) {
         case 0:  r = eval_compound(g, actor, c); break;
         case 1:  r = eval_location(g, actor, c); break;
-        case 2:  r = eval_comparison(g, actor, c); break;
+        case 2:  r = eval_comparison_inner(g, actor, host_cid, c); break;
         case 3:  r = eval_movement(g, actor, c); break;
         case 4:  r = eval_group(g, actor, c); break;
         case 5:  r = eval_appearance(g, actor, c); break;
@@ -426,7 +472,13 @@ static int eval_condition_inner(const struct GameState *g, int actor, const Cond
     }
     return negation ? !r : r;
 }
+static int eval_condition_inner(const struct GameState *g, int actor, const Condition *c) {
+    return eval_condition_inner_host(g, actor, -1, c);
+}
 
 int rb_eval_condition(const struct GameState *g, int actor, const Condition *c) {
     return eval_condition_inner(g, actor, c);
+}
+int rb_eval_condition_for_host(const struct GameState *g, int actor, int host_cid, const Condition *c) {
+    return eval_condition_inner_host(g, actor, host_cid, c);
 }

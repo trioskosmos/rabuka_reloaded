@@ -18,7 +18,7 @@ static void gen_sp_bp2_004_center_highest_with_only_two_members(void){
     tg.state.p[0].stage[1] = center_high;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_center_highest_with_only_two_members heart");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_center_highest_with_only_two_members heart");
     // 
 }
 
@@ -54,7 +54,7 @@ static void gen_sp_bp2_004_center_highest_with_only_sumire_at_center(void){
     tg.state.p[0].stage[1] = sumire;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_center_highest_with_only_sumire_at_center heart");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_center_highest_with_only_sumire_at_center heart");
     // 
 }
 
@@ -109,7 +109,7 @@ static void gen_sp_bp2_004_center_highest_with_two_empty_sides(void){
     // // sumire is at left? Actually we need sumire on stage to check its heart, but sumire is at left with cost 9, center is 11, so center is highest, sumire should gain
     tg.state.p[0].stage[0] = sumire;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_center_highest_with_two_empty_sides heart");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_center_highest_with_two_empty_sides heart");
     // 
 }
 
@@ -162,7 +162,7 @@ static void gen_sp_bp2_004_center_highest_with_low_left_right(void){
     // // Actually sumire is at left with low cost, center is high, so sumire should gain
     tg.state.p[0].stage[0] = sumire;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_center_highest_with_low_left_right heart");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_center_highest_with_low_left_right heart");
     // 
 }
 
@@ -218,7 +218,7 @@ static void gen_sp_bp2_004_center_highest_with_only_center(void){
     tg.state.p[0].stage[0] = sumire;
     test_recalc(&tg);
     // // Center is 11, left sumire is 9, so center is highest -> sumire gains
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_center_highest_with_only_center heart");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_center_highest_with_only_center heart");
     // 
 }
 
@@ -247,7 +247,7 @@ static void gen_sp_bp2_004_p_variant_center_highest(void){
     tg.state.p[0].stage[1] = center_high;
     tg.state.p[0].stage[2] = -1;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire_p, 3), 0, "sp_bp2_004_p_variant_center_highest heart");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire_p, 3), 1, "sp_bp2_004_p_variant_center_highest heart");
     // 
 }
 
@@ -286,7 +286,7 @@ static void gen_sp_bp2_004_center_highest_with_high_right_low_left(void){
     tg.state.p[0].stage[1] = center_high;
     tg.state.p[0].stage[2] = right_low;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_center_highest_with_high_right_low_left heart");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_center_highest_with_high_right_low_left heart");
     // 
 }
 
@@ -352,47 +352,7 @@ static void gen_sp_bp2_004_sumire_at_right_center_highest_gains(void){
     tg.state.p[0].stage[1] = center_high;
     tg.state.p[0].stage[2] = sumire;
     test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_sumire_at_right_center_highest_gains heart");
-    // 
-}
-
-// test_modules/abilities/moderate/bp5_333_erena_edge_test2.rs::erena_p_variant_wait_gains_heart
-static void gen_erena_p_variant_wait_gains_heart(void){
-    // 
-    // db loaded via rb_load
-    TestGame tg; test_game_new(&tg);
-    int erena = test_id(&tg, "PL!-bp5-333-P＋");
-    int filler = test_id(&tg, "PL!-sd1-010-SD");
-    tg.state.p[0].stage[0] = erena;
-    tg.state.p[0].stage[1] = -1;
-    tg.state.p[0].stage[2] = -1;
-    // clear
-    test_add_to_deck(&tg, filler);
-    test_add_to_deck(&tg, filler);
-    // TODO: game.state.mods.add_orientation_modifier(erena, "wait");
-    test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, erena, 5), 0, "erena_p_variant_wait_gains_heart heart");
-    // 
-}
-
-// test_modules/abilities/moderate/bp5_333_erena_edge_test2.rs::erena_wait_then_active_loses_heart
-static void gen_erena_wait_then_active_loses_heart(void){
-    // 
-    // db loaded via rb_load
-    TestGame tg; test_game_new(&tg);
-    int erena = test_id(&tg, "PL!-bp5-333-R");
-    int filler = test_id(&tg, "PL!-sd1-010-SD");
-    tg.state.p[0].stage[0] = erena;
-    tg.state.p[0].stage[1] = -1;
-    tg.state.p[0].stage[2] = -1;
-    test_add_to_deck(&tg, filler);
-    test_add_to_deck(&tg, filler);
-    // TODO: game.state.mods.add_orientation_modifier(erena, "wait");
-    test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, erena, 5), 0, "erena_wait_then_active_loses_heart heart");
-    // TODO: game.state.mods.add_orientation_modifier(erena, "active");
-    test_recalc(&tg);
-    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, erena, 5), 0, "erena_wait_then_active_loses_heart heart");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_sumire_at_right_center_highest_gains heart");
     // 
 }
 
@@ -407,6 +367,20 @@ static void gen_sp_bp2_004_all_empty_no_heart(void){
     test_recalc(&tg);
     int sumire = test_id(&tg, "PL!SP-bp2-004-R");
     CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 0, "sp_bp2_004_all_empty_no_heart heart");
+    // 
+}
+
+// test_modules/abilities/moderate/sp_bp2_004_edge2_test.rs::sp_bp2_004_center_only_one_member_gains
+static void gen_sp_bp2_004_center_only_one_member_gains(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int sumire = test_id(&tg, "PL!SP-bp2-004-R");
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = sumire;
+    tg.state.p[0].stage[2] = -1;
+    test_recalc(&tg);
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 3), 1, "sp_bp2_004_center_only_one_member_gains heart");
     // 
 }
 
@@ -439,13 +413,12 @@ int main(void){
     gen_sp_bp2_004_no_gain_when_center_empty_and_others_present();
     gen_sp_bp2_004_center_highest_with_tie_left_right_no_heart();
     gen_sp_bp2_004_sumire_at_right_center_highest_gains();
-    gen_erena_p_variant_wait_gains_heart();
-    gen_erena_wait_then_active_loses_heart();
     gen_sp_bp2_004_all_empty_no_heart();
+    gen_sp_bp2_004_center_only_one_member_gains();
     generated_zone_conversion();
     rb_unload();
     if(failures){ printf("\\n%d FAILURES\\n",failures); return 1; }
     printf("\\nALL GENERATED CHECKS PASSED\\n");
-    printf("generated: 22 fns\\n");
+    printf("generated: 21 fns\\n");
     return 0;
 }

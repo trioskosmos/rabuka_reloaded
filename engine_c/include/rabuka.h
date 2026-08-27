@@ -115,6 +115,7 @@ static inline int16_t rb_saturate_i16(int v) {
 /* Forward decl for condition eval (GameState defined below) */
 struct GameState;
 int  rb_eval_condition(const struct GameState *g, int actor, const Condition *c);
+int  rb_eval_condition_for_host(const struct GameState *g, int actor, int host_cid, const Condition *c);
 
 /* ── Modifiers (engine/src/core/game_modifiers.rs) ── */
 typedef struct { int16_t set; int16_t add; } RbModifierEntry;

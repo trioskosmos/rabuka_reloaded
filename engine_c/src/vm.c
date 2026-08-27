@@ -291,7 +291,7 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
             } else skip_value(r, tag);
             continue;
         }
-        /* scalar extras (stringify) */
+        /* scalar extras (stringify) — also handle heart_colors array */
         if (tag == RB_TAG_STR) {
             uint32_t idx; if (rd_idx(r, &idx)) effect_set_extra(e, key, rb_get_string(idx));
         } else if (tag == RB_TAG_I64) {
@@ -300,6 +300,23 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
             effect_set_extra(e, key, "true");
         } else if (tag == RB_TAG_FALSE) {
             effect_set_extra(e, key, "false");
+        } else if (tag == RB_TAG_ARRAY) {
+            // heart_colors: ["heart03"] etc. — capture first element as heart_color
+            uint32_t n; if (!rd_len(r, &n)) { skip_value(r, tag); continue; }
+            if (n==0) continue;
+            // peek first element
+            uint8_t etag; if (!rd_u8(r, &etag)) continue;
+            if (etag == RB_TAG_STR) {
+                uint32_t eidx; if (rd_idx(r, &eidx)) {
+                    const char *es = rb_get_string(eidx);
+                    if (key && (!strcmp(key,"heart_colors") || !strcmp(key,"heart_color"))) effect_set_extra(e, "heart_color", es);
+                    else effect_set_extra(e, key, es);
+                }
+            } else if (etag == RB_TAG_I64) {
+                int64_t ev; if (rd_int(r, &ev)) { char buf[24]; snprintf(buf,sizeof(buf),"%lld",(long long)ev); effect_set_extra(e, key, buf); }
+            }
+            // skip remaining elements
+            for (uint32_t j=1;j<n;j++) skip_one(r);
         } else {
             skip_value(r, tag);
         }
