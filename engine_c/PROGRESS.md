@@ -1,6 +1,6 @@
 # engine_c — C Port of the Rabuka Engine
 
-**Status: Foundation v0 — compiles, decodes, and runs a demo match on PC.** Not yet a faithful port. The data pipeline + decoder + skeleton turn loop are proven; the remaining work — faithful effect execution, conditions, choices, triggers, and the full Live/performance machine — slots in without restructuring.
+**Status: v0.1 — decodes faithfully (variant-byte fix), Constant cost/heart/score modifiers green, 35 ported tests automated (13 hanayo + 22 generated).** Foundation + first mass-port batch proven; remaining work — Live/performance snapshots, move_cards/choice, and remaining 240 simple constant tests — slots in without restructuring. `make test` green on 4 binaries.
 
 > **Scope invariant:** The C rewrite is **only game logic**. Card data and ability bytecode are *generated artifacts* embedded as data, not hand-rewritten:
 > - `cards.bin` — compiled card records (`cards/compile_cards.py`, 2526 cards)
