@@ -68,6 +68,55 @@ static int count_in_zone(const struct GameState *g, int pl, const char *loc) {
     }
     return 0;
 }
+static int count_distinct_in_zone(const struct GameState *g, int pl, const char *loc) {
+    if (!loc) return 0;
+    const RbPlayer *P = &g->p[pl];
+    int ids[RB_MAX_ZONE]; int n=0;
+    if (!strcmp(loc, "hand")){ for(int i=0;i<P->hand.n;i++) ids[n++]=P->hand.cards[i]; }
+    else if (!strcmp(loc, "stage")){ for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]!=RB_EMPTY_SLOT) ids[n++]=P->stage[i]; }
+    else if (!strcmp(loc, "deck")){ for(int i=0;i<P->deck.n;i++) ids[n++]=P->deck.cards[i]; }
+    else if (!strcmp(loc, "discard")||!strcmp(loc,"waitroom")){ for(int i=0;i<P->discard.n;i++) ids[n++]=P->discard.cards[i]; }
+    else return count_in_zone(g,pl,loc);
+    /* distinct by card name string */
+    int distinct=0;
+    for(int i=0;i<n;i++){
+        Card ci; if(!rb_decode_card_by_index((uint32_t)ids[i],&ci)) continue;
+        int seen=0;
+        for(int j=0;j<i;j++){
+            Card cj; if(!rb_decode_card_by_index((uint32_t)ids[j],&cj)) continue;
+            if(!strcmp(ci.name, cj.name)) seen=1;
+            rb_free_card(&cj);
+            if(seen) break;
+        }
+        if(!seen) distinct++;
+        rb_free_card(&ci);
+    }
+    return distinct;
+}
+static int zone_count_filtered(const struct GameState *g, int pl, const char *loc, const char *card_type){
+    int base = count_in_zone(g,pl,loc);
+    if(!card_type) return base;
+    /* filter: live_card vs member_card vs energy_card */
+    const RbPlayer *P=&g->p[pl];
+    int ids[RB_MAX_ZONE]; int n=0;
+    if (!strcmp(loc, "hand")){ for(int i=0;i<P->hand.n;i++) ids[n++]=P->hand.cards[i]; }
+    else if (!strcmp(loc, "stage")){ for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]!=RB_EMPTY_SLOT) ids[n++]=P->stage[i]; }
+    else return base; /* other zones: no filter for now */
+    int filtered=0;
+    for(int i=0;i<n;i++){
+        Card c; if(!rb_decode_card_by_index((uint32_t)ids[i],&c)) continue;
+        int is_live = (c.n_hearts==0 && c.cost==0 && c.blade==0);
+        int is_member = !is_live;
+        int match=0;
+        if(!strcmp(card_type,"live_card") && is_live) match=1;
+        else if(!strcmp(card_type,"member_card") && is_member) match=1;
+        else if(!strcmp(card_type,"energy_card")) match=0; /* no energy cards in hand/stage */
+        else if(!strcmp(card_type,"card")) match=1;
+        if(match) filtered++;
+        rb_free_card(&c);
+    }
+    return filtered;
+}
 
 /* Forward */
 static int eval_condition_inner(const struct GameState *g, int actor, const Condition *c);
@@ -93,6 +142,14 @@ static int eval_location(const struct GameState *g, int actor, const Condition *
     int has_count = 0; int cnt_thr = 1;
     int tmp;
     has_count = get_i(c, "count", &tmp); if (has_count) cnt_thr = tmp;
+    /* distinct flag — if true, count distinct card names not total cards */
+    int distinct=0; get_bool(c,"distinct",&distinct);
+    if(!distinct){
+        const CondValue *dv=find_val(c,"distinct");
+        if(dv && dv->tag==RB_TAG_OBJVAR && dv->cond){
+            for(uint32_t i=0;i<dv->cond->n_fields;i++) if(!strcmp(dv->cond->fields[i].key,"distinct") && dv->cond->fields[i].v.tag==RB_TAG_TRUE) distinct=1;
+        }
+    }
     /* location field may be in 'location' or 'locations' arr */
     const char *loc = get_str(c, "location");
     if (!loc) {
@@ -101,7 +158,11 @@ static int eval_location(const struct GameState *g, int actor, const Condition *
     }
     if (!loc) loc = "stage";
     int pl = target_player_idx(actor, c);
-    int actual = count_in_zone(g, pl, loc);
+    const char *ctype = get_str(c, "card_type");
+    int actual = 0;
+    if (ctype) actual = zone_count_filtered(g, pl, loc, ctype);
+    else if (distinct) actual = count_distinct_in_zone(g, pl, loc);
+    else actual = count_in_zone(g, pl, loc);
 
     /* 'all' flag means require all slots filled etc. For now treat as count check */
     if (has_count) {

@@ -290,7 +290,7 @@ Each phase ends with a **concrete, runnable verification** — no phase is "done
 - **Files:** `src/phase.c:1`, `src/triggers.c:1`, `src/ability_queue.c:1`, `include/rabuka.h:280`, `src/engine.c:471`
 - **Verify:** `make test` RPS→Active→Energy→Draw→Main→LiveSet→Performance→Victory walk with `0xCAFE` seed; `rb_trigger_is` unit covered via `tests/replay.c`
 
-### Phase 5 — Live / performance (DONE — faithful core, snapshot stub)
+### Phase 5 — Live / performance (IN PROGRESS — core pass/fail done, snapshots pending)
 
 **Scope:** A yelled Live produces the same hearts, allocations, verdicts, scores, and snapshots as Rust.
 
@@ -298,40 +298,48 @@ Each phase ends with a **concrete, runnable verification** — no phase is "done
 - [x] `src/stats_pipeline.c:1` — `rb_effective_need_heart` (base `need` + `need_heart` mods) and `rb_stage_hearts_pipeline` single source (`engine/src/core/stats_pipeline.rs`)
 - [x] Allocation — greedy `icon_all` (col 7) covers `heart0` bucket then per-color deficits (`pool[1..6]`→`required[1..6]`); `total_pool<total_req` fast-fail; heart0 any-color rule
 - [x] Verdict — per-live `required[8]` via `rb_effective_need_heart`, `score` via `score` mods, move to `success` on `all_pass` else `discard` + yell discard; `re_yell`/`perform_yell` deferred via `rb_execute_effect` children path
-- [x] Snapshots/surplus stubbed (full `LivePerformanceData` breakdown deferred to Phase 7 golden harness) — core pass/fail and scoring are faithful; `make test` live scenario asserts `live.n==0` and `score` non-decreasing
+- [ ] Snapshots/surplus — full `LivePerformanceData { lives[], total_hearts, breakdown, member_contributions, total_score, success, surplus_hearts }` plus `re_yell` rebuild (`pending_reyell_rebuild`), `LiveSuccess` trigger → `drain_pending_live_success_choices` → `populate_live_verdicts` → `finalize_snapshot_fields` → `compute_surplus_and_flags` not yet; currently stubbed, `make test` live scenario asserts `live.n==0` and `score` non-decreasing but does not diff against `cargo run --bin trace_game` oracle
 - **Files:** `src/live.c:1` (~169 LOC), `src/stats_pipeline.c:1`, `include/rabuka.h:286`, `src/engine.c:465` (`live_phase`→`rb_perform_live`)
-- **Verify:** `tests/replay.c:scenario_live_performance` + `make test` `ALL REPLAY CHECKS PASSED`; full snapshot parity against `cargo run --bin trace_game` queued for Phase 7
+- **Verify:** `tests/replay.c:scenario_live_performance` + `make test` `ALL REPLAY CHECKS PASSED`; **still missing:** snapshot parity against `cargo run --bin trace_game` oracle; will add `tests/fixtures/live_snapshot.json` and `RB_TRACE` diff before marking DONE
 
-### Phase 6 — Effect verb completion (DONE — 42/42 verbs present, faithful core)
+### Phase 6 — Effect verb completion (IN PROGRESS — 42/42 strings present, semantics partial)
 
 **Scope:** Remaining 30 verb handlers implemented to match `ability/effects/*.rs` + `ability/move_cards.rs`.
 
-- [x] **Movement cluster** — `move_cards` in `src/engine.c:224` with typed `RbZone` dispatch (`hand`/`stage`/`waitroom`/`energy`/`deck`/`deck_top`/`deck_bottom`/`live`/`success` + `those_cards`/`recently_moved`/`looked_at`→`hand` stub, `deck_top_or_bottom` `toTop`, `count` semantics, `card_type` filter stub)
-- [x] **Look/select cluster** — `look_at`/`look_and_select`/`select_cards`/`select`/`reveal*` in `src/engine.c:239` emit `RB_CHOICE_SELECT_CARD` (`zone`=`looked_at`, `card_type` via `extra`, `allow_skip`= `is_optional`), host drains via `rb_resume_with_choice`
-- [x] **State cluster** — `change_state` via `RbMods` orientation `src/engine.c:228`, `position_change`/`rotation` left↔right swap `src/engine.c:289`, `place_energy_under_member` via `gain_resource`, `set_blade_type`/`set_heart_type` trace no-op, `choose_required_hearts` no-op
-- [x] **Cost/modifier cluster** — `modify_cost`/`set_cost`/`set_cost_to_use`/`modify_yell_*` via `RbMods` `src/engine.c:248` (target first staged or hand), `modify_required_hearts`/`_global`/`_success` via `need_heart` `src/engine.c:265`, `gain_resource`/`pay_energy` with caps, `reduce_live_card_set_limit` no-op
-- [x] **Ability cluster** — `gain_ability`/`gain_ability_from_source`/`invalidate_ability`/`suppress_ability_trigger`/`activate_ability` no-op with trace
-- [x] **Compound control** — `sequential` children recursion in `src/engine.c:159` (pending-gated per child), `conditional_alternative`/`conditional_on_result`/`conditional_on_optional`/`choice` emit `SELECT_TARGET`, `repeat_procedure`/`re_yell`/`perform_yell`/`custom`/`do_nothing` as no-ops after children
-- [x] **Utility** — `shuffle` Fisher-Yates `src/engine.c:27`, `discard_until_count`, `re_yell`/`perform_yell` deferred, `play_baton_touch`/`double_baton_touch` `src/engine.c:297`, `choose_target_player` → `self_or_opponent`
+- [x] **Movement cluster — strings present** — `move_cards` in `src/engine.c:224` with typed `RbZone` dispatch (`hand`/`stage`/`waitroom`/`energy`/`deck`/`deck_top`/`deck_bottom`/`live`/`success` + `deck_top_or_bottom` `toTop`, `count` semantics)
+- [ ] **Movement cluster — still missing** — `card_type`/`group`/`card_property` filters (`ability/move_cards.rs:3780` `CardFilter`), `those_cards`/`RecentlyMoved`/`LookedAtRemaining` relay (requires `selected_cards`/`revealed_cards` pools), `count=-1` drain-all, `destination` `under_member`/`same_area`/`empty_area` placement, baton cost-reduction (`cost_modifiers` on replaced member), back-fill after vacate
+- [x] **Look/select cluster — emit present** — `look_at`/`look_and_select`/`select_cards`/`select`/`reveal*` in `src/engine.c:239` emit `RB_CHOICE_SELECT_CARD` (`zone`=`looked_at`, `card_type` via `extra`, `allow_skip`= `is_optional`), host drains via `rb_resume_with_choice`
+- [ ] **Look/select cluster — still missing** — `looked_at` pool vs `revealed_cards` distinction, `looked_at_remaining` → discard vs deck, `keep_shuffle_under` 2-phase (`ability/look.rs:1211`), `select` `heart_colors`/`group` filter exact match
+- [x] **State cluster — basic** — `change_state` via `RbMods` orientation `src/engine.c:228`, `position_change`/`rotation` left↔right swap `src/engine.c:289`, `place_energy_under_member` via `gain_resource`
+- [ ] **State cluster — still missing** — `formation_plan` swap batch (`position_change` multiple targets), `set_blade_type` recolor persistence via `blade_type_modifiers`, `set_blade_count`/`set_heart_type`/`choose_required_hearts` property rewrites persisting beyond one turn
+- [x] **Cost/modifier cluster — basic** — `modify_cost`/`set_cost`/`set_cost_to_use`/`modify_yell_*` via `RbMods` `src/engine.c:248` (target first staged or hand), `modify_required_hearts`/`_global`/`_success` via `need_heart` `src/engine.c:265`, `gain_resource`/`pay_energy` with caps
+- [ ] **Cost/modifier cluster — still missing** — per-card cost/yell `heart_copy`/`multiplier` interaction, `set_cost` set-override vs additive stacking, global `constant_global_need_heart` apply to all lives vs single target
+- [x] **Ability cluster — strings present** — `gain_ability`/`gain_ability_from_source`/`invalidate_ability`/`suppress_ability_trigger`/`activate_ability` no-op with trace
+- [ ] **Ability cluster — still missing** — `push_temporary_effect` with `Duration`/`TemporaryEffect` expiry, `revocation` maps, `activate_ability` immediate execute, `gain_ability_from_source` source filter
+- [x] **Compound control — basic** — `sequential` children recursion in `src/engine.c:159` (pending-gated per child), `conditional_alternative`/`conditional_on_result`/`conditional_on_optional`/`choice` emit `SELECT_TARGET`, `repeat_procedure`/`re_yell`/`perform_yell`/`custom`/`do_nothing` as no-ops after children
+- [ ] **Compound control — still missing** — `repeat_procedure` one-at-a-time feeding (`pending_repeat_actions`), `re_yell`/`perform_yell` deferred rebuild of `total_hearts` before verdict
+- [x] **Utility — present** — `shuffle` Fisher-Yates `src/engine.c:27`, `discard_until_count`, `play_baton_touch`/`double_baton_touch` `src/engine.c:297`, `choose_target_player` → `self_or_opponent`
+- **Files:** `src/engine.c:182` verb dispatch (42/42 branches), `src/choice.c:1` emit
+- **Still missing overall:** `src/effects_move.c`/`src/effects_look.c` split (currently collapsed in `engine.c`), per-zone unit tests, `make audit` still shows 42 distinct but handlers are stubs; will split and add fixtures before marking DONE
 
-**Files:** `src/engine.c:182` verb dispatch (42/42 branches), `src/choice.c:1` emit
-**Verify:** `make audit` verb census 42 distinct + `tests/replay.c` `move_cards`/`choice` fixtures; `make test` green
-
-### Phase 7 — Parity harness & CI (DONE — scaffold, golden queued)
+### Phase 7 — Parity harness & CI (IN PROGRESS — scaffold green, not parity)
 
 **Scope:** Any behavioral drift from Rust is caught by automated replay.
 
 - [x] `tests/replay.c:1` — 4 embedded fixtures (draw+score, live via mods, `move_cards` typed zones, condition 99→skip/1→fire) no-JSON dep, `make test` runs `rb_engine_test` + `rb_engine_replay` → `ALL REPLAY CHECKS PASSED`; fixture shape mirrors `engine/tests/**` `GameState`+`action`+`expected`
 - [x] Property smoke in `tests/test_basic.c:47` random 300-turn walk never panics, zones in caps, winner decided or turn limit
-- [ ] Golden snapshot (queued) — `cargo run --bin trace_game` dumps `LivePerformanceData`/`verdicts`/`rule_log` diffed against C `--trace` (`RB_TRACE`) for 100 seeds; plumbing is `make audit` verb census + `tests/replay.c` harness ready to ingest `tests/fixtures/*.json` when `cards/test_inventory.py --check` style dump lands (hand-author 20 fixtures next, then `cargo test -- --format json` dumper)
-- **Wire into CI:** `make test` green is gating; `make regen` (`tools/gen_from_rs.py`+`gen_bytecode.py` → `git diff --stat` empty) queued for CI check parity with `cards/test_inventory.py --check`
+- [ ] Golden snapshot — `cargo run --bin trace_game` dumps `LivePerformanceData`/`verdicts`/`rule_log` diffed against C `--trace` (`RB_TRACE`) for 100 seeds; plumbing is `make audit` verb census + `tests/replay.c` harness ready to ingest `tests/fixtures/*.json` when `cards/test_inventory.py --check` style dump lands (hand-author 20 fixtures: debut, LiveStart, LiveSuccess, cost-gated activation, baton, re-yell, mulligan, prohibition tie)
+- [ ] JSON loader — `tests/replay_json.h` (jsmn or hand-rolled, no cJSON) to load `tests/fixtures/*.json` and drive `rb_advance_phase`/`rb_resume_with_choice` vs Rust oracle
+- [ ] CI gate — `make regen` (`tools/gen_from_rs.py`+`gen_bytecode.py` → `git diff --stat` empty) and `cards/test_inventory.py --check` parity check not yet wired into GH Actions for `engine_c`
+- **Wire into CI:** `make test` green is gating; will gate on `make audit && make test && make replay` with fixture diff before marking DONE
 
-### Phase 8 — Portable targets (DONE — allocator+streaming, SDL shim queued)
+### Phase 8 — Portable targets (IN PROGRESS — allocator+streaming done, shims present but not CI)
 
 - [x] **Allocator abstraction** — `RB_NO_MALLOC` bump-alloc fallback (`src/alloc.c:5` 512 KB arena): `rb_malloc`/`rb_free` route to `malloc` on hosted, to arena on bare metal. `rb_unload` no-op on arena; PC free-checked
 - [x] **Data streaming** — `rb_load_streaming(dir, read_fn)` `src/data.c:134` alternative to `rb_load(dir)`: `fread` on hosted *or* streamed from ROM/CD/flash sector-by-sector via `read_fn` callback; 1 MB CD-i etc. stream `bytecode_blob`+`cards.bin` on demand (`rb_card_record`/`rb_bc_slice` cache)
 - [x] **No `fopen`/`printf` in `src/`** except `src/data.c:rb_load` / `src/main.c`; `src/vm.c`/`src/engine.c` compile `-ffreestanding` clean
-- [ ] **Platform shims** (queued) — `platforms/sdl/main.c` hosted reference (window+input→`Choice`, mirrors `ports/3ds`), `platforms/cdi/cdi_main.c`/`platforms/ds/main.c` each only `platform_read_file`/`platform_input_poll`/`platform_render_text`/`platform_random_seed`; toolchain `gcc`/`clang`/`m68k-elf-gcc`/`arm-none-eabi-gcc` all `-std=c11 -O2 -Wall -Wextra -Wpedantic -ffreestanding`
+- [x] **Platform shims — files present** — `platforms/sdl/main.c` hosted reference (window+input→`Choice`), `platforms/cdi/cdi_main.c` bare-metal stub; each only `platform_read_file`/`platform_input_poll`/`platform_render_text`/`platform_random_seed`
+- [ ] **Platform shims — still missing** — `platforms/cdi` linker script (`app at $8000`), `m68k-elf-gcc` build, 1 MB RAM profiling (heart tables precomputed, not malloc'd), `platforms/sdl` `Makefile` target `make -C platforms/sdl` + `RB_NO_MALLOC=1 make -C engine_c` CI matrix
 - **Verify:** `RB_NO_MALLOC=1 make -C engine_c` builds; each shim (when landed) boots, seeds RNG, completes match within RAM budget (CD-i stream, not cache)
 
 ---
