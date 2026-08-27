@@ -49,9 +49,10 @@ void rb_advance_phase(GameState *g) {
     if(g->phase==RB_PHASE_MAIN){
         /* In the two-attacker model, after first attacker's Main we flip
            active to second attacker and re-enter Active. If this was already
-           the second attacker, proceed to LiveSet. */
-        static int main_count=0;
-        main_count++;
+           the second attacker, proceed to LiveSet. Mirrors
+           engine/src/turn/phases.rs: TurnPhase::FirstAttackerNormal → SecondAttackerNormal → Live.
+           No static: use g->active vs g->first_attacker as the turn discriminator
+           (static would leak across games and break determinism). */
         if(g->active==g->first_attacker){
             g->active=g->second_attacker;
             g->phase=RB_PHASE_ACTIVE;
@@ -59,7 +60,6 @@ void rb_advance_phase(GameState *g) {
             g->active=g->first_attacker; /* Live first_attacker starts */
             g->phase=RB_PHASE_LIVE_SET;
         }
-        if(main_count>=2) main_count=0;
         return;
     }
     if(g->phase==RB_PHASE_LIVE_SET){

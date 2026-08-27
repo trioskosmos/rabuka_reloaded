@@ -308,6 +308,8 @@ typedef struct {
     int n_lives;
     int total_score;
     int success; /* 1 if all_pass */
+    int surplus_hearts; /* total_pool - total_required, -1 on fail */
+    int note_icons;
 } RbLiveSnapshot;
 
 #define RB_MAX_SNAPSHOTS 64

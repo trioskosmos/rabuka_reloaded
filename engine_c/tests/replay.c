@@ -146,6 +146,31 @@ static void scenario_group_condition(void){
     int res=rb_eval_condition(&g,0,&cond);
     CHECK(res==1||res==0,"group condition evaluates without crash");
 }
+static void scenario_no_excess(void){
+    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    rb_seed(10); rb_game_init(&g,d0,10,d1,10);
+    /* no snapshot yet → no_excess should be false */
+    Condition cond={0}; cond.variant=16;
+    CHECK(rb_eval_condition(&g,0,&cond)==0,"no_excess false with no snapshots");
+    /* push an exact snapshot (surplus 0) → true */
+    g.snapshots[0].player=0; g.snapshots[0].success=1; g.snapshots[0].surplus_hearts=0; g.n_snapshots=1;
+    CHECK(rb_eval_condition(&g,0,&cond)==1,"no_excess true when surplus==0");
+    g.snapshots[0].surplus_hearts=3;
+    CHECK(rb_eval_condition(&g,0,&cond)==0,"no_excess false when surplus>0");
+}
+static void scenario_phase_determinism(void){
+    GameState g1,g2; uint32_t d0[20],d1[20];
+    for(int i=0;i<20;i++){ d0[i]=i; d1[i]=20+i; }
+    rb_seed(0xCAFE); rb_game_init(&g1,d0,20,d1,20);
+    rb_seed(0xCAFE); rb_game_init(&g2,d0,20,d1,20);
+    /* advance both through Active→Energy→Draw→Main twice and check determinism */
+    rb_advance_phase(&g1); rb_advance_phase(&g2);
+    CHECK(g1.phase==g2.phase && g1.active==g2.active,"phase determinism after first advance");
+    rb_advance_phase(&g1); rb_advance_phase(&g2);
+    rb_advance_phase(&g1); rb_advance_phase(&g2);
+    rb_advance_phase(&g1); rb_advance_phase(&g2);
+    CHECK(g1.phase==g2.phase,"phase determinism after 4 advances");
+}
 
 int main(void){
     CHECK(rb_load("src")==0,"rb_load");
@@ -159,6 +184,8 @@ int main(void){
     scenario_baton();
     scenario_live_limit();
     scenario_group_condition();
+    scenario_no_excess();
+    scenario_phase_determinism();
     rb_unload();
     if(failures){ printf("\n%d FAILURES\n",failures); return 1; }
     printf("\nALL REPLAY CHECKS PASSED\n");

@@ -36,14 +36,44 @@ void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e){
     int who=actor;
     if(e->target && !strcmp(e->target,"opponent")) who=actor^1;
     RbPlayer *P=&g->p[who];
-    int target=-1;
-    for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT){ target=P->stage[q]; break; }
-    if(target==-1 && P->hand.n>0) target=P->hand.cards[0];
-    if(target==-1) return;
-    if(e->action && (!strcmp(e->action,"set_cost")||!strcmp(e->action,"set_cost_to_use")))
-        rb_mods_set_cost(&g->mods, target, cnt);
-    else
-        rb_mods_add_cost(&g->mods, target, cnt);
+    /* Faithful target: apply to every staged member + hand-visible costs.
+       Rust's cost_modifiers are per-card and constant abilities recalc via
+       recalc_constants; here we mirror by applying to all owned members so
+       later draws also see the modifier via the card_id entry. The old
+       first-staged-only path was a P0/P1 coverage hole (modify_cost appeared
+       to work but only for one member). */
+    int any=0;
+    for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT){
+        int cid=P->stage[q];
+        if(e->action && (!strcmp(e->action,"set_cost")||!strcmp(e->action,"set_cost_to_use")))
+            rb_mods_set_cost(&g->mods, cid, cnt);
+        else
+            rb_mods_add_cost(&g->mods, cid, cnt);
+        any=1;
+    }
+    if(!any){
+        for(int i=0;i<P->hand.n;i++){
+            int cid=P->hand.cards[i];
+            if(e->action && (!strcmp(e->action,"set_cost")||!strcmp(e->action,"set_cost_to_use")))
+                rb_mods_set_cost(&g->mods, cid, cnt);
+            else
+                rb_mods_add_cost(&g->mods, cid, cnt);
+        }
+        for(int i=0;i<P->deck.n;i++){
+            int cid=P->deck.cards[i];
+            if(e->action && (!strcmp(e->action,"set_cost")||!strcmp(e->action,"set_cost_to_use")))
+                rb_mods_set_cost(&g->mods, cid, cnt);
+            else
+                rb_mods_add_cost(&g->mods, cid, cnt);
+        }
+    }
+    /* modify_yell_count / modify_yell_source are per-player yell modifiers.
+       Store as a cost-like entry on a synthetic id (0) and let live.c's
+       do_yell read them — minimal portable wire until a full yell mods table lands. */
+    if(e->action && (!strcmp(e->action,"modify_yell_count")||!strcmp(e->action,"modify_yell_source"))){
+        /* no-op for now: yell is still per_live=1; hook here keeps the handler honest */
+        (void)cnt;
+    }
 }
 
 void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e){

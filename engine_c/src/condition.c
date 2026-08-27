@@ -301,12 +301,12 @@ static int eval_resource(const struct GameState *g, int actor, const Condition *
 }
 static int eval_no_excess(const struct GameState *g, int actor, const Condition *c){
     int pl=target_player_idx(actor,c);
-    /* NoExcessHeart: check if last live had no surplus hearts (all_exact) */
-    /* Use snapshots: if any snapshot for player has success and surplus 0 */
-    for(int i=0;i<g->n_snapshots;i++) if(g->snapshots[i].player==pl && g->snapshots[i].success){
-        int surplus=0; for(int k=0;k<8;k++) surplus+=g->snapshots[i].total_hearts[k];
-        /* simplified: if total_hearts == required for lives, surplus small */
-        if(surplus<=4) return 1;
+    /* NoExcessHeart: check if last live had no surplus hearts (all_exact)
+       Mirrors engine/src/turn/live.rs compute_surplus_and_flags → surplus_hearts == 0.
+       We now snapshot surplus directly in live.c (total_pool - total_required). */
+    for(int i=g->n_snapshots-1;i>=0;i--) if(g->snapshots[i].player==pl && g->snapshots[i].success){
+        if(g->snapshots[i].surplus_hearts==0) return 1;
+        if(g->snapshots[i].surplus_hearts>=0) return 0; /* most recent snapshot decides */
     }
     return 0;
 }

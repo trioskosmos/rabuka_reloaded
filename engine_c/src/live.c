@@ -62,15 +62,19 @@ static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_LIVE_CARDS*3], in
 }
 
 /* Greedy allocation: assign total_hearts[8] to each live's required[8] (need_heart).
-   Returns 1 if all lives pass. */
-static int allocate_and_verdict(const GameState *g, int pl, const int total_hearts[8], int *out_passed, int *out_score){
+    Returns 1 if all lives pass. Also computes surplus (total - required) for
+    no_excess checks — mirrors engine/src/turn/live.rs compute_surplus_and_flags
+    which snapshots use for NoExcessHeart condition gating. */
+static int allocate_and_verdict(const GameState *g, int pl, const int total_hearts[8], int *out_passed, int *out_score, int *out_surplus){
     RbPlayer *P=(RbPlayer*)&g->p[pl];
     int total_score=0;
     int all_pass=1;
     int pool[8]; memcpy(pool,total_hearts,8*sizeof(int));
+    int total_required_all=0;
     for(int li=0; li<P->live.n; li++){
         int required[8]={0};
         rb_effective_need_heart(g, P->live.cards[li], required);
+        for(int k=0;k<8;k++) total_required_all+=required[k];
         /* allocation: total coverage check */
         int total_req=0,total_pool=0; for(int k=0;k<8;k++){ total_req+=required[k]; total_pool+=pool[k]; }
         if(total_pool < total_req){ all_pass=0; continue; }
@@ -121,6 +125,11 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
     }
     if(out_passed) *out_passed=all_pass;
     if(out_score) *out_score=total_score;
+    if(out_surplus){
+        int total_pool=0; for(int k=0;k<8;k++) total_pool+=total_hearts[k];
+        *out_surplus = all_pass ? (total_pool - total_required_all) : -1;
+        if(*out_surplus < 0 && all_pass) *out_surplus = 0;
+    }
     return all_pass;
 }
 
@@ -139,15 +148,18 @@ int rb_perform_live(GameState *g, int pl){
     /* add ability-granted hearts pool (P->hearts flat = pink etc.) — map to col 0..7 */
     for(int col=0;col<8 && col<RB_MAX_HEARTS;col++) total_hearts[col]+=P->hearts[col];
 
-    int passed=0, live_score=0;
-    allocate_and_verdict(g, pl, total_hearts, &passed, &live_score);
-    /* push snapshot for parity diff (trace_game oracle) */
+    int passed=0, live_score=0, surplus=-1;
+    allocate_and_verdict(g, pl, total_hearts, &passed, &live_score, &surplus);
+    /* push snapshot for parity diff (trace_game oracle) — surplus feeds
+       NoExcessHeart condition (engine/src/turn/live.rs compute_surplus_and_flags) */
     if(g->n_snapshots < RB_MAX_SNAPSHOTS){
         RbLiveSnapshot *s=&g->snapshots[g->n_snapshots++];
         s->player=pl; s->turn=g->turn; s->n_lives=P->live.n;
         for(int i=0;i<P->live.n && i<RB_MAX_LIVE_CARDS;i++) s->lives[i]=P->live.cards[i];
         for(int i=0;i<8;i++) s->total_hearts[i]=total_hearts[i];
         s->total_score=live_score; s->success=passed;
+        s->surplus_hearts = surplus;
+        s->note_icons = note_icons;
     }
     /* Move lives: if all passed, to success (score added); else to discard */
     int lives_to_move=P->live.n;

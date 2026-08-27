@@ -15,38 +15,26 @@ static char *xstrdup(const char *s) {
     if (p) memcpy(p, s, n); return p;
 }
 
-/* hash map of string -> count */
+/* simple linear tally — no hashing, faithful and obviously correct */
 typedef struct { char *k; int c; } Ent;
-static Ent *g_act = NULL; static size_t g_act_n = 0, g_act_cap = 0;
-static Ent *g_extra = NULL; static size_t g_extra_n = 0, g_extra_cap = 0;
+static Ent g_act[512]; static size_t g_act_n = 0;
+static Ent g_extra[512]; static size_t g_extra_n = 0;
 static long g_effects = 0, g_has_condition = 0;
 
-static unsigned long hash(const char *s) {
-    unsigned long h = 1469598103934665603UL;
-    for (; *s; s++) { h ^= (unsigned char)*s; h *= 1099511628211UL; }
-    return h;
-}
-static void bump(Ent **m, size_t *n, size_t *cap, const char *k) {
+static void bump(Ent *m, size_t *n, size_t cap, const char *k) {
     if (!k) return;
-    size_t cap0 = *cap;
-    if (cap0 == 0) { cap0 = 256; *m = malloc(cap0 * sizeof(Ent)); *cap = cap0; }
-    unsigned long h = hash(k) & (cap0 - 1);
-    for (;;) {
-        if ((*m)[h].k == NULL) {
-            (*m)[h].k = xstrdup(k); (*m)[h].c = 1; (*n)++; return;
-        }
-        if (!strcmp((*m)[h].k, k)) { (*m)[h].c++; return; }
-        h = (h + 1) & (cap0 - 1);
-    }
+    for (size_t i = 0; i < *n; i++) if (!strcmp(m[i].k, k)) { m[i].c++; return; }
+    if (*n >= cap) return;
+    m[*n].k = xstrdup(k); m[*n].c = 1; (*n)++;
 }
 
 /* recurse the decoded effect tree */
 static void walk(AbilityEffect *e) {
     if (!e) return;
     g_effects++;
-    if (e->action) bump(&g_act, &g_act_n, &g_act_cap, e->action);
+    if (e->action) bump(g_act, &g_act_n, 512, e->action);
     if (e->has_condition) g_has_condition++;
-    for (int i = 0; i < e->n_extra; i++) bump(&g_extra, &g_extra_n, &g_extra_cap, e->extra_k[i]);
+    for (int i = 0; i < e->n_extra; i++) bump(g_extra, &g_extra_n, 512, e->extra_k[i]);
     for (int i = 0; i < e->n_child; i++) walk(e->child[i]);
 }
 
@@ -68,12 +56,12 @@ int main(void) {
     printf("=== ACTION VERBS (%zu distinct, %ld effect nodes) ===\n", g_act_n, g_effects);
     qsort(g_act, g_act_n, sizeof(Ent), cmp_ent);
     for (size_t i = 0; i < g_act_n; i++)
-        printf("%6d  %s\n", g_act[i].c, g_act[i].k ? g_act[i].k : "(null)");
+        if (g_act[i].k) printf("%6d  %s\n", g_act[i].c, g_act[i].k);
 
     printf("\n=== EXTRA FIELDS (%zu distinct) ===\n", g_extra_n);
     qsort(g_extra, g_extra_n, sizeof(Ent), cmp_ent);
     for (size_t i = 0; i < g_extra_n; i++)
-        printf("%6d  %s\n", g_extra[i].c, g_extra[i].k ? g_extra[i].k : "(null)");
+        if (g_extra[i].k) printf("%6d  %s\n", g_extra[i].c, g_extra[i].k);
 
     printf("\ncondition-flagged effect nodes: %ld\n", g_has_condition);
     printf("abilities with use_limit>=0: ");
