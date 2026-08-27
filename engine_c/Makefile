@@ -1,15 +1,19 @@
 CC      ?= gcc
 CFLAGS  ?= -std=c11 -O2 -Wall -Iinclude
-SRC     := src/data.c src/vm.c src/cards.c src/engine.c src/main.c src/bytecode_blob.c src/gen_data.c
+SRC     := src/data.c src/vm.c src/cards.c src/alloc.c src/modifiers.c src/condition.c src/engine.c src/main.c src/bytecode_blob.c src/gen_data.c
 OBJ     := $(SRC:.c=.o)
 # library objects (everything except main, so tests can supply their own main)
-OBJ_LIB := src/data.o src/vm.o src/cards.c src/engine.o src/bytecode_blob.o src/gen_data.o
+OBJ_LIB := src/data.o src/vm.o src/cards.o src/alloc.o src/modifiers.o src/condition.o src/engine.o src/bytecode_blob.o src/gen_data.o
 TARGET  := rb_engine
 TEST    := tests/test_basic.c
 AUDIT   := tools/audit_actions.c
 
-.PHONY: all test audit clean
+.PHONY: all test audit regen clean
 all: $(TARGET)
+
+regen:
+	python3 tools/gen_from_rs.py ../cards/build/abilities_gen.rs
+	python3 tools/gen_bytecode.py
 
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ)

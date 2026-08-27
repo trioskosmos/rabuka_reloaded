@@ -139,6 +139,35 @@ Plus `enums.rs:ConditionType` variants not yet observed: `AnyOfCondition`, `Choi
 
 `audit_actions.c` also tallies extra fields (`heart_color`, `state`, `count`, `cost`, etc.) — drive per-verb optional params.
 
+### 2.5 Naming — Rust → C mapping (why not everything is identical)
+
+C has no namespace, no `self`, and must compile `-ffreestanding` on bare-metal targets (GBA/DS/CD-i). Names are kept identical where they are the ABI, and prefixed where C hygiene requires it. The table is the grep map — if you `rg` the Rust name, the C name is the prefixed variant.
+
+| Category | Rust (source of truth) | C (engine_c) | Why differ | Must stay byte-identical? |
+|----------|------------------------|--------------|------------|--------------------------|
+| Wire tags | `RB_TAG_NULL = 0x00` `engine/src/ability/vm.rs:8` | `RB_TAG_NULL` `include/rabuka.h:8` | — | **Yes** (bytecode is the ABI) |
+| Heart colors | `HEART_COLORS` `cards/compile_cards.py:1` | `RB_HEART_PINK…` `include/rabuka.h:19` | Same enum, `RB_` prefix to avoid bare-metal colliding `PINK` macro | Values yes, prefix no |
+| Ability types | `struct Ability { full_text, triggers, use_limit }` `engine/src/core/card.rs:4138` | `typedef struct Ability { full_text, triggers, use_limit }` `include/rabuka.h:75` | Identical field names | Field names yes |
+| Effect tree | `AbilityEffect { action, source, destination, count, condition }` `engine/src/ability/types.rs:1` | `AbilityEffect { action, source, destination, count, condition }` `include/rabuka.h:57` | Identical | Yes (decoded from `abilities.json:936`) |
+| Action verbs | `ActionType::MoveCards => "move_cards"` `engine/src/ability/enums.rs:861` | `e->action == "move_cards"` `src/engine.c:182` | Wire string is the dispatch key | **Yes — verb strings** |
+| Condition types | `ConditionType::CardCountCondition => "card_count_condition"` `engine/src/ability/enums.rs:861` | `c->variant` + field `key=="card_count_condition"` `src/vm.c:167` | Same wire, decoded via `OBJVAR` variant | Yes |
+| Zones | `Zone::Hand => "hand"` `engine/src/ability/enums.rs:11` | `RB_ZONE_HAND` + `rb_zone_of_str("hand")` `include/rabuka.h:207` | `Zone` is bare `Hand` in Rust; C needs `RB_ZONE_`/typed enum to avoid colliding `Hand` on Windows headers | Wire `"hand"` yes, enum prefix no |
+| Constants | `STAGE_SIZE = 3` `engine/src/core/constants.rs:5` | `RB_STAGE_SIZE 3` `include/rabuka.h:91` | C has no `constants::` namespace; `STAGE_SIZE` collides on some SDKs | Value yes, name prefixed |
+| Game state | `GameState { player1, player2, turn_number, current_phase, mods: GameModifiers }` `engine/src/core/game_state/mod.rs:1` | `GameState { p[2], turn, phase, mods: RbMods }` `include/rabuka.h:252` | `p[2]` is compact for `p[active]` indexing; `turn_number→turn` and `current_phase→phase` are shortened — **drift to fix**: keep `player1` alias (`#define` or `p[0]` accessor) so `rg player1` hits | Alias recommended |
+| Modifiers | `ModifierEntry { set, additive, total() }` `engine/src/core/game_modifiers.rs:40` | `RbModifierEntry { set, add }` `include/rabuka.h:120` + `rb_modifier_total()` | `add` shortened, `total()` → `rb_modifier_total()` (no methods in C) | Struct layout yes |
+| Modifier methods | `mods.add_blade_modifier(cid, delta)` `engine/src/core/game_modifiers.rs:217` | `rb_mods_add_blade(&g->mods, cid, delta)` `src/modifiers.c:12` | `self` → explicit `RbMods*` first arg, `RB_`/`rb_` prefix | Same base name (`blade`) |
+| Player bags | `player.hand.add_card(c)` `engine/src/core/player.rs:516` | `bag_push(&P->hand, c)` `src/engine.c:17` | No `self`/`Vec` in C; `RbBag` is a fixed `int cards[512]` not `Vec<i16>` | Semantics same, name differs (vector vs bag) |
+| Alloc | `Box/Vec/String` (heap) | `rb_malloc`/`rb_free`/`rb_strdup2` `src/alloc.c:5` with `RB_NO_MALLOC` bump arena | Must compile `-ffreestanding`; Rust heap is implicit | Never identical — abstraction |
+| Files | `ability/resolver.rs` + `ability/choice.rs` + `ability/compound.rs` | `src/engine.c:rb_execute_effect` (now) → `src/choice.c` + `src/compound.c` + `src/ability_queue.c` (planned) `PROGRESS.md:336` | Collapsed for v0 skeleton; split restores 1:1 in Phase 3 | File names intentionally diverge until split |
+| Triggers | `TriggerKind::Debut => "登場"` `engine/src/triggers.rs:1` | `a->triggers` string + `canonical_trigger()` `src/triggers.c` (planned) | Wire Japanese string is the key | Trigger string **yes** |
+
+**Rules for the port:**
+
+1. **Wire strings are the ABI** — `action`, `triggers`, zone names (`"hand"`/`"stage"`/`"deck_top"` etc), condition field keys, heart-color strings (`"heart00"`/`"all"`) — never rename. The 92,901-byte `RBKA_BYTECODE[]` and `cards.bin` are generated from Rust and decoded verbatim.
+2. **Base names stay** — `blade`, `heart`, `score`, `cost`, `need_heart`, `orientation`, `add_blade`, `set_score`, `saturate_u8` all keep the Rust base; only add `RB_`/`rb_`/`Rb` prefix and `*m`/`*g` context pointer.
+3. **Shortening only where indexed** — `player1`→`p[0]` and `turn_number`→`turn` are tolerated for compact loops but keep a `player1` accessor macro/comment so Rust `rg` hits the C site. New code should add `g->player1` → `g->p[0]` comments.
+4. **No silent drift** — if a Rust name changes (e.g. new `Zone::UnderMember` added to `enums.rs:30`), the C `rb_zone_of_str` table must be updated in the same commit, and `make audit` must still pass.
+
 ---
 
 ## 3. File map — Rust → C
@@ -312,12 +341,15 @@ Three tiers:
 
 **Wire into CI:** `make audit && make test && make replay` must be green before any `engine_c` PR merges. Document in `cards/test_inventory.py --check` style.
 
-### Phase 8 — CD-i port (after Phase 5, parallelizable; est. 2 sessions)
+### Phase 8 — Portable targets (after Phase 5, parallelizable; est. 1–2 sessions)
 
-- `platforms/cdi/cdi_main.c` — text-grid render (20×16 chars) + joypad/serial input → `Choice` selection; no allocator (static bump heap; `rb_unload` no-ops).
-- Disc layout — stream `cards.bin` + `abilities_strings.bin` + `RBKA_BYTECODE` from CD sector reads (don't RAM-load; 1 MB wall — see PORTS.md §CD-i).
-- Linker script (`app at $8000`, loaded by `cdi-serial` stub), `m68k-elf-gcc` build, 1 MB RAM profiling (heart tables precomputed, not malloc'd).
-- **Verify:** Boots on emulator, completes a seeded match within RAM budget (trace mass exceeds 1 MB → stream, don't cache).
+General C — no platform-specific logic in `src/`; every port is a thin `platforms/<target>/` shim over the same engine.
+
+- **Allocator abstraction** — `RB_NO_MALLOC` bump-alloc fallback (`src/alloc.c`): `rb_malloc`/`rb_free` route to `malloc` on hosted (PC), to a static arena on bare metal. `rb_unload` is a no-op on arena targets; PC build free-checks under ASan/Valgrind.
+- **Data streaming** — `rb_load_streaming(dir, read_fn)` alternative to `rb_load(dir)`: cards/strings/bytecode can be `fread` from host FS *or* streamed from ROM/CD/flash sector-by-sector. 1 MB CD-i, 2 MB DS, etc. don't RAM-load all tables at once — stream `bytecode_blob` + `cards.bin` on demand (`rb_card_record` / `rb_bc_slice` backed by a read cache). See `docs/PORTS.md` for per-target budgets (CD-i 1 MB wall included as one data point, not the design center).
+- **Platform shims** — `platforms/sdl/main.c` (hosted reference: window + input → `Choice` selection, mirrors `ports/3ds` pattern), `platforms/cdi/cdi_main.c` and `platforms/ds/main.c` etc. each only provide: `platform_read_file`, `platform_input_poll`, `platform_render_text`, `platform_random_seed`. Engine never calls `fopen`/`printf` directly outside `src/main.c`.
+- **Toolchain** — `gcc ≥ 9` / `clang` on PC, `m68k-elf-gcc` (CD-i), `arm-none-eabi-gcc` (GBA/DS/3DS), `mipsel` etc. — all `-std=c11 -ffreestanding` clean. No C++ runtime, no external libs, no `fs` dependency in `src/vm.c`/`src/engine.c`.
+- **Verify:** Each shim boots, seeds RNG, completes `make -C platforms/<target>` + runs a seeded match within its RAM budget (CD-i: trace mass must stream, not cache).
 
 ---
 
@@ -329,9 +361,10 @@ Suggested file layout after all phases:
 
 ```
 engine_c/
-  include/rabuka.h            # public API (stable)
+  include/rabuka.h            # public API (stable, hosted + bare metal)
   include/rabuka_internal.h    # modifier / queue / choice internals
   src/data.c vm.c cards.c
+  src/alloc.c                 # RB_NO_MALLOC bump arena vs malloc
   src/modifiers.c stats_pipeline.c
   src/condition.c choice.c ability_queue.c triggers.c
   src/phase.c live.c
@@ -341,7 +374,8 @@ engine_c/
   tests/test_basic.c test_modifiers.c test_condition.c test_choice.c
         test_phases.c test_triggers.c test_live.c test_replay.c
   tools/gen_from_rs.py gen_bytecode.py audit_actions.c
-  platforms/cdi/cdi_main.c
+  platforms/sdl/main.c        # hosted reference shim
+  platforms/cdi/cdi_main.c    # bare-metal examples (one per target)
   Makefile
   PROGRESS.md
 ```
@@ -355,7 +389,7 @@ Add `tests/replay_json.h` (tiny JSON loader, no external deps — jsmn or hand-r
 - **`strdup` / strings** — Use the local `rb_strdup` everywhere; don't mix with platform `strdup`. Free paths mirror alloc paths (`rb_free_ability`, `rb_free_condition`, `rb_free_card`); leak-check with `tests/test_free.c`.
 - **Fixed caps vs. overflow** — Every `RB_MAX_*` cap must be checked before write; on overflow return `0` / log and drop the card to waitroom (matching Rust `shuffle`/`add_card` semantics). Never `assert`.
 - **`RB_MAX_CHILD=64`, `RB_MAX_EXTRA=32`** — Current `vm.c` silently drops beyond cap; after Phase 6 audit whether any real ability exceeds 64 children (likely not — max observed is 11) and add a `log::debug!`-style `RB_TRACE` warning on drop.
-- **`rb_unload` / no-std** — Keep heap usage explicit (`malloc`/`free` on PC, bump-alloc on CD-i behind `#ifdef RB_NO_MALLOC`). No global C++ static init.
+- **`rb_unload` / `no_std` / alloc** — Keep heap usage explicit behind `src/alloc.c` (`RB_NO_MALLOC` → bump arena, otherwise `malloc`/`free`). No global C++ static init, no `fopen` in `src/vm.c`/`src/engine.c` — host I/O stays in `src/data.c:rb_load` / `rb_load_streaming`.
 - **Tracer** — Add `RB_TRACE` compile flag that prints `[phase]`, `[condition verdict]`, `[choice offered]`, `[move src→dst]`, `[live allocation]` etc. gated on `getenv("RUST_LOG")`-style env var; leave lines in tree — cost 0 when off, priceless when debugging.
 - **Byte regeneration** — `make regen` rule that runs both `gen_from_rs.py` + `gen_bytecode.py` and checks `git diff --stat` is empty (CI parity check). Document that `condition_decoder_gen.rs` / `effect_decoder_gen.rs` are auto-generated; edit `cards/generate_condition_decoder.py` not the output.
 
@@ -391,7 +425,7 @@ make audit      # → ./rb_engine_audit (verb/condition census)
 python3 tools/gen_from_rs.py ../cards/build/abilities_gen.rs --check
 ```
 
-Toolchain: `gcc ≥ 9` or `m68k-elf-gcc` (CD-i), `-std=c11 -O2 -Wall -Wextra -Wpedantic`. No C++ runtime. No external libs.
+Toolchain: `gcc ≥ 9` / `clang` on PC, `m68k-elf-gcc` (CD-i), `arm-none-eabi-gcc` (GBA/DS/3DS) etc., all `-std=c11 -O2 -Wall -Wextra -Wpedantic -ffreestanding` clean. No C++ runtime. No external libs. `src/` compiles with `-DRB_NO_MALLOC` for bare-metal targets.
 
 ---
 
@@ -403,7 +437,7 @@ Toolchain: `gcc ≥ 9` or `m68k-elf-gcc` (CD-i), `-std=c11 -O2 -Wall -Wextra -Wp
 - `engine/src/ability/enums.rs` — canonical ActionType / ConditionType / Zone wire tables
 - `cards/abilities.json` — 936 unique abilities (source for audit counts above)
 - `engine_c/tools/audit_actions.c` — live census of verbs/conditions actually present in bytecode
-- `docs/PORTS.md` §CD-i — 1 MB RAM / CD streaming constraints
+- `docs/PORTS.md` — per-target budgets (CD-i 1 MB wall is one data point; general engine is storage-agnostic via `rb_load_streaming`)
 
 ---
 

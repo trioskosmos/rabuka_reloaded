@@ -82,6 +82,79 @@ typedef struct Ability {
     AbilityEffect *effect;  /* nullable */
 } Ability;
 
+/* ── Portable allocator ── */
+void *rb_malloc(size_t n);
+void  rb_free(void *p);
+char *rb_strdup2(const char *s);
+
+/* ── Constants (engine/src/core/constants.rs) ── */
+#define RB_STAGE_SIZE          3
+#define RB_MAX_ENERGY_CARDS    12
+#define RB_MAX_LIVE_CARDS      3
+#define RB_VICTORY_CARD_COUNT  3
+#define RB_MAX_ZONE            512
+#define RB_MAX_HAND            40
+#define RB_MAX_DECK            60
+#define RB_MAX_HEART_COLORS    11
+#define RB_SCORE_WIN           7
+#define RB_ENERGY_CAP          7
+#define RB_MAX_CARD_IDS        4096
+#define RB_EMPTY_SLOT          (-1)
+
+static inline uint8_t rb_saturate_u8(int v) {
+    if (v < 0) return 0;
+    if (v > 255) return 255;
+    return (uint8_t)v;
+}
+static inline int16_t rb_saturate_i16(int v) {
+    if (v < -32768) return -32768;
+    if (v > 32767) return 32767;
+    return (int16_t)v;
+}
+
+/* Forward decl for condition eval (GameState defined below) */
+struct GameState;
+int  rb_eval_condition(const struct GameState *g, int actor, const Condition *c);
+
+/* ── Modifiers (engine/src/core/game_modifiers.rs) ── */
+typedef struct { int16_t set; int16_t add; } RbModifierEntry;
+static inline int rb_modifier_total(RbModifierEntry e) { return (int)e.set + (int)e.add; }
+
+typedef struct {
+    RbModifierEntry blade[RB_MAX_CARD_IDS];
+    RbModifierEntry heart[RB_MAX_CARD_IDS][8];      /* per-color (0..7) */
+    RbModifierEntry need_heart[RB_MAX_CARD_IDS][8];
+    RbModifierEntry score[RB_MAX_CARD_IDS];
+    RbModifierEntry cost[RB_MAX_CARD_IDS];
+    uint8_t         orientation[RB_MAX_CARD_IDS]; /* 0 none, 1 active, 2 wait */
+    uint8_t         delayed_cannot_active[RB_MAX_CARD_IDS]; /* remaining turns */
+    /* constant-derived attribution (cleared on recalc) */
+    int16_t         constant_blade[RB_MAX_CARD_IDS];
+    int16_t         constant_score[RB_MAX_CARD_IDS];
+} RbMods;
+
+void rb_mods_init(RbMods *m);
+void rb_mods_clear_card(RbMods *m, int card_id);
+int  rb_mods_get_blade(RbMods *m, int card_id);
+void rb_mods_add_blade(RbMods *m, int card_id, int delta);
+void rb_mods_set_blade(RbMods *m, int card_id, int value);
+int  rb_mods_get_heart(RbMods *m, int card_id, int color);
+void rb_mods_add_heart(RbMods *m, int card_id, int color, int delta);
+int  rb_mods_get_need_heart(RbMods *m, int card_id, int color);
+void rb_mods_add_need_heart(RbMods *m, int card_id, int color, int delta);
+void rb_mods_set_need_heart(RbMods *m, int card_id, int color, int value);
+int  rb_mods_get_score(RbMods *m, int card_id);
+void rb_mods_add_score(RbMods *m, int card_id, int delta);
+void rb_mods_set_score(RbMods *m, int card_id, int value);
+int  rb_mods_get_cost(RbMods *m, int card_id);
+void rb_mods_add_cost(RbMods *m, int card_id, int delta);
+void rb_mods_set_cost(RbMods *m, int card_id, int value);
+const char *rb_mods_get_orientation(RbMods *m, int card_id);
+void rb_mods_set_orientation(RbMods *m, int card_id, const char *s);
+int  rb_mods_is_delayed_cannot_active(RbMods *m, int card_id);
+void rb_mods_add_delayed_cannot_active(RbMods *m, int card_id, uint8_t turns);
+void rb_mods_tick_delayed_for(RbMods *m, const int *owned, int n_owned);
+
 /* ── Card (decoded from cards.bin) ── */
 #define RB_MAX_HEARTS 64
 typedef struct {
@@ -100,6 +173,8 @@ typedef struct {
 
 /* ── Lifecycle ── */
 int  rb_load(const char *data_dir);   /* load cards.bin + abilities_strings.bin */
+int  rb_load_streaming(const char *dir,
+                      unsigned char *(*read_fn)(const char *path, long *out_len)); /* alt I/O */
 void rb_unload(void);
 uint32_t rb_num_cards(void);
 uint32_t rb_num_abilities(void);
@@ -111,7 +186,6 @@ const char *rb_get_string(uint32_t idx);
 int  rb_decode_ability(uint32_t idx, Ability *out);     /* returns 1 on success */
 void rb_free_ability(Ability *a);
 void rb_free_condition(Condition *c);
-int  rb_eval_condition(const GameState *g, int actor, const Condition *c); /* 1=truthy */
 int  rb_decode_card_by_index(uint32_t i, Card *out);    /* 0..num_cards-1 */
 void rb_free_card(Card *c);
 uint16_t rb_card_ability_idx(uint32_t i);   /* 0xFFFF if none */
@@ -120,23 +194,15 @@ const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len);
 const char *rb_card_string(uint16_t idx);
 
 /* ════════════════════════════════════════════════════════════════════
-   Engine — game state + turn loop + faithful effect execution.
-   The decoder (above) is byte-identical to the Rust VM. The execution
-   below is a real, working port of the core rules (constants.rs /
-   phases.rs / actions.rs): zones, a 3-position stage, energy, the
-   Live/performance heart loop, and a broad action-verb dispatch.
-   ════════════════════════════════════════════════════════════════════ */
-
-#define RB_STAGE_SIZE          3
-#define RB_MAX_ENERGY_CARDS    12
-#define RB_MAX_LIVE_CARDS      3
-#define RB_VICTORY_CARD_COUNT  3
-#define RB_MAX_ZONE            512
-#define RB_MAX_HAND            40
-#define RB_MAX_DECK            60
-#define RB_MAX_HEART_COLORS    11
-#define RB_SCORE_WIN           7
-#define RB_ENERGY_CAP          7
+    Engine — game state + turn loop + faithful effect execution.
+    The decoder (above) is byte-identical to the Rust VM. The execution
+    below is a real, working port of the core rules (constants.rs /
+    phases.rs / actions.rs): zones, a 3-position stage, energy, the
+    Live/performance heart loop, and a broad action-verb dispatch.
+    Host I/O (fopen) lives only in data.c:rb_load; bare-metal ports
+    provide rb_load_streaming with a custom read_fn and compile with
+    -DRB_NO_MALLOC (bump arena in src/alloc.c).
+    ════════════════════════════════════════════════════════════════════ */
 
 typedef enum {
     RB_ZONE_HAND = 0,
@@ -183,8 +249,9 @@ typedef enum {
     RB_PHASE_DONE
 } RbPhase;
 
-typedef struct {
+typedef struct GameState {
     RbPlayer p[2];
+    RbMods   mods;            /* global modifiers (blades/hearts/scores/costs) */
     int      active;          /* player taking the normal-phase turn */
     int      first_attacker;  /* 0/1 winner of RPS for first turn */
     int      second_attacker; /* the other player */

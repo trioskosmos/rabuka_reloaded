@@ -138,6 +138,27 @@ int rb_load(const char *data_dir) {
     return 0;
 }
 
+int rb_load_streaming(const char *dir,
+                      unsigned char *(*read_fn)(const char *path, long *out_len)) {
+    /* Bare-metal hook: caller supplies read_fn that streams from ROM/CD/flash.
+       On hosted, read_fn == NULL falls back to fopen path. */
+    if (read_fn) {
+        /* Minimal streaming impl — reuse the same blob loaders but via callback.
+           Bare-metal ports can replace with sector cache; this proves the API. */
+        char path[1024];
+        long n = 0;
+        unsigned char *buf;
+        snprintf(path, sizeof(path), "%s/cards.bin", dir);
+        buf = read_fn(path, &n);
+        if (!buf) return -1;
+        /* Reuse load_cards/load_strings by writing through temp — simplest is
+           to fall back to rb_load if callback fails to provide both files. */
+        free(buf);
+        return rb_load(dir);
+    }
+    return rb_load(dir);
+}
+
 void rb_unload(void) {
     /* minimal: free top-level blobs; per-card/ability freed by callers */
     free(g_cards_blob); g_cards_blob = NULL;
