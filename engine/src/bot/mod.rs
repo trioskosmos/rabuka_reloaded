@@ -12,6 +12,8 @@ pub mod strategy_v2;
 pub mod strategy_v3;
 pub mod strategy_v4;
 pub mod strategy_v5;
+pub mod strategy_v6;
+pub mod strategy_v7;
 pub mod weights;
 
 pub use ismcts::search;
@@ -28,6 +30,8 @@ pub use strategy_v3::{
 };
 pub use strategy_v4::{choose_action_v4, choose_live_set_v4, choose_mulligan_v4};
 pub use strategy_v5::{choose_action_v5, choose_live_set_v5, choose_mulligan_v5};
+pub use strategy_v6::{choose_action_v6, choose_live_set_v6, choose_mulligan_v6};
+pub use strategy_v7::{choose_action_v7, choose_live_set_v7, choose_mulligan_v7};
 
 use crate::card::CardDatabase;
 use crate::game_setup::{Action, ActionType};

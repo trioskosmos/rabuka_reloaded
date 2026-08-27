@@ -27,9 +27,38 @@ that fixed the arena stall and rewrote the live-set portfolio doctrine (§8).
 7. **公式総合ルール ver 1.02 (PDF)**
    <https://llofficial-cardgame.com/wordpress/wp-content/uploads/2025/03/18104002/loveca_rule_ver102.pdf>
 8. **公式ラブカポイントシステム**（環境カード評価）
-   <https://llofficial-cardgame.com/lovecapointsystem/>
+    <https://llofficial-cardgame.com/lovecapointsystem/>
+9. **クリフ — ライブチェック成功率計算ツール**（Binomial 命中率シミュレータ）
+    <https://note.com/cliff1811/n/n3b4eba399aa1>
+10. **岡崎みどぅー — 環境デッキのターン毎の打点**（先攻/後攻ごとの想定ダメージ）
+    <https://note.com/msttakahashi/n/n0cacc1311272>
+11. **たつどら — 先攻革命**（先攻のライブ成功時効果・主導権）
+    <https://note.com/tatsudora/n/nd5a0b7a7b1ac>
+12. **かしわもちチャンめる — マリガン・展開ガイド**
+    <https://note.com/kasiwamoti_y/n/n6bb70f5f28bc>
+13. **かしわもちチャンめる — バトンタッチ・キープ方針**
+    <https://note.com/kasiwamoti_y/n/n390430fd20f4>
+14. **グリリバ — ヨール・ブレードハート運用**
+    <https://note.com/guririba21/n/n3734ce079186>
+15. **ミウミ@ラブカ — 1ヨールあたりのブレードハート命中率 (~73%)**（X 投稿）
+    <https://x.com/miumi_loveca/status/2056661387326190061>
 
 ---
+
+## 0. BOT GENERATIONS AT A GLANCE (updated 2026-08-27)
+
+| Bot | Main phase | Live set | Fair? | Head-to-head vs v5 |
+|---|---|---|---|---|
+| v1 | heuristic | heuristic | yes | n/a (early) |
+| v2 | MC-ladder scalar eval | MC-ladder | yes | loses ~59% |
+| v3 | archetype + clone-eval | archetype | yes | ~parity |
+| v4 | hearts fundamentalism | deterministic pass | yes | loses ~43% |
+| v5 | v4 delegate | binomial + gamble + junk | yes | baseline (100%) |
+| **v6** | **tempo: deploy while useful, else Pass** | **binomial + gamble + junk (reused)** | **yes** | **wins ~76% (217–68 / 300)** |
+
+v6 is the current strongest heuristic bot. It keeps v5's binomial-aware live
+set (the part that actually places cards) and replaces only the Main-phase
+policy, which was the source of the "do-nothing" turns. See §8.5.
 
 ## 1. EXPECTED GAME LENGTH (guide data — re-researched 2026-08-22)
 
@@ -275,6 +304,7 @@ PERFORMANCE/VICTORY: automatic — log outcomes to update opponent modeling.
 | S7 | v4/v5 mulligan (keep lives ≤3, dump expensive non-lives) |
 | L4 | v5 exhaustive subset search ranked `(score desc, count asc)` behind `binom_ge(blades, relied_hits, density) ≥ floor` |
 | Search | v2 UCB1 determinized rollouts (`ismcts.rs`); v4/v5 one-ply clone-eval with no-op/hand-reserve breakers |
+| **v6 Main** | tempo deploy-while-useful policy (§8.5): `Pass` ranked below any value>0 action, hearts+blades dev, baton priority, anti-clog |
 
 Version history:
 
@@ -288,18 +318,44 @@ Version history:
 - **v5** `strategy_v5.rs` — v4 execution + comparison awareness: binomial
   stance floors, score-max portfolios, free-win rule, committed gamble,
   starvation hand-filtering.
-- **v6** `strategy_v5.rs::choose_action_v6` — experiment log (2026-08-22):
-  (a) adversarial live-set EV with invented comparison probabilities →
-  measured WORSE (66–71 / 76–84 vs v5), scrapped; (b) next-check-equity main
-  phase (projected portfolio delta, race-scaled weight) → measured WORSE
-  (~46% vs v5, games stretching to T10+), reverted; (c) surviving changes:
-  rule-fact-only opponent terms (tie-worthless discount at my match point,
-  P(pass)-weighted portfolio ranking). Result: statistically indistinguishable
-  from v5 head-to-head (73–73 / 80–82), still beats v2 ~59% and random ~97%.
-  **Conclusion: v5 sits on a heuristic plateau — marginal term surgery does
-  not move it.** Next structural step per `V3_WHY_IT_SUCKS.md`: fix the
-  measurement bug (§8.4), then simulation-priced decisions (determinized
-  self-play rollouts over live-set/main candidates).
+- **v6** `strategy_v6.rs` — **current strongest heuristic** (2026-08-27).
+  Keeps v5's binomial-aware live set verbatim (the component that actually
+  places success cards) and replaces only the Main-phase policy. Diagnosis of
+  the "do-nothing" turns: `choose_action_v4` (v5's Main delegate) scored
+  `Pass` (end Main phase) at ~0 and selected with a STRICT `>`, so any member
+  play that did not immediately raise `passable`/`ammo`/`stage` counts tied at
+  ≈0 and lost to an earlier `Pass` in the actions list — the bot ended Main
+  having deployed nothing even with affordable members on board. Fix: rank
+  `Pass` strictly below any action with value > 0, but ALSO below a
+  value-0 member is allowed to lose (anti-clog: a 0-contribution waiting member
+  must not fill the 5-slot stage). Result (300-game arena, untraced, mirrored
+  `5CP3Z idou` deck): **v6 beats v5 217–68 (~76%)**, live-set fold rate
+  7.6%→0.8%, median game length ~5.8 turns. v6 still uses ONLY fair
+  information (own hand/deck + opponent public board via `estimate_opp_score`).
+   Do-nothing root cause and the exact mechanism are documented in §8.5.
+- **v7** `strategy_v7.rs` — **v6 alias; does NOT improve on v6** (2026-08-27).
+  Two intuitive improvements were attempted and both regressed against v6 in
+  cross-deck arena:
+  1. *Aggressive match-point live set* (lower binomial floors + mandatory 1-life
+     attempt at match point) — on `fade deck` v7 fell to **70–100 vs v6**
+     (v6 was 142–39 vs v5), stalls rising 17→24. Every all-or-nothing failure
+     *wastes a life* without placing; lives are not infinitely recycled mid-game
+     (refresh only fires on deck-out, which these games never reach). Forcing
+     attempts just depleted ammo → more stalls. Re-confirms the V3_WHY_IT_SUCKS
+     correction: "folding is usually worse than swinging" is **false** when ammo
+     is effectively finite.
+  2. *Color-aware Main development* (bonus for playing members whose `base_heart`
+     colors match our own hand lives' `need_heart`) — v7 then lost to v6 on 6 of
+     8 decks (liella 58–84, fade 47–81, muse 59–78, aqours 60–68, 5CP3Z 64–79…)
+     and only won on hasunosora. Steering development toward *specific* life
+     colors trades board power for a false target — what the yell needs is total
+     hearts+blades, because flips supply the needed colors stochastically.
+  **Conclusion: v6 is at a heuristic plateau.** Marginal term surgery does not
+  move win rate, and aggressive variants actively hurt. v7 is therefore kept as a
+  v6 alias so it never regresses. The genuine path to >v6 is the *structural*
+  fix the doc prescribes: simulation/ISMCTS-backed live-set (and main) decisions
+  via the existing `ismcts.rs` + `DeterminizationSampler` + `PublicObservation`
+  infrastructure — not more scalar terms (see §8 / §10).
 
 ## 8. POST-MORTEM 2026-08-22 — why it looked terrible and what was fixed
 
@@ -374,6 +430,55 @@ allocation-layout-dependently. Until root-caused:
 - This also retroactively taints any analysis session that read traced games
   (including parts of `V3_WHY_IT_SUCKS.md`).
 
+## 8.5 Do-nothing turns — root cause & fix (2026-08-27)
+
+Symptom reported: bots "play many turns of nothing." Two distinct failure
+modes were measured in the arena (untraced, 300 games, mirrored `5CP3Z idou`):
+
+1. **Empty Main phases** — a Main phase ending in `Pass` with zero member
+   deploys. For v5 this was ~4.3% of Main-phase ends; most were *legitimate*
+   (no affordable/useful member), but a measurable slice came from the tie
+   bug below.
+2. **Live-set folds** — a Live Card Set that sets zero lives (only junk or
+   nothing), guaranteeing zero placements that turn. For v5 this was **7.6%**
+   of live phases; combined with comparison losses this is the real pace
+   killer (it is what stretches games past the guide band — §1).
+
+### 8.5.1 The Main-phase tie bug (primary do-nothing cause)
+
+`strategy_v4::choose_action_v4` (which v5's `choose_action_v5` delegates to)
+scores every candidate action and keeps the max with a STRICT `>`. `Pass`
+("Pass - End Main Phase") is always present in the actions list (generated
+first in `generate_main_phase_actions`) and scores ≈0 when ending the phase
+changes no tracked zone. Any member play that does not *immediately* raise
+`passable`/`ammo`/`stage` counts (e.g. a member with no `base_heart`, or one
+whose blades only matter at the yell flip) also scores ≈0. Because the
+comparison is strict and `Pass` is seen first, the bot kept `Pass` and deployed
+nothing — despite affordable members being on board. This is the mechanism
+behind "several turns of nothing."
+
+### 8.5.2 The fix (v6)
+
+v6 evaluates all actions, finds `best_nonpass` = the highest value among
+non-`Pass` actions, then sets `Pass`'s value to `−∞` when `best_nonpass > 0`
+(so a useful deploy is always taken), and to `0` otherwise (so a useless
+0-contribution waiting member is NOT force-played into the 5-slot stage —
+anti-clog). Development is valued in **HEARTS + BLADES** (not cost), because
+both feed the yell check (§4): every extra active blade is a fresh Binomial
+trial (source 9 / source 15's ~73% per-blade-heart hit rate) that can supply
+the hearts a check needs, and baton touches (9.6.2.3.2, source 13) are
+prioritized as discounted power-piece upgrades (guide curve 4→9→13, source 1).
+
+Effect (v6 vs v5, 300 games): live-set fold 7.6%→**0.8%**, empty Main phases
+shift to "pass only when nothing useful" and v6 wins **217–68 (~76%)**.
+
+### 8.5.3 Fairness of the fix
+
+v6 adds no hidden-information use. Its Main-phase eval reads only our own
+hand/stage/energy/deck; its live-set still calls `estimate_opp_score`, which
+estimates the opponent ceiling from their **public** board and our own deck
+density (both fair per §9). No peek at opponent hand/deck.
+
 ## 9. FAIRNESS POLICY
 
 The old bot sampled the opponent's hidden hand/deck from their **actual deck
@@ -394,8 +499,10 @@ determinized states (standard PIMC practice).
 1. Root-cause §8.4 allocation-layout sensitivity (poisons all measurement).
 2. Tie-value table in L3/L4: explicit tie scoring (win ≤1 success, loss at 2,
    suicide at 2-2) instead of floor approximations.
-3. M2: main-phase eval undervalues 起動 engines (v3 trace: 28 vs v2's
-   60/game) — ensure UseAbility actions aren't pruned by acquisition deltas.
+3. ~~M2: main-phase eval undervalues 起動 engines~~ — v6 now values any
+   value>0 main action (including UseAbility/baton) above Pass, so activation
+   engines are no longer pruned by acquisition deltas. (Do-nothing Main-phase
+   bug fixed in §8.5; v6 beats v5 ~76%.)
 4. Position keywords (センター/左サイド) ignored entirely by every eval.
 5. M1: explicit baton-efficiency term (net energy per ceiling point).
 6. Turn-order planning (sole placer becomes 先攻, 8.4.13) — no eval term yet.

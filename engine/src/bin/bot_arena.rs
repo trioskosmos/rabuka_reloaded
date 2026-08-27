@@ -6,7 +6,7 @@
 //! Moved out of tests/test_modules/strategy_bot_test.rs  Ethis is a
 //! benchmark/arena, not a unit test. Run it when you want numbers.
 
-use rabuka_engine::bot::{strategy, strategy_v2, strategy_v3, strategy_v4, strategy_v5};
+use rabuka_engine::bot::{strategy, strategy_v2, strategy_v3, strategy_v4, strategy_v5, strategy_v6, strategy_v7};
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
 use rabuka_engine::deck_parser;
@@ -152,9 +152,26 @@ fn main() {
 
     let mut wins = [0u32; 2];
     let mut draws = 0u32;
+    // Draw-type breakdown: a "draw" (z1<3 xor z2<3 is false) is either a real
+    // mutual 3-3 (both >=3) or a STALL (neither reached 3 — a no-contest
+    // artifact from the stuck counter / turn cap). A game that ends while
+    // `game_result == Ongoing` was a stuck/timeout break, not a real result.
+    let mut real_draws = 0u32;
+    let mut stall_draws = 0u32;
+    let mut stuck_ends = 0u32;
+    let mut final_hist: std::collections::BTreeMap<(u8, u8), u32> = std::collections::BTreeMap::new();
     let mut games = 0u32;
     let mut total_actions = 0u64;
     let mut total_turns = 0u64;
+    // Do-nothing telemetry: how often a Main phase ends with no member played
+    // (ConfirmMainPhase chosen while a deploy was available) and how often a
+    // Live Card Set folds to an empty zone.
+    let mut main_decisions = 0u64;
+    let mut main_confirms = 0u64;
+    let mut live_decisions = 0u64;
+    let mut live_folds = 0u64;
+    let mut main_phase_count = 0u64;
+    let mut empty_main_count = 0u64;
     let t0 = std::time::Instant::now();
     // Optional hard game-count cap (ARENA_GAMES env): removes time-budget
     // truncation bias when comparing logged vs unlogged runs.
@@ -183,6 +200,10 @@ fn main() {
         // show WHO set WHAT and whether checks passed.
         let mut prev_phase = gs.current_phase;
         let mut timeline: Vec<String> = Vec::new();
+        // Per-main-phase deploy tracking (do-nothing detection); counters
+        // themselves live in the outer scope and accumulate across games.
+        let mut cur_is_main = false;
+        let mut cur_main_plays = 0u64;
         let snap_row = |tag: &str, gs: &GameState| -> String {
             let lives_in_hand = |p: &rabuka_engine::player::Player| {
                 p.hand
@@ -366,11 +387,18 @@ fn main() {
                         )
                     }
                     BotKind::V4 => strategy_v4::choose_live_set_v4(&gs, &actions, &db),
-                    BotKind::V7 => rabuka_engine::bot::rollout::choose_live_set_v7(&gs, &actions, &db),
+                    BotKind::V7 => strategy_v7::choose_live_set_v7(&gs, &actions, &db),
                     BotKind::Conductor => rabuka_engine::bot::conductor::choose_live_set_conductor(&gs, &actions, &db),
-                    BotKind::V5 | BotKind::V6 => strategy_v5::choose_live_set_v5(&gs, &actions, &db),
+                    BotKind::V5 => strategy_v5::choose_live_set_v5(&gs, &actions, &db),
+                    BotKind::V6 => strategy_v6::choose_live_set_v6(&gs, &actions, &db),
                     BotKind::Random => actions[rng.range(actions.len())].clone(),
                 };
+                if a.action_type == rabuka_engine::game_setup::ActionType::ConfirmLiveCardSet {
+                    live_decisions += 1;
+                    if gs.live_card_selected_indices.is_empty() {
+                        live_folds += 1;
+                    }
+                }
                 if trace {
                     let card_no = a
                         .parameters
@@ -434,11 +462,43 @@ fn main() {
                     strategy_v3::choose_action_heuristic_v3(&gs, &actions, me, plan)
                 }
                 BotKind::V4 => strategy_v4::choose_action_v4(&gs, &actions, me),
-                BotKind::V6 | BotKind::V7 => strategy_v5::choose_action_v6(&gs, &actions, me),
+                BotKind::V6 => strategy_v6::choose_action_v6(&gs, &actions, me),
+                BotKind::V7 => strategy_v7::choose_action_v7(&gs, &actions, me),
                 BotKind::Conductor => rabuka_engine::bot::conductor::choose_main_conductor(&gs, &actions, me),
                 BotKind::V5 => strategy_v5::choose_action_v5(&gs, &actions, me),
                 BotKind::Random => actions[rng.range(actions.len())].clone(),
             };
+            main_decisions += 1;
+            if gs.current_phase == Phase::Main {
+                if !cur_is_main {
+                    cur_is_main = true;
+                    cur_main_plays = 0;
+                }
+                let is_pass = action.action_type == rabuka_engine::game_setup::ActionType::Pass;
+                let is_deploy = action.action_type
+                    == rabuka_engine::game_setup::ActionType::PlayMemberToStage
+                    || (action.action_type == rabuka_engine::game_setup::ActionType::UseAbility
+                        && action
+                            .parameters
+                            .as_ref()
+                            .and_then(|p| p.use_baton_touch)
+                            == Some(true));
+                if is_deploy {
+                    cur_main_plays += 1;
+                }
+                if is_pass {
+                    main_phase_count += 1;
+                    if cur_main_plays == 0 {
+                        empty_main_count += 1;
+                    }
+                    cur_is_main = false;
+                }
+            } else {
+                cur_is_main = false;
+            }
+            if action.action_type == rabuka_engine::game_setup::ActionType::Pass {
+                main_confirms += 1;
+            }
             if trace {
                 let card_no = action
                     .parameters
@@ -469,12 +529,24 @@ fn main() {
 
         let z1 = gs.player1.success_live_card_zone.cards.len();
         let z2 = gs.player2.success_live_card_zone.cards.len();
+        final_hist
+            .entry((z1 as u8, z2 as u8))
+            .and_modify(|c| *c += 1)
+            .or_insert(1);
         if z1 >= 3 && z2 <= 2 {
             wins[0] += 1;
         } else if z2 >= 3 && z1 <= 2 {
             wins[1] += 1;
         } else {
             draws += 1;
+            if z1 >= 3 && z2 >= 3 {
+                real_draws += 1;
+            } else {
+                stall_draws += 1;
+            }
+        }
+        if matches!(gs.game_result, GameResult::Ongoing) {
+            stuck_ends += 1;
         }
 
         if logs {
@@ -559,6 +631,34 @@ fn main() {
         draws,
         total_actions,
         total_turns as f64 / games.max(1) as f64,
+    );
+    let mut hist_lines: Vec<String> = final_hist
+        .iter()
+        .map(|((a, b), c)| format!("    final success {a}-{b}: {c} game(s)"))
+        .collect();
+    hist_lines.sort();
+    println!(
+        "DRAW TYPES: real 3-3 draws={} | stall/no-contest draws={} | stuck/timeout ends={}",
+        real_draws, stall_draws, stuck_ends,
+    );
+    println!("FINAL SCORE HISTOGRAM (success_p1-success_p2 : count):");
+    for l in hist_lines {
+        println!("{l}");
+    }
+    let empty_main_rate = if main_phase_count > 0 {
+        empty_main_count as f64 / main_phase_count as f64
+    } else {
+        0.0
+    };
+    let live_fold_rate = if live_decisions > 0 {
+        live_folds as f64 / live_decisions as f64
+    } else {
+        0.0
+    };
+    println!(
+        "DO-NOTHING telemetry: empty Main phases {}/{} = {:.1}% | live-set fold {}/{} = {:.1}%",
+        empty_main_count, main_phase_count, empty_main_rate * 100.0,
+        live_folds, live_decisions, live_fold_rate * 100.0,
     );
     if trace {
         let path = std::path::Path::new("../test_output/bot_arena_trace.csv");
