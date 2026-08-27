@@ -22,19 +22,10 @@ void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]){
         int cid=P->stage[s];
         if(cid==RB_EMPTY_SLOT) continue;
         Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)) continue;
-        /* base hearts */
-        for(int h=0;h<c.n_hearts;h++){
-            int col=c.heart_color[h]%8;
-            out[col]+=c.heart_count[h];
-        }
-        /* blade as pink (col 0) plus blade modifiers */
-        int blade = (int)c.blade + rb_mods_get_blade((RbMods*)&g->mods, cid);
+        for(int h=0;h<c.n_hearts;h++) out[c.heart_color[h]%8]+=c.heart_count[h];
+        int blade=(int)c.blade + rb_mods_get_blade((RbMods*)&g->mods, cid);
         if(blade>0) out[RB_HEART_PINK]+=blade;
-        /* per-card heart modifiers (already in RbMods) */
-        for(int col=0;col<8;col++){
-            int mod=rb_mods_get_heart((RbMods*)&g->mods, cid, col);
-            if(mod) out[col]+=mod;
-        }
+        for(int col=0;col<8;col++){ int mod=rb_mods_get_heart((RbMods*)&g->mods, cid, col); if(mod) out[col]+=mod; }
         rb_free_card(&c);
     }
 }
@@ -78,21 +69,11 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
     int all_pass=1;
     int pool[8]; memcpy(pool,total_hearts,8*sizeof(int));
     for(int li=0; li<P->live.n; li++){
-        Card c; if(!rb_decode_card_by_index((uint32_t)P->live.cards[li],&c)){ all_pass=0; continue; }
         int required[8]={0};
-        for(int h=0;h<c.n_hearts;h++) required[c.heart_color[h]%8]+=c.heart_count[h];
-        /* apply need_heart modifiers (set/add) */
-        for(int col=0;col<8;col++){
-            int mod=rb_mods_get_need_heart((RbMods*)&g->mods, P->live.cards[li], col);
-            if(mod){
-                /* set vs additive already in total; we just apply additive on top of base */
-                /* RbMods need_heart total is set+add, but base required already includes set? Simplified: add */
-                required[col]=rb_saturate_u8(required[col]+mod);
-            }
-        }
+        rb_effective_need_heart(g, P->live.cards[li], required);
         /* allocation: total coverage check */
         int total_req=0,total_pool=0; for(int k=0;k<8;k++){ total_req+=required[k]; total_pool+=pool[k]; }
-        if(total_pool < total_req){ all_pass=0; rb_free_card(&c); continue; }
+        if(total_pool < total_req){ all_pass=0; continue; }
         /* heart0 bucket (col 0) can be filled by any 1..6 + icon_all */
         /* For faithful, we use greedy: first fill with exact color, then icon_all (col 7) covers deficits */
         int icon_all=pool[7];
@@ -131,11 +112,12 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
                     pool[7]=icon_all;
                 }
             }
-            int score=(int)c.score + rb_mods_get_score((RbMods*)&g->mods, P->live.cards[li]);
+            Card sc; int base=0;
+            if(rb_decode_card_by_index((uint32_t)P->live.cards[li],&sc)){ base=(int)sc.score; rb_free_card(&sc); }
+            int score=base + rb_mods_get_score((RbMods*)&g->mods, P->live.cards[li]);
             if(score<0) score=0;
             total_score+=score;
         } else all_pass=0;
-        rb_free_card(&c);
     }
     if(out_passed) *out_passed=all_pass;
     if(out_score) *out_score=total_score;
@@ -150,7 +132,7 @@ int rb_perform_live(GameState *g, int pl){
     do_yell(g, pl, yell_cards, &n_yell, blade_hearts, &note_icons);
 
     int stage_hearts[8]={0};
-    rb_calc_stage_hearts(g, pl, stage_hearts);
+    rb_stage_hearts_pipeline(g, pl, stage_hearts);
 
     int total_hearts[8]={0};
     for(int i=0;i<8;i++) total_hearts[i]=stage_hearts[i]+blade_hearts[i];

@@ -1,7 +1,10 @@
 #include "rabuka.h"
 #include <string.h>
 
-void rb_mods_init(RbMods *m) { memset(m, 0, sizeof(*m)); }
+void rb_mods_init(RbMods *m) {
+    memset(m, 0, sizeof(*m));
+    for(int i=0;i<RB_MAX_CARD_IDS;i++){ m->heart_copy[i]=-1; m->heart_multiplier[i]=-1; m->blade_type[i]=-1; }
+}
 
 void rb_mods_clear_card(RbMods *m, int cid) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
@@ -16,6 +19,9 @@ void rb_mods_clear_card(RbMods *m, int cid) {
     m->delayed_cannot_active[cid] = 0;
     m->constant_blade[cid] = 0;
     m->constant_score[cid] = 0;
+    m->heart_copy[cid] = -1;
+    m->heart_multiplier[cid] = -1;
+    m->blade_type[cid] = -1;
 }
 
 /* ── blade ── */

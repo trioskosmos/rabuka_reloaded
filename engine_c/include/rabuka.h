@@ -131,6 +131,9 @@ typedef struct {
     /* constant-derived attribution (cleared on recalc) */
     int16_t         constant_blade[RB_MAX_CARD_IDS];
     int16_t         constant_score[RB_MAX_CARD_IDS];
+    int16_t         heart_copy[RB_MAX_CARD_IDS];   /* target→source */
+    int8_t          heart_multiplier[RB_MAX_CARD_IDS]; /* -1 none, else colour 0..7 */
+    int8_t          blade_type[RB_MAX_CARD_IDS];   /* -1 none, else BladeColor idx */
 } RbMods;
 
 void rb_mods_init(RbMods *m);
@@ -332,12 +335,14 @@ int  rb_play_card(GameState *g, int pl, int hand_idx);
 int  rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos); /* to stage */
 int  rb_activate_ability(GameState *g, int pl, int hand_idx);
 
-/* ── Triggers / phase / live (triggers.c / phase.c / live.c) ── */
+/* ── Triggers / phase / live / stats_pipeline ── */
 int  rb_trigger_is(const char *triggers, const char *needle);
 int  rb_trigger_debut(GameState *g, int pl, int card_id);
 void rb_recalc_constants(GameState *g);
 void rb_advance_phase(GameState *g);
 void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]);
+void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]);
+void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]);
 int  rb_perform_live(GameState *g, int pl);
 
 /* ── Effect execution (public for testing / harness) ── */
