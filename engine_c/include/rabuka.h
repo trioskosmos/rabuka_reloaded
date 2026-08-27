@@ -344,6 +344,18 @@ void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]);
 void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]);
 void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]);
 int  rb_perform_live(GameState *g, int pl);
+/* Effects — verb handlers */
+void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e);
+void rb_gain_ability(GameState *g, int actor, AbilityEffect *e);
+void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e);
+void rb_look_clear(int pl);
+void rb_tick_gained(void);
+int  card_matches_card_type_filter(int card_idx, const char *filter);
+void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
+                    const char *zone, const char *card_type,
+                    int count, int allow_skip, const char *target);
 
 /* ── Effect execution (public for testing / harness) ── */
 void rb_execute_effect(GameState *g, int actor, AbilityEffect *e);

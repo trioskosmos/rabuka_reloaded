@@ -112,7 +112,7 @@ static int heart_color_of(AbilityEffect *e, int dflt) {
 }
 
 /* Move `count` cards from one of actor's zones to another. */
-static int card_matches_card_type_filter(int card_idx, const char *filter){
+int card_matches_card_type_filter(int card_idx, const char *filter){
     if(!filter) return 1;
     Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
     int is_live = (c.n_hearts==0 && c.cost==0 && c.blade==0);
@@ -243,17 +243,7 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
         int col = heart_color_of(e, RB_HEART_PINK);
         O->hearts[col] += cnt;
     } else if (!strcmp(act, "move_cards")) {
-        const char *src_s = e->source ? e->source : "hand";
-        const char *dst_s = e->destination ? e->destination : "discard";
-        if (!strcmp(src_s,"those_cards")||!strcmp(src_s,"recently_moved")||!strcmp(src_s,"looked_at")||!strcmp(src_s,"selected_cards")) src_s="hand";
-        if (!strcmp(dst_s,"those_cards")||!strcmp(dst_s,"recently_moved")||!strcmp(dst_s,"looked_at")) dst_s="discard";
-        if (!strcmp(dst_s,"under_member")||!strcmp(dst_s,"same_area")||!strcmp(dst_s,"empty_area")) dst_s="discard";
-        RbZone src = RB_ZONE_HAND, dst = RB_ZONE_DISCARD;
-        rb_zone_of_str(src_s, &src);
-        rb_zone_of_str(dst_s, &dst);
-        int to_top = (e->destination && (!strcmp(e->destination, "deck_top")||!strcmp(e->destination,"deck_top_or_bottom")));
-        const char *ctype = extra(e, "card_type");
-        do_move_filtered(g, who, src, dst, cnt, to_top, ctype);
+        rb_effect_move_cards(g, who, e);
     } else if (!strcmp(act, "change_state")) {
         const char *st = extra(e, "state");
         if(!st) st = extra(e, "to_state");
@@ -265,17 +255,13 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
                 break;
             }
         }
-    } else if (!strcmp(act, "reveal") || !strcmp(act, "look_at") ||
-               !strcmp(act, "look_and_select") || !strcmp(act, "select") ||
-               !strcmp(act, "select_cards") || !strcmp(act, "select_number") ||
+    } else if (!strcmp(act, "look_at") || !strcmp(act, "reveal") ||
                !strcmp(act, "reveal_per_group") || !strcmp(act, "reveal_until_live_card") ||
                !strcmp(act, "reveal_until_chosen_card")) {
-        /* Choice: surface to host (portable shim / bot) instead of headless no-op.
-           allow_skip= is_optional → may decline; zone carries look source. */
-        const char *zone = e->source ? e->source : "looked_at";
-        const char *ctype = extra(e, "card_type");
-        int allow = e->is_optional ? 1 : 0;
-        rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, zone, ctype, cnt, allow, NULL);
+        rb_effect_look_at(g, actor, e);
+    } else if (!strcmp(act, "select_cards") || !strcmp(act, "select") ||
+               !strcmp(act, "select_number") || !strcmp(act, "look_and_select")) {
+        rb_effect_select_cards(g, actor, e);
     } else if (!strcmp(act, "set_cost") || !strcmp(act, "modify_cost") ||
                !strcmp(act, "set_cost_to_use") || !strcmp(act,"modify_yell_count") ||
                !strcmp(act,"modify_yell_source")) {
@@ -300,9 +286,11 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
         for(int q=0;q<RB_STAGE_SIZE;q++) if(W->stage[q]!=RB_EMPTY_SLOT){ target_id=W->stage[q]; break; }
         if(target_id==-1 && W->hand.n>0) target_id=W->hand.cards[0];
         if(target_id!=-1) rb_mods_add_need_heart(&g->mods, target_id, col, cnt);
-    } else if (!strcmp(act, "gain_ability") || !strcmp(act, "gain_ability_from_source") ||
-               !strcmp(act, "invalidate_ability") || !strcmp(act, "suppress_ability_trigger") ||
-               !strcmp(act, "activate_ability") || !strcmp(act, "reduce_live_card_set_limit")) {
+    } else if (!strcmp(act, "gain_ability") || !strcmp(act, "gain_ability_from_source")) {
+        rb_gain_ability(g, actor, e);
+    } else if (!strcmp(act, "invalidate_ability") || !strcmp(act, "suppress_ability_trigger")) {
+        rb_invalidate_ability(g, actor, e);
+    } else if (!strcmp(act, "activate_ability") || !strcmp(act, "reduce_live_card_set_limit")) {
         /* ability gain/suppression; no-op for now — tracked via mods for score */
         if(e->action && !strcmp(e->action,"reduce_live_card_set_limit")){
             W->live.n = W->live.n; /* placeholder */
