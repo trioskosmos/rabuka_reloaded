@@ -910,6 +910,7 @@ pub struct EffectFilter {
     pub self_cost: Option<bool>,
     pub shuffle: Option<bool>,
     pub effect_constraint: Option<ArcStr>,
+    pub score_floor: Option<u8>,
     pub sign: Option<ArcStr>,
     pub heart_type: Option<ArcStr>,
     pub alternative_count_type: Option<ArcStr>,
@@ -1460,6 +1461,7 @@ impl AbilityEffect {
             self_cost: bool_field!("self_cost"),
             shuffle: bool_field!("shuffle"),
             effect_constraint: str_field!("effect_constraint"),
+            score_floor: u8_field!("score_floor"),
             sign: str_field!("sign"),
             heart_type: str_field!("heart_type"),
             picker: str_field!("picker"),
@@ -1778,6 +1780,8 @@ impl AbilityEffect {
     }
 
     filter_str_getter!(effect_constraint_any, effect_constraint);
+
+    filter_u8_getter!(score_floor_any, score_floor);
 
     filter_u8_getter!(energy_count_any, energy_count);
 

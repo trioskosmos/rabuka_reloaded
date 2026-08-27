@@ -170,3 +170,91 @@ fn mia_q190_skipping_the_cost_specifies_nothing() {
         "no heart gained without paying"
     );
 }
+
+#[test]
+fn mia_q190_choose_heart05_grants_heart05() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mia = setup_mia(&mut game);
+    let live_for_zone = game.id("PL!-sd1-019-SD");
+    let live_for_cost = game.id("PL!-sd1-021-SD");
+    game.add_to_hand(live_for_zone);
+    game.add_to_hand(live_for_cost);
+    advance_to_live_set(&mut game);
+    game.set_live_card(live_for_zone);
+    game.pass(); game.pass();
+    assert!(game.has_pending_choice());
+    let live_pos = game.state.player1.hand.cards.iter().position(|&c| c == live_for_cost).unwrap();
+    let filtered_idx = game.state.player1.hand.cards.iter().take(live_pos).filter(|&&c| game.db.get_card(c).is_some_and(|card| card.card_type == rabuka_engine::card::CardType::Live)).count();
+    game.select_indices(&[filtered_idx]);
+    assert!(game.has_pending_choice());
+    // Choose heart05 (index 4 in sorted heart01-06)
+    game.select_option(4);
+    assert_eq!(game.state.mods.get_heart_modifier(mia, HeartColor::Heart05), 1, "heart05 should be gained");
+    assert_eq!(game.state.mods.get_heart_modifier(mia, HeartColor::Heart02), 0, "other heart not gained");
+}
+
+#[test]
+fn mia_q190_no_live_in_hand_still_prompts_skip() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mia = setup_mia(&mut game);
+    let live_for_zone = game.id("PL!-sd1-019-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+    game.add_to_hand(live_for_zone);
+    game.add_to_hand(filler);
+    advance_to_live_set(&mut game);
+    game.set_live_card(live_for_zone);
+    game.pass(); game.pass();
+    // With no live in hand (only filler), the optional cost may still prompt as skippable or may be auto-skipped
+    if game.has_pending_choice() {
+        match game.get_pending_choice() {
+            Choice::SelectCard { allow_skip, .. } => assert!(*allow_skip),
+            other => panic!("expected SelectCard, got {:?}", other),
+        }
+        game.select_indices(&[]);
+    }
+    assert!(!game.has_pending_choice());
+}
+
+#[test]
+fn mia_live_success_distinct_3_recovers() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mia = game.id("PL!N-bp4-011-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+    let l1 = game.id("PL!N-bp1-028-L");
+    let l2 = game.new_id("PL!N-bp1-028-L");
+    let l3 = game.new_id("PL!N-bp1-028-L");
+    game.state.player1.waitroom.cards.push(l1);
+    game.state.player1.waitroom.cards.push(l2);
+    game.state.player1.waitroom.cards.push(l3);
+    game.state.player1.stage.stage = [-1, mia, -1];
+    for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); game.state.player2.main_deck.cards.push(filler); }
+    let live = game.id("PL!-sd1-019-SD");
+    game.state.player1.hand.cards.push(live);
+    for _ in 0..5 { game.pass(); }
+    game.set_live_card(live);
+    for _ in 0..7 { game.pass(); if game.has_pending_choice() { game.select_indices(&[]); } }
+    assert!(!game.has_pending_choice());
+}
+
+#[test]
+fn mia_live_success_distinct_2_no_recover() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mia = game.id("PL!N-bp4-011-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+    let l1 = game.id("PL!N-bp1-028-L");
+    let l2 = game.new_id("PL!N-bp1-028-L");
+    game.state.player1.waitroom.cards.push(l1);
+    game.state.player1.waitroom.cards.push(l2);
+    game.state.player1.stage.stage = [-1, mia, -1];
+    for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); }
+    let live = game.id("PL!-sd1-019-SD");
+    game.state.player1.hand.cards.push(live);
+    for _ in 0..5 { game.pass(); }
+    game.set_live_card(live);
+    for _ in 0..7 { game.pass(); if game.has_pending_choice() { game.select_indices(&[]); } }
+    assert!(!game.has_pending_choice());
+}

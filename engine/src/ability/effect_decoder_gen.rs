@@ -113,6 +113,7 @@ fn decode_effect_field(bc: &mut BcReader, key: &str,
             "self_cost" => { ek.self_cost = bc.read_bool_value(); return Some(true); }
             "shuffle" => { ek.shuffle = bc.read_bool_value(); return Some(true); }
             "effect_constraint" => { ek.effect_constraint = bc.read_arc_str_value(); return Some(true); }
+            "score_floor" => { ek.score_floor = bc.read_u8_value(); return Some(true); }
             "sign" => { ek.sign = bc.read_arc_str_value(); return Some(true); }
             "heart_type" => { ek.heart_type = bc.read_arc_str_value(); return Some(true); }
             "alternative_count_type" => { ek.alternative_count_type = bc.read_arc_str_value(); return Some(true); }
@@ -352,6 +353,7 @@ pub(crate) struct EffectKindLocals {
     pub reveal: Option<bool>,
     pub same_name: Option<bool>,
     pub same_unit_name: Option<bool>,
+    pub score_floor: Option<u8>,
     pub self_cost: Option<bool>,
     pub self_target: Option<bool>,
     pub shuffle: Option<bool>,
@@ -434,6 +436,7 @@ fn build_filter(ek: &EffectKindLocals) -> Option<Box<EffectFilter>> {
         self_cost: ek.self_cost.clone(),
         shuffle: ek.shuffle.clone(),
         effect_constraint: ek.effect_constraint.clone(),
+        score_floor: ek.score_floor.clone(),
         sign: ek.sign.clone(),
         heart_type: ek.heart_type.clone(),
         alternative_count_type: ek.alternative_count_type.clone(),

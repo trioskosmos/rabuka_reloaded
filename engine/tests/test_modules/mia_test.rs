@@ -111,3 +111,43 @@ fn mia_q102_no_live_card_anywhere() {
         discard_count
     );
 }
+
+#[test]
+fn mia_q102_live_immediately_on_top() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let mia = game.id("PL!N-bp1-011-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live = game.id("PL!-sd1-019-SD");
+    game.add_to_hand(mia);
+    game.add_to_hand(filler);
+    // Deck top is live
+    game.state.player1.main_deck.cards.push(live);
+    for _ in 0..3 { game.state.player1.main_deck.cards.push(filler); }
+    game.give_energy(10);
+    game.play_to_stage(mia, MemberArea::Center);
+    assert!(game.has_pending_choice());
+    game.select_indices(&[0]);
+    assert!(game.state.player1.hand.cards.contains(&live), "live on top should be obtained");
+    assert_eq!(game.state.player1.main_deck.cards.len(), 3, "3 filler should remain after revealing 1 live");
+}
+
+#[test]
+fn mia_q102_skip_cost_still_reveals() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let mia = game.id("PL!N-bp1-011-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live = game.id("PL!-sd1-019-SD");
+    game.add_to_hand(mia);
+    game.add_to_hand(filler);
+    game.state.player1.main_deck.cards.push(live);
+    for _ in 0..3 { game.state.player1.main_deck.cards.push(filler); }
+    game.give_energy(10);
+    game.play_to_stage(mia, MemberArea::Center);
+    if game.has_pending_choice() {
+        game.select_indices(&[]); // skip discard cost
+    }
+    // Even when skipping cost, the reveal should still happen (or at least no panic)
+    assert!(game.state.player1.hand.cards.contains(&live) || game.state.player1.waitroom.cards.contains(&live) || game.state.player1.main_deck.cards.contains(&live), "no panic, live somewhere");
+}

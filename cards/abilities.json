@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-08-27T02:43:37.725411",
+  "generated_at": "2026-08-27T15:32:08.691331",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "8ac1f436",
+  "engine_commit": "60929be4",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -14699,7 +14699,7 @@
             "text": "控え室に置く手札の数が1枚減る",
             "per_unit": true,
             "per_unit_count": 1,
-            "per_unit_type": "live_card_zone",
+            "per_unit_type": "success_live_card_zone",
             "source": "hand",
             "destination": "discard",
             "count": 1,
@@ -23441,7 +23441,9 @@
             "type": "baton_touch",
             "tense": "past",
             "location": "stage"
-          }
+          },
+          "cost_limit": 7,
+          "cost_limit_operator": "=="
         },
         "action": "sequential",
         "actions": [

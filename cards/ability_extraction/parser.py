@@ -2766,7 +2766,9 @@ def _extract_per_unit_info_from_text(text):
     count_match = re.search(r"(\d+)(?:人|枚|つ)", per_unit_text)
     per_unit_count = int(count_match.group(1)) if count_match else 1
     per_unit_type = None
-    if (
+    if "成功ライブカード置き場" in per_unit_text:
+        per_unit_type = "success_live_card_zone"
+    elif (
         "ライブ中のカード" in per_unit_text
         or "ライブ中のライブカード" in per_unit_text
         or "ライブカード置き場" in per_unit_text
@@ -3952,6 +3954,13 @@ def _try_baton_touch(text):
     if cl_op:
         result["cost_limit"] = cl_op[0]
         result["cost_limit_operator"] = cl_op[1]
+    else:
+        # Exact cost like "コスト7のメンバーから" → cost 7, operator ==
+        # Parser previously missed this because extract_cost_limit_with_operator requires 以上/以下
+        cl = extract_cost_limit(text)
+        if cl is not None and "コスト" in text and "メンバーから" in text and "バトンタッチ" in text:
+            result["cost_limit"] = cl
+            result["cost_limit_operator"] = "=="
     # Extract group_names (for から-form, this is handled below)
     gns = extract_all_groups(text)
     if gns:

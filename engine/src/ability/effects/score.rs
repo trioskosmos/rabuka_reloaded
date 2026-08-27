@@ -59,6 +59,7 @@ impl AbilityResolver {
         // (which saturates via zones.rs) to avoid breaking per_unit live_total cards.
         let has_floor = is_live_total
             && (effect.effect_constraint_any().as_deref() == Some("min:0")
+                || effect.score_floor_any().is_some()
                 || effect.text.contains("未満にはならない"));
         if is_live_total && has_floor {
             let delta: i16 = match operation.as_str() {
@@ -286,11 +287,14 @@ impl AbilityResolver {
             (target_card_ids, final_value)
         };
 
+        let has_floor = effect.score_floor_any().is_some()
+            || effect_constraint.as_deref() == Some("min:0")
+            || effect.text.contains("未満にはならない");
         let mut count_applied = 0u8;
         for (card_id, delta) in &live_card_ids {
-            if let Some(constraint) = &effect_constraint {
+            if has_floor {
                 let current_mod = gs.mods.get_score_modifier(*card_id);
-                if constraint.as_str() == "min:0" && current_mod + (*delta as i32) < 0 {
+                if current_mod + (*delta as i32) < 0 {
                     continue;
                 }
             }

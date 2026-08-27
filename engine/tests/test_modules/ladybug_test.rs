@@ -98,3 +98,56 @@ fn ladybug_q114_missing_sayaka_no_reduction() {
         .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(reduction, 0, "Q114: Missing さやか → no heart reduction");
 }
+
+#[test]
+fn ladybug_q114_missing_kosuzu_no_reduction() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let ladybug = game.id("PL!HS-bp2-024-L");
+    let sayaka = game.id("PL!HS-sd1-002-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+    game.add_to_stage(MemberArea::Center, sayaka);
+    game.state.player1.hand.cards.push(ladybug);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(ladybug);
+    advance_to_live_start(&mut game);
+    let reduction: i32 = game.state.mods.need_heart_modifiers.get(&ladybug).and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00)).map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+    assert_eq!(reduction, 0, "Missing kosuzu → no reduction");
+}
+
+#[test]
+fn ladybug_q114_wrong_character_no_reduction() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let ladybug = game.id("PL!HS-bp2-024-L");
+    let filler = game.id("PL!-sd1-010-SD");
+    let other = game.id("PL!HS-bp1-001-R"); // not kosuzu/sayaka
+    game.add_to_stage(MemberArea::LeftSide, other);
+    game.add_to_stage(MemberArea::Center, other);
+    game.state.player1.hand.cards.push(ladybug);
+    for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); game.state.player2.main_deck.cards.push(filler); }
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(ladybug);
+    advance_to_live_start(&mut game);
+    let reduction: i32 = game.state.mods.need_heart_modifiers.get(&ladybug).and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00)).map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+    assert_eq!(reduction, 0, "Wrong characters should not trigger");
+}
+
+#[test]
+fn ladybug_q114_no_members_no_reduction() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let ladybug = game.id("PL!HS-bp2-024-L");
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state.player1.hand.cards.push(ladybug);
+    for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); game.state.player2.main_deck.cards.push(filler); }
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(ladybug);
+    advance_to_live_start(&mut game);
+    let reduction: i32 = game.state.mods.need_heart_modifiers.get(&ladybug).and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00)).map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+    assert_eq!(reduction, 0, "No members → no reduction");
+}

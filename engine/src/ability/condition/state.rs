@@ -391,9 +391,19 @@ impl<'a> ConditionContext<'a> {
                     if stage_cards.is_empty() {
                         return false;
                     }
-                    let has_filter = condition.get_group_names().is_some()
-                        || condition.get_card_type().is_some()
-                        || condition.get_characters().is_some_and(|c| !c.is_empty());
+                    // For "このメンバーがウェイト..." self-state, card_type=member_card is parser default and should NOT be treated as an ANY filter.
+                    // Otherwise every waited member on stage would grant the heart to every Erena copy (two-copy bug).
+                    let is_self_text = condition
+                        .get_text()
+                        .is_some_and(|t| t.contains("このメンバーが"));
+                    let has_filter = if is_self_text && condition.get_check_self().is_none() {
+                        // Force self-branch for このメンバー self-state regardless of generic card_type.
+                        false
+                    } else {
+                        condition.get_group_names().is_some()
+                            || condition.get_card_type().is_some()
+                            || condition.get_characters().is_some_and(|c| !c.is_empty())
+                    };
                     let check_orientation = |cid: i16| -> bool {
                         crate::ability::util::orientation_matches_state(
                             self.game_state.mods.get_orientation_modifier(cid),

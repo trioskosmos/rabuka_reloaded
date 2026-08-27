@@ -6,7 +6,7 @@ use rabuka_engine::zones::MemberArea;
 
 const FILLER: &str = "PL!-sd1-010-SD"; // μ's member, cost 4
 
-fn run_flow(db: std::sync::Arc<rabuka_engine::card::CardDatabase>, replaced_no: &str) {
+fn run_flow(db: std::sync::Arc<rabuka_engine::card::CardDatabase>, replaced_no: &str, should_draw: bool) {
     let mut game = TestGame::new(db);
     let replaced = game.id(replaced_no);
     game.state.player1.stage.stage[0] = replaced;
@@ -23,37 +23,54 @@ fn run_flow(db: std::sync::Arc<rabuka_engine::card::CardDatabase>, replaced_no: 
     let deck_before = game.state.player1.main_deck.cards.len();
 
     game.play_to_stage(me, MemberArea::LeftSide);
-    assert!(
-        game.has_pending_choice(),
-        "hand-discard prompt expected after the baton debut"
-    );
-    assert_eq!(
-        game.pending_choice_type().as_deref(),
-        Some("SelectCard"),
-        "expected SelectCard (hand, count=1)"
-    );
-    game.select_indices(&[0]);
+    if should_draw {
+        assert!(
+            game.has_pending_choice(),
+            "hand-discard prompt expected after the baton debut (cost7)"
+        );
+        assert_eq!(
+            game.pending_choice_type().as_deref(),
+            Some("SelectCard"),
+            "expected SelectCard (hand, count=1)"
+        );
+        game.select_indices(&[0]);
 
-    assert_eq!(
-        game.state.player1.main_deck.cards.len(),
-        deck_before - 2,
-        "replaced {:?} (cost {}) -> deck should shrink by 2 draws",
-        replaced_no,
-        {
-            let c = game.db.get_card(game.id(replaced_no)).map(|x| x.cost).flatten();
-            format!("{:?}", c)
-        }
-    );
+        assert_eq!(
+            game.state.player1.main_deck.cards.len(),
+            deck_before - 2,
+            "replaced {:?} (cost {}) -> deck should shrink by 2 draws",
+            replaced_no,
+            {
+                let c = game.db.get_card(game.id(replaced_no)).map(|x| x.cost).flatten();
+                format!("{:?}", c)
+            }
+        );
+    } else {
+        assert!(
+            !game.has_pending_choice(),
+            "cost !=7 baton should NOT trigger draw, but got pending choice"
+        );
+        assert_eq!(
+            game.state.player1.main_deck.cards.len(),
+            deck_before,
+            "replaced {:?} (cost {}) -> deck should NOT shrink",
+            replaced_no,
+            {
+                let c = game.db.get_card(game.id(replaced_no)).map(|x| x.cost).flatten();
+                format!("{:?}", c)
+            }
+        );
+    }
 }
 
 #[test]
 fn pr0045_baton_over_cost7_draws() {
     let db = load_real_database();
-    run_flow(db, "PL!-sd1-007-SD"); // lilywhite 東條希, printed cost 7
+    run_flow(db, "PL!-sd1-007-SD", true); // lilywhite 東條希, printed cost 7
 }
 
 #[test]
 fn pr0045_baton_over_cost4_no_draw() {
     let db = load_real_database();
-    run_flow(db, "PL!-sd1-001-SD"); // CYaRon 高海千歌, printed cost != 7
+    run_flow(db, "PL!-sd1-001-SD", false); // CYaRon 高海千歌, printed cost != 7
 }

@@ -1161,19 +1161,55 @@ impl AbilityResolver {
             if let Some(mod_cost) = util::find_modify_cost(effect, None, None) {
                 if mod_cost.operation_any().as_deref() == Some("subtract")
                     && mod_cost.per_unit_any().unwrap_or(false)
-                    && mod_cost.per_unit_type_any().as_deref() == Some("group_name")
                 {
-                    // Count distinct group names on self's stage
-                    // (shared with generation's effective-cost evaluator).
-                    let groups = gs.distinct_stage_groups("self");
-                    let per_unit_count = mod_cost.per_unit_count_any().unwrap_or(1);
-                    let reduction = (groups / per_unit_count) * mod_cost.count.unwrap_or(1);
-                    if cost.action == crate::ability::enums::ActionType::PayEnergy {
-                        let new_energy = cost
-                            .energy_count_any()
-                            .unwrap_or(0)
-                            .saturating_sub(reduction);
-                        cost.set_energy_count(Some(new_energy));
+                    let per_unit_type_owned = mod_cost.per_unit_type_any();
+                    let per_unit_type = per_unit_type_owned.as_deref();
+                    if per_unit_type == Some("group_name") {
+                        // Count distinct group names on self's stage
+                        // (shared with generation's effective-cost evaluator).
+                        let groups = gs.distinct_stage_groups("self");
+                        let per_unit_count = mod_cost.per_unit_count_any().unwrap_or(1);
+                        let reduction = (groups / per_unit_count) * mod_cost.count.unwrap_or(1);
+                        if cost.action == crate::ability::enums::ActionType::PayEnergy {
+                            let new_energy = cost
+                                .energy_count_any()
+                                .unwrap_or(0)
+                                .saturating_sub(reduction);
+                            cost.set_energy_count(Some(new_energy));
+                        }
+                    } else if matches!(
+                        per_unit_type,
+                        Some("success_live_card_zone")
+                            | Some("success_live_zone")
+                            | Some("live_card_zone")
+                            | Some("live_zone")
+                    ) && cost.action == crate::ability::enums::ActionType::MoveCards
+                    {
+                        // PB1-007: hand discard 3 reduced by 1 per success live (e.g. PL!-pb1-007-R)
+                        // per_unit_type may be live_card_zone due to parser gap; handle both.
+                        let player_id = gs
+                            .ability_queue
+                            .current_entry()
+                            .map(|e| e.player_id.clone())
+                            .unwrap_or_else(|| gs.player1.id.clone());
+                        let success_len = if player_id == gs.player1.id {
+                            gs.player1.success_live_card_zone.cards.len() as u8
+                        } else {
+                            gs.player2.success_live_card_zone.cards.len() as u8
+                        };
+                        let per_unit_cnt = mod_cost.per_unit_count_any().unwrap_or(1);
+                        let unit = mod_cost.count.unwrap_or(1);
+                        let reduction = (success_len / per_unit_cnt) * unit;
+                        let new_count = cost.count.unwrap_or(0).saturating_sub(reduction);
+                        cost.count = Some(new_count);
+                        log::debug!(
+                            "[COST_REDUCE_HAND] success_len={} per_unit_cnt={} unit={} reduction={} new_count={}",
+                            success_len,
+                            per_unit_cnt,
+                            unit,
+                            reduction,
+                            new_count
+                        );
                     }
                 }
             }

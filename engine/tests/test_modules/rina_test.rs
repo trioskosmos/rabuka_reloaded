@@ -58,3 +58,51 @@ fn rina_q226_position_clamps_to_bottom() {
     // The last card should be the live card (placed at clamped bottom position)
     assert_eq!(deck[2], live, "Live card is at bottom of deck");
 }
+
+#[test]
+fn rina_q226_skip_optional_placement() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let rina = game.id("PL!N-bp5-021-N");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live = game.id("LL-bp5-001-L");
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..4 { game.state.player1.main_deck.cards.push(filler); }
+    game.state.player1.waitroom.cards.push(live);
+    game.state.player1.hand.cards.push(rina);
+    game.state.player1.hand.cards.push(filler);
+    game.give_energy(4);
+    game.play_to_stage(rina, rabuka_engine::zones::MemberArea::Center);
+    assert!(game.has_pending_choice(), "optional placement expected");
+    // Skip the optional placement
+    game.select_indices(&[]);
+    assert!(!game.has_pending_choice(), "skipping should end with no pending");
+    // Deck should have 2 cards (4 -2 discarded, no placement)
+    assert_eq!(game.state.player1.main_deck.cards.len(), 2, "skipped placement keeps deck at 2");
+    // Live should remain in discard
+    assert!(game.state.player1.waitroom.cards.contains(&live), "live stays in discard when skipped");
+}
+
+#[test]
+fn rina_q226_no_live_in_discard_no_prompt() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let rina = game.id("PL!N-bp5-021-N");
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..4 { game.state.player1.main_deck.cards.push(filler); }
+    // Waitroom has no live card
+    game.state.player1.waitroom.cards.push(filler);
+    game.state.player1.hand.cards.push(rina);
+    game.give_energy(4);
+    game.play_to_stage(rina, rabuka_engine::zones::MemberArea::Center);
+    // With no live in discard, the optional SelectCard should either not appear or be skippable with 0 options
+    // Drain any pending (if appears, skip)
+    let mut safety = 0;
+    while game.has_pending_choice() && safety < 5 {
+        safety += 1;
+        game.select_indices(&[]);
+    }
+    assert!(!game.has_pending_choice(), "no live in discard should end cleanly");
+    assert_eq!(game.state.player1.main_deck.cards.len(), 2, "deck 4-2 =2");
+}

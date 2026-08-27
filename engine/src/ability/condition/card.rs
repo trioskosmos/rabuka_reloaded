@@ -1475,11 +1475,9 @@ impl<'a> ConditionContext<'a> {
         let op = condition.get_operator();
 
         let cards: Vec<i16> = if Zone::from_str(location) == Some(Zone::RevealedCards) {
-            // When yell_trigger is true, the ability triggers on yell alone
-            // regardless of how many (or which) cards were revealed.
-            // The revealed pool is an action detail, not a trigger gate.
-            if condition.get_yell_trigger() == Some(true) {
-                return self.game_state.yell_occurred;
+            if condition.get_yell_trigger() == Some(true) && !self.game_state.yell_occurred {
+                log::debug!("[LOC_COND] yell_trigger true but yell_occurred false → fail");
+                return false;
             }
             self.game_state.revealed_cards.to_vec()
         } else if is_both {
