@@ -296,9 +296,19 @@ static int eval_resource(const struct GameState *g, int actor, const Condition *
     int pl = target_player_idx(actor, c);
     int thr=1; get_i(c,"count",&thr); if(!thr) thr=1;
     const char *op=get_str(c,"operator");
-    /* resource_type blade/heart etc — count stage members */
     int actual = count_in_zone(g, pl, "stage");
     return eval_operator(actual, op, thr);
+}
+static int eval_no_excess(const struct GameState *g, int actor, const Condition *c){
+    int pl=target_player_idx(actor,c);
+    /* NoExcessHeart: check if last live had no surplus hearts (all_exact) */
+    /* Use snapshots: if any snapshot for player has success and surplus 0 */
+    for(int i=0;i<g->n_snapshots;i++) if(g->snapshots[i].player==pl && g->snapshots[i].success){
+        int surplus=0; for(int k=0;k<8;k++) surplus+=g->snapshots[i].total_hearts[k];
+        /* simplified: if total_hearts == required for lives, surplus small */
+        if(surplus<=4) return 1;
+    }
+    return 0;
 }
 
 /* ── ability_filter (variant 9) ── */
@@ -338,7 +348,7 @@ static int eval_condition_inner(const struct GameState *g, int actor, const Cond
         case 13: /* PositionCond */ r = eval_location(g, actor, c); break;
         case 14: /* OpponentChoice */ r = 1; break;
         case 15: /* OpponentLiveSuccess */ r = 0; break;
-        case 16: /* NoExcessHeart */ r = 1; break;
+        case 16: /* NoExcessHeart */ r = eval_no_excess(g, actor, c); break;
         case 17: /* AlwaysTrue */ r = 1; break;
         case 18: /* AnyOf */ r = 1; break;
         case 19: /* AllRevealed */ r = 1; break;
