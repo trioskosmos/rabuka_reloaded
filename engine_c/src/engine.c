@@ -269,11 +269,13 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
         rb_gain_ability(g, actor, e);
     } else if (!strcmp(act, "invalidate_ability") || !strcmp(act, "suppress_ability_trigger")) {
         rb_invalidate_ability(g, actor, e);
-    } else if (!strcmp(act, "activate_ability") || !strcmp(act, "reduce_live_card_set_limit")) {
-        /* ability gain/suppression; no-op for now — tracked via mods for score */
-        if(e->action && !strcmp(e->action,"reduce_live_card_set_limit")){
-            W->live.n = W->live.n; /* placeholder */
-        }
+    } else if (!strcmp(act, "activate_ability")) {
+        /* immediate execute of gained ability — stub to emit choice if needed */
+        rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 1, "activate_ability");
+    } else if (!strcmp(act, "reduce_live_card_set_limit")) {
+        int lim = cnt>0?cnt:1;
+        g->live_set_limit_reduction[who] += lim;
+        if(g->live_set_limit_reduction[who] > RB_MAX_LIVE_CARDS) g->live_set_limit_reduction[who]=RB_MAX_LIVE_CARDS;
     } else if (!strcmp(act, "position_change") || !strcmp(act, "rotation")) {
         rb_effect_position_change(g, actor, e);
     } else if (!strcmp(act, "choose_target_player")) {
@@ -414,11 +416,14 @@ static void main_phase(GameState *g, int pl) {
 int rb_perform_live(GameState *g, int pl);
 
 static void live_phase(GameState *g) {
-    /* Live card set: auto-place up to MAX_LIVE_CARDS from each player's hand. */
+    /* Live card set: auto-place up to MAX_LIVE_CARDS - reduction from each player's hand. */
     for (int pl = 0; pl < 2; pl++) {
         RbPlayer *P = &g->p[pl];
+        int limit = RB_MAX_LIVE_CARDS - g->live_set_limit_reduction[pl];
+        if(limit<0) limit=0;
+        if(limit>RB_MAX_LIVE_CARDS) limit=RB_MAX_LIVE_CARDS;
         int placed = 0;
-        for (int i = 0; i < P->hand.n && placed < RB_MAX_LIVE_CARDS; ) {
+        for (int i = 0; i < P->hand.n && placed < limit; ) {
             Card c;
             if (rb_decode_card_by_index((uint32_t)P->hand.cards[i], &c)) {
                 if (card_is_live(&c)) {
@@ -437,6 +442,7 @@ static void live_phase(GameState *g) {
     /* Performance: first attacker then second attacker (faithful via live.c). */
     rb_perform_live(g, g->first_attacker);
     rb_perform_live(g, g->second_attacker);
+    for(int pl=0;pl<2;pl++) g->live_set_limit_reduction[pl]=0;
 }
 
 static void check_victory(GameState *g) {

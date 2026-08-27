@@ -304,6 +304,7 @@ typedef struct GameState {
     RbPlayer p[2];
     RbMods   mods;            /* global modifiers (blades/hearts/scores/costs) */
     RbAbilityQueue queue;     /* pending choice / deferred sequential */
+    int      live_set_limit_reduction[2]; /* per-player reduce_live_card_set_limit */
     int      active;          /* player taking the normal-phase turn */
     int      first_attacker;  /* 0/1 winner of RPS for first turn */
     int      second_attacker; /* the other player */

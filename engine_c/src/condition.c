@@ -219,12 +219,28 @@ static int eval_group(const struct GameState *g, int actor, const Condition *c) 
     const char *loc = get_str(c, "location");
     if (!loc) loc = "stage";
     int pl = target_player_idx(actor, c);
-    int actual = count_in_zone(g, pl, loc);
-    /* group_names filtering would narrow, but without DB lookup we approximate */
     const CondValue *gv = find_val(c, "group_names");
-    if (!gv || gv->tag != RB_TAG_ARRAY) return actual>0;
-    /* has group filter → still just check presence */
-    return actual>0;
+    if (!gv || gv->tag != RB_TAG_ARRAY || gv->arr_n==0) return count_in_zone(g, pl, loc)>0;
+    /* Check if any card in zone has group matching any of group_names */
+    const RbPlayer *P=&g->p[pl];
+    int ids[RB_MAX_ZONE]; int n=0;
+    if (!strcmp(loc,"stage")){ for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]!=RB_EMPTY_SLOT) ids[n++]=P->stage[i]; }
+    else if(!strcmp(loc,"hand")){ for(int i=0;i<P->hand.n;i++) ids[n++]=P->hand.cards[i]; }
+    else if(!strcmp(loc,"discard")||!strcmp(loc,"waitroom")){ for(int i=0;i<P->discard.n;i++) ids[n++]=P->discard.cards[i]; }
+    else return count_in_zone(g,pl,loc)>0;
+    for(int i=0;i<n;i++){
+        Card card; if(!rb_decode_card_by_index((uint32_t)ids[i],&card)) continue;
+        const char *gname = rb_card_string(card.group_idx);
+        for(uint32_t gi=0;gi<gv->arr_n;gi++) if(gv->arr[gi].tag==RB_TAG_STR && gv->arr[gi].s && gname && !strcmp(gname, gv->arr[gi].s)){
+            rb_free_card(&card); return 1;
+        }
+        /* also substring match for normalized group */
+        for(uint32_t gi=0;gi<gv->arr_n;gi++) if(gv->arr[gi].tag==RB_TAG_STR && gv->arr[gi].s && gname && strstr(gname, gv->arr[gi].s)){
+            rb_free_card(&card); return 1;
+        }
+        rb_free_card(&card);
+    }
+    return 0;
 }
 
 /* ── appearance (variant 5) ── */
