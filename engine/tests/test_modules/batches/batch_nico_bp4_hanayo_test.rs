@@ -1,6 +1,6 @@
 /// Batch: remaining 1-QA cards with simple testable abilities
 use crate::helpers::*;
-use crate::test_modules::bp7_wait_immunity_helpers::*;
+use crate::test_modules::support::bp7_wait_immunity_helpers::*;
 use rabuka_engine::zones::MemberArea;
 
 /// にこ's debut wait is blocked by 松浦果南's wait-immunity on the opponent's member.

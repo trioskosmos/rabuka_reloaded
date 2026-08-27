@@ -12,7 +12,7 @@
 ///   相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。
 ///   (Ab#0's opponent wait action triggers Ab#1)
 use crate::helpers::*;
-use crate::test_modules::bp7_wait_immunity_helpers::*;
+use crate::test_modules::support::bp7_wait_immunity_helpers::*;
 
 /// 真姫's ab#0 opponent-wait is blocked by 松浦果南's wait-immunity on the member.
 #[test]

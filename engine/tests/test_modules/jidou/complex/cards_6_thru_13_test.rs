@@ -1,5 +1,5 @@
 use crate::helpers::*;
-use crate::test_modules::bp7_wait_immunity_helpers::*;
+use crate::test_modules::support::bp7_wait_immunity_helpers::*;
 use rabuka_engine::zones::MemberArea;
 
 /// 桂城's debut waits ALL blade≤3 members on both stages; wait-immunity protects 果南.

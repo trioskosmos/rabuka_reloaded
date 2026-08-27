@@ -21,7 +21,7 @@
 ///   4. Negative control: without any recorded immunity, the same member IS waited
 ///      (proving the blocking is caused by the immunity, not a broken wait effect).
 use crate::helpers::*;
-use crate::test_modules::bp7_wait_immunity_helpers::p1_establish_wait_immunity;
+use crate::test_modules::support::bp7_wait_immunity_helpers::p1_establish_wait_immunity;
 
 const KANAN: &str = "PL!S-bp7-003-R\u{ff0b}"; // 松浦果南 — Aqours, blade 2 (immune, blade ≤ 3)
 const KARIN: &str = "PL!N-bp7-004-R"; // 朝香果林 — waits opp blade ≤ (energy_under + 1)

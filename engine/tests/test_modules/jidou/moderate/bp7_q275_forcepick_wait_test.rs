@@ -25,7 +25,7 @@
 /// no prompt. To exercise the offered-choice filtering, each test keeps TWO+ legal
 /// (non-immune) candidates alongside the immune one so a stage SelectCard prompt appears.
 use crate::helpers::*;
-use crate::test_modules::bp7_wait_immunity_helpers::p1_establish_wait_immunity;
+use crate::test_modules::support::bp7_wait_immunity_helpers::p1_establish_wait_immunity;
 use rabuka_engine::zones::MemberArea;
 
 const CERAS: &str = "PL!HS-bp6-007-R"; // セラス 柳田 リリエンフェルト — EdelNote, cost 15

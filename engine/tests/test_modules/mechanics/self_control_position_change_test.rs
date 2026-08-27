@@ -18,7 +18,7 @@
 ///   4. Advance to LiveStart with SELF CONTROL!! as live card.
 ///   5. SELF CONTROL!! fires: only Seira A and Seira B get blade; filler does not.
 use crate::helpers::*;
-use crate::test_modules::bp7_wait_immunity_helpers::*;
+use crate::test_modules::support::bp7_wait_immunity_helpers::*;
 
 /// 聖良's ab#1 (area-move trigger) wait is blocked by wait-immunity.
 #[test]

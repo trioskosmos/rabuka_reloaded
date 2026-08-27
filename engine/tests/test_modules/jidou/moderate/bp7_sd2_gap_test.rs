@@ -10,7 +10,7 @@
 ///   - PL!N-sd2-019-SD2 優木せつ菜 (登場): heart05 till live end
 ///   - PL!N-sd2-021-SD2 天王寺璃奈 (登場): wait 1 opp member cost <= 4
 use crate::helpers::*;
-use crate::test_modules::bp7_wait_immunity_helpers::is_waited;
+use crate::test_modules::support::bp7_wait_immunity_helpers::is_waited;
 use rabuka_engine::card::HeartColor;
 use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
