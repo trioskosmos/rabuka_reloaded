@@ -141,7 +141,14 @@ int rb_perform_live(GameState *g, int pl){
 
     int passed=0, live_score=0;
     allocate_and_verdict(g, pl, total_hearts, &passed, &live_score);
-
+    /* push snapshot for parity diff (trace_game oracle) */
+    if(g->n_snapshots < RB_MAX_SNAPSHOTS){
+        RbLiveSnapshot *s=&g->snapshots[g->n_snapshots++];
+        s->player=pl; s->turn=g->turn; s->n_lives=P->live.n;
+        for(int i=0;i<P->live.n && i<RB_MAX_LIVE_CARDS;i++) s->lives[i]=P->live.cards[i];
+        for(int i=0;i<8;i++) s->total_hearts[i]=total_hearts[i];
+        s->total_score=live_score; s->success=passed;
+    }
     /* Move lives: if all passed, to success (score added); else to discard */
     int lives_to_move=P->live.n;
     if(passed){

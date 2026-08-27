@@ -300,19 +300,32 @@ int  rb_queue_has_pending(const RbAbilityQueue *q);
 int  rb_use_limit_reached(RbAbilityQueue *q, int card_id, int ability_idx, int limit, int cur_turn);
 void rb_record_use(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn);
 
+typedef struct {
+    int player; /* 0/1 */
+    int turn;
+    int total_hearts[8];
+    int lives[RB_MAX_LIVE_CARDS];
+    int n_lives;
+    int total_score;
+    int success; /* 1 if all_pass */
+} RbLiveSnapshot;
+
+#define RB_MAX_SNAPSHOTS 64
 typedef struct GameState {
     RbPlayer p[2];
-    RbMods   mods;            /* global modifiers (blades/hearts/scores/costs) */
-    RbAbilityQueue queue;     /* pending choice / deferred sequential */
-    int      live_set_limit_reduction[2]; /* per-player reduce_live_card_set_limit */
-    int      active;          /* player taking the normal-phase turn */
-    int      first_attacker;  /* 0/1 winner of RPS for first turn */
-    int      second_attacker; /* the other player */
-    int      turn;            /* turn number (starts at 1) */
-    int      winner;          /* -1 none, 0/1 winner, 2 draw */
+    RbMods   mods;
+    RbAbilityQueue queue;
+    int      live_set_limit_reduction[2];
+    RbLiveSnapshot snapshots[RB_MAX_SNAPSHOTS];
+    int      n_snapshots;
+    int      active;
+    int      first_attacker;
+    int      second_attacker;
+    int      turn;
+    int      winner;
     RbPhase  phase;
-    int      rps[2];          /* 0=rock 1=paper 2=scissors */
-    int      live_set_player; /* which player is setting live cards (first/second) */
+    int      rps[2];
+    int      live_set_player;
 } GameState;
 
 /* ── RNG (xorshift; deterministic given seed) ── */
