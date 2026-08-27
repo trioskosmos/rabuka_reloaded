@@ -175,23 +175,47 @@ static int eval_location(const struct GameState *g, int actor, const Condition *
 
 /* ── comparison (variant 2) ── handles count vs threshold generic */
 static int eval_comparison(const struct GameState *g, int actor, const Condition *c) {
-    /* Most comparison conditions are just card_count with operator.
-       Reuse location logic if location present. */
     const char *loc = get_str(c, "location");
+    const char *agg = get_str(c, "aggregate");
+    const char *ctype = get_str(c, "comparison_type");
+    /* hanayo: location=success_live_card_zone, card_type=live_card, count=6, operator=>=, comparison_type=score, aggregate=total
+       → sum of card scores in zone, not count. Mirrors engine/src/ability/condition/card.rs evaluate_comparison. */
+    if (loc && agg && !strcmp(agg,"total") && ctype && !strcmp(ctype,"score")) {
+        int pl = target_player_idx(actor, c);
+        const RbPlayer *P=&g->p[pl];
+        const char *ct = get_str(c,"card_type");
+        int sum=0;
+        if(!strcmp(loc,"success")||!strcmp(loc,"success_zone")||!strcmp(loc,"success_live_zone")||!strcmp(loc,"success_live_card_zone")){
+            for(int i=0;i<P->success.n;i++){
+                if(ct && !card_matches_card_type_filter(P->success.cards[i], ct)) continue;
+                Card cc; if(!rb_decode_card_by_index((uint32_t)P->success.cards[i],&cc)) continue;
+                sum += cc.score;
+                rb_free_card(&cc);
+            }
+        } else if(!strcmp(loc,"hand")){
+            for(int i=0;i<P->hand.n;i++){
+                if(ct && !card_matches_card_type_filter(P->hand.cards[i], ct)) continue;
+                Card cc; if(!rb_decode_card_by_index((uint32_t)P->hand.cards[i],&cc)) continue;
+                sum += cc.score;
+                rb_free_card(&cc);
+            }
+        } else {
+            /* fallback: count */
+            sum = count_in_zone(g,pl,loc);
+        }
+        int thr=0; get_i(c,"count",&thr);
+        const char *op=get_str(c,"operator");
+        return eval_operator(sum, op, thr);
+    }
     if (loc) return eval_location(g, actor, c);
     int cnt=0, has_cnt=get_i(c, "count", &cnt);
     if (!has_cnt) {
-        /* fallback: check values array length vs count */
         const CondValue *vv = find_val(c, "values");
         if (vv && vv->tag==RB_TAG_ARRAY) cnt = (int)vv->arr_n;
     }
     const char *op = get_str(c, "operator");
-    /* comparison_source/target may override actual count; simplified */
-    /* Use player score / hand size as placeholder for comparison_source? */
-    /* For portable stub, treat as threshold check against 1 */
     if (!has_cnt) return 1;
-    int actual = cnt; /* stub: assume actual == threshold so operator passes if threshold met */
-    /* Better: if comparison_source is "hand" count hand etc. */
+    int actual = cnt;
     const char *src = get_str(c, "comparison_source");
     if (src) {
         int pl = target_player_idx(actor, c);

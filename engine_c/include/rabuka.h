@@ -195,6 +195,7 @@ uint16_t rb_card_ability_idx(uint32_t i);   /* 0xFFFF if none */
 const unsigned char *rb_card_record(uint32_t i);
 const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len);
 const char *rb_card_string(uint16_t idx);
+int rb_find_card_by_no(const char *card_no); /* linear scan cards.bin card_no strings, -1 if not found */
 
 /* ════════════════════════════════════════════════════════════════════
     Engine — game state + turn loop + faithful effect execution.

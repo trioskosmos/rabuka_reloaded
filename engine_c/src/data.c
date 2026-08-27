@@ -198,3 +198,15 @@ const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len) {
     if (start + len > g_bc_len) return NULL;
     return g_bc + start;
 }
+
+int rb_find_card_by_no(const char *card_no) {
+    if (!card_no || !g_cards_blob) return -1;
+    for (uint32_t i = 0; i < g_num_cards; i++) {
+        const unsigned char *rec = rb_card_record(i);
+        if (!rec) continue;
+        uint16_t no_idx = le16(rec + 0); /* card_no_idx at offset 0 per cards.c */
+        const char *no = rb_card_string(no_idx);
+        if (no && strcmp(no, card_no) == 0) return (int)i;
+    }
+    return -1;
+}
