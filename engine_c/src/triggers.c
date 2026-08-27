@@ -11,19 +11,22 @@ int rb_trigger_is(const char *triggers, const char *needle) {
 }
 
 /* Queue all stage members' debut abilities for the player who just played.
-    Caller has just placed card_id onto stage; scan that card's ability triggers. */
+     Scan ALL abilities for that card (cards can have debut+constant). Mirrors
+     Rust Card.abilities:Vec<AbilityRef> via CARD_ABILITY_PAIRS. */
 int rb_trigger_debut(GameState *g, int pl, int card_id) {
-    Card c;
-    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+    int n = rb_card_num_abilities((uint32_t)card_id);
     int queued = 0;
-    if (c.ability && c.ability->triggers && rb_trigger_is(c.ability->triggers, "登場")) {
-        if (!rb_use_limit_reached(&g->queue, card_id, 0, c.ability->use_limit < 0 ? 99 : c.ability->use_limit, g->turn)) {
-            rb_queue_push(&g->queue, card_id, 0);
-            rb_record_use(&g->queue, card_id, 0, g->turn);
-            queued = 1;
+    for(int i=0;i<n;i++){
+        Ability ab; if(!rb_decode_card_ability((uint32_t)card_id,i,&ab)) continue;
+        if(ab.triggers && rb_trigger_is(ab.triggers, "登場")){
+            if (!rb_use_limit_reached(&g->queue, card_id, i, ab.use_limit < 0 ? 99 : ab.use_limit, g->turn)) {
+                rb_queue_push(&g->queue, card_id, i);
+                rb_record_use(&g->queue, card_id, i, g->turn);
+                queued = 1;
+            }
         }
+        rb_free_ability(&ab);
     }
-    rb_free_card(&c);
     (void)pl;
     return queued;
 }
@@ -33,15 +36,18 @@ int rb_trigger_live_start(GameState *g, int pl) {
     for(int s=0;s<RB_STAGE_SIZE;s++){
         int cid=g->p[pl].stage[s];
         if(cid==RB_EMPTY_SLOT) continue;
-        Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)) continue;
-        if(c.ability && c.ability->triggers && rb_trigger_is(c.ability->triggers,"ライブ開始時")){
-            if(!rb_use_limit_reached(&g->queue, cid, 0, c.ability->use_limit<0?99:c.ability->use_limit, g->turn)){
-                rb_queue_push(&g->queue, cid, 0);
-                rb_record_use(&g->queue, cid, 0, g->turn);
-                queued++;
+        int n = rb_card_num_abilities((uint32_t)cid);
+        for(int i=0;i<n;i++){
+            Ability ab; if(!rb_decode_card_ability((uint32_t)cid,i,&ab)) continue;
+            if(ab.triggers && rb_trigger_is(ab.triggers,"ライブ開始時")){
+                if(!rb_use_limit_reached(&g->queue, cid, i, ab.use_limit<0?99:ab.use_limit, g->turn)){
+                    rb_queue_push(&g->queue, cid, i);
+                    rb_record_use(&g->queue, cid, i, g->turn);
+                    queued++;
+                }
             }
+            rb_free_ability(&ab);
         }
-        rb_free_card(&c);
     }
     return queued;
 }
@@ -132,28 +138,25 @@ void rb_recalc_constants(GameState *g) {
         for (int s=0;s<RB_STAGE_SIZE;s++) {
             int cid = g->p[pl].stage[s];
             if (cid==RB_EMPTY_SLOT) continue;
-            Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)) continue;
-            if (c.ability && c.ability->triggers && rb_trigger_is(c.ability->triggers,"常時") && c.ability->effect) {
-                AbilityEffect *e=c.ability->effect;
-                /* Gate on effect condition (e.g. position left/center, energy count).
-                   Mirrors Rust's ConditionContext with skip_phase_gate=true. */
-                int cond_ok=1;
-                if(e->has_condition && e->condition) cond_ok=rb_eval_condition(g, pl, e->condition);
-                if(cond_ok) apply_constant_effect(g, cid, e);
-                else {
-                    /* For sequential常時 where condition is on a child, apply_constant_effect
-                       will still recurse and each child is gated individually if needed.
-                       To handle that, walk children even when top fails, but only those
-                       whose own condition passes. */
-                    for(int i=0;i<e->n_child;i++){
-                        AbilityEffect *ch=e->child[i];
-                        int ch_ok=1;
-                        if(ch->has_condition && ch->condition) ch_ok=rb_eval_condition(g, pl, ch->condition);
-                        if(ch_ok) apply_constant_effect(g, cid, ch);
+            int n = rb_card_num_abilities((uint32_t)cid);
+            for(int ai=0; ai<n; ai++){
+                Ability ab; if(!rb_decode_card_ability((uint32_t)cid, ai, &ab)) continue;
+                if (ab.triggers && rb_trigger_is(ab.triggers,"常時") && ab.effect) {
+                    AbilityEffect *e=ab.effect;
+                    int cond_ok=1;
+                    if(e->has_condition && e->condition) cond_ok=rb_eval_condition(g, pl, e->condition);
+                    if(cond_ok) apply_constant_effect(g, cid, e);
+                    else {
+                        for(int i=0;i<e->n_child;i++){
+                            AbilityEffect *ch=e->child[i];
+                            int ch_ok=1;
+                            if(ch->has_condition && ch->condition) ch_ok=rb_eval_condition(g, pl, ch->condition);
+                            if(ch_ok) apply_constant_effect(g, cid, ch);
+                        }
                     }
                 }
+                rb_free_ability(&ab);
             }
-            rb_free_card(&c);
         }
     }
 }

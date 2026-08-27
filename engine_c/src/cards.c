@@ -1,6 +1,8 @@
 #include "rabuka.h"
+#include "gen_data.h"
 #include <stdlib.h>
 #include <string.h>
+extern const uint16_t RBKA_CARD_ABILITY_PAIRS[];
 
 static uint16_t le16p(const unsigned char *p) {
     return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
@@ -58,4 +60,44 @@ int rb_decode_card_by_index(uint32_t i, Card *out) {
 void rb_free_card(Card *c) {
     if (!c) return;
     if (c->ability) { rb_free_ability(c->ability); free(c->ability); c->ability = NULL; }
+}
+
+/* Multi-ability support — uses RBKA_CARD_ABILITY_PAIRS (card_no string idx → ability idx).
+   The pairs table's card_no idx is into abilities_strings (RBKA_STRINGS_OFFSETS),
+   while the card's card_no_idx is into g_card_strings (cards.bin). They are
+   different string tables, so we compare the actual string content, not the
+   numeric index. Mirrors Rust CardLoader::build_abilities_map_shared. */
+int rb_card_num_abilities(uint32_t card_idx){
+    const unsigned char *r = rb_card_record(card_idx);
+    if(!r) return 0;
+    uint16_t card_no_idx = le16p(r+0);
+    const char *card_no = rb_card_string(card_no_idx);
+    if(!card_no) return 0;
+    int cnt=0;
+    for(uint32_t i=0;i<RBKA_NUM_CARD_ABILITY_PAIRS*2; i+=2){
+        const char *pair_no = rb_get_string(RBKA_CARD_ABILITY_PAIRS[i]);
+        if(pair_no && !strcmp(pair_no, card_no)) cnt++;
+    }
+    return cnt;
+}
+int rb_card_get_ability_idx(uint32_t card_idx, int n, uint32_t *out){
+    const unsigned char *r = rb_card_record(card_idx);
+    if(!r || !out) return 0;
+    uint16_t card_no_idx = le16p(r+0);
+    const char *card_no = rb_card_string(card_no_idx);
+    if(!card_no) return 0;
+    int cur=0;
+    for(uint32_t i=0;i<RBKA_NUM_CARD_ABILITY_PAIRS*2; i+=2){
+        const char *pair_no = rb_get_string(RBKA_CARD_ABILITY_PAIRS[i]);
+        if(pair_no && !strcmp(pair_no, card_no)){
+            if(cur==n){ *out = RBKA_CARD_ABILITY_PAIRS[i+1]; return 1; }
+            cur++;
+        }
+    }
+    return 0;
+}
+int rb_decode_card_ability(uint32_t card_idx, int n, Ability *out){
+    uint32_t ab_idx;
+    if(!rb_card_get_ability_idx(card_idx, n, &ab_idx)) return 0;
+    return rb_decode_ability(ab_idx, out);
 }

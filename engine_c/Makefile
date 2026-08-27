@@ -1,5 +1,5 @@
 CC      ?= gcc
-CFLAGS  ?= -std=c11 -O2 -Wall -Iinclude
+CFLAGS  ?= -std=c11 -O2 -Wall -Iinclude -Isrc
 SRC     := src/data.c src/vm.c src/cards.c src/alloc.c src/modifiers.c src/condition.c src/choice.c src/ability_queue.c src/triggers.c src/phase.c src/stats_pipeline.c src/live.c src/effects_move.c src/effects_look.c src/effects_ability.c src/effects_state.c src/engine.c src/main.c src/bytecode_blob.c src/gen_data.c
 OBJ     := $(SRC:.c=.o)
 # library objects (everything except main, so tests can supply their own main)

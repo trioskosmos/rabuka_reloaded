@@ -191,11 +191,18 @@ void rb_free_ability(Ability *a);
 void rb_free_condition(Condition *c);
 int  rb_decode_card_by_index(uint32_t i, Card *out);    /* 0..num_cards-1 */
 void rb_free_card(Card *c);
-uint16_t rb_card_ability_idx(uint32_t i);   /* 0xFFFF if none */
+uint16_t rb_card_ability_idx(uint32_t i);   /* 0xFFFF if none — first ability only (legacy) */
 const unsigned char *rb_card_record(uint32_t i);
 const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len);
 const char *rb_card_string(uint16_t idx);
 int rb_find_card_by_no(const char *card_no); /* linear scan cards.bin card_no strings, -1 if not found */
+/* Multi-ability support — cards can have 1..N abilities (e.g. hanayo debut+constant).
+   The pairs table RBKA_CARD_ABILITY_PAIRS maps card_no string idx → ability idx.
+   Use these to iterate all abilities for a card (mirrors Rust Card.abilities:Vec). */
+extern const uint16_t RBKA_CARD_ABILITY_PAIRS[];
+int rb_card_num_abilities(uint32_t card_idx); /* count of abilities for card */
+int rb_card_get_ability_idx(uint32_t card_idx, int n, uint32_t *out_ability_idx); /* nth ability idx */
+int rb_decode_card_ability(uint32_t card_idx, int n, Ability *out); /* decode nth ability */
 
 /* ════════════════════════════════════════════════════════════════════
     Engine — game state + turn loop + faithful effect execution.
