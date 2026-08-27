@@ -129,6 +129,23 @@ static void scenario_baton(void){
     rb_execute_effect(&g,0,&e);
     CHECK(g.p[0].hand.n==hand_before-1 || g.p[0].hand.n==hand_before,"baton consumes hand if possible");
 }
+static void scenario_live_limit(void){
+    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    rb_seed(8); rb_game_init(&g,d0,10,d1,10);
+    g.live_set_limit_reduction[0]=2;
+    int limit=RB_MAX_LIVE_CARDS - g.live_set_limit_reduction[0];
+    CHECK(limit==1,"live limit reduction 2 → limit 1");
+}
+static void scenario_group_condition(void){
+    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    rb_seed(9); rb_game_init(&g,d0,10,d1,10);
+    if(g.p[0].stage[0]==-1 && g.p[0].hand.n>0){ int c=g.p[0].hand.cards[0]; g.p[0].stage[0]=c; g.p[0].hand.cards[0]=g.p[0].hand.cards[g.p[0].hand.n-1]; g.p[0].hand.n--; }
+    Condition cond={0}; cond.variant=4;
+    CondField *f=&cond.fields[cond.n_fields++];
+    f->key="location"; f->v.tag=RB_TAG_STR; f->v.s="stage";
+    int res=rb_eval_condition(&g,0,&cond);
+    CHECK(res==1||res==0,"group condition evaluates without crash");
+}
 
 int main(void){
     CHECK(rb_load("src")==0,"rb_load");
@@ -140,6 +157,8 @@ int main(void){
     scenario_heart_modifier();
     scenario_look_select();
     scenario_baton();
+    scenario_live_limit();
+    scenario_group_condition();
     rb_unload();
     if(failures){ printf("\n%d FAILURES\n",failures); return 1; }
     printf("\nALL REPLAY CHECKS PASSED\n");
