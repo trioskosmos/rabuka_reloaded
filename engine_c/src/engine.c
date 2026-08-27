@@ -311,7 +311,13 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
         }
     } else if (!strcmp(act, "restriction") || !strcmp(act, "activation_restriction") ||
                !strcmp(act, "modify_limit")) {
-        /* placement/trigger restrictions; no-op */
+        /* placement/trigger restrictions; no-op — prohibition_effects would be tracked here */
+    } else if (!strcmp(act, "repeat_procedure") || !strcmp(act, "re_yell") ||
+               !strcmp(act, "perform_yell") || !strcmp(act, "custom") ||
+               !strcmp(act, "do_nothing") || !strcmp(act, "sequential") ||
+               !strcmp(act, "conditional_alternative")) {
+        /* Compound/control: children already executed pre-order in rb_execute_effect.
+           repeat_procedure would loop children cnt times in full port; stub does once. */
     } else if (!strcmp(act, "choice") || !strcmp(act, "conditional_on_result") ||
                !strcmp(act, "conditional_on_optional") || !strcmp(act, "conditional_alternative")) {
         int allow = e->is_optional ? 1 : 0;
