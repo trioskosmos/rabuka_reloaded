@@ -332,11 +332,13 @@ int  rb_play_card(GameState *g, int pl, int hand_idx);
 int  rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos); /* to stage */
 int  rb_activate_ability(GameState *g, int pl, int hand_idx);
 
-/* ── Triggers / phase (triggers.c / phase.c) ── */
+/* ── Triggers / phase / live (triggers.c / phase.c / live.c) ── */
 int  rb_trigger_is(const char *triggers, const char *needle);
 int  rb_trigger_debut(GameState *g, int pl, int card_id);
 void rb_recalc_constants(GameState *g);
 void rb_advance_phase(GameState *g);
+void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]);
+int  rb_perform_live(GameState *g, int pl);
 
 /* ── Effect execution (public for testing / harness) ── */
 void rb_execute_effect(GameState *g, int actor, AbilityEffect *e);

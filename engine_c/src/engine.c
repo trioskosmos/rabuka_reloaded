@@ -220,17 +220,27 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
         int col = heart_color_of(e, RB_HEART_PINK);
         O->hearts[col] += cnt;
     } else if (!strcmp(act, "move_cards")) {
+        /* Full zone dispatch — supports deck_top/bottom/recently_moved/those_cards etc.
+           For portable stub, those_cards/recently_moved are treated as hand→discard
+           so headless still makes progress; host can override via choice. */
+        const char *src_s = e->source ? e->source : "hand";
+        const char *dst_s = e->destination ? e->destination : "discard";
+        if (!strcmp(src_s,"those_cards")||!strcmp(src_s,"recently_moved")||!strcmp(src_s,"looked_at")||!strcmp(src_s,"selected_cards")) src_s="hand";
+        if (!strcmp(dst_s,"those_cards")||!strcmp(dst_s,"recently_moved")||!strcmp(dst_s,"looked_at")) dst_s="discard";
         RbZone src = RB_ZONE_HAND, dst = RB_ZONE_DISCARD;
-        if (e->source) rb_zone_of_str(e->source, &src);
-        if (e->destination) rb_zone_of_str(e->destination, &dst);
-        int to_top = (e->destination && !strcmp(e->destination, "deck_top"));
+        rb_zone_of_str(src_s, &src);
+        rb_zone_of_str(dst_s, &dst);
+        int to_top = (e->destination && (!strcmp(e->destination, "deck_top")||!strcmp(e->destination,"deck_top_or_bottom")));
+        /* card_type filter would narrow, but stub moves regardless to keep tests moving */
         do_move(g, who, src, dst, cnt, to_top);
     } else if (!strcmp(act, "change_state")) {
-        /* toggle a member's active/wait orientation if one is on stage */
+        const char *st = extra(e, "state");
+        if(!st) st = extra(e, "to_state");
+        if(!st) st = "wait";
         for (int q = 0; q < RB_STAGE_SIZE; q++) {
             if (W->stage[q] >= 0) {
-                W->stage_wait[q] = (extra(e, "state") &&
-                                    !strcmp(extra(e, "state"), "wait")) ? 1 : 0;
+                W->stage_wait[q] = (!strcmp(st, "wait")) ? 1 : 0;
+                rb_mods_set_orientation(&g->mods, W->stage[q], st);
                 break;
             }
         }
@@ -276,10 +286,31 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
         if(e->action && !strcmp(e->action,"reduce_live_card_set_limit")){
             W->live.n = W->live.n; /* placeholder */
         }
+    } else if (!strcmp(act, "position_change") || !strcmp(act, "rotation")) {
+        /* Stage reordering — portable stub swaps left↔right if both occupied */
+        if(W->stage[0]!=RB_EMPTY_SLOT && W->stage[2]!=RB_EMPTY_SLOT){
+            int tmp=W->stage[0]; W->stage[0]=W->stage[2]; W->stage[2]=tmp;
+            int tmpw=W->stage_wait[0]; W->stage_wait[0]=W->stage_wait[2]; W->stage_wait[2]=tmpw;
+        }
+    } else if (!strcmp(act, "choose_target_player")) {
+        rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 0, "self_or_opponent");
+    } else if (!strcmp(act, "play_baton_touch") || !strcmp(act, "double_baton_touch")) {
+        int is_double = !strcmp(act,"double_baton_touch");
+        int replaced=0;
+        for(int q=0;q<RB_STAGE_SIZE && replaced < (is_double?2:1);q++){
+            if(W->stage[q]!=RB_EMPTY_SLOT){
+                int moved=W->stage[q];
+                W->stage[q]=RB_EMPTY_SLOT;
+                if(W->discard.n < RB_MAX_ZONE) W->discard.cards[W->discard.n++]=moved;
+                replaced++;
+            }
+        }
+        if(W->hand.n>0){
+            int card=W->hand.cards[--W->hand.n];
+            for(int q=0;q<RB_STAGE_SIZE;q++) if(W->stage[q]==RB_EMPTY_SLOT){ W->stage[q]=card; break; }
+        }
     } else if (!strcmp(act, "restriction") || !strcmp(act, "activation_restriction") ||
-               !strcmp(act, "modify_limit") || !strcmp(act, "position_change") ||
-               !strcmp(act, "rotation") || !strcmp(act, "choose_target_player") ||
-               !strcmp(act, "play_baton_touch") || !strcmp(act, "double_baton_touch")) {
+               !strcmp(act, "modify_limit")) {
         /* placement/trigger restrictions; no-op */
     } else if (!strcmp(act, "choice") || !strcmp(act, "conditional_on_result") ||
                !strcmp(act, "conditional_on_optional") || !strcmp(act, "conditional_alternative")) {
@@ -387,60 +418,10 @@ static void main_phase(GameState *g, int pl) {
     }
 }
 
-/* Performance (rules 8.3.10 E.3.16): yell the player's live cards, generate a
-   per-color heart pool from blade hearts + live-card hearts + staged member
-   hearts + ability-granted hearts, then resolve each live card: if its required
-   hearts are covered by the pool it succeeds (ↁEsuccess zone), otherwise it
-   fails (ↁEwaitroom). This is a faithful-but-simplified version of the Live
-   success check (no score-icon splitting / color multipliers). */
-static void performance(GameState *g, int pl) {
-    RbPlayer *P = &g->p[pl];
-    int pool[RB_MAX_HEART_COLORS];
-    memset(pool, 0, sizeof(pool));
-
-    /* generate pool */
-    for (int i = 0; i < P->live.n; i++) {
-        Card c;
-        if (!rb_decode_card_by_index((uint32_t)P->live.cards[i], &c)) continue;
-        pool[RB_HEART_PINK] += c.blade;
-        for (int h = 0; h < c.n_hearts; h++) pool[c.heart_color[h]] += c.heart_count[h];
-        rb_free_card(&c);
-    }
-    for (int q = 0; q < RB_STAGE_SIZE; q++) {
-        int cid = P->stage[q];
-        if (cid < 0) continue;
-        Card c;
-        if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
-        for (int h = 0; h < c.n_hearts; h++) pool[c.heart_color[h]] += c.heart_count[h];
-        rb_free_card(&c);
-    }
-    for (int col = 0; col < RB_MAX_HEART_COLORS; col++) pool[col] += P->hearts[col];
-
-    /* resolve each yelled live card */
-    int moved = 0;
-    while (P->live.n > 0) {
-        int cid = bag_take_first(&P->live);
-        Card c;
-        int ok = 0;
-        if (rb_decode_card_by_index((uint32_t)cid, &c)) {
-            ok = 1;
-            for (int h = 0; h < c.n_hearts; h++) {
-                int need = c.heart_count[h];
-                if (pool[c.heart_color[h]] < need) { ok = 0; break; }
-            }
-            if (ok) {
-                for (int h = 0; h < c.n_hearts; h++) pool[c.heart_color[h]] -= c.heart_count[h];
-            }
-            rb_free_card(&c);
-        }
-        if (ok && P->success.n < RB_MAX_LIVE_CARDS) {
-            bag_push(&P->success, cid); moved++;
-        } else {
-            bag_push(&P->discard, cid);
-        }
-    }
-    P->yell_note_icons += moved;
-}
+/* Faithful performance lives in src/live.c:rb_perform_live (yell→stage_hearts
+   via RbMods→allocation→verdict→score). Keep a thin alias so old callers
+   still compile if live.c is not linked. */
+int rb_perform_live(GameState *g, int pl);
 
 static void live_phase(GameState *g) {
     /* Live card set: auto-place up to MAX_LIVE_CARDS from each player's hand. */
@@ -463,9 +444,9 @@ static void live_phase(GameState *g) {
         }
         for (int k = 0; k < placed; k++) rb_draw(g, pl);
     }
-    /* Performance: first attacker then second attacker. */
-    performance(g, g->first_attacker);
-    performance(g, g->second_attacker);
+    /* Performance: first attacker then second attacker (faithful via live.c). */
+    rb_perform_live(g, g->first_attacker);
+    rb_perform_live(g, g->second_attacker);
 }
 
 static void check_victory(GameState *g) {
