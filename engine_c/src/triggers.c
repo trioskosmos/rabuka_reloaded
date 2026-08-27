@@ -11,7 +11,7 @@ int rb_trigger_is(const char *triggers, const char *needle) {
 }
 
 /* Queue all stage members' debut abilities for the player who just played.
-   Caller has just placed card_id onto stage; scan that card's ability triggers. */
+    Caller has just placed card_id onto stage; scan that card's ability triggers. */
 int rb_trigger_debut(GameState *g, int pl, int card_id) {
     Card c;
     if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
@@ -19,11 +19,30 @@ int rb_trigger_debut(GameState *g, int pl, int card_id) {
     if (c.ability && c.ability->triggers && rb_trigger_is(c.ability->triggers, "登場")) {
         if (!rb_use_limit_reached(&g->queue, card_id, 0, c.ability->use_limit < 0 ? 99 : c.ability->use_limit, g->turn)) {
             rb_queue_push(&g->queue, card_id, 0);
+            rb_record_use(&g->queue, card_id, 0, g->turn);
             queued = 1;
         }
     }
     rb_free_card(&c);
     (void)pl;
+    return queued;
+}
+
+int rb_trigger_live_start(GameState *g, int pl) {
+    int queued=0;
+    for(int s=0;s<RB_STAGE_SIZE;s++){
+        int cid=g->p[pl].stage[s];
+        if(cid==RB_EMPTY_SLOT) continue;
+        Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)) continue;
+        if(c.ability && c.ability->triggers && rb_trigger_is(c.ability->triggers,"ライブ開始時")){
+            if(!rb_use_limit_reached(&g->queue, cid, 0, c.ability->use_limit<0?99:c.ability->use_limit, g->turn)){
+                rb_queue_push(&g->queue, cid, 0);
+                rb_record_use(&g->queue, cid, 0, g->turn);
+                queued++;
+            }
+        }
+        rb_free_card(&c);
+    }
     return queued;
 }
 

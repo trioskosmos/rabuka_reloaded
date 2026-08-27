@@ -202,16 +202,34 @@ static int eval_comparison(const struct GameState *g, int actor, const Condition
 
 /* ── movement (variant 3) ── */
 static int eval_movement(const struct GameState *g, int actor, const Condition *c) {
-    (void)actor;
     const char *mv = get_str(c, "movement");
     if (!mv) mv = get_str(c, "source"); /* some use source */
-    /* Stub: if movement == "has_moved" check any recently moved? No tracking yet so assume 0 */
-    if (mv && (!strcmp(mv,"has_moved") || !strcmp(mv,"hasMoved"))) {
-        /* No movement tracking yet → false */
-        return 0;
+    int has_any = g->n_recently_moved > 0;
+    /* If condition specifies a card filter (e.g. group), check if any recently moved matches */
+    if (has_any) {
+        const char *group = get_str(c, "group_names");
+        const char *ctype = get_str(c, "card_type");
+        if (group || ctype) {
+            has_any = 0;
+            for(int i=0;i<g->n_recently_moved;i++){
+                int cid=g->recently_moved[i];
+                if(ctype && !card_matches_card_type_filter(cid, ctype)) continue;
+                if(group){
+                    Card cc; if(!rb_decode_card_by_index((uint32_t)cid,&cc)) continue;
+                    const char *gn=rb_card_string(cc.group_idx);
+                    int ok= gn && (strstr(gn,group)||!strcmp(gn,group));
+                    rb_free_card(&cc);
+                    if(!ok) continue;
+                }
+                has_any=1; break;
+            }
+        }
     }
-    if (mv && (!strcmp(mv,"not_moved") || !strcmp(mv,"notMoved"))) return 1;
-    return 1; /* default pass for unknown movement */
+    if (mv && (!strcmp(mv,"has_moved") || !strcmp(mv,"hasMoved") || !strcmp(mv,"has_moved_stage"))) {
+        return has_any ? 1 : 0;
+    }
+    if (mv && (!strcmp(mv,"not_moved") || !strcmp(mv,"notMoved"))) return has_any ? 0 : 1;
+    return has_any ? 1 : 0;
 }
 
 /* ── group (variant 4) ── */

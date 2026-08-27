@@ -65,8 +65,11 @@ void rb_advance_phase(GameState *g) {
     if(g->phase==RB_PHASE_LIVE_SET){
         /* Load-bearing: re-evaluates constant abilities before performance (mirrors
            engine/src/turn/phases.rs:222 check_timing at LiveCardSetSecond→FirstPerformance).
-           Without this q127_wien leaves_stage_modifier_removed breaks. */
+           Without this q127_wien leaves_stage_modifier_removed breaks.
+           Also queue LiveStart autos for both players (turn/triggers.rs). */
         rb_recalc_constants(g);
+        rb_trigger_live_start(g, 0);
+        rb_trigger_live_start(g, 1);
         g->phase=RB_PHASE_PERFORMANCE;
         return;
     }

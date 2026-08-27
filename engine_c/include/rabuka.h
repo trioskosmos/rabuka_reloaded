@@ -313,6 +313,7 @@ typedef struct {
 } RbLiveSnapshot;
 
 #define RB_MAX_SNAPSHOTS 64
+#define RB_MAX_RECENTLY_MOVED 8
 typedef struct GameState {
     RbPlayer p[2];
     RbMods   mods;
@@ -320,6 +321,8 @@ typedef struct GameState {
     int      live_set_limit_reduction[2];
     RbLiveSnapshot snapshots[RB_MAX_SNAPSHOTS];
     int      n_snapshots;
+    int      recently_moved[RB_MAX_RECENTLY_MOVED];
+    int      n_recently_moved;
     int      active;
     int      first_attacker;
     int      second_attacker;
@@ -354,6 +357,7 @@ int  rb_activate_ability(GameState *g, int pl, int hand_idx);
 /* ── Triggers / phase / live / stats_pipeline ── */
 int  rb_trigger_is(const char *triggers, const char *needle);
 int  rb_trigger_debut(GameState *g, int pl, int card_id);
+int  rb_trigger_live_start(GameState *g, int pl);
 void rb_recalc_constants(GameState *g);
 void rb_advance_phase(GameState *g);
 void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]);

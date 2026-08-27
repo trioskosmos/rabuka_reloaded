@@ -130,6 +130,10 @@ static void do_move_filtered(GameState *g, int actor, RbZone src, RbZone dst, in
 static void do_move(GameState *g, int actor, RbZone src, RbZone dst, int count, int to_top) {
     do_move_filtered(g, actor, src, dst, count, to_top, NULL);
 }
+static void record_movement(GameState *g, int cid){
+    if(g->n_recently_moved < RB_MAX_RECENTLY_MOVED) g->recently_moved[g->n_recently_moved++]=cid;
+    else { for(int i=1;i<RB_MAX_RECENTLY_MOVED;i++) g->recently_moved[i-1]=g->recently_moved[i]; g->recently_moved[RB_MAX_RECENTLY_MOVED-1]=cid; }
+}
 static void do_move_filtered(GameState *g, int actor, RbZone src, RbZone dst, int count, int to_top, const char *card_type_filter) {
     RbPlayer *A = &g->p[actor];
     if (src == RB_ZONE_STAGE) {
@@ -138,6 +142,7 @@ static void do_move_filtered(GameState *g, int actor, RbZone src, RbZone dst, in
         for (int pos = 0; pos < RB_STAGE_SIZE && moved < limit; pos++) {
             if (A->stage[pos] >= 0 && card_matches_card_type_filter(A->stage[pos], card_type_filter)) {
                 int c = A->stage[pos]; A->stage[pos] = -1; A->stage_wait[pos] = 0;
+                record_movement(g,c);
                 if (dst == RB_ZONE_STAGE) { /* relocate on stage: first empty */
                     for (int q = 0; q < RB_STAGE_SIZE; q++)
                         if (A->stage[q] < 0) { A->stage[q] = c; break; }
@@ -159,6 +164,7 @@ static void do_move_filtered(GameState *g, int actor, RbZone src, RbZone dst, in
         int cid = sb->cards[i];
         if (!card_matches_card_type_filter(cid, card_type_filter)) continue;
         int c = bag_remove_at(sb, i);
+        record_movement(g,c);
         if (dst == RB_ZONE_STAGE) {
             for (int q = 0; q < RB_STAGE_SIZE; q++)
                 if (A->stage[q] < 0) { A->stage[q] = c; break; }
