@@ -1,6 +1,7 @@
 // Auto-generated. Tests live as sibling .rs files in this folder.
     pub mod b8_live_timing_test;
     pub mod b9_more_test;
+    pub mod baton_touch_restriction_combination_test;
     pub mod blade_per_discard_test;
     pub mod bp5_333_erena_edge_test2;
     pub mod bp7_ai_energy_under_member_optional_test;
@@ -20,10 +21,18 @@
     pub mod butterfly_wing_suppress_test;
     #[cfg(feature = "bytecode_abilities")]
     pub mod bytecode_deep_compare_test;
+    pub mod cannot_baton_touch_test;
+    pub mod card_count_state_test;
+    pub mod card_filter_test;
+    pub mod characterization_promoted_test;
     pub mod chika_bp7_reveal_cost_test;
+    pub mod chisato_live_success_test;
+    pub mod condition_evaluation_test;
     pub mod draw_one_put_bottom_debut_test;
+    pub mod either_or_state_change_test;
     pub mod eli_bp4_test;
     pub mod eli_test;
+    pub mod energy_state_condition_test;
     pub mod eri_bp3_test;
     pub mod eternalize_love_test;
     pub mod formation_change_test;
@@ -47,16 +56,23 @@
     pub mod l0_gap_livesuccess2_test;
     pub mod l0_gap_livesuccess3_test;
     pub mod l0_gap_livesuccess_test;
+    pub mod live_card_zone_movement_test;
     pub mod ll_bp2_001_cost_reduction_test;
     pub mod love_u_test;
     pub mod maki_pb1_006_debut_test;
     pub mod mari_test;
+    pub mod modifier_layer_characterization_test;
     pub mod modify_required_hearts_13key_test;
+    pub mod neutral_live_success_test;
     pub mod nonfiction_cost_comparison_test;
+    pub mod performance_phase_rules_test;
+    pub mod performance_pipeline_test;
+    pub mod performance_snapshot_audit_test;
     pub mod pl_bp5_012_test;
     pub mod pl_hs_bp1_003_test;
     pub mod pl_s_bp6_006_test;
     pub mod pl_sp_pb2_005_test;
+    pub mod position_ability_test;
     pub mod riko_test;
     pub mod rin_bp6_test;
     pub mod shizuku_pb1_test;
@@ -64,6 +80,7 @@
     pub mod sp_bp2_004_edge2_test;
     pub mod sp_bp4_008_position_test;
     pub mod sp_bp5_choice_energy_test;
+    pub mod state_condition_test;
     pub mod sumire_bp2_center_cost_test;
     pub mod sumire_bp4_test;
     pub mod sumire_bp5_test;
