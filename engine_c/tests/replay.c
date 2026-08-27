@@ -71,9 +71,8 @@ static void scenario_move_cards(void){
 static void scenario_condition_gate(void){
     GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(3); rb_game_init(&g,d0,10,d1,10);
-    /* Effect with condition that requires hand >=99 should be gated */
     AbilityEffect e={0}; e.action="modify_score"; e.count=5;
-    Condition cond={0}; cond.variant=1; /* Location/card_count */
+    Condition cond={0}; cond.variant=1;
     CondField *f=&cond.fields[cond.n_fields++];
     f->key="location"; f->v.tag=RB_TAG_STR; f->v.s="hand";
     f=&cond.fields[cond.n_fields++];
@@ -84,10 +83,51 @@ static void scenario_condition_gate(void){
     int sc=g.p[0].score;
     rb_execute_effect(&g,0,&e);
     CHECK(g.p[0].score==sc,"condition-gated effect skipped when hand<99");
-    /* Now with count=1 should pass */
     cond.fields[1].v.i=1;
     rb_execute_effect(&g,0,&e);
     CHECK(g.p[0].score==sc+5,"condition-gated effect fires when hand>=1");
+}
+static void scenario_cost_modifier(void){
+    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    rb_seed(4); rb_game_init(&g,d0,10,d1,10);
+    if(g.p[0].stage[0]==-1 && g.p[0].hand.n>0){ int c=g.p[0].hand.cards[0]; g.p[0].stage[0]=c; g.p[0].hand.cards[0]=g.p[0].hand.cards[g.p[0].hand.n-1]; g.p[0].hand.n--; }
+    int cid=g.p[0].stage[0];
+    if(cid==-1) return;
+    int before=rb_mods_get_cost(&g.mods,cid);
+    AbilityEffect e={0}; e.action="modify_cost"; e.count=1;
+    rb_execute_effect(&g,0,&e);
+    CHECK(rb_mods_get_cost(&g.mods,cid)==before+1,"modify_cost via mods");
+}
+static void scenario_heart_modifier(void){
+    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    rb_seed(5); rb_game_init(&g,d0,10,d1,10);
+    if(g.p[0].stage[0]==-1 && g.p[0].hand.n>0){ int c=g.p[0].hand.cards[0]; g.p[0].stage[0]=c; g.p[0].hand.cards[0]=g.p[0].hand.cards[g.p[0].hand.n-1]; g.p[0].hand.n--; }
+    int cid=g.p[0].stage[0]; if(cid==-1) return;
+    int before=rb_mods_get_need_heart(&g.mods,cid,0);
+    AbilityEffect e={0}; e.action="modify_required_hearts"; e.count=2; e.extra_k[0]="heart_color"; e.extra_v[0]="pink"; e.n_extra=1;
+    rb_execute_effect(&g,0,&e);
+    CHECK(rb_mods_get_need_heart(&g.mods,cid,0)==before+2,"modify_required_hearts via need_heart mods");
+}
+static void scenario_look_select(void){
+    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    rb_seed(6); rb_game_init(&g,d0,10,d1,10);
+    AbilityEffect e={0}; e.action="look_at"; e.source="deck"; e.count=2;
+    rb_execute_effect(&g,0,&e);
+    CHECK(rb_has_pending_choice(&g)==1,"look_at emits SELECT_CARD pending");
+    const RbChoice *ch=rb_get_pending_choice(&g);
+    CHECK(ch && ch->kind==RB_CHOICE_SELECT_CARD,"look_at pending is SELECT_CARD");
+    rb_resume_with_choice(&g,-1);
+    CHECK(rb_has_pending_choice(&g)==0,"look_at skip clears pending");
+}
+static void scenario_baton(void){
+    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    rb_seed(7); rb_game_init(&g,d0,10,d1,10);
+    if(g.p[0].stage[0]==-1 && g.p[0].hand.n>0){ int c=g.p[0].hand.cards[0]; g.p[0].stage[0]=c; g.p[0].hand.cards[0]=g.p[0].hand.cards[g.p[0].hand.n-1]; g.p[0].hand.n--; }
+    int stage_before = (g.p[0].stage[0]!=-1)+(g.p[0].stage[1]!=-1)+(g.p[0].stage[2]!=-1);
+    int hand_before=g.p[0].hand.n;
+    AbilityEffect e={0}; e.action="play_baton_touch"; e.count=1;
+    rb_execute_effect(&g,0,&e);
+    CHECK(g.p[0].hand.n==hand_before-1 || g.p[0].hand.n==hand_before,"baton consumes hand if possible");
 }
 
 int main(void){
@@ -96,6 +136,10 @@ int main(void){
     scenario_live_performance();
     scenario_move_cards();
     scenario_condition_gate();
+    scenario_cost_modifier();
+    scenario_heart_modifier();
+    scenario_look_select();
+    scenario_baton();
     rb_unload();
     if(failures){ printf("\n%d FAILURES\n",failures); return 1; }
     printf("\nALL REPLAY CHECKS PASSED\n");
