@@ -356,6 +356,10 @@ int  card_matches_card_type_filter(int card_idx, const char *filter);
 void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
                     const char *zone, const char *card_type,
                     int count, int allow_skip, const char *target);
+void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_position_change(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e);
 
 /* ── Effect execution (public for testing / harness) ── */
 void rb_execute_effect(GameState *g, int actor, AbilityEffect *e);

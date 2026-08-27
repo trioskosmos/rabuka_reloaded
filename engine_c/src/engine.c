@@ -245,16 +245,7 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
     } else if (!strcmp(act, "move_cards")) {
         rb_effect_move_cards(g, who, e);
     } else if (!strcmp(act, "change_state")) {
-        const char *st = extra(e, "state");
-        if(!st) st = extra(e, "to_state");
-        if(!st) st = "wait";
-        for (int q = 0; q < RB_STAGE_SIZE; q++) {
-            if (W->stage[q] >= 0) {
-                W->stage_wait[q] = (!strcmp(st, "wait")) ? 1 : 0;
-                rb_mods_set_orientation(&g->mods, W->stage[q], st);
-                break;
-            }
-        }
+        rb_effect_change_state(g, actor, e);
     } else if (!strcmp(act, "look_at") || !strcmp(act, "reveal") ||
                !strcmp(act, "reveal_per_group") || !strcmp(act, "reveal_until_live_card") ||
                !strcmp(act, "reveal_until_chosen_card")) {
@@ -265,15 +256,7 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
     } else if (!strcmp(act, "set_cost") || !strcmp(act, "modify_cost") ||
                !strcmp(act, "set_cost_to_use") || !strcmp(act,"modify_yell_count") ||
                !strcmp(act,"modify_yell_source")) {
-        /* Apply cost/yell modifiers via RbMods — affects next play cost / yell. */
-        int target_id = -1;
-        for(int q=0;q<RB_STAGE_SIZE;q++) if(W->stage[q]!=RB_EMPTY_SLOT){ target_id=W->stage[q]; break; }
-        if(target_id==-1 && W->hand.n>0) target_id=W->hand.cards[0];
-        if(target_id!=-1){
-            if(!strcmp(act,"set_cost") || !strcmp(act,"set_cost_to_use")) rb_mods_set_cost(&g->mods, target_id, cnt);
-            else if(!strcmp(act,"modify_cost")) rb_mods_add_cost(&g->mods, target_id, cnt);
-            else { /* modify_yell */ }
-        }
+        rb_effect_modify_cost(g, actor, e);
     } else if (!strcmp(act, "set_card_identity") || !strcmp(act, "set_blade_type") ||
                !strcmp(act, "set_blade_count") || !strcmp(act, "set_heart_type") ||
                !strcmp(act, "choose_required_hearts") || !strcmp(act, "all_blade_timing")) {
@@ -281,11 +264,7 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
         if(g->mods.constant_blade[0]==0) { /* touch mods to avoid unused warning */ }
     } else if (!strcmp(act, "modify_required_hearts") || !strcmp(act, "modify_required_hearts_global") ||
                !strcmp(act, "modify_required_hearts_success")) {
-        int col = heart_color_of(e, RB_HEART_PINK) % 8;
-        int target_id = -1;
-        for(int q=0;q<RB_STAGE_SIZE;q++) if(W->stage[q]!=RB_EMPTY_SLOT){ target_id=W->stage[q]; break; }
-        if(target_id==-1 && W->hand.n>0) target_id=W->hand.cards[0];
-        if(target_id!=-1) rb_mods_add_need_heart(&g->mods, target_id, col, cnt);
+        rb_effect_modify_hearts(g, actor, e);
     } else if (!strcmp(act, "gain_ability") || !strcmp(act, "gain_ability_from_source")) {
         rb_gain_ability(g, actor, e);
     } else if (!strcmp(act, "invalidate_ability") || !strcmp(act, "suppress_ability_trigger")) {
@@ -296,11 +275,7 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
             W->live.n = W->live.n; /* placeholder */
         }
     } else if (!strcmp(act, "position_change") || !strcmp(act, "rotation")) {
-        /* Stage reordering — portable stub swaps left↔right if both occupied */
-        if(W->stage[0]!=RB_EMPTY_SLOT && W->stage[2]!=RB_EMPTY_SLOT){
-            int tmp=W->stage[0]; W->stage[0]=W->stage[2]; W->stage[2]=tmp;
-            int tmpw=W->stage_wait[0]; W->stage_wait[0]=W->stage_wait[2]; W->stage_wait[2]=tmpw;
-        }
+        rb_effect_position_change(g, actor, e);
     } else if (!strcmp(act, "choose_target_player")) {
         rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 0, "self_or_opponent");
     } else if (!strcmp(act, "play_baton_touch") || !strcmp(act, "double_baton_touch")) {
