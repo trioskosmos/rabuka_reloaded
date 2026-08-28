@@ -1,5 +1,6 @@
 #include "rabuka.h"
 #include <string.h>
+#include <stdlib.h>
 
 /* State / cost / compound handlers — mirrors
    engine/src/ability/effects/state.rs + misc.rs + compound.rs */
@@ -87,35 +88,36 @@ void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e){
     int who=actor;
     if(e->target && !strcmp(e->target,"opponent")) who=actor^1;
     RbPlayer *P=&g->p[who];
+    /* set_cost/set_cost_to_use carry the amount in a "value" extra when the
+       wire encodes it that way; prefer it over the bare count. */
+    int val=cnt;
+    for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"value")){
+        int v=atoi(e->extra_v[i]); if(v) val=v;
+    }
+    int is_set = e->action && (!strcmp(e->action,"set_cost")||!strcmp(e->action,"set_cost_to_use"));
     /* Faithful target: apply to every staged member + hand-visible costs.
-       Rust's cost_modifiers are per-card and constant abilities recalc via
-       recalc_constants; here we mirror by applying to all owned members so
-       later draws also see the modifier via the card_id entry. The old
-       first-staged-only path was a P0/P1 coverage hole (modify_cost appeared
-       to work but only for one member). */
+        Rust's cost_modifiers are per-card and constant abilities recalc via
+        recalc_constants; here we mirror by applying to all owned members so
+        later draws also see the modifier via the card_id entry. The old
+        first-staged-only path was a P0/P1 coverage hole (modify_cost appeared
+        to work but only for one member). */
     int any=0;
     for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT){
         int cid=P->stage[q];
-        if(e->action && (!strcmp(e->action,"set_cost")||!strcmp(e->action,"set_cost_to_use")))
-            rb_mods_set_cost(&g->mods, cid, cnt);
-        else
-            rb_mods_add_cost(&g->mods, cid, cnt);
+        if(is_set) rb_mods_set_cost(&g->mods, cid, val);
+        else       rb_mods_add_cost(&g->mods, cid, cnt);
         any=1;
     }
     if(!any){
         for(int i=0;i<P->hand.n;i++){
             int cid=P->hand.cards[i];
-            if(e->action && (!strcmp(e->action,"set_cost")||!strcmp(e->action,"set_cost_to_use")))
-                rb_mods_set_cost(&g->mods, cid, cnt);
-            else
-                rb_mods_add_cost(&g->mods, cid, cnt);
+            if(is_set) rb_mods_set_cost(&g->mods, cid, val);
+            else       rb_mods_add_cost(&g->mods, cid, cnt);
         }
         for(int i=0;i<P->deck.n;i++){
             int cid=P->deck.cards[i];
-            if(e->action && (!strcmp(e->action,"set_cost")||!strcmp(e->action,"set_cost_to_use")))
-                rb_mods_set_cost(&g->mods, cid, cnt);
-            else
-                rb_mods_add_cost(&g->mods, cid, cnt);
+            if(is_set) rb_mods_set_cost(&g->mods, cid, val);
+            else       rb_mods_add_cost(&g->mods, cid, cnt);
         }
     }
     /* modify_yell_count / modify_yell_source are per-player yell modifiers.
