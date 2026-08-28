@@ -158,6 +158,17 @@ static void scenario_no_excess(void){
     g.snapshots[0].surplus_hearts=3;
     CHECK(rb_eval_condition(&g,0,&cond)==0,"no_excess false when surplus>0");
 }
+static void scenario_opponent_live_success(void){
+    GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    rb_seed(11); rb_game_init(&g,d0,10,d1,10);
+    Condition cond={0}; cond.variant=15; /* RB_COND_OPPONENT_LIVE_SUCCESS */
+    /* no live performed → opponent flag 0 → false */
+    CHECK(rb_eval_condition(&g,0,&cond)==0,"opponent_live_success false before any live");
+    g.live_success[1]=1; /* opponent (player1) passed their live this turn */
+    CHECK(rb_eval_condition(&g,0,&cond)==1,"opponent_live_success true when opponent passed");
+    g.live_success[1]=0;
+    CHECK(rb_eval_condition(&g,0,&cond)==0,"opponent_live_success false when opponent failed");
+}
 static void scenario_phase_determinism(void){
     GameState g1,g2; uint32_t d0[20],d1[20];
     for(int i=0;i<20;i++){ d0[i]=i; d1[i]=20+i; }

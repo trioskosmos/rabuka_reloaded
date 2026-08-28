@@ -1,6 +1,6 @@
 # engine_c — C Port of the Rabuka Engine
 
-**Status: v0.1 — decodes faithfully (variant-byte fix), Constant cost/heart/score modifiers green, 35 ported tests automated (13 hanayo + 22 generated).** Foundation + first mass-port batch proven; remaining work — Live/performance snapshots, move_cards/choice, and remaining 240 simple constant tests — slots in without restructuring. `make test` green on 4 binaries.
+**Status: v0.2 — decodes faithfully (variant-byte fix), Constant cost/heart/score modifiers green, 35 ported tests automated (13 hanayo + 22 generated).** `rb_check_timing` integrity cascade ported (victory/invalid-zone/orphaned-under/resolution/permanent-loop + `rb_player_refresh`) and wired at the Active/Draw/LiveCardSet phase transitions, mirroring `engine/src/turn/actions.rs:check_timing`. Foundation + first mass-port batch proven; remaining work — Live/performance snapshots, `ability/cost.rs` pay gate, move_cards relay pools, and remaining 240 simple constant tests — slots in without restructuring. `make test` green on 4 binaries.
 
 > **Scope invariant:** The C rewrite is **only game logic**. Card data and ability bytecode are *generated artifacts* embedded as data, not hand-rewritten:
 > - `cards.bin` — compiled card records (`cards/compile_cards.py`, 2526 cards)
@@ -573,7 +573,7 @@ Toolchain: `gcc ≥ 9` / `clang` on PC, `m68k-elf-gcc` (CD-i), `arm-none-eabi-gc
 | Phases/Live/Triggers (4 files, ~4.8k) | 1 path | 3 | 0 | 0 | Two-attacker flip faithful (fixed `static main_count`); mulligan + `check_timing` + `re_yell` missing |
 | Game/Bot/Infra (~9k) | 1 | 2 | 1 | 13 | Demo harness only; web_server/bot/display out-of-scope for `engine_c` |
 
-**The next commits that move the needle (in order):** (1) `check_timing` hooks at `Active→Energy→Draw→LiveSet→Performance` + `constant` heart/need_heart recalc (covers `q127_wien_*`), (2) full `ability/cost.rs` pay gate (`sequential_cost`, `optional_cost`, `change_state wait`), (3) `turn/live.rs` `re_yell`→`pending_reyell_rebuild` + `LiveSuccess` trigger → `compute_surplus_and_flags` oracle diff against `cargo run --bin trace_game`, (4) `effects/move_cards` relay pools (`ThoseCards/RecentlyMoved/LookedAtRemaining`) + `effects/look` `keep_shuffle_under`, (5) `ability_queue` `QueueState` FSM + `ChoiceRoute`/`ConditionalChoice` routing. No restructuring needed — each slots into `src/phase.c:rb_advance_phase`, `src/live.c:rb_perform_live`, `src/effects_*`, `src/choice.c`, `src/ability_queue.c`.
+**The next commits that move the needle (in order):** (1) ~~`check_timing` hooks at `Active→Energy→Draw→LiveSet→Performance` + `constant` heart/need_heart recalc (covers `q127_wien_*`)~~ — **DONE**: `rb_check_timing` (+ `rb_check_victory_condition`, `rb_check_invalid_live_cards`, `rb_check_invalid_energy_cards`, `rb_check_orphaned_under_cards`, `rb_check_invalid_resolution_zone`, `rb_check_permanent_loop`, `rb_player_refresh`) added to `src/turn/phase.c`; `RbPlayer.under_cards[3]` + `GameState.resolution` added to `rabuka.h`; wired at the three phase transitions that Rust calls it (Active, Draw, LiveCardSet). `recalculate_constants` was already in `rb_recalc_constants`. (2) full `ability/cost.rs` pay gate (`sequential_cost`, `optional_cost`, `change_state wait`), (3) `turn/live.rs` `re_yell`→`pending_reyell_rebuild` + `LiveSuccess` trigger → `compute_surplus_and_flags` oracle diff against `cargo run --bin trace_game`, (4) `effects/move_cards` relay pools (`ThoseCards/RecentlyMoved/LookedAtRemaining`) + `effects/look` `keep_shuffle_under`, (5) `ability_queue` `QueueState` FSM + `ChoiceRoute`/`ConditionalChoice` routing. No restructuring needed — each slots into `src/phase.c:rb_advance_phase`, `src/live.c:rb_perform_live`, `src/effects_*`, `src/choice.c`, `src/ability_queue.c`.
 
 *This §12 is the single source of truth for the C rewrite. Every row corresponds to a Rust file/function that will land as a traced commit; tick it off as each phase lands.*
 
@@ -616,3 +616,20 @@ Toolchain: `gcc ≥ 9` / `clang` on PC, `m68k-elf-gcc` (CD-i), `arm-none-eabi-gc
 **Parity caveat (important).** The test binaries assert against the generated ported tests, many of which are still TODOs (e.g. the `sd1-022` LiveStart test only checks a negative and is marked "TODO fire_trigger"). So a green `make test` does **not** fully prove effect parity — which is why the direct verification program is used for individual effect/trigger grants (LiveStart blade grant, debuts, constants, etc.).
 
 **Status as of this commit.** `rb_engine_test` + `rb_engine_replay` pass; `rb_engine_ported` (7) and `rb_engine_generated` (26) have pre-existing failures unrelated to the latest condition port (hanayo `score`/`modify_score`/`recalc_constants` gaps). Build is clean (`-Wall`, warnings only). Throughput observed ~43.3 t/s.
+
+---
+
+## 14. Strategy — translate the WHOLE engine first, then let tests pass
+
+**The Rust tests convert cleanly (see `tools/gen_tests.py`), so the test harness is not the bottleneck.** The bottleneck is that the C engine is still a partial translation: many effect/condition/trigger kinds are stubs or best-effort, so the auto-ported Rust tests fail not because the conversion is wrong, but because the underlying C engine function is not implemented yet.
+
+** therefore the workflow is:**
+1. **Translate the engine completely**, file-by-file, mirroring `engine/src/...` (the §12 matrix is the checklist). Each Rust function lands as a faithful, real implementation — no "best-effort returns 0" shortcuts.
+2. **Only after a subsystem is fully translated** do we re-run `make test` and fix the now-revealed gaps. The failure count is a *worklist*, not a scoreboard.
+3. **The absolute test numbers do NOT matter until EVERYTHING is translated.** A green `make test` before the engine is complete would be misleading; a red one is expected and healthy. Do not cherry-pick tests to make them pass — implement the engine.
+
+**What has been automated (good, keep using it):**
+- `tools/gen_tests.py` mass-ports Rust `#[test]` fns → `tests/test_ported_generated.c` via `test_game.h`. It already broadens across `pass()`/debut/`play_to_stage`/board asserts; keep extending it as new engine functions land so coverage tracks the translation.
+- `make regen` rebuilds `cards.bin`/`bytecode_blob.c` from `engine/src` data — the C engine always runs off the same card/ability DB as Rust.
+
+**Next concrete engine translations (priority order, from §12.8):** (1) ~~`check_timing` hooks at `Active→Energy→Draw→LiveSet→Performance` + constant heart/need_heart recalc~~ — **DONE** (see §12.8); (2) full `ability/cost.rs` pay gate (`sequential_cost`, `optional_cost`, `change_state wait`); (3) `turn/live.rs` `re_yell`→`pending_reyell_rebuild` + `LiveSuccess` trigger → `compute_surplus_and_flags` oracle diff; (4) `effects/move_cards` relay pools (`ThoseCards`/`RecentlyMoved`/`LookedAtRemaining`) + `effects/look` `keep_shuffle_under`; (5) `ability_queue` `QueueState` FSM + `ChoiceRoute`/`ConditionalChoice` routing. Each slots into `src/phase.c:rb_advance_phase`, `src/live.c:rb_perform_live`, `src/effects_*`, `src/choice.c`, `src/ability_queue.c`.

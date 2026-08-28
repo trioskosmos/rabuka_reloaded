@@ -32,6 +32,7 @@ void rb_advance_phase(GameState *g) {
     if(g->phase==RB_PHASE_ACTIVE){
         activate_wait_members(g, g->active);
         rb_recalc_constants(g);
+        rb_check_timing(g);
         g->phase=RB_PHASE_ENERGY;
         return;
     }
@@ -43,6 +44,7 @@ void rb_advance_phase(GameState *g) {
     if(g->phase==RB_PHASE_DRAW){
         rb_draw(g, g->active);
         rb_recalc_constants(g);
+        rb_check_timing(g);
         g->phase=RB_PHASE_MAIN;
         return;
     }
@@ -66,11 +68,11 @@ void rb_advance_phase(GameState *g) {
         /* Load-bearing: re-evaluates constant abilities before performance (mirrors
            engine/src/turn/phases.rs:222 check_timing at LiveCardSetSecond→FirstPerformance).
            Without this q127_wien leaves_stage_modifier_removed breaks.
-           Also queue LiveStart autos for both players (turn/triggers.rs). */
-        rb_recalc_constants(g);
+           Trigger LiveStart autos for both players, then process them (phases.rs:231-243). */
+        rb_check_timing(g);
         rb_trigger_live_start(g, 0);
         rb_trigger_live_start(g, 1);
-        rb_drain_ability_queue(g);
+        rb_process_pending_auto_abilities(g);
         g->phase=RB_PHASE_PERFORMANCE;
         return;
     }
@@ -91,4 +93,112 @@ void rb_advance_phase(GameState *g) {
         g->active=g->active^1;
         g->phase=RB_PHASE_ACTIVE;
     }
+}
+
+/* ───────────────────────────── check_timing (turn/actions.rs) ─────────────────────────────
+   Integrity cascade run between phase steps: refresh derived zones, re-check
+   victory, evict illegally-zoned cards, recompute constants, clear the
+   resolution zone, detect permanent loops, then process pending auto-abilities. */
+
+static void bag_push_local(RbBag *b, int c) { if (b->n < RB_MAX_ZONE) b->cards[b->n++] = c; }
+static int  bag_remove_at_local(RbBag *b, int i) {
+    if (i < 0 || i >= b->n) return -1;
+    int c = b->cards[i];
+    for (int j = i; j < b->n - 1; j++) b->cards[j] = b->cards[j + 1];
+    b->n--;
+    return c;
+}
+
+void rb_player_refresh(GameState *g, int pl) {
+    /* Rust Player::refresh() recomputes cached derived zone state. The C model
+       keeps zones authoritative (no separate cached view), so the only derived
+       quantity is energy_active, which activates all non-delayed energy. */
+    RbPlayer *P = &g->p[pl];
+    if (P->energy_active < P->energy.n) P->energy_active = P->energy.n;
+}
+
+void rb_check_victory_condition(GameState *g) {
+    int p1 = g->p[0].success.n;
+    int p2 = g->p[1].success.n;
+    if (p1 >= RB_VICTORY_CARD_COUNT && p2 >= RB_VICTORY_CARD_COUNT) {
+        g->winner = 2;            /* draw */
+    } else if (p1 >= RB_VICTORY_CARD_COUNT && p2 <= 2) {
+        g->winner = 0;
+    } else if (p2 >= RB_VICTORY_CARD_COUNT && p1 <= 2) {
+        g->winner = 1;
+    }
+}
+
+void rb_check_invalid_live_cards(GameState *g, int is_p1) {
+    RbPlayer *P = is_p1 ? &g->p[0] : &g->p[1];
+    /* collect indices of non-live cards in the live zone (iterate backwards) */
+    for (int i = P->live.n - 1; i >= 0; i--) {
+        int cid = P->live.cards[i];
+        if (!rb_card_is_live(cid)) {
+            int c = bag_remove_at_local(&P->live, i);
+            if (rb_card_is_energy(c)) bag_push_local(&P->energy, c);
+            else                       bag_push_local(&P->discard, c);
+        }
+    }
+}
+
+void rb_check_invalid_energy_cards(GameState *g, int pl) {
+    RbPlayer *P = &g->p[pl];
+    for (int i = P->energy.n - 1; i >= 0; i--) {
+        int cid = P->energy.cards[i];
+        if (!rb_card_is_energy(cid)) {
+            int c = bag_remove_at_local(&P->energy, i);
+            bag_push_local(&P->discard, c);
+        }
+    }
+}
+
+void rb_check_orphaned_under_cards(GameState *g, int pl) {
+    RbPlayer *P = &g->p[pl];
+    for (int a = 0; a < RB_STAGE_SIZE; a++) {
+        if (P->stage[a] == RB_EMPTY_SLOT && P->under_cards[a].n > 0) {
+            for (int i = P->under_cards[a].n - 1; i >= 0; i--) {
+                int cid = bag_remove_at_local(&P->under_cards[a], i);
+                if (rb_card_is_energy(cid)) bag_push_local(&P->energy, cid);
+                else                        bag_push_local(&P->discard, cid);
+            }
+        }
+    }
+}
+
+void rb_check_invalid_resolution_zone(GameState *g) {
+    if (g->resolution.n == 0) return;
+    RbPlayer *P = &g->p[g->active];
+    for (int i = g->resolution.n - 1; i >= 0; i--) {
+        int cid = bag_remove_at_local(&g->resolution, i);
+        bag_push_local(&P->discard, cid);
+    }
+}
+
+int rb_check_permanent_loop(const GameState *g) {
+    /* Rust GameState::check_permanent_loop detects a non-terminating state
+       (e.g. mutual infinite triggers). The C model does not track the loop
+       graph, so it never forces a draw. */
+    (void)g;
+    return 0;
+}
+
+void rb_check_timing(GameState *g) {
+    rb_player_refresh(g, 0);
+    rb_player_refresh(g, 1);
+    rb_check_victory_condition(g);
+    rb_check_invalid_live_cards(g, true);
+    rb_check_invalid_live_cards(g, false);
+    rb_check_invalid_energy_cards(g, 0);
+    rb_check_invalid_energy_cards(g, 1);
+    rb_check_orphaned_under_cards(g, 0);
+    rb_check_orphaned_under_cards(g, 1);
+    rb_recalc_constants(g);
+    rb_check_invalid_resolution_zone(g);
+    if (rb_check_permanent_loop(g)) {
+        g->winner = 2;
+    }
+    int active = g->active;
+    rb_process_pending_auto_abilities(g);
+    (void)active;
 }

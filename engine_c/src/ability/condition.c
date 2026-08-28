@@ -865,9 +865,9 @@ static int eval_condition_inner_host(const struct GameState *g, int actor, int h
             break;
         case RB_COND_OPPONENT_LIVE_SUCCESS:
             /* Mirror state.rs:evaluate_opponent_live_success_condition — true only if
-               the owner's opponent won their live this turn. Headless tracks no
-               live-success flag yet, so return false (no live => not succeeded). */
-            r = 0;
+                the owner's OPPONENT passed their live THIS TURN (g->live_success
+                tracks each player's per-turn live result, set in live.c). */
+            r = g->live_success[actor ^ 1] ? 1 : 0;
             break;
         case RB_COND_NO_EXCESS_HEART:     r = eval_no_excess(g, actor, c); break;
         case RB_COND_ALWAYS_TRUE:         r = 1; break;

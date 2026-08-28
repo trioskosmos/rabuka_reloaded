@@ -271,6 +271,7 @@ typedef struct {
     RbBag     deck;
     int       stage[RB_STAGE_SIZE];   /* card_no index or -1 */
     int       stage_wait[RB_STAGE_SIZE]; /* 1 if member is in "wait" state */
+    RbBag     under_cards[RB_STAGE_SIZE]; /* cards placed under each stage member */
     RbBag     energy;                 /* energy cards in energy zone */
     int       energy_active;          /* count of active energy */
     RbBag     live;                   /* live card zone */
@@ -393,6 +394,7 @@ typedef struct GameState {
     RbPhase  phase;
     int      rps[2];
     int      live_set_player;
+    RbBag    resolution;             /* resolution zone (temp holding) */
     RbTempEffect temp_effects[RB_MAX_TEMP_EFFECTS];
     int      n_temp_effects;
 } GameState;
@@ -431,6 +433,20 @@ int  rb_trigger_live_success(GameState *g, int pl);
 void rb_recalc_constants(GameState *g);
 void rb_check_expired_effects(GameState *g);
 void rb_advance_phase(GameState *g);
+
+/* ── check_timing + integrity checks (engine/src/turn/actions.rs:check_timing) ── */
+void rb_check_timing(GameState *g);
+void rb_check_victory_condition(GameState *g);
+void rb_check_invalid_live_cards(GameState *g, int is_p1);
+void rb_check_invalid_energy_cards(GameState *g, int pl);
+void rb_check_orphaned_under_cards(GameState *g, int pl);
+void rb_check_invalid_resolution_zone(GameState *g);
+int  rb_check_permanent_loop(const GameState *g);
+void rb_player_refresh(GameState *g, int pl);
+
+/* ── Card classification (mirrors Rust Card::is_live / is_energy) ── */
+int rb_card_is_live(int card_id);
+int rb_card_is_energy(int card_id);
 void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]);
 void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]);
 void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]);
