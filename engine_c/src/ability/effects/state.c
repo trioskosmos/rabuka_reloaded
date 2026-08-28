@@ -39,10 +39,46 @@ void rb_effect_position_change(GameState *g, int actor, AbilityEffect *e){
     if(e->target && !strcmp(e->target,"opponent")) who=actor^1;
     RbPlayer *P=&g->p[who];
     (void)e;
-    /* Formation swap batch: simple left<->right as portable core */
-    if(P->stage[0]!=RB_EMPTY_SLOT && P->stage[2]!=RB_EMPTY_SLOT){
-        int tmp=P->stage[0]; P->stage[0]=P->stage[2]; P->stage[2]=tmp;
-        int tmpw=P->stage_wait[0]; P->stage_wait[0]=P->stage_wait[2]; P->stage_wait[2]=tmpw;
+    /* Resolve source/destination areas. Rust mirrors position_change(source, dest)
+       where each may be a position ("left"/"center"/"right") or unspecified
+       (any occupied / first empty). Interactive area-select is folded to the
+       headless no-op-skip path; we honor the parsed positions here. */
+    const char *src_pos=NULL, *dst_pos=NULL;
+    for(int i=0;i<e->n_extra;i++){
+        if(e->extra_k[i] && !strcmp(e->extra_k[i],"source_position")) src_pos=e->extra_v[i];
+        else if(e->extra_k[i] && (!strcmp(e->extra_k[i],"destination")||!strcmp(e->extra_k[i],"dest_position"))) dst_pos=e->extra_v[i];
+    }
+    if(!dst_pos && e->destination && *e->destination) dst_pos=e->destination;
+    int src = src_pos ? rb_pos_to_area(src_pos) : -1;
+    int dst = dst_pos ? rb_pos_to_area(dst_pos) : -1;
+
+    if(src>=0 && dst>=0){
+        if(src!=dst && P->stage[src]>=0 && P->stage[dst]<0){
+            int c=P->stage[src]; P->stage[src]=RB_EMPTY_SLOT; P->stage_wait[src]=0;
+            P->stage[dst]=c; P->stage_wait[dst]=0;
+        }
+    } else if(src>=0 && dst<0){
+        /* move src member to first empty slot */
+        if(P->stage[src]>=0){
+            for(int d=0;d<RB_STAGE_SIZE;d++) if(P->stage[d]<0){
+                int c=P->stage[src]; P->stage[src]=RB_EMPTY_SLOT; P->stage_wait[src]=0;
+                P->stage[d]=c; P->stage_wait[d]=0; break;
+            }
+        }
+    } else if(src<0 && dst>=0){
+        /* move first occupied member to dst if free */
+        if(P->stage[dst]<0){
+            for(int s=0;s<RB_STAGE_SIZE;s++) if(P->stage[s]>=0){
+                int c=P->stage[s]; P->stage[s]=RB_EMPTY_SLOT; P->stage_wait[s]=0;
+                P->stage[dst]=c; P->stage_wait[dst]=0; break;
+            }
+        }
+    } else {
+        /* No positions given: portable fallback — left<->right swap. */
+        if(P->stage[0]!=RB_EMPTY_SLOT && P->stage[2]!=RB_EMPTY_SLOT){
+            int tmp=P->stage[0]; P->stage[0]=P->stage[2]; P->stage[2]=tmp;
+            int tmpw=P->stage_wait[0]; P->stage_wait[0]=P->stage_wait[2]; P->stage_wait[2]=tmpw;
+        }
     }
 }
 
