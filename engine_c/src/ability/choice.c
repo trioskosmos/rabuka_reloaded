@@ -15,15 +15,22 @@ void rb_clear_pending_choice(GameState *g) {
 int rb_resume_with_choice(GameState *g, int selected_idx) {
     if (!g || !g->queue.has_pending) return 0;
     /* selected_idx==-1 means skip (may-pay gate declined). For the portable stub,
-       we just clear the choice; deferred sequential remainder is dropped on skip,
-       executed on pick. Full resolver will route to sequential continuation. */
+       the deferred effect (stashed at emit time) is dropped on skip, executed on
+       pick. Optional costs (pay_optional_cost:skip) are paid on pick rather than
+       executed as effects (mirrors cost.rs handle_optional_cost_payment). */
     AbilityEffect *def = g->queue.deferred;
     int was_skip = (selected_idx < 0);
+    int actor = g->queue.actor;
     rb_clear_pending_choice(g);
     if (!was_skip && def) {
-        /* resume the deferred remainder */
-        int actor = g->queue.actor;
-        rb_execute_effect(g, actor, def);
+        /* An optional energy/cost gate defers the cost effect; paying it deducts
+           the energy. Any other deferred effect is resumed as an effect tree. */
+        if (def->action && (!strcmp(def->action, "pay_energy") ||
+                            !strcmp(def->action, "pay_cost") ||
+                            !strcmp(def->action, "activation_cost")))
+            rb_pay_cost(g, actor, def);
+        else
+            rb_execute_effect(g, actor, def);
     }
     return 1;
 }

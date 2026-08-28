@@ -304,8 +304,11 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         /* Optional pay-or-skip gate (mirrors ability/cost.rs: has_skip_prompt / handle_optional_cost_payment).
            If the effect is marked optional and active energy insufficient, emit a pay/skip choice
            instead of auto-paying. Host auto-drains via skip. */
-        if (e->is_optional && W->energy_active < cnt) {
+        if (e->is_optional) {
+            /* Optional cost: emit a pay/skip gate (cost.rs handle_optional_cost_payment).
+               Stash the cost effect so resume can pay (selected) or skip (declined). */
             rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, 1, "pay_optional_cost:skip");
+            g->queue.deferred = (AbilityEffect *)e;
             return;
         }
         if (W->energy_active < cnt) {
