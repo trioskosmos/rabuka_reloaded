@@ -537,6 +537,42 @@ static int collect_stage_costs(const struct GameState *g, int pl, int out[RB_STA
     return n;
 }
 
+/* Map a stage position string to its stage index (mirror util::card_at_position). */
+static int stage_index_of_position(const char *pos) {
+    if (!pos) return -1;
+    if (!strcmp(pos, "center"))    return 1;
+    if (!strcmp(pos, "left_side")) return 0;
+    if (!strcmp(pos, "right_side"))return 2;
+    return -1;
+}
+
+/* highest_cost_on_stage_condition: the card at `position` must have an effective
+   cost that satisfies `operator` against EVERY other occupied stage member's
+   effective cost. Mirror card.rs:evaluate_highest_cost_on_stage_condition. */
+static int eval_highest_cost_on_stage(const struct GameState *g, int actor, const Condition *c) {
+    const char *pos = get_str(c, "position");
+    int idx = stage_index_of_position(pos);
+    if (idx < 0) return 0;
+    const char *tgt = get_str(c, "target");
+    int pl = (tgt && !strcmp(tgt, "opponent")) ? (actor ^ 1) : actor;
+    int cid = g->p[pl].stage[idx];
+    if (cid == RB_EMPTY_SLOT) return 0;
+    Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) return 0;
+    int pos_cost = rb_saturate_u8((int)cc.cost + rb_mods_get_cost((RbMods*)&g->mods, cid));
+    rb_free_card(&cc);
+    const char *op = get_str(c, "operator");
+    if (!op) op = ">";
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        int other = g->p[pl].stage[i];
+        if (other == RB_EMPTY_SLOT || other == cid) continue;
+        Card oc; if (!rb_decode_card_by_index((uint32_t)other, &oc)) continue;
+        int o_cost = rb_saturate_u8((int)oc.cost + rb_mods_get_cost((RbMods*)&g->mods, other));
+        rb_free_card(&oc);
+        if (!eval_operator(pos_cost, op, o_cost)) return 0;
+    }
+    return 1;
+}
+
 static int eval_resource(const struct GameState *g, int actor, const Condition *c) {
     const char *res = get_str(c, "resource_type");
     const char *src = get_str(c, "source");
@@ -560,6 +596,11 @@ static int eval_resource(const struct GameState *g, int actor, const Condition *
             if (eval_operator(self_costs[i], oop, max_opp)) return 1;
         return 0;
     }
+
+    /* highest_cost_on_stage_condition: position-based cost comparison (no
+       resource_type / comparison_type=="cost"). Mirror card.rs:evaluate_highest_cost_on_stage_condition. */
+    const char *pos = get_str(c, "position");
+    if (pos) return eval_highest_cost_on_stage(g, actor, c);
 
     if (res && !strcmp(res, "blade")) {
         /* sum effective blade of selection set (recently_moved) or stage */

@@ -580,3 +580,39 @@ Toolchain: `gcc ≥ 9` / `clang` on PC, `m68k-elf-gcc` (CD-i), `arm-none-eabi-gc
 ---
 
 *This document is the single source of truth for the C rewrite. Every `-[ ]` above corresponds to a file/task that will land as a separate commit on top of `engine_c-v0`. Keep this file updated as each phase lands; the per-phase checklists are the PR checklists.*
+
+---
+
+## 13. Build & toolchain (machine notes — 2026-08-28)
+
+`engine_c/` is a from-scratch C11 port of `engine/src/`. The mature Rust source is the translation reference; `engine_c/` mirrors its layout file-by-file.
+
+**Toolchain.** The `Makefile` uses `CC ?= gcc`. On this machine `gcc` resolves to the MSYS2 / Cygwin-w64 GCC 15.3.0 shipped with devkitPro (`/opt/devkitpro/msys2/usr/bin/gcc`, Windows path `C:\devkitPro\msys2\usr\bin\gcc.exe`). Flags are fixed: `-std=c11 -O2 -Wall`, include paths `-Iinclude -Isrc -Isrc/core/generated`. (No `gcc`/`make`/`clang` is on the default `PATH` — invoke the devkitPro msys2 `gcc.exe` directly, or `cl.exe` from MSVC BuildTools if msys2 is unavailable.)
+
+**Build targets.**
+- `make all` → compiles every `.c` in `SRC` to `.o` (pattern rule `src/%.o: src/%.c`) and links `rb_engine` (headless demo: seeds RNG `0xCAFE`, runs a match to a winner).
+- `make test` → builds four test binaries against the library objects (`OBJ_LIB`, which excludes `main.c` so tests supply their own `main`):
+  - `rb_engine_test` ← `tests/test_basic.c`
+  - `rb_engine_replay` ← `tests/replay.c`
+  - `rb_engine_ported` ← `tests/test_ported_simple.c`
+  - `rb_engine_generated` ← `tests/test_ported_generated.c` (mass-ported Rust tests)
+  then runs all four. `ALL TESTS PASSED` / `ALL REPLAY CHECKS PASSED` come from these.
+
+**Single public header.** `include/rabuka.h` declares every struct (`GameState`, `RbPlayer`, `RbBag`, `Ability`, `AbilityEffect`, `RbMods`, `RbTempEffect`, `RbAbilityQueue`, …) and all functions. `GameState` is defined mid-file; that is why the drain/owner-lookup declarations live after it.
+
+**The card/ability database (what matters at runtime).**
+- At startup the engine calls `rb_load("src")`, which memory-maps `src/cards.bin` (card table, 2526 cards) and `src/abilities_strings.bin` (ability text + string table).
+- These are generated, not hand-written. `make regen` runs:
+  - `python3 tools/gen_from_rs.py ../cards/build/abilities_gen.rs` — `abilities_gen.rs` is the Rust engine's generated ability DB (itself produced from `cards/abilities.json`).
+  - `python3 tools/gen_bytecode.py` — emits the compact encoded effect/condition bytecode in `src/core/generated/bytecode_blob.c` + `src/core/generated/gen_data.c`.
+- `rb_decode_card_by_index` / `rb_decode_card_ability` / `rb_card_num_abilities` read from that blob at runtime, so the C engine behaves off the same data the Rust engine uses.
+
+**Edit-verify loop (per change).**
+1. Edit one `.c`/`.h` (e.g. `src/engine.c`, `src/turn/triggers.c`, `include/rabuka.h`).
+2. Recompile just that file: `gcc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -c -o src/engine.o src/engine.c`.
+3. Link a scratch harness (e.g. `tests/verify_live_start.c`: `rb_load("src")` + put `sd1-022` on the live zone + 3 stage members) against all the `.o` files and run it to confirm the auto queued, drained, and granted its resource.
+4. Final gate: `make all` then `make test` for no regressions.
+
+**Parity caveat (important).** The test binaries assert against the generated ported tests, many of which are still TODOs (e.g. the `sd1-022` LiveStart test only checks a negative and is marked "TODO fire_trigger"). So a green `make test` does **not** fully prove effect parity — which is why the direct verification program is used for individual effect/trigger grants (LiveStart blade grant, debuts, constants, etc.).
+
+**Status as of this commit.** `rb_engine_test` + `rb_engine_replay` pass; `rb_engine_ported` (7) and `rb_engine_generated` (26) have pre-existing failures unrelated to the latest condition port (hanayo `score`/`modify_score`/`recalc_constants` gaps). Build is clean (`-Wall`, warnings only). Throughput observed ~43.3 t/s.
