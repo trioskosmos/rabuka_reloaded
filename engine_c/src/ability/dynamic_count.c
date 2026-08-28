@@ -50,8 +50,8 @@ int rb_resolve_dynamic_count(const struct GameState *g, int owner,
         else if (g->n_recently_moved > 0) count = g->n_recently_moved;
         else count = 0;
     } else if (!strcmp(reference_text, "revealed_cards") ||
-               !strcmp(reference_text, "previous_reveal")) {
-        count = 0; /* revealed pool not tracked in C GameState (cheer_revealed_cards) */
+                !strcmp(reference_text, "previous_reveal")) {
+        count = g->n_revealed; /* revealed pool tracked via g->revealed_cards[] */
     } else if (!strcmp(reference_text, "unit_count")) {
         const RbPlayer *P = &g->p[owner];
         for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) count++;
@@ -90,7 +90,8 @@ int rb_resolve_dynamic_count(const struct GameState *g, int owner,
         int diff = threshold - P->discard.n;
         count = diff < 0 ? 0 : diff;
     } else if (!strcmp(reference_text, "energy_cards_under_this_member")) {
-        count = 0; /* per-area under_cards not tracked in C RbPlayer */
+        const RbPlayer *P = &g->p[owner];
+        for (int a = 0; a < RB_STAGE_SIZE; a++) count += P->under_cards[a].n;
     } else {
         if (count_type && !strcmp(count_type, "revealed_cards")) count = 0;
         else count = 0;
