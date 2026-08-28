@@ -391,6 +391,27 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                 g->mods.blade_type[cid] = (int8_t)col;
             } else if (!strcmp(act, "set_blade_count")) {
                 rb_mods_set_blade(&g->mods, cid, cnt);
+            } else if (!strcmp(act, "all_blade_timing")) {
+                /* "all" blade color so the member's blade satisfies any
+                   blade-timing condition (mirrors ability blade_type = all). */
+                g->mods.blade_type[cid] = 7;
+            } else if (!strcmp(act, "set_heart_type")) {
+                /* Recolor the member's required heart: add `cnt` need-hearts of
+                   the chosen color (default all=7). */
+                int hcol = 7;
+                for (int i = 0; i < e->n_extra; i++) if (e->extra_k[i] && !strcmp(e->extra_k[i], "heart_color")) {
+                    const char *hc = e->extra_v[i];
+                    if (!hc) continue;
+                    else if (!strcmp(hc,"pink")||!strcmp(hc,"heart00")) hcol=0;
+                    else if (!strcmp(hc,"red")) hcol=1;
+                    else if (!strcmp(hc,"yellow")) hcol=2;
+                    else if (!strcmp(hc,"green")) hcol=3;
+                    else if (!strcmp(hc,"blue")) hcol=4;
+                    else if (!strcmp(hc,"purple")) hcol=5;
+                    else if (!strcmp(hc,"orange")) hcol=6;
+                    else if (!strcmp(hc,"all")) hcol=7;
+                }
+                rb_mods_add_need_heart(&g->mods, cid, hcol, cnt > 0 ? cnt : 1);
             }
             rb_recalc_constants(g);
         }
