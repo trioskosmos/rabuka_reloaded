@@ -64,7 +64,7 @@ int rb_resolver_trigger_infos(const GameState *g, int actor, const char *trigger
 
 /* Mirror resolver.rs:resolve_ability — run a single ability's effects. */
 int rb_resolve_ability(GameState *g, int actor, const AbilityEffect *eff, int *resolved) {
-    return rb_compound_sequential(g, actor, &g->p[actor], eff, 1, resolved);
+    return rb_compound_sequential(g, actor, &g->p[actor], eff, 1, resolved, -1);
 }
 
 /* Mirror resolver.rs:card_matches_type — selector card-type filter.

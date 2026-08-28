@@ -174,21 +174,27 @@ static void do_move_filtered(GameState *g, int actor, RbZone src, RbZone dst, in
 }
 
 /* ───────────────────────────── effect execution ───────────────────────────── */
-static void handle_action(GameState *g, int actor, AbilityEffect *e);
+static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
                     const char *zone, const char *card_type,
                     int count, int allow_skip, const char *target);
 
-void rb_execute_effect(GameState *g, int actor, AbilityEffect *e) {
+/* Mirror Rust's `activating_card`: the card whose ability is resolving.
+   Threaded through so per-card modifiers (blade/heart) attribute correctly. */
+void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_cid) {
     if (!e) return;
     if (rb_has_pending_choice(g)) return;
     if (e->has_condition && e->condition && !rb_eval_condition(g, actor, e->condition)) return;
     for (int i = 0; i < e->n_child; i++) {
-        rb_execute_effect(g, actor, e->child[i]);
+        rb_execute_effect_ex(g, actor, e->child[i], host_cid);
         if (rb_has_pending_choice(g)) return;
     }
     if (!e->action) return;
-    handle_action(g, actor, e);
+    handle_action(g, actor, e, host_cid);
+}
+
+void rb_execute_effect(GameState *g, int actor, AbilityEffect *e) {
+    rb_execute_effect_ex(g, actor, e, -1);
 }
 
 static int target_player(AbilityEffect *e, int actor) {
@@ -199,7 +205,7 @@ static int target_player(AbilityEffect *e, int actor) {
     return actor;
 }
 
-static void handle_action(GameState *g, int actor, AbilityEffect *e) {
+static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_cid) {
     const char *act = e->action;
     int cnt = rb_effect_count(g, actor, e, 0);
     int who = target_player(e, actor);
@@ -243,14 +249,32 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e) {
     } else if (!strcmp(act, "gain_heart") ||
                !strcmp(act, "place_heart") || !strcmp(act, "specify_heart_color")) {
         int col = heart_color_of(e, RB_HEART_PINK);
-        W->hearts[col] += cnt;
+        if (host_cid >= 0) rb_mods_add_heart(&g->mods, host_cid, col, cnt);
+        else W->hearts[col] += cnt;
     } else if (!strcmp(act, "lose_heart") || !strcmp(act, "damage")) {
         int col = heart_color_of(e, RB_HEART_PINK);
         O->hearts[col] -= cnt;
         if (O->hearts[col] < 0) O->hearts[col] = 0;
     } else if (!strcmp(act, "heal")) {
         int col = heart_color_of(e, RB_HEART_PINK);
-        O->hearts[col] += cnt;
+        if (host_cid >= 0) rb_mods_add_heart(&g->mods, host_cid, col, cnt);
+        else O->hearts[col] += cnt;
+    } else if (!strcmp(act, "gain_blade") || !strcmp(act, "add_blade") ||
+               !strcmp(act, "gain_blade_heart") || !strcmp(act, "set_blade_count") ||
+               !strcmp(act, "modify_blade")) {
+        /* Blade is a per-card property; mirror misc.rs grant_blade which targets
+           the resolving card (activating_card). Fall back to the actor's first
+           stage member when no host is threaded. */
+        int cid = host_cid >= 0 ? host_cid : -1;
+        if (cid < 0) for (int q = 0; q < RB_STAGE_SIZE; q++) if (W->stage[q] != RB_EMPTY_SLOT) { cid = W->stage[q]; break; }
+        if (cid >= 0) rb_mods_add_blade(&g->mods, cid, cnt);
+        rb_recalc_constants(g);
+    } else if (!strcmp(act, "return_to_hand") || !strcmp(act, "bounce") ||
+               !strcmp(act, "back_to_hand")) {
+        rb_effect_move_cards(g, who, e); /* source/dest resolved by helper */
+        (void)O;
+    } else if (!strcmp(act, "deck_bottom") || !strcmp(act, "put_on_bottom")) {
+        do_move(g, who, RB_ZONE_HAND, RB_ZONE_DECK, cnt, 0);
     } else if (!strcmp(act, "move_cards")) {
         rb_effect_move_cards(g, who, e);
     } else if (!strcmp(act, "change_state")) {
@@ -358,9 +382,9 @@ int rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos) {
             rb_trigger_debut(g, pl, card);
             /* If no pending choice was queued, execute now (host auto-drains) */
             if (!rb_has_pending_choice(g))
-                rb_execute_effect(g, pl, c.ability->effect);
+                rb_execute_effect_ex(g, pl, c.ability->effect, card);
         } else {
-            rb_execute_effect(g, pl, c.ability->effect);
+            rb_execute_effect_ex(g, pl, c.ability->effect, card);
         }
     }
     rb_free_card(&c);
@@ -374,7 +398,7 @@ int rb_activate_ability(GameState *g, int pl, int hand_idx) {
     if (!rb_decode_card_by_index((uint32_t)P->hand.cards[hand_idx], &c)) return 0;
     int ok = 0;
     if (c.ability && c.ability->effect) {
-        rb_execute_effect(g, pl, c.ability->effect);
+        rb_execute_effect_ex(g, pl, c.ability->effect, (int)P->hand.cards[hand_idx]);
         ok = 1;
     }
     rb_free_card(&c);
@@ -439,7 +463,7 @@ static void main_phase(GameState *g, int pl) {
         Card c;
         if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
         if (c.ability && c.ability->effect)
-            rb_execute_effect(g, pl, c.ability->effect);
+            rb_execute_effect_ex(g, pl, c.ability->effect, cid);
         rb_free_card(&c);
     }
 }

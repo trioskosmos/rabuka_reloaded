@@ -466,6 +466,9 @@ int  rb_zone_cards(const struct GameState *g, int pl, const char *zone,
 
 /* ── Effect execution (public for testing / harness) ── */
 void rb_execute_effect(GameState *g, int actor, AbilityEffect *e);
+/* Like rb_execute_effect but carries the resolving card id (Rust activating_card)
+   so per-card modifiers (blade/heart) attribute correctly. */
+void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_cid);
 
 /* ── Choice API (portable shim calls these instead of reading GameState directly) ── */
 int       rb_has_pending_choice(const GameState *g);
@@ -484,17 +487,21 @@ int rb_get_change_state_candidates(const GameState *g, int actor,
 
 /* ── Compound / sequential / conditional execution (engine/src/ability/compound.rs) ── */
 int rb_compound_sequential(GameState *g, int actor, const RbPlayer *self,
-                           const AbilityEffect *effects, int n, int *resolved);
+                            const AbilityEffect *effects, int n, int *resolved, int host_cid);
 int rb_compound_route_branch(const GameState *g, int actor, const AbilityEffect *eff);
 int rb_compound_conditional_alternative(GameState *g, int actor, const RbPlayer *self,
-                                        const AbilityEffect *eff, int branch, int *resolved);
+                                         const AbilityEffect *eff, int branch, int *resolved,
+                                         int host_cid);
 int rb_compound_conditional_on_result(GameState *g, int actor, const RbPlayer *self,
-                                      const AbilityEffect *eff, int last_result, int *resolved);
+                                       const AbilityEffect *eff, int last_result, int *resolved,
+                                       int host_cid);
 int rb_compound_conditional_on_optional(GameState *g, int actor, const RbPlayer *self,
-                                        const AbilityEffect *eff, int taken, int *resolved);
+                                         const AbilityEffect *eff, int taken, int *resolved,
+                                         int host_cid);
 int rb_compound_choice_string(const AbilityEffect *eff, const char *choice);
 int rb_compound_choice_action(GameState *g, int actor, const RbPlayer *self,
-                              const AbilityEffect *eff, int choice_idx, int *resolved);
+                               const AbilityEffect *eff, int choice_idx, int *resolved,
+                               int host_cid);
 
 /* ── Ability resolver frontend (engine/src/ability/resolver.rs) ── */
 typedef struct AbilityInfo {
@@ -517,7 +524,7 @@ int  rb_collect_live_modifiers(const GameState *g, int actor, AbilityEffect *out
 int  rb_trigger_auto_abilities(GameState *g, int actor, const char *trigger);
 int  rb_process_pending_auto_abilities(GameState *g);
 void rb_check_expired_effects(GameState *g);
-int  rb_apply_ability_effects(GameState *g, int actor, const Ability *ab);
+int  rb_apply_ability_effects(GameState *g, int actor, const Ability *ab, int host_cid);
 
 /* ── Misc effect handlers (engine/src/ability/effects/misc.rs) ── */
 int rb_execute_misc_effect(GameState *g, int actor, const RbPlayer *self,

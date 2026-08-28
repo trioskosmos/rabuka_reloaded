@@ -98,7 +98,7 @@ static int fire_zone_abilities(GameState *g, int actor, const int *ids, int n,
             if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
             if (rb_ability_matches_trigger(&ab, trigger)) {
                 if (ab.effect)
-                    rb_compound_sequential(g, actor, &g->p[actor], ab.effect, 1, NULL);
+                    rb_compound_sequential(g, actor, &g->p[actor], ab.effect, 1, NULL, cid);
                 fired++;
             }
             rb_free_ability(&ab);
@@ -137,8 +137,8 @@ int rb_process_pending_auto_abilities(GameState *g) {
    effects of an ability. The engine's rb_execute_effect already handles the
    action dispatch; here we drive the decoded effect tree via the compound
    sequential runner. */
-int rb_apply_ability_effects(GameState *g, int actor, const Ability *ab) {
+int rb_apply_ability_effects(GameState *g, int actor, const Ability *ab, int host_cid) {
     if (!g || !ab || !ab->effect) return 0;
-    rb_compound_sequential(g, actor, &g->p[actor], ab->effect, 1, NULL);
+    rb_compound_sequential(g, actor, &g->p[actor], ab->effect, 1, NULL, host_cid);
     return 1;
 }
