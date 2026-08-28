@@ -447,8 +447,12 @@ int  rb_resolve_dynamic_count(const struct GameState *g,
                              const char *count_type, const char *calculation,
                              int calculation_value, int owner_on_p1,
                              const int *moved, int n_moved,
-                             const int *selected, int n_selected,
-                             int last_draw_count);
+                              const int *selected, int n_selected,
+                              int last_draw_count);
+/* Resolve an effect's count: static `count`, or (if -1) decode the DynamicCount
+   params stored as extra_kv and call rb_resolve_dynamic_count. */
+int rb_effect_count(const GameState *g, int actor, const AbilityEffect *e,
+                    int last_draw_count);
 
 /* ── Shared card/zone/comparison helpers (engine/src/ability/util.rs) ── */
 int  rb_compare_counts(const char *operator, int actual, int expected);

@@ -101,3 +101,39 @@ int rb_resolve_dynamic_count(const struct GameState *g,
     }
     return count;
 }
+
+/* ── effect-level count resolution ── */
+static const char *dc_extra(const AbilityEffect *e, const char *key) {
+    for (int i = 0; i < e->n_extra; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], key)) return e->extra_v[i];
+    return NULL;
+}
+static int dc_extra_int(const AbilityEffect *e, const char *key) {
+    const char *v = dc_extra(e, key);
+    return v ? atoi(v) : 0;
+}
+
+/* Resolve an effect's repeat/draw count: return the static `count` if set,
+   otherwise pull the DynamicCount parameters the decoder stored as extra_kv
+   and feed them to rb_resolve_dynamic_count. Falls back to 1 when no dynamic
+   parameters are present (preserves prior default). */
+int rb_effect_count(const struct GameState *g, int actor, const AbilityEffect *e,
+                    int last_draw_count) {
+    if (!e) return 0;
+    if (e->count >= 0) return e->count;
+    const char *reference = dc_extra(e, "reference");
+    const char *base_reference = dc_extra(e, "base_reference");
+    const char *count_type = dc_extra(e, "count_type");
+    if (!reference && !base_reference && !count_type) return 1; /* unresolved → default */
+    const char *calculation = dc_extra(e, "calculation");
+    int calc_value = dc_extra_int(e, "calculation_value");
+    const char *on_p1 = dc_extra(e, "owner_on_p1");
+    int owner_on_p1 = (on_p1 && !strcmp(on_p1, "true")) ? 1 : 0;
+    int moved = dc_extra_int(e, "moved");
+    int selected = dc_extra_int(e, "selected");
+    return rb_resolve_dynamic_count(g, reference, base_reference, count_type, calculation,
+                                    calc_value, owner_on_p1,
+                                    &moved, moved > 0 ? 1 : 0,
+                                    &selected, selected > 0 ? 1 : 0,
+                                    last_draw_count);
+}

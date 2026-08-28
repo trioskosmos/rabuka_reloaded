@@ -201,7 +201,7 @@ static int target_player(AbilityEffect *e, int actor) {
 
 static void handle_action(GameState *g, int actor, AbilityEffect *e) {
     const char *act = e->action;
-    int cnt = (e->count >= 0) ? e->count : 1;
+    int cnt = rb_effect_count(g, actor, e, 0);
     int who = target_player(e, actor);
     RbPlayer *W = &g->p[who];
     RbPlayer *O = &g->p[actor ^ 1];
