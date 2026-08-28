@@ -15,9 +15,13 @@
 
 static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e) {
     /* Mirror misc.rs:execute_gain_resource — add `count` energy to the
-       actor's active energy pool (capped at RB_ENERGY_CAP). */
+       actor's energy zone AND activate it (capped at RB_ENERGY_CAP). The
+       C model tracks energy as a count, so both the zone size and the
+       active count advance together to keep zone/active consistent. */
     int n = e->count > 0 ? e->count : 1;
     RbPlayer *P = &g->p[actor];
+    P->energy.n += n;
+    if (P->energy.n > RB_ENERGY_CAP) P->energy.n = RB_ENERGY_CAP;
     P->energy_active += n;
     if (P->energy_active > RB_ENERGY_CAP) P->energy_active = RB_ENERGY_CAP;
     return 1;
