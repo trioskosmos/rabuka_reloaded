@@ -125,8 +125,8 @@ int rb_trigger_auto_abilities(GameState *g, int actor, const char *trigger) {
 /* Mirror abilities.rs:process_pending_auto_abilities — drain the queue of
    deferred auto-triggers. Returns count processed. */
 int rb_process_pending_auto_abilities(GameState *g) {
-    (void)g;
-    return 0;
+    if (!g) return 0;
+    return rb_drain_ability_queue(g);
 }
 
 /* Mirror abilities.rs:check_expired_effects — expire temporary effects whose
