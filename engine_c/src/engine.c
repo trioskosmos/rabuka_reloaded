@@ -412,6 +412,10 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                     else if (!strcmp(hc,"all")) hcol=7;
                 }
                 rb_mods_add_need_heart(&g->mods, cid, hcol, cnt > 0 ? cnt : 1);
+            } else if (!strcmp(act, "choose_required_hearts")) {
+                /* Headless can't let the player pick a color, so apply the chosen
+                   required-heart count to the "all" color (satisfies any color check). */
+                rb_mods_add_need_heart(&g->mods, cid, 7, cnt > 0 ? cnt : 1);
             }
             rb_recalc_constants(g);
         }
