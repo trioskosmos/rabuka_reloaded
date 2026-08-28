@@ -379,6 +379,12 @@ typedef struct GameState {
     int      n_snapshots;
     int      recently_moved[RB_MAX_RECENTLY_MOVED];
     int      n_recently_moved;
+    int      live_success[2];   /* per player: did this player pass their live this turn */
+    int      revealed_cards[RB_MAX_RECENTLY_MOVED]; /* cards revealed by yell/re_yell */
+    int      n_revealed;
+    int      re_yell_occurred;  /* a re_yell effect fired this live */
+    int      re_yell_blade_hearts[8]; /* hearts harvested by perform_yell, applied to live */
+    int      re_yell_note_icons;
     int      active;
     int      first_attacker;
     int      second_attacker;

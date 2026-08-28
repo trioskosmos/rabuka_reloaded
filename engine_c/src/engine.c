@@ -402,8 +402,62 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
     } else if (!strcmp(act, "restriction") || !strcmp(act, "activation_restriction") ||
                !strcmp(act, "modify_limit")) {
         /* placement/trigger restrictions; no-op — prohibition_effects would be tracked here */
-    } else if (!strcmp(act, "repeat_procedure") || !strcmp(act, "re_yell") ||
-               !strcmp(act, "perform_yell") || !strcmp(act, "custom") ||
+    } else if (!strcmp(act, "re_yell")) {
+        /* Mirror misc.rs:execute_re_yell. Optionally clear blade/heart modifiers
+           of the target's staged members, clear the revealed pool, and mark that
+           a re-yell occurred so perform_yell's hearts are applied this live. */
+        int tgt = target_player(e, actor);
+        RbPlayer *TP = &g->p[tgt];
+        int lose = 0;
+        for (int i = 0; i < e->n_extra; i++)
+            if (e->extra_k[i] && !strcmp(e->extra_k[i], "lose_blade_hearts") &&
+                e->extra_v[i] && !strcmp(e->extra_v[i], "true")) lose = 1;
+        if (lose) {
+            for (int q = 0; q < RB_STAGE_SIZE; q++) {
+                int cid = TP->stage[q];
+                if (cid != RB_EMPTY_SLOT) rb_mods_clear_card(&g->mods, cid);
+            }
+        }
+        g->n_revealed = 0;
+        g->re_yell_occurred = 1;
+    } else if (!strcmp(act, "perform_yell")) {
+        /* Mirror misc.rs:execute_perform_yell. Draw `total_blade` (= sum of the
+           target's effective stage blades) cards, reveal + harvest their yell
+           icons, draw the draw-icon count, and stash harvested blade hearts for
+           the live's success check (pending_reyell_rebuild). */
+        int tgt = target_player(e, actor);
+        RbPlayer *TP = &g->p[tgt];
+        int total_blade = 0;
+        for (int q = 0; q < RB_STAGE_SIZE; q++) {
+            int cid = TP->stage[q];
+            if (cid == RB_EMPTY_SLOT) continue;
+            Card c; if (rb_decode_card_by_index((uint32_t)cid, &c)) {
+                total_blade += (int)c.blade + rb_mods_get_blade(&g->mods, cid);
+                rb_free_card(&c);
+            }
+        }
+        int count = total_blade > 0 ? total_blade : cnt;
+        if (count <= 0) count = 1;
+        int draw_total = 0;
+        for (int k = 0; k < count; k++) {
+            if (TP->deck.n == 0) break;
+            int cid = TP->deck.cards[--TP->deck.n];
+            if (g->n_revealed < RB_MAX_RECENTLY_MOVED) g->revealed_cards[g->n_revealed++] = cid;
+            Card c; if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
+            int blade = (int)c.blade + rb_mods_get_blade(&g->mods, cid);
+            if (blade > 0) g->re_yell_blade_hearts[RB_HEART_PINK] += blade;
+            for (int hh = 0; hh < c.n_hearts; hh++) {
+                int col = c.heart_color[hh];
+                if (col == RB_HEART_DRAW) draw_total += c.heart_count[hh];
+                else if (col == RB_HEART_SCORE) g->re_yell_note_icons += c.heart_count[hh];
+                else if (col >= 0 && col < 8) g->re_yell_blade_hearts[col % 8] += c.heart_count[hh];
+            }
+            rb_free_card(&c);
+        }
+        for (int d = 0; d < draw_total; d++) { if (TP->deck.n == 0) break; rb_draw(g, tgt); }
+        g->re_yell_occurred = 1;
+    } else if (!strcmp(act, "repeat_procedure") ||
+               !strcmp(act, "custom") ||
                !strcmp(act, "do_nothing") || !strcmp(act, "sequential") ||
                !strcmp(act, "conditional_alternative")) {
         /* Compound/control: children already executed pre-order in rb_execute_effect.
@@ -546,6 +600,7 @@ int rb_perform_live(GameState *g, int pl);
 
 static void live_phase(GameState *g) {
     /* Live card set: auto-place up to MAX_LIVE_CARDS - reduction from each player's hand. */
+    g->live_success[0] = 0; g->live_success[1] = 0; /* fresh per-turn live result */
     for (int pl = 0; pl < 2; pl++) {
         RbPlayer *P = &g->p[pl];
         int limit = RB_MAX_LIVE_CARDS - g->live_set_limit_reduction[pl];

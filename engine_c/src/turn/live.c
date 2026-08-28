@@ -136,6 +136,11 @@ static int allocate_and_verdict(const GameState *g, int pl, const int total_hear
 int rb_perform_live(GameState *g, int pl){
     RbPlayer *P=&g->p[pl];
     if(P->live.n==0) return 0;
+    /* Fresh re_yell state for this live. */
+    g->re_yell_occurred = 0;
+    g->re_yell_note_icons = 0;
+    memset(g->re_yell_blade_hearts, 0, sizeof(g->re_yell_blade_hearts));
+    g->n_revealed = 0;
     int yell_cards[RB_MAX_LIVE_CARDS*3]; int n_yell=0;
     int blade_hearts[8]={0}; int note_icons=0;
     do_yell(g, pl, yell_cards, &n_yell, blade_hearts, &note_icons);
@@ -161,6 +166,34 @@ int rb_perform_live(GameState *g, int pl){
         s->surplus_hearts = surplus;
         s->note_icons = note_icons;
     }
+    g->live_success[pl] = passed; /* record this turn's live result for opponent_live_success */
+    /* Mirror engine/src/turn/live.rs: after a successful live, fire that
+       player's ライブ成功時 (LiveSuccess) auto-abilities and drain them so
+       their score/blade/heart grants apply before the live is finalized. */
+    if (passed) {
+        rb_trigger_live_success(g, pl);
+        rb_drain_ability_queue(g);
+    }
+    /* Two-pass re_yell rebuild: LiveSuccess triggers may have stashed re-yell
+       hearts (perform_yell). Re-apply them to the success check, mirroring
+       engine/src/turn/live.rs pending_reyell_rebuild. */
+    if (g->re_yell_occurred) {
+        for (int i = 0; i < 8; i++) total_hearts[i] += g->re_yell_blade_hearts[i];
+        int passed2 = 0, score2 = 0, surplus2 = -1;
+        allocate_and_verdict(g, pl, total_hearts, &passed2, &score2, &surplus2);
+        passed = passed2; live_score = score2; surplus = surplus2;
+        g->live_success[pl] = passed;
+        note_icons += g->re_yell_note_icons;
+        if (g->n_snapshots > 0) {
+            RbLiveSnapshot *s = &g->snapshots[g->n_snapshots - 1];
+            s->success = passed; s->surplus_hearts = surplus;
+            s->total_score = live_score; s->note_icons = note_icons;
+        }
+        g->re_yell_occurred = 0;
+        g->re_yell_note_icons = 0;
+        memset(g->re_yell_blade_hearts, 0, sizeof(g->re_yell_blade_hearts));
+    }
+
     /* Move lives: if all passed, to success (score added); else to discard */
     int lives_to_move=P->live.n;
     if(passed){
