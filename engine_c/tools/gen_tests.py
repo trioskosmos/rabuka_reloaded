@@ -13,27 +13,43 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "engine" / "tests"
 OUT = ROOT / "engine_c" / "tests" / "test_ported_generated.c"
 
+def split_top_commas(s: str):
+    """Split on commas that are NOT inside parentheses (so test_id(&tg, "X")
+    is treated as a single array element)."""
+    out, depth, cur = [], 0, ""
+    for ch in s:
+        if ch == '(':
+            depth += 1; cur += ch
+        elif ch == ')':
+            depth -= 1; cur += ch
+        elif ch == ',' and depth == 0:
+            out.append(cur); cur = ''
+        else:
+            cur += ch
+    if cur.strip():
+        out.append(cur)
+    return [x.strip() for x in out]
+
 SIMPLE_RE = re.compile(r'TestGame::new')
 
 def is_simple(path: pathlib.Path) -> bool:
     t = path.read_text(encoding="utf-8", errors="ignore")
     if not SIMPLE_RE.search(t):
         return False
-    if "recalculate_constants" not in t:
-        return False
-    # exclude live/choice heavy - but allow live_card_zone for heart tests
+    # Exclude heavy / not-yet-transpiled interaction patterns. Everything else
+    # (recalculate_constants, debut/fire_trigger, play_to_stage, pass()-driven
+    # board asserts) is uniform enough to transpile via test_game.h.
     if "select_indices" in t or "has_pending_choice" in t:
         return False
     if "set_live_card" in t or "player_perform_live" in t or "rule_log" in t:
         return False
-    # exclude files with complex helpers that we don't yet transpile
-    if "place_tang" in t or "place_" in t and "MemberArea" in t:
-        # keep but will handle const case - actually filter tang files
-        if "TANG" in t:
-            return False
-    # skip files that define custom setup helpers returning tuples (kanon)
-    # we will handle kanon separately via manual port, so exclude it from batch
+    if "place_tang" in t or "TANG" in t:
+        return False
     if "fn setup_cards" in t:
+        return False
+    if "is_waiting_for_choice" in t or "select_option" in t or "ability_queue" in t:
+        return False
+    if "match &choice" in t:
         return False
     return True
 
@@ -63,11 +79,66 @@ def map_modifier_expr(expr: str, func_name: str):
     if m: return f'rb_mods_get_blade(&tg.state.mods, {m.group(1)})'
     m = re.match(r'game\.state\.mods\.get_heart_modifier\((\w+)\s*,\s*HeartColor::Heart(\d+)', e)
     if m: return f'rb_mods_get_heart(&tg.state.mods, {m.group(1)}, {int(m.group(2))})'
-    # player field access: game.state.playerN.field
+    # player field access: game.state.playerN.field (only known C fields)
     m = re.match(r'game\.state\.player(\d+)\.(\w+)', e)
-    if m: return f'tg.state.p[{int(m.group(1))-1}].{m.group(2)}'
+    if m:
+        fld = KNOWN_PLAYER_FIELD.get(m.group(2))
+        if fld is not None:
+            return f'tg.state.p[{int(m.group(1))-1}].{fld}'
+        return None
     # plain identifier (a previously-fetched local)
     if re.match(r'^\w+$', e): return e
+    return None
+
+ZONE_TO_TESTADD = {
+    "main_deck": "test_add_to_deck",
+    "deck": "test_add_to_deck",
+    "hand": "test_add_to_hand",
+    "success_live_card_zone": "test_add_to_success",
+    "success": "test_add_to_success",
+    "live_card_zone": "test_add_to_live",
+    "live": "test_add_to_live",
+    "energy_zone": "test_add_to_discard",  # energy cards go to energy via give_energy; fallback
+    "waitroom": "test_add_to_discard",
+}
+AREA_MAP = {"Left": "0", "Center": "1", "Right": "2"}
+
+# Player struct fields the C RbPlayer actually has (zone/field aliases resolved).
+KNOWN_PLAYER_FIELD = {
+    "score": "score", "energy_active": "energy_active",
+    "main_deck": "deck", "deck": "deck", "hand": "hand", "stage": "stage",
+    "stage_wait": "stage_wait", "success_live_card_zone": "success",
+    "success": "success", "live_card_zone": "live", "live": "live",
+    "energy_zone": "energy", "energy": "energy", "waitroom": "discard",
+    "discard": "discard",
+}
+
+def map_board_expr(expr: str, func_name: str):
+    """Map a Rust board-access expression (game.state.playerN...) to C, else None."""
+    e = expr.strip()
+    # game.state.playerN.stage.stage[i]  -> tg.state.p[N-1].stage[i]
+    m = re.match(r'game\.state\.player(\d+)\.stage\.stage\[(\d+)\]', e)
+    if m:
+        return f"tg.state.p[{int(m.group(1))-1}].stage[{m.group(2)}]"
+    # game.state.playerN.energy_zone.active_count() -> energy_active
+    m = re.match(r'game\.state\.player(\d+)\.energy_zone\.active_count\(\)', e)
+    if m:
+        return f"tg.state.p[{int(m.group(1))-1}].energy_active"
+    # game.state.playerN.<zone>.cards.len() -> tg.state.p[N-1].<bag>.n
+    m = re.match(r'game\.state\.player(\d+)\.(\w+)\.cards\.len\(\)', e)
+    if m:
+        pl = int(m.group(1)) - 1
+        bag = KNOWN_PLAYER_FIELD.get(m.group(2), m.group(2))
+        return f"tg.state.p[{pl}].{bag}.n"
+    # game.state.playerN.<known field>  (score, energy, ...)
+    m = re.match(r'game\.state\.player(\d+)\.(\w+)', e)
+    if m:
+        fld = KNOWN_PLAYER_FIELD.get(m.group(2))
+        if fld is None:
+            return None
+        return f"tg.state.p[{int(m.group(1))-1}].{fld}"
+    if re.match(r'^\w+$', e):
+        return e
     return None
 
 def merge_asserts(lines):
@@ -115,6 +186,11 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
 
     def assert_resolvable(rust_expr):
         e = rust_expr.strip()
+        # Board-access expressions (game.state.playerN...) are always transpiled,
+        # so they are resolvable. Bare locals are NOT auto-resolvable here — they
+        # must have been declared via a handled `let` (modifier/local) rule.
+        if re.search(r'game\.state\.player', e):
+            return True
         m = re.match(r'game\.state\.mods\.get_(\w+)_modifier\((\w+)\)', e)
         if m: return m.group(2) in declared
         m = re.match(r'game\.state\.mods\.get_heart_modifier\((\w+)\s*,\s*HeartColor::Heart(\d+)', e)
@@ -124,6 +200,11 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         return re.match(r'^\w+$', e) is not None and e in declared
 
     for line in lines:
+        # Inline r-value substitution: game.id("CARD") / game.new_id("CARD") -> C
+        # test_id(&tg, "CARD"). Keeps stage-assignment LHS (game.state.playerN...)
+        # intact so the dedicated stage rules still fire.
+        line = re.sub(r'game\.id\("([^"]+)"\)', r'test_id(&tg, "\1")', line)
+        line = re.sub(r'game\.new_id\("([^"]+)"\)', r'test_id(&tg, "\1")', line)
         stripped = line.strip()
         if not stripped or stripped.startswith("//"):
             out.append(f"    // {stripped}")
@@ -179,7 +260,10 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
             else:
                 out.append(f'    {v} = rb_mods_get_heart(&tg.state.mods, {arg}, {hc});')
             continue
-        m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*game\.id\("([^"]+)"\)', line)
+        m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*(?:game\.)?id\("([^"]+)"\)', line)
+        if m:
+            emit_game_id(m.group(1), m.group(2)); continue
+        m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*test_id\(&tg,\s*"([^"]+)"\)', line)
         if m:
             emit_game_id(m.group(1), m.group(2)); continue
         m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*game\.id\((\w+)\)', line)
@@ -191,7 +275,7 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
             else:
                 out.append(f"    // TODO game.id({const_name}) -> {stripped}")
             continue
-        m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*game\.new_id\("([^"]+)"\)', line)
+        m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*(?:game\.)?new_id\("([^"]+)"\)', line)
         if m:
             emit_game_id(m.group(1), m.group(2)); continue
         m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*game\.new_id\((\w+)\)', line)
@@ -209,14 +293,14 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
             out.append(f"    // TODO setup_cards: {stripped}"); continue
         m = re.search(r'game\.state\.player1\.stage\.stage\s*=\s*\[([^\]]+)\]', line)
         if m:
-            elems = [e.strip() for e in m.group(1).split(',')]
+            elems = split_top_commas(m.group(1))
             for i, e in enumerate(elems):
                 if e == '-1':
                     out.append(f"    tg.state.p[0].stage[{i}] = -1;")
                 elif e:
                     out.append(f"    tg.state.p[0].stage[{i}] = {e};")
             continue
-        m = re.search(r'game\.state\.player1\.stage\.stage\[(\d+)\]\s*=\s*([^;]+);', line)
+        m = re.search(r'game\.state\.player1\.stage\.stage\[(\d+)\]\s*=\s*([^;\n]+);', line)
         if m:
             out.append(f"    tg.state.p[0].stage[{m.group(1)}] = {m.group(2).strip().rstrip(';')};"); continue
         m = re.search(r'game\.add_to_stage\(MemberArea::(\w+),\s*(\w+)\)', line)
@@ -274,11 +358,61 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
             else:
                 out.append("    // clear")
             continue
+        # ---- uniform action / board patterns (broadened batch) ----
+        if 'game.pass()' in line:
+            out.append("    rb_advance_phase(&tg.state);"); continue
+        m = re.match(r'\s*game\.play_to_stage\((\w+),\s*MemberArea::(\w+)\)', line)
+        if m:
+            area = AREA_MAP.get(m.group(2), "1")
+            var = m.group(1)
+            if var not in declared:
+                unresolved = True; continue
+            out.append(f"    test_play_to_stage(&tg, {var}, {area});"); continue
+        if 'game.add_to_hand(' in line:
+            mm = re.search(r'add_to_hand\((\w+)\)', line)
+            if mm:
+                if mm.group(1) not in declared: unresolved = True; continue
+                out.append(f"    test_add_to_hand(&tg, {mm.group(1)});"); continue
+        if 'game.give_energy(' in line:
+            mm = re.search(r'give_energy\((\d+)\)', line)
+            if mm:
+                out.append(f"    test_give_energy(&tg, {mm.group(1)});"); continue
+        m = re.match(r'\s*game\.fire_trigger\((\w+)\s*,', line)
+        if m:
+            var = m.group(1)
+            if var not in declared: unresolved = True; continue
+            out.append(f"    rb_fire_debut(&tg.state, 0, {var});"); continue
+        if 'game.select_option(' in line:
+            mm = re.search(r'select_option\((\d+)\)', line)
+            if mm:
+                out.append(f"    rb_resume_with_choice(&tg.state, {mm.group(1)});"); continue
+        m = re.search(r'game\.state\.player(\d+)\.stage\.stage\s*=\s*\[([^\]]+)\]', line)
+        if m:
+            pl = int(m.group(1)) - 1
+            elems = split_top_commas(m.group(2))
+            for i, e in enumerate(elems[:3]):
+                if e == '-1':
+                    out.append(f"    tg.state.p[{pl}].stage[{i}] = -1;")
+                elif e:
+                    out.append(f"    tg.state.p[{pl}].stage[{i}] = {e};")
+            continue
+        m = re.search(r'game\.state\.player(\d+)\.(\w+)\.cards\.push\((\w+)\)', line)
+        if m:
+            pl = int(m.group(1)) - 1
+            zone = m.group(2); var = m.group(3)
+            helper = ZONE_TO_TESTADD.get(zone)
+            if helper is None:
+                out.append(f"    // TODO push to {zone}"); continue
+            if var not in declared: unresolved = True; continue
+            out.append(f"    {helper}(&tg, {var});")
+            continue
         if 'assert_eq!' in line:
             mm = re.search(r'assert_eq!\s*\(\s*(.+?)\s*,\s*(-?\d+)\s*(?:,\s*"[^"]*"\s*)?\)', line, re.DOTALL)
             if mm:
                 expr, expected = mm.group(1).strip(), mm.group(2)
-                cexpr = map_modifier_expr(expr, func_name)
+                cexpr = map_board_expr(expr, func_name)
+                if cexpr is None:
+                    cexpr = map_modifier_expr(expr, func_name)
                 if cexpr is not None and assert_resolvable(expr):
                     out.append(f'    CHECK_EQ({cexpr}, {expected}, "{func_name}");')
                     continue

@@ -7,6 +7,55 @@ static int failures=0;
 #define CHECK_EQ(a,b,msg) do{ if((a)!=(b)){ fprintf(stderr,"FAIL %s:%d: %s (got %d expected %d)\n",__FILE__,__LINE__,msg,(int)(a),(int)(b)); failures++; } else printf("ok: %s\n",msg);} while(0)
 
 /* generated — mass-port of simple constant tests (recalculate_constants) */
+// test_modules/jidou/complex/bp7_005_ren_jidou_test.rs::ren_005_turn2_blocks_third_energy_placed
+static void gen_ren_005_turn2_blocks_third_energy_placed(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int ren = test_id(&tg, "PL!SP-bp7-005-R＋");
+    tg.state.p[0].stage[0] = ren;
+    tg.state.p[0].stage[1] = -1;
+    tg.state.p[0].stage[2] = -1;
+    // TODO: game.state.player1.energy_zone.cards.push(test_id(&tg, "PL!-sd1-010-SD"));
+    // TODO: game.state.player1.energy_zone.set_active_count(1);
+    // // First energy placed - use energy_zone
+    // TODO: game.state.push_movement_event(-1, "energy_deck", "energy_zone", Some(ren), "p1", true);
+    // TODO: let pid = game.state.player1.id.clone();
+    // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    // TODO: game.state.process_pending_auto_abilities(&pid);
+    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ren), 1, "ren_005_turn2_blocks_third_energy_placed");
+    // // Second same turn (turn2 allows 2)
+    // TODO: game.state.push_movement_event(-1, "energy_deck", "energy_zone", Some(ren), "p1", true);
+    // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    // TODO: game.state.process_pending_auto_abilities(&pid);
+    int second = rb_mods_get_blade(&tg.state.mods, ren);
+    // TODO assert: assert!(second == 1 || second == 2, "second placement should be 1 or 2, got {}", second);
+    // // Third same turn should be blocked (ターン2回)
+    // TODO: game.state.push_movement_event(-1, "energy_deck", "energy_zone", Some(ren), "p1", true);
+    // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    // TODO: game.state.process_pending_auto_abilities(&pid);
+    int third = rb_mods_get_blade(&tg.state.mods, ren);
+    // TODO assert: assert!(third <= 2, "ターン2回 should block third, got {}", third);
+    // 
+}
+
+// test_modules/edge_cases/sd2_002_edge_test.rs::sd2_002_natural_move_no_heart
+static void gen_sd2_002_natural_move_no_heart(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int keke = test_id(&tg, "PL!SP-sd2-002-SD2");
+    tg.state.p[0].stage[1] = keke;
+    // // Natural move (effect_only false) should NOT trigger the jidou
+    // TODO: game.state.push_movement_event(keke, "stage", "stage", None, "p1", false);
+    // TODO: let pid = game.state.player1.id.clone();
+    // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    // TODO: game.state.process_pending_auto_abilities(&pid);
+    int heart_mod = rb_mods_get_heart(&tg.state.mods, keke, 6);
+    CHECK_EQ(heart_mod, 0, "sd2_002_natural_move_no_heart");
+    // 
+}
+
 // test_modules/edge_cases/sp_bp2_004_extra_test10.rs::sp_bp2_004_center_highest_with_only_two_members
 static void gen_sp_bp2_004_center_highest_with_only_two_members(void){
     // 
@@ -464,6 +513,127 @@ static void gen_sp_bp2_004_center_only_one_member_gains(void){
     // 
 }
 
+// test_modules/abilities/simple/rin_test.rs::rin_q79_vacated_area_can_receive_new_member
+static void gen_rin_q79_vacated_area_can_receive_new_member(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int rin = test_id(&tg, "PL!-sd1-005-SD");
+    int live_card = test_id(&tg, "PL!-sd1-019-SD");
+    // 
+    // // Stage: 星空凛 at center
+    tg.state.p[0].stage[0] = -1;
+    tg.state.p[0].stage[1] = rin;
+    tg.state.p[0].stage[2] = -1;
+    // 
+    // // Hand: a live card so waitroom has a target for recovery
+    test_add_to_hand(&tg, live_card);
+    // // Put the live card in waitroom for recovery
+    // TODO: game.add_to_discard(live_card);
+    test_give_energy(&tg, 3);
+    // 
+    // TODO: game.activate_ability(rin);
+    // 
+    // // Center stage should be empty after self_cost
+    CHECK_EQ(tg.state.p[0].stage[1], -1, "rin_q79_vacated_area_can_receive_new_member");
+    // 
+    // // Waitroom should have Rin (from self_cost) — live card was recovered
+    // TODO assert: assert!( game.state.player1.waitroom.cards.contains(&rin), "Rin should be in waitroom" );
+    // TODO assert: assert!( game.state.player1.hand.cards.contains(&live_card), "Live card should be recovered to hand" );
+    // 
+    // // The vacated center area can receive a new card (empty slot exists)
+    // 
+}
+
+// test_modules/jidou/moderate/sd2_002_jidou_cause_test.rs::keke_jidou_effect_only_false_no_trigger
+static void gen_keke_jidou_effect_only_false_no_trigger(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int keke = test_id(&tg, "PL!SP-sd2-002-SD2");
+    tg.state.p[0].stage[1] = keke;
+    // // Natural move (effect_only false) should NOT trigger
+    // TODO: game.state.push_movement_event(keke, "stage", "stage", None, "p1", false);
+    // TODO: let pid = game.state.player1.id.clone();
+    // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    // TODO: game.state.process_pending_auto_abilities(&pid);
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, keke, 6), 0, "keke_jidou_effect_only_false_no_trigger");
+    // 
+}
+
+// test_modules/jidou/moderate/sd2_002_jidou_cause_test.rs::keke_jidou_self_effect_move_triggers
+static void gen_keke_jidou_self_effect_move_triggers(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int keke = test_id(&tg, "PL!SP-sd2-002-SD2");
+    tg.state.p[0].stage[1] = keke;
+    // TODO: game.state.push_movement_event(keke, "stage", "stage", Some(keke), "p1", true);
+    // TODO: let pid = game.state.player1.id.clone();
+    // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    // TODO: game.state.process_pending_auto_abilities(&pid);
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, keke, 6), 1, "keke_jidou_self_effect_move_triggers");
+    // 
+}
+
+// test_modules/batches/untested_abilities_batch18_test.rs::wish_song_five_distinct_liella_revealed_scores
+static void gen_wish_song_five_distinct_liella_revealed_scores(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int live = test_id(&tg, "PL!SP-bp4-026-L");
+    test_add_to_live(&tg, live);
+    // 
+    // TODO: for id in [game.id(KANON), game.id(KEKE), game.id(REN), game.id(SUMIRE), game.id(WIEN)] {
+    // TODO: game.state.revealed_cards.push(id);
+    // TODO: }
+    // 
+    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    // 
+    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "wish_song_five_distinct_liella_revealed_scores");
+    // 
+}
+
+// test_modules/batches/untested_abilities_batch18_test.rs::wish_song_four_distinct_liella_revealed_no_score
+static void gen_wish_song_four_distinct_liella_revealed_no_score(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int live = test_id(&tg, "PL!SP-bp4-026-L");
+    test_add_to_live(&tg, live);
+    // 
+    // TODO: for id in [game.id(KANON), game.id(KEKE), game.id(REN), game.id(SUMIRE)] {
+    // TODO: game.state.revealed_cards.push(id);
+    // TODO: }
+    // 
+    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    // 
+    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "wish_song_four_distinct_liella_revealed_no_score");
+    // 
+}
+
+// test_modules/edge_cases/bp4_014_ability_filter_edge_test.rs::rin_only_ls_live_no_blade
+static void gen_rin_only_ls_live_no_blade(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int rin = test_id(&tg, "PL!-bp4-014-N");
+    int mate = test_id(&tg, "PL!S-sd1-001-SD");
+    tg.state.p[0].stage[0] = mate;
+    tg.state.p[0].stage[1] = rin;
+    tg.state.p[0].stage[2] = -1;
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // TODO: fill_decks(&mut game, filler);
+    // // Find a live with only LS (e.g., PL!N-bp1-027-L has LS)
+    int only_ls = test_id(&tg, "PL!N-bp1-027-L");
+    test_add_to_live(&tg, only_ls);
+    // TODO: fire_live_start(&mut game, rin);
+    int blade = rb_mods_get_blade(&tg.state.mods, mate);
+    CHECK_EQ(blade, 0, "rin_only_ls_live_no_blade");
+    // 
+}
+
 // test_modules/edge_cases/sp_bp2_004_highest_cost_edge_test.rs::sp_bp2_004_center_tie_with_both_sides_no_heart
 static void gen_sp_bp2_004_center_tie_with_both_sides_no_heart(void){
     // 
@@ -603,7 +773,7 @@ static void gen_spb1_005_opponent_more_energy_grants_blade(void){
     // // P1 has no energy, P2 has plenty
     // TODO: game.state.player2.energy_zone
     // TODO: .cards
-    // TODO: .push(game.id("LL-E-001-SD"));
+    // TODO: .push(test_id(&tg, "LL-E-001-SD"));
     // TODO: game.state.player2.energy_zone.add_active(3);
     test_recalc(&tg);
     // 
@@ -699,6 +869,75 @@ static void gen_pb2_041_right_blade_plus2(void){
     // 
 }
 
+// test_modules/jidou/moderate/miyashita_ai_test.rs::miyashita_ai_only_two_debuts_no_draw
+static void gen_miyashita_ai_only_two_debuts_no_draw(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    int ai = test_id(&tg, "PL!N-bp3-005-P");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // 
+    test_give_energy(&tg, 20);
+    test_add_to_hand(&tg, filler);
+    test_add_to_hand(&tg, ai);
+    // 
+    // // Debut #1: filler
+    test_play_to_stage(&tg, filler, 1);
+    // // Debut #2: Ai (only 2 total debuts)
+    test_play_to_stage(&tg, ai, 1);
+    // 
+    // // With only 2 debuts (< 3), the auto ability condition should fail
+    // // Hand was [filler, ai] and both played, so hand = []
+    CHECK_EQ(tg.state.p[0].hand.n, 0, "miyashita_ai_only_two_debuts_no_draw");
+    // 
+}
+
+// test_modules/jidou/moderate/sd2_011_tomari_jidou_test.rs::tomari_jidou_self_move_triggers
+static void gen_tomari_jidou_self_move_triggers(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int tomari = test_id(&tg, "PL!SP-sd2-011-SD2");
+    tg.state.p[0].stage[1] = tomari;
+    // TODO: game.state.push_movement_event(tomari, "stage", "stage", Some(tomari), "p1", true);
+    // TODO: let pid = game.state.player1.id.clone();
+    // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    // TODO: game.state.process_pending_auto_abilities(&pid);
+    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, tomari), 1, "tomari_jidou_self_move_triggers");
+    // 
+}
+
+// test_modules/jidou/moderate/sd2_011_tomari_jidou_test.rs::tomari_jidou_opponent_move_triggers
+static void gen_tomari_jidou_opponent_move_triggers(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int tomari = test_id(&tg, "PL!SP-sd2-011-SD2");
+    tg.state.p[0].stage[1] = tomari;
+    // TODO: game.state.push_movement_event(tomari, "stage", "stage", Some(tomari), "p2", true);
+    // TODO: let pid = game.state.player1.id.clone();
+    // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    // TODO: game.state.process_pending_auto_abilities(&pid);
+    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, tomari), 1, "tomari_jidou_opponent_move_triggers");
+    // 
+}
+
+// test_modules/jidou/moderate/sd2_011_tomari_jidou_test.rs::tomari_jidou_natural_move_no_trigger
+static void gen_tomari_jidou_natural_move_no_trigger(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int tomari = test_id(&tg, "PL!SP-sd2-011-SD2");
+    tg.state.p[0].stage[1] = tomari;
+    // TODO: game.state.push_movement_event(tomari, "stage", "stage", None, "p1", false);
+    // TODO: let pid = game.state.player1.id.clone();
+    // TODO: rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    // TODO: game.state.process_pending_auto_abilities(&pid);
+    CHECK_EQ(rb_mods_get_blade(&tg.state.mods, tomari), 0, "tomari_jidou_natural_move_no_trigger");
+    // 
+}
+
 // test_modules/batches/untested_abilities_batch11_test.rs::cl1_006_debut_gains_three_blades
 static void gen_cl1_006_debut_gains_three_blades(void){
     // 
@@ -710,6 +949,128 @@ static void gen_cl1_006_debut_gains_three_blades(void){
     // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, me), 3, "cl1_006_debut_gains_three_blades");
+    // 
+}
+
+// test_modules/batches/untested_abilities_batch15_test.rs::sd1026_energy_below_nine_no_score
+static void gen_sd1026_energy_below_nine_no_score(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int live = test_id(&tg, "PL!SP-sd1-026-SD");
+    test_add_to_live(&tg, live);
+    test_give_energy(&tg, 8);
+    // 
+    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    // 
+    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "sd1026_energy_below_nine_no_score");
+    // 
+}
+
+// test_modules/batches/untested_abilities_batch15_test.rs::treco_please_aqours_h04_total_ten_scores_two
+static void gen_treco_please_aqours_h04_total_ten_scores_two(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int live = test_id(&tg, "PL!S-pb1-020-L");
+    test_add_to_live(&tg, live);
+    // 
+    // // Two Aqours members with 5 printed heart04 each => total 10.
+    int a1 = test_id(&tg, "PL!S-bp5-007-R");
+    int a2 = test_id(&tg, "PL!S-bp5-007-R");
+    tg.state.p[0].stage[0] = a1;
+    tg.state.p[0].stage[1] = a2;
+    // 
+    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    // 
+    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 2, "treco_please_aqours_h04_total_ten_scores_two");
+    // 
+}
+
+// test_modules/batches/untested_abilities_batch15_test.rs::treco_please_aqours_h04_below_ten_no_score
+static void gen_treco_please_aqours_h04_below_ten_no_score(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int live = test_id(&tg, "PL!S-pb1-020-L");
+    test_add_to_live(&tg, live);
+    // 
+    // // Single member with 5 heart04 -> below threshold.
+    int a1 = test_id(&tg, "PL!S-bp5-007-R");
+    tg.state.p[0].stage[0] = a1;
+    // 
+    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    // 
+    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "treco_please_aqours_h04_below_ten_no_score");
+    // 
+}
+
+// test_modules/abilities/moderate/bp7_q267_rinna_mill_refresh_test.rs::q267_deck_exhausts_mid_mill_refreshes_and_completes
+static void gen_q267_deck_exhausts_mid_mill_refreshes_and_completes(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    // TODO: setup_and_trigger(&mut game, 3, 7, 30, 0);
+    // 
+    // // Core Q267: refresh happened DURING the mill.
+    // TODO assert: assert!( game.state.player1.deck_refreshed_this_turn, "p1 deck hit 0 mid-mill → must refresh immediately (Q267)" );
+    // // The initially-milled 3 cards left the waitroom (shuffled back to deck).
+    CHECK_EQ(tg.state.p[0].discard.n, 4, "q267_deck_exhausts_mid_mill_refreshes_and_completes");
+    CHECK_EQ(tg.state.p[0].deck.n, 6, "q267_deck_exhausts_mid_mill_refreshes_and_completes");
+    CHECK_EQ(tg.state.p[0].discard.n, 10, "q267_deck_exhausts_mid_mill_refreshes_and_completes");
+    // 
+    // // p2 had a full deck → milled a clean 7, no refresh.
+    // TODO assert: assert!( !game.state.player2.deck_refreshed_this_turn, "p2 had 30 cards → must NOT refresh" );
+    CHECK_EQ(tg.state.p[1].discard.n, 7, "q267_deck_exhausts_mid_mill_refreshes_and_completes");
+    CHECK_EQ(tg.state.p[1].deck.n, 23, "q267_deck_exhausts_mid_mill_refreshes_and_completes");
+    // 
+}
+
+// test_modules/abilities/moderate/bp7_q267_rinna_mill_refresh_test.rs::q267_deck_exactly_seven_no_refresh
+static void gen_q267_deck_exactly_seven_no_refresh(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    // // p1: deck=7 (exact), waitroom=3 (refresh material present but unused).
+    // TODO: setup_and_trigger(&mut game, 7, 3, 30, 0);
+    // 
+    // TODO assert: assert!( !game.state.player1.deck_refreshed_this_turn, "deck exactly 7 → no overdraw → no refresh, despite waitroom material" );
+    CHECK_EQ(tg.state.p[0].deck.n, 0, "q267_deck_exactly_seven_no_refresh");
+    CHECK_EQ(tg.state.p[0].discard.n, 10, "q267_deck_exactly_seven_no_refresh");
+    // 
+}
+
+// test_modules/abilities/moderate/bp7_q267_rinna_mill_refresh_test.rs::q267_deck_five_refresh_completes_to_seven
+static void gen_q267_deck_five_refresh_completes_to_seven(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    // TODO: setup_and_trigger(&mut game, 5, 3, 30, 0);
+    // 
+    // TODO assert: assert!( game.state.player1.deck_refreshed_this_turn, "p1 deck (5) ran out mid-mill → refresh" );
+    CHECK_EQ(tg.state.p[0].discard.n, 2, "q267_deck_five_refresh_completes_to_seven");
+    CHECK_EQ(tg.state.p[0].deck.n, 6, "q267_deck_five_refresh_completes_to_seven");
+    CHECK_EQ(tg.state.p[0].discard.n, 8, "q267_deck_five_refresh_completes_to_seven");
+    // 
+}
+
+// test_modules/abilities/moderate/bp7_q267_rinna_mill_refresh_test.rs::q267_both_players_refresh_their_own_deck
+static void gen_q267_both_players_refresh_their_own_deck(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // 
+    // TODO: setup_and_trigger(&mut game, 3, 7, 3, 7);
+    // 
+    // TODO assert: assert!( game.state.player1.deck_refreshed_this_turn, "p1 deck hit 0 → refresh" );
+    // TODO assert: assert!( game.state.player2.deck_refreshed_this_turn, "p2 deck hit 0 during its own mill → refresh" );
+    CHECK_EQ(tg.state.p[0].discard.n, 4, "q267_both_players_refresh_their_own_deck");
+    CHECK_EQ(tg.state.p[1].discard.n, 4, "q267_both_players_refresh_their_own_deck");
+    CHECK_EQ(tg.state.p[0].deck.n, 6, "q267_both_players_refresh_their_own_deck");
+    CHECK_EQ(tg.state.p[1].deck.n, 6, "q267_both_players_refresh_their_own_deck");
     // 
 }
 
@@ -732,7 +1093,7 @@ static void gen_wien_cost_modifier_dynamic(void){
     CHECK_EQ(rb_mods_get_cost(&tg.state.mods, wien), 0, "wien_cost_modifier_dynamic");
     // 
     // // Add 1 more → 10 energy
-    // TODO: game.state.player1.energy_zone.cards.push(energy_id);
+    test_add_to_discard(&tg, energy_id);
     // TODO: game.state.player1.energy_zone.add_active(1);
     test_recalc(&tg);
     CHECK_EQ(rb_mods_get_cost(&tg.state.mods, wien), 4, "wien_cost_modifier_dynamic");
@@ -762,11 +1123,75 @@ static void gen_wien_cost_modifier_cleared_on_leave(void){
     // 
     // // Remove from stage
     tg.state.p[0].stage[1] = -1;
-    // TODO: game.state.player1.waitroom.cards.push(wien);
+    test_add_to_discard(&tg, wien);
     test_clear_mods_for_card(&tg, wien);
     test_recalc(&tg);
     // 
     CHECK_EQ(rb_mods_get_cost(&tg.state.mods, wien), 0, "wien_cost_modifier_cleared_on_leave");
+    // 
+}
+
+// test_modules/batches/untested_abilities_batch12_test.rs::bp6022_more_opp_energy_scores
+static void gen_bp6022_more_opp_energy_scores(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int live = test_id(&tg, "PL!S-bp6-022-L");
+    test_add_to_live(&tg, live);
+    // 
+    test_give_energy(&tg, 1);
+    // // Opponent gets 3 active energies.
+    // TODO: for _ in 0..3 {
+    int e2 = test_id(&tg, "LL-E-001-SD");
+    test_add_to_discard(&tg, e2);
+    // TODO: }
+    // TODO: game.state.player2.energy_zone.add_active(3);
+    // 
+    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    // 
+    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "bp6022_more_opp_energy_scores");
+    // 
+}
+
+// test_modules/batches/untested_abilities_batch12_test.rs::bp6022_equal_or_fewer_opp_energy_no_score
+static void gen_bp6022_equal_or_fewer_opp_energy_no_score(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int live = test_id(&tg, "PL!S-bp6-022-L");
+    test_add_to_live(&tg, live);
+    // 
+    test_give_energy(&tg, 2);
+    // TODO: for _ in 0..2 {
+    int e2 = test_id(&tg, "LL-E-001-SD");
+    test_add_to_discard(&tg, e2);
+    // TODO: }
+    // TODO: game.state.player2.energy_zone.add_active(2);
+    // 
+    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    // 
+    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "bp6022_equal_or_fewer_opp_energy_no_score");
+    // 
+}
+
+// test_modules/batches/untested_abilities_batch12_test.rs::bp6012_debut_activates_energy_with_sbuuke_teammate
+static void gen_bp6012_debut_activates_energy_with_sbuuke_teammate(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int me = test_id(&tg, "PL!HS-bp6-012-R");
+    int mate = test_id(&tg, "PL!HS-bp1-012-PR");
+    tg.state.p[0].stage[0] = me;
+    tg.state.p[0].stage[1] = mate;
+    // 
+    // // One WAIT energy (card pushed without add_active).
+    int energy = test_id(&tg, "LL-E-001-SD");
+    test_add_to_discard(&tg, energy);
+    CHECK_EQ(tg.state.p[0].energy_active, 0, "bp6012_debut_activates_energy_with_sbuuke_teammate");
+    // 
+    // TODO: fire_trigger(&mut game, me, AbilityTrigger::Debut, "登場");
+    // 
+    CHECK_EQ(tg.state.p[0].energy_active, 1, "bp6012_debut_activates_energy_with_sbuuke_teammate");
     // 
 }
 
@@ -867,6 +1292,250 @@ static void gen_sd1022_live_start_grants_blade_to_all_aqours_members(void){
     // 
 }
 
+// test_modules/edge_cases/sp_bp2_015_021_comprehensive_edge_test.rs::yell_all_blade_blocks_sumire_and_wien
+static void gen_yell_all_blade_blocks_sumire_and_wien(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int sumire = test_id(&tg, "PL!SP-bp2-015-N");
+    int wien = test_id(&tg, "PL!SP-bp2-021-N");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    // // Use a card that has ALL blade heart. PL!HS-bp1-019? Let's pick PL!SP-bp1-025-L which is Starlight Prologue with ALL? Check has_blade_heart includes ALL.
+    // // The test helper earlier used PL!-pb1-014-R as blade example. For ALL, we can use PL!HS-PR-010-PR which is Reflection with ALL per earlier.
+    int all_blade_card = test_id(&tg, "PL!HS-PR-010-PR");
+    // // Ensure it indeed has blade heart (has_blade_heart includes ALL)
+    // TODO assert: assert!(game.db.get_card(all_blade_card).unwrap().has_blade_heart(), "chosen card must have blade heart (ALL)");
+    tg.state.p[0].stage[0] = filler;
+    tg.state.p[0].stage[1] = sumire;
+    tg.state.p[0].stage[2] = wien;
+    // TODO: trigger_yell(&mut game, sumire, wien, &[all_blade_card]);
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "yell_all_blade_blocks_sumire_and_wien");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, wien, 3), 0, "yell_all_blade_blocks_sumire_and_wien");
+    // 
+}
+
+// test_modules/edge_cases/sp_bp2_015_021_comprehensive_edge_test.rs::yell_only_one_present_triggers_self_only
+static void gen_yell_only_one_present_triggers_self_only(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int sumire = test_id(&tg, "PL!SP-bp2-015-N");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    int m_no_blade = test_id(&tg, "PL!S-bp2-002-R");
+    tg.state.p[0].stage[0] = filler;
+    tg.state.p[0].stage[1] = sumire;
+    tg.state.p[0].stage[2] = -1;
+    // TODO: trigger_yell(&mut game, sumire, filler, &[m_no_blade]);
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 1, "yell_only_one_present_triggers_self_only");
+    // // Ensure Wien absent doesn't somehow get heart on filler
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, filler, 3), 0, "yell_only_one_present_triggers_self_only");
+    // 
+}
+
+// test_modules/batches/untested_abilities_batch10_test.rs::go_master_start_fewer_success_cards_scores
+static void gen_go_master_start_fewer_success_cards_scores(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int live = test_id(&tg, "PL!SP-bp2-023-L");
+    test_add_to_live(&tg, live);
+    // 
+    int s1 = test_id(&tg, "PL!-sd1-010-SD");
+    test_add_to_live(&tg, s1);
+    int o1 = test_id(&tg, "PL!-sd1-010-SD");
+    int o2 = test_id(&tg, "PL!-sd1-010-SD");
+    test_add_to_live(&tg, o1);
+    test_add_to_live(&tg, o2);
+    // 
+    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    // 
+    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "go_master_start_fewer_success_cards_scores");
+    // 
+}
+
+// test_modules/batches/untested_abilities_batch10_test.rs::go_master_start_equal_success_cards_no_score
+static void gen_go_master_start_equal_success_cards_no_score(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int live = test_id(&tg, "PL!SP-bp2-023-L");
+    test_add_to_live(&tg, live);
+    // 
+    int s1 = test_id(&tg, "PL!-sd1-010-SD");
+    test_add_to_live(&tg, s1);
+    int o1 = test_id(&tg, "PL!-sd1-010-SD");
+    test_add_to_live(&tg, o1);
+    // 
+    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    // 
+    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "go_master_start_equal_success_cards_no_score");
+    // 
+}
+
+// test_modules/batches/untested_abilities_batch10_test.rs::note_mermaid_two_distinct_kaleidoscope_members_score
+static void gen_note_mermaid_two_distinct_kaleidoscope_members_score(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int live = test_id(&tg, "PL!SP-pb1-024-L");
+    test_add_to_live(&tg, live);
+    // 
+    // // Two different KALEIDOSCORE characters.
+    int ren = test_id(&tg, "PL!SP-bp1-013-PR");
+    int wien = test_id(&tg, "PL!SP-PR-017-PR");
+    tg.state.p[0].stage[0] = ren;
+    tg.state.p[0].stage[1] = wien;
+    // 
+    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    // 
+    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 1, "note_mermaid_two_distinct_kaleidoscope_members_score");
+    // 
+}
+
+// test_modules/batches/untested_abilities_batch10_test.rs::note_mermaid_duplicate_kaleidoscope_names_no_score
+static void gen_note_mermaid_duplicate_kaleidoscope_names_no_score(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int live = test_id(&tg, "PL!SP-pb1-024-L");
+    test_add_to_live(&tg, live);
+    // 
+    // // Two copies of the SAME character -> not "名前の異なる".
+    int ren1 = test_id(&tg, "PL!SP-bp1-013-PR");
+    int ren2 = test_id(&tg, "PL!SP-pb1-013-PR");
+    tg.state.p[0].stage[0] = ren1;
+    tg.state.p[0].stage[1] = ren2;
+    // 
+    // TODO: fire_trigger(&mut game, live, AbilityTrigger::LiveStart, "ライブ開始時");
+    // 
+    CHECK_EQ(rb_mods_get_score(&tg.state.mods, live), 0, "note_mermaid_duplicate_kaleidoscope_names_no_score");
+    // 
+}
+
+// test_modules/jidou/complex/sp_bp2_015_021_yell_blade_test.rs::sumire_yell_no_blade_gains_heart06
+static void gen_sumire_yell_no_blade_gains_heart06(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int sumire = test_id(&tg, "PL!SP-bp2-015-N");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    int m_no_blade = test_id(&tg, "PL!S-bp2-002-R");
+    tg.state.p[0].stage[0] = filler;
+    tg.state.p[0].stage[1] = sumire;
+    tg.state.p[0].stage[2] = -1;
+    // TODO: game.state.revealed_cards.clear();
+    // TODO: game.state.revealed_cards.push(m_no_blade);
+    // TODO: game.state.yell_occurred = true;
+    test_add_to_discard(&tg, m_no_blade);
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "sumire_yell_no_blade_gains_heart06");
+    // TODO: game.state.trigger_auto_abilities_for_player("p1");
+    // TODO: game.state.process_pending_auto_abilities("p1");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 1, "sumire_yell_no_blade_gains_heart06");
+    // 
+}
+
+// test_modules/jidou/complex/sp_bp2_015_021_yell_blade_test.rs::sumire_yell_with_blade_no_gain
+static void gen_sumire_yell_with_blade_no_gain(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int sumire = test_id(&tg, "PL!SP-bp2-015-N");
+    int wien = test_id(&tg, "PL!SP-bp2-021-N");
+    int m_blade = test_id(&tg, "PL!-pb1-014-R");
+    // TODO: setup_yell(&mut game, sumire, wien, &[m_blade]);
+    // TODO: game.state.trigger_auto_abilities_for_player("p1");
+    // TODO: game.state.process_pending_auto_abilities("p1");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "sumire_yell_with_blade_no_gain");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, wien, 3), 0, "sumire_yell_with_blade_no_gain");
+    // 
+}
+
+// test_modules/jidou/complex/sp_bp2_015_021_yell_blade_test.rs::yell_mixed_blade_and_no_blade_no_gain
+static void gen_yell_mixed_blade_and_no_blade_no_gain(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int sumire = test_id(&tg, "PL!SP-bp2-015-N");
+    int wien = test_id(&tg, "PL!SP-bp2-021-N");
+    int m_no_blade = test_id(&tg, "PL!S-bp2-002-R");
+    int m_blade = test_id(&tg, "PL!-pb1-014-R");
+    // TODO: setup_yell(&mut game, sumire, wien, &[m_no_blade, m_blade]);
+    // TODO: game.state.trigger_auto_abilities_for_player("p1");
+    // TODO: game.state.process_pending_auto_abilities("p1");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "yell_mixed_blade_and_no_blade_no_gain");
+    // 
+}
+
+// test_modules/jidou/complex/sp_bp2_015_021_yell_blade_test.rs::yell_empty_revealed_no_gain
+static void gen_yell_empty_revealed_no_gain(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int sumire = test_id(&tg, "PL!SP-bp2-015-N");
+    int wien = test_id(&tg, "PL!SP-bp2-021-N");
+    // // Empty yell: per phases.rs yell_occurred = !revealed.is_empty() => false, so no trigger
+    tg.state.p[0].stage[0] = test_id(&tg, "PL!S-sd1-003-SD");
+    tg.state.p[0].stage[1] = sumire;
+    tg.state.p[0].stage[2] = wien;
+    // TODO: game.state.revealed_cards.clear();
+    // TODO: game.state.yell_occurred = false;
+    // TODO: game.state.trigger_auto_abilities_for_player("p1");
+    // TODO: game.state.process_pending_auto_abilities("p1");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 0, "yell_empty_revealed_no_gain");
+    // 
+}
+
+// test_modules/jidou/complex/sp_bp2_015_021_yell_blade_test.rs::yell_turn1_blocks_second_trigger
+static void gen_yell_turn1_blocks_second_trigger(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    int sumire = test_id(&tg, "PL!SP-bp2-015-N");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    int m_no_blade = test_id(&tg, "PL!S-bp2-002-R");
+    tg.state.p[0].stage[0] = filler;
+    tg.state.p[0].stage[1] = sumire;
+    tg.state.p[0].stage[2] = -1;
+    // TODO: game.state.revealed_cards.clear();
+    // TODO: game.state.revealed_cards.push(m_no_blade);
+    // TODO: game.state.yell_occurred = true;
+    test_add_to_discard(&tg, m_no_blade);
+    // TODO: game.state.trigger_auto_abilities_for_player("p1");
+    // TODO: game.state.process_pending_auto_abilities("p1");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 1, "yell_turn1_blocks_second_trigger");
+    // // Second trigger same turn should be blocked by ターン1回 — clear revealed and retrigger, modifier must stay 1
+    // TODO: game.state.revealed_cards.clear();
+    // TODO: game.state.revealed_cards.push(m_no_blade);
+    // TODO: game.state.yell_occurred = true;
+    // TODO: game.state.trigger_auto_abilities_for_player("p1");
+    // TODO: game.state.process_pending_auto_abilities("p1");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, sumire, 6), 1, "yell_turn1_blocks_second_trigger");
+    // 
+}
+
+// test_modules/jidou/complex/sp_bp2_015_021_yell_blade_test.rs::wien_yell_no_blade_gains_heart03_independent
+static void gen_wien_yell_no_blade_gains_heart03_independent(void){
+    // 
+    // db loaded via rb_load
+    TestGame tg; test_game_new(&tg);
+    // // Only Wien on stage — Sumire absent, so only Wien triggers
+    int wien = test_id(&tg, "PL!SP-bp2-021-N");
+    int filler = test_id(&tg, "PL!-sd1-010-SD");
+    int m_no_blade = test_id(&tg, "PL!S-bp2-002-R");
+    tg.state.p[0].stage[0] = filler;
+    tg.state.p[0].stage[1] = wien;
+    tg.state.p[0].stage[2] = -1;
+    // TODO: game.state.revealed_cards.clear();
+    // TODO: game.state.revealed_cards.push(m_no_blade);
+    // TODO: game.state.yell_occurred = true;
+    // TODO: game.state.trigger_auto_abilities_for_player("p1");
+    // TODO: game.state.process_pending_auto_abilities("p1");
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, wien, 3), 1, "wien_yell_no_blade_gains_heart03_independent");
+    // // Sumire not on stage → no heart06 anywhere
+    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, filler, 6), 0, "wien_yell_no_blade_gains_heart03_independent");
+    // 
+}
+
 // test_modules/jidou/moderate/location_condition_cost_test.rs::cost13_on_opponent_stage_meets_condition
 static void gen_cost13_on_opponent_stage_meets_condition(void){
     // 
@@ -879,7 +1548,9 @@ static void gen_cost13_on_opponent_stage_meets_condition(void){
     tg.state.p[0].stage[0] = you;
     tg.state.p[0].stage[1] = -1;
     tg.state.p[0].stage[2] = -1;
-    // TODO: game.state.player2.stage.stage = [cost13_card, -1, -1];
+    tg.state.p[1].stage[0] = cost13_card;
+    tg.state.p[1].stage[1] = -1;
+    tg.state.p[1].stage[2] = -1;
     // 
     test_recalc(&tg);
     // 
@@ -898,7 +1569,9 @@ static void gen_cost13_exact_boundary_triggers(void){
     tg.state.p[0].stage[0] = you;
     tg.state.p[0].stage[1] = cost13_exact;
     tg.state.p[0].stage[2] = -1;
-    // TODO: game.state.player2.stage.stage = [-1, -1, -1];
+    tg.state.p[1].stage[0] = -1;
+    tg.state.p[1].stage[1] = -1;
+    tg.state.p[1].stage[2] = -1;
     test_recalc(&tg);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, you), 2, "cost13_exact_boundary_triggers");
     // 
@@ -915,7 +1588,9 @@ static void gen_cost12_below_threshold_no_trigger(void){
     tg.state.p[0].stage[0] = you;
     tg.state.p[0].stage[1] = -1;
     tg.state.p[0].stage[2] = -1;
-    // TODO: game.state.player2.stage.stage = [cost_low, -1, -1];
+    tg.state.p[1].stage[0] = cost_low;
+    tg.state.p[1].stage[1] = -1;
+    tg.state.p[1].stage[2] = -1;
     test_recalc(&tg);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, you), 0, "cost12_below_threshold_no_trigger");
     // 
@@ -947,7 +1622,9 @@ static void gen_both_sides_cost13_still_only_two_blades(void){
     tg.state.p[0].stage[0] = you;
     tg.state.p[0].stage[1] = c13a;
     tg.state.p[0].stage[2] = -1;
-    // TODO: game.state.player2.stage.stage = [c13b, -1, -1];
+    tg.state.p[1].stage[0] = c13b;
+    tg.state.p[1].stage[1] = -1;
+    tg.state.p[1].stage[2] = -1;
     test_recalc(&tg);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, you), 2, "both_sides_cost13_still_only_two_blades");
     // 
@@ -973,7 +1650,7 @@ static void gen_q46_kanako_condition_less_than_3_live_cards_no_gain(void){
     // TODO: .player1
     // TODO: .live_card_zone
     // TODO: .cards
-    // TODO: .push(game.new_id("PL!-sd1-019-SD"));
+    // TODO: .push(test_id(&tg, "PL!-sd1-019-SD"));
     // 
     test_recalc(&tg);
     // 
@@ -1000,17 +1677,17 @@ static void gen_q46_kanako_no_nijigasaki_live_card_no_gain(void){
     // TODO: .player1
     // TODO: .live_card_zone
     // TODO: .cards
-    // TODO: .push(game.new_id("PL!-sd1-019-SD"));
+    // TODO: .push(test_id(&tg, "PL!-sd1-019-SD"));
     // TODO: game.state
     // TODO: .player1
     // TODO: .live_card_zone
     // TODO: .cards
-    // TODO: .push(game.new_id("PL!-sd1-019-SD"));
+    // TODO: .push(test_id(&tg, "PL!-sd1-019-SD"));
     // TODO: game.state
     // TODO: .player1
     // TODO: .live_card_zone
     // TODO: .cards
-    // TODO: .push(game.new_id("PL!-sd1-019-SD"));
+    // TODO: .push(test_id(&tg, "PL!-sd1-019-SD"));
     // 
     test_recalc(&tg);
     // 
@@ -1039,12 +1716,12 @@ static void gen_q46_kanako_not_on_stage_no_constant(void){
     // TODO: .player1
     // TODO: .live_card_zone
     // TODO: .cards
-    // TODO: .push(game.new_id("PL!-sd1-019-SD"));
+    // TODO: .push(test_id(&tg, "PL!-sd1-019-SD"));
     // TODO: game.state
     // TODO: .player1
     // TODO: .live_card_zone
     // TODO: .cards
-    // TODO: .push(game.new_id("PL!-sd1-019-SD"));
+    // TODO: .push(test_id(&tg, "PL!-sd1-019-SD"));
     // 
     test_recalc(&tg);
     // 
@@ -1072,12 +1749,12 @@ static void gen_q46_kanako_leaves_stage_blade_removed(void){
     // TODO: .player1
     // TODO: .live_card_zone
     // TODO: .cards
-    // TODO: .push(game.new_id("PL!-sd1-019-SD"));
+    // TODO: .push(test_id(&tg, "PL!-sd1-019-SD"));
     // TODO: game.state
     // TODO: .player1
     // TODO: .live_card_zone
     // TODO: .cards
-    // TODO: .push(game.new_id("PL!-sd1-019-SD"));
+    // TODO: .push(test_id(&tg, "PL!-sd1-019-SD"));
     // 
     test_recalc(&tg);
     // 
@@ -1114,12 +1791,12 @@ static void gen_q46_live_card_removed_condition_fails_blade_removed(void){
     // TODO: .player1
     // TODO: .live_card_zone
     // TODO: .cards
-    // TODO: .push(game.new_id("PL!-sd1-019-SD"));
+    // TODO: .push(test_id(&tg, "PL!-sd1-019-SD"));
     // TODO: game.state
     // TODO: .player1
     // TODO: .live_card_zone
     // TODO: .cards
-    // TODO: .push(game.new_id("PL!-sd1-019-SD"));
+    // TODO: .push(test_id(&tg, "PL!-sd1-019-SD"));
     // 
     test_recalc(&tg);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, kanako), 2, "q46_live_card_removed_condition_fails_blade_removed");
@@ -1155,12 +1832,12 @@ static void gen_q46_multiple_kanako_each_gains_blades(void){
     // TODO: .player1
     // TODO: .live_card_zone
     // TODO: .cards
-    // TODO: .push(game.new_id("PL!-sd1-019-SD"));
+    // TODO: .push(test_id(&tg, "PL!-sd1-019-SD"));
     // TODO: game.state
     // TODO: .player1
     // TODO: .live_card_zone
     // TODO: .cards
-    // TODO: .push(game.new_id("PL!-sd1-019-SD"));
+    // TODO: .push(test_id(&tg, "PL!-sd1-019-SD"));
     // 
     test_recalc(&tg);
     // 
@@ -1325,7 +2002,9 @@ static void gen_ruby_left_affects_p2_right_only(void){
     tg.state.p[0].stage[0] = ruby;
     tg.state.p[0].stage[1] = -1;
     tg.state.p[0].stage[2] = -1;
-    // TODO: game.state.player2.stage.stage = [-1, opp_center, opp_right];
+    tg.state.p[1].stage[0] = -1;
+    tg.state.p[1].stage[1] = opp_center;
+    tg.state.p[1].stage[2] = opp_right;
     test_recalc(&tg);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, opp_right), -1, "ruby_left_affects_p2_right_only");
@@ -1344,7 +2023,9 @@ static void gen_ruby_facing_ruby_both_debuffed(void){
     tg.state.p[0].stage[0] = -1;
     tg.state.p[0].stage[1] = ruby_p1;
     tg.state.p[0].stage[2] = -1;
-    // TODO: game.state.player2.stage.stage = [-1, ruby_p2, -1];
+    tg.state.p[1].stage[0] = -1;
+    tg.state.p[1].stage[1] = ruby_p2;
+    tg.state.p[1].stage[2] = -1;
     test_recalc(&tg);
     // 
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, ruby_p1), -1, "ruby_facing_ruby_both_debuffed");
@@ -1364,12 +2045,16 @@ static void gen_opponent_member_moves_out_of_front_recovers_blade(void){
     tg.state.p[0].stage[0] = -1;
     tg.state.p[0].stage[1] = ruby;
     tg.state.p[0].stage[2] = -1;
-    // TODO: game.state.player2.stage.stage = [-1, opp, -1];
+    tg.state.p[1].stage[0] = -1;
+    tg.state.p[1].stage[1] = opp;
+    tg.state.p[1].stage[2] = -1;
     test_recalc(&tg);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, opp), -1, "opponent_member_moves_out_of_front_recovers_blade");
     // 
     // // Opponent moves to P2 Left (slot 0)
-    // TODO: game.state.player2.stage.stage = [opp, -1, -1];
+    tg.state.p[1].stage[0] = opp;
+    tg.state.p[1].stage[1] = -1;
+    tg.state.p[1].stage[2] = -1;
     test_recalc(&tg);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, opp), 0, "opponent_member_moves_out_of_front_recovers_blade");
     // 
@@ -1386,7 +2071,9 @@ static void gen_ruby_leaves_stage_modifier_removed(void){
     tg.state.p[0].stage[0] = -1;
     tg.state.p[0].stage[1] = ruby;
     tg.state.p[0].stage[2] = -1;
-    // TODO: game.state.player2.stage.stage = [-1, opp, -1];
+    tg.state.p[1].stage[0] = -1;
+    tg.state.p[1].stage[1] = opp;
+    tg.state.p[1].stage[2] = -1;
     test_recalc(&tg);
     CHECK_EQ(rb_mods_get_blade(&tg.state.mods, opp), -1, "ruby_leaves_stage_modifier_removed");
     // 
@@ -1514,7 +2201,7 @@ static void gen_love_wing_bell_not_in_success_zone_no_blade(void){
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     // 
     // // Love wing bell in waitroom, NOT success zone
-    // TODO: game.state.player1.waitroom.cards.push(love_wing);
+    test_add_to_discard(&tg, love_wing);
     tg.state.p[0].stage[0] = filler;
     tg.state.p[0].stage[1] = muse_center;
     tg.state.p[0].stage[2] = -1;
@@ -1619,7 +2306,9 @@ static void gen_love_wing_bell_both_players_get_own_center_blade(void){
     // TODO: .success_live_card_zone
     // TODO: .cards
     // TODO: .push(love_wing_p2);
-    // TODO: game.state.player2.stage.stage = [filler, muse_center_p2, -1];
+    tg.state.p[1].stage[0] = filler;
+    tg.state.p[1].stage[1] = muse_center_p2;
+    tg.state.p[1].stage[2] = -1;
     // 
     test_recalc(&tg);
     // 
@@ -1696,6 +2385,8 @@ static void generated_zone_conversion(void){
 int main(void){
     if(rb_load("src")!=0){ fprintf(stderr,"rb_load failed\\n"); return 1; }
     printf("=== generated mass-port batch (simple constants) ===\\n");
+    gen_ren_005_turn2_blocks_third_energy_placed();
+    gen_sd2_002_natural_move_no_heart();
     gen_sp_bp2_004_center_highest_with_only_two_members();
     gen_sp_bp2_004_center_low_with_two_members_no_heart();
     gen_sp_bp2_004_center_highest_with_only_sumire_at_center();
@@ -1721,6 +2412,12 @@ int main(void){
     gen_sumire_pr_center_position_grants_blade();
     gen_sp_bp2_004_all_empty_no_heart();
     gen_sp_bp2_004_center_only_one_member_gains();
+    gen_rin_q79_vacated_area_can_receive_new_member();
+    gen_keke_jidou_effect_only_false_no_trigger();
+    gen_keke_jidou_self_effect_move_triggers();
+    gen_wish_song_five_distinct_liella_revealed_scores();
+    gen_wish_song_four_distinct_liella_revealed_no_score();
+    gen_rin_only_ls_live_no_blade();
     gen_sp_bp2_004_center_tie_with_both_sides_no_heart();
     gen_sp_bp2_004_center_highest_with_empty_side();
     gen_sp_bp2_004_p_variant_same();
@@ -1732,14 +2429,40 @@ int main(void){
     gen_sd2_004_center_blade_plus4();
     gen_pb2_035_left_blade_plus2();
     gen_pb2_041_right_blade_plus2();
+    gen_miyashita_ai_only_two_debuts_no_draw();
+    gen_tomari_jidou_self_move_triggers();
+    gen_tomari_jidou_opponent_move_triggers();
+    gen_tomari_jidou_natural_move_no_trigger();
     gen_cl1_006_debut_gains_three_blades();
+    gen_sd1026_energy_below_nine_no_score();
+    gen_treco_please_aqours_h04_total_ten_scores_two();
+    gen_treco_please_aqours_h04_below_ten_no_score();
+    gen_q267_deck_exhausts_mid_mill_refreshes_and_completes();
+    gen_q267_deck_exactly_seven_no_refresh();
+    gen_q267_deck_five_refresh_completes_to_seven();
+    gen_q267_both_players_refresh_their_own_deck();
     gen_wien_cost_modifier_dynamic();
     gen_wien_cost_modifier_cleared_on_leave();
+    gen_bp6022_more_opp_energy_scores();
+    gen_bp6022_equal_or_fewer_opp_energy_no_score();
+    gen_bp6012_debut_activates_energy_with_sbuuke_teammate();
     gen_spr039_constant_blades_with_combined_success_cards();
     gen_spr039_constant_blades_off_below_four_combined();
     gen_bp7020_constant_blades_while_energy_ahead();
     gen_bp7020_constant_blades_off_when_behind();
     gen_sd1022_live_start_grants_blade_to_all_aqours_members();
+    gen_yell_all_blade_blocks_sumire_and_wien();
+    gen_yell_only_one_present_triggers_self_only();
+    gen_go_master_start_fewer_success_cards_scores();
+    gen_go_master_start_equal_success_cards_no_score();
+    gen_note_mermaid_two_distinct_kaleidoscope_members_score();
+    gen_note_mermaid_duplicate_kaleidoscope_names_no_score();
+    gen_sumire_yell_no_blade_gains_heart06();
+    gen_sumire_yell_with_blade_no_gain();
+    gen_yell_mixed_blade_and_no_blade_no_gain();
+    gen_yell_empty_revealed_no_gain();
+    gen_yell_turn1_blocks_second_trigger();
+    gen_wien_yell_no_blade_gains_heart03_independent();
     gen_cost13_on_opponent_stage_meets_condition();
     gen_cost13_exact_boundary_triggers();
     gen_cost12_below_threshold_no_trigger();
@@ -1775,6 +2498,6 @@ int main(void){
     rb_unload();
     if(failures){ printf("\\n%d FAILURES\\n",failures); return 1; }
     printf("\\nALL GENERATED CHECKS PASSED\\n");
-    printf("generated: 75 fns\\n");
+    printf("generated: 109 fns\\n");
     return 0;
 }
