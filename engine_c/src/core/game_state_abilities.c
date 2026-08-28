@@ -48,12 +48,41 @@ int rb_collect_live_modifiers(const GameState *g, int actor, AbilityEffect *out,
     return 0;
 }
 
+/* Fire every ability on the cards `ids[0..n]` whose trigger matches. */
+static int fire_zone_abilities(GameState *g, int actor, const int *ids, int n,
+                                const char *trigger) {
+    int fired = 0;
+    for (int i = 0; i < n; i++) {
+        int cid = ids[i];
+        if (cid < 0) continue;
+        int nab = rb_card_num_abilities((uint32_t)cid);
+        for (int a = 0; a < nab; a++) {
+            Ability ab;
+            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+            if (rb_ability_matches_trigger(&ab, trigger)) {
+                if (ab.effect)
+                    rb_compound_sequential(g, actor, &g->p[actor], ab.effect, 1, NULL);
+                fired++;
+            }
+            rb_free_ability(&ab);
+        }
+    }
+    return fired;
+}
+
 /* Mirror abilities.rs:trigger_auto_abilities_for_player — fire all
-   auto-trigger abilities of `actor` matching `trigger`. Returns count
-   fired. STUB: not yet driven. */
+   auto-trigger abilities of `actor` matching `trigger` across the actor's
+   stage, success-live, live, hand and energy zones. Returns count fired. */
 int rb_trigger_auto_abilities(GameState *g, int actor, const char *trigger) {
-    (void)g; (void)actor; (void)trigger;
-    return 0;
+    if (!g || !trigger) return 0;
+    int total = 0;
+    const RbPlayer *P = &g->p[actor];
+    total += fire_zone_abilities(g, actor, P->stage, RB_STAGE_SIZE, trigger);
+    total += fire_zone_abilities(g, actor, P->success.cards, P->success.n, trigger);
+    total += fire_zone_abilities(g, actor, P->live.cards, P->live.n, trigger);
+    total += fire_zone_abilities(g, actor, P->hand.cards, P->hand.n, trigger);
+    total += fire_zone_abilities(g, actor, P->energy.cards, P->energy.n, trigger);
+    return total;
 }
 
 /* Mirror abilities.rs:process_pending_auto_abilities — drain the queue of
