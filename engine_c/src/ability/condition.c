@@ -519,12 +519,47 @@ static int effective_blade(const struct GameState *g, int cid) {
     if (b > 255) b = 255;
     return b;
 }
+/* Collect effective cost (base + cost modifier, saturating u8) of each
+   occupied stage member for `pl`. Returns the occupied count (0..STAGE_SIZE).
+   Mirror engine/src/ability/condition/card.rs get_stage_costs closure. */
+static int collect_stage_costs(const struct GameState *g, int pl, int out[RB_STAGE_SIZE]) {
+    const RbPlayer *P = &g->p[pl];
+    int n = 0;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        int cid = P->stage[i];
+        if (cid == RB_EMPTY_SLOT) continue;
+        Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
+        int base = (int)cc.cost;
+        rb_free_card(&cc);
+        int eff = rb_saturate_u8(base + rb_mods_get_cost((RbMods*)&g->mods, cid));
+        out[n++] = eff;
+    }
+    return n;
+}
+
 static int eval_resource(const struct GameState *g, int actor, const Condition *c) {
     const char *res = get_str(c, "resource_type");
     const char *src = get_str(c, "source");
+    const char *cmptype = get_str(c, "comparison_type");
     int pl = target_player_idx(actor, c);
     int thr=1; get_i(c,"count",&thr); if(!thr) thr=1;
     const char *op=get_str(c,"operator");
+
+    /* all_cost_comparison_condition: at least one of SELF's stage members has
+       an effective cost that satisfies `operator` against the MAXIMUM cost of
+       the OPPONENT's stage members. Mirror card.rs:evaluate_all_cost_comparison_condition. */
+    if (cmptype && !strcmp(cmptype, "cost")) {
+        int self_costs[RB_STAGE_SIZE];
+        int opp_costs[RB_STAGE_SIZE];
+        int ns = collect_stage_costs(g, actor, self_costs);
+        int no = collect_stage_costs(g, actor ^ 1, opp_costs);
+        int max_opp = 0;
+        for (int i = 0; i < no; i++) if (opp_costs[i] > max_opp) max_opp = opp_costs[i];
+        const char *oop = op ? op : ">=";
+        for (int i = 0; i < ns; i++)
+            if (eval_operator(self_costs[i], oop, max_opp)) return 1;
+        return 0;
+    }
 
     if (res && !strcmp(res, "blade")) {
         /* sum effective blade of selection set (recently_moved) or stage */

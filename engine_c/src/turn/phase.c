@@ -70,6 +70,7 @@ void rb_advance_phase(GameState *g) {
         rb_recalc_constants(g);
         rb_trigger_live_start(g, 0);
         rb_trigger_live_start(g, 1);
+        rb_drain_ability_queue(g);
         g->phase=RB_PHASE_PERFORMANCE;
         return;
     }

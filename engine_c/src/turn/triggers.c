@@ -35,6 +35,26 @@ int rb_trigger_debut(GameState *g, int pl, int card_id) {
 
 int rb_trigger_live_start(GameState *g, int pl) {
     int queued=0;
+    /* Live cards in the live-card zone — mirrors Rust's scan of
+       player.live_card_zone.cards before the stage scan. Many LiveStart
+       autos (e.g. sd1-022) live on the live card, not on a stage member. */
+    for (int i = 0; i < g->p[pl].live.n; i++) {
+        int cid = g->p[pl].live.cards[i];
+        if (cid == RB_EMPTY_SLOT) continue;
+        int n = rb_card_num_abilities((uint32_t)cid);
+        for (int ai = 0; ai < n; ai++) {
+            Ability ab; if(!rb_decode_card_ability((uint32_t)cid, ai, &ab)) continue;
+            if (ab.triggers && rb_trigger_is(ab.triggers,"ライブ開始時")) {
+                if (!rb_use_limit_reached(&g->queue, cid, ai, ab.use_limit<0?99:ab.use_limit, g->turn)) {
+                    rb_queue_push(&g->queue, cid, ai);
+                    rb_record_use(&g->queue, cid, ai, g->turn);
+                    queued++;
+                }
+            }
+            rb_free_ability(&ab);
+        }
+    }
+    /* Stage members — mirrors Rust's scan of player.stage. */
     for(int s=0;s<RB_STAGE_SIZE;s++){
         int cid=g->p[pl].stage[s];
         if(cid==RB_EMPTY_SLOT) continue;
@@ -43,6 +63,29 @@ int rb_trigger_live_start(GameState *g, int pl) {
             Ability ab; if(!rb_decode_card_ability((uint32_t)cid,i,&ab)) continue;
             if(ab.triggers && rb_trigger_is(ab.triggers,"ライブ開始時")){
                 if(!rb_use_limit_reached(&g->queue, cid, i, ab.use_limit<0?99:ab.use_limit, g->turn)){
+                    rb_queue_push(&g->queue, cid, i);
+                    rb_record_use(&g->queue, cid, i, g->turn);
+                    queued++;
+                }
+            }
+            rb_free_ability(&ab);
+        }
+    }
+    return queued;
+}
+
+/* Mirror rb_trigger_live_start for the ライブ成功時 (LiveSuccess) trigger.
+   Queues abilities whose trigger matches on the given player's staged members. */
+int rb_trigger_live_success(GameState *g, int pl) {
+    int queued = 0;
+    for (int s = 0; s < RB_STAGE_SIZE; s++) {
+        int cid = g->p[pl].stage[s];
+        if (cid == RB_EMPTY_SLOT) continue;
+        int n = rb_card_num_abilities((uint32_t)cid);
+        for (int i = 0; i < n; i++) {
+            Ability ab; if (!rb_decode_card_ability((uint32_t)cid, i, &ab)) continue;
+            if (ab.triggers && rb_trigger_is(ab.triggers, "ライブ成功時")) {
+                if (!rb_use_limit_reached(&g->queue, cid, i, ab.use_limit < 0 ? 99 : ab.use_limit, g->turn)) {
                     rb_queue_push(&g->queue, cid, i);
                     rb_record_use(&g->queue, cid, i, g->turn);
                     queued++;
@@ -119,12 +162,12 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
         }
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"sign") && e->extra_v[i] && !strcmp(e->extra_v[i],"negative")) cnt = -cnt;
         rb_mods_add_cost(&g->mods, tgt_cid, cnt);
-        g->mods.constant_cost[tgt_cid]+=cnt;
+        if(!acc) g->mods.constant_cost[tgt_cid]+=cnt;
         if(acc) acc->cost+=cnt;
     } else if (!strcmp(e->action,"modify_score")) {
         int cnt=e->count>=0?e->count:1;
         rb_mods_add_score(&g->mods, tgt_cid, cnt);
-        g->mods.constant_score[tgt_cid]+=cnt;
+        if(!acc) g->mods.constant_score[tgt_cid]+=cnt;
         if(acc) acc->score+=cnt;
     } else if (!strcmp(e->action,"gain_resource")) {
         const char *res=NULL;
@@ -133,7 +176,7 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"sign") && e->extra_v[i] && !strcmp(e->extra_v[i],"negative")) cnt = -cnt;
         if (res && (!strcmp(res,"blade")||!strcmp(res,"ブレード"))) {
             rb_mods_add_blade(&g->mods, tgt_cid, cnt);
-            g->mods.constant_blade[tgt_cid]+=cnt;
+            if(!acc) g->mods.constant_blade[tgt_cid]+=cnt;
             if(acc) acc->blade+=cnt;
         } else if (res && (!strcmp(res,"heart")||!strcmp(res,"ハート"))) {
             const char *hc=NULL;
@@ -150,7 +193,7 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
                 else if(!strcmp(hc,"all")||!strcmp(hc,"heart07")||!strcmp(hc,"b_all")) col=7;
             }
             rb_mods_add_heart(&g->mods, tgt_cid, col, cnt);
-            g->mods.constant_heart[tgt_cid][col]+=cnt;
+            if(!acc) g->mods.constant_heart[tgt_cid][col]+=cnt;
             if(acc) acc->heart[col]+=cnt;
         }
     } else if (!strcmp(e->action,"modify_required_hearts") || !strcmp(e->action,"modify_required_hearts_global")) {
@@ -169,14 +212,14 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
         }
         int cnt=e->count>=0?e->count:1;
         rb_mods_add_need_heart(&g->mods, tgt_cid, col, cnt);
-        g->mods.constant_need_heart[tgt_cid][col]+=cnt;
+        if(!acc) g->mods.constant_need_heart[tgt_cid][col]+=cnt;
         if(acc) acc->need_heart[col]+=cnt;
     } else if (!strcmp(e->action,"gain_ability")) {
         const char *ag=NULL;
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"ability_gain")) ag=e->extra_v[i];
         if(ag && strstr(ag,"ハート")) {
             rb_mods_add_heart(&g->mods, tgt_cid, 7, 1);
-            g->mods.constant_heart[tgt_cid][7]+=1;
+            if(!acc) g->mods.constant_heart[tgt_cid][7]+=1;
             if(acc) acc->heart[7]+=1;
         }
     }
@@ -213,17 +256,15 @@ void rb_check_expired_effects(GameState *g) {
     for(int i=0;i<g->n_temp_effects;i++){
         RbTempEffect *te=&g->temp_effects[i];
         if(!te->live_end) continue;
+        /* live_end grants are credited to the effective modifier only (not the
+           constant_* tracking that rb_recalc_constants owns), so revert by
+           subtracting the effective modifier here. */
         rb_mods_add_blade(&g->mods, te->card_id, -te->blade);
-        g->mods.constant_blade[te->card_id]-=te->blade;
         rb_mods_add_score(&g->mods, te->card_id, -te->score);
-        g->mods.constant_score[te->card_id]-=te->score;
         rb_mods_add_cost(&g->mods, te->card_id, -te->cost);
-        g->mods.constant_cost[te->card_id]-=te->cost;
         for(int c=0;c<8;c++){
             rb_mods_add_heart(&g->mods, te->card_id, c, -te->heart[c]);
-            g->mods.constant_heart[te->card_id][c]-=te->heart[c];
             rb_mods_add_need_heart(&g->mods, te->card_id, c, -te->need_heart[c]);
-            g->mods.constant_need_heart[te->card_id][c]-=te->need_heart[c];
         }
     }
     g->n_temp_effects=0;

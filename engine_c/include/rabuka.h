@@ -339,7 +339,7 @@ typedef struct {
 int  rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx);
 void rb_queue_clear(RbAbilityQueue *q);
 int  rb_queue_has_pending(const RbAbilityQueue *q);
-int  rb_use_limit_reached(RbAbilityQueue *q, int card_id, int ability_idx, int limit, int cur_turn);
+int rb_use_limit_reached(RbAbilityQueue *q, int card_id, int ability_idx, int limit, int cur_turn);
 void rb_record_use(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn);
 
 typedef struct {
@@ -391,6 +391,10 @@ typedef struct GameState {
     int      n_temp_effects;
 } GameState;
 
+/* ── Ability queue drain + owner lookup (engine/src/ability_queue.rs) ── */
+int rb_owner_of_card(const GameState *g, int cid);
+int rb_drain_ability_queue(GameState *g);
+
 /* ── RNG (xorshift; deterministic given seed) ── */
 void rb_seed(uint32_t s);
 uint32_t rb_rand(void);
@@ -417,6 +421,7 @@ int  rb_trigger_is(const char *triggers, const char *needle);
 int  rb_trigger_debut(GameState *g, int pl, int card_id);
 void rb_fire_debut(GameState *g, int pl, int card_id);
 int  rb_trigger_live_start(GameState *g, int pl);
+int  rb_trigger_live_success(GameState *g, int pl);
 void rb_recalc_constants(GameState *g);
 void rb_check_expired_effects(GameState *g);
 void rb_advance_phase(GameState *g);
@@ -442,7 +447,7 @@ void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e);
 
 /* ── Dynamic count resolution (engine/src/ability/dynamic_count.rs) ── */
-int  rb_resolve_dynamic_count(const struct GameState *g,
+int  rb_resolve_dynamic_count(const struct GameState *g, int owner,
                              const char *reference, const char *base_reference,
                              const char *count_type, const char *calculation,
                              int calculation_value, int owner_on_p1,

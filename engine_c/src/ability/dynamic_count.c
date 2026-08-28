@@ -19,8 +19,8 @@
 #include <string.h>
 #include <stdlib.h>
 
-int rb_resolve_dynamic_count(const struct GameState *g,
-                             const char *reference,
+int rb_resolve_dynamic_count(const struct GameState *g, int owner,
+                              const char *reference,
                              const char *base_reference,
                              const char *count_type,
                              const char *calculation,
@@ -53,40 +53,40 @@ int rb_resolve_dynamic_count(const struct GameState *g,
                !strcmp(reference_text, "previous_reveal")) {
         count = 0; /* revealed pool not tracked in C GameState (cheer_revealed_cards) */
     } else if (!strcmp(reference_text, "unit_count")) {
-        const RbPlayer *P = &g->p[g->active];
+        const RbPlayer *P = &g->p[owner];
         for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) count++;
     } else if (!strcmp(reference_text, "energy_difference")) {
         int threshold = base_reference ? atoi(base_reference) : 0;
-        const RbPlayer *P = &g->p[g->active];
+        const RbPlayer *P = &g->p[owner];
         int n = P->energy.n - threshold;
         count = n < 0 ? 0 : n;
     } else if (!strcmp(reference_text, "success_pile_count_difference")) {
         /* opponent's success pile minus owner's success pile */
-        const RbPlayer *own = owner_on_p1 ? &g->p[0] : &g->p[1];
-        const RbPlayer *other = owner_on_p1 ? &g->p[1] : &g->p[0];
+        const RbPlayer *own = &g->p[owner];
+        const RbPlayer *other = &g->p[1 - owner];
         int diff = other->success.n - own->success.n;
         count = diff < 0 ? 0 : diff;
     } else if (!strcmp(reference_text, "these_waitroom_placed_count")) {
         if (g->n_recently_moved > 0) count = g->n_recently_moved;
         else count = n_moved;
     } else if (!strcmp(reference_text, "total_live_score")) {
-        const RbPlayer *P = &g->p[g->active];
+        const RbPlayer *P = &g->p[owner];
         for (int i = 0; i < P->live.n; i++) {
             Card c; if (rb_decode_card_by_index((uint32_t)P->live.cards[i], &c)) { count += c.score; rb_free_card(&c); }
         }
     } else if (!strcmp(reference_text, "stage_member_count")) {
-        const RbPlayer *P = &g->p[g->active];
+        const RbPlayer *P = &g->p[owner];
         for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) count++;
     } else if (!strcmp(reference_text, "opponent_stage_member_count")) {
-        const RbPlayer *P = &g->p[1 - g->active];
+        const RbPlayer *P = &g->p[1 - owner];
         for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) count++;
     } else if (!strcmp(reference_text, "opponent_waited_member_count")) {
-        const RbPlayer *P = &g->p[1 - g->active];
+        const RbPlayer *P = &g->p[1 - owner];
         for (int i = 0; i < RB_STAGE_SIZE; i++)
             if (P->stage[i] != RB_EMPTY_SLOT && P->stage_wait[i]) count++;
     } else if (!strcmp(reference_text, "waitroom_count_below_base")) {
         int threshold = base_reference ? atoi(base_reference) : 0;
-        const RbPlayer *P = &g->p[g->active];
+        const RbPlayer *P = &g->p[owner];
         int diff = threshold - P->discard.n;
         count = diff < 0 ? 0 : diff;
     } else if (!strcmp(reference_text, "energy_cards_under_this_member")) {
@@ -131,7 +131,7 @@ int rb_effect_count(const struct GameState *g, int actor, const AbilityEffect *e
     int owner_on_p1 = (on_p1 && !strcmp(on_p1, "true")) ? 1 : 0;
     int moved = dc_extra_int(e, "moved");
     int selected = dc_extra_int(e, "selected");
-    return rb_resolve_dynamic_count(g, reference, base_reference, count_type, calculation,
+    return rb_resolve_dynamic_count(g, actor, reference, base_reference, count_type, calculation,
                                     calc_value, owner_on_p1,
                                     &moved, moved > 0 ? 1 : 0,
                                     &selected, selected > 0 ? 1 : 0,

@@ -27,3 +27,47 @@ void rb_record_use(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn
     for (int i = 0; i < q->n_uses; i++) if (q->use_keys[i] == key) { q->use_counts[i]++; return; }
     if (q->n_uses < RB_USE_TRACK) { q->use_keys[q->n_uses] = key; q->use_counts[q->n_uses] = 1; q->n_uses++; }
 }
+
+/* Return the player index that currently owns `cid` (searches stage/hand/
+   energy/live/success/discard/deck), or -1. Mirrors Rust's player.contains_card. */
+int rb_owner_of_card(const GameState *g, int cid) {
+    if (!g || cid < 0) return -1;
+    const RbBag *zones[6];
+    for (int pl = 0; pl < 2; pl++) {
+        const RbPlayer *P = &g->p[pl];
+        zones[0] = &P->hand;   zones[1] = &P->deck;   zones[2] = &P->discard;
+        zones[3] = &P->energy;  zones[4] = &P->live;   zones[5] = &P->success;
+        for (int z = 0; z < 6; z++) {
+            const RbBag *Z = zones[z];
+            for (int i = 0; i < Z->n; i++) if (Z->cards[i] == cid) return pl;
+        }
+        for (int s = 0; s < RB_STAGE_SIZE; s++) if (P->stage[s] == cid) return pl;
+    }
+    return -1;
+}
+
+/* Drain every queued ability whose effect has not started, executing its
+   effect tree with host_cid = the card that owns the ability (Rust's
+   activating_card). Stops if an ability queues a pending choice so the host
+   can resume the rest later. Returns count executed.
+   Mirror ability_queue.rs drain + execute path. */
+int rb_drain_ability_queue(GameState *g) {
+    if (!g) return 0;
+    int ran = 0;
+    for (int i = 0; i < g->queue.n_entries; i++) {
+        RbQueueEntry *e = &g->queue.entries[i];
+        if (e->effect_started) continue;
+        e->effect_started = 1;
+        int n = rb_card_num_abilities((uint32_t)e->card_id);
+        if (e->ability_idx < 0 || e->ability_idx >= n) continue;
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)e->card_id, e->ability_idx, &ab)) continue;
+        int actor = rb_owner_of_card(g, e->card_id);
+        if (actor < 0) actor = g->active;
+        if (ab.effect) rb_execute_effect_ex(g, actor, ab.effect, e->card_id);
+        rb_free_ability(&ab);
+        ran++;
+        if (rb_has_pending_choice(g)) break;
+    }
+    return ran;
+}

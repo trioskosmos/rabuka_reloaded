@@ -226,8 +226,79 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         rb_shuffle(W->deck.cards, W->deck.n);
     } else if (!strcmp(act, "gain_resource") || !strcmp(act, "place_energy") ||
                !strcmp(act, "place_energy_under_member")) {
-        W->energy_active += cnt;
-        if (W->energy_active > RB_MAX_ENERGY_CARDS) W->energy_active = RB_MAX_ENERGY_CARDS;
+        /* gain_resource: mirror misc.rs:execute_gain_resource — the resource
+           (blade/heart/score/energy) is granted to the targets chosen by
+           target / card_type / group_names / self_target. Duration::LiveEnd
+           registers a temporary effect that rb_check_expired_effects reverts
+           at live end (same mechanism as rb_fire_debut). place_energy* carries
+           no resource field and falls through to the energy path. */
+        const char *res = NULL; int live_end = 0;
+        for (int i = 0; i < e->n_extra; i++) {
+            if (e->extra_k[i] && !strcmp(e->extra_k[i], "resource")) res = e->extra_v[i];
+            if (e->extra_k[i] && !strcmp(e->extra_k[i], "duration") &&
+                e->extra_v[i] && !strcmp(e->extra_v[i], "live_end")) live_end = 1;
+        }
+        int amt = cnt < 0 ? -cnt : cnt;
+        int sign = cnt < 0 ? -1 : 1;
+        int self_target = 0; const char *gn = NULL;
+        for (int i = 0; i < e->n_extra; i++) {
+            if (e->extra_k[i] && !strcmp(e->extra_k[i], "self_target") &&
+                e->extra_v[i] && !strcmp(e->extra_v[i], "true")) self_target = 1;
+            if (e->extra_k[i] && !strcmp(e->extra_k[i], "group_names")) gn = e->extra_v[i];
+        }
+        if (!res || !strcmp(res, "energy")) {
+            W->energy_active += cnt;
+            if (W->energy_active > RB_MAX_ENERGY_CARDS) W->energy_active = RB_MAX_ENERGY_CARDS;
+        } else {
+            int recips[RB_STAGE_SIZE + 1]; int nr = 0;
+            if (self_target && !gn) {
+                /* no group/card_type filter → the resolving (host) card */
+                if (host_cid >= 0) recips[nr++] = host_cid;
+            } else {
+                /* mirror Rust resolve_gain_resource_targets: when a group/card_type
+                   filter is present, targets are the matching stage members of
+                   the (target) player regardless of self_target. */
+                int tgt = target_player(e, actor);
+                RbPlayer *TP = &g->p[tgt];
+                for (int q = 0; q < RB_STAGE_SIZE; q++) {
+                    int cid = TP->stage[q];
+                    if (cid == RB_EMPTY_SLOT) continue;
+                    if (gn && !rb_card_matches_group_str(cid, gn)) continue;
+                    if (nr < (int)(sizeof(recips)/sizeof(recips[0]))) recips[nr++] = cid;
+                }
+            }
+            if (nr == 0 && host_cid >= 0) recips[nr++] = host_cid;
+            for (int r = 0; r < nr; r++) {
+                int cid = recips[r];
+                if (!strcmp(res, "blade")) {
+                    rb_mods_add_blade(&g->mods, cid, amt * sign);
+                    if (live_end) {
+                        RbTempEffect te; memset(&te, 0, sizeof(te));
+                        te.card_id = cid; te.live_end = 1; te.blade = (int16_t)(amt * sign);
+                        if (g->n_temp_effects < RB_MAX_TEMP_EFFECTS) g->temp_effects[g->n_temp_effects++] = te;
+                    }
+                } else if (!strcmp(res, "heart")) {
+                    int col = heart_color_of(e, RB_HEART_PINK);
+                    rb_mods_add_heart(&g->mods, cid, col, amt * sign);
+                    if (live_end) {
+                        RbTempEffect te; memset(&te, 0, sizeof(te));
+                        te.card_id = cid; te.live_end = 1; te.heart[col] = (int16_t)(amt * sign);
+                        if (g->n_temp_effects < RB_MAX_TEMP_EFFECTS) g->temp_effects[g->n_temp_effects++] = te;
+                    }
+                } else if (!strcmp(res, "score")) {
+                    rb_mods_add_score(&g->mods, cid, amt * sign);
+                    if (live_end) {
+                        RbTempEffect te; memset(&te, 0, sizeof(te));
+                        te.card_id = cid; te.live_end = 1; te.score = (int16_t)(amt * sign);
+                        if (g->n_temp_effects < RB_MAX_TEMP_EFFECTS) g->temp_effects[g->n_temp_effects++] = te;
+                    }
+                }
+            }
+            /* live_end grants are tracked via temp effects and must survive
+               rb_recalc_constants (which owns the constant_* tracking); only
+               recalc for permanent (non-live_end) grants. */
+            if (!live_end) rb_recalc_constants(g);
+        }
     } else if (!strcmp(act, "pay_energy") || !strcmp(act, "pay_cost") ||
                !strcmp(act, "activation_cost")) {
         /* Optional pay-or-skip gate (mirrors ability/cost.rs: has_skip_prompt / handle_optional_cost_payment).

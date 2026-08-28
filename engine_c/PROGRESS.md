@@ -48,7 +48,7 @@ Derived from `cards/abilities.json` (`abilities.json:936 unique`), cross-checked
 | Count | Verb | Rust handler | C status | Priority |
 |------:|------|--------------|----------|----------|
 | 338 | `move_cards` | `ability/move_cards.rs` (3780 LOC) | ⚠️ stub — `do_move` handles stage↔bag only | P0 |
-| 271 | `gain_resource` | `ability/effects/state.rs` | ⚠️ energy count only (no under-member/baton interaction) | P0 |
+| 271 | `gain_resource` | `ability/effects/state.rs` | ✅ honors `resource` (blade/heart/score/energy) to targets chosen by target/card_type/group_names/self_target; `live_end` registers temp effect reverted by `rb_check_expired_effects`; energy-only fallback preserved for place_energy* | P0 |
 | 251 | `sequential` | `ability/compound.rs` | ✅ children executed, but gate/condition semantics missing | P0 |
 | 127 | `draw_card` | `ability/effects/draw.rs` | ✅ handled | P0 |
 | 101 | `modify_score` | `ability/effects/score.rs` | ✅ handled (`modify_score`/`gain_score`) | P0 |
@@ -126,7 +126,7 @@ Plus `enums.rs:ConditionType` variants not yet observed: `AnyOfCondition`, `Choi
 | Count | Trigger | Rust path | C status |
 |------:|---------|-----------|----------|
 | 256 | `登場` (Debut) | `triggers.rs:TriggerKind::Debut` | 🔴 |
-| 255 | `ライブ開始時` (LiveStart) | `triggers.rs` | 🔴 |
+| 255 | `ライブ開始時` (LiveStart) | `triggers.rs` | ✅ wired — `rb_trigger_live_start` scans live zone + stage, `rb_drain_ability_queue` executes via `rb_execute_effect_ex`; group-targeted `gain_resource` blade grants now land (sd1-022 → Aqours members) |
 | 122 | `ライブ成功時` (LiveSuccess) | `turn/live.rs` | 🔴 |
 | 117 | `常時` (Constant) | `core/game_state/modifiers.rs` | 🔴 |
 | 96 | `起動` (Activation) | `triggers.rs:Activation` | 🔴 (cost gated) |
