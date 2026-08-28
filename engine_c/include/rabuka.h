@@ -129,6 +129,7 @@ char *rb_strdup2(const char *s);
 #define RB_ENERGY_CAP          7
 #define RB_MAX_CARD_IDS        4096
 #define RB_EMPTY_SLOT          (-1)
+#define RB_MAX_USED            256
 
 static inline uint8_t rb_saturate_u8(int v) {
     if (v < 0) return 0;
@@ -467,5 +468,55 @@ int       rb_has_pending_choice(const GameState *g);
 const RbChoice *rb_get_pending_choice(const GameState *g);
 int       rb_resume_with_choice(GameState *g, int selected_idx); /* 0..count-1, -1=skip */
 void      rb_clear_pending_choice(GameState *g);
+
+/* ── Ability cost payment (engine/src/ability/cost.rs) ── */
+int rb_pay_cost(GameState *g, int actor, const AbilityEffect *cost);
+int rb_validate_cost(const GameState *g, int actor, const AbilityEffect *cost);
+int rb_pay_deferred_costs(GameState *g, int actor, const AbilityEffect *cost);
+int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect *cost, int pay);
+int rb_cost_has_skip_prompt(const AbilityEffect *cost);
+int rb_get_change_state_candidates(const GameState *g, int actor,
+                                   int *out_positions, int max);
+
+/* ── Compound / sequential / conditional execution (engine/src/ability/compound.rs) ── */
+int rb_compound_sequential(GameState *g, int actor, const RbPlayer *self,
+                           const AbilityEffect *effects, int n, int *resolved);
+int rb_compound_route_branch(const GameState *g, int actor, const AbilityEffect *eff);
+int rb_compound_conditional_alternative(GameState *g, int actor, const RbPlayer *self,
+                                        const AbilityEffect *eff, int branch, int *resolved);
+int rb_compound_conditional_on_result(GameState *g, int actor, const RbPlayer *self,
+                                      const AbilityEffect *eff, int last_result, int *resolved);
+int rb_compound_conditional_on_optional(GameState *g, int actor, const RbPlayer *self,
+                                        const AbilityEffect *eff, int taken, int *resolved);
+int rb_compound_choice_string(const AbilityEffect *eff, const char *choice);
+int rb_compound_choice_action(GameState *g, int actor, const RbPlayer *self,
+                              const AbilityEffect *eff, int choice_idx, int *resolved);
+
+/* ── Ability resolver frontend (engine/src/ability/resolver.rs) ── */
+typedef struct AbilityInfo {
+    int cid;            /* card id */
+    int ability_idx;    /* index within card's abilities */
+    const char *trigger;
+} AbilityInfo;
+int  rb_resolver_pending_choice(const GameState *g);
+int  rb_can_activate_effect(const GameState *g, int actor, const AbilityEffect *eff);
+int  rb_resolver_trigger_infos(const GameState *g, int actor, const char *trigger,
+                               AbilityInfo *out, int max);
+int  rb_resolve_ability(GameState *g, int actor, const AbilityEffect *eff, int *resolved);
+int  rb_resolver_card_matches_type(int cid, const char *filter);
+
+/* ── Auto-trigger engine + ability use tracking (core/game_state/abilities.rs) ── */
+int  rb_ability_matches_trigger(const Ability *ab, const char *trigger);
+void rb_record_ability_use(GameState *g, int cid, int idx);
+int  rb_collect_constant_hand(const GameState *g, int actor, AbilityEffect *out, int max);
+int  rb_collect_live_modifiers(const GameState *g, int actor, AbilityEffect *out, int max);
+int  rb_trigger_auto_abilities(GameState *g, int actor, const char *trigger);
+int  rb_process_pending_auto_abilities(GameState *g);
+void rb_check_expired_effects(GameState *g);
+int  rb_apply_ability_effects(GameState *g, int actor, const Ability *ab);
+
+/* ── Misc effect handlers (engine/src/ability/effects/misc.rs) ── */
+int rb_execute_misc_effect(GameState *g, int actor, const RbPlayer *self,
+                           const AbilityEffect *e, int *resolved);
 
 #endif /* RABUKA_H */

@@ -183,8 +183,12 @@ C has no namespace, no `self`, and must compile `-ffreestanding` on bare-metal t
 | `ability/dynamic_count.rs` (resolve_dynamic_count) | `src/ability/dynamic_count.c` | ⚠️ faithful; `revealed_cards`/under_cards counts return 0 (not tracked) |
 | `ability/effects/{draw,score,state,misc,ability_effects}.rs` | `src/engine.c:handle_action` + `src/ability/effects/{move,look,state,ability}.c` | ⚠️ ~12/42 verbs faithful; move/look/state split into effects/ |
 | `ability/condition/{card,compound,state}.rs` (condition.rs 1039 LOC) | `src/ability/condition.c` | ⚠️ resource/ability_filter/state/any_of/temporal now ported; movement/complex/choice still partial |
-| `ability/compound.rs` + `ability/choice.rs` (3447 LOC) | `src/ability/choice.c` | 🔴 sequential gates, conditional_on_*, choice spawning, pay-skip gate, repeat_procedure |
-| `ability/cost.rs` + `ability/resolver.rs` + `ability_queue.rs` + `triggers.rs` | `src/ability/ability_queue.c` + `src/turn/triggers.c` | 🔴 ability queue (debut/auto/live_start/live_success), cost payment, use_limit, cost_paid/effect_started flags |
+| `ability/compound.rs` + `ability/choice.rs` (3447 LOC) | `src/ability/choice.c` + `src/ability/compound.c` | 🔴 compound.c scaffolded (sequential/conditional/choice wrappers delegate to rb_execute_effect/rb_eval_condition); real sequential gates, conditional_on_*, choice spawning, pay-skip gate, repeat_procedure still TODO |
+| `ability/cost.rs` | `src/ability/cost.c` | ⚠️ energy + change-state cost path now REAL (rb_pay_cost/validate_cost deduct energy_active / put member to wait); deferred/optional/other-resource costs TODO |
+| `ability/resolver.rs` | `src/ability/resolver.c` | 🔴 scaffold (pending_choice/can_activate/trigger_infos/resolve_ability wrappers); activation gating unwired |
+| `core/game_state/abilities.rs` | `src/core/game_state_abilities.c` | 🔴 scaffold (ability_matches_trigger/record_use/collect_constant_hand/trigger_auto_abilities/process_pending/apply_ability_effects); auto-trigger engine unwired |
+| `ability/effects/misc.rs` | `src/ability/effects/misc.c` | 🔴 scaffold (rb_execute_misc_effect dispatches 13 misc verbs; handlers are no-ops) |
+| `ability/cost.rs` + `ability/resolver.rs` + `ability_queue.rs` + `triggers.rs` | `src/ability/ability_queue.c` + `src/turn/triggers.c` | 🔴 ability queue (debut/auto/live_start/live_success), use_limit, cost_paid/effect_started flags |
 | `turn/phases.rs` (1685 LOC) + `turn/actions.rs` + `turn/live.rs` (2846 LOC) + `turn/triggers.rs` | `src/engine.c` + `src/turn/live.c` + `src/turn/phase.c` + `src/turn/triggers.c` | 🔴 full phase machine (see §4), baton touch, yell → heart allocation → verdict → score → victory |
 | `game/match_runner.rs` + `game/game_setup.rs` | `src/engine.c:rb_game_init` | ⚠️ RPS/mulligan simplified; needs hand-size / mulligan choice flow |
 
