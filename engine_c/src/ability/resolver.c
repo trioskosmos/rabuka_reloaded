@@ -13,8 +13,8 @@
 /* Mirror resolver.rs:resolver_get_pending_choice — return the index of the
    effect currently awaiting an interactive choice, or -1. */
 int rb_resolver_pending_choice(const GameState *g) {
-    (void)g;
-    return -1;
+    if (!g || !g->queue.has_pending) return -1;
+    return (int)g->queue.pending.route;
 }
 
 /* Mirror resolver.rs:can_activate_effect — is this effect activatable now?
