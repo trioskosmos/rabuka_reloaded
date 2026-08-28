@@ -1,6 +1,7 @@
 #include "rabuka.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 /* Portable trigger scan — mirrors engine/src/triggers.rs:canonical_trigger
    + engine/src/turn/triggers.rs . Wire trigger strings are Japanese:
@@ -56,30 +57,68 @@ int rb_trigger_live_start(GameState *g, int pl) {
 /* Helper: apply a single effect as a constant modifier (no condition gate here
     beyond the caller's check). Mirrors the blade/heart/score/need_heart branches
     of engine/src/core/game_state/modifiers.rs:recalculate_constants . */
-static void apply_constant_effect(GameState *g, int host_cid, AbilityEffect *e) {
+/* Mirror a stage position across the center line: left<->right, center stays. */
+static const char *mirror_position(const char *pos) {
+    if (!pos) return NULL;
+    if (!strcmp(pos,"left_side"))  return "right_side";
+    if (!strcmp(pos,"right_side")) return "left_side";
+    return pos; /* center / other */
+}
+/* Return the card id occupying `pos` on player `pl`, or RB_EMPTY_SLOT. */
+static int card_at_position(const GameState *g, int pl, const char *pos) {
+    int idx = -1;
+    if (!pos) return RB_EMPTY_SLOT;
+    if (!strcmp(pos,"center")) idx = 1;
+    else if (!strcmp(pos,"left_side")) idx = 0;
+    else if (!strcmp(pos,"right_side")) idx = 2;
+    else return RB_EMPTY_SLOT;
+    return g->p[pl].stage[idx];
+}
+
+static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEffect *e) {
     if (!e || !e->action) return;
+    /* Position-targeted modifiers (ruby front / love_wing_bell center): the
+       effect grants its resource to the member at a given stage position rather
+       than the host. Mirrors engine/src/core/game_state/modifiers.rs constant
+       application where the effect's `position`/`activation_position` select the
+       recipient. */
+    int tgt_cid = host_cid;
+    int tgt_pl  = pl;
+    const char *pos = NULL, *act_pos = NULL;
+    for(int i=0;i<e->n_extra;i++){
+        if(e->extra_k[i] && !strcmp(e->extra_k[i],"position")) pos=e->extra_v[i];
+        if(e->extra_k[i] && !strcmp(e->extra_k[i],"activation_position")) act_pos=e->extra_v[i];
+    }
+    if (pos) {
+        if (act_pos) {            /* front mechanic: affects OPPONENT at mirrored pos */
+            tgt_pl = 1 - pl;
+            pos = mirror_position(act_pos);
+        } else {                  /* same-player position (e.g. own center) */
+            tgt_pl = pl;
+        }
+        int c = card_at_position(g, tgt_pl, pos);
+        if (c != RB_EMPTY_SLOT) tgt_cid = c;
+    }
     if (!strcmp(e->action,"modify_cost")) {
-        /* hanayo: operation add value 3 count 3 — duration as_long_as.
-           Rust: constant +3 to Stage member cost when condition true.
-           Extras: operation, value, duration, card_type — count is the delta. */
         int cnt = e->count>=0?e->count:1;
-        /* Some constant costs encode delta in extra "value" not count (hanayo value=3 count=3 both 3, but be robust) */
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"value")){
             int v = atoi(e->extra_v[i]); if(v) cnt = v;
         }
-        rb_mods_add_cost(&g->mods, host_cid, cnt);
-        g->mods.constant_cost[host_cid]+=cnt;
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"sign") && e->extra_v[i] && !strcmp(e->extra_v[i],"negative")) cnt = -cnt;
+        rb_mods_add_cost(&g->mods, tgt_cid, cnt);
+        g->mods.constant_cost[tgt_cid]+=cnt;
     } else if (!strcmp(e->action,"modify_score")) {
         int cnt=e->count>=0?e->count:1;
-        rb_mods_add_score(&g->mods, host_cid, cnt);
-        g->mods.constant_score[host_cid]+=cnt;
+        rb_mods_add_score(&g->mods, tgt_cid, cnt);
+        g->mods.constant_score[tgt_cid]+=cnt;
     } else if (!strcmp(e->action,"gain_resource")) {
         const char *res=NULL;
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"resource")) res=e->extra_v[i];
+        int cnt=e->count>=0?e->count:1;
+        for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"sign") && e->extra_v[i] && !strcmp(e->extra_v[i],"negative")) cnt = -cnt;
         if (res && (!strcmp(res,"blade")||!strcmp(res,"ブレード"))) {
-            int cnt=e->count>=0?e->count:1;
-            rb_mods_add_blade(&g->mods, host_cid, cnt);
-            g->mods.constant_blade[host_cid]+=cnt;
+            rb_mods_add_blade(&g->mods, tgt_cid, cnt);
+            g->mods.constant_blade[tgt_cid]+=cnt;
         } else if (res && (!strcmp(res,"heart")||!strcmp(res,"ハート"))) {
             const char *hc=NULL;
             for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"heart_color")) hc=e->extra_v[i];
@@ -94,8 +133,8 @@ static void apply_constant_effect(GameState *g, int host_cid, AbilityEffect *e) 
                 else if(!strcmp(hc,"orange")||!strcmp(hc,"heart06")||!strcmp(hc,"heart6")) col=6;
                 else if(!strcmp(hc,"all")||!strcmp(hc,"heart07")||!strcmp(hc,"b_all")) col=7;
             }
-            int cnt=e->count>=0?e->count:1;
-            rb_mods_add_heart(&g->mods, host_cid, col, cnt);
+            rb_mods_add_heart(&g->mods, tgt_cid, col, cnt);
+            g->mods.constant_heart[tgt_cid][col]+=cnt;
         }
     } else if (!strcmp(e->action,"modify_required_hearts") || !strcmp(e->action,"modify_required_hearts_global")) {
         const char *hc=NULL;
@@ -112,18 +151,18 @@ static void apply_constant_effect(GameState *g, int host_cid, AbilityEffect *e) 
             else if(!strcmp(hc,"all")) col=7;
         }
         int cnt=e->count>=0?e->count:1;
-        /* for global, apply to all lives later via need_heart pipeline; for now treat same */
-        rb_mods_add_need_heart(&g->mods, host_cid, col, cnt);
+        rb_mods_add_need_heart(&g->mods, tgt_cid, col, cnt);
+        g->mods.constant_need_heart[tgt_cid][col]+=cnt;
     } else if (!strcmp(e->action,"gain_ability")) {
-        /* constant gain_ability that grants all-heart / score : treat as heart or score */
         const char *ag=NULL;
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"ability_gain")) ag=e->extra_v[i];
         if(ag && strstr(ag,"ハート")) {
-            rb_mods_add_heart(&g->mods, host_cid, 7, 1);
+            rb_mods_add_heart(&g->mods, tgt_cid, 7, 1);
+            g->mods.constant_heart[tgt_cid][7]+=1;
         }
     }
     /* sequential children: walk them (q127_wien leaves_stage_modifier_removed etc.) */
-    for(int i=0;i<e->n_child;i++) apply_constant_effect(g, host_cid, e->child[i]);
+    for(int i=0;i<e->n_child;i++) apply_constant_effect(g, pl, host_cid, e->child[i]);
 }
 
 void rb_recalc_constants(GameState *g) {
@@ -136,21 +175,23 @@ void rb_recalc_constants(GameState *g) {
         if (g->mods.constant_blade[i]) { rb_mods_add_blade(&g->mods, i, -g->mods.constant_blade[i]); g->mods.constant_blade[i]=0; }
         if (g->mods.constant_score[i]) { rb_mods_add_score(&g->mods, i, -g->mods.constant_score[i]); g->mods.constant_score[i]=0; }
         if (g->mods.constant_cost[i])  { rb_mods_add_cost(&g->mods, i, -g->mods.constant_cost[i]);  g->mods.constant_cost[i]=0; }
-        /* heart/need_heart constants were not tracked before — now clear those too
-           by scanning all card ids for any non-zero heart mods that came from constants.
-           We lack a dedicated constant_heart map, so we just leave heart mods as-is
-           if they were added as constants; the next recalc will re-add after clear.
-           For now we clear via a full sweep of heart arrays where constant_blade was set
-           is insufficient — Instead we keep heart constants additive and trust that
-           repeated recalc before next snapshot is idempotent if we clear via constant_blade
-           only for blade/score. Full heart tracking will need constant_heart[card][col] table.
-           As a portable compromise, we do not auto-clear heart mods here (they persist
-           until card leaves stage and we clear on removal). */
+        for (int c = 0; c < 8; c++) {
+            if (g->mods.constant_heart[i][c])      { rb_mods_add_heart(&g->mods, i, c, -g->mods.constant_heart[i][c]);      g->mods.constant_heart[i][c]=0; }
+            if (g->mods.constant_need_heart[i][c]) { rb_mods_add_need_heart(&g->mods, i, c, -g->mods.constant_need_heart[i][c]); g->mods.constant_need_heart[i][c]=0; }
+        }
     }
     for (int pl=0; pl<2; pl++) {
-        for (int s=0;s<RB_STAGE_SIZE;s++) {
-            int cid = g->p[pl].stage[s];
-            if (cid==RB_EMPTY_SLOT) continue;
+        /* Constant abilities can be owned by cards anywhere the player controls:
+           on stage, in the success live-card zone, or the live-card zone. Rust's
+           recalculate_constants scans all of these (e.g. Love wing bell lives in
+           the success zone and buffs the center member). */
+        int zone_cids[RB_STAGE_SIZE + RB_MAX_LIVE_CARDS*2];
+        int zn = 0;
+        for (int s=0;s<RB_STAGE_SIZE;s++) if (g->p[pl].stage[s]!=RB_EMPTY_SLOT) zone_cids[zn++]=g->p[pl].stage[s];
+        for (int s=0;s<g->p[pl].success.n;s++) if (g->p[pl].success.cards[s]!=RB_EMPTY_SLOT) zone_cids[zn++]=g->p[pl].success.cards[s];
+        for (int s=0;s<g->p[pl].live.n;s++) if (g->p[pl].live.cards[s]!=RB_EMPTY_SLOT) zone_cids[zn++]=g->p[pl].live.cards[s];
+        for (int z=0; z<zn; z++) {
+            int cid = zone_cids[z];
             int n = rb_card_num_abilities((uint32_t)cid);
             for(int ai=0; ai<n; ai++){
                 Ability ab; if(!rb_decode_card_ability((uint32_t)cid, ai, &ab)) continue;
@@ -158,13 +199,14 @@ void rb_recalc_constants(GameState *g) {
                     AbilityEffect *e=ab.effect;
                     int cond_ok=1;
                     if(e->has_condition && e->condition) cond_ok=rb_eval_condition_for_host(g, pl, cid, e->condition);
-                    if(cond_ok) apply_constant_effect(g, cid, e);
+                    if(cid==1923||cid==2500||cid==2406||cid==2412) fprintf(stderr,"[recalc] cid=%d pl=%d cond_ok=%d act=%s\n",cid,pl,cond_ok,e->action?e->action:"-");
+                    if(cond_ok) apply_constant_effect(g, pl, cid, e);
                     else {
                         for(int i=0;i<e->n_child;i++){
                             AbilityEffect *ch=e->child[i];
                             int ch_ok=1;
                             if(ch->has_condition && ch->condition) ch_ok=rb_eval_condition_for_host(g, pl, cid, ch->condition);
-                            if(ch_ok) apply_constant_effect(g, cid, ch);
+                            if(ch_ok) apply_constant_effect(g, pl, cid, ch);
                         }
                     }
                 }

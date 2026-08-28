@@ -19,6 +19,8 @@ void rb_mods_clear_card(RbMods *m, int cid) {
     m->delayed_cannot_active[cid] = 0;
     m->constant_blade[cid] = 0;
     m->constant_score[cid] = 0;
+    m->constant_cost[cid] = 0;
+    for (int c = 0; c < 8; c++) { m->constant_heart[cid][c] = 0; m->constant_need_heart[cid][c] = 0; }
     m->heart_copy[cid] = -1;
     m->heart_multiplier[cid] = -1;
     m->blade_type[cid] = -1;

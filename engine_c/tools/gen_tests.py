@@ -49,12 +49,80 @@ def collect_consts(text: str):
     m = re.findall(r'const\s+(\w+)\s*:\s*&str\s*=\s*"([^"]+)"', text)
     return dict(m)
 
+HEART_IDX = {"Heart00":"0","Heart01":"1","Heart02":"2","Heart03":"3",
+               "Heart04":"4","Heart05":"5","Heart06":"6","Heart07":"7"}
+
+def map_modifier_expr(expr: str, func_name: str):
+    """Map a Rust modifier accessor expression to a C expression, or None."""
+    e = expr.strip()
+    m = re.match(r'game\.state\.mods\.get_cost_modifier\((\w+)\)', e)
+    if m: return f'rb_mods_get_cost(&tg.state.mods, {m.group(1)})'
+    m = re.match(r'game\.state\.mods\.get_score_modifier\((\w+)\)', e)
+    if m: return f'rb_mods_get_score(&tg.state.mods, {m.group(1)})'
+    m = re.match(r'game\.state\.mods\.get_blade_modifier\((\w+)\)', e)
+    if m: return f'rb_mods_get_blade(&tg.state.mods, {m.group(1)})'
+    m = re.match(r'game\.state\.mods\.get_heart_modifier\((\w+)\s*,\s*HeartColor::Heart(\d+)', e)
+    if m: return f'rb_mods_get_heart(&tg.state.mods, {m.group(1)}, {int(m.group(2))})'
+    # player field access: game.state.playerN.field
+    m = re.match(r'game\.state\.player(\d+)\.(\w+)', e)
+    if m: return f'tg.state.p[{int(m.group(1))-1}].{m.group(2)}'
+    # plain identifier (a previously-fetched local)
+    if re.match(r'^\w+$', e): return e
+    return None
+
+def merge_asserts(lines):
+    """Merge multi-line assert_eq! blocks into single logical lines."""
+    out = []
+    buf = []
+    depth = 0
+    for raw in lines:
+        line = raw.rstrip('\n')
+        if not buf and 'assert_eq!' not in line and 'assert!' not in line:
+            out.append(line)
+            continue
+        if not buf:
+            buf.append(line)
+            depth = line.count('(') - line.count(')')
+            if depth <= 0:
+                out.append(buf.pop())
+            continue
+        buf.append(line)
+        depth += line.count('(') - line.count(')')
+        if depth <= 0:
+            out.append(" ".join(seg.strip() for seg in buf))
+            buf = []
+    if buf:
+        out.append(" ".join(seg.strip() for seg in buf))
+    return out
+
+KNOWN_PLAYER_FIELDS = {"energy_active", "score"}
+
 def transpile_body(body: str, consts: dict, func_name: str) -> str:
-    lines = body.split('\n')
+    raw_lines = body.split('\n')
+    lines = merge_asserts(raw_lines)
     out = []
     seen_tg = False
-    # track declared vars to avoid redecl
     declared = set()
+    unresolved = False
+
+    def emit_game_id(var, card):
+        nonlocal unresolved
+        if var not in declared:
+            out.append(f'    int {var} = test_id(&tg, "{card}");')
+            declared.add(var)
+        else:
+            out.append(f'    {var} = test_id(&tg, "{card}");')
+
+    def assert_resolvable(rust_expr):
+        e = rust_expr.strip()
+        m = re.match(r'game\.state\.mods\.get_(\w+)_modifier\((\w+)\)', e)
+        if m: return m.group(2) in declared
+        m = re.match(r'game\.state\.mods\.get_heart_modifier\((\w+)\s*,\s*HeartColor::Heart(\d+)', e)
+        if m: return m.group(1) in declared
+        m = re.match(r'game\.state\.player(\d+)\.(\w+)', e)
+        if m: return m.group(2) in KNOWN_PLAYER_FIELDS
+        return re.match(r'^\w+$', e) is not None and e in declared
+
     for line in lines:
         stripped = line.strip()
         if not stripped or stripped.startswith("//"):
@@ -63,72 +131,85 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         if 'load_real_database' in line:
             out.append("    // db loaded via rb_load")
             continue
-        # TestGame::new - handle once per function
         if 'TestGame::new' in line:
             if not seen_tg:
                 out.append("    TestGame tg; test_game_new(&tg);")
                 seen_tg = True
             else:
-                # second game in same test - create tg2
                 out.append("    TestGame tg2; test_game_new(&tg2); // second game (rare)")
+            continue
+        # modifier-let assignment: let X = game.state.mods.get_X_modifier(...)
+        m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*game\.state\.mods\.get_cost_modifier\((\w+)\)', line)
+        if m:
+            v, arg = m.group(1), m.group(2)
+            if arg not in declared:
+                unresolved = True; continue
+            if v not in declared:
+                out.append(f'    int {v} = rb_mods_get_cost(&tg.state.mods, {arg});'); declared.add(v)
+            else:
+                out.append(f'    {v} = rb_mods_get_cost(&tg.state.mods, {arg});')
+            continue
+        m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*game\.state\.mods\.get_score_modifier\((\w+)\)', line)
+        if m:
+            v, arg = m.group(1), m.group(2)
+            if arg not in declared:
+                unresolved = True; continue
+            if v not in declared:
+                out.append(f'    int {v} = rb_mods_get_score(&tg.state.mods, {arg});'); declared.add(v)
+            else:
+                out.append(f'    {v} = rb_mods_get_score(&tg.state.mods, {arg});')
+            continue
+        m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*game\.state\.mods\.get_blade_modifier\((\w+)\)', line)
+        if m:
+            v, arg = m.group(1), m.group(2)
+            if arg not in declared:
+                unresolved = True; continue
+            if v not in declared:
+                out.append(f'    int {v} = rb_mods_get_blade(&tg.state.mods, {arg});'); declared.add(v)
+            else:
+                out.append(f'    {v} = rb_mods_get_blade(&tg.state.mods, {arg});')
+            continue
+        m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*game\.state\.mods\.get_heart_modifier\((\w+)\s*,\s*HeartColor::Heart(\d+)\)', line)
+        if m:
+            v, arg, hc = m.group(1), m.group(2), int(m.group(3))
+            if arg not in declared:
+                unresolved = True; continue
+            if v not in declared:
+                out.append(f'    int {v} = rb_mods_get_heart(&tg.state.mods, {arg}, {hc});'); declared.add(v)
+            else:
+                out.append(f'    {v} = rb_mods_get_heart(&tg.state.mods, {arg}, {hc});')
             continue
         m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*game\.id\("([^"]+)"\)', line)
         if m:
-            var, card = m.group(1), m.group(2)
-            if var not in declared:
-                out.append(f'    int {var} = test_id(&tg, "{card}");')
-                declared.add(var)
-            else:
-                out.append(f'    {var} = test_id(&tg, "{card}");')
-            continue
+            emit_game_id(m.group(1), m.group(2)); continue
         m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*game\.id\((\w+)\)', line)
         if m:
             var, const_name = m.group(1), m.group(2)
             card = consts.get(const_name, const_name)
-            # if const not found, try to use as is (might be variable)
             if card.startswith("PL!") or card.startswith("LL-"):
-                if var not in declared:
-                    out.append(f'    int {var} = test_id(&tg, "{card}");')
-                    declared.add(var)
-                else:
-                    out.append(f'    {var} = test_id(&tg, "{card}");')
+                emit_game_id(var, card)
             else:
                 out.append(f"    // TODO game.id({const_name}) -> {stripped}")
             continue
         m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*game\.new_id\("([^"]+)"\)', line)
         if m:
-            var, card = m.group(1), m.group(2)
-            if var not in declared:
-                out.append(f'    int {var} = test_id(&tg, "{card}");')
-                declared.add(var)
-            else:
-                out.append(f'    {var} = test_id(&tg, "{card}");')
-            continue
+            emit_game_id(m.group(1), m.group(2)); continue
         m = re.match(r'\s*let\s+(?:mut\s+)?(\w+)\s*=\s*game\.new_id\((\w+)\)', line)
         if m:
             var, const_name = m.group(1), m.group(2)
             card = consts.get(const_name, const_name)
             if card.startswith("PL!") or card.startswith("LL-"):
-                if var not in declared:
-                    out.append(f'    int {var} = test_id(&tg, "{card}");')
-                    declared.add(var)
-                else:
-                    out.append(f'    {var} = test_id(&tg, "{card}");')
+                emit_game_id(var, card)
             else:
                 out.append(f"    // TODO new_id({const_name})")
             continue
-        # destructuring let (a,b) = setup... -> skip
         if re.match(r'\s*let\s*\(.*\)\s*=', line):
-            out.append(f"    // TODO destructuring: {stripped}")
-            continue
+            out.append(f"    // TODO destructuring: {stripped}"); continue
         if 'setup_cards' in line:
-            out.append(f"    // TODO setup_cards: {stripped}")
-            continue
-        # stage assignment
+            out.append(f"    // TODO setup_cards: {stripped}"); continue
         m = re.search(r'game\.state\.player1\.stage\.stage\s*=\s*\[([^\]]+)\]', line)
         if m:
-            arr = m.group(1)
-            elems = [e.strip() for e in arr.split(',')]
+            elems = [e.strip() for e in m.group(1).split(',')]
             for i, e in enumerate(elems):
                 if e == '-1':
                     out.append(f"    tg.state.p[0].stage[{i}] = -1;")
@@ -137,47 +218,46 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
             continue
         m = re.search(r'game\.state\.player1\.stage\.stage\[(\d+)\]\s*=\s*([^;]+);', line)
         if m:
-            idx, val = m.group(1), m.group(2).strip().rstrip(';')
-            out.append(f"    tg.state.p[0].stage[{idx}] = {val};")
-            continue
+            out.append(f"    tg.state.p[0].stage[{m.group(1)}] = {m.group(2).strip().rstrip(';')};"); continue
         m = re.search(r'game\.add_to_stage\(MemberArea::(\w+),\s*(\w+)\)', line)
         if m:
-            area_map = {"Left":"0","Center":"1","Right":"2"}
-            area = area_map.get(m.group(1), "1")
+            area = {"Left":"0","Center":"1","Right":"2"}.get(m.group(1), "1")
             var = m.group(2)
-            out.append(f"    test_add_to_stage(&tg, {area}, {var});")
-            continue
+            if var not in declared:
+                unresolved = True; continue
+            out.append(f"    test_add_to_stage(&tg, {area}, {var});"); continue
         if 'live_card_zone.cards.push' in line:
-            m = re.search(r'push\((\w+)\)', line)
-            if m:
-                out.append(f"    test_add_to_live(&tg, {m.group(1)});")
-                continue
+            mm = re.search(r'push\((\w+)\)', line)
+            if mm:
+                if mm.group(1) not in declared: unresolved = True; continue
+                out.append(f"    test_add_to_live(&tg, {mm.group(1)});"); continue
         if 'success_live_card_zone.cards.push' in line or ('success' in line and '.cards.push' in line):
-            m = re.search(r'push\((\w+)\)', line)
-            if m:
-                out.append(f"    test_add_to_success(&tg, {m.group(1)});")
-                continue
+            mm = re.search(r'push\((\w+)\)', line)
+            if mm:
+                if mm.group(1) not in declared: unresolved = True; continue
+                out.append(f"    test_add_to_success(&tg, {mm.group(1)});"); continue
         if 'hand.cards.push' in line:
-            m = re.search(r'push\((\w+)\)', line)
-            if m:
-                out.append(f"    test_add_to_hand(&tg, {m.group(1)});")
-                continue
+            mm = re.search(r'push\((\w+)\)', line)
+            if mm:
+                if mm.group(1) not in declared: unresolved = True; continue
+                out.append(f"    test_add_to_hand(&tg, {mm.group(1)});"); continue
         if 'main_deck.cards.push' in line or 'deck.cards.push' in line:
-            m = re.search(r'push\((\w+)\)', line)
-            if m:
-                out.append(f"    test_add_to_deck(&tg, {m.group(1)});")
-                continue
+            mm = re.search(r'push\((\w+)\)', line)
+            if mm:
+                if mm.group(1) not in declared: unresolved = True; continue
+                out.append(f"    test_add_to_deck(&tg, {mm.group(1)});"); continue
         m = re.search(r'game\.give_energy\((\d+)\)', line)
         if m:
-            out.append(f"    test_give_energy(&tg, {m.group(1)});")
-            continue
+            out.append(f"    test_give_energy(&tg, {m.group(1)});"); continue
         if 'recalculate_constants' in line:
-            out.append("    test_recalc(&tg);")
-            continue
+            out.append("    test_recalc(&tg);"); continue
         m = re.search(r'clear_all_for_card\((\w+)\)', line)
         if m:
-            out.append(f"    test_clear_mods_for_card(&tg, {m.group(1)});")
-            continue
+            out.append(f"    test_clear_mods_for_card(&tg, {m.group(1)});"); continue
+        if 'add_orientation_modifier' in line:
+            mm = re.search(r'add_orientation_modifier\((\w+),\s*"([^"]+)"\)', line)
+            if mm:
+                out.append(f'    rb_mods_set_orientation(&tg.state.mods, {mm.group(1)}, "{mm.group(2)}");'); continue
         if '.cards.pop()' in line:
             if 'success' in line:
                 out.append("    if (tg.state.p[0].success.n>0) tg.state.p[0].success.n--;")
@@ -195,47 +275,30 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
                 out.append("    // clear")
             continue
         if 'assert_eq!' in line:
-            if 'get_cost_modifier' in line:
-                m2 = re.search(r'get_cost_modifier\((\w+)\)', line)
-                var = m2.group(1) if m2 else "cid"
-                m3 = re.search(r',\s*(-?\d+)\s*[,\)]', line)
-                if not m3:
-                    m3 = re.search(r'assert_eq!\(\s*\w+,\s*(-?\d+)', line)
-                expected = m3.group(1) if m3 else "0"
-                out.append(f'    CHECK_EQ(rb_mods_get_cost(&tg.state.mods, {var}), {expected}, "{func_name} cost");')
+            mm = re.search(r'assert_eq!\s*\(\s*(.+?)\s*,\s*(-?\d+)\s*(?:,\s*"[^"]*"\s*)?\)', line, re.DOTALL)
+            if mm:
+                expr, expected = mm.group(1).strip(), mm.group(2)
+                cexpr = map_modifier_expr(expr, func_name)
+                if cexpr is not None and assert_resolvable(expr):
+                    out.append(f'    CHECK_EQ({cexpr}, {expected}, "{func_name}");')
+                    continue
+                unresolved = True
+                out.append(f"    // TODO assert_eq (unresolved): {stripped}")
                 continue
-            if 'get_heart_modifier' in line:
-                m2 = re.search(r'get_heart_modifier\((\w+)', line)
-                var = m2.group(1) if m2 else "cid"
-                # find expected - handle assert_eq!(..., 1) or ..., 1,
-                m3 = re.search(r',\s*(-?\d+)\s*[,\)]', line)
-                if not m3:
-                    m3 = re.search(r'heart[^\d]*\s*(-?\d+)', line)
-                expected = m3.group(1) if m3 else "0"
-                hc_idx = "0"
-                if "Heart03" in line: hc_idx = "3"
-                elif "Heart00" in line: hc_idx = "0"
-                elif "Heart01" in line: hc_idx = "1"
-                elif "Heart02" in line: hc_idx = "2"
-                elif "Heart04" in line: hc_idx = "4"
-                elif "Heart05" in line: hc_idx = "5"
-                elif "Heart06" in line: hc_idx = "6"
-                elif "Heart07" in line: hc_idx = "7"
-                out.append(f'    CHECK_EQ(rb_mods_get_heart(&tg.state.mods, {var}, {hc_idx}), {expected}, "{func_name} heart");')
-                continue
-            if 'get_score' in line:
-                out.append(f"    // TODO score assert: {stripped}")
-                continue
+            unresolved = True
             out.append(f"    // TODO assert_eq: {stripped}")
             continue
         if 'assert!' in line:
             out.append(f"    // TODO assert: {stripped}")
             continue
-        # fallback
         out.append(f"    // TODO: {stripped}")
     if not seen_tg:
-        # ensure tg exists if body didn't create it (should not happen for simple)
         out.insert(0, "    TestGame tg; test_game_new(&tg);")
+    if unresolved:
+        # Conservative: skip fns whose assertions reference untranspiled locals
+        # or unsupported struct fields — emit a no-op stub with no CHECK_EQ so
+        # the caller skips it rather than producing a false-positive / broken build.
+        return "    TestGame tg; test_game_new(&tg);\n    // SKIPPED: unresolved references in " + func_name
     return "\n".join(out)
 
 def main():
@@ -268,8 +331,10 @@ static int failures=0;
 
     body_parts = []
     generated = 0
-    # cap to keep compile reasonable, prioritize smallest files first
-    for path in sorted(simple, key=lambda p: len(extract_tests(p)))[:20]:
+    # prioritize smallest files first so the batch fills with easy wins;
+    # cap raised to cover the whole simple cohort (262 fns → up to FN_CAP)
+    FN_CAP = 250
+    for path in sorted(simple, key=lambda p: len(extract_tests(p))):
         text = path.read_text(encoding="utf-8", errors="ignore")
         consts = collect_consts(text)
         rel = path.relative_to(SRC)
@@ -288,9 +353,7 @@ static int failures=0;
             # skip if body has unsupported heavy patterns within the test itself
             if "place_tang" in body or "TANG" in body:
                 continue
-            if name in ("erena_p_variant_wait_gains_heart", "erena_wait_then_active_loses_heart"):
-                # TODO state wait condition for erena (stage_wait) — eval_state needs host wait handling
-                continue
+            # erena wait-state now handled via rb_mods_set_orientation
             # fixed: highest_cost_on_stage now implemented via host-aware eval
             # need at least one game.id with literal or const we can resolve
             cname = sanitize_c_name(name)
@@ -301,9 +364,9 @@ static int failures=0;
             func = f"static void gen_{cname}(void){{\n{c_body}\n}}\n"
             body_parts.append(f"// {rel}::{name}\n" + func)
             generated += 1
-            if generated >= 60:
+            if generated >= FN_CAP:
                 break
-        if generated >= 60:
+        if generated >= FN_CAP:
             break
 
     body_parts.append("""

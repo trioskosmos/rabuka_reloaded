@@ -216,6 +216,27 @@ static int eval_highest_cost(const struct GameState *g, int actor, int host_cid,
     return eval_operator(center_cost, op, max_other);
 }
 
+/* Mirror engine/src/ability/condition/card.rs:evaluate_position_condition.
+   target defaults to "self"; resolve to a player; check that the player's
+   stage slot for the given position is occupied. */
+static int resolve_target_player(int actor, const Condition *c) {
+    const char *t = get_str(c, "target");
+    if (t && !strcmp(t, "opponent")) return 1 - actor;
+    return actor; /* "self" or default */
+}
+static int eval_position(const struct GameState *g, int actor, const Condition *c) {
+    int pl = resolve_target_player(actor, c);
+    const RbPlayer *P = &g->p[pl];
+    const char *pos = get_str(c, "position");
+    if (!pos) return 1;
+    if (!strcmp(pos, "center"))    return P->stage[1] != RB_EMPTY_SLOT;
+    if (!strcmp(pos, "left_side")) return P->stage[0] != RB_EMPTY_SLOT;
+    if (!strcmp(pos, "right_side"))return P->stage[2] != RB_EMPTY_SLOT;
+    if (!strcmp(pos, "any"))
+        return P->stage[0] != RB_EMPTY_SLOT || P->stage[1] != RB_EMPTY_SLOT || P->stage[2] != RB_EMPTY_SLOT;
+    return 1;
+}
+
 static int eval_comparison_inner(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     const char *loc = get_str(c, "location");
     const char *agg = get_str(c, "aggregate");
@@ -250,7 +271,7 @@ static int eval_comparison_inner(const struct GameState *g, int actor, int host_
         return eval_operator(sum, op, thr);
     }
     const char *pos = get_str(c, "position");
-    if (pos && !strcmp(pos, "center") && loc && !strcmp(loc, "stage") && host_cid >= 0) {
+    if (pos && !strcmp(pos, "center") && loc && !strcmp(loc, "stage")) {
         return eval_highest_cost(g, actor, host_cid, c);
     }
     if (loc) return eval_location(g, actor, c);
@@ -446,6 +467,10 @@ static int eval_complex(const struct GameState *g, int actor, const Condition *c
 static int eval_condition_inner_host(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     if (!c) return 1;
     int negation=0; get_bool(c,"negation",&negation);
+    { const char *dp=get_str(c,"position"), *dl=get_str(c,"location"), *dc=get_str(c,"comparison_type"),
+        *dt=get_str(c,"target"), *dcs=get_str(c,"check_self");
+      if(dp&&!strcmp(dp,"center")) fprintf(stderr,"[cond] v=%d pos=center loc=%s cmptype=%s target=%s checkself=%s\n",
+          c->variant, dl?dl:"-", dc?dc:"-", dt?dt:"-", dcs?dcs:"-"); }
     int r=1;
     switch (c->variant) {
         case 0:  r = eval_compound(g, actor, c); break;
@@ -461,7 +486,7 @@ static int eval_condition_inner_host(const struct GameState *g, int actor, int h
         case 10: r = eval_score(g, actor, c); break;
         case 11: r = eval_choice(g, actor, c); break;
         case 12: r = eval_complex(g, actor, c); break;
-        case 13: /* PositionCond */ r = eval_location(g, actor, c); break;
+        case 13: /* PositionCond */ r = eval_position(g, actor, c); break;
         case 14: /* OpponentChoice */ r = 1; break;
         case 15: /* OpponentLiveSuccess */ r = 0; break;
         case 16: /* NoExcessHeart */ r = eval_no_excess(g, actor, c); break;

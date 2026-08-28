@@ -133,6 +133,8 @@ typedef struct {
     int16_t         constant_blade[RB_MAX_CARD_IDS];
     int16_t         constant_score[RB_MAX_CARD_IDS];
     int16_t         constant_cost[RB_MAX_CARD_IDS];
+    int16_t         constant_heart[RB_MAX_CARD_IDS][8];  /* per-color, cleared on recalc */
+    int16_t         constant_need_heart[RB_MAX_CARD_IDS][8];
     int16_t         heart_copy[RB_MAX_CARD_IDS];   /* target→source */
     int8_t          heart_multiplier[RB_MAX_CARD_IDS]; /* -1 none, else colour 0..7 */
     int8_t          blade_type[RB_MAX_CARD_IDS];   /* -1 none, else BladeColor idx */
