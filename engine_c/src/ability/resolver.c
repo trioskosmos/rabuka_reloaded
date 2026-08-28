@@ -29,11 +29,37 @@ int rb_can_activate_effect(const GameState *g, int actor, const AbilityEffect *e
 }
 
 /* Mirror resolver.rs:get_trigger_ability_infos — collect abilities whose
-   trigger matches `trigger`. Fills out (cap max), returns count. */
+   trigger matches `trigger` across the actor's controlled zones. Fills out
+   (cap max), returns the count. */
 int rb_resolver_trigger_infos(const GameState *g, int actor, const char *trigger,
-                              AbilityInfo *out, int max) {
-    (void)g; (void)actor; (void)trigger; (void)out; (void)max;
-    return 0;
+                               AbilityInfo *out, int max) {
+    if (!g || !trigger || !out || max <= 0) return 0;
+    int n = 0;
+    const RbPlayer *P = &g->p[actor];
+    /* stage, success, live, hand, energy */
+    int zone[RB_STAGE_SIZE + RB_MAX_LIVE_CARDS*2 + RB_MAX_HAND + RB_MAX_ENERGY_CARDS];
+    int zn = 0;
+    for (int s = 0; s < RB_STAGE_SIZE; s++) if (P->stage[s] >= 0) zone[zn++] = P->stage[s];
+    for (int s = 0; s < P->success.n; s++) zone[zn++] = P->success.cards[s];
+    for (int s = 0; s < P->live.n; s++)    zone[zn++] = P->live.cards[s];
+    for (int s = 0; s < P->hand.n; s++)    zone[zn++] = P->hand.cards[s];
+    for (int s = 0; s < P->energy.n; s++)  zone[zn++] = P->energy.cards[s];
+    for (int z = 0; z < zn && n < max; z++) {
+        int cid = zone[z];
+        int nab = rb_card_num_abilities((uint32_t)cid);
+        for (int a = 0; a < nab && n < max; a++) {
+            Ability ab;
+            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+            if (rb_ability_matches_trigger(&ab, trigger)) {
+                out[n].cid = cid;
+                out[n].ability_idx = a;
+                out[n].trigger = trigger;
+                n++;
+            }
+            rb_free_ability(&ab);
+        }
+    }
+    return n;
 }
 
 /* Mirror resolver.rs:resolve_ability — run a single ability's effects. */
