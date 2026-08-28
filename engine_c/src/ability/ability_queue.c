@@ -12,6 +12,15 @@ int rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx) {
 }
 void rb_queue_clear(RbAbilityQueue *q) { if (q) { memset(q, 0, sizeof(*q)); } }
 int rb_queue_has_pending(const RbAbilityQueue *q) { return q && q->n_entries > 0; }
+RbQueueState rb_queue_state(const RbAbilityQueue *q) {
+    return q ? q->state : RB_QUEUE_IDLE;
+}
+void rb_queue_set_state(RbAbilityQueue *q, RbQueueState s) {
+    if (q) q->state = s;
+}
+void rb_choice_set_route(RbChoice *ch, RbChoiceRoute r) {
+    if (ch) ch->route = r;
+}
 
 int rb_use_limit_reached(RbAbilityQueue *q, int card_id, int ability_idx, int limit, int cur_turn) {
     if (!q || limit <= 0) return 0;
@@ -53,6 +62,8 @@ int rb_owner_of_card(const GameState *g, int cid) {
    Mirror ability_queue.rs drain + execute path. */
 int rb_drain_ability_queue(GameState *g) {
     if (!g) return 0;
+    if (g->queue.n_entries == 0) { rb_queue_set_state(&g->queue, RB_QUEUE_IDLE); return 0; }
+    rb_queue_set_state(&g->queue, RB_QUEUE_RESOLVING);
     int ran = 0;
     for (int i = 0; i < g->queue.n_entries; i++) {
         RbQueueEntry *e = &g->queue.entries[i];
@@ -67,7 +78,16 @@ int rb_drain_ability_queue(GameState *g) {
         if (ab.effect) rb_execute_effect_ex(g, actor, ab.effect, e->card_id);
         rb_free_ability(&ab);
         ran++;
-        if (rb_has_pending_choice(g)) break;
+        if (rb_has_pending_choice(g)) {
+            /* yield to host; resume re-enters the loop (FSM stays AwaitingChoice
+               until the choice resolves and the queue is drained again). */
+            rb_queue_set_state(&g->queue, RB_QUEUE_AWAITING_CHOICE);
+            break;
+        }
     }
+    if (rb_queue_state(&g->queue) == RB_QUEUE_RESOLVING)
+        rb_queue_set_state(&g->queue, RB_QUEUE_DRAINING);
+    if (g->queue.n_entries > 0 && !rb_has_pending_choice(g))
+        rb_queue_set_state(&g->queue, RB_QUEUE_IDLE);
     return ran;
 }

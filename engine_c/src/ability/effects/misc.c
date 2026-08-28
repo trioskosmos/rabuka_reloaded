@@ -79,20 +79,55 @@ static int h_rotation(GameState *g, int actor, const AbilityEffect *e) {
     return 0;
 }
 static int h_place_energy_under_member(GameState *g, int actor, const AbilityEffect *e) {
-    (void)g; (void)actor; (void)e;
-    return 1; /* TODO: tuck energy under a member */
+    /* Mirror misc.rs place_energy_under_member — tuck `count` energy cards
+       under a stage member (under_cards[area]). They leave the energy zone. */
+    RbPlayer *P = &g->p[actor];
+    int area = 1; /* center */
+    const char *dest = e->destination && *e->destination ? e->destination : e->target;
+    if (dest && *dest) area = rb_pos_to_area(dest);
+    if (area < 0 || area >= RB_STAGE_SIZE) area = 1;
+    if (P->stage[area] < 0) return 0; /* no member to tuck under */
+    int n = e->count > 0 ? e->count : 1;
+    int moved = 0;
+    while (moved < n && P->energy.n > 0) {
+        int cid = P->energy.cards[--P->energy.n];
+        if (P->under_cards[area].n < RB_MAX_ZONE)
+            P->under_cards[area].cards[P->under_cards[area].n++] = cid;
+        moved++;
+    }
+    return 1;
 }
 static int h_play_baton_touch(GameState *g, int actor, const AbilityEffect *e) {
     (void)g; (void)actor; (void)e;
-    return 1; /* TODO: baton touch redirect */
+    /* Mirror misc.rs play_baton_touch — interactive baton-redirect gate.
+       Headless auto-play has no opponent to redirect to, so this is a
+       permissive no-op (the redirected play is simply allowed). */
+    return 1;
 }
 static int h_re_yell(GameState *g, int actor, const AbilityEffect *e) {
-    (void)g; (void)actor; (void)e;
-    return 1; /* TODO: re-yell trigger */
+    (void)actor; (void)e;
+    /* Mirror misc.rs re_yell — re-run the live yell pool. Signals live.c's
+       two-pass rebuild (g->re_yell_occurred) so hearts harvested by
+       perform_yell are re-applied to the success check. */
+    g->re_yell_occurred = 1;
+    return 1;
 }
 static int h_perform_yell(GameState *g, int actor, const AbilityEffect *e) {
-    (void)g; (void)actor; (void)e;
-    return 1; /* TODO: perform yell */
+    (void)e;
+    /* Mirror misc.rs perform_yell — finalize the current yell, harvesting the
+       yelled member's blade into the live pool. The yelled cards are the
+       actor's currently-staged live cards; sum their effective blade into the
+       re_yell harvest that live.c's two-pass rebuild re-applies. */
+    RbPlayer *P = &g->p[actor];
+    for (int i = 0; i < P->live.n; i++) {
+        Card c; if (rb_decode_card_by_index((uint32_t)P->live.cards[i], &c)) {
+            int blade = (int)c.blade + rb_mods_get_blade(&g->mods, P->live.cards[i]);
+            if (blade > 0) g->re_yell_blade_hearts[RB_HEART_PINK] += blade;
+            rb_free_card(&c);
+        }
+    }
+    g->re_yell_occurred = 1;
+    return 1;
 }
 static int h_shuffle(GameState *g, int actor, const AbilityEffect *e) {
     /* Mirror misc.rs shuffle — Fisher-Yates shuffle of the named zone

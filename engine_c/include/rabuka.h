@@ -303,6 +303,25 @@ typedef enum {
     RB_CHOICE_SELECT_HEART_COLOR
 } RbChoiceKind;
 
+/* ChoiceRoute — mirrors engine/src/ability/types.rs::ChoiceRoute. Tags which
+   cost/choice gate produced a pending choice so resume can route correctly. */
+typedef enum {
+    RB_ROUTE_NONE = 0,
+    RB_ROUTE_OPTIONAL_COST,   /* pay/skip an optional cost */
+    RB_ROUTE_CHOICE_COST,     /* a ChoiceCondition cost option */
+    RB_ROUTE_SELECT_CARDS,    /* select_cards / look_and_select */
+    RB_ROUTE_SELECT_TARGET,   /* select_target (position/destination) */
+    RB_ROUTE_CONDITIONAL_CHOICE
+} RbChoiceRoute;
+
+/* QueueState — mirrors engine/src/ability_queue.rs::QueueState FSM. */
+typedef enum {
+    RB_QUEUE_IDLE = 0,
+    RB_QUEUE_RESOLVING,
+    RB_QUEUE_AWAITING_CHOICE,
+    RB_QUEUE_DRAINING
+} RbQueueState;
+
 typedef struct {
     RbChoiceKind kind;
     char zone[32];        /* e.g. "hand", "looked_at" */
@@ -311,6 +330,7 @@ typedef struct {
     int  allow_skip;      /* 1 = may skip */
     char target[64];      /* for SELECT_TARGET: "pay_optional_cost:skip..." etc. */
     char description[128];
+    RbChoiceRoute route;  /* which gate produced this choice (ChoiceRoute) */
 } RbChoice;
 
 typedef struct {
@@ -335,13 +355,17 @@ typedef struct {
     int      use_counts[RB_USE_TRACK];
     int      n_uses;
     int      use_turn;         /* turn number for which use_keys are valid */
+    RbQueueState state;        /* QueueState FSM (Idle/Resolving/AwaitingChoice/Draining) */
 } RbAbilityQueue;
 
 int  rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx);
 void rb_queue_clear(RbAbilityQueue *q);
 int  rb_queue_has_pending(const RbAbilityQueue *q);
+RbQueueState rb_queue_state(const RbAbilityQueue *q);
+void rb_queue_set_state(RbAbilityQueue *q, RbQueueState s);
 int rb_use_limit_reached(RbAbilityQueue *q, int card_id, int ability_idx, int limit, int cur_turn);
 void rb_record_use(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn);
+void rb_choice_set_route(RbChoice *ch, RbChoiceRoute r);
 
 typedef struct {
     int player; /* 0/1 */
