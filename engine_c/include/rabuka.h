@@ -455,6 +455,7 @@ int  rb_perform_live(GameState *g, int pl);
 void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e);
+int  rb_looked_at_pool(int pl, int *out_ids, int max);
 void rb_gain_ability(GameState *g, int actor, AbilityEffect *e);
 void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e);
 void rb_look_clear(int pl);

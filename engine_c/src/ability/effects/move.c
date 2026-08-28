@@ -74,7 +74,9 @@ void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e){
     RbPlayer *A=&g->p[actor^ (e->target && !strcmp(e->target,"opponent")?1:0)];
     (void)actor;
     int src_ids[RB_MAX_ZONE]; int ns=0;
-    if(relay){
+    if(!strcmp(src_s,"looked_at")||!strcmp(src_s,"looked_at_remaining")){
+        ns = rb_looked_at_pool(actor, src_ids, RB_MAX_ZONE);
+    } else if(relay){
         for(int i=0;i<g->n_recently_moved;i++) src_ids[ns++]=g->recently_moved[i];
     } else {
         RbZone src=RB_ZONE_HAND; rb_zone_of_str(src_s,&src);

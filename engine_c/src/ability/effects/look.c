@@ -8,16 +8,27 @@
    goes to destination (usually discard or deck). Full keep_shuffle_under
    2-phase lands with the 20-fixture harness. */
 
-#define MAX_LOOKED 16
+#define MAX_LOOKED 64
 typedef struct {
     int cards[MAX_LOOKED];
     int n;
     int from_deck; /* 1 if pool came from deck top */
+    int owner;     /* player whose cards are in the pool */
 } LookPool;
 
 static LookPool g_look[2]; /* per-player */
 
-void rb_look_clear(int pl){ g_look[pl].n=0; g_look[pl].from_deck=0; }
+void rb_look_clear(int pl){ g_look[pl].n=0; g_look[pl].from_deck=0; g_look[pl].owner=pl; }
+
+/* Expose the looked_at pool for relay references (move_cards source
+   "looked_at" / "looked_at_remaining", mirroring engine/src/ability/look.rs
+   looked_at relay pool). Returns the count, fills out_ids (cap max). */
+int rb_looked_at_pool(int pl, int *out_ids, int max){
+    LookPool *lp=&g_look[pl];
+    int n = lp->n < max ? lp->n : max;
+    for(int i=0;i<n;i++) out_ids[i]=lp->cards[i];
+    return n;
+}
 
 void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e){
     int cnt = e->count>=0? e->count:1;
@@ -25,7 +36,7 @@ void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e){
     if(e->target && !strcmp(e->target,"opponent")) who=actor^1;
     RbPlayer *P=&g->p[who];
     LookPool *lp=&g_look[who];
-    lp->n=0; lp->from_deck=0;
+    lp->n=0; lp->from_deck=0; lp->owner=who;
     const char *src = e->source ? e->source : "deck";
     int from_deck = !strcmp(src,"deck")||!strcmp(src,"deck_top");
     lp->from_deck = from_deck;
@@ -52,32 +63,45 @@ void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, zone, ctype, cnt, e->is_optional?1:0, NULL);
 }
 
-/* Called when host resumes SELECT_CARD — move chosen card to destination */
+/* Called when host resumes SELECT_CARD — move chosen card to destination.
+   Mirrors engine/src/ability/look.rs keep_shuffle_under: cards that came
+   from the deck and were NOT kept are shuffled back into the owner's deck
+   (under), not discarded; hand-sourced cards return to hand; the rest go to
+   the destination / discard. */
 void rb_look_resume(GameState *g, int actor, int selected_idx, const char *destination){
-    int who=actor;
-    LookPool *lp=&g_look[who];
+    LookPool *lp=&g_look[actor];
+    int who = lp->owner;
+    RbPlayer *P=&g->p[who];
     if(selected_idx<0 || selected_idx>=lp->n){
-        /* skip: return all to discard/deck */
-        for(int i=0;i<lp->n;i++){
-            RbPlayer *P=&g->p[who];
-            if(P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++]=lp->cards[i];
+        /* skip: every looked card returns to its origin (deck→shuffle under,
+           hand→hand) */
+        if(lp->from_deck){
+            for(int i=0;i<lp->n;i++) if(P->deck.n < RB_MAX_ZONE) P->deck.cards[P->deck.n++]=lp->cards[i];
+            rb_shuffle(P->deck.cards, P->deck.n);
+        } else {
+            for(int i=0;i<lp->n;i++) if(P->hand.n < RB_MAX_ZONE) P->hand.cards[P->hand.n++]=lp->cards[i];
         }
         lp->n=0; return;
     }
     int chosen=lp->cards[selected_idx];
-    RbPlayer *P=&g->p[who];
     RbZone dst=RB_ZONE_HAND;
     if(destination) rb_zone_of_str(destination,&dst);
-    else dst=RB_ZONE_HAND;
     RbBag *db=NULL;
     if(dst==RB_ZONE_HAND) db=&P->hand;
     else if(dst==RB_ZONE_DISCARD) db=&P->discard;
     else if(dst==RB_ZONE_DECK) db=&P->deck;
     else if(dst==RB_ZONE_STAGE) db=NULL; /* stage placement handled via play */
     if(db && db->n < RB_MAX_ZONE) db->cards[db->n++]=chosen;
-    /* remaining go to discard (looked_at_remaining) */
-    for(int i=0;i<lp->n;i++) if(i!=selected_idx){
-        if(P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++]=lp->cards[i];
+    /* remaining: deck-sourced shuffle back under; otherwise to discard */
+    if(lp->from_deck){
+        for(int i=0;i<lp->n;i++) if(i!=selected_idx){
+            if(P->deck.n < RB_MAX_ZONE) P->deck.cards[P->deck.n++]=lp->cards[i];
+        }
+        rb_shuffle(P->deck.cards, P->deck.n);
+    } else {
+        for(int i=0;i<lp->n;i++) if(i!=selected_idx){
+            if(P->discard.n < RB_MAX_ZONE) P->discard.cards[P->discard.n++]=lp->cards[i];
+        }
     }
     lp->n=0;
 }
