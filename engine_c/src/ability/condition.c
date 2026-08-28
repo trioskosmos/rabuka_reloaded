@@ -773,12 +773,28 @@ static int eval_condition_inner_host(const struct GameState *g, int actor, int h
         case RB_COND_CHOICE:              r = eval_choice(g, actor, c); break;
         case RB_COND_COMPLEX:             r = eval_complex(g, actor, c); break;
         case RB_COND_POSITION:            r = eval_position(g, actor, c); break;
-        case RB_COND_OPPONENT_CHOICE:     r = 1; break; /* interactive — not evaluated headless */
-        case RB_COND_OPPONENT_LIVE_SUCCESS: r = 0; break; /* live_success_triggered_this_turn not tracked */
+        case RB_COND_OPPONENT_CHOICE:
+            /* Mirror state.rs:evaluate_opponent_choice_condition — true unless the
+               opponent declined. Headless has no opponent-decline state, so assume
+               the opponent accepted (gs.opponent_choice_declined == false). Negation
+               is applied by rb_eval_condition's top-level wrapper, so return raw. */
+            r = 1;
+            break;
+        case RB_COND_OPPONENT_LIVE_SUCCESS:
+            /* Mirror state.rs:evaluate_opponent_live_success_condition — true only if
+               the owner's opponent won their live this turn. Headless tracks no
+               live-success flag yet, so return false (no live => not succeeded). */
+            r = 0;
+            break;
         case RB_COND_NO_EXCESS_HEART:     r = eval_no_excess(g, actor, c); break;
         case RB_COND_ALWAYS_TRUE:         r = 1; break;
         case RB_COND_ANY_OF:              r = eval_any_of(g, actor, c); break;
-        case RB_COND_ALL_REVEALED:        r = 1; break;
+        case RB_COND_ALL_REVEALED:
+            /* Mirror condition.rs:evaluate_all_revealed_match_heart_color — true if
+               >= count revealed cards match the heart color. Headless has no
+               revealed_cards list, so matching == 0 => false for any threshold. */
+            r = 0;
+            break;
         default: r = 1; break;
     }
     return negation ? !r : r;
