@@ -133,9 +133,12 @@ int rb_process_pending_auto_abilities(GameState *g) {
    duration has elapsed (end of turn / end of live). Definition lives in
    turn/triggers.c (shared with the live/turn pipeline); declared in rabuka.h. */
 
-/* Mirror abilities.rs:apply_ability_effects — apply the persistent effects
-   of an ability (constant modifiers). STUB. */
+/* Mirror abilities.rs:apply_ability_effects — run the persistent / on-trigger
+   effects of an ability. The engine's rb_execute_effect already handles the
+   action dispatch; here we drive the decoded effect tree via the compound
+   sequential runner. */
 int rb_apply_ability_effects(GameState *g, int actor, const Ability *ab) {
-    (void)g; (void)actor; (void)ab;
-    return 0;
+    if (!g || !ab || !ab->effect) return 0;
+    rb_compound_sequential(g, actor, &g->p[actor], ab->effect, 1, NULL);
+    return 1;
 }
