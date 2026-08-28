@@ -186,7 +186,10 @@ void rb_execute_effect_ex(GameState *g, int actor, AbilityEffect *e, int host_ci
     if (rb_has_pending_choice(g)) return;
     if (e->has_condition && e->condition && !rb_eval_condition(g, actor, e->condition)) return;
     for (int i = 0; i < e->n_child; i++) {
-        rb_execute_effect_ex(g, actor, e->child[i], host_cid);
+        /* repeat_procedure's children are executed cnt times by handle_action,
+           so skip the single pre-order pass here to avoid a double execution. */
+        if (!(e->action && !strcmp(e->action, "repeat_procedure")))
+            rb_execute_effect_ex(g, actor, e->child[i], host_cid);
         if (rb_has_pending_choice(g)) return;
     }
     if (!e->action) return;
@@ -509,14 +512,20 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
         }
         for (int d = 0; d < draw_total; d++) { if (TP->deck.n == 0) break; rb_draw(g, tgt); }
         g->re_yell_occurred = 1;
-    } else if (!strcmp(act, "repeat_procedure") ||
-               !strcmp(act, "custom") ||
-               !strcmp(act, "do_nothing") || !strcmp(act, "sequential") ||
-               !strcmp(act, "conditional_alternative")) {
-        /* Compound/control: children already executed pre-order in rb_execute_effect.
-           repeat_procedure would loop children cnt times in full port; stub does once. */
+    } else if (!strcmp(act, "repeat_procedure")) {
+        /* Mirror misc.rs repeat_procedure — execute the procedure's children
+           `count` times. The single pre-order pass is skipped in
+           rb_execute_effect_ex so this runs exactly `count` repetitions. */
+        int reps = cnt >= 1 ? cnt : 1;
+        for (int r = 0; r < reps; r++)
+            for (int i = 0; i < e->n_child; i++)
+                rb_execute_effect_ex(g, actor, e->child[i], host_cid);
+    } else if (!strcmp(act, "custom") ||
+                !strcmp(act, "do_nothing") || !strcmp(act, "sequential") ||
+                !strcmp(act, "conditional_alternative")) {
+        /* Compound/control: children already executed pre-order in rb_execute_effect. */
     } else if (!strcmp(act, "choice") || !strcmp(act, "conditional_on_result") ||
-               !strcmp(act, "conditional_on_optional") || !strcmp(act, "conditional_alternative")) {
+                !strcmp(act, "conditional_on_optional")) {
         int allow = e->is_optional ? 1 : 0;
         rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, cnt, allow, act);
     }
