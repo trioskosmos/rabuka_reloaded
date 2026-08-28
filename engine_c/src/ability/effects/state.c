@@ -12,10 +12,25 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e){
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"state")) st=e->extra_v[i];
     if(!st) for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"to_state")) st=e->extra_v[i];
     if(!st) st="wait";
-    for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]!=RB_EMPTY_SLOT){
+    /* which members: explicit position, "all", or first occupied. */
+    const char *pos=NULL;
+    int all=0;
+    for(int i=0;i<e->n_extra;i++){
+        if(e->extra_k[i] && !strcmp(e->extra_k[i],"position")) pos=e->extra_v[i];
+        else if(e->extra_k[i] && !strcmp(e->extra_k[i],"all") && e->extra_v[i] && !strcmp(e->extra_v[i],"true")) all=1;
+    }
+    if(e->target && !pos && !strcmp(e->target,"all")) all=1;
+    int apply_pos = pos ? rb_pos_to_area(pos) : -1;
+    for(int q=0;q<RB_STAGE_SIZE;q++){
+        if(P->stage[q]==RB_EMPTY_SLOT) continue;
+        if(!all && apply_pos>=0 && apply_pos!=q) continue;
+        if(!all && apply_pos<0 && q!=(RB_STAGE_SIZE==3?1:0)) {
+            /* no explicit target: act on the first member only (break after) */
+        }
         P->stage_wait[q]=(!strcmp(st,"wait"))?1:0;
+        /* "rest" sets the rest orientation; orientation mod stores the string verbatim */
         rb_mods_set_orientation(&g->mods, P->stage[q], st);
-        break;
+        if(!all && apply_pos<0) break; /* first-member-only default */
     }
 }
 
