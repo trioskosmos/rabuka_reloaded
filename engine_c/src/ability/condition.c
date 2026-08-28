@@ -711,8 +711,43 @@ static int eval_score(const struct GameState *g, int actor, const Condition *c) 
     return eval_operator(g->p[pl].score, op, thr);
 }
 /* ── choice/position etc ── */
-static int eval_choice(const struct GameState *g, int actor, const Condition *c){ (void)g;(void)actor;(void)c; return 1; }
-static int eval_complex(const struct GameState *g, int actor, const Condition *c){ (void)g;(void)actor;(void)c; return 1; }
+static int eval_choice(const struct GameState *g, int actor, const Condition *c) {
+    /* Choice conditions are interactive; headless eval treats them as
+       satisfiable. If a nested "condition" field is present, gate on it. */
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        const CondField *f = &c->fields[i];
+        if (f->v.tag == RB_TAG_OBJVAR && f->v.cond && f->key && !strcmp(f->key, "condition"))
+            return rb_eval_condition(g, actor, f->v.cond);
+    }
+    return 1;
+}
+
+/* Complex condition (variant 12) — Rust ANDs a nested `cause` (and `effect`)
+   condition. The decoder stores nested conditions as RB_TAG_OBJVAR CondValues,
+   so we evaluate every nested sub-condition with AND (OR when the field is an
+   array keyed "or"/"any_of"). Mirrors state.rs:evaluate_complex_condition. */
+static int eval_complex(const struct GameState *g, int actor, const Condition *c) {
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        const CondField *f = &c->fields[i];
+        if (f->v.tag == RB_TAG_OBJVAR && f->v.cond) {
+            if (!rb_eval_condition(g, actor, f->v.cond)) return 0;
+        } else if (f->v.tag == RB_TAG_ARRAY) {
+            int combine_or = (f->key && (!strcmp(f->key, "or") ||
+                                         !strcmp(f->key, "any_of") ||
+                                         !strcmp(f->key, "any")));
+            int any = 0, all = 1;
+            for (uint32_t j = 0; j < f->v.arr_n; j++) {
+                CondValue *e = &f->v.arr[j];
+                if (e->tag == RB_TAG_OBJVAR && e->cond) {
+                    if (rb_eval_condition(g, actor, e->cond)) any = 1; else all = 0;
+                }
+            }
+            if (combine_or) { if (!any) return 0; }
+            else if (!all) return 0;
+        }
+    }
+    return 1;
+}
 
 
 static int eval_condition_inner_host(const struct GameState *g, int actor, int host_cid, const Condition *c) {
