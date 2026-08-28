@@ -111,20 +111,11 @@ static int heart_color_of(AbilityEffect *e, int dflt) {
     return dflt;
 }
 
-/* Move `count` cards from one of actor's zones to another. */
+/* Move `count` cards from one of actor's zones to another.
+   Delegates to rb_card_matches_type (src/ability/util.c) which mirrors
+   engine/src/ability/util.rs:card_matches_type. */
 int card_matches_card_type_filter(int card_idx, const char *filter){
-    if(!filter) return 1;
-    Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
-    int is_live = (c.n_hearts==0 && c.cost==0 && c.blade==0);
-    int is_member = !is_live;
-    int match=0;
-    if(!strcmp(filter,"live_card") && is_live) match=1;
-    else if(!strcmp(filter,"member_card") && is_member) match=1;
-    else if(!strcmp(filter,"card")) match=1;
-    else if(!strcmp(filter,"energy_card")) match=0;
-    else match=1;
-    rb_free_card(&c);
-    return match;
+    return rb_card_matches_type(card_idx, filter);
 }
 static void do_move_filtered(GameState *g, int actor, RbZone src, RbZone dst, int count, int to_top, const char *card_type_filter);
 static void do_move(GameState *g, int actor, RbZone src, RbZone dst, int count, int to_top) {

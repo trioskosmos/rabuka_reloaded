@@ -75,7 +75,20 @@ static int card_at_position(const GameState *g, int pl, const char *pos) {
     return g->p[pl].stage[idx];
 }
 
-static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEffect *e) {
+static int effect_is_live_end(AbilityEffect *e) {
+    if (!e) return 0;
+    for (int i=0;i<e->n_extra;i++) {
+        if (e->extra_k[i] && !strcmp(e->extra_k[i],"duration") && e->extra_v[i]) {
+            const char *v = e->extra_v[i];
+            if (strstr(v,"live") || strstr(v,"ライブ")) return 1;
+        }
+    }
+    return 0;
+}
+
+/* acc != NULL means "record deltas into this temporary effect" (for Duration::LiveEnd
+   debut effects). The same code path applies the modifier to the live modifier table. */
+static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEffect *e, RbTempEffect *acc) {
     if (!e || !e->action) return;
     /* Position-targeted modifiers (ruby front / love_wing_bell center): the
        effect grants its resource to the member at a given stage position rather
@@ -107,10 +120,12 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"sign") && e->extra_v[i] && !strcmp(e->extra_v[i],"negative")) cnt = -cnt;
         rb_mods_add_cost(&g->mods, tgt_cid, cnt);
         g->mods.constant_cost[tgt_cid]+=cnt;
+        if(acc) acc->cost+=cnt;
     } else if (!strcmp(e->action,"modify_score")) {
         int cnt=e->count>=0?e->count:1;
         rb_mods_add_score(&g->mods, tgt_cid, cnt);
         g->mods.constant_score[tgt_cid]+=cnt;
+        if(acc) acc->score+=cnt;
     } else if (!strcmp(e->action,"gain_resource")) {
         const char *res=NULL;
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"resource")) res=e->extra_v[i];
@@ -119,6 +134,7 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
         if (res && (!strcmp(res,"blade")||!strcmp(res,"ブレード"))) {
             rb_mods_add_blade(&g->mods, tgt_cid, cnt);
             g->mods.constant_blade[tgt_cid]+=cnt;
+            if(acc) acc->blade+=cnt;
         } else if (res && (!strcmp(res,"heart")||!strcmp(res,"ハート"))) {
             const char *hc=NULL;
             for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"heart_color")) hc=e->extra_v[i];
@@ -135,6 +151,7 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
             }
             rb_mods_add_heart(&g->mods, tgt_cid, col, cnt);
             g->mods.constant_heart[tgt_cid][col]+=cnt;
+            if(acc) acc->heart[col]+=cnt;
         }
     } else if (!strcmp(e->action,"modify_required_hearts") || !strcmp(e->action,"modify_required_hearts_global")) {
         const char *hc=NULL;
@@ -153,16 +170,63 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid, AbilityEff
         int cnt=e->count>=0?e->count:1;
         rb_mods_add_need_heart(&g->mods, tgt_cid, col, cnt);
         g->mods.constant_need_heart[tgt_cid][col]+=cnt;
+        if(acc) acc->need_heart[col]+=cnt;
     } else if (!strcmp(e->action,"gain_ability")) {
         const char *ag=NULL;
         for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],"ability_gain")) ag=e->extra_v[i];
         if(ag && strstr(ag,"ハート")) {
             rb_mods_add_heart(&g->mods, tgt_cid, 7, 1);
             g->mods.constant_heart[tgt_cid][7]+=1;
+            if(acc) acc->heart[7]+=1;
         }
     }
     /* sequential children: walk them (q127_wien leaves_stage_modifier_removed etc.) */
-    for(int i=0;i<e->n_child;i++) apply_constant_effect(g, pl, host_cid, e->child[i]);
+    for(int i=0;i<e->n_child;i++) apply_constant_effect(g, pl, host_cid, e->child[i], acc);
+}
+
+/* Fire a card's 登場 (Debut) abilities immediately, applying their modifiers and
+   registering any Duration::LiveEnd grants as temporary effects so they can be
+   reverted later. Mirrors engine/src/turn/triggers.rs:trigger_debut_abilities. */
+void rb_fire_debut(GameState *g, int pl, int card_id) {
+    int n = rb_card_num_abilities((uint32_t)card_id);
+    for(int i=0;i<n;i++){
+        Ability ab; if(!rb_decode_card_ability((uint32_t)card_id,i,&ab)) continue;
+        if(ab.triggers && rb_trigger_is(ab.triggers,"登場") && ab.effect){
+            int cond_ok=1;
+            if(ab.effect->has_condition && ab.effect->condition)
+                cond_ok=rb_eval_condition_for_host(g, pl, card_id, ab.effect->condition);
+            if(cond_ok){
+                RbTempEffect te; memset(&te,0,sizeof(te)); te.card_id=card_id;
+                int live_end = effect_is_live_end(ab.effect);
+                te.live_end = live_end;
+                apply_constant_effect(g, pl, card_id, ab.effect, live_end?&te:NULL);
+                if(live_end && g->n_temp_effects < RB_MAX_TEMP_EFFECTS)
+                    g->temp_effects[g->n_temp_effects++]=te;
+            }
+        }
+        rb_free_ability(&ab);
+    }
+}
+
+/* Revert all Duration::LiveEnd temporary effects (called at live-phase end). */
+void rb_check_expired_effects(GameState *g) {
+    for(int i=0;i<g->n_temp_effects;i++){
+        RbTempEffect *te=&g->temp_effects[i];
+        if(!te->live_end) continue;
+        rb_mods_add_blade(&g->mods, te->card_id, -te->blade);
+        g->mods.constant_blade[te->card_id]-=te->blade;
+        rb_mods_add_score(&g->mods, te->card_id, -te->score);
+        g->mods.constant_score[te->card_id]-=te->score;
+        rb_mods_add_cost(&g->mods, te->card_id, -te->cost);
+        g->mods.constant_cost[te->card_id]-=te->cost;
+        for(int c=0;c<8;c++){
+            rb_mods_add_heart(&g->mods, te->card_id, c, -te->heart[c]);
+            g->mods.constant_heart[te->card_id][c]-=te->heart[c];
+            rb_mods_add_need_heart(&g->mods, te->card_id, c, -te->need_heart[c]);
+            g->mods.constant_need_heart[te->card_id][c]-=te->need_heart[c];
+        }
+    }
+    g->n_temp_effects=0;
 }
 
 void rb_recalc_constants(GameState *g) {
@@ -200,13 +264,13 @@ void rb_recalc_constants(GameState *g) {
                     int cond_ok=1;
                     if(e->has_condition && e->condition) cond_ok=rb_eval_condition_for_host(g, pl, cid, e->condition);
                     if(cid==1923||cid==2500||cid==2406||cid==2412) fprintf(stderr,"[recalc] cid=%d pl=%d cond_ok=%d act=%s\n",cid,pl,cond_ok,e->action?e->action:"-");
-                    if(cond_ok) apply_constant_effect(g, pl, cid, e);
+                    if(cond_ok) apply_constant_effect(g, pl, cid, e, NULL);
                     else {
                         for(int i=0;i<e->n_child;i++){
                             AbilityEffect *ch=e->child[i];
                             int ch_ok=1;
                             if(ch->has_condition && ch->condition) ch_ok=rb_eval_condition_for_host(g, pl, cid, ch->condition);
-                            if(ch_ok) apply_constant_effect(g, pl, cid, ch);
+                            if(ch_ok) apply_constant_effect(g, pl, cid, ch, NULL);
                         }
                     }
                 }

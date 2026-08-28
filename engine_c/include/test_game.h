@@ -29,6 +29,14 @@ int  test_play_to_stage(TestGame *tg, int card_id, int area);
 int  test_try_play_to_stage(TestGame *tg, int card_id, int area); /* returns 1 on success */
 void test_recalc(TestGame *tg);
 void test_clear_mods_for_card(TestGame *tg, int card_id);
+/* opponent-side helpers (mirror player2.* in Rust TestGame) */
+void test_give_opp_energy(TestGame *tg, int count);
+void test_set_opp_stage(TestGame *tg, int area, int card_id);
+void test_add_to_opp_live(TestGame *tg, int card_id);
+void test_add_to_opp_success(TestGame *tg, int card_id);
+/* trigger / temporary-effect helpers */
+void test_fire_debut(TestGame *tg, int card_id);
+void test_expire_effects(TestGame *tg);
 const char *test_card_name(int card_id);
 
 /* board helpers for assertions */

@@ -1,9 +1,11 @@
 CC      ?= gcc
-CFLAGS  ?= -std=c11 -O2 -Wall -Iinclude -Isrc
-SRC     := src/data.c src/vm.c src/cards.c src/alloc.c src/modifiers.c src/condition.c src/choice.c src/ability_queue.c src/triggers.c src/phase.c src/stats_pipeline.c src/live.c src/effects_move.c src/effects_look.c src/effects_ability.c src/effects_state.c src/engine.c src/main.c src/bytecode_blob.c src/gen_data.c
+CFLAGS  ?= -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated
+# Layout mirrors engine/src: ability/ (vm, condition, choice, queue, effects/),
+# core/ (card, data, alloc, modifiers, stats_pipeline, generated/), turn/ (phase, live, triggers).
+SRC     := src/ability/vm.c src/ability/condition.c src/ability/choice.c src/ability/ability_queue.c src/ability/dynamic_count.c src/ability/util.c src/ability/effects/move.c src/ability/effects/look.c src/ability/effects/state.c src/ability/effects/ability.c src/core/card.c src/core/data.c src/core/alloc.c src/core/modifiers.c src/core/stats_pipeline.c src/core/generated/bytecode_blob.c src/core/generated/gen_data.c src/turn/phase.c src/turn/live.c src/turn/triggers.c src/engine.c src/main.c
 OBJ     := $(SRC:.c=.o)
 # library objects (everything except main, so tests can supply their own main)
-OBJ_LIB := src/data.o src/vm.o src/cards.o src/alloc.o src/modifiers.o src/condition.o src/choice.o src/ability_queue.o src/triggers.o src/phase.o src/stats_pipeline.o src/live.o src/effects_move.o src/effects_look.o src/effects_ability.o src/effects_state.o src/engine.o src/bytecode_blob.o src/gen_data.o src/test_game.o
+OBJ_LIB := src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/effects/move.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/core/card.o src/core/data.o src/core/alloc.o src/core/modifiers.o src/core/stats_pipeline.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o
 TARGET  := rb_engine
 TEST    := tests/test_basic.c
 REPLAY  := tests/replay.c

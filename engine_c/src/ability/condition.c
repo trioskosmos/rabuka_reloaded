@@ -237,6 +237,37 @@ static int eval_position(const struct GameState *g, int actor, const Condition *
     return 1;
 }
 
+/* ── both_condition (variant 2 alias) ──
+   Mirror engine/src/ability/condition/card.rs:evaluate_both_condition.
+   `values` is a list of card scores; route to success/live cards and
+   require that EVERY listed score is present. Not yet dispatched from
+   eval_comparison_inner because the C bytecode merges both_condition into
+   the same variant 2 as comparison_condition (no wire-type discriminator);
+   kept for future routing once the envelope carries the condition type. */
+static int __attribute__((unused)) eval_both_condition(const struct GameState *g, int actor, const Condition *c) {
+    const CondValue *vv = find_val(c, "values");
+    if (!vv || vv->tag != RB_TAG_ARRAY || vv->arr_n == 0) return 0;
+    int pl = target_player_idx(actor, c);
+    const RbPlayer *P = &g->p[pl];
+    for (uint32_t i = 0; i < vv->arr_n; i++) {
+        int want = (vv->arr[i].tag == RB_TAG_I64) ? (int)vv->arr[i].i
+                 : (vv->arr[i].tag == RB_TAG_STR && vv->arr[i].s) ? atoi(vv->arr[i].s) : 0;
+        int found = 0;
+        for (int j = 0; j < P->success.n && !found; j++) {
+            Card cc; if (rb_decode_card_by_index((uint32_t)P->success.cards[j], &cc)) {
+                if (cc.score == want) found = 1; rb_free_card(&cc);
+            }
+        }
+        for (int j = 0; j < P->live.n && !found; j++) {
+            Card cc; if (rb_decode_card_by_index((uint32_t)P->live.cards[j], &cc)) {
+                if (cc.score == want) found = 1; rb_free_card(&cc);
+            }
+        }
+        if (!found) return 0;
+    }
+    return 1;
+}
+
 static int eval_comparison_inner(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     const char *loc = get_str(c, "location");
     const char *agg = get_str(c, "aggregate");
@@ -340,12 +371,17 @@ static int eval_group(const struct GameState *g, int actor, const Condition *c) 
     for(int i=0;i<n;i++){
         Card card; if(!rb_decode_card_by_index((uint32_t)ids[i],&card)) continue;
         const char *gname = rb_card_string(card.group_idx);
-        for(uint32_t gi=0;gi<gv->arr_n;gi++) if(gv->arr[gi].tag==RB_TAG_STR && gv->arr[gi].s && gname && !strcmp(gname, gv->arr[gi].s)){
-            rb_free_card(&card); return 1;
+        const char *uname = rb_card_string(card.unit_idx);
+        if (gname && (strstr(gname,"μ")||strstr(gname,"ミ"))) {
+            for(uint32_t gi=0;gi<gv->arr_n;gi++) if(gv->arr[gi].tag==RB_TAG_STR && gv->arr[gi].s)
+                fprintf(stderr,"[grp] card=%s gname=%s uname=%s target=%s\n",
+                        card.name?card.name:"?", gname, uname?uname:"-", gv->arr[gi].s);
         }
-        /* also substring match for normalized group */
-        for(uint32_t gi=0;gi<gv->arr_n;gi++) if(gv->arr[gi].tag==RB_TAG_STR && gv->arr[gi].s && gname && strstr(gname, gv->arr[gi].s)){
-            rb_free_card(&card); return 1;
+        for(uint32_t gi=0;gi<gv->arr_n;gi++){
+            const char *t = (gv->arr[gi].tag==RB_TAG_STR)?gv->arr[gi].s:NULL;
+            if(!t) continue;
+            if(gname && (!strcmp(gname,t)||strstr(gname,t)||strstr(t,gname))) { rb_free_card(&card); return 1; }
+            if(uname && (!strcmp(uname,t)||strstr(uname,t)||strstr(t,uname))) { rb_free_card(&card); return 1; }
         }
         rb_free_card(&card);
     }
@@ -378,7 +414,15 @@ static int eval_appearance(const struct GameState *g, int actor, const Condition
     return 0;
 }
 
-/* ── temporal (variant 6) ── */
+/* ── temporal (variant 6) ──
+   Mirror engine/src/ability/condition/state.rs:evaluate_temporal_condition.
+   Supports turn_number (+operator), `temporal` scope strings ("this_turn",
+   "live_end", "during_live", "before_live", "first_turn") and the `phase`
+   gate. Sub-checks that need unimplemented state (has_card_moved_this_turn,
+   debut_count_this_turn, nested conditions) degrade gracefully. */
+static int phase_in_live(const struct GameState *g) {
+    return g->phase==RB_PHASE_LIVE_SET || g->phase==RB_PHASE_PERFORMANCE || g->phase==RB_PHASE_VICTORY;
+}
 static int eval_temporal(const struct GameState *g, int actor, const Condition *c) {
     (void)actor;
     int tn=0;
@@ -386,43 +430,139 @@ static int eval_temporal(const struct GameState *g, int actor, const Condition *
         const char *op = get_str(c,"operator");
         return eval_operator(g->turn, op, tn);
     }
+    /* phase gate */
     const char *phase = get_str(c,"phase");
     if (phase) {
-        /* crude phase gate: check current phase string */
         if (!strcmp(phase,"main") || !strcmp(phase,"main_phase")) return g->phase==RB_PHASE_MAIN;
         if (!strcmp(phase,"active")) return g->phase==RB_PHASE_ACTIVE;
-        if (!strcmp(phase,"live") || !strcmp(phase,"live_phase")) return g->phase==RB_PHASE_LIVE_SET || g->phase==RB_PHASE_PERFORMANCE;
+        if (!strcmp(phase,"live") || !strcmp(phase,"live_phase") ||
+            !strcmp(phase,"live_card_set")||!strcmp(phase,"live_performance")||!strcmp(phase,"live_victory"))
+            return phase_in_live(g);
+    }
+    /* temporal scope strings */
+    const char *temp = get_str(c,"temporal");
+    if (temp) {
+        if (!strcmp(temp,"live_end"))  return g->phase==RB_PHASE_VICTORY;
+        if (!strcmp(temp,"during_live")||!strcmp(temp,"this_live"))
+            return phase_in_live(g);
+        if (!strcmp(temp,"before_live"))
+            return !(g->phase==RB_PHASE_LIVE_SET || g->phase==RB_PHASE_PERFORMANCE || g->phase==RB_PHASE_VICTORY);
+        if (!strcmp(temp,"first_turn")) return g->turn==1;
+        /* this_turn with a count defaults to debut_count_this_turn which the
+           C port does not track; fall back to true per Rust's no-nested default. */
+        if (!strcmp(temp,"this_turn")) return 1;
     }
     return 1;
 }
 
-/* ── state (variant 7) ── */
+/* ── state (variant 7) ──
+   Mirror engine/src/ability/condition/state.rs:evaluate_state_condition +
+   evaluate_energy_state_condition. Covers the `state_condition`,
+   `energy_state_condition` and `state_change_condition` aliases (all share
+   the State variant discriminant). resource_type=="energy" or the
+   `energy_state` field gate on active/wait energy counts; otherwise the
+   member orientation (stage_wait flag + orientation modifier) is matched. */
 static int eval_state(const struct GameState *g, int actor, const Condition *c) {
-    const char *st = get_str(c,"state");
-    if (!st) st = get_str(c,"from_state");
-    if (!st) return 1;
+    const char *res = get_str(c, "resource_type");
+    const char *es  = get_str(c, "energy_state");
+    const char *st  = get_str(c, "state");
+    if (!st) st = get_str(c, "from_state");
     int pl = target_player_idx(actor, c);
     const RbPlayer *P = &g->p[pl];
-    int matching=0;
-    for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]!=RB_EMPTY_SLOT){
-        int is_wait = P->stage_wait[i];
-        const char *cur = is_wait? "wait":"active";
-        if(!strcmp(st,cur)) matching++;
-        /* also check orientation mods */
-        const char *om = rb_mods_get_orientation((RbMods*)&g->mods, P->stage[i]);
-        if(om && !strcmp(om,st)) matching++;
+
+    /* energy_state_condition: "active" when active energy count > 0.
+       (abilities emit "state":"active" in some dumps; accept both.) */
+    if (es && !strcmp(es, "active")) return P->energy_active > 0;
+    if (res && !strcmp(res, "energy")) {
+        if (!st) st = "active";
+        int is_all = 0; get_bool(c, "all", &is_all);
+        if (!strcmp(st, "active")) {
+            if (is_all) return P->energy.n > 0 && P->energy_active == P->energy.n;
+            return P->energy_active > 0;
+        }
+        if (!strcmp(st, "wait")) {
+            if (is_all) return P->energy.n > 0 && P->energy_active == 0;
+            return P->energy_active < P->energy.n;
+        }
+        return 1;
     }
-    const char *op=get_str(c,"operator"); int cnt=1; get_i(c,"count",&cnt);
-    return eval_operator(matching, op, cnt);
+
+    /* member active/wait state */
+    if (st && (!strcmp(st, "active") || !strcmp(st, "wait"))) {
+        int matching = 0;
+        for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] != RB_EMPTY_SLOT) {
+            int is_wait = P->stage_wait[i];
+            const char *cur = is_wait ? "wait" : "active";
+            if (!strcmp(st, cur)) matching++;
+            const char *om = rb_mods_get_orientation((RbMods*)&g->mods, P->stage[i]);
+            if (om && !strcmp(om, st)) matching++;
+        }
+        const char *op = get_str(c, "operator");
+        int cnt = 1; get_i(c, "count", &cnt);
+        return eval_operator(matching, op, cnt);
+    }
+    return 1;
 }
 
-/* ── resource / card_blade (variant 8) + energy_state (variant ~11) ── */
+/* ── resource / card_blade (variant 8) ──
+   Mirror engine/src/ability/condition/card.rs:evaluate_resource_condition
+   and evaluate_card_blade_condition. resource_type "blade" sums each
+   staged member's effective blade (printed + modifier); "surplus_heart"
+   is stage total_hearts minus live-card need hearts. The CardBlade
+   condition (selected_cards) falls back to the staged members when no
+   movement snapshot exists (C tracks recently_moved as the selection set). */
+static int effective_blade(const struct GameState *g, int cid) {
+    Card c; if (!rb_decode_card_by_index((uint32_t)cid, &c)) return 0;
+    int b = (int)c.blade + rb_mods_get_blade((RbMods*)&g->mods, cid);
+    rb_free_card(&c);
+    if (b < 0) b = 0;
+    if (b > 255) b = 255;
+    return b;
+}
 static int eval_resource(const struct GameState *g, int actor, const Condition *c) {
+    const char *res = get_str(c, "resource_type");
+    const char *src = get_str(c, "source");
     int pl = target_player_idx(actor, c);
     int thr=1; get_i(c,"count",&thr); if(!thr) thr=1;
     const char *op=get_str(c,"operator");
-    /* energy_state_condition checks active energy or energy_zone count.
-       Distinguish by location field if present. */
+
+    if (res && !strcmp(res, "blade")) {
+        /* sum effective blade of selection set (recently_moved) or stage */
+        int ids[RB_MAX_ZONE]; int n=0;
+        if (src && !strcmp(src, "preceding_moved") && g->n_recently_moved>0) {
+            for (int i=0;i<g->n_recently_moved;i++) ids[n++]=g->recently_moved[i];
+        } else {
+            for (int i=0;i<RB_STAGE_SIZE;i++)
+                if (g->p[pl].stage[i]!=RB_EMPTY_SLOT) ids[n++]=g->p[pl].stage[i];
+        }
+        int total=0; for(int i=0;i<n;i++) total += effective_blade(g, ids[i]);
+        return eval_operator(total, op, thr);
+    }
+    if (res && !strcmp(res, "surplus_heart")) {
+        /* stage total_hearts - live/success need hearts */
+        int heart_total=0;
+        for (int i=0;i<RB_STAGE_SIZE;i++) {
+            int cid=g->p[pl].stage[i]; if (cid==RB_EMPTY_SLOT) continue;
+            Card cc; if(!rb_decode_card_by_index((uint32_t)cid,&cc)) continue;
+            for (int h=0;h<cc.n_hearts;h++) heart_total += cc.heart_count[h];
+            rb_free_card(&cc);
+        }
+        int need=0;
+        for (int i=0;i<g->p[pl].live.n;i++) {
+            int cid=g->p[pl].live.cards[i];
+            Card cc; if(!rb_decode_card_by_index((uint32_t)cid,&cc)) continue;
+            for (int h=0;h<cc.n_hearts;h++) need += cc.heart_count[h];
+            rb_free_card(&cc);
+        }
+        for (int i=0;i<g->p[pl].success.n;i++) {
+            int cid=g->p[pl].success.cards[i];
+            Card cc; if(!rb_decode_card_by_index((uint32_t)cid,&cc)) continue;
+            for (int h=0;h<cc.n_hearts;h++) need += cc.heart_count[h];
+            rb_free_card(&cc);
+        }
+        return eval_operator(heart_total - need, op, thr);
+    }
+    /* energy_state-style count (active energy / energy zone) */
     const char *loc = get_str(c, "location");
     int actual;
     if (loc && (!strcmp(loc,"energy")||!strcmp(loc,"energy_zone"))) {
@@ -448,9 +588,120 @@ static int eval_no_excess(const struct GameState *g, int actor, const Condition 
     return 0;
 }
 
-/* ── ability_filter (variant 9) ── */
+/* Read a string-array field (e.g. ability_filter_triggers / any_of). */
+static const CondValue *get_arr(const Condition *c, const char *key) {
+    const CondValue *v = find_val(c, key);
+    if (!v || v->tag != RB_TAG_ARRAY) return NULL;
+    return v;
+}
+/* Does any decoded ability of card `cid` have a trigger containing `trig`? */
+static int card_ability_trigger_contains(int cid, const char *trig) {
+    int n = rb_card_num_abilities((uint32_t)cid);
+    for (int i = 0; i < n; i++) {
+        Ability ab; if (!rb_decode_card_ability((uint32_t)cid, i, &ab)) continue;
+        int hit = 0;
+        if (ab.triggers && strstr(ab.triggers, trig)) hit = 1;
+        rb_free_ability(&ab);
+        if (hit) return 1;
+    }
+    return 0;
+}
+/* ── ability_filter (variant 9) ──
+   Mirror engine/src/ability/condition/card.rs:evaluate_ability_filter_condition.
+   Scans the location's cards (stage/hand/discard/live) for has_ability /
+   no_ability, optionally requiring a matching trigger prefix. */
 static int eval_ability_filter(const struct GameState *g, int actor, const Condition *c) {
-    (void)g;(void)actor;(void)c; return 1;
+    const char *filter = get_str(c, "ability_filter");
+    if (!filter) filter = "no_ability";
+    const char *loc = get_str(c, "location");
+    if (!loc) loc = "stage";
+    int pl = target_player_idx(actor, c);
+
+    int ids[RB_MAX_ZONE]; int n=0;
+    if (!strcmp(loc,"stage")) { for(int i=0;i<RB_STAGE_SIZE;i++) if(g->p[pl].stage[i]!=RB_EMPTY_SLOT) ids[n++]=g->p[pl].stage[i]; }
+    else if (!strcmp(loc,"hand")) { for(int i=0;i<g->p[pl].hand.n;i++) ids[n++]=g->p[pl].hand.cards[i]; }
+    else if (!strcmp(loc,"discard")||!strcmp(loc,"waitroom")) { for(int i=0;i<g->p[pl].discard.n;i++) ids[n++]=g->p[pl].discard.cards[i]; }
+    else if (!strcmp(loc,"energy")) { for(int i=0;i<g->p[pl].energy.n;i++) ids[n++]=g->p[pl].energy.cards[i]; }
+    else if (!strcmp(loc,"live")||!strcmp(loc,"live_card_zone")) { for(int i=0;i<g->p[pl].live.n;i++) ids[n++]=g->p[pl].live.cards[i]; }
+    else { /* fall back to activating card (host_cid) */ }
+
+    /* trigger prefixes */
+    const CondValue *tv = get_arr(c, "ability_filter_triggers");
+
+    int has_ability = 0;
+    if (n == 0) {
+        /* no zone cards: ability_filter resolves to the activating card; if
+           none, mirror Rust (returns false for has_ability, true for no_ability). */
+    } else {
+        for (int i = 0; i < n; i++) {
+            int cid = ids[i];
+            int na = rb_card_num_abilities((uint32_t)cid);
+            int present = na > 0;
+            if (present && tv) {
+                present = 0;
+                for (uint32_t t = 0; t < tv->arr_n; t++) {
+                    if (tv->arr[t].tag==RB_TAG_STR && tv->arr[t].s &&
+                        card_ability_trigger_contains(cid, tv->arr[t].s)) { present = 1; break; }
+                }
+            }
+            if (present) { has_ability = 1; break; }
+        }
+    }
+
+    if (!strcmp(filter, "has_ability")) return has_ability;
+    if (!strcmp(filter, "no_ability"))  return !has_ability;
+    if (!strcmp(filter, "no_ability_type")) {
+        /* Some card lacks EVERY listed trigger type. */
+        if (!tv || tv->arr_n==0) return 0;
+        if (n == 0) return 0;
+        for (int i = 0; i < n; i++) {
+            int cid = ids[i];
+            int lacks_all = 1;
+            for (uint32_t t = 0; t < tv->arr_n; t++) {
+                if (tv->arr[t].tag==RB_TAG_STR && tv->arr[t].s &&
+                    card_ability_trigger_contains(cid, tv->arr[t].s)) { lacks_all = 0; break; }
+            }
+            if (lacks_all) return 1;
+        }
+        return 0;
+    }
+    return 1;
+}
+
+/* ── any_of (variant 18) ──
+   Mirror engine/src/ability/condition/compound.rs:any_of_matches. The
+   condition carries an `any_of` string-array; each entry names a probe. */
+static int any_of_matches(const struct GameState *g, const char *ct) {
+    if (!strcmp(ct, "has_member")) {
+        for (int i=0;i<RB_STAGE_SIZE;i++) if (g->p[g->active].stage[i]!=RB_EMPTY_SLOT) return 1;
+        return 0;
+    }
+    if (!strcmp(ct, "has_energy")) return g->p[g->active].energy.n > 0;
+    if (!strcmp(ct, "has_hand"))   return g->p[g->active].hand.n > 0;
+    if (!strcmp(ct, "has_live_card")) return g->p[g->active].live.n > 0;
+    if (!strcmp(ct, "has_blade_heart")) {
+        for (int i=0;i<RB_STAGE_SIZE;i++) {
+            int cid=g->p[g->active].stage[i]; if (cid==RB_EMPTY_SLOT) continue;
+            Card c; if(!rb_decode_card_by_index((uint32_t)cid,&c)) continue;
+            int hb = c.has_special; /* proxy: blade heart ≈ special/blade heart flag */
+            rb_free_card(&c);
+            if (hb) return 1;
+        }
+        return 0;
+    }
+    if (!strcmp(ct, "is_active_phase")) return g->phase==RB_PHASE_ACTIVE;
+    if (!strcmp(ct, "is_main_phase"))   return g->phase==RB_PHASE_MAIN;
+    return 0;
+}
+static int eval_any_of(const struct GameState *g, int actor, const Condition *c) {
+    (void)actor;
+    const CondValue *av = get_arr(c, "any_of");
+    if (!av) return 1;
+    for (uint32_t i=0;i<av->arr_n;i++) {
+        if (av->arr[i].tag==RB_TAG_STR && av->arr[i].s && any_of_matches(g, av->arr[i].s))
+            return 1;
+    }
+    return 0;
 }
 /* ── score_threshold (10) ── */
 static int eval_score(const struct GameState *g, int actor, const Condition *c) {
@@ -472,27 +723,27 @@ static int eval_condition_inner_host(const struct GameState *g, int actor, int h
       if(dp&&!strcmp(dp,"center")) fprintf(stderr,"[cond] v=%d pos=center loc=%s cmptype=%s target=%s checkself=%s\n",
           c->variant, dl?dl:"-", dc?dc:"-", dt?dt:"-", dcs?dcs:"-"); }
     int r=1;
-    switch (c->variant) {
-        case 0:  r = eval_compound(g, actor, c); break;
-        case 1:  r = eval_location(g, actor, c); break;
-        case 2:  r = eval_comparison_inner(g, actor, host_cid, c); break;
-        case 3:  r = eval_movement(g, actor, c); break;
-        case 4:  r = eval_group(g, actor, c); break;
-        case 5:  r = eval_appearance(g, actor, c); break;
-        case 6:  r = eval_temporal(g, actor, c); break;
-        case 7:  r = eval_state(g, actor, c); break;
-        case 8:  r = eval_resource(g, actor, c); break;
-        case 9:  r = eval_ability_filter(g, actor, c); break;
-        case 10: r = eval_score(g, actor, c); break;
-        case 11: r = eval_choice(g, actor, c); break;
-        case 12: r = eval_complex(g, actor, c); break;
-        case 13: /* PositionCond */ r = eval_position(g, actor, c); break;
-        case 14: /* OpponentChoice */ r = 1; break;
-        case 15: /* OpponentLiveSuccess */ r = 0; break;
-        case 16: /* NoExcessHeart */ r = eval_no_excess(g, actor, c); break;
-        case 17: /* AlwaysTrue */ r = 1; break;
-        case 18: /* AnyOf */ r = 1; break;
-        case 19: /* AllRevealed */ r = 1; break;
+    switch ((RbConditionVariant)c->variant) {
+        case RB_COND_COMPOUND:            r = eval_compound(g, actor, c); break;
+        case RB_COND_LOCATION:            r = eval_location(g, actor, c); break;
+        case RB_COND_COMPARISON:          r = eval_comparison_inner(g, actor, host_cid, c); break;
+        case RB_COND_MOVEMENT:            r = eval_movement(g, actor, c); break;
+        case RB_COND_GROUP:               r = eval_group(g, actor, c); break;
+        case RB_COND_APPEARANCE:          r = eval_appearance(g, actor, c); break;
+        case RB_COND_TEMPORAL:            r = eval_temporal(g, actor, c); break;
+        case RB_COND_STATE:               r = eval_state(g, actor, c); break;
+        case RB_COND_RESOURCE:            r = eval_resource(g, actor, c); break;
+        case RB_COND_ABILITY_FILTER:      r = eval_ability_filter(g, actor, c); break;
+        case RB_COND_SCORE_THRESHOLD:     r = eval_score(g, actor, c); break;
+        case RB_COND_CHOICE:              r = eval_choice(g, actor, c); break;
+        case RB_COND_COMPLEX:             r = eval_complex(g, actor, c); break;
+        case RB_COND_POSITION:            r = eval_position(g, actor, c); break;
+        case RB_COND_OPPONENT_CHOICE:     r = 1; break; /* interactive — not evaluated headless */
+        case RB_COND_OPPONENT_LIVE_SUCCESS: r = 0; break; /* live_success_triggered_this_turn not tracked */
+        case RB_COND_NO_EXCESS_HEART:     r = eval_no_excess(g, actor, c); break;
+        case RB_COND_ALWAYS_TRUE:         r = 1; break;
+        case RB_COND_ANY_OF:              r = eval_any_of(g, actor, c); break;
+        case RB_COND_ALL_REVEALED:        r = 1; break;
         default: r = 1; break;
     }
     return negation ? !r : r;

@@ -174,16 +174,18 @@ C has no namespace, no `self`, and must compile `-ffreestanding` on bare-metal t
 
 | Rust source | C counterpart | Work remaining |
 |-------------|---------------|----------------|
-| `ability/vm.rs` + `ability/condition_decoder_gen.rs` + `ability/effect_decoder_gen.rs` | `src/vm.c` | ✅ foundation done; extend for any newly-added wire keys (e.g. `choice_maker`, `looked_at_deck_position`) |
-| `core/card.rs` (4138 LOC) + `core/card_binary.rs` | `src/cards.c` | ✅ done; add `blade_heart` / `need_heart` split when Live phase needs it |
+| `ability/vm.rs` + `ability/condition_decoder_gen.rs` + `ability/effect_decoder_gen.rs` | `src/ability/vm.c` | ✅ foundation done; extend for any newly-added wire keys (e.g. `choice_maker`, `looked_at_deck_position`) |
+| `core/card.rs` (4138 LOC) + `core/card_binary.rs` | `src/core/card.c` | ✅ done; add `blade_heart` / `need_heart` split when Live phase needs it |
 | `core/zones.rs` + `core/player.rs` + `core/constants.rs:MAX_LIVE_CARDS=3` | `include/rabuka.h:RbPlayer/RbBag/RbZone` + `src/engine.c:do_move` | ⚠️ bags are flat vectors; need `stage[3]` strict, waitroom/energy as typed zones, cap enforcement |
-| `core/game_modifiers.rs` + `core/game_state/modifiers.rs` + `core/stats_pipeline.rs` | — (new `src/modifiers.c`) | 🔴 needed: per-card heart/score/blade/cost modifiers, constant abilities, timed-expiry |
-| `core/pool.rs` + `core/types.rs` | — | 🔴 needed for heart pool / blade accounting in Live |
-| `ability/effects/{draw,score,state,misc,ability_effects}.rs` | `src/engine.c:handle_action` | ⚠️ 10/42 verbs; remainder need individual `else if` clauses mirroring Rust handlers |
-| `ability/condition/{card,compound,state}.rs` (condition.rs 1039 LOC) | `src/condition.c` (new) | 🔴 full Condition eval tree + `rb_eval_condition(g, actor, cond)` |
-| `ability/compound.rs` + `ability/choice.rs` (3447 LOC) | `src/choice.c` (new) | 🔴 sequential gates, conditional_on_*, choice spawning, pay-skip gate, repeat_procedure |
-| `ability/cost.rs` + `ability/resolver.rs` + `ability_queue.rs` + `triggers.rs` | `src/ability_queue.c` + `src/triggers.c` | 🔴 ability queue (debut/auto/live_start/live_success), cost payment, use_limit, cost_paid/effect_started flags |
-| `turn/phases.rs` (1685 LOC) + `turn/actions.rs` + `turn/live.rs` (2846 LOC) + `turn/triggers.rs` | `src/engine.c` + new `src/live.c` + `src/phase.c` | 🔴 full phase machine (see §4), baton touch, yell → heart allocation → verdict → score → victory |
+| `core/game_modifiers.rs` + `core/game_state/modifiers.rs` + `core/stats_pipeline.rs` | `src/core/modifiers.c` + `src/core/stats_pipeline.c` | ⚠️ modifiers faithful; `recalculate_constants`/`heart_copy` partial |
+| `core/pool.rs` + `core/types.rs` | `src/core/alloc.c` | ✅ faithful (bump arena) |
+| `ability/util.rs` (compare_counts, card_matches_type, card_matches_group_str, card_at_position, pos_to_area, orientation_matches_state, zone_cards) | `src/ability/util.c` | ⚠️ group match approximate (no series/`set_card_identity` memberships) |
+| `ability/dynamic_count.rs` (resolve_dynamic_count) | `src/ability/dynamic_count.c` | ⚠️ faithful; `revealed_cards`/under_cards counts return 0 (not tracked) |
+| `ability/effects/{draw,score,state,misc,ability_effects}.rs` | `src/engine.c:handle_action` + `src/ability/effects/{move,look,state,ability}.c` | ⚠️ ~12/42 verbs faithful; move/look/state split into effects/ |
+| `ability/condition/{card,compound,state}.rs` (condition.rs 1039 LOC) | `src/ability/condition.c` | ⚠️ resource/ability_filter/state/any_of/temporal now ported; movement/complex/choice still partial |
+| `ability/compound.rs` + `ability/choice.rs` (3447 LOC) | `src/ability/choice.c` | 🔴 sequential gates, conditional_on_*, choice spawning, pay-skip gate, repeat_procedure |
+| `ability/cost.rs` + `ability/resolver.rs` + `ability_queue.rs` + `triggers.rs` | `src/ability/ability_queue.c` + `src/turn/triggers.c` | 🔴 ability queue (debut/auto/live_start/live_success), cost payment, use_limit, cost_paid/effect_started flags |
+| `turn/phases.rs` (1685 LOC) + `turn/actions.rs` + `turn/live.rs` (2846 LOC) + `turn/triggers.rs` | `src/engine.c` + `src/turn/live.c` + `src/turn/phase.c` + `src/turn/triggers.c` | 🔴 full phase machine (see §4), baton touch, yell → heart allocation → verdict → score → victory |
 | `game/match_runner.rs` + `game/game_setup.rs` | `src/engine.c:rb_game_init` | ⚠️ RPS/mulligan simplified; needs hand-size / mulligan choice flow |
 
 ---

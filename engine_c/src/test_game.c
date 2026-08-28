@@ -62,6 +62,30 @@ int test_try_play_to_stage(TestGame *tg, int card_id, int area){
 }
 void test_recalc(TestGame *tg){ rb_recalc_constants(&tg->state); }
 void test_clear_mods_for_card(TestGame *tg, int card_id){ rb_mods_clear_card(&tg->state.mods, card_id); }
+void test_give_opp_energy(TestGame *tg, int count){
+    int eid = rb_find_card_by_no("LL-E-001-SD");
+    if(eid<0) eid=0;
+    RbPlayer *P=&tg->state.p[1];
+    for(int i=0;i<count;i++){
+        if(P->energy.n < RB_MAX_ZONE) P->energy.cards[P->energy.n++]=eid;
+        if(P->energy_active < RB_MAX_ENERGY_CARDS) P->energy_active++;
+    }
+}
+void test_set_opp_stage(TestGame *tg, int area, int card_id){
+    if(area<0||area>=RB_STAGE_SIZE) return;
+    tg->state.p[1].stage[area]=card_id;
+    tg->state.p[1].stage_wait[area]=0;
+}
+void test_add_to_opp_live(TestGame *tg, int card_id){
+    RbPlayer *P=&tg->state.p[1];
+    if(P->live.n < RB_MAX_ZONE) P->live.cards[P->live.n++]=card_id;
+}
+void test_add_to_opp_success(TestGame *tg, int card_id){
+    RbPlayer *P=&tg->state.p[1];
+    if(P->success.n < RB_MAX_ZONE) P->success.cards[P->success.n++]=card_id;
+}
+void test_fire_debut(TestGame *tg, int card_id){ rb_fire_debut(&tg->state, 0, card_id); }
+void test_expire_effects(TestGame *tg){ rb_check_expired_effects(&tg->state); }
 const char *test_card_name(int card_id){
     Card c; if(!rb_decode_card_by_index((uint32_t)card_id,&c)) return "?";
     const char *n=c.name; /* borrowed */

@@ -50,6 +50,35 @@ typedef struct Condition {
     uint32_t  n_fields;
 } Condition;
 
+/* Condition variant — mirrors the discriminant order of the Rust
+   `engine/src/core/card.rs:Condition` enum (Compound=0, Location=1, …).
+   The bytecode serializer writes this exact index as the variant byte, so
+   these enumerators are NOT arbitrary magic numbers: they are the same
+   Rust enum tags, given names the way Rust's `match` would. Switch on the
+   named constants instead of bare ints. */
+typedef enum {
+    RB_COND_COMPOUND = 0,   /* compound / or_condition */
+    RB_COND_LOCATION,       /* card_count_condition / location_condition */
+    RB_COND_COMPARISON,     /* comparison / both / all_cost / highest_cost_on_stage */
+    RB_COND_MOVEMENT,       /* movement_condition / has_moved / not_moved */
+    RB_COND_GROUP,          /* group_condition */
+    RB_COND_APPEARANCE,     /* appearance_condition */
+    RB_COND_TEMPORAL,       /* temporal_condition */
+    RB_COND_STATE,          /* state / energy_state / state_change */
+    RB_COND_RESOURCE,       /* resource_condition / card_blade_condition */
+    RB_COND_ABILITY_FILTER, /* ability_filter_condition */
+    RB_COND_SCORE_THRESHOLD,/* score_threshold_condition */
+    RB_COND_CHOICE,         /* choice_condition / position_change_condition */
+    RB_COND_COMPLEX,        /* complex_condition */
+    RB_COND_POSITION,       /* position_condition */
+    RB_COND_OPPONENT_CHOICE,/* opponent_choice_condition */
+    RB_COND_OPPONENT_LIVE_SUCCESS, /* opponent_live_success */
+    RB_COND_NO_EXCESS_HEART,/* no_excess_heart */
+    RB_COND_ALWAYS_TRUE,    /* otherwise / action_success / custom */
+    RB_COND_ANY_OF,         /* any_of_condition */
+    RB_COND_ALL_REVEALED    /* all_revealed_match_heart_color */
+} RbConditionVariant;
+
 /* ── Ability effect tree (decoded from bytecode) ── */
 #define RB_MAX_CHILD 64
 #define RB_MAX_EXTRA 32
@@ -324,6 +353,20 @@ typedef struct {
     int note_icons;
 } RbLiveSnapshot;
 
+/* A modifier granted by a trigger with a Duration (e.g. Debut with
+   Duration::LiveEnd) that must be reverted when the duration expires.
+   Mirrors engine/src/core/game_state/mod.rs TemporaryEffect. */
+#define RB_MAX_TEMP_EFFECTS 64
+typedef struct {
+    int card_id;            /* host card the effect belongs to */
+    int live_end;           /* 1 = expires at live-phase end */
+    int blade;
+    int score;
+    int cost;
+    int heart[8];
+    int need_heart[8];
+} RbTempEffect;
+
 #define RB_MAX_SNAPSHOTS 64
 #define RB_MAX_RECENTLY_MOVED 8
 typedef struct GameState {
@@ -343,6 +386,8 @@ typedef struct GameState {
     RbPhase  phase;
     int      rps[2];
     int      live_set_player;
+    RbTempEffect temp_effects[RB_MAX_TEMP_EFFECTS];
+    int      n_temp_effects;
 } GameState;
 
 /* ── RNG (xorshift; deterministic given seed) ── */
@@ -369,8 +414,10 @@ int  rb_activate_ability(GameState *g, int pl, int hand_idx);
 /* ── Triggers / phase / live / stats_pipeline ── */
 int  rb_trigger_is(const char *triggers, const char *needle);
 int  rb_trigger_debut(GameState *g, int pl, int card_id);
+void rb_fire_debut(GameState *g, int pl, int card_id);
 int  rb_trigger_live_start(GameState *g, int pl);
 void rb_recalc_constants(GameState *g);
+void rb_check_expired_effects(GameState *g);
 void rb_advance_phase(GameState *g);
 void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]);
 void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]);
@@ -392,6 +439,25 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_position_change(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e);
+
+/* ── Dynamic count resolution (engine/src/ability/dynamic_count.rs) ── */
+int  rb_resolve_dynamic_count(const struct GameState *g,
+                             const char *reference, const char *base_reference,
+                             const char *count_type, const char *calculation,
+                             int calculation_value, int owner_on_p1,
+                             const int *moved, int n_moved,
+                             const int *selected, int n_selected,
+                             int last_draw_count);
+
+/* ── Shared card/zone/comparison helpers (engine/src/ability/util.rs) ── */
+int  rb_compare_counts(const char *operator, int actual, int expected);
+int  rb_card_matches_type(int card_id, const char *filter);
+int  rb_orientation_matches_state(const char *orientation, const char *state);
+int  rb_card_matches_group_str(int card_id, const char *group_name);
+int  rb_card_at_position(const struct GameState *g, int pl, const char *pos);
+int  rb_pos_to_area(const char *pos);
+int  rb_zone_cards(const struct GameState *g, int pl, const char *zone,
+                   int *out_ids, int max);
 
 /* ── Effect execution (public for testing / harness) ── */
 void rb_execute_effect(GameState *g, int actor, AbilityEffect *e);
