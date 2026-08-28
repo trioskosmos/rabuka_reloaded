@@ -20,8 +20,12 @@ int rb_resolver_pending_choice(const GameState *g) {
 /* Mirror resolver.rs:can_activate_effect — is this effect activatable now?
    Default: yes (no timing/energy gating yet). */
 int rb_can_activate_effect(const GameState *g, int actor, const AbilityEffect *eff) {
-    (void)g; (void)actor; (void)eff;
-    return 1;
+    (void)actor; (void)eff;
+    /* Mirror resolver.rs:can_activate_effect — abilities may be activated
+       during the Main phase (the engine fires debut/on_live automatically
+       elsewhere). TODO: consult the ability's cost via rb_validate_cost
+       once the Ability (not just its effect) is passed in. */
+    return g->phase == RB_PHASE_MAIN ? 1 : 0;
 }
 
 /* Mirror resolver.rs:get_trigger_ability_infos — collect abilities whose
