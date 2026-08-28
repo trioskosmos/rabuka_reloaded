@@ -33,12 +33,49 @@ void rb_record_ability_use(GameState *g, int cid, int idx) {
     s_n_used++;
 }
 
-/* Mirror abilities.rs:collect_constant_hand — push the constant-amount
-   hand-modifier effects of all active abilities into `out` (cap max).
-   Returns the count. Currently returns 0 (no constant modifiers tracked). */
+/* Apply one constant-modifier effect node to the per-card constant tables.
+   The wire maps the resource kind via source/destination/action and the
+   magnitude via count. Best-effort mapping (see PROGRESS §12). */
+static void apply_constant_node(RbMods *m, int cid, const AbilityEffect *e) {
+    if (!e) return;
+    int delta = e->count != 0 ? e->count : 1;
+    const char *kind = e->source ? e->source : (e->destination ? e->destination : e->action);
+    if (!kind) return;
+    if (strstr(kind, "score"))            rb_mods_add_score(m, cid, delta);
+    else if (strstr(kind, "blade"))       rb_mods_add_blade(m, cid, delta);
+    else if (strstr(kind, "heart"))       rb_mods_add_heart(m, cid, 0, delta);
+    else if (strstr(kind, "need_heart"))  rb_mods_add_need_heart(m, cid, 0, delta);
+    else if (strstr(kind, "cost"))        rb_mods_add_cost(m, cid, delta);
+    /* recurse into sub-nodes (conditional constant abilities) */
+    for (int i = 0; i < e->n_child; i++) apply_constant_node(m, cid, e->child[i]);
+}
+
+/* Mirror abilities.rs:collect_constant_hand — scan the actor's stage members,
+   decode their triggerless/constant abilities, and apply their constant
+   modifiers into g->mods. Returns the number of constant abilities found. */
 int rb_collect_constant_hand(const GameState *g, int actor, AbilityEffect *out, int max) {
-    (void)g; (void)actor; (void)out; (void)max;
-    return 0;
+    (void)out; (void)max;
+    if (!g) return 0;
+    int found = 0;
+    const RbPlayer *P = &g->p[actor];
+    for (int s = 0; s < RB_STAGE_SIZE; s++) {
+        int cid = P->stage[s];
+        if (cid < 0) continue;
+        int nab = rb_card_num_abilities((uint32_t)cid);
+        for (int a = 0; a < nab; a++) {
+            Ability ab;
+            if (!rb_decode_card_ability((uint32_t)cid, a, &ab)) continue;
+            int is_constant = (ab.triggers == NULL || ab.triggers[0] == '\0' ||
+                               strstr(ab.triggers, "constant") != NULL ||
+                               strstr(ab.triggers, "continuous") != NULL);
+            if (is_constant && ab.effect) {
+                apply_constant_node((RbMods *)&g->mods, cid, ab.effect);
+                found++;
+            }
+            rb_free_ability(&ab);
+        }
+    }
+    return found;
 }
 
 /* Mirror abilities.rs:collect_live_ability_modifiers — gather temporary
