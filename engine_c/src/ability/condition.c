@@ -604,15 +604,22 @@ static int eval_resource(const struct GameState *g, int actor, const Condition *
 
     if (res && !strcmp(res, "blade")) {
         /* sum effective blade of selection set (recently_moved) or stage */
+        /* card_blade_condition: sum effective blade of the selected/moved
+           card set (falling back to stage members) and compare to `count`.
+           Mirror card.rs:evaluate_card_blade_condition — an EMPTY selection set
+           resolves to false (Rust returns false when selected_card_ids is empty). */
         int ids[RB_MAX_ZONE]; int n=0;
         if (src && !strcmp(src, "preceding_moved") && g->n_recently_moved>0) {
+            for (int i=0;i<g->n_recently_moved;i++) ids[n++]=g->recently_moved[i];
+        } else if (g->n_recently_moved>0) {
             for (int i=0;i<g->n_recently_moved;i++) ids[n++]=g->recently_moved[i];
         } else {
             for (int i=0;i<RB_STAGE_SIZE;i++)
                 if (g->p[pl].stage[i]!=RB_EMPTY_SLOT) ids[n++]=g->p[pl].stage[i];
         }
+        if (n == 0) return 0;
         int total=0; for(int i=0;i<n;i++) total += effective_blade(g, ids[i]);
-        return eval_operator(total, op, thr);
+        return eval_operator(rb_saturate_u8(total), op ? op : ">=", thr);
     }
     if (res && !strcmp(res, "surplus_heart")) {
         /* stage total_hearts - live/success need hearts */
