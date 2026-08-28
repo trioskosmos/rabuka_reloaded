@@ -70,8 +70,13 @@ void rb_effect_modify_cost(GameState *g, int actor, AbilityEffect *e){
     /* modify_yell_count / modify_yell_source are per-player yell modifiers.
        Store as a cost-like entry on a synthetic id (0) and let live.c's
        do_yell read them — minimal portable wire until a full yell mods table lands. */
-    if(e->action && (!strcmp(e->action,"modify_yell_count")||!strcmp(e->action,"modify_yell_source"))){
-        /* no-op for now: yell is still per_live=1; hook here keeps the handler honest */
+    if(e->action && !strcmp(e->action,"modify_yell_count")){
+        /* Mirror misc.rs modify_yell_count — add `count` to the per-live yell
+           card count; live.c do_yell reads g->yell_count_mod[pl]. */
+        g->yell_count_mod[who] += cnt;
+    } else if(e->action && !strcmp(e->action,"modify_yell_source")){
+        /* modify_yell_source changes which cards are yelled; headless yell uses
+           the deck top regardless of source, so this is a documented no-op. */
         (void)cnt;
     }
 }

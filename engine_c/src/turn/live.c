@@ -36,7 +36,8 @@ static int do_yell(GameState *g, int pl, int yell_cards[RB_MAX_LIVE_CARDS*3], in
     RbPlayer *P=&g->p[pl];
     int lives=P->live.n;
     if(lives==0) return 0;
-    int per_live=1; /* TODO: modify_yell_count modifier would adjust */
+    int per_live = 1 + (pl >= 0 && pl < 2 ? g->yell_count_mod[pl] : 0); /* modify_yell_count adds per-live */
+    if (per_live < 1) per_live = 1;
     int total_needed=lives*per_live;
     int revealed=0;
     memset(blade_hearts,0,8*sizeof(int));

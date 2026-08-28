@@ -362,10 +362,35 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                !strcmp(act,"modify_yell_source")) {
         rb_effect_modify_cost(g, actor, e);
     } else if (!strcmp(act, "set_card_identity") || !strcmp(act, "set_blade_type") ||
-               !strcmp(act, "set_blade_count") || !strcmp(act, "set_heart_type") ||
-               !strcmp(act, "choose_required_hearts") || !strcmp(act, "all_blade_timing")) {
-        /* card-property rewrites; log as trace */
-        if(g->mods.constant_blade[0]==0) { /* touch mods to avoid unused warning */ }
+                !strcmp(act, "set_blade_count") || !strcmp(act, "set_heart_type") ||
+                !strcmp(act, "choose_required_hearts") || !strcmp(act, "all_blade_timing")) {
+        /* card-property rewrites — set_blade_type recolors the target member's
+           blade; set_blade_count sets its blade modifier. Others (identity/
+           heart_type/required_hearts) need per-card fields the C model does not
+           track yet; they are documented no-ops. */
+        int cid = host_cid >= 0 ? host_cid : -1;
+        if (cid < 0) for (int q = 0; q < RB_STAGE_SIZE; q++) if (W->stage[q] != RB_EMPTY_SLOT) { cid = W->stage[q]; break; }
+        if (cid >= 0) {
+            if (!strcmp(act, "set_blade_type")) {
+                const char *bc = NULL;
+                for (int i = 0; i < e->n_extra; i++) if (e->extra_k[i] && (!strcmp(e->extra_k[i], "blade_color") || !strcmp(e->extra_k[i], "blade_type"))) bc = e->extra_v[i];
+                int col = -1;
+                if (bc) {
+                    if (!strcmp(bc, "pink")||!strcmp(bc,"heart00")) col = 0;
+                    else if (!strcmp(bc, "red")) col = 1;
+                    else if (!strcmp(bc, "yellow")) col = 2;
+                    else if (!strcmp(bc, "green")) col = 3;
+                    else if (!strcmp(bc, "blue")) col = 4;
+                    else if (!strcmp(bc, "purple")) col = 5;
+                    else if (!strcmp(bc, "orange")) col = 6;
+                    else if (!strcmp(bc, "all")) col = 7;
+                }
+                g->mods.blade_type[cid] = (int8_t)col;
+            } else if (!strcmp(act, "set_blade_count")) {
+                rb_mods_set_blade(&g->mods, cid, cnt);
+            }
+            rb_recalc_constants(g);
+        }
     } else if (!strcmp(act, "modify_required_hearts") || !strcmp(act, "modify_required_hearts_global") ||
                !strcmp(act, "modify_required_hearts_success")) {
         rb_effect_modify_hearts(g, actor, e);

@@ -400,6 +400,7 @@ typedef struct GameState {
     RbMods   mods;
     RbAbilityQueue queue;
     int      live_set_limit_reduction[2];
+    int      yell_count_mod[2];   /* per-player modify_yell_count delta (live.c do_yell) */
     RbLiveSnapshot snapshots[RB_MAX_SNAPSHOTS];
     int      n_snapshots;
     int      recently_moved[RB_MAX_RECENTLY_MOVED];
