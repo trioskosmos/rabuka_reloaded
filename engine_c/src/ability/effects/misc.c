@@ -49,12 +49,33 @@ static int h_choice(GameState *g, int actor, const AbilityEffect *e) {
     return 1; /* TODO: open interactive choice */
 }
 static int h_position_change(GameState *g, int actor, const AbilityEffect *e) {
-    (void)g; (void)actor; (void)e;
-    return 1; /* TODO: move a member to a new position */
+    /* Mirror misc.rs position_change — move a member from a source area to a
+       destination area on the actor's stage. Source defaults to center,
+       destination from e->destination (else e->target). */
+    RbPlayer *P = &g->p[actor];
+    int src = 1, dst = 1;
+    if (e->source && *e->source) src = rb_pos_to_area(e->source);
+    const char *dest = e->destination && *e->destination ? e->destination : e->target;
+    if (dest && *dest) dst = rb_pos_to_area(dest);
+    if (src < 0 || src >= RB_STAGE_SIZE) src = 1;
+    if (dst < 0 || dst >= RB_STAGE_SIZE) dst = 1;
+    if (src == dst) return 1;
+    if (P->stage[src] < 0) return 0;        /* nothing to move */
+    if (P->stage[dst] >= 0) return 0;        /* destination occupied */
+    int card = P->stage[src];
+    P->stage[src] = -1; P->stage_wait[src] = 0;
+    P->stage[dst] = card; P->stage_wait[dst] = 0;
+    return 1;
 }
 static int h_rotation(GameState *g, int actor, const AbilityEffect *e) {
-    (void)g; (void)actor; (void)e;
-    return 1; /* TODO: rotate orientation */
+    /* Mirror misc.rs rotation — flip the orientation (active<->wait) of the
+       targeted member. Target area defaults to center. */
+    RbPlayer *P = &g->p[actor];
+    int area = 1; /* center */
+    if (e->target && *e->target) area = rb_pos_to_area(e->target);
+    if (area < 0 || area >= RB_STAGE_SIZE) area = 1;
+    if (P->stage[area] >= 0) { P->stage_wait[area] = !P->stage_wait[area]; return 1; }
+    return 0;
 }
 static int h_place_energy_under_member(GameState *g, int actor, const AbilityEffect *e) {
     (void)g; (void)actor; (void)e;
