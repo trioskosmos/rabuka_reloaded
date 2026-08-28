@@ -11,6 +11,7 @@
 
 #include "rabuka.h"
 #include <string.h>
+#include <stdlib.h>
 
 static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e) {
     /* Mirror misc.rs:execute_gain_resource — add `count` energy to the
@@ -94,8 +95,21 @@ static int h_perform_yell(GameState *g, int actor, const AbilityEffect *e) {
     return 1; /* TODO: perform yell */
 }
 static int h_shuffle(GameState *g, int actor, const AbilityEffect *e) {
-    (void)g; (void)actor; (void)e;
-    return 1; /* TODO: shuffle zone */
+    /* Mirror misc.rs shuffle — Fisher-Yates shuffle of the named zone
+       (default: deck). */
+    (void)actor;
+    const char *zone = e->target && *e->target ? e->target : "deck";
+    RbBag *b = NULL;
+    if (!strcmp(zone, "hand")) b = &g->p[actor].hand;
+    else if (!strcmp(zone, "deck")) b = &g->p[actor].deck;
+    else if (!strcmp(zone, "energy")) b = &g->p[actor].energy;
+    else if (!strcmp(zone, "discard")) b = &g->p[actor].discard;
+    if (!b || b->n < 2) return 1;
+    for (int i = b->n - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        int t = b->cards[i]; b->cards[i] = b->cards[j]; b->cards[j] = t;
+    }
+    return 1;
 }
 
 /* Dispatch an "misc" effect by its name string. Returns 1 on handled. */
