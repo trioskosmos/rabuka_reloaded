@@ -60,23 +60,16 @@ const char *rb_get_string(uint32_t idx) {
     return g_strings[idx];
 }
 
-/* ── load cards.bin ── */
-static int load_cards(const char *dir) {
-    char path[1024];
-    snprintf(path, sizeof(path), "%s/cards.bin", dir);
-    g_cards_blob = read_file(path, &g_cards_len);
-    if (!g_cards_blob) return -1;
-    fprintf(stderr, "[dbg] cards.bin loaded len=%ld\n", g_cards_len);
-    if (g_cards_len < 12 || memcmp(g_cards_blob, "CARD", 4) != 0) return -2;
-
-    /* header: "<4sHI" => magic(4) + num_cards(u16) + strtab_len(u32) */
+/* ── parse cards.bin from an in-memory blob ── */
+static int parse_cards(const unsigned char *blob, long len) {
+    g_cards_blob = (unsigned char *)blob;
+    g_cards_len = len;
     if (g_cards_len < 10 || memcmp(g_cards_blob, "CARD", 4) != 0) return -2;
     g_num_cards = le16(g_cards_blob + 4);
     uint32_t strtab_len = le32(g_cards_blob + 6);
     const unsigned char *strtab = g_cards_blob + 10;
     const unsigned char *p = strtab;
 
-    /* string table: u16 len + bytes per entry */
     size_t cap = 256, n = 0;
     g_card_strings = malloc(cap * sizeof(char *));
     while ((long)(p - strtab) < (long)strtab_len) {
@@ -89,7 +82,6 @@ static int load_cards(const char *dir) {
     }
     g_card_strings = realloc(g_card_strings, (n ? n : 1) * sizeof(char *));
 
-    /* length table: one u8 per card, then concatenated card records */
     const unsigned char *lentab = strtab + strtab_len;
     const unsigned char *cardbase = lentab + g_num_cards;
     g_card_off = malloc((g_num_cards + 1) * sizeof(uint32_t));
@@ -100,8 +92,34 @@ static int load_cards(const char *dir) {
     }
     g_card_off[g_num_cards] = off;
     g_card_data = (unsigned char *)cardbase;
-    fprintf(stderr, "[dbg] load_cards ok num_cards=%u strtab=%u\n", g_num_cards, strtab_len);
     return 0;
+}
+
+/* ── parse abilities_strings.bin from an in-memory blob ── */
+static int parse_strings(const unsigned char *blob, long len) {
+    g_abstr_blob = (unsigned char *)blob;
+    g_abstr_len = len;
+    uint32_t n = RBKA_NUM_STRING_OFFSETS ? (RBKA_NUM_STRING_OFFSETS - 1) : 0;
+    g_strings = malloc((n ? n : 1) * sizeof(char *));
+    for (uint32_t i = 0; i < n; i++) {
+        uint32_t a = RBKA_STRINGS_OFFSETS[i];
+        uint32_t b = RBKA_STRINGS_OFFSETS[i + 1];
+        uint32_t sl = b - a;
+        char *s = malloc(sl + 1);
+        memcpy(s, g_abstr_blob + a, sl); s[sl] = 0;
+        g_strings[i] = s;
+    }
+    return 0;
+}
+
+/* ── load cards.bin ── */
+static int load_cards(const char *dir) {
+    char path[1024];
+    snprintf(path, sizeof(path), "%s/cards.bin", dir);
+    g_cards_blob = read_file(path, &g_cards_len);
+    if (!g_cards_blob) return -1;
+    fprintf(stderr, "[dbg] cards.bin loaded len=%ld\n", g_cards_len);
+    return parse_cards(g_cards_blob, g_cards_len);
 }
 
 /* ── load abilities_strings.bin + build null-terminated copies ── */
@@ -110,18 +128,7 @@ static int load_strings(const char *dir) {
     snprintf(path, sizeof(path), "%s/abilities_strings.bin", dir);
     g_abstr_blob = read_file(path, &g_abstr_len);
     if (!g_abstr_blob) return -1;
-
-    uint32_t n = RBKA_NUM_STRING_OFFSETS ? (RBKA_NUM_STRING_OFFSETS - 1) : 0;
-    g_strings = malloc((n ? n : 1) * sizeof(char *));
-    for (uint32_t i = 0; i < n; i++) {
-        uint32_t a = RBKA_STRINGS_OFFSETS[i];
-        uint32_t b = RBKA_STRINGS_OFFSETS[i + 1];
-        uint32_t len = b - a;
-        char *s = malloc(len + 1);
-        memcpy(s, g_abstr_blob + a, len); s[len] = 0;
-        g_strings[i] = s;
-    }
-    return 0;
+    return parse_strings(g_abstr_blob, g_abstr_len);
 }
 
 /* ── point at the combined bytecode blob (static, no free) ── */
@@ -141,22 +148,34 @@ int rb_load(const char *data_dir) {
 int rb_load_streaming(const char *dir,
                       unsigned char *(*read_fn)(const char *path, long *out_len)) {
     /* Bare-metal hook: caller supplies read_fn that streams from ROM/CD/flash.
-       On hosted, read_fn == NULL falls back to fopen path. */
+       When read_fn is provided we read both data blobs through it and parse
+       them in place — no fopen, no host filesystem required. */
     if (read_fn) {
-        /* Minimal streaming impl — reuse the same blob loaders but via callback.
-           Bare-metal ports can replace with sector cache; this proves the API. */
         char path[1024];
         long n = 0;
         unsigned char *buf;
         snprintf(path, sizeof(path), "%s/cards.bin", dir);
         buf = read_fn(path, &n);
         if (!buf) return -1;
-        /* Reuse load_cards/load_strings by writing through temp — simplest is
-           to fall back to rb_load if callback fails to provide both files. */
+        if (parse_cards(buf, n) != 0) { free(buf); return -2; }
         free(buf);
-        return rb_load(dir);
+        snprintf(path, sizeof(path), "%s/abilities_strings.bin", dir);
+        buf = read_fn(path, &n);
+        if (!buf) return -1;
+        if (parse_strings(buf, n) != 0) { free(buf); return -3; }
+        free(buf);
+        /* Ability bytecode: stream it from storage too (don't embed 90+ KB in
+           the ROM image). Keep the buffer live — g_bc points at it. */
+        snprintf(path, sizeof(path), "%s/bytecode.bin", dir);
+        buf = read_fn(path, &n);
+        if (!buf) return -4;
+        g_bc = buf;        /* owned, live for the match */
+        g_bc_len = (uint32_t)n;
+        return 0;
     }
-    return rb_load(dir);
+    /* No read_fn supplied: bare-metal ports must provide one. The hosted
+       PC build calls rb_load() directly instead of via this path. */
+    return -1;
 }
 
 void rb_unload(void) {

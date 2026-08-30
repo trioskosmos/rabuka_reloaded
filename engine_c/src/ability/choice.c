@@ -11,11 +11,13 @@ void rb_clear_pending_choice(GameState *g) {
     memset(&g->queue.pending, 0, sizeof(g->queue.pending));
     g->queue.has_pending = 0;
     g->queue.deferred = NULL;
+    g->queue.resume_is_select = 0;
 }
 int rb_resume_with_choice(GameState *g, int selected_idx) {
     if (!g || !g->queue.has_pending) return 0;
     int actor = g->queue.actor;
     int mode = g->queue.resume_mode;
+    int is_select = g->queue.resume_is_select;
     AbilityEffect *eff = g->queue.resume_eff;
     int host = g->queue.resume_host;
     int was_skip = (selected_idx < 0);
@@ -25,7 +27,7 @@ int rb_resume_with_choice(GameState *g, int selected_idx) {
     g->queue.auto_ability = 0;
     if (mode == 2) {                 /* select_cards → look.ts keep/drop */
         const char *dest = eff ? eff->destination : NULL;
-        rb_look_resume(g, actor, selected_idx, dest);
+        rb_look_resume(g, actor, selected_idx, dest, is_select);
     } else if (mode == 1) {          /* position_change destination selection */
         if (!was_skip && eff) {
             g->queue.resume_active = 1;

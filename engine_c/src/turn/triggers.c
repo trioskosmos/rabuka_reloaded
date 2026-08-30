@@ -237,23 +237,33 @@ void rb_fire_debut(GameState *g, int pl, int card_id) {
         rb_drain_ability_queue(g);
 }
 
-/* Revert all Duration::LiveEnd temporary effects (called at live-phase end). */
-void rb_check_expired_effects(GameState *g) {
-    for(int i=0;i<g->n_temp_effects;i++){
+/* Revert temporary effects whose Duration matches `which`:
+     0 = all, 1 = live_end/during_live (called at live-phase end),
+     2 = until_end_of_turn/first_turn (called at turn rollover).
+   Reverted entries are compacted out of the array so other durations survive. */
+void rb_check_expired_effects(GameState *g, int which) {
+    int w = g->n_temp_effects;
+    int j = 0;
+    for(int i=0;i<w;i++){
         RbTempEffect *te=&g->temp_effects[i];
-        if(!te->live_end) continue;
-        /* live_end grants are credited to the effective modifier only (not the
-           constant_* tracking that rb_recalc_constants owns), so revert by
-           subtracting the effective modifier here. */
-        rb_mods_add_blade(&g->mods, te->card_id, -te->blade);
-        rb_mods_add_score(&g->mods, te->card_id, -te->score);
-        rb_mods_add_cost(&g->mods, te->card_id, -te->cost);
-        for(int c=0;c<8;c++){
-            rb_mods_add_heart(&g->mods, te->card_id, c, -te->heart[c]);
-            rb_mods_add_need_heart(&g->mods, te->card_id, c, -te->need_heart[c]);
+        int expire = (which==0) || (which==1 && te->dur==RB_TEMP_LIVE_END) ||
+                     (which==2 && te->dur==RB_TEMP_TURN_END);
+        if(expire){
+            /* grants are credited to the effective modifier only (not the
+               constant_* tracking that rb_recalc_constants owns), so revert by
+               subtracting the effective modifier here. */
+            rb_mods_add_blade(&g->mods, te->card_id, -te->blade);
+            rb_mods_add_score(&g->mods, te->card_id, -te->score);
+            rb_mods_add_cost(&g->mods, te->card_id, -te->cost);
+            for(int c=0;c<8;c++){
+                rb_mods_add_heart(&g->mods, te->card_id, c, -te->heart[c]);
+                rb_mods_add_need_heart(&g->mods, te->card_id, c, -te->need_heart[c]);
+            }
+        } else {
+            g->temp_effects[j++] = g->temp_effects[i]; /* keep */
         }
     }
-    g->n_temp_effects=0;
+    g->n_temp_effects = j;
 }
 
 void rb_recalc_constants(GameState *g) {

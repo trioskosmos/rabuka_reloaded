@@ -50,7 +50,7 @@ typedef struct Condition {
     uint32_t  n_fields;
 } Condition;
 
-/* Condition variant — mirrors the discriminant order of the Rust
+/* Condition variant  Emirrors the discriminant order of the Rust
    `engine/src/core/card.rs:Condition` enum (Compound=0, Location=1, …).
    The bytecode serializer writes this exact index as the variant byte, so
    these enumerators are NOT arbitrary magic numbers: they are the same
@@ -227,13 +227,13 @@ void rb_free_ability(Ability *a);
 void rb_free_condition(Condition *c);
 int  rb_decode_card_by_index(uint32_t i, Card *out);    /* 0..num_cards-1 */
 void rb_free_card(Card *c);
-uint16_t rb_card_ability_idx(uint32_t i);   /* 0xFFFF if none — first ability only (legacy) */
+uint16_t rb_card_ability_idx(uint32_t i);   /* 0xFFFF if none  Efirst ability only (legacy) */
 const unsigned char *rb_card_record(uint32_t i);
 const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len);
 const char *rb_card_string(uint16_t idx);
 int rb_find_card_by_no(const char *card_no); /* linear scan cards.bin card_no strings, -1 if not found */
-/* Multi-ability support — cards can have 1..N abilities (e.g. hanayo debut+constant).
-   The pairs table RBKA_CARD_ABILITY_PAIRS maps card_no string idx → ability idx.
+/* Multi-ability support  Ecards can have 1..N abilities (e.g. hanayo debut+constant).
+   The pairs table RBKA_CARD_ABILITY_PAIRS maps card_no string idx ↁEability idx.
    Use these to iterate all abilities for a card (mirrors Rust Card.abilities:Vec). */
 extern const uint16_t RBKA_CARD_ABILITY_PAIRS[];
 int rb_card_num_abilities(uint32_t card_idx); /* count of abilities for card */
@@ -241,7 +241,7 @@ int rb_card_get_ability_idx(uint32_t card_idx, int n, uint32_t *out_ability_idx)
 int rb_decode_card_ability(uint32_t card_idx, int n, Ability *out); /* decode nth ability */
 
 /* ════════════════════════════════════════════════════════════════════
-    Engine — game state + turn loop + faithful effect execution.
+    Engine  Egame state + turn loop + faithful effect execution.
     The decoder (above) is byte-identical to the Rust VM. The execution
     below is a real, working port of the core rules (constants.rs /
     phases.rs / actions.rs): zones, a 3-position stage, energy, the
@@ -281,7 +281,7 @@ typedef struct {
     RbBag     discard;                /* waitroom */
     int       deck_refreshed_this_turn; /* Rule 10.2.2.1 mid-effect refresh flag */
     int       score;
-    int       life;                   /* life points (HP) — tracked for parity with Rust engine */
+    int       life;                   /* life points (HP)  Etracked for parity with Rust engine */
     int       hearts[RB_MAX_HEARTS]; /* hearts-by-color on this player */
     int       yell_note_icons;        /* hearts produced during performance */
 } RbPlayer;
@@ -309,7 +309,7 @@ typedef enum {
     RB_CHOICE_SELECT_HEART_COLOR
 } RbChoiceKind;
 
-/* ChoiceRoute — mirrors engine/src/ability/types.rs::ChoiceRoute. Tags which
+/* ChoiceRoute  Emirrors engine/src/ability/types.rs::ChoiceRoute. Tags which
    cost/choice gate produced a pending choice so resume can route correctly. */
 typedef enum {
     RB_ROUTE_NONE = 0,
@@ -320,7 +320,7 @@ typedef enum {
     RB_ROUTE_CONDITIONAL_CHOICE
 } RbChoiceRoute;
 
-/* QueueState — mirrors engine/src/ability_queue.rs::QueueState FSM. */
+/* QueueState  Emirrors engine/src/ability_queue.rs::QueueState FSM. */
 typedef enum {
     RB_QUEUE_IDLE = 0,
     RB_QUEUE_RESOLVING,
@@ -372,6 +372,9 @@ typedef struct {
     int      auto_ability;     /* 1 if pending choice is an auto-ability (drainable) */
     int      choice_result;    /* selected index stored for the resumed node */
     int      resume_mode;      /* 0=deferred, 1=position_change, 2=select_card, 3=auto_ability */
+    int      resume_is_select; /* 1 if the select_card choice is a select_cards/select/look_and_select
+                                  (kept card recorded into g->selected_cards). Set by the emitter, not
+                                  derived from resume_eff (which may dangle after the source Card is freed). */
 } RbAbilityQueue;
 
 int  rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx);
@@ -395,13 +398,17 @@ typedef struct {
     int note_icons;
 } RbLiveSnapshot;
 
-/* A modifier granted by a trigger with a Duration (e.g. Debut with
-   Duration::LiveEnd) that must be reverted when the duration expires.
-   Mirrors engine/src/core/game_state/mod.rs TemporaryEffect. */
+/* A modifier granted by a trigger with a Duration that must be reverted when
+   the duration expires. Mirrors engine/src/core/game_state/mod.rs TemporaryEffect.
+   dur: 0 = permanent (no expiry), 1 = live_end/during_live (revert at live
+   phase end), 2 = until_end_of_turn/first_turn (revert at turn rollover). */
 #define RB_MAX_TEMP_EFFECTS 64
+#define RB_TEMP_PERM      0
+#define RB_TEMP_LIVE_END  1
+#define RB_TEMP_TURN_END  2
 typedef struct {
     int card_id;            /* host card the effect belongs to */
-    int live_end;           /* 1 = expires at live-phase end */
+    int dur;                /* RB_TEMP_* duration kind */
     int blade;
     int score;
     int cost;
@@ -421,6 +428,8 @@ typedef struct GameState {
     int      n_snapshots;
     int      recently_moved[RB_MAX_RECENTLY_MOVED];
     int      n_recently_moved;
+    int      selected_cards[RB_MAX_RECENTLY_MOVED]; /* cards chosen by a select_cards/select/look_and_select choice */
+    int      n_selected_cards;
     int      live_success[2];   /* per player: did this player pass their live this turn */
     int      revealed_cards[RB_MAX_RECENTLY_MOVED]; /* cards revealed by yell/re_yell */
     int      n_revealed;
@@ -486,7 +495,7 @@ int rb_is_action_prohibited(const GameState *g, const char *action);
 /* ── Ability queue drain + owner lookup (engine/src/ability_queue.rs) ── */
 int rb_owner_of_card(const GameState *g, int cid);
 int rb_drain_ability_queue(GameState *g);
-void rb_look_resume(GameState *g, int actor, int selected_idx, const char *destination);
+void rb_look_resume(GameState *g, int actor, int selected_idx, const char *destination, int is_select);
 void rb_resume_position_change(GameState *g, int actor, const AbilityEffect *e, int host_cid, int selected_idx);
 
 /* ── RNG (xorshift; deterministic given seed) ── */
@@ -526,7 +535,7 @@ void rb_fire_debut(GameState *g, int pl, int card_id);
 int  rb_trigger_live_start(GameState *g, int pl);
 int  rb_trigger_live_success(GameState *g, int pl);
 void rb_recalc_constants(GameState *g);
-void rb_check_expired_effects(GameState *g);
+void rb_check_expired_effects(GameState *g, int which);
 void rb_advance_phase(GameState *g);
 
 /* ── check_timing + integrity checks (engine/src/turn/actions.rs:check_timing) ── */
@@ -546,14 +555,17 @@ void rb_calc_stage_hearts(const GameState *g, int pl, int out[8]);
 void rb_stage_hearts_pipeline(const GameState *g, int pl, int out[8]);
 void rb_effective_need_heart(const GameState *g, int live_cid, int out[8]);
 int  rb_perform_live(GameState *g, int pl);
-/* Effects — verb handlers */
+/* Effects  Everb handlers */
 void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_reveal_until_live_card(GameState *g, int actor, AbilityEffect *e);
+void rb_effect_reveal_until_chosen_card(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e);
 int  rb_looked_at_pool(int pl, int *out_ids, int max);
 void rb_gain_ability(GameState *g, int actor, AbilityEffect *e);
+void rb_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e);
-void rb_look_clear(int pl);
+void rb_activate_ability_effect(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_tick_gained(void);
 int  card_matches_card_type_filter(int card_idx, const char *filter);
 void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
@@ -588,6 +600,8 @@ int  rb_compare_counts(const char *operator, int actual, int expected);
 int  rb_card_matches_type(int card_id, const char *filter);
 int  rb_orientation_matches_state(const char *orientation, const char *state);
 int  rb_card_matches_group_str(int card_id, const char *group_name);
+void rb_set_card_identity(int cid, const char *name);
+int  rb_card_matches_identity_str(int card_id, const char *group_name);
 int  rb_card_at_position(const struct GameState *g, int pl, const char *pos);
 int  rb_pos_to_area(const char *pos);
 int  rb_zone_cards(const struct GameState *g, int pl, const char *zone,
@@ -595,8 +609,8 @@ int  rb_zone_cards(const struct GameState *g, int pl, const char *zone,
 
 /* ── HeartColor parsing (engine/src/core/card.rs parse_heart_color / index) ── */
 /* Faithful port of `s.parse::<HeartColor>()` / `HeartColor::index()`. String
-   → RbHeartColor; "b_"-prefixed blade hearts strip the prefix and recurse;
-   "heart07"/"b_heart07" → colorless (RB_HEART_PINK / index 0); unknown → pink. */
+   ↁERbHeartColor; "b_"-prefixed blade hearts strip the prefix and recurse;
+   "heart07"/"b_heart07" ↁEcolorless (RB_HEART_PINK / index 0); unknown ↁEpink. */
 RbHeartColor rb_parse_heart_color(const char *s);
 int          rb_heart_index(RbHeartColor c);
 
@@ -659,7 +673,7 @@ int  rb_collect_constant_hand(const GameState *g, int actor, AbilityEffect *out,
 int  rb_collect_live_modifiers(const GameState *g, int actor, AbilityEffect *out, int max);
 int  rb_trigger_auto_abilities(GameState *g, int actor, const char *trigger);
 int  rb_process_pending_auto_abilities(GameState *g);
-void rb_check_expired_effects(GameState *g);
+void rb_check_expired_effects(GameState *g, int which);
 int  rb_apply_ability_effects(GameState *g, int actor, const Ability *ab, int host_cid);
 
 /* ── Misc effect handlers (engine/src/ability/effects/misc.rs) ── */

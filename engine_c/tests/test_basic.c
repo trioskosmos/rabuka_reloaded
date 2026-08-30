@@ -6,6 +6,7 @@ static int failures = 0;
 #define CHECK(cond, msg) do { if (!(cond)) { fprintf(stderr, "FAIL: %s (%s:%d)\n", msg, __FILE__, __LINE__); failures++; } else { printf("ok: %s\n", msg); } } while (0)
 
 int main(void) {
+    setvbuf(stdout, NULL, _IONBF, 0);
     CHECK(rb_load("src") == 0, "rb_load");
     CHECK(rb_num_cards() > 1000, "num_cards > 1000");
     CHECK(rb_num_abilities() == 936, "num_abilities == 936");

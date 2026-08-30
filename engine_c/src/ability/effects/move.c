@@ -31,6 +31,27 @@ static int card_matches_filter(int card_idx, AbilityEffect *e){
         rb_free_card(&c);
         if(!match) return 0;
     }
+    /* card_property filter (mirrors util.rs check_card_property): has_blade_heart /
+       has_score_icon match the card's heart icons; negation inverts. */
+    const char *cp=NULL; int neg=0;
+    for(int i=0;i<e->n_extra;i++){
+        if(e->extra_k[i] && !strcmp(e->extra_k[i],"card_property")) cp=e->extra_v[i];
+        else if(e->extra_k[i] && !strcmp(e->extra_k[i],"negation") &&
+                e->extra_v[i] && !strcmp(e->extra_v[i],"true")) neg=1;
+    }
+    if(cp){
+        Card c; if(!rb_decode_card_by_index((uint32_t)card_idx,&c)) return 0;
+        int has=0;
+        if(!strcmp(cp,"has_blade_heart")){
+            for(int h=0;h<c.n_hearts;h++) if(c.heart_color[h]>=RB_HEART_PINK && c.heart_color[h]<=RB_HEART_ALL) { has=1; break; }
+        } else if(!strcmp(cp,"has_score_icon")){
+            for(int h=0;h<c.n_hearts;h++) if(c.heart_color[h]==RB_HEART_SCORE) { has=1; break; }
+        }
+        /* has_all_blade requires a card flag the C decoder does not expose yet. */
+        if(neg) has=!has;
+        rb_free_card(&c);
+        if(!has) return 0;
+    }
     return 1;
 }
 
@@ -112,7 +133,11 @@ void rb_effect_move_cards(GameState *g, int actor, AbilityEffect *e){
             ns = rb_looked_at_pool(actor, src_ids, RB_MAX_ZONE);
             for(int i=0;i<ns;i++) src_area[i]=-1;
         } else if(relay){
-            for(int i=0;i<g->n_recently_moved && ns<cnt;i++){ src_ids[ns]=g->recently_moved[i]; src_area[ns]=-1; ns++; }
+            if(!strcmp(src_s,"selected_cards")){
+                for(int i=0;i<g->n_selected_cards && ns<cnt;i++){ src_ids[ns]=g->selected_cards[i]; src_area[ns]=-1; ns++; }
+            } else {
+                for(int i=0;i<g->n_recently_moved && ns<cnt;i++){ src_ids[ns]=g->recently_moved[i]; src_area[ns]=-1; ns++; }
+            }
         } else {
             RbZone src=RB_ZONE_HAND; rb_zone_of_str(src_s,&src);
             if(src==RB_ZONE_STAGE){ for(int pos=0;pos<RB_STAGE_SIZE && ns<cnt;pos++) if(A->stage[pos]>=0 && card_matches_filter(A->stage[pos],e)){ src_ids[ns]=A->stage[pos]; src_area[ns]=pos; ns++; } }

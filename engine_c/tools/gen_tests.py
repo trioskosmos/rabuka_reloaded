@@ -331,9 +331,50 @@ def merge_asserts(lines):
 
 KNOWN_PLAYER_FIELDS = {"energy_active", "score", "deck_refreshed_this_turn", "life"}
 
+def expand_for_loops(lines, consts):
+    """Expand `for _ in START..END { body }` (range with a literal or const
+    upper bound) into repeated body statements so setup such as deck-fill
+    pushes actually executes instead of degrading to a TODO comment."""
+    out = []
+    i = 0
+    n = len(lines)
+    while i < n:
+        s = lines[i].strip()
+        m = re.match(r'\s*for\s+(?:mut\s+)?(?:_|\(\s*[^)]*?\)|\w+)\s+in\s+(\d+)\.\.(\w+)\s*\{?\s*$', s)
+        if not m:
+            out.append(lines[i]); i += 1; continue
+        start = int(m.group(1)); endtok = m.group(2)
+        if re.match(r'^\d+$', endtok):
+            end = int(endtok)
+        elif endtok in consts and re.match(r'^\d+$', consts[endtok]):
+            end = int(consts[endtok])
+        else:
+            out.append(lines[i]); i += 1; continue
+        count = end - start
+        if count <= 0 or count > 64:
+            out.append(lines[i]); i += 1; continue
+        depth = lines[i].count('{') - lines[i].count('}')
+        j = i + 1
+        body = []
+        while j < n and depth > 0:
+            body.append(lines[j])
+            depth += lines[j].count('{') - lines[j].count('}')
+            j += 1
+        if body and body[-1].strip() == '}':
+            body = body[:-1]
+        blob = "\n".join(body)
+        # Don't expand loops that spin up a fresh game, return, or call a second
+        # game — repeating those would redeclare tg2 / break control flow.
+        if "TestGame" in blob or "tg2" in blob or "return" in blob:
+            out.append(lines[i]); i += 1; continue
+        for _ in range(count):
+            out.extend(body)
+        i = j
+    return out
+
 def transpile_body(body: str, consts: dict, func_name: str) -> str:
     raw_lines = body.split('\n')
-    lines = merge_asserts(raw_lines)
+    lines = expand_for_loops(merge_asserts(raw_lines), consts)
     out = []
     seen_tg = False
     declared = set()
@@ -791,6 +832,12 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         if 'game.pass()' in line:
             out.append("    rb_advance_phase(&tg.state);"); mark_real(); continue
         # ---- choice / pending-choice bucket (largest excluded cohort) ----
+        # while game.has_pending_choice() { ... resolve choices ... } must win over
+        # the plain has_pending_choice() rule below, else the loop collapses.
+        m = re.match(r'\s*while\s+game\.has_pending_choice\(\)\s*\{?\s*$', stripped)
+        if m:
+            out.append("    while (test_has_pending_choice(&tg)) rb_resume_with_choice(&tg.state, 0);")
+            mark_real(); continue
         if 'has_pending_choice' in line:
             mm = re.search(r'has_pending_choice\(\)', line)
             if mm:
@@ -798,7 +845,7 @@ def transpile_body(body: str, consts: dict, func_name: str) -> str:
         m = re.match(r'\s*game\.select_indices_sequential\(', line)
         if m:
             out.append(f"    // TODO select_indices_sequential: {stripped}"); continue
-        m = re.search(r'game\.select_indices\s*\(\s*vec!\[([^\]]*)\]', line)
+        m = re.search(r'game\.select_indices\s*\(\s*(?:vec!|&)?\[([^\]]*)\]', line)
         if m:
             idxs = [x.strip() for x in m.group(1).split(',') if x.strip() != '']
             if not idxs:

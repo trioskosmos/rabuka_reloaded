@@ -244,11 +244,15 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
            registers a temporary effect that rb_check_expired_effects reverts
            at live end (same mechanism as rb_fire_debut). place_energy* carries
            no resource field and falls through to the energy path. */
-        const char *res = NULL; int live_end = 0;
+        const char *res = NULL; int dur = RB_TEMP_PERM;
         for (int i = 0; i < e->n_extra; i++) {
             if (e->extra_k[i] && !strcmp(e->extra_k[i], "resource")) res = e->extra_v[i];
-            if (e->extra_k[i] && !strcmp(e->extra_k[i], "duration") &&
-                e->extra_v[i] && !strcmp(e->extra_v[i], "live_end")) live_end = 1;
+            if (e->extra_k[i] && !strcmp(e->extra_k[i], "duration") && e->extra_v[i]) {
+                if (!strcmp(e->extra_v[i], "live_end") || !strcmp(e->extra_v[i], "during_live"))
+                    dur = RB_TEMP_LIVE_END;
+                else if (!strcmp(e->extra_v[i], "until_end_of_turn") || !strcmp(e->extra_v[i], "first_turn"))
+                    dur = RB_TEMP_TURN_END;
+            }
         }
         int amt = cnt < 0 ? -cnt : cnt;
         int sign = cnt < 0 ? -1 : 1;
@@ -284,32 +288,32 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                 int cid = recips[r];
                 if (!strcmp(res, "blade")) {
                     rb_mods_add_blade(&g->mods, cid, amt * sign);
-                    if (live_end) {
+                    if (dur != RB_TEMP_PERM) {
                         RbTempEffect te; memset(&te, 0, sizeof(te));
-                        te.card_id = cid; te.live_end = 1; te.blade = (int16_t)(amt * sign);
+                        te.card_id = cid; te.dur = dur; te.blade = (int16_t)(amt * sign);
                         if (g->n_temp_effects < RB_MAX_TEMP_EFFECTS) g->temp_effects[g->n_temp_effects++] = te;
                     }
                 } else if (!strcmp(res, "heart")) {
                     int col = heart_color_of(e, RB_HEART_PINK);
                     rb_mods_add_heart(&g->mods, cid, col, amt * sign);
-                    if (live_end) {
+                    if (dur != RB_TEMP_PERM) {
                         RbTempEffect te; memset(&te, 0, sizeof(te));
-                        te.card_id = cid; te.live_end = 1; te.heart[col] = (int16_t)(amt * sign);
+                        te.card_id = cid; te.dur = dur; te.heart[col] = (int16_t)(amt * sign);
                         if (g->n_temp_effects < RB_MAX_TEMP_EFFECTS) g->temp_effects[g->n_temp_effects++] = te;
                     }
                 } else if (!strcmp(res, "score")) {
                     rb_mods_add_score(&g->mods, cid, amt * sign);
-                    if (live_end) {
+                    if (dur != RB_TEMP_PERM) {
                         RbTempEffect te; memset(&te, 0, sizeof(te));
-                        te.card_id = cid; te.live_end = 1; te.score = (int16_t)(amt * sign);
+                        te.card_id = cid; te.dur = dur; te.score = (int16_t)(amt * sign);
                         if (g->n_temp_effects < RB_MAX_TEMP_EFFECTS) g->temp_effects[g->n_temp_effects++] = te;
                     }
                 }
             }
-            /* live_end grants are tracked via temp effects and must survive
-               rb_recalc_constants (which owns the constant_* tracking); only
-               recalc for permanent (non-live_end) grants. */
-            if (!live_end) rb_recalc_constants(g);
+            /* Temporary-duration grants are tracked via temp effects and must
+               survive rb_recalc_constants (which owns the constant_* tracking);
+               only recalc for permanent grants. */
+            if (dur == RB_TEMP_PERM) rb_recalc_constants(g);
         }
     } else if (!strcmp(act, "pay_energy") || !strcmp(act, "pay_cost") ||
                !strcmp(act, "activation_cost")) {
@@ -366,9 +370,12 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
     } else if (!strcmp(act, "change_state")) {
         rb_effect_change_state(g, actor, e);
     } else if (!strcmp(act, "look_at") || !strcmp(act, "reveal") ||
-               !strcmp(act, "reveal_per_group") || !strcmp(act, "reveal_until_live_card") ||
-               !strcmp(act, "reveal_until_chosen_card")) {
+                !strcmp(act, "reveal_per_group")) {
         rb_effect_look_at(g, actor, e);
+    } else if (!strcmp(act, "reveal_until_live_card")) {
+        rb_effect_reveal_until_live_card(g, actor, e);
+    } else if (!strcmp(act, "reveal_until_chosen_card")) {
+        rb_effect_reveal_until_chosen_card(g, actor, e);
     } else if (!strcmp(act, "select_cards") || !strcmp(act, "select") ||
                !strcmp(act, "select_number") || !strcmp(act, "look_and_select")) {
         rb_effect_select_cards(g, actor, e);
@@ -428,19 +435,35 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
                 /* Headless can't let the player pick a color, so apply the chosen
                    required-heart count to the "all" color (satisfies any color check). */
                 rb_mods_add_need_heart(&g->mods, cid, 7, cnt > 0 ? cnt : 1);
+            } else if (!strcmp(act, "set_card_identity")) {
+                /* Rewrite this member's identity to the listed group/unit names so
+                   it counts as them in group/name matching (mirrors
+                   ability_effects.rs::execute_set_card_identity). identities may be a
+                   comma/、/space separated list. */
+                for (int i = 0; i < e->n_extra; i++) {
+                    if (e->extra_k[i] && (!strcmp(e->extra_k[i], "identities") ||
+                        !strcmp(e->extra_k[i], "identity")) && e->extra_v[i]) {
+                        char buf[256]; strncpy(buf, e->extra_v[i], 255); buf[255] = 0;
+                        char *tok = strtok(buf, ",、 ");
+                        while (tok) { rb_set_card_identity(cid, tok); tok = strtok(NULL, ",、 "); }
+                    }
+                }
             }
             rb_recalc_constants(g);
         }
     } else if (!strcmp(act, "modify_required_hearts") || !strcmp(act, "modify_required_hearts_global") ||
                !strcmp(act, "modify_required_hearts_success")) {
         rb_effect_modify_hearts(g, actor, e);
-    } else if (!strcmp(act, "gain_ability") || !strcmp(act, "gain_ability_from_source")) {
+    } else if (!strcmp(act, "gain_ability")) {
         rb_gain_ability(g, actor, e);
+    } else if (!strcmp(act, "gain_ability_from_source")) {
+        rb_gain_ability_from_source(g, actor, e, host_cid);
     } else if (!strcmp(act, "invalidate_ability") || !strcmp(act, "suppress_ability_trigger")) {
         rb_invalidate_ability(g, actor, e);
     } else if (!strcmp(act, "activate_ability")) {
-        /* immediate execute of gained ability — stub to emit choice if needed */
-        rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1, 1, "activate_ability");
+        /* Mirror ability_effects.rs::execute_activate_ability — fire the matching
+           ability of each selected card (or the activating card's own ability). */
+        rb_activate_ability_effect(g, actor, e, host_cid);
     } else if (!strcmp(act, "reduce_live_card_set_limit")) {
         int lim = cnt>0?cnt:1;
         g->live_set_limit_reduction[who] += lim;
@@ -467,8 +490,13 @@ static void handle_action(GameState *g, int actor, AbilityEffect *e, int host_ci
             for(int q=0;q<RB_STAGE_SIZE;q++) if(W->stage[q]==RB_EMPTY_SLOT){ W->stage[q]=card; break; }
         }
     } else if (!strcmp(act, "restriction") || !strcmp(act, "activation_restriction") ||
-               !strcmp(act, "modify_limit")) {
-        /* placement/trigger restrictions; no-op — prohibition_effects would be tracked here */
+                !strcmp(act, "modify_limit")) {
+        /* Real handler in effects/misc.c (h_restriction): records prohibition
+           notes (consulted by rb_is_action_prohibited) and applies
+           cannot_activate / cannot_active lockouts. */
+        int resolved = 0;
+        rb_execute_misc_effect(g, actor, W, e, &resolved);
+        (void)resolved;
     } else if (!strcmp(act, "re_yell")) {
         /* Mirror misc.rs:execute_re_yell. Optionally clear blade/heart modifiers
            of the target's staged members, clear the revealed pool, and mark that
@@ -788,6 +816,8 @@ static void check_victory(GameState *g) {
 }
 
 static void rollover(GameState *g) {
+    /* Revert until_end_of_turn / first_turn temporary effects at turn end. */
+    rb_check_expired_effects(g, RB_TEMP_TURN_END);
     check_victory(g);
     if (g->winner != -1) { g->phase = RB_PHASE_DONE; return; }
     g->turn++;
@@ -807,6 +837,7 @@ void rb_turn(GameState *g) {
     }
     g->n_cannot_active_cards = 0;
     g->n_prohibition = 0;
+    g->n_selected_cards = 0;
     g->phase = RB_PHASE_ACTIVE;
     activate_wait_members(g, pl);
     g->phase = RB_PHASE_ENERGY;
@@ -817,6 +848,10 @@ void rb_turn(GameState *g) {
     main_phase(g, pl);
     g->phase = RB_PHASE_LIVE_SET;
     live_phase(g);
+    /* Revert Duration::LiveEnd / during_live temporary effects (blade/heart/score
+       granted during this live). Mirrors Rust's LiveVictoryDetermination cleanup.
+       Without this the grants leak into subsequent turns. */
+    rb_check_expired_effects(g, RB_TEMP_LIVE_END);
     g->phase = RB_PHASE_VICTORY;
     rollover(g);
 }

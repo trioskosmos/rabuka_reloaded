@@ -92,11 +92,49 @@ int rb_card_matches_group_str(int card_id, const char *group_name) {
                        (nnorm && (strstr(nnorm, gn) || strstr(gn, nnorm)))))
             match = 1;
     }
+    /* set_card_identity overrides: a rewritten member counts as its new identity */
+    if (!match) match = rb_card_matches_identity_str(card_id, group_name);
     rb_free_card(&c);
     if (gn) rb_free(gn);
     if (gnorm) rb_free(gnorm);
     if (unorm) rb_free(unorm);
     if (nnorm) rb_free(nnorm);
+    return match;
+}
+
+/* set_card_identity override table — mirrors engine/src/ability/util.rs
+   card_matches_identity_str. When a member's identity is rewritten (e.g. to a
+   unit/group name), group/name matching must also accept those identities.
+   Stored as raw group/unit name strings keyed by card_id. */
+#define RB_MAX_IDENT 8
+static char g_ident[RB_MAX_CARD_IDS][RB_MAX_IDENT][28];
+static int  g_ident_n[RB_MAX_CARD_IDS];
+
+void rb_set_card_identity(int cid, const char *name) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS || !name || !*name) return;
+    for (int i = 0; i < g_ident_n[cid]; i++)
+        if (!strcmp(g_ident[cid][i], name)) return;
+    if (g_ident_n[cid] < RB_MAX_IDENT) {
+        strncpy(g_ident[cid][g_ident_n[cid]], name, 27);
+        g_ident[cid][g_ident_n[cid]][27] = 0;
+        g_ident_n[cid]++;
+    }
+}
+
+int rb_card_matches_identity_str(int card_id, const char *group_name) {
+    if (card_id < 0 || card_id >= RB_MAX_CARD_IDS || !group_name) return 0;
+    char *gn = norm_str(group_name);
+    int match = 0;
+    for (int i = 0; i < g_ident_n[card_id]; i++) {
+        char *io = norm_str(g_ident[card_id][i]);
+        if ((io && (strstr(io, gn) || strstr(gn, io))) ||
+            (strstr(g_ident[card_id][i], group_name) ||
+             strstr(group_name, g_ident[card_id][i])))
+            match = 1;
+        if (io) rb_free(io);
+        if (match) break;
+    }
+    if (gn) rb_free(gn);
     return match;
 }
 
